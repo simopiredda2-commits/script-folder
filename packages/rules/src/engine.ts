@@ -21,7 +21,10 @@ export function checkPrescription(
 ): CheckResult {
   const ruleset = rulesetAt(ctx.date, rulesets);
   const byId = Object.fromEntries(ruleset.rules.map((r) => [r.id, r])) as Record<RuleId, Rule>;
-  const issues = ruleset.rules.flatMap((r) => evaluateRule(r, ctx, byId));
+  // Ogni problema porta la fonte della sua regola: chi è bloccato vede il perché (seconda fermata).
+  const issues = ruleset.rules.flatMap((r) =>
+    evaluateRule(r, ctx, byId).map((i) => ({ ...i, source: i.source ?? r.sources[0]?.title })),
+  );
   const blocking = issues.filter((i) => i.severity === 'block' || i.severity === 'warn');
   const reasonsUsed = Object.fromEntries(
     Object.entries(ctx.reasons).filter(([id, text]) =>

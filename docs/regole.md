@@ -10,6 +10,7 @@ Da verificare con la Dr.ssa Rocca e con un consulente alla seconda fermata. Font
   - Le regole che vengono da una **norma bloccano** l'invio.
   - Il contatore delle confezioni (R11) **informa** soltanto: scelta di Simone alla seconda fermata, nella versione 2026-11-18.2 delle regole. Un motivo scritto dal medico resta comunque registrato.
   - Le **note AIFA** vanno confermate dal medico.
+- Ogni problema porta la **fonte** della sua regola e, quando blocca, il **rimedio**: che cosa fare per procedere. Per R15 e R16 l'avviso spiega perché il canale o il recapito non sono ammessi e come sbloccare (scelta della seconda fermata).
 - Ogni controllo fatto prima di un invio resta registrato e non si modifica: versione delle regole, problemi trovati, motivi dati, note confermate. La ricetta inviata porta la versione delle regole.
 - Quando un dato manca (soprattutto la banca dati farmaci, che arriva alla tappa 5), la regola **non indovina**. O resta al limite prudente (R2 al posto di R3 e R4) o dice che non è verificabile.
 

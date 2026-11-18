@@ -17,6 +17,10 @@ export interface Issue {
   lineId?: string;
   /** Che cosa serve al medico per procedere. */
   needs?: 'reason' | 'aifa_confirmation';
+  /** Da dove viene la regola: lo aggiunge il motore dai dati (titolo della prima fonte). */
+  source?: string;
+  /** Che cosa fare per poter procedere, quando la regola blocca. */
+  remedy?: string;
 }
 
 type Evaluator = (rule: Rule, ctx: RuleContext, all: Readonly<Record<RuleId, Rule>>) => Issue[];
@@ -393,14 +397,20 @@ const evaluators: Record<RuleId, Evaluator> = {
       issues.push({
         ruleId: 'R15',
         severity: severityOf(rule),
-        message: 'Canale del promemoria senza recapito',
+        message:
+          'Promemoria su un canale diverso dalla carta senza recapito: il promemoria non arriverebbe al paziente',
+        remedy:
+          'Indica il recapito del paziente per questo canale, oppure consegna il promemoria cartaceo',
       });
     }
     if (ctx.patient.reminderChannel !== channel || !ctx.patient.reminderChannelChosenOn) {
       issues.push({
         ruleId: 'R15',
         severity: severityOf(rule),
-        message: 'Il paziente non ha registrato la scelta di questo canale per il promemoria',
+        message:
+          'Il paziente non ha registrato la scelta di questo canale: un canale diverso dalla carta si usa solo su sua richiesta',
+        remedy:
+          'Registra in cartella la scelta del paziente (canale, recapito e data), oppure consegna il promemoria cartaceo',
       });
     }
     return issues;
@@ -426,7 +436,10 @@ const evaluators: Record<RuleId, Evaluator> = {
           {
             ruleId: 'R16',
             severity: severityOf(rule),
-            message: 'Il recapito non è del paziente né di un delegato registrato',
+            message:
+              'Il recapito indicato non è del paziente né di un delegato registrato: la ricetta e l’NRE sono dati sanitari del paziente',
+            remedy:
+              'Usa un recapito del paziente, oppure registra la delega in cartella prima di inviare a un’altra persona',
           },
         ];
   },

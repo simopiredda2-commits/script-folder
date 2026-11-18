@@ -496,6 +496,32 @@ describe('R15, R16 · promemoria al paziente', () => {
   });
 });
 
+describe('blocchi spiegati (seconda fermata)', () => {
+  it('R15 e R16 dicono perché bloccano, da quale norma e che cosa fare', () => {
+    const c = ctx({
+      prescription: { reminderChannel: 'email', reminderContact: 'estraneo@example.org' },
+    });
+    const r15 = of(c, 'R15');
+    const r16 = of(c, 'R16')[0]!;
+    expect(r15.length).toBeGreaterThan(0);
+    for (const i of [...r15, r16]) expect(i.remedy).toMatch(/promemoria|recapito|delega/);
+    expect(r15[0]!.source).toBe('DM MEF 25/03/2020 e norme successive');
+    expect(r16.source).toMatch(/Privacy \(GDPR\)/);
+  });
+  it('ogni problema che blocca porta la fonte della sua regola', () => {
+    const c = ctx({
+      prescription: {
+        reminderChannel: 'email',
+        reminderContact: 'estraneo@example.org',
+        lines: [line({ quantity: 3, activeIngredient: null, aifaNote: '13' })],
+      },
+    });
+    const blocking = run(c).blocking;
+    expect(blocking.length).toBeGreaterThan(3);
+    for (const i of blocking) expect(i.source, i.ruleId).toBeTruthy();
+  });
+});
+
 describe('R17 · esenzione e prestazioni', () => {
   const spec = (services?: Set<string>) =>
     ctx({

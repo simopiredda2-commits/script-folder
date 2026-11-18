@@ -70,6 +70,8 @@ export interface PreSendIssue {
   message: string;
   lineId?: string;
   needs?: 'reason' | 'aifa_confirmation';
+  source?: string;
+  remedy?: string;
 }
 
 /** Ciò che il medico aggiunge al momento della firma: motivi per gli avvisi, note confermate. */
@@ -419,10 +421,16 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       });
     }
     if (blocking.length > 0) {
-      throw new HttpError(422, blocking.map((i) => `${i.ruleId}: ${i.message}`).join('\n'), {
-        versioneRegole: rulesVersion,
-        problemi: issues,
-      });
+      throw new HttpError(
+        422,
+        blocking
+          .map((i) => `${i.ruleId}: ${i.message}${i.remedy ? ` — ${i.remedy}` : ''}`)
+          .join('\n'),
+        {
+          versioneRegole: rulesVersion,
+          problemi: issues,
+        },
+      );
     }
 
     // Passaggio atomico a «in invio»: se due richieste arrivano insieme, ne passa una sola.

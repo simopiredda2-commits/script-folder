@@ -140,12 +140,15 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 
 ## Risposte della seconda fermata (18/11/2026)
 
-Simone ha risposto con il pulsante. **Applicate** su `tappe-3-4` (D49–D51); poi si aggiorna la pull request #2 e si **richiede il via** prima di unire.
+Simone ha risposto con il pulsante. **Applicate** su `tappe-3-4` (D49–D53) e via dato: la pull request #2 si unisce.
 
 - **Ciclo della ricetta**: ripetizioni raggruppate: la segreteria mette più terapie croniche nella stessa ricetta, entro il limite di confezioni.
 - **Confezioni (R1–R4)**: va bene così.
 - **Piani, note, classe ed esenzioni (R5–R9, R17)**: va bene così.
 - **Contatore (R11)**: solo informativo, senza motivo obbligatorio.
+- **R13, R14**: va bene così.
+- **R15, R16**: va bene, «prevedi comunque un alert con motivazione nel caso bloccasse». Applicato come avviso che spiega perché e che cosa fare (D52).
+- **Via libera**: unire la #2 e proseguire con le tappe 5–6.
 
 ## Risposte della prima fermata (18/11/2026)
 
@@ -160,6 +163,10 @@ Simone ha risposto con il pulsante. **Applicate** sul branch `tappe-0-2` (decisi
 - **Dati clinici e storico**: va bene così.
 - **Registro degli accessi**: va bene così.
 - **Esportazione**: aggiungere anche il CSV (una tabella per file).
+
+## Domande per la fermata finale
+
+1. **R15, R16 (D52)**: «alert con motivazione» letto come avviso che spiega il blocco. Se invece si voleva poter procedere scrivendo un motivo, è in conflitto con i requisiti (le regole da norma non hanno deroghe): da decidere.
 
 ## Cose irreversibili non fatte
 
@@ -253,3 +260,5 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Ripetizioni con la stessa esenzione                       | Esenzione ignorata nel raggruppamento              | Rosso, poi verde                                                                                                                                                                   |
 | R11 informativo nella versione .2                         | R11 di nuovo «avvisa» nella .2                     | Rosso, poi verde                                                                                                                                                                   |
 | A parità di data vale la versione più alta                | Ordine delle versioni senza numero                 | Rosso, poi verde                                                                                                                                                                   |
+| Ogni blocco porta la fonte della regola                   | Fonte non aggiunta dal motore                      | Rosso, poi verde                                                                                                                                                                   |
+| R15 spiega che cosa fare                                  | Rimedio tolto                                      | Rosso, poi verde                                                                                                                                                                   |

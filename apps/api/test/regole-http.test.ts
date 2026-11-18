@@ -121,6 +121,14 @@ describe('regole di prescrizione prima dell’invio', () => {
     const rules = res.json().dettagli.problemi.map((p: { ruleId: string }) => p.ruleId);
     expect(rules).toContain('R15');
     expect(rules).toContain('R16');
+    // Ogni blocco spiega il perché e che cosa fare (seconda fermata).
+    for (const p of res
+      .json()
+      .dettagli.problemi.filter((x: { ruleId: string }) => ['R15', 'R16'].includes(x.ruleId))) {
+      expect(p.source).toBeTruthy();
+      expect(p.remedy).toBeTruthy();
+    }
+    expect(res.json().errore).toMatch(/ — /);
   });
 
   it('R11: ricetta in anticipo sulla copertura: solo un’informazione, registrata con il controllo', async () => {
