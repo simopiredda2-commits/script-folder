@@ -163,13 +163,20 @@ try {
   await page.getByRole('table').waitFor();
   await shot(page, '10-farmaci-ed-equivalenti');
 
-  // Terapia completa (D80–D83), recapiti (D86) e archivio (D84).
-  await page.goto(`${base}/pazienti/${patientId}/terapie/nuova`);
+  // Terapia completa (D80–D83), recapiti (D86) e archivio (D84). La terapia nuova, scelta dalla
+  // banca dati con il nome della confezione, va a un altro paziente: le schermate della cartella
+  // del paziente principale restano senza nomi di ditte, per il sito (D149).
+  const second = await db.execute<{ id: string }>(sql`
+    select distinct p.id, p.last_name from patient p
+    join clinical_entry c on c.patient_id = p.id and c.kind = 'problem'
+    where p.id <> ${patientId} order by p.last_name limit 1`);
+  const otherPatientId = second.rows[0]!.id;
+  await page.goto(`${base}/pazienti/${otherPatientId}/terapie/nuova`);
   await page.getByRole('heading', { level: 1, name: 'Nuova terapia' }).waitFor();
   const restart = page.getByRole('button', { name: 'Annulla le modifiche' });
   if (await page.getByRole('button', { name: 'Cambia farmaco' }).count()) {
     await restart.click();
-    await page.goto(`${base}/pazienti/${patientId}/terapie/nuova`);
+    await page.goto(`${base}/pazienti/${otherPatientId}/terapie/nuova`);
   }
   await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
   // Un generico che nessun paziente dimostrativo ha già in terapia.
@@ -180,7 +187,7 @@ try {
   await page.getByLabel('Unità', { exact: true }).selectOption('compressa');
   await page.getByLabel('Frequenza').selectOption('1 volta al giorno');
   await page.getByLabel('Momento').selectOption('la sera');
-  await page.getByLabel('Via').selectOption('per bocca');
+  await page.getByLabel('Via', { exact: true }).selectOption('per bocca');
   await page.getByLabel('Istruzioni per il paziente').fill('Dopo cena.');
   await page.getByText('1 compressa una volta al giorno, la sera, per bocca').waitFor();
   await page
@@ -268,7 +275,10 @@ try {
 
   await page.goto(`${base}/pazienti/${patientId}/piani`);
   await page.getByRole('heading', { level: 1, name: 'Piani terapeutici' }).waitFor();
-  await page.getByLabel('Farmaco', { exact: true }).fill('TRULICITY 1,5 mg, 4 penne');
+  // Per principio attivo, con la descrizione AIFA del gruppo: nessun marchio a schermo (D149).
+  await page
+    .getByLabel('Farmaco', { exact: true })
+    .fill("DULAGLUTIDE 1,5MG 4 UNITA' USO PARENTERALE");
   await page.getByLabel('Principio attivo').fill('DULAGLUTIDE');
   await page.getByLabel('Rilasciato il').fill(studioDate(new Date(Date.now() - 60 * 86_400_000)));
   await page.getByLabel('Scade il').fill(studioDate(new Date(Date.now() + 20 * 86_400_000)));

@@ -38,6 +38,7 @@ import {
   studio,
   therapy,
 } from './schema';
+import { DEMO_PATIENTS, DRUGS, PROBLEMS } from './demo';
 import { withActor } from './tx';
 
 const DEMO_USERS: { username: string; displayName: string; roles: Role[] }[] = [
@@ -51,35 +52,6 @@ const DEMO_USERS: { username: string; displayName: string; roles: Role[] }[] = [
   { username: 'amministratore', displayName: 'Andrea Conti', roles: ['administrator'] },
 ];
 
-/** Dati clinici inventati, scelti dal generatore deterministico. */
-const PROBLEMS = [
-  { code: '401.9', description: 'Ipertensione essenziale, non specificata' },
-  { code: '250.00', description: 'Diabete mellito tipo 2 senza complicanze' },
-  { code: '272.0', description: 'Ipercolesterolemia pura' },
-];
-// Un farmaco per problema, nello stesso ordine. Sono confezioni vere della banca dati d'esempio
-// (pnpm banche-dati:importa -- --esempio): righe AIFA lette il 18/11/2026, con AIC, nome e
-// confezione come li compone l'interfaccia, e il principio attivo dell'anagrafica, che la ricetta
-// riporta sempre (R13).
-const DRUGS = [
-  {
-    drugName: 'AMLODIPINA DOC GENERICI 5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
-    drugAic: '038092019',
-    activeIngredient: 'AMLODIPINA BESILATO',
-  },
-  {
-    drugName:
-      'METFORMINA AUROBINDO 500 MG COMPRESSE RIVESTITE CON FILM- 30 COMPRESSE IN BLISTER PVC/AL',
-    drugAic: '040592103',
-    activeIngredient: 'METFORMINA CLORIDRATO',
-  },
-  {
-    drugName:
-      'ATORVASTATINA DOC GENERICS 20 MG COMPRESSE RIVESTITE CON FILM- 30 COMPRESSE IN BLISTER PVC-PE-PVDC/AL',
-    drugAic: '048247023',
-    activeIngredient: 'ATORVASTATINA',
-  },
-];
 /** Primi pazienti con un appuntamento oggi, ogni quarto d'ora dalle 8:30. */
 const APPOINTMENTS_TODAY = 8;
 const QUARTER_MS = 15 * 60_000;
@@ -214,7 +186,7 @@ try {
     grantedBy: doctorId,
   });
 
-  const people = generatePatients({ seed: 'demo', count: 40 });
+  const people = generatePatients(DEMO_PATIENTS);
   const rnd = new Random('demo-clinica');
   const midnight = startOfStudioDay(studioDate(new Date())).getTime();
   const secretaryId = users.get('segreteria')!;
@@ -332,6 +304,7 @@ try {
         .values({
           patientId: pid,
           ...drug,
+          byActiveIngredient: true,
           kind: 'chronic',
           startOn: '2026-01-01',
           dose: '1',
@@ -365,9 +338,9 @@ try {
         prescriptionId: rx!.id,
         position: 1,
         therapyId: r.therapyId,
-        drugAic: r.drug.drugAic,
         drugName: r.drug.drugName,
         activeIngredient: r.drug.activeIngredient,
+        byActiveIngredient: true,
         quantity: 1,
         posologyText: '1 compressa una volta al giorno',
       });

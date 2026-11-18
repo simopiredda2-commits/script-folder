@@ -549,3 +549,17 @@ Da ora una prova su tutto il codice (`packages/brand/test/provenienza.test.ts`) 
 - **Prezzi che non sono numeri.** Nella classe H, 117 prezzi non sono numeri: 31 «-», perché c'è solo il prezzo massimo di cessione, e 86 prezzi dell'ossigeno a metro cubo («6,55/m³»). Senza una regola, l'intero file sarebbe stato rifiutato. Una mappatura ora può dichiarare quali valori, in un campo facoltativo, valgono «nessun valore» (`nessunValore`). Vale solo per i valori visti nei file veri, con il motivo nella nota. Il rapporto d'importazione dice quante celle ha letto così.
 - **Nota AIFA.** Le liste di classe non hanno la colonna della nota: le note vengono dall'elenco DPC. La lista di trasparenza (`Lista_farmaci_equivalenti.csv`) ha nota e ATC per ogni AIC, ma scrive l'AIC senza lo zero iniziale, a 8 cifre. Va mappata in un passo dedicato: finché non lo è, il programma non conosce, per esempio, la nota 13 delle statine.
 - **Equivalenti.** Si ordinano per prezzo e, a parità di prezzo, per nome e AIC: lo stesso ordine a ogni ricerca.
+
+**D149 · Dati dimostrativi: solo adulti, terapie per principio attivo.** Due richieste del 18/11/2026:
+
+- **Nessun paziente in età pediatrica.** Simone: «non mettere pazienti pediatrici!!». La schermata delle cartelle aperte mostrava pazienti di 4 e di 14 anni, che non hanno senso nello studio di un medico di medicina generale.
+  - Il generatore ora ha un'età minima (`minAge`): i pazienti più giovani si saltano, gli altri restano gli stessi e nello stesso ordine.
+  - Il seed chiede solo maggiorenni (`apps/api/src/db/demo.ts`). Una prova lo controlla.
+  - Le prove interne restano con le età di prima, perché alcune hanno bisogno di minori.
+- **Nessun nome di ditta o marchio nelle schermate per il sito di SCRIPT.** La richiesta è arrivata dalla sessione che fa il sito. Riporta le parole di Simone: «se ci sono dubbi, scegli un principio attivo in cui sia indicato "generico"». Il dubbio riguarda la pubblicità al pubblico di medicinali con obbligo di ricetta (d.lgs. 219/2006) e l'uso di marchi altrui.
+  - I generici AIFA portano sempre il nome della ditta (per esempio «METFORMINA MYLAN GENERICS»): una confezione senza ditta non c'è.
+  - Le terapie dimostrative sono quindi **per principio attivo**, come il programma già consente. Il nome è la descrizione AIFA del gruppo di equivalenza, letta dalla lista di classe A del 30/6/2026, per esempio «METFORMINA 500MG 30 UNITA' USO ORALE».
+  - Anche il piano terapeutico dimostrativo è per principio attivo (dulaglutide).
+  - La terapia nuova scelta dalla banca dati (schermate 12 e 13) va a un altro paziente, così la cartella del paziente principale resta senza ditte.
+  - I nomi delle confezioni restano dove sono il punto della schermata: ricerca ed equivalenti (10), controlli della ricetta (07), terapia dalla banca dati (12 e 13). Quelle schermate servono alla documentazione, non al sito.
+- **Difetto messo in luce.** Nel promemoria, una riga per principio attivo stampa solo il principio attivo, senza dosaggio né confezione (schermata 18). La descrizione giusta è quella AIFA del gruppo di equivalenza. È nelle liste di classe (colonna «Descrizione gruppo») ma non è ancora importata: da correggere, con le specifiche del promemoria alla mano.

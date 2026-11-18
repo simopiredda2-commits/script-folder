@@ -31,6 +31,18 @@ export interface GenerateOptions {
   count: number;
   /** Data di riferimento per le età, AAAA-MM-GG. Fissa, così il risultato non cambia nel tempo. */
   referenceDate?: string;
+  /**
+   * Età minima, in anni compiuti alla data di riferimento. I più giovani si saltano: gli altri
+   * restano gli stessi, nello stesso ordine, di una generazione senza limite. Per i dati
+   * dimostrativi di uno studio di medicina generale: nessun paziente in età pediatrica (D149).
+   */
+  minAge?: number;
+}
+
+/** Anni compiuti alla data di riferimento (date AAAA-MM-GG). */
+export function ageAt(birthDate: string, referenceDate: string): number {
+  const years = Number(referenceDate.slice(0, 4)) - Number(birthDate.slice(0, 4));
+  return referenceDate.slice(5) < birthDate.slice(5) ? years - 1 : years;
 }
 
 function isoDate(y: number, m: number, d: number): string {
@@ -46,11 +58,12 @@ export function generatePatients({
   seed,
   count,
   referenceDate = '2026-11-18',
+  minAge = 0,
 }: GenerateOptions): FixturePatient[] {
   const rnd = new Random(seed);
   const refYear = Number(referenceDate.slice(0, 4));
   const patients: FixturePatient[] = [];
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; patients.length < count; i++) {
     const sex: Sex = rnd.chance(0.5) ? 'F' : 'M';
     const firstName = rnd.pick(sex === 'F' ? femaleNames : maleNames);
     const lastName = rnd.pick(surnames);
@@ -65,7 +78,7 @@ export function generatePatients({
     const status: PatientStatus =
       roll < 0.88 ? 'active' : roll < 0.94 ? 'revoked' : roll < 0.97 ? 'deceased' : 'temporary';
     const slug = `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z.]/g, '');
-    patients.push({
+    const patient: FixturePatient = {
       id: rnd.uuid(),
       firstName,
       lastName,
@@ -90,7 +103,9 @@ export function generatePatients({
         province: town.province,
       },
       status,
-    });
+    };
+    // Tutti i numeri casuali sono già stati presi: saltare un paziente non cambia gli altri.
+    if (ageAt(birthDate, referenceDate) >= minAge) patients.push(patient);
   }
   return patients;
 }

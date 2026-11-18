@@ -531,7 +531,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Unità', { exact: true }).selectOption('compressa');
     await page.getByLabel('Frequenza').selectOption('2 volte al giorno');
     await page.getByLabel('Momento').selectOption('la sera');
-    await page.getByLabel('Via').selectOption('per bocca');
+    await page.getByLabel('Via', { exact: true }).selectOption('per bocca');
     await page.getByText('1 compressa due volte al giorno, la sera, per bocca').waitFor();
     await expect(
       page.getByLabel('Unità al giorno, per il contatore (R11)').inputValue(),
