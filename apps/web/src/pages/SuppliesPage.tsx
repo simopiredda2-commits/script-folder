@@ -6,6 +6,7 @@ import { api, ApiError } from '../lib/api';
 import type { EntryList } from '../lib/clinical';
 import { date, studioToday } from '../lib/format';
 import { useSession } from '../lib/session';
+import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
@@ -259,8 +260,12 @@ function SupplyForm({
     indicazione: '',
     note: '',
   };
-  const [f, setF] = useState(empty);
-  const [reserved, setReserved] = useState(false);
+  // Ricordato per paziente finché non si registra (D68, D129).
+  const [f, setF, resetF] = usePersistentState(`bozza-presidio-${patientId}`, empty);
+  const [reserved, setReserved, resetReserved] = usePersistentState(
+    `bozza-presidio-${patientId}-riservato`,
+    false,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const set = (k: keyof typeof empty) => (e: { target: { value: string } }) =>
@@ -292,8 +297,8 @@ function SupplyForm({
           ...(reserved ? { riservato: true } : {}),
         },
       });
-      setF(empty);
-      setReserved(false);
+      resetF();
+      resetReserved();
       onSaved();
     } catch (err) {
       setError(failure(err));

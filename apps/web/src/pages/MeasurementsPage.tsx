@@ -6,6 +6,7 @@ import { TrendChart, type TrendSeries } from '../components/TrendChart';
 import { api, ApiError } from '../lib/api';
 import { useCatalog, type Catalog, type Series } from '../lib/clinical';
 import { date, studioToday } from '../lib/format';
+import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
@@ -180,9 +181,11 @@ function MeasurementsForm({
   onSaved: () => void;
 }) {
   const today = studioToday();
-  const [day, setDay] = useState(today);
-  const [values, setValues] = useState<Record<string, string>>({});
-  const [reserved, setReserved] = useState(false);
+  // Ricordati per paziente finché non si registrano, come la ricetta (D68, D129).
+  const key = `bozza-parametri-${patientId}`;
+  const [day, setDay, resetDay] = usePersistentState(`${key}-data`, today);
+  const [values, setValues, resetValues] = usePersistentState<Record<string, string>>(key, {});
+  const [reserved, setReserved, resetReserved] = usePersistentState(`${key}-riservati`, false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState<number | null>(null);
@@ -204,7 +207,9 @@ function MeasurementsForm({
         method: 'POST',
         body: { data: day, misure, ...(reserved ? { riservata: true } : {}) },
       });
-      setValues({});
+      resetValues();
+      resetReserved();
+      resetDay();
       setDone(misure.length);
       onSaved();
     } catch (err) {

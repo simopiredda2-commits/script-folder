@@ -4,6 +4,7 @@ import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common'
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { date, studioToday } from '../lib/format';
+import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
@@ -136,11 +137,17 @@ function ServiceCard({
     for (let n = 1; n <= s.quantita; n++) if (!used.has(n)) return n;
     return null;
   })();
-  const [open, setOpen] = useState(false);
-  const [day, setDay] = useState(today);
-  const [facility, setFacility] = useState('');
-  const [outcome, setOutcome] = useState('');
-  const [session, setSession] = useState(String(nextSession ?? ''));
+  // Ricordato per paziente e prestazione finché non si registra (D68, D129); il file no: il browser
+  // non lo conserva, si sceglie di nuovo.
+  const key = `bozza-esecuzione-${patientId}-${s.rigaId}`;
+  const [open, setOpen, resetOpen] = usePersistentState(`${key}-aperto`, false);
+  const [day, setDay, resetDay] = usePersistentState(`${key}-data`, today);
+  const [facility, setFacility, resetFacility] = usePersistentState(`${key}-struttura`, '');
+  const [outcome, setOutcome, resetOutcome] = usePersistentState(`${key}-esito`, '');
+  const [session, setSession, resetSession] = usePersistentState(
+    `${key}-seduta`,
+    String(nextSession ?? ''),
+  );
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
@@ -165,10 +172,9 @@ function ServiceCard({
           ...(referto ? { referto } : {}),
         },
       });
-      setOutcome('');
+      for (const reset of [resetDay, resetFacility, resetOutcome, resetSession, resetOpen]) reset();
       setFile(null);
       setDone(true);
-      setOpen(false);
       onChanged();
     } catch (err) {
       setError(failure(err));

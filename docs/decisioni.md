@@ -415,3 +415,10 @@ Simone ha risposto con il pulsante.
 **D128 · Via alle tappe 11 e 12.** Prima il Profilo Sanitario Sintetico con un simulatore del Gateway (tappa 11), poi la condivisione tra i medici dell'AFT (tappa 12), con lo stesso metodo: fonti, simulatori, prove e sabotaggi, schermate. Branch `tappe-11-12`, una fermata dopo la tappa 12. Si parte dalle fonti non ancora lette elencate in `docs/fse.md`.
 
 **Medicazioni avanzate (D123)**: resta il blocco oltre i 6 mesi per il medico di famiglia, come deciso; si cambia se Simone lo chiede o se l'atto regionale dice altro.
+
+## Dopo la fermata finale del secondo giro (18/11/2026)
+
+**D129 · Cartelle aperte con molte schede, e quello che si scrive resta per paziente.** Simone ha chiesto se la schermata con più cartelle aperte era provata. Nel browser era provata con due schede. Il limite di 20 era provato solo senza browser, e le pagine delle tappe 9 e 10 non erano provate dentro le schede. La prova nuova, con 21 pazienti inventati, ha trovato due difetti, ora corretti:
+
+- **Scheda attiva fuori vista**: con molte schede la barra scorre, e la scheda del paziente attivo poteva restare fuori dalla parte visibile, soprattutto su tablet. Ora la barra scorre da sola fino alla scheda attiva, anche quando cambia la larghezza dello schermo; la pagina non si sposta.
+- **Scritti persi cambiando paziente**: nelle pagine nuove, e nel certificato di malattia, quello che si stava scrivendo si perdeva passando a un altro paziente e tornando. Ora resta ricordato per paziente come la ricetta e la terapia (D68, D80), nella memoria della scheda del browser, che si svuota all'uscita. Vale per voci cliniche, parametri, piani terapeutici, presidi, consensi, deleghe, seguito delle prestazioni e certificato. Si cancella quando si registra; il file del referto no, perché il browser non lo conserva e va scelto di nuovo.

@@ -14,6 +14,7 @@ import {
 } from '../lib/clinical';
 import { date, studioToday } from '../lib/format';
 import { useSession } from '../lib/session';
+import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { entrySummary } from './ClinicalEntriesPage';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
@@ -121,12 +122,23 @@ function ConsentsSection({
   onChanged: () => void;
 }) {
   const today = studioToday();
-  const [kind, setKind] = useState(catalog.consensi[0]?.chiave ?? 'fse_cura');
-  const [status, setStatus] = useState<'dato' | 'negato'>('dato');
-  const [day, setDay] = useState(today);
-  const [description, setDescription] = useState('');
-  const [by, setBy] = useState('');
-  const [notes, setNotes] = useState('');
+  // Ricordato per paziente finché non si registra (D68, D129).
+  const key = `bozza-consenso-${patientId}`;
+  const [kind, setKind, resetKind] = usePersistentState(
+    `${key}-tipo`,
+    catalog.consensi[0]?.chiave ?? 'fse_cura',
+  );
+  const [status, setStatus, resetStatus] = usePersistentState<'dato' | 'negato'>(
+    `${key}-stato`,
+    'dato',
+  );
+  const [day, setDay, resetDay] = usePersistentState(`${key}-data`, today);
+  const [description, setDescription, resetDescription] = usePersistentState(
+    `${key}-descrizione`,
+    '',
+  );
+  const [by, setBy, resetBy] = usePersistentState(`${key}-da`, '');
+  const [notes, setNotes, resetNotes] = usePersistentState(`${key}-note`, '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -161,9 +173,8 @@ function ConsentsSection({
           ...(notes.trim() ? { note: notes.trim() } : {}),
         },
       });
-      setDescription('');
-      setBy('');
-      setNotes('');
+      for (const reset of [resetKind, resetStatus, resetDay, resetDescription, resetBy, resetNotes])
+        reset();
     }, 'Consenso registrato.');
   }
 
@@ -350,8 +361,8 @@ function DelegationsSection({
 }) {
   const today = studioToday();
   const empty = { nome: '', codiceFiscale: '', telefono: '', email: '', ambito: '', al: '' };
-  const [f, setF] = useState(empty);
-  const [from, setFrom] = useState(today);
+  const [f, setF, resetF] = usePersistentState(`bozza-delega-${patientId}`, empty);
+  const [from, setFrom, resetFrom] = usePersistentState(`bozza-delega-${patientId}-dal`, today);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -384,7 +395,8 @@ function DelegationsSection({
       if (f[k].trim()) body[k] = f[k].trim();
     void run(async () => {
       await api(`/api/pazienti/${patientId}/deleghe`, { method: 'POST', body });
-      setF(empty);
+      resetF();
+      resetFrom();
     }, 'Delega registrata.');
   }
 

@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { generatePatients } from '@mmg/fixtures';
 import { loadMappings, overrideMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
@@ -836,7 +837,118 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'presidi', true);
   });
 
-  it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {
+  it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {
+    // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20.
+    const extra = generatePatients({ seed: `molte-cartelle-${s.studioId}`, count: 18 });
+    const added = await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .insert(patient)
+        .values(
+          extra.map((p) => ({
+            studioId: s.studioId,
+            archiveId: s.archives.titolare,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            sex: p.sex,
+            birthDate: p.birthDate,
+            birthPlaceCode: p.birthPlace.code,
+            birthPlaceName: p.birthPlace.name,
+            fiscalCode: p.fiscalCode,
+            status: p.status,
+          })),
+        )
+        .returning({ id: patient.id }),
+    );
+    const ids = [...s.patients.titolare, ...added.map((r) => r.id)];
+    const names = new Map(
+      (await t.db.select().from(patient)).map((p) => [p.id, `${p.lastName} ${p.firstName}`]),
+    );
+    const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const bar = page.getByRole('navigation', { name: 'Cartelle aperte' });
+    const tab = (id: string) =>
+      bar.getByRole('link', {
+        name: new RegExp(`^${escape(names.get(id)!)}(?![\\p{L}'])`, 'u'),
+      });
+    /** La scheda attiva si vede tutta nella barra, anche quando la barra scorre. */
+    const activeVisible = () =>
+      page.evaluate(() => {
+        const nav = document.querySelector('nav.schede-aperte');
+        const li = nav?.querySelector('a[aria-current="page"]')?.closest('li');
+        if (!nav || !li) return false;
+        const n = nav.getBoundingClientRect();
+        const r = li.getBoundingClientRect();
+        return r.left >= n.left - 1 && r.right <= n.right + 1;
+      });
+
+    await page.goto(`${base}/pazienti`);
+    await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
+    const closeAll = page.getByRole('button', { name: 'Chiudi tutte' });
+    if (await closeAll.count()) await closeAll.click();
+    for (const id of ids.slice(0, 20)) {
+      await page.goto(`${base}/pazienti/${id}`);
+      await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    }
+    await expect(bar.getByRole('link').count()).resolves.toBe(20);
+    await expect(activeVisible()).resolves.toBe(true);
+    await check(page, 'venti cartelle aperte', true);
+
+    // La ventunesima: si chiude quella usata meno di recente, con l'avviso.
+    await page.goto(`${base}/pazienti/${ids[20]}`);
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    await page.getByText(`chiusa quella di ${names.get(ids[0]!)}, usata meno di recente`).waitFor();
+    await expect(bar.getByRole('link').count()).resolves.toBe(20);
+    await expect(tab(ids[0]!).count()).resolves.toBe(0);
+    await expect(activeVisible()).resolves.toBe(true);
+    for (const v of TABLETS) {
+      await page.setViewportSize(v);
+      // Il riposizionamento segue l'evento di ridimensionamento: si aspetta un attimo.
+      await expect
+        .poll(() => activeVisible(), { timeout: 2000, message: `tablet ${v.width}×${v.height}` })
+        .toBe(true);
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    // Pagine nuove nelle schede: si torna alla pagina lasciata, con quello che si stava scrivendo.
+    const [a, b] = [ids[20]!, ids[19]!];
+    await page.goto(`${base}/pazienti/${a}/voci?tipo=diario`);
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await page.getByLabel('Testo', { exact: true }).fill('Nota lasciata a metà.');
+    await tab(b).click();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Parametri' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Parametri' }).waitFor();
+    await page.getByRole('textbox', { name: /^Peso/ }).fill('70');
+    await tab(a).click();
+    await page.waitForURL(`**/pazienti/${a}/voci?tipo=diario`);
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe(
+      'Nota lasciata a metà.',
+    );
+    await expect(activeVisible()).resolves.toBe(true);
+    // Registrata, la bozza non resta: tornando, il modulo è vuoto.
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Voce registrata.').waitFor();
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
+    await tab(b).click();
+    await page.waitForURL(`**/pazienti/${b}/parametri`);
+    await expect(page.getByRole('textbox', { name: /^Peso/ }).inputValue()).resolves.toBe('70');
+    await tab(a).click();
+    await page.waitForURL(`**/pazienti/${a}/voci?tipo=diario`);
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
+    await tab(b).click();
+    await page.waitForURL(`**/pazienti/${b}/parametri`);
+    // Ciascuno il suo: la nota di un paziente non compare nella cartella dell'altro.
+    await page.goto(`${base}/pazienti/${b}/voci?tipo=diario`);
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
+  });
+
+  it('dopo l’inattività la sessione si blocca e si sblocca con il codice; le cartelle aperte restano', async () => {
+    const bar = page.getByRole('navigation', { name: 'Cartelle aperte' });
+    const before = await bar.getByRole('link').count();
+    expect(before).toBeGreaterThan(1);
     s.clock.advance(6 * 60_000);
     await page.goto(`${base}/pazienti`);
     await page.getByRole('heading', { name: 'Sessione bloccata' }).waitFor();
@@ -846,5 +958,6 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Codice a 6 cifre').fill(totp(secret, s.clock.now().getTime()));
     await page.getByRole('button', { name: 'Sblocca' }).click();
     await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
+    await expect(bar.getByRole('link').count()).resolves.toBe(before);
   });
 });

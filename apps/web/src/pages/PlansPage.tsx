@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { PLAN_VALIDITY_LABEL, type Plan } from '../lib/clinical';
 import { date, plural, studioToday } from '../lib/format';
+import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
@@ -274,7 +275,11 @@ function PlanEditor({
   onDone: (message: string) => void;
   onCancel: () => void;
 }) {
-  const [f, setF] = useState<PlanForm>(() => (plan ? fromPlan(plan) : blank()));
+  // Ricordato per paziente (e per piano, in modifica) finché non si salva (D68, D129).
+  const [f, setF, resetF] = usePersistentState<PlanForm>(
+    `bozza-piano-${patientId}-${plan?.id ?? 'nuovo'}`,
+    plan ? fromPlan(plan) : blank(),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const set = (k: keyof PlanForm) => (e: { target: { value: string } }) =>
@@ -290,7 +295,7 @@ function PlanEditor({
         plan ? `/api/pazienti/${patientId}/piani/${plan.id}` : `/api/pazienti/${patientId}/piani`,
         { method: plan ? 'PUT' : 'POST', body: toBody(f) },
       );
-      if (!plan) setF(blank());
+      resetF();
       onDone(plan ? 'Modifiche salvate.' : 'Piano registrato.');
     } catch (err) {
       setError(failure(err));
@@ -380,7 +385,14 @@ function PlanEditor({
             <Icon name="fatto" /> <span>{plan ? 'Salva le modifiche' : 'Registra il piano'}</span>
           </button>
           {plan && (
-            <button type="button" className="pulsante" onClick={onCancel}>
+            <button
+              type="button"
+              className="pulsante"
+              onClick={() => {
+                resetF();
+                onCancel();
+              }}
+            >
               <Icon name="annulla" /> <span>Lascia com’era</span>
             </button>
           )}

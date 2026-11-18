@@ -1,5 +1,5 @@
 import { PRODUCT_NAME } from '@mmg/brand';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router';
 import { age } from '../lib/format';
 import { patientIdOf, recordLabel, useOpenRecords, MAX_OPEN_RECORDS } from '../lib/openRecords';
@@ -34,10 +34,28 @@ function OpenRecordsBar() {
     if (current) visit(current, location.pathname + location.search);
   }, [current, location.pathname, location.search, visit]);
 
+  // Con molte cartelle la barra scorre: la scheda attiva deve restare in vista (D68), anche se
+  // cambia la larghezza dello schermo. Si scorre solo la barra, mai la pagina.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const showActive = () => {
+      const nav = navRef.current;
+      const li = nav?.querySelector('a[aria-current="page"]')?.closest('li');
+      if (!nav || !li) return;
+      const n = nav.getBoundingClientRect();
+      const r = li.getBoundingClientRect();
+      if (r.left < n.left) nav.scrollLeft -= n.left - r.left + 8;
+      else if (r.right > n.right) nav.scrollLeft += r.right - n.right + 8;
+    };
+    showActive();
+    window.addEventListener('resize', showActive);
+    return () => window.removeEventListener('resize', showActive);
+  }, [current, records]);
+
   if (records.length === 0) return null;
   return (
     <div className="schede-aperte-contenitore">
-      <nav aria-label="Cartelle aperte" className="schede-aperte">
+      <nav aria-label="Cartelle aperte" className="schede-aperte" ref={navRef}>
         <ul>
           {records.map((r) => {
             const label = recordLabel(r, records);

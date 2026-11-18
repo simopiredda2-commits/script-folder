@@ -421,6 +421,20 @@ Fonti lette il 18/11/2026: DPCM 12/1/2017 sui LEA, art. 10–14 (GU n. 65 del 18
 - Le modifiche del 2026 ai LEA (D124): da confrontare con il testo vigente.
 - Referti grandi o scansionati veri: il limite di 5 MB è da vedere con la Dr.ssa Rocca.
 
+### Dopo la fermata finale – Molte cartelle aperte (D129)
+
+Domanda di Simone: «La schermata con più schede pazienti aperte l'hai testata?». Prima: provata nel browser con due schede; il limite di 20 solo senza browser; le pagine delle tappe 9 e 10 non dentro le schede.
+
+**Fatto**
+
+- Prova nel browser con 21 pazienti inventati. Controlla: 20 schede; la ventunesima chiude quella usata meno di recente, con l'avviso; la scheda attiva sempre in vista, anche su tablet; accessibilità, 44 px, tablet; il ritorno alle pagine nuove (voci cliniche, parametri) con quello che si stava scrivendo, separato per paziente e cancellato dopo la registrazione; le schede restano dopo il blocco per inattività.
+- Due difetti trovati e corretti (D129): la scheda attiva poteva restare fuori vista; nelle pagine nuove e nel certificato quello che si scriveva si perdeva cambiando paziente.
+
+**Non provato**
+
+- Le bozze di piani, presidi, consensi, deleghe, seguito e certificato con la prova nel browser: usano lo stesso meccanismo delle voci e dei parametri, provati con i sabotaggi, ma non sono passate una per una.
+- Su tablet veri e con lettori di schermo.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:

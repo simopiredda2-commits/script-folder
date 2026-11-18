@@ -12,6 +12,7 @@ import {
   type EntryType,
 } from '../lib/clinical';
 import { date, studioToday } from '../lib/format';
+import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
@@ -178,13 +179,17 @@ function NewEntryForm({
   onSaved: () => void;
 }) {
   const today = studioToday();
-  const [f, setF] = useState<Record<string, string | boolean>>({
-    data: today,
-    stato: 'attivo',
-    contatto: 'studio',
-    sezione: 'familiare',
-    fattore: catalog.fattori[0] ?? '',
-  });
+  // Quello che si sta scrivendo resta ricordato per paziente e tipo, come la ricetta (D68, D129).
+  const [f, setF, resetF] = usePersistentState<Record<string, string | boolean>>(
+    `bozza-voce-${patientId}-${tipo}`,
+    {
+      data: today,
+      stato: 'attivo',
+      contatto: 'studio',
+      sezione: 'familiare',
+      fattore: catalog.fattori[0] ?? '',
+    },
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState(false);
@@ -252,13 +257,7 @@ function NewEntryForm({
     setDone(false);
     try {
       await api(`/api/pazienti/${patientId}/voci`, { method: 'POST', body: body() });
-      setF((x) => ({
-        data: today,
-        stato: 'attivo',
-        contatto: x.contatto ?? 'studio',
-        sezione: x.sezione ?? 'familiare',
-        fattore: x.fattore ?? '',
-      }));
+      resetF();
       setDone(true);
       onSaved();
     } catch (err) {
