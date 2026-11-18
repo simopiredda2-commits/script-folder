@@ -79,6 +79,17 @@ describe('scheda della terapia: nuova, modifica, sospensione, ripresa', () => {
     expect(res.json().errore).toMatch(/non è un problema di questo paziente/);
   });
 
+  it('i messaggi di validazione arrivano in italiano (D85)', async () => {
+    const res = await req('POST', url(), doctor, { ...base, packsPerPrescription: 100 });
+    expect(res.statusCode).toBe(400);
+    const messages = res
+      .json()
+      .dettagli.map((i: { message: string }) => i.message)
+      .join(' ');
+    expect(messages).toMatch(/Troppo grande/);
+    expect(messages).not.toMatch(/Too big/);
+  });
+
   it('la segreteria non modifica le terapie, e il tentativo è registrato', async () => {
     const res = await req('POST', url(), secretary, base);
     expect(res.statusCode).toBe(403);

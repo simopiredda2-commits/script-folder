@@ -104,7 +104,12 @@ export function Shell({ children }: { children: ReactNode }) {
           <Logo />
         </NavLink>
         <nav aria-label="Sezioni" className="menu">
-          {NAV.map((n) => (
+          {[
+            ...NAV,
+            ...(me?.archivio
+              ? [{ to: '/archivio', label: 'Archivio', icon: 'archivio' as const, end: false }]
+              : []),
+          ].map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className="menu-voce">
               <Icon name={n.icon} />
               <span>{n.label}</span>

@@ -25,16 +25,22 @@ All'accesso si sceglie un utente del seed (`medico`, `segreteria`, `sostituto`);
 | ![](schermate/09-esami.png)                    | Esami: valore e intervallo del referto, senza giudizio (D71)                                                       |
 | ![](schermate/10-farmaci-ed-equivalenti.png)   | Ricerca farmaci con filtri ed equivalenti                                                                          |
 | ![](schermate/11-cartella-tablet.png)          | La cartella su un tablet in verticale                                                                              |
+| ![](schermate/12-nuova-terapia.png)            | Nuova terapia: farmaco dalla banca dati, come si prende, come la legge il paziente, unità al giorno (D80)          |
+| ![](schermate/13-sospensione.png)              | Sospensione con motivo; la reazione avversa va tra le allergie (D81)                                               |
+| ![](schermate/14-schema-orario.png)            | Schema orario da stampare: momento della giornata, come si prende, fino a quando (D83)                             |
+| ![](schermate/15-recapiti.png)                 | Anagrafica e recapiti modificabili dalla cartella (D86)                                                            |
+| ![](schermate/16-archivio.png)                 | Archivio del titolare: che cosa vede la segreteria ed esportazione completa (D84)                                  |
 
 Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al file), su un database appena preparato con il seed.
 
 ## Come è fatta
 
-- **Menu**: Oggi, Pazienti, Ricette (con il numero da firmare), Farmaci e prestazioni. Simbolo accanto al nome, mai al suo posto (D67).
+- **Menu**: Oggi, Pazienti, Ricette (con il numero da firmare), Farmaci e prestazioni; Archivio per il medico titolare (D84). Simbolo accanto al nome, mai al suo posto (D67).
 - **Cartelle aperte insieme**: fino a 20, una scheda per paziente; ogni scheda riporta all'ultima pagina vista e la ricetta in corso resta ricordata (D68).
 - **Colori**: i blu di SCRIPT per struttura e informazioni; l'evidenziatore giallo per contatori, cartella attiva e selezioni; arancio bruciato per gli avvisi, rosso per errori e blocchi, verde per gli esiti (D69). Ogni messaggio ha anche simbolo e parola.
 - **Ricette**: la segreteria prepara e manda alla firma; il medico controlla, conferma le note, scrive i motivi e firma. Se l'ente non risponde, la ricetta rossa; se l'esito è incerto, niente ricetta rossa finché non è chiaro.
 - **Storico** di ogni farmaco e prestazione: confezioni degli ultimi 12 mesi, autori, controlli, passaggi con l'ente; annullamento solo se l'ente non ha ancora lavorato la ricetta, e le annullate restano (D70).
+- **Terapia**: nuova, modifica, sospensione con motivo (la reazione avversa va tra le allergie), ripresa, schema orario da stampare (D80–D83). I controlli formali si vedono prima di salvare, vicino al campo, e il servizio li ripete.
 - **Accesso**: password e secondo fattore; dopo 5 minuti senza attività la sessione si blocca e si sblocca con il codice. All'uscita il browser non conserva dati dei pazienti.
 
 ## Accessibilità (WCAG 2.2 AA)
@@ -50,8 +56,8 @@ Le pagine hanno il salto al contenuto, titoli in ordine, etichette per ogni camp
 
 ## Che cosa non c'è ancora
 
-- Nuova terapia, modifica, sospensione e schema orario stampabile (D72).
-- Agenda e prenotazione (proposta: da Ready!), Riepiloghi, certificati INPS, diario e voci cliniche nuove, anagrafica modificabile dall'interfaccia (le rotte ci sono), impostazioni dell'archivio, esportazione dall'interfaccia (c'è la rotta).
+- Agenda e prenotazione (proposta: da Ready!), riepiloghi, certificati INPS, diario e voci cliniche nuove (allergie, problemi, piani terapeutici dall'interfaccia), presidi, seguito delle prestazioni (esecuzione, struttura, esito, referto).
+- Collegamento alla segnalazione di farmacovigilanza: da completare (D82).
 - Stampa del promemoria e della ricetta rossa nel modulo conforme: da completare con le specifiche.
 - Tema scuro.
 

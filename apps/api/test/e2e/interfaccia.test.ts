@@ -55,6 +55,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   let work: string;
   let therapyId: string;
   let lastName: string;
+  let newTherapyUrl: string;
 
   /** Codice a 6 cifre: ogni accesso usa l'intervallo di 30 secondi successivo. */
   const nextCode = (secret: string) => {
@@ -257,7 +258,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
   it('il menu ha simbolo e nome insieme (D67)', async () => {
     const items = page.locator('nav[aria-label="Sezioni"] a');
-    for (const label of ['Oggi', 'Pazienti', 'Ricette', 'Farmaci e prestazioni']) {
+    for (const label of ['Oggi', 'Pazienti', 'Ricette', 'Farmaci e prestazioni', 'Archivio']) {
       const item = items.filter({ hasText: label });
       await expect(item.locator('svg[aria-hidden="true"]').count()).resolves.toBe(1);
     }
@@ -396,6 +397,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await sec.getByRole('button', { name: /Ripeti 1 terapia/ }).click();
       await sec.getByText(/coda «da firmare» del medico/).waitFor();
       await check(sec, 'cartella vista dalla segreteria');
+      // La segreteria non scrive le terapie e non ha un archivio suo.
+      await expect(sec.getByRole('link', { name: 'Nuova terapia' }).count()).resolves.toBe(0);
+      await expect(
+        sec
+          .getByRole('navigation', { name: 'Sezioni' })
+          .getByRole('link', { name: 'Archivio' })
+          .count(),
+      ).resolves.toBe(0);
     } finally {
       await ctx.close();
     }
@@ -437,6 +446,148 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByRole('button', { name: `Chiudi la cartella di ${other!.lastName} ${other!.firstName}` })
       .click();
     await expect(bar.getByRole('link').count()).resolves.toBe(1);
+  });
+
+  it('nuova terapia dalla banca dati: controlli della scheda, lettura per il paziente, unità al giorno (D80)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page.getByRole('link', { name: 'Nuova terapia' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Nuova terapia' }).waitFor();
+    // Senza farmaco la scheda non si salva, e lo dice.
+    await page.getByRole('button', { name: 'Salva la scheda' }).click();
+    await page.getByText('La scheda non si può salvare:').waitFor();
+    await page
+      .getByText('Scegli un farmaco dalla banca dati o scrivine il nome.')
+      .first()
+      .waitFor();
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
+    const item = page.locator('.risultato').filter({ hasText: '28 compresse' });
+    await item.waitFor();
+    await item.getByRole('button', { name: 'Scegli' }).click();
+    await page.getByRole('button', { name: 'Cambia farmaco' }).waitFor();
+    await page.getByLabel('Dose', { exact: true }).fill('1');
+    await page.getByLabel('Unità', { exact: true }).selectOption('compressa');
+    await page.getByLabel('Frequenza').selectOption('2 volte al giorno');
+    await page.getByLabel('Momento').selectOption('la sera');
+    await page.getByLabel('Via').selectOption('per bocca');
+    await page.getByText('1 compressa due volte al giorno, la sera, per bocca').waitFor();
+    await expect(
+      page.getByLabel('Unità al giorno, per il contatore (R11)').inputValue(),
+    ).resolves.toBe('2');
+    await page.getByLabel('Istruzioni per il paziente').fill('Dopo cena.');
+    // Non sostituibile senza motivazione: R13, vicino al campo.
+    await page.getByLabel(/Non sostituibile/).check();
+    await page.getByRole('button', { name: 'Salva la scheda' }).click();
+    await page
+      .getByText('Non sostituibile: serve una sintetica motivazione (R13).')
+      .first()
+      .waitFor();
+    await check(page, 'nuova terapia con gli errori', true);
+    await page.getByLabel(/Non sostituibile/).uncheck();
+    await page.getByRole('button', { name: 'Salva la scheda' }).click();
+    await page.getByText('Terapia aggiunta.').waitFor();
+    await page.getByRole('heading', { level: 1, name: /PROVALINA 28 compresse/ }).waitFor();
+    newTherapyUrl = page.url();
+    await check(page, 'scheda della terapia nuova', true);
+  });
+
+  it('modifica della scheda: unità al giorno corrette a mano, poi salvate', async () => {
+    await page.goto(newTherapyUrl);
+    await page.getByRole('link', { name: 'Modifica', exact: true }).click();
+    await page.getByRole('heading', { level: 1, name: /Modifica: PROVALINA/ }).waitFor();
+    await page.getByLabel('Dose', { exact: true }).fill('1/2');
+    await expect(
+      page.getByLabel('Unità al giorno, per il contatore (R11)').inputValue(),
+    ).resolves.toBe('1');
+    await page.getByLabel('Unità al giorno, per il contatore (R11)').fill('0,75');
+    await page.getByText(/Corretta a mano; dal calcolo verrebbe 1/).waitFor();
+    await check(page, 'modifica della terapia', true);
+    await page.getByRole('button', { name: 'Salva la scheda' }).click();
+    await page.getByText('Scheda della terapia salvata.').waitFor();
+    await page.locator('.dati').getByText('0,75').waitFor();
+  });
+
+  it('sospensione per reazione avversa: la reazione va in testata; poi si riprende (D81)', async () => {
+    await page.goto(newTherapyUrl);
+    await page.getByRole('button', { name: 'Sospendi…' }).click();
+    await page.getByRole('heading', { name: 'Sospendi la terapia' }).waitFor();
+    await page.getByRole('button', { name: 'Sospendi la terapia' }).click();
+    await page.getByText('Scrivi il motivo della sospensione.').waitFor();
+    await page.getByLabel('Motivo della sospensione').fill('Reazione cutanea di prova');
+    await page.getByLabel(/È una reazione avversa/).check();
+    await page.getByLabel('Reazione osservata (facoltativa)').fill('Eritema di prova');
+    await page.getByText(/farmacovigilanza: da completare/).waitFor();
+    await check(page, 'sospensione della terapia');
+    await page.getByRole('button', { name: 'Sospendi la terapia' }).click();
+    await page
+      .getByText(/Terapia sospesa\. La reazione a principio di prova è ora tra le allergie/)
+      .waitFor();
+    await page.locator('.testata-avvisi').getByText('Allergia: principio di prova').waitFor();
+    await page.getByText(/Motivo: Reazione cutanea di prova/).waitFor();
+    await check(page, 'terapia sospesa', true);
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page.getByRole('heading', { name: 'Terapie sospese' }).waitFor();
+    await page.getByRole('link', { name: /PROVALINA 28 compresse/ }).click();
+    await page.getByRole('button', { name: 'Riprendi' }).click();
+    await page.getByText('Terapia ripresa: è di nuovo tra quelle in corso.').waitFor();
+  });
+
+  it('schema orario stampabile: momenti della giornata, fino a quando, istruzioni', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/schema-orario`);
+    await page.getByRole('heading', { name: 'Schema orario della terapia' }).waitFor();
+    const evening = page.getByRole('region', { name: 'Sera' });
+    await evening.getByText(/PROVALINA 28 compresse/).waitFor();
+    await evening.getByText('Dopo cena.').waitFor();
+    // La terapia riservata resta fuori finché il medico non la include.
+    await expect(page.getByText('Farmaco riservato di prova').count()).resolves.toBe(0);
+    await page.getByLabel(/Includi le terapie riservate/).check();
+    await page.getByText('Farmaco riservato di prova').waitFor();
+    await check(page, 'schema orario', true);
+    // Su carta restano solo il foglio e le sue tabelle.
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.locator('.app-header').isVisible()).resolves.toBe(false);
+    await expect(page.locator('.no-stampa').isVisible()).resolves.toBe(false);
+    await expect(page.locator('.foglio-schema').isVisible()).resolves.toBe(true);
+    await page.emulateMedia({ media: 'screen' });
+  });
+
+  it('anagrafica: si correggono i recapiti dalla cartella, con l’errore spiegato', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page.getByRole('button', { name: 'Modifica i recapiti' }).click();
+    await page.getByLabel('Telefono').fill('011 000 0000');
+    await page.getByLabel('Email', { exact: true }).fill('non-una-email');
+    await check(page, 'modifica dei recapiti', true);
+    await page.getByRole('button', { name: 'Salva i recapiti' }).click();
+    await page.getByText(/^Email:/).waitFor();
+    await page.getByLabel('Email', { exact: true }).fill('');
+    await page.getByRole('button', { name: 'Salva i recapiti' }).click();
+    await page.getByText('Recapiti salvati.').waitFor();
+    await page.locator('.dati').getByText('011 000 0000').waitFor();
+  });
+
+  it('archivio del titolare: che cosa vede la segreteria ed esportazione completa (D84)', async () => {
+    await page.goto(base);
+    await page
+      .getByRole('navigation', { name: 'Sezioni' })
+      .getByRole('link', { name: 'Archivio' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Archivio' }).waitFor();
+    // Pagina corta: la barra delle cartelle aperte resta alta quanto le sue schede.
+    const bar = await page
+      .locator('.schede-aperte-contenitore')
+      .evaluate((el) => el.getBoundingClientRect().height);
+    expect(bar).toBeLessThan(120);
+    const summary = page.getByLabel(/La segreteria legge il riepilogo clinico/);
+    await expect(summary.isChecked()).resolves.toBe(false);
+    await summary.check();
+    await page.getByText('La segreteria legge il riepilogo clinico: acceso.').waitFor();
+    await summary.uncheck();
+    await page.getByText('La segreteria legge il riepilogo clinico: spento.').waitFor();
+    await check(page, 'archivio', true);
+    const link = page.getByRole('link', { name: /Scarica in JSON/ });
+    await expect(link.getAttribute('href')).resolves.toBe('/api/esportazione?formato=json');
+    const res = await page.request.get(`${base}/api/esportazione?formato=json`);
+    expect(res.status()).toBe(200);
+    expect((await res.json()).formato).toBe('mmg-esportazione');
   });
 
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {

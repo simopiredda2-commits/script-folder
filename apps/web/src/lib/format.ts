@@ -43,6 +43,11 @@ export function longDate(isoDate: string): string {
 }
 
 /** Età in anni compiuti alla data di oggi. */
+/** La data di oggi per lo studio (ora italiana), come AAAA-MM-GG. */
+export function studioToday(now = new Date()): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(now);
+}
+
 export function age(birthDate: string, today = new Date()): number {
   const [y, m, d] = birthDate.split('-').map(Number) as [number, number, number];
   let years = today.getFullYear() - y;
@@ -85,9 +90,13 @@ export const THERAPY_KIND: Record<string, string> = {
   cycle: 'Ciclo con data di fine',
 };
 
+/**
+ * Tipo di accesso della ricetta specialistica, con le parole delle specifiche del Sistema TS
+ * (campo tipoAccesso: 1 = primo accesso, 0 = altra tipologia di accesso; D79).
+ */
 export const ACCESS_TYPE: Record<string, string> = {
   first: 'Primo accesso',
-  subsequent: 'Accesso successivo',
+  subsequent: 'Altra tipologia di accesso',
 };
 
 /** Classi di priorità della ricetta specialistica, con il loro significato. */

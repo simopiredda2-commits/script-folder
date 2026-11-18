@@ -30,6 +30,7 @@ const PATHS = {
   indietro: ['M15 5l-7 7 7 7'],
   apri: ['M9 5l7 7-7 7'],
   annulla: ['M6 6l12 12', 'M18 6L6 18'],
+  archivio: ['M4 4h16v5H4z', 'M5 9v11h14V9', 'M10 13h4'],
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -2,7 +2,7 @@ import cookie from '@fastify/cookie';
 import { PRODUCT_NAME } from '@mmg/brand';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { createAuthService, type Actor } from './auth/service';
 import type { Config } from './config';
 import type { Database } from './db/client';
@@ -18,6 +18,9 @@ import { createPrescriptionService, type PrescriptionDeps } from './prescription
 import { SimulatedGateway, type GatewaySystem, type PrescriptionGateway } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
+
+// I messaggi di validazione arrivano all'interfaccia: in italiano, come il resto (D85).
+z.config(z.locales.it());
 
 declare module 'fastify' {
   interface FastifyContextConfig {

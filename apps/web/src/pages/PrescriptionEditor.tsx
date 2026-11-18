@@ -11,7 +11,7 @@ import {
 import { Icon } from '../components/Icon';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
-import { date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
+import { ACCESS_TYPE, date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
 import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, posology, type Patient, type Summary, type TherapyRow } from './RecordPage';
@@ -503,17 +503,14 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               <>
                 <fieldset className="scelta">
                   <legend>Tipo di accesso</legend>
-                  {[
-                    ['first', 'Primo accesso'],
-                    ['subsequent', 'Accesso successivo'],
-                  ].map(([v, label]) => (
+                  {Object.entries(ACCESS_TYPE).map(([v, label]) => (
                     <div key={v} className="casella">
                       <input
                         type="radio"
                         id={`accesso-${v}`}
                         name="accesso"
                         checked={accessType === v}
-                        onChange={() => setAccessType(v!)}
+                        onChange={() => setAccessType(v)}
                       />
                       <label htmlFor={`accesso-${v}`}>{label}</label>
                     </div>

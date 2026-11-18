@@ -45,7 +45,10 @@ try {
     (app.server.address() as AddressInfo).port,
   );
   const base = `http://127.0.0.1:${(web.address() as AddressInfo).port}`;
-  const browser = await chromium.launch();
+  // Lingua del browser italiana: i campi data si leggono gg/mm/aaaa, come in studio.
+  const browser = await chromium.launch({
+    env: { ...process.env, LANG: 'it_IT.UTF-8', LANGUAGE: 'it' },
+  });
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     deviceScaleFactor: 2,
@@ -126,6 +129,56 @@ try {
     .click();
   await page.getByRole('table').waitFor();
   await shot(page, '10-farmaci-ed-equivalenti');
+
+  // Terapia completa (D80–D83), recapiti (D86) e archivio (D84).
+  await page.goto(`${base}/pazienti/${patientId}/terapie/nuova`);
+  await page.getByRole('heading', { level: 1, name: 'Nuova terapia' }).waitFor();
+  const restart = page.getByRole('button', { name: 'Annulla le modifiche' });
+  if (await page.getByRole('button', { name: 'Cambia farmaco' }).count()) {
+    await restart.click();
+    await page.goto(`${base}/pazienti/${patientId}/terapie/nuova`);
+  }
+  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
+  const provalina = page.locator('.risultato').filter({ hasText: '28 compresse' });
+  await provalina.waitFor();
+  await provalina.getByRole('button', { name: 'Scegli' }).click();
+  await page.getByLabel('Dose', { exact: true }).fill('1');
+  await page.getByLabel('Unità', { exact: true }).selectOption('compressa');
+  await page.getByLabel('Frequenza').selectOption('1 volta al giorno');
+  await page.getByLabel('Momento').selectOption('la sera');
+  await page.getByLabel('Via').selectOption('per bocca');
+  await page.getByLabel('Istruzioni per il paziente').fill('Dopo cena.');
+  await page.getByText('1 compressa una volta al giorno, la sera, per bocca').waitFor();
+  await page
+    .getByRole('heading', { name: 'Come si prende' })
+    .evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.evaluate(() => window.scrollBy(0, -260));
+  await shot(page, '12-nuova-terapia');
+  await page.getByRole('button', { name: 'Salva la scheda' }).click();
+  await page.getByText('Terapia aggiunta.').waitFor();
+  await page.getByRole('button', { name: 'Sospendi…' }).click();
+  await page.getByLabel('Motivo della sospensione').fill('Eruzione cutanea dopo l’inizio');
+  await page.getByLabel(/È una reazione avversa/).check();
+  await page.getByLabel('Reazione osservata (facoltativa)').fill('Eritema diffuso');
+  await shot(page, '13-sospensione');
+  await page.getByRole('button', { name: 'Non sospendere' }).click();
+
+  await page.goto(`${base}/pazienti/${patientId}/schema-orario`);
+  await page.getByRole('heading', { name: 'Schema orario della terapia' }).waitFor();
+  await shot(page, '14-schema-orario');
+
+  await page.goto(`${base}/pazienti/${patientId}`);
+  await page.getByRole('button', { name: 'Modifica i recapiti' }).click();
+  await page
+    .getByRole('heading', { name: 'Anagrafica e recapiti' })
+    .evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.evaluate(() => window.scrollBy(0, -120));
+  await shot(page, '15-recapiti');
+
+  await page.goto(`${base}/archivio`);
+  await page.getByRole('heading', { level: 1, name: 'Archivio' }).waitFor();
+  await page.getByLabel(/La segreteria legge il riepilogo clinico/).waitFor();
+  await shot(page, '16-archivio');
 
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto(`${base}/pazienti/${patientId}`);

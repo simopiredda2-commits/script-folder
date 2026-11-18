@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router';
-import { ErrorMessage, Loading, PageHeader, type RuleIssue } from '../components/common';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router';
+import { ErrorMessage, Loading, Notice, PageHeader, type RuleIssue } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError, query } from '../lib/api';
 import { useSession } from '../lib/session';
@@ -13,8 +13,16 @@ import {
   PRIORITY,
   THERAPY_KIND,
 } from '../lib/format';
+import { LINKS } from '../lib/links';
+import { patientReading } from '../lib/therapy';
 import { useApi } from '../lib/useApi';
-import { PatientBanner, posology, type Patient, type TherapyRow } from './RecordPage';
+import {
+  PatientBanner,
+  posology,
+  type Patient,
+  type Summary,
+  type TherapyFull,
+} from './RecordPage';
 
 interface HistoryEntry {
   ricetta: {
@@ -294,27 +302,6 @@ function HistoryTable({
   );
 }
 
-interface TherapyFull extends TherapyRow {
-  atc: string | null;
-  drugClass: string | null;
-  dpc: boolean;
-  route: string | null;
-  startOn: string;
-  endOn: string | null;
-  packsPerPrescription: number;
-  habitualExemptionCode: string | null;
-  suggestedByName: string | null;
-  suggestedByFacility: string | null;
-  patientInstructions: string | null;
-  notReimbursable: boolean;
-  byActiveIngredient: boolean;
-  notSubstitutable: boolean;
-  notSubstitutableReason: string | null;
-  multiPrescription: boolean;
-  suggestedS: boolean;
-  hospitalH: boolean;
-}
-
 /** Interruttore della scheda in sola lettura: nome e una riga di spiegazione, non un'icona. */
 function Option({ on, name, explanation }: { on: boolean; name: string; explanation: string }) {
   return (
@@ -328,19 +315,161 @@ function Option({ on, name, explanation }: { on: boolean; name: string; explanat
   );
 }
 
-/** Scheda della terapia in tre parti, con lo storico delle prescrizioni (D65). */
+/** Sospensione con motivo; per una reazione avversa la reazione entra tra le allergie (D81). */
+function SuspendPanel({
+  patientId,
+  therapy,
+  onDone,
+  onCancel,
+}: {
+  patientId: string;
+  therapy: TherapyFull;
+  onDone: (message: string) => void;
+  onCancel: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [adverse, setAdverse] = useState(false);
+  const [reaction, setReaction] = useState('');
+  const [error, setError] = useState<ApiError | null>(null);
+  const [busy, setBusy] = useState(false);
+  const substance = therapy.activeIngredient ?? therapy.drugName;
+  return (
+    <form
+      className="riquadro pannello-sospensione"
+      aria-labelledby="titolo-sospensione"
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!reason.trim()) {
+          setError(new ApiError(400, 'Scrivi il motivo della sospensione.'));
+          return;
+        }
+        setBusy(true);
+        setError(null);
+        api<{ reazioneRegistrata: boolean }>(
+          `/api/pazienti/${patientId}/terapie/${therapy.id}/sospendi`,
+          {
+            method: 'POST',
+            body: {
+              motivo: reason.trim(),
+              ...(adverse ? { reazioneAvversa: true, reazione: reaction.trim() || undefined } : {}),
+            },
+          },
+        )
+          .then((r) =>
+            onDone(
+              r.reazioneRegistrata
+                ? `Terapia sospesa. La reazione a ${substance} è ora tra le allergie e reazioni da farmaci, in testata.`
+                : 'Terapia sospesa.',
+            ),
+          )
+          .catch((err: unknown) => setError(err instanceof ApiError ? err : null))
+          .finally(() => setBusy(false));
+      }}
+    >
+      <h2 id="titolo-sospensione">Sospendi la terapia</h2>
+      <div className="campo">
+        <label htmlFor="motivo-sospensione">Motivo della sospensione</label>
+        <textarea
+          id="motivo-sospensione"
+          rows={2}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          aria-invalid={error?.status === 400 && !reason.trim() ? true : undefined}
+        />
+      </div>
+      <div className="casella">
+        <input
+          type="checkbox"
+          id="reazione-avversa"
+          checked={adverse}
+          onChange={(e) => setAdverse(e.target.checked)}
+        />
+        <label htmlFor="reazione-avversa">
+          <strong>È una reazione avversa</strong>{' '}
+          <span className="tenue">
+            Si registra tra le allergie e reazioni da farmaci ({substance}), sempre in testata.
+          </span>
+        </label>
+      </div>
+      {adverse && (
+        <>
+          <div className="campo">
+            <label htmlFor="reazione-osservata">Reazione osservata (facoltativa)</label>
+            <textarea
+              id="reazione-osservata"
+              rows={2}
+              value={reaction}
+              onChange={(e) => setReaction(e.target.value)}
+              aria-describedby="reazione-aiuto"
+            />
+            <p className="aiuto" id="reazione-aiuto">
+              Se resta vuota si registra il motivo della sospensione.
+            </p>
+          </div>
+          <p className="aiuto">
+            {LINKS.pharmacovigilanceReport ? (
+              <a href={LINKS.pharmacovigilanceReport} target="_blank" rel="noreferrer">
+                Segnala la sospetta reazione avversa (farmacovigilanza)
+              </a>
+            ) : (
+              'Collegamento alla segnalazione di farmacovigilanza: da completare (indirizzo ufficiale non ancora verificato).'
+            )}
+          </p>
+        </>
+      )}
+      <ErrorMessage error={error} />
+      <div className="azioni">
+        <button type="submit" className="pulsante pulsante-primario" disabled={busy}>
+          <Icon name="blocco" /> <span>Sospendi la terapia</span>
+        </button>
+        <button type="button" className="pulsante" onClick={onCancel}>
+          <Icon name="annulla" /> <span>Non sospendere</span>
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Scheda della terapia in tre parti, con le azioni e lo storico delle prescrizioni (D65). */
 export function TherapyPage() {
   const { id, therapyId } = useParams<{ id: string; therapyId: string }>();
-  const record = useApi<{ paziente: Patient }>(`/api/pazienti/${id}`);
+  const location = useLocation();
+  const { isDoctor } = useSession();
+  const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
   const therapies = useApi<{ terapie: TherapyFull[] }>(`/api/pazienti/${id}/terapie`);
   const history = useApi<History>(
     `/api/pazienti/${id}/storico-prescrizioni${query({ terapia: therapyId })}`,
   );
+  const [suspending, setSuspending] = useState(false);
+  const [done, setDone] = useState<string | null>(
+    (location.state as { avviso?: string } | null)?.avviso ?? null,
+  );
+  const [actionError, setActionError] = useState<ApiError | null>(null);
   const t = therapies.data?.terapie.find((x) => x.id === therapyId);
 
   if ((record.loading || therapies.loading) && !t) return <Loading what="dati della terapia" />;
-  if (!record.data || !t) return <ErrorMessage error={record.error ?? therapies.error} />;
+  if (!record.data || !t)
+    return (
+      <ErrorMessage
+        error={record.error ?? therapies.error ?? new ApiError(404, 'Terapia non trovata')}
+      />
+    );
   const p = record.data.paziente;
+  const summary = record.data.riepilogo;
+  const indication = summary?.problemiAttivi.find((x) => x.id === t.indicationEntryId);
+  const suspended = t.status === 'suspended';
+
+  async function resume() {
+    setActionError(null);
+    try {
+      await api(`/api/pazienti/${id}/terapie/${therapyId}/riprendi`, { method: 'POST', body: {} });
+      setDone('Terapia ripresa: è di nuovo tra quelle in corso.');
+      therapies.reload();
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e : null);
+    }
+  }
 
   return (
     <>
@@ -354,8 +483,55 @@ export function TherapyPage() {
             <span aria-hidden="true">/</span> <span>Scheda della terapia</span>
           </>
         }
+        actions={
+          <>
+            {isDoctor && (
+              <Link
+                className="pulsante pulsante-primario"
+                to={`/pazienti/${id}/terapie/${t.id}/modifica`}
+              >
+                <Icon name="firma" /> <span>Modifica</span>
+              </Link>
+            )}
+            <Link className="pulsante" to={`/pazienti/${id}/schema-orario`}>
+              <Icon name="stampa" /> <span>Stampa lo schema orario</span>
+            </Link>
+            {isDoctor && !suspended && !suspending && (
+              <button type="button" className="pulsante" onClick={() => setSuspending(true)}>
+                <Icon name="blocco" /> <span>Sospendi…</span>
+              </button>
+            )}
+            {isDoctor && suspended && (
+              <button type="button" className="pulsante" onClick={() => void resume()}>
+                <Icon name="ripeti" /> <span>Riprendi</span>
+              </button>
+            )}
+          </>
+        }
       />
-      <PatientBanner patient={p} />
+      <PatientBanner patient={p} summary={summary} />
+      {done && <Notice kind="fatto">{done}</Notice>}
+      <ErrorMessage error={actionError} />
+      {suspended && (
+        <Notice kind="avviso">
+          <strong>Terapia sospesa.</strong>
+          {t.suspendedReason ? ` Motivo: ${t.suspendedReason}` : ''} Non si ripete e non entra nello
+          schema orario finché non la riprendi.
+        </Notice>
+      )}
+      {suspending && (
+        <SuspendPanel
+          patientId={id!}
+          therapy={t}
+          onCancel={() => setSuspending(false)}
+          onDone={(message) => {
+            setSuspending(false);
+            setDone(message);
+            therapies.reload();
+            record.reload();
+          }}
+        />
+      )}
       <div className="griglia-cartella">
         <section className="riquadro" aria-labelledby="titolo-farmaco">
           <h2 id="titolo-farmaco">Il farmaco</h2>
@@ -375,12 +551,28 @@ export function TherapyPage() {
           <dl className="dati">
             <dt>Posologia</dt>
             <dd>{posology(t) || '—'}</dd>
+            <dt>Come la legge il paziente</dt>
+            <dd>{patientReading(t) || '—'}</dd>
             <dt>Tipo di terapia</dt>
             <dd>{THERAPY_KIND[t.kind]}</dd>
             <dt>Dal</dt>
             <dd>
               {date(t.startOn)}
               {t.endOn ? ` al ${date(t.endOn)}` : ''}
+            </dd>
+            <dt>Unità al giorno (R11)</dt>
+            <dd>
+              {t.unitsPerDay
+                ? t.unitsPerDay.replace('.', ',')
+                : 'Non indicate: il contatore non conta'}
+            </dd>
+            <dt>Indicazione</dt>
+            <dd>
+              {indication
+                ? `${indication.descrizione}${indication.codice ? ` · ${indication.codice}` : ''}`
+                : t.indicationEntryId
+                  ? 'Problema non più tra gli attivi'
+                  : '—'}
             </dd>
             <dt>Istruzioni per il paziente</dt>
             <dd>{t.patientInstructions ?? '—'}</dd>
@@ -396,7 +588,11 @@ export function TherapyPage() {
             <dt>Nota AIFA</dt>
             <dd>{t.aifaNote ? `${t.aifaNote}: da confermare a ogni ricetta (R7)` : 'Nessuna'}</dd>
             <dt>Medico suggeritore</dt>
-            <dd>{[t.suggestedByName, t.suggestedByFacility].filter(Boolean).join(', ') || '—'}</dd>
+            <dd>
+              {[t.suggestedByName, t.suggestedByFacility, t.suggestedOn && date(t.suggestedOn)]
+                .filter(Boolean)
+                .join(', ') || '—'}
+            </dd>
           </dl>
           <ul className="opzioni">
             <Option

@@ -7,6 +7,7 @@ import { api, ApiError, query } from '../lib/api';
 import { age, date, maskedFiscalCode, THERAPY_KIND, TIMELINE_KIND } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { RegistrySection, type Registry } from './RegistrySection';
 
 export interface Patient {
   id: string;
@@ -24,7 +25,7 @@ export interface Patient {
 
 export interface Summary {
   allergie: { sostanza: string; reazione: string | null }[];
-  problemiAttivi: { descrizione: string; codice: string | null; dal: string | null }[];
+  problemiAttivi: { id: string; descrizione: string; codice: string | null; dal: string | null }[];
   pianiTerapeutici: { farmaco: string; scadenza: string }[];
   esenzioni: { codice: string; dal: string; al: string | null }[];
   parametri: { data: string; parametro: string; valore: string; unita: string }[];
@@ -44,6 +45,33 @@ export interface TherapyRow {
   aifaNote: string | null;
   reserved: boolean;
   important: boolean;
+}
+
+/** La scheda intera, come la restituisce il servizio. */
+export interface TherapyFull extends TherapyRow {
+  atc: string | null;
+  drugClass: string | null;
+  equivalenceGroup: string | null;
+  dpc: boolean;
+  route: string | null;
+  unitsPerDay: string | null;
+  startOn: string;
+  endOn: string | null;
+  packsPerPrescription: number;
+  indicationEntryId: string | null;
+  habitualExemptionCode: string | null;
+  suggestedByName: string | null;
+  suggestedByFacility: string | null;
+  suggestedOn: string | null;
+  patientInstructions: string | null;
+  notReimbursable: boolean;
+  byActiveIngredient: boolean;
+  notSubstitutable: boolean;
+  notSubstitutableReason: string | null;
+  multiPrescription: boolean;
+  suggestedS: boolean;
+  hospitalH: boolean;
+  suspendedReason: string | null;
 }
 
 interface PrescriptionRow {
@@ -148,8 +176,10 @@ export function RecordPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { isDoctor } = useSession();
-  const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
-  const therapies = useApi<{ terapie: TherapyRow[] }>(`/api/pazienti/${id}/terapie`);
+  const record = useApi<{ paziente: Patient & Partial<Registry>; riepilogo: Summary | null }>(
+    `/api/pazienti/${id}`,
+  );
+  const therapies = useApi<{ terapie: TherapyFull[] }>(`/api/pazienti/${id}/terapie`);
   const prescriptions = useApi<{ ricette: PrescriptionRow[] }>(`/api/pazienti/${id}/ricette`);
   const [filter, setFilter] = useState<(typeof FILTERS)[number][0]>('tutto');
   const timeline = useApi<{
@@ -190,6 +220,7 @@ export function RecordPage() {
   if (!record.data) return <ErrorMessage error={record.error} />;
   const { paziente: p, riepilogo } = record.data;
   const active = (therapies.data?.terapie ?? []).filter((t) => t.status === 'active');
+  const suspended = (therapies.data?.terapie ?? []).filter((t) => t.status === 'suspended');
 
   async function repeat() {
     setRepeatError(null);
@@ -293,6 +324,16 @@ export function RecordPage() {
           <h2 id="titolo-terapia">
             <Icon name="terapia" /> Terapia in corso
           </h2>
+          <div className="azioni">
+            {isDoctor && (
+              <Link className="pulsante" to={`/pazienti/${id}/terapie/nuova`}>
+                <Icon name="aggiungi" /> <span>Nuova terapia</span>
+              </Link>
+            )}
+            <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/schema-orario`}>
+              <Icon name="stampa" /> <span>Schema orario</span>
+            </Link>
+          </div>
           {therapies.loading && !therapies.data && <Loading what="terapie" />}
           <Forbidden error={therapies.error} what="Terapie" />
           {therapies.data && active.length === 0 && (
@@ -377,6 +418,23 @@ export function RecordPage() {
           <ErrorMessage error={repeatError} />
           {repeatDone && <Notice kind="fatto">{repeatDone}</Notice>}
 
+          {suspended.length > 0 && (
+            <>
+              <h3>Terapie sospese</h3>
+              <ul className="elenco-semplice">
+                {suspended.map((t) => (
+                  <li key={t.id}>
+                    <Link to={`/pazienti/${id}/terapie/${t.id}`}>{t.drugName}</Link>
+                    <span className="tenue">
+                      {' '}
+                      · sospesa{t.suspendedReason ? `: ${t.suspendedReason}` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
           <h3>Prestazioni prescritte</h3>
           {services.length === 0 ? (
             <p className="tenue">Nessuna ricetta specialistica.</p>
@@ -400,6 +458,8 @@ export function RecordPage() {
           )}
         </section>
       </div>
+
+      <RegistrySection patient={p} onSaved={record.reload} />
 
       <section className="riquadro" aria-labelledby="titolo-cronologia">
         <h2 id="titolo-cronologia">

@@ -15,6 +15,8 @@ export interface Me {
   nome: string;
   ruoli: { codice: string; nome: string }[];
   postazione: string | null;
+  /** L'archivio di cui l'utente è titolare: impostazioni ed esportazione (pagina Archivio). */
+  archivio: { id: string; nome: string } | null;
 }
 
 type State =

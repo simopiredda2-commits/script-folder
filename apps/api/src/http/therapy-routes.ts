@@ -148,8 +148,10 @@ export function registerTherapyRoutes(app: FastifyInstance, db: Database, now: (
 
   app.put('/api/pazienti/:id/terapie/:therapyId', scoped, async (req) => {
     const actor = req.actor!;
-    const { id, therapyId } = therapyParams.parse(req.params);
+    const { id } = params.parse(req.params);
     const { context } = await guardPatient(db, actor, id, 'therapy.write', 'modifica_terapia');
+    // Il resto si valida dopo la guardia: anche una richiesta sbagliata entra nel registro.
+    const { therapyId } = therapyParams.parse(req.params);
     const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
     await loadTherapy(id, therapyId, reservedAllowed);
     const body = normalize(therapyBody.parse(req.body));
@@ -169,8 +171,9 @@ export function registerTherapyRoutes(app: FastifyInstance, db: Database, now: (
    */
   app.post('/api/pazienti/:id/terapie/:therapyId/sospendi', scoped, async (req) => {
     const actor = req.actor!;
-    const { id, therapyId } = therapyParams.parse(req.params);
+    const { id } = params.parse(req.params);
     const { context } = await guardPatient(db, actor, id, 'therapy.write', 'sospensione_terapia');
+    const { therapyId } = therapyParams.parse(req.params);
     const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
     const t = await loadTherapy(id, therapyId, reservedAllowed);
     if (t.status !== 'active') throw new HttpError(409, 'La terapia non è in corso');
@@ -205,8 +208,9 @@ export function registerTherapyRoutes(app: FastifyInstance, db: Database, now: (
 
   app.post('/api/pazienti/:id/terapie/:therapyId/riprendi', scoped, async (req) => {
     const actor = req.actor!;
-    const { id, therapyId } = therapyParams.parse(req.params);
+    const { id } = params.parse(req.params);
     const { context } = await guardPatient(db, actor, id, 'therapy.write', 'modifica_terapia');
+    const { therapyId } = therapyParams.parse(req.params);
     const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
     const t = await loadTherapy(id, therapyId, reservedAllowed);
     if (t.status !== 'suspended') throw new HttpError(409, 'La terapia non è sospesa');
