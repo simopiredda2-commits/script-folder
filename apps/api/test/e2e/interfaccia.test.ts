@@ -34,10 +34,13 @@ import { startOfStudioDay } from '../../src/http/today-routes';
 import { studioDate } from '../../src/prescriptions/rules-check';
 import {
   EXAMPLE_TRANSCRIPTIONS,
+  EXAMPLES_DIR,
+  exampleSourcesSync,
   runSyncOnExample,
   serveExampleSite,
 } from '../../src/reference/example-site';
 import { importReferenceData } from '../../src/reference/importer';
+import { ReferenceUpdates, sourceNamesOf } from '../../src/reference/updates-service';
 import { base32Decode } from '../../src/security/base32';
 import { totp } from '../../src/security/totp';
 import { createScenario, PASSWORD, type Scenario } from '../helpers/scenario';
@@ -92,9 +95,16 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await p.getByLabel('Password').fill(PASSWORD);
     await p.getByLabel('Postazione').fill(`browser-${who}`);
     await p.getByRole('button', { name: 'Continua' }).click();
-    const secret = await p.locator('.segreto').innerText();
-    s.secrets.set(s.users[who].id, base32Decode(secret.replace(/\s/g, '')));
-    await p.getByLabel('Codice a 6 cifre').fill(nextCode(secret));
+    // Al primo accesso si attiva il secondo fattore; ai successivi basta il codice.
+    const known = s.secrets.get(s.users[who].id);
+    if (known) {
+      s.clock.advance(30_000);
+      await p.getByLabel('Codice a 6 cifre').fill(totp(known, s.clock.now().getTime()));
+    } else {
+      const secret = await p.locator('.segreto').innerText();
+      s.secrets.set(s.users[who].id, base32Decode(secret.replace(/\s/g, '')));
+      await p.getByLabel('Codice a 6 cifre').fill(nextCode(secret));
+    }
     await p.getByRole('button', { name: 'Entra' }).click();
     await p.getByRole('heading', { level: 1, name: 'Oggi' }).waitFor();
   }
@@ -201,7 +211,35 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     } finally {
       await site.close();
     }
-    s = await createScenario(t.db);
+    // Aggiornamento delle banche dati (D156) sul sito d'esempio, ogni notte alle 03:30.
+    let updates!: ReferenceUpdates;
+    s = await createScenario(
+      t.db,
+      {},
+      {
+        referenceUpdates: (now) => {
+          updates = new ReferenceUpdates(
+            t.db,
+            {
+              dataDir: join(work, 'aggiornamenti'),
+              transcriptionsDir: EXAMPLE_TRANSCRIPTIONS,
+              mappings: loadMappings(),
+              sync: exampleSourcesSync(),
+            },
+            {
+              time: '03:30',
+              now,
+              sourceNames: sourceNamesOf(join(EXAMPLES_DIR, 'fonti-prova.json')),
+            },
+          );
+          return updates;
+        },
+      },
+    );
+    // Il giro di stanotte c'è stato: le versioni in uso hanno la loro fonte controllata.
+    expect((await (await updates.start('automatico', 'orologio del servizio')).done).outcome).toBe(
+      'ok',
+    );
     const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
     lastName = rich!.lastName;
     firstName = rich!.firstName;
@@ -1102,6 +1140,46 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     }
   });
 
+  it('aggiornamento delle banche dati: quando parte, com’è andato, «Aggiorna adesso» dell’amministratore (D156)', async () => {
+    // Chi usa le banche dati vede quando è stata controllata la fonte, e da lì l'aggiornamento.
+    await page.goto(`${base}/banche-dati`);
+    await page
+      .getByText(/fonte controllata il/)
+      .first()
+      .waitFor();
+    await page.getByRole('link', { name: 'Aggiornamento delle banche dati' }).click();
+    await page
+      .getByRole('heading', { level: 2, name: 'Aggiornamento delle banche dati' })
+      .waitFor();
+    await page.getByText('Aggiornamento automatico: ogni notte alle 03:30.').waitFor();
+    await page
+      .getByText('Automatico, di notte (orologio del servizio)', { exact: false })
+      .waitFor();
+    // Il medico non è amministratore: niente pulsante.
+    await expect(page.getByRole('button', { name: 'Aggiorna adesso' }).count()).resolves.toBe(0);
+    await check(page, 'aggiornamento delle banche dati', true);
+
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    const admin = await ctx.newPage();
+    try {
+      await loginInBrowser(admin, 'amministratore');
+      await admin.goto(`${base}/strumenti?sezione=banche-dati`);
+      await admin.getByRole('button', { name: 'Aggiorna adesso' }).click();
+      // La pagina segue il giro da sola; alla fine l'ultimo è quello del pulsante.
+      await admin.getByText(/Pulsante «Aggiorna adesso» \(/).waitFor({ timeout: 30_000 });
+      await admin.getByRole('caption').filter({ hasText: 'Aggiornamenti recenti' }).waitFor();
+      await expect(
+        admin.getByRole('table', { name: 'Aggiornamenti recenti' }).getByRole('row').count(),
+      ).resolves.toBe(3);
+      await check(admin, 'aggiornamento delle banche dati (amministratore)', true);
+    } finally {
+      await ctx.close();
+    }
+  });
+
   it('modelli dei certificati: impaginazione del medico, modello dello studio, rilascio e annullamento (tappa 13)', async () => {
     // Impaginazione del medico, con la prova di stampa.
     await page
@@ -1178,8 +1256,20 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {
-    // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20.
-    const extra = generatePatients({ seed: `molte-cartelle-${s.studioId}`, count: 18 });
+    // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20. Senza
+    // omonimi: il seme cambia a ogni giro, e due «Neri Ada» farebbero cercare la scheda sbagliata.
+    const used = new Set(
+      (await t.db.select().from(patient)).map((p) => `${p.lastName} ${p.firstName}`),
+    );
+    const extra = generatePatients({ seed: `molte-cartelle-${s.studioId}`, count: 60 })
+      .filter((p) => {
+        const name = `${p.lastName} ${p.firstName}`;
+        if (used.has(name)) return false;
+        used.add(name);
+        return true;
+      })
+      .slice(0, 18);
+    expect(extra).toHaveLength(18);
     const added = await withActor(t.db, s.users.titolare.id, (tx) =>
       tx
         .insert(patient)

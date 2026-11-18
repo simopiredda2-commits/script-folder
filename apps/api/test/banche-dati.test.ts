@@ -264,12 +264,18 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     expect(await ref.municipality('A074', '2020-01-01')).toBeUndefined();
   });
 
-  it('A6: ogni versione in uso ha la sua data; la vecchiaia si segnala solo con una soglia', async () => {
+  it('A6: ogni versione in uso ha la sua data; la vecchiaia si segnala con la soglia della fonte', async () => {
     const versions = await new ReferenceData(t.db, repo).versions(today);
     const comuni = versions.find((v) => v.kind === 'comuni')!;
     expect(comuni).toMatchObject({
       validFrom: today,
       validFromBasis: 'scaricamento',
+      staleAfterDays: 185,
+      stale: false,
+      staleReasons: [],
+    });
+    // Senza soglia e senza aggiornamenti registrati non si sa: nessun avviso, né falso né vero.
+    expect(versions.find((v) => v.series === 'aifa-anagrafica')).toMatchObject({
       staleAfterDays: null,
       stale: null,
     });

@@ -127,6 +127,13 @@
       "when": 1795035043138,
       "tag": "0017_codice_nomenclatore",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795036688054,
+      "tag": "0018_aggiornamenti_banche_dati",
+      "breakpoints": true
     }
   ]
 }

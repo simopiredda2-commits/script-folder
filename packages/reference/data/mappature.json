@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-18.3",
+  "versione": "2026-11-18.4",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -15,8 +15,8 @@
         "provinceAbbr": "Sigla automobilistica",
         "cadastralCode": "Codice Catastale del Comune"
       },
-      "vecchiaDopoGiorni": null,
-      "nota": "Intestazioni lette il 18/11/2026 dal file ISTAT aggiornato al 21/02/2026, con un'estrazione testuale del foglio: da confermare sul file che sync scarica al primo giro. Soglia di vecchiaia da completare."
+      "vecchiaDopoGiorni": 185,
+      "nota": "Intestazioni lette il 18/11/2026 dal file ISTAT aggiornato al 21/02/2026, con un'estrazione testuale del foglio: da confermare sul file che sync scarica al primo giro. Soglia di vecchiaia (D156): ISTAT aggiorna l'elenco «almeno ogni sei mesi» (sync/fonti.json, letta il 17/11/2026), quindi 184 giorni più una notte."
     },
     {
       "id": "aifa-anagrafica",
@@ -36,7 +36,7 @@
         "holder": "RAGIONE_SOCIALE"
       },
       "vecchiaDopoGiorni": null,
-      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA confezioni_fornitura.csv (drive.aifa.gov.it/farmaci/, collegato dalla pagina «Liste dei farmaci»): 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Soglia di vecchiaia da completare."
+      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA confezioni_fornitura.csv (drive.aifa.gov.it/farmaci/, collegato dalla pagina «Liste dei farmaci»): 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Nessuna soglia di vecchiaia (D156): AIFA pubblica ogni giorno, ma il contenuto può restare uguale e una soglia d'età darebbe avvisi falsi; vale il controllo di ogni notte."
     },
     {
       "id": "aifa-classe-a",

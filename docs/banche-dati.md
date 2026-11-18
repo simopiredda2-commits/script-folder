@@ -102,7 +102,52 @@ Le forme dei codici: AIC di 9 cifre (tutti i 160.101 dell'anagrafica AIFA letta 
 - Ogni importazione è una versione **immutabile** (`reference_dataset` e tabelle `ref_*`, con divieto di modifica, cancellazione e svuotamento nel database).
 - Data d'inizio: per i file di `sync/` il giorno del download; per le trascrizioni la data dell'atto.
 - **A5.** Alla data di una ricetta, per ogni serie vale la versione con la data d'inizio più recente non successiva; a parità di data, l'ultima importata. Esempio provato: il 29/10/2026 vale il catalogo precedente, dal 30/10/2026 quello nuovo.
-- **A6.** `GET /api/banche-dati` e ogni ricerca restituiscono `versioni`: tipo, titolo, data d'inizio e su che cosa si basa, data del download, righe, atto. `stale` dice se la versione è più vecchia del previsto; è `null` finché la soglia è da completare. Non blocca nulla: il controllo finale resta del SAC.
+- **A6.** `GET /api/banche-dati` e ogni ricerca restituiscono `versioni`: tipo, titolo, data d'inizio e su che cosa si basa, data del download, righe, atto, ultimo controllo della fonte (`checkedAt`). `stale` dice se la versione è più vecchia del previsto e `staleReasons` perché (D156, sotto). Non blocca nulla: il controllo finale resta del SAC.
+
+## Aggiornamento continuo (D156)
+
+Banche dati e tabelle di codici si aggiornano da sole ogni notte, e quando serve anche subito. Un solo giro fa tutto: `sync/` scarica dalle fonti solo ciò che è cambiato (A1), l'importazione controlla e mette in uso le versioni nuove (A3, A5), il giro resta nel registro (`reference_update_run`).
+
+Il giro si avvia in tre modi:
+
+- **ogni notte**, all'ora di `BANCHE_DATI_AGGIORNAMENTO` (per esempio `03:30`, ora dello studio). L'orologio tiene conto del cambio dell'ora. Se il servizio era spento all'ora prevista, il giro perso parte un minuto dopo l'avvio;
+- **con il comando** `pnpm banche-dati:aggiorna`, anche da un'attività pianificata del server;
+- **con il pulsante «Aggiorna adesso»**, solo per l'amministratore dello studio (`admin.reference_data`), in Strumenti › Banche dati.
+
+Le regole del giro:
+
+- **Uno alla volta.** Un secondo giro trova il primo in corso e non parte. Un giro rimasto «in corso» per più di 6 ore si chiude come interrotto. Alla chiusura del servizio il download si ferma e il giro resta interrotto.
+- **Cadenza dei controlli.** Tutte le fonti, ogni notte (A1): le richieste condizionate rendono leggero un controllo che non trova nulla di nuovo.
+- **Che cosa dice l'esito.** Le regole sono quelle di `sync/` e del comando d'importazione:
+  - `ok`;
+  - `da_verificare`: una versione nuova trattenuta, un PDF da trascrivere, un file sparito dalla pagina;
+  - `errore`: una fonte che non risponde, un file non valido, un'impronta diversa;
+  - `interrotto`.
+- **Che cosa resta di ogni giro.**
+  - Il rapporto JSON di `sync/` (`ultimo-rapporto.json`), il rapporto dell'importazione e le cose da controllare.
+  - Per ogni serie in uso: l'ultimo controllo riuscito della sua fonte, se il controllo di quel giro è fallito, e se una versione più nuova aspetta qualcuno.
+
+**Più vecchia del previsto** (A6), con il motivo accanto alla data della versione:
+
+- l'ultimo aggiornamento non è riuscito a controllare la sua fonte;
+- l'aggiornamento di ogni notte manca, cioè nessun giro è partito dopo l'ultima ora prevista;
+- una versione più nuova aspetta la verifica in `sync/` (A3), oppure il file nuovo non è entrato in uso (colonne, righe non valide);
+- per le trascrizioni: il PDF trascritto è cambiato alla fonte, oppure la stessa fonte ha documenti nuovi da trascrivere. È il caso del catalogo regionale quando la Regione pubblica una determina nuova;
+- la versione supera la soglia d'età della sua fonte (`vecchiaDopoGiorni`). C'è solo dove la fonte dichiara una cadenza regolare. Oggi è il caso dell'ISTAT, che aggiorna l'elenco dei comuni «almeno ogni sei mesi»: 184 giorni più una notte, 185. AIFA pubblica l'anagrafica ogni giorno, ma il contenuto può restare uguale, quindi una soglia d'età darebbe avvisi falsi: vale il controllo di ogni notte. Le altre fonti non hanno una cadenza regolare.
+
+Senza giri registrati e senza soglia, `stale` è `null`: non si sa, e non si avvisa.
+
+**Configurazione** (variabili d'ambiente del servizio, `.env.example`):
+
+| Variabile                   | Che cosa                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `BANCHE_DATI_DIR`           | cartella dei dati di `sync/`; senza, il servizio non aggiorna nulla (sviluppo e prove)      |
+| `BANCHE_DATI_TRASCRIZIONI`  | cartella delle trascrizioni dei PDF                                                         |
+| `BANCHE_DATI_FONTI`         | `pubbliche` (`sync/fonti.json`, per difetto), `esempio` (sito d'esempio) o un file di fonti |
+| `BANCHE_DATI_AGGIORNAMENTO` | ora dell'aggiornamento di ogni notte, `HH:MM`; senza, solo comando e pulsante               |
+| `SYNC_CONTATTO`             | email nello User-Agent di `sync/`, perché i gestori dei siti sappiano chi scarica           |
+
+In sviluppo e nelle prove non c'è `BANCHE_DATI_DIR`, quindi il servizio non chiama nessun sito (regola 7). Le prove usano il sito d'esempio servito in locale.
 
 ## Che cosa ne ricavano le regole
 
@@ -126,14 +171,16 @@ Con un fatto non noto le regole si comportano come senza banca dati (D42): non b
 
 Servono una sessione; non sono dati dei pazienti, quindi niente registro degli accessi alla cartella. Parametro facoltativo `data=AAAA-MM-GG` per consultare le banche dati a una data (A5).
 
-| Rotta                     | Risposta                                                          |
-| ------------------------- | ----------------------------------------------------------------- |
-| `GET /api/banche-dati`    | versioni in uso                                                   |
-| `GET /api/farmaci?q=`     | farmaci per nome, principio attivo, AIC o ATC, con versioni       |
-| `GET /api/farmaci/:aic`   | il farmaco e gli equivalenti del suo gruppo                       |
-| `GET /api/prestazioni?q=` | prestazioni per descrizione, branca, codice regionale o nazionale |
-| `GET /api/esenzioni?q=`   | esenzioni per codice o descrizione                                |
-| `GET /api/comuni/:codice` | comune per codice catastale                                       |
+| Rotta                                 | Risposta                                                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/banche-dati`                | versioni in uso                                                                                                     |
+| `GET /api/farmaci?q=`                 | farmaci per nome, principio attivo, AIC o ATC, con versioni                                                         |
+| `GET /api/farmaci/:aic`               | il farmaco e gli equivalenti del suo gruppo                                                                         |
+| `GET /api/prestazioni?q=`             | prestazioni per descrizione, branca, codice regionale o nazionale                                                   |
+| `GET /api/esenzioni?q=`               | esenzioni per codice o descrizione                                                                                  |
+| `GET /api/comuni/:codice`             | comune per codice catastale                                                                                         |
+| `GET /api/banche-dati/aggiornamenti`  | ora e prossimo aggiornamento, giro in corso, ultimo giro con le cose da controllare, ultimi dieci giri              |
+| `POST /api/banche-dati/aggiornamenti` | avvia subito un giro (solo l'amministratore dello studio); 409 se uno è in corso o se il servizio non è configurato |
 
 Le banche dati pubbliche non sono dati del medico: non entrano nella sua esportazione.
 
@@ -142,7 +189,11 @@ Le banche dati pubbliche non sono dati del medico: non entrano nella sua esporta
 ```sh
 pnpm banche-dati:importa -- --dati ~/dati-pubblici --trascrizioni ~/trascrizioni
 pnpm banche-dati:importa -- --esempio      # sync sul sito d'esempio, poi importazione (dati dimostrativi)
+pnpm banche-dati:aggiorna -- --dati ~/dati-pubblici --trascrizioni ~/trascrizioni   # giro completo (D156)
+pnpm banche-dati:aggiorna -- --esempio     # giro completo sul sito d'esempio
 ```
+
+`banche-dati:aggiorna` prende la cartella, le trascrizioni e le fonti anche dalle variabili del servizio (`BANCHE_DATI_DIR`, `BANCHE_DATI_TRASCRIZIONI`, `BANCHE_DATI_FONTI`): un'attività pianificata del server lo può lanciare senza opzioni.
 
 Codici d'uscita come `sync/`: `0` tutto a posto, `1` almeno un errore, `2` qualcosa da completare o verificare.
 
@@ -155,6 +206,10 @@ Codici d'uscita come `sync/`: `0` tutto a posto, `1` almeno un errore, `2` qualc
 - Le prove (`apps/api/test/banche-dati.test.ts`) servono il sito in locale, lanciano `sync/banche_dati.py` vero e importano il suo output (D63).
 
 ## Che cosa non è stato provato
+
+- L'aggiornamento di ogni notte sulle fonti vere: provato solo sul sito d'esempio, con un orologio finto per l'ora e per i due cambi dell'ora. Il primo giro sui siti veri va fatto da un computer dello studio (requisiti, «Ambiente di test»).
+- Due istanze del servizio insieme: un giro solo alla volta è garantito dal database (vincolo sul giro in corso), provato con due avvii nello stesso servizio.
+- I moduli dei certificati non sono ancora tra le fonti controllate: gli atti dei modelli ufficiali entreranno in `sync/fonti.json` con la tappa 13.
 
 - L'importazione nel database dei file AIFA interi: le mappature sono state controllate sui file interi del 18/11/2026 (forme di AIC, ATC e prezzi), ma `sync/` sul sito vero e l'importazione completa non sono stati lanciati da qui. Il file ISTAT completo non si raggiunge dal cloud.
 - Le intestazioni ISTAT vengono da un'estrazione testuale, non dai byte del file: da confermare al primo giro.

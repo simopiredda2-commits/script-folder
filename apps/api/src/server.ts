@@ -1,10 +1,16 @@
 import { buildApp } from './app';
 import { loadConfig } from './config';
 import { createDatabase, createPool } from './db/client';
+import { referenceUpdatesFromConfig } from './reference/updates-service';
 
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
-const app = buildApp({ db: createDatabase(pool), config, logger: true });
+const db = createDatabase(pool);
+// Aggiornamento delle banche dati (D156): solo se la configurazione lo chiede (BANCHE_DATI_DIR).
+const referenceUpdates = referenceUpdatesFromConfig(db, config.referenceUpdate, {
+  log: (message, err) => console.error(message, err),
+});
+const app = buildApp({ db, config, logger: true, referenceUpdates });
 
 const shutdown = async () => {
   await app.close();
@@ -14,3 +20,9 @@ process.on('SIGINT', () => void shutdown());
 process.on('SIGTERM', () => void shutdown());
 
 await app.listen({ port: config.port, host: config.host });
+await referenceUpdates.startScheduler();
+if (referenceUpdates.time) {
+  app.log.info(
+    `Aggiornamento delle banche dati ogni notte alle ${referenceUpdates.time}; prossimo: ${referenceUpdates.nextRun()?.toISOString()}`,
+  );
+}

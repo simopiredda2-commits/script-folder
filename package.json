@@ -16,7 +16,8 @@
     "format": "prettier --write .",
     "fixtures": "pnpm --filter @mmg/fixtures generate",
     "db:seed": "pnpm --filter @mmg/api db:seed",
-    "banche-dati:importa": "pnpm --filter @mmg/api banche-dati:importa"
+    "banche-dati:importa": "pnpm --filter @mmg/api banche-dati:importa",
+    "banche-dati:aggiorna": "pnpm --filter @mmg/api banche-dati:aggiorna"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

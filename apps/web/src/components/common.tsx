@@ -58,6 +58,10 @@ export interface DatasetVersion {
   downloadedAt: string | null;
   act: string | null;
   stale: boolean | null;
+  /** Perché è più vecchia del previsto (D156). */
+  staleReasons?: string[];
+  /** Ultimo controllo riuscito della sua fonte (D156). */
+  checkedAt?: string | null;
 }
 
 /** A6: ogni schermata che usa una banca dati mostra la data della versione in uso. */
@@ -89,10 +93,30 @@ export function DataVersions({
                 ? `in vigore dal ${date(v.validFrom)}${v.act ? ` (${v.act})` : ''}`
                 : `scaricata il ${v.downloadedAt ? dateTime(v.downloadedAt) : date(v.validFrom)}`}
             </span>
-            {v.stale && <strong className="versioni-vecchia"> · più vecchia del previsto</strong>}
+            {v.checkedAt && (
+              <span className="versioni-data"> · fonte controllata il {dateTime(v.checkedAt)}</span>
+            )}
+            {v.stale && (
+              <>
+                <strong className="versioni-vecchia">
+                  {' '}
+                  · <Icon name="avviso" /> più vecchia del previsto
+                </strong>
+                {v.staleReasons && v.staleReasons.length > 0 && (
+                  <ul className="versioni-motivi">
+                    {v.staleReasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
           </li>
         ))}
       </ul>
+      <Link className="versioni-aggiornamento" to="/strumenti?sezione=banche-dati">
+        Aggiornamento delle banche dati
+      </Link>
     </div>
   );
 }

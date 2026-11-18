@@ -9,7 +9,7 @@ import {
   type ServiceIndex,
 } from '@mmg/reference';
 import type { DrugFacts } from '@mmg/rules';
-import { and, desc, eq, ilike, inArray, lte, or, type SQL } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, lte, or, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
   refDpcDrug,
@@ -20,7 +20,9 @@ import {
   refMunicipality,
   refService,
   referenceDataset,
+  referenceUpdateRun,
 } from '../db/schema';
+import type { SeriesStatus } from './update';
 
 /** Versione di una banca dati, come la vedono le schermate (A6). */
 export interface DatasetVersion {
@@ -35,11 +37,30 @@ export interface DatasetVersion {
   rows: number;
   act: string | null;
   origin: string;
-  /** Oltre quanti giorni la versione è più vecchia del previsto; null = soglia da completare. */
+  /** Oltre quanti giorni la versione è più vecchia del previsto; null = nessuna soglia d'età. */
   staleAfterDays: number | null;
-  /** Vero se più vecchia del previsto; null se la soglia non c'è. Non blocca nulla (A6). */
+  /**
+   * Vero se più vecchia del previsto (A6, D156): la sua fonte non è stata controllata nell'ultimo
+   * aggiornamento, l'aggiornamento di stanotte manca, una versione più nuova aspetta qualcuno, o è
+   * oltre la soglia d'età. Null se non si sa nulla (nessun aggiornamento registrato e nessuna
+   * soglia). Non blocca nulla: il controllo finale resta del SAC.
+   */
   stale: boolean | null;
+  /** Perché è più vecchia del previsto, in parole. */
+  staleReasons: string[];
+  /** Ultimo controllo riuscito della sua fonte, se si sa. */
+  checkedAt: string | null;
 }
+
+/** Da dove la consultazione sa se le versioni sono aggiornate (D156). */
+export interface Freshness {
+  now: () => Date;
+  /** Da quando dovrebbe esserci un aggiornamento nuovo; null senza aggiornamento automatico. */
+  expectedSince: (at: Date) => Date | null;
+}
+
+const dayIt = (d: Date | string) =>
+  new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome' }).format(new Date(d));
 
 export interface DrugInfo {
   aic: string;
@@ -114,7 +135,35 @@ export class ReferenceData {
   constructor(
     private readonly db: Database,
     private readonly mappings?: MappingSet,
+    private readonly freshness?: Freshness,
   ) {}
+
+  /** Stato delle serie dopo l'ultimo aggiornamento finito, e se quello di stanotte manca. */
+  private async updateState() {
+    const [last] = await this.db
+      .select({
+        startedAt: referenceUpdateRun.startedAt,
+        seriesStatus: referenceUpdateRun.seriesStatus,
+      })
+      .from(referenceUpdateRun)
+      .where(isNotNull(referenceUpdateRun.finishedAt))
+      .orderBy(desc(referenceUpdateRun.startedAt))
+      .limit(1);
+    const [started] = await this.db
+      .select({ startedAt: referenceUpdateRun.startedAt })
+      .from(referenceUpdateRun)
+      .orderBy(desc(referenceUpdateRun.startedAt))
+      .limit(1);
+    const series = new Map(
+      ((last?.seriesStatus as SeriesStatus[] | null) ?? []).map((x) => [x.series, x]),
+    );
+    const expected = this.freshness ? this.freshness.expectedSince(this.freshness.now()) : null;
+    const late =
+      expected && (!started || started.startedAt.getTime() < expected.getTime())
+        ? `l’aggiornamento di ogni notte manca dal ${dayIt(expected)}`
+        : null;
+    return { series, last: last ?? null, late, scheduled: expected !== null };
+  }
 
   async inEffect(kind: DatasetKind, date: string) {
     return this.db
@@ -146,12 +195,27 @@ export class ReferenceData {
     kinds: readonly DatasetKind[] = Object.keys(KINDS) as DatasetKind[],
   ) {
     const out: DatasetVersion[] = [];
+    const state = await this.updateState();
     for (const kind of kinds) {
       for (const d of await this.inEffect(kind, date)) {
         const staleAfterDays = this.staleAfter(d.series, kind);
         const reference = d.downloadedAt
           ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(d.downloadedAt)
           : d.validFrom;
+        const status = state.series.get(d.series);
+        // Una versione che sync non aggiorna (trascrizione senza PDF scaricato) non dipende dalla notte.
+        const updatable = d.origin === 'sync' || !!d.source;
+        const reasons: string[] = [...(status?.pending ?? [])];
+        if (status?.checkFailed && state.last) {
+          reasons.push(
+            `l’aggiornamento del ${dayIt(state.last.startedAt)} non è riuscito a controllare la fonte`,
+          );
+        }
+        if (state.late && updatable) reasons.push(state.late);
+        const tooOld = staleAfterDays !== null && daysBetween(reference, date) > staleAfterDays;
+        if (tooOld) reasons.push(`scaricata da più di ${staleAfterDays} giorni`);
+        const known =
+          status !== undefined || staleAfterDays !== null || (state.scheduled && updatable);
         out.push({
           kind,
           kindLabel: KINDS[kind].label,
@@ -165,7 +229,9 @@ export class ReferenceData {
           act: d.act,
           origin: d.origin,
           staleAfterDays,
-          stale: staleAfterDays === null ? null : daysBetween(reference, date) > staleAfterDays,
+          stale: reasons.length > 0 ? true : known ? false : null,
+          staleReasons: reasons,
+          checkedAt: status?.checkedAt ?? null,
         });
       }
     }

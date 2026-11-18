@@ -42,6 +42,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Gestire le stampanti | No | No | No | No | No | Sì |
 | Gestire le intestazioni | No | No | No | No | No | Sì |
 | Gestire i modelli | No | No | No | No | No | Sì |
+| Avviare subito l’aggiornamento delle banche dati | No | No | No | No | No | Sì |
 
 <!-- matrice:fine -->
 

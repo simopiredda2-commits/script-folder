@@ -22,6 +22,7 @@ import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
 import { registerReferenceRoutes } from './http/reference-routes';
+import { registerReferenceUpdateRoutes } from './http/reference-update-routes';
 import { registerReminderRoutes } from './http/reminder-routes';
 import { registerTherapyRoutes } from './http/therapy-routes';
 import { registerTodayRoutes } from './http/today-routes';
@@ -50,6 +51,7 @@ import {
 } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
+import { ReferenceUpdates } from './reference/updates-service';
 import { createReminderService } from './reminders/service';
 
 // I messaggi di validazione arrivano all'interfaccia: in italiano, come il resto (D85).
@@ -102,6 +104,11 @@ export interface AppDeps {
    * simulatore rilascia i certificati del programma all'avvio, solo in memoria (regola 7).
    */
   fse?: { gateway: FseGatewayClient; audience: string; signer: DocumentSigner };
+  /**
+   * Aggiornamento delle banche dati (D156). Per difetto nessuno: in sviluppo e nelle prove il
+   * servizio non scarica nulla (regola 7); in produzione lo prepara server.ts dalla configurazione.
+   */
+  referenceUpdates?: ReferenceUpdates;
 }
 
 export function buildApp({
@@ -124,6 +131,7 @@ export function buildApp({
   reminderSender = new SimulatedReminderSender(),
   sendTimeoutMs,
   fse = defaultFse(now),
+  referenceUpdates = new ReferenceUpdates(db, null, now ? { now } : {}),
 }: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
   const auth = createAuthService({
@@ -208,8 +216,14 @@ export function buildApp({
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
   registerFollowUpRoutes(app, db, now ?? (() => new Date()));
   // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
-  const reference = new ReferenceData(db, loadMappings());
+  const reference = new ReferenceData(db, loadMappings(), {
+    now: now ?? (() => new Date()),
+    expectedSince: (at) => referenceUpdates.expectedSince(at),
+  });
   registerReferenceRoutes(app, reference, now ?? (() => new Date()));
+  registerReferenceUpdateRoutes(app, db, referenceUpdates);
+  // Alla chiusura si ferma l'orologio e il download in corso (il giro resta «interrotto»).
+  app.addHook('onClose', async () => referenceUpdates.stop());
   registerPrescriptionRoutes(
     app,
     createPrescriptionService({

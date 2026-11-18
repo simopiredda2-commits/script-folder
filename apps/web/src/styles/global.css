@@ -721,6 +721,45 @@ legend {
   color: var(--color-warning);
 }
 
+.versioni-motivi {
+  color: var(--color-text);
+}
+
+/* Il collegamento all'aggiornamento: bersaglio di almeno 44 px. */
+.versioni-aggiornamento {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Aggiornamento delle banche dati (D156): esito con simbolo e parola. */
+.esito-aggiornamento {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.esito-fatto {
+  color: var(--color-success);
+}
+
+.esito-avviso {
+  color: var(--color-warning);
+}
+
+.esito-errore {
+  color: var(--color-danger);
+}
+
+.esito-info {
+  color: var(--color-info);
+}
+
+.da-controllare > li {
+  margin-bottom: 0.5rem;
+}
+
 /* Oggi ------------------------------------------------------------------------------------ */
 
 .agenda {

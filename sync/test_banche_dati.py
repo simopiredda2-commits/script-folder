@@ -148,6 +148,14 @@ class ProvaGiri(unittest.TestCase):
         self.assertIn("t_file/Elenco-comuni-italiani.xlsx", stato)
         self.assertEqual(stato["t_pagina/Classe-A.csv"]["righe"], 100)
         self.assertTrue((self.dest / "ultimo-rapporto.md").exists())
+        # lo stesso rapporto in JSON, per il programma che importa
+        rj = json.loads((self.dest / "ultimo-rapporto.json").read_text())
+        self.assertEqual(rj["fonti"], ["t_pagina", "t_file", "t_osserva"])
+        self.assertLessEqual(rj["iniziato_il"], rj["finito_il"])
+        esiti = {(r["fonte"], r["nome"]): r["esito"] for r in rj["righe"]}
+        self.assertEqual(esiti[("t_pagina", "Classe-A.csv")], "nuovo")
+        self.assertEqual(esiti[("t_pagina", "rotto.csv")], "errore")
+        self.assertEqual(len(list((self.dest / "rapporti").glob("*.json"))), 1)
         registro = (self.dest / "registro.jsonl").read_text().splitlines()
         self.assertTrue(any('"esito": "errore"' in r and "pagina web" in r for r in registro))
 
@@ -160,6 +168,12 @@ class ProvaGiri(unittest.TestCase):
         self.assertEqual(self.giro(), 0)
         dopo = sorted(p.name for p in (self.dest / "archivio").rglob("*") if p.is_file())
         self.assertEqual(prima, dopo)
+        rj = json.loads((self.dest / "ultimo-rapporto.json").read_text())
+        self.assertTrue(all(r["esito"] in ("invariato", "registrato") for r in rj["righe"]), rj["righe"])
+        # ogni file controllato in questo giro, anche quelli fermi (304 compreso), ha l'ora del controllo
+        stato = json.loads((self.dest / "stato.json").read_text())["file"]
+        for k in ("t_pagina/Classe-A.csv", "t_pagina/825643_Lista_farmaci_equivalenti.csv", "t_file/Elenco-comuni-italiani.xlsx"):
+            self.assertGreaterEqual(stato[k]["controllato_il"], rj["iniziato_il"], k)
 
         # 3) nuova pubblicazione: Classe A con nuovo nome e +5% righe (va in uso);
         #    lista equivalenti +70% righe (resta da verificare, in uso la vecchia)
@@ -169,11 +183,16 @@ class ProvaGiri(unittest.TestCase):
             ("/web/media/57684/download", "Farmaci PHT DPC"))
         PERCORSI["/files/Classe-A_31-12-2026.csv"] = {"corpo": csv_righe(105, "15/12/2026")}
         PERCORSI["/documents/20142/825643/Lista_farmaci_equivalenti.csv/ab-12"] = {"corpo": csv_righe(170)}
+        giro_prima = json.loads((self.dest / "ultimo-rapporto.json").read_text())["giro"]
         self.assertEqual(self.giro(), 2)
         self.assertEqual(self.corrente("Classe-A.csv"), csv_righe(105, "15/12/2026"))
         self.assertEqual(self.corrente("825643_Lista_farmaci_equivalenti.csv"), csv_righe(100))
         stato = json.loads((self.dest / "stato.json").read_text())["file"]
         self.assertIsNotNone(stato["t_pagina/825643_Lista_farmaci_equivalenti.csv"].get("in_attesa"))
+        # la fonte è stata controllata anche se la versione nuova aspetta la verifica
+        rj = json.loads((self.dest / "ultimo-rapporto.json").read_text())
+        self.assertGreaterEqual(stato["t_pagina/825643_Lista_farmaci_equivalenti.csv"]["controllato_il"], rj["iniziato_il"])
+        self.assertNotEqual(rj["giro"], giro_prima)
         rapporto = (self.dest / "ultimo-rapporto.md").read_text()
         self.assertIn("oltre la soglia", rapporto)
 

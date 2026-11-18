@@ -26,7 +26,11 @@ const mappingSchema = z.object({
    * con il motivo nella nota della mappatura.
    */
   nessunValore: z.record(z.string(), z.array(z.string().min(1))).default({}),
-  /** Oltre quanti giorni la versione in uso è più vecchia del previsto (A6); null = da completare. */
+  /**
+   * Oltre quanti giorni dal download la versione in uso è più vecchia del previsto (A6). Solo
+   * dove la fonte dichiara una cadenza regolare; null = nessuna soglia d'età, vale il controllo di
+   * ogni notte (D156).
+   */
   vecchiaDopoGiorni: z.number().int().positive().nullable(),
   nota: z.string().optional(),
 });

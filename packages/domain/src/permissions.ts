@@ -55,6 +55,8 @@ export const ACTIONS = [
   'admin.printers',
   'admin.headers',
   'admin.templates',
+  /** Avviare subito l'aggiornamento delle banche dati, senza aspettare la notte (D156). */
+  'admin.reference_data',
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -83,6 +85,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'admin.printers': 'Gestire le stampanti',
   'admin.headers': 'Gestire le intestazioni',
   'admin.templates': 'Gestire i modelli',
+  'admin.reference_data': 'Avviare subito l’aggiornamento delle banche dati',
 };
 
 const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
@@ -132,6 +135,7 @@ const ADMINISTRATOR: Action[] = [
   'admin.printers',
   'admin.headers',
   'admin.templates',
+  'admin.reference_data',
 ];
 
 export const ADMIN_ACTIONS: readonly Action[] = ADMINISTRATOR;

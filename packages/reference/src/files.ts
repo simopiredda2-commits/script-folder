@@ -33,6 +33,8 @@ const syncEntrySchema = z
     sha256: z.string().optional(),
     byte: z.number().optional(),
     scaricato_il: z.string().optional(),
+    /** Ultimo controllo riuscito alla fonte (anche se il file non era cambiato). */
+    controllato_il: z.string().optional(),
     righe: z.number().nullable().optional(),
     colonne: z.number().nullable().optional(),
     intestazione: z.array(z.string()).nullable().optional(),
@@ -52,6 +54,49 @@ export type SyncEntry = z.infer<typeof syncEntrySchema>;
 export function readSyncState(dir: string): SyncEntry[] {
   const raw: unknown = JSON.parse(readFileSync(join(dir, 'stato.json'), 'utf-8'));
   return Object.values(syncStateSchema.parse(raw).file);
+}
+
+/** Esiti di un file nel rapporto di sync (Contesto.esito in sync/banche_dati.py). */
+export const SYNC_OUTCOMES = [
+  'invariato',
+  'nuovo',
+  'aggiornato',
+  'da_verificare',
+  'errore',
+  'registrato',
+] as const;
+
+const syncReportSchema = z.object({
+  versione: z.literal(1),
+  banche_dati: z.string(),
+  /** Identificativo del giro: distingue il rapporto di questo giro da quello del precedente. */
+  giro: z.string(),
+  iniziato_il: z.string(),
+  finito_il: z.string(),
+  /** Le fonti elaborate in quel giro (tutte, o quelle di --solo). */
+  fonti: z.array(z.string()),
+  righe: z.array(
+    z.object({
+      fonte: z.string(),
+      nome: z.string(),
+      esito: z.enum(SYNC_OUTCOMES),
+      note: z.array(z.string()),
+      righe: z.number().nullable(),
+    }),
+  ),
+});
+
+export type SyncReport = z.infer<typeof syncReportSchema>;
+
+/** Legge ultimo-rapporto.json, il rapporto dell'ultimo giro di sync; null se non c'è. */
+export function readSyncReport(dir: string): SyncReport | null {
+  let text: string;
+  try {
+    text = readFileSync(join(dir, 'ultimo-rapporto.json'), 'utf-8');
+  } catch {
+    return null;
+  }
+  return syncReportSchema.parse(JSON.parse(text));
 }
 
 // --------------------------------------------------------------------------- trascrizioni

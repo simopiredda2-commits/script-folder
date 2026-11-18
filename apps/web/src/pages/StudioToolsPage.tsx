@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { DataUpdatesSection } from './DataUpdatesSection';
 import { LayoutSection, TemplatesSection } from './TemplatesTools';
 
 interface Option {
@@ -75,11 +76,13 @@ const SECTIONS = [
   { key: 'modelli', label: 'Modelli dei certificati', doctorOnly: false },
   { key: 'impaginazione', label: 'Impaginazione', doctorOnly: true },
   { key: 'fascicolo', label: 'Fascicolo sanitario', doctorOnly: false },
+  { key: 'banche-dati', label: 'Banche dati', doctorOnly: false },
 ] as const;
 
 /**
  * Strumenti dello studio: modelli dei certificati e impaginazione del medico (tappa 13),
- * impostazioni del Fascicolo Sanitario Elettronico (tappa 11). Le impostazioni del Fascicolo sono i
+ * impostazioni del Fascicolo Sanitario Elettronico (tappa 11), aggiornamento delle banche dati
+ * (D156). Le impostazioni del Fascicolo sono i
  * valori dell'accreditamento presso il Gateway: le inserisce l'amministratore, gli altri le leggono.
  */
 export function StudioToolsPage() {
@@ -106,6 +109,7 @@ export function StudioToolsPage() {
       {current.key === 'modelli' && <TemplatesSection />}
       {current.key === 'impaginazione' && <LayoutSection />}
       {current.key === 'fascicolo' && <FseSection />}
+      {current.key === 'banche-dati' && <DataUpdatesSection />}
     </>
   );
 }

@@ -49,8 +49,14 @@ describe('mappature del repository', () => {
     }
   });
 
-  it('le soglie di vecchiaia (A6) non ci sono nei requisiti: restano da completare', () => {
-    expect(repo.mappings.every((m) => m.vecchiaDopoGiorni === null)).toBe(true);
+  it('soglia di vecchiaia (A6) solo dove la fonte dichiara una cadenza regolare (D156)', () => {
+    // ISTAT: «almeno ogni sei mesi» (sync/fonti.json) → 184 giorni più una notte.
+    const soglie = Object.fromEntries(repo.mappings.map((m) => [m.id, m.vecchiaDopoGiorni]));
+    expect(soglie['istat-comuni']).toBe(185);
+    // Le altre no: vale il controllo di ogni notte.
+    expect(repo.mappings.filter((m) => m.vecchiaDopoGiorni !== null).map((m) => m.id)).toEqual([
+      'istat-comuni',
+    ]);
   });
 });
 

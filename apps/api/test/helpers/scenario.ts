@@ -89,7 +89,10 @@ export async function createScenario(
     | 'sickLeaveGateway'
     | 'regional'
     | 'fse'
-  > = {},
+  > & {
+    /** Aggiornamento delle banche dati (D156), costruito con l'orologio della prova. */
+    referenceUpdates?: (now: () => Date) => NonNullable<AppDeps['referenceUpdates']>;
+  } = {},
 ): Promise<Scenario> {
   const clock = new Clock();
   const encryptionKey = randomBytes(32);
@@ -359,11 +362,13 @@ export async function createScenario(
       .returning({ id: sickLeaveCertificate.id }),
   );
 
+  const { referenceUpdates, ...deps } = appOptions;
   const app = buildApp({
     db,
     config: { encryptionKey, sessionMaxHours: 12, cookieSecure: false },
     now: clock.now,
-    ...appOptions,
+    ...deps,
+    ...(referenceUpdates ? { referenceUpdates: referenceUpdates(clock.now) } : {}),
     secondFactor,
   });
   return {
