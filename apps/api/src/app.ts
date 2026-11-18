@@ -11,6 +11,7 @@ import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
 import { registerReferenceRoutes } from './http/reference-routes';
+import { registerTherapyRoutes } from './http/therapy-routes';
 import { registerTodayRoutes } from './http/today-routes';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
@@ -113,6 +114,7 @@ export function buildApp({
   registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
   registerPatientRoutes(app, db);
   registerTodayRoutes(app, db, now ?? (() => new Date()));
+  registerTherapyRoutes(app, db, now ?? (() => new Date()));
   // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
   const reference = new ReferenceData(db, loadMappings());
   registerReferenceRoutes(app, reference, now ?? (() => new Date()));

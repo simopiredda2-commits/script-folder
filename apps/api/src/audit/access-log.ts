@@ -31,7 +31,10 @@ export type AccessAction =
   | 'lettura_storico_prescrizioni'
   | 'lettura_cronologia'
   | 'lettura_esami'
-  | 'ricetta_stato';
+  | 'ricetta_stato'
+  | 'nuova_terapia'
+  | 'modifica_terapia'
+  | 'sospensione_terapia';
 
 export interface AccessEntry {
   studioId?: string | null;

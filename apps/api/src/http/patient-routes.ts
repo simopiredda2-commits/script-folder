@@ -43,13 +43,19 @@ const registryPatch = z
   .strict();
 
 export function registerPatientRoutes(app: FastifyInstance, db: Database) {
-  app.get('/api/io', (req) => {
+  app.get('/api/io', async (req) => {
     const actor = req.actor!;
+    // L'archivio di cui l'utente è titolare: impostazioni ed esportazione dall'interfaccia.
+    const [own] = await db
+      .select({ id: archive.id, nome: archive.name })
+      .from(archive)
+      .where(and(eq(archive.studioId, actor.studioId), eq(archive.ownerUserId, actor.userId)));
     return {
       id: actor.userId,
       nome: actor.displayName,
       ruoli: actor.roles.map((r) => ({ codice: r, nome: ROLE_LABELS[r] })),
       postazione: actor.workstation,
+      archivio: own ?? null,
     };
   });
 
@@ -125,6 +131,7 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
             ),
           problemiAttivi: await db
             .select({
+              id: problemDetail.entryId,
               descrizione: problemDetail.description,
               codice: problemDetail.icdCode,
               dal: problemDetail.onsetOn,
