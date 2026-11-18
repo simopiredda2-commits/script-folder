@@ -34,6 +34,8 @@ export const KINDS = {
       atc: ATC,
       form: { type: 'text' },
       supplyRegime: { type: 'text' },
+      /** Ditta titolare dell'AIC: per i generici, il nome del fornitore (D151). */
+      holder: { type: 'text' },
     },
   },
   /** Elenchi AIFA dei farmaci di classe A e H, con prezzo e gruppo di equivalenza. */

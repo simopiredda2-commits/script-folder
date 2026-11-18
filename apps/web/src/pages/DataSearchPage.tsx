@@ -41,6 +41,7 @@ function Equivalents({ aic }: { aic: string }) {
       <thead>
         <tr>
           <th scope="col">Medicinale</th>
+          <th scope="col">Ditta</th>
           <th scope="col">AIC</th>
           <th scope="col">Prezzo</th>
         </tr>
@@ -49,6 +50,7 @@ function Equivalents({ aic }: { aic: string }) {
         {r.data.equivalenti.map((e) => (
           <tr key={e.aic}>
             <td>{[e.name, e.pack].filter(Boolean).join(' ')}</td>
+            <td>{e.holder ?? '—'}</td>
             <td className="codice">{e.aic}</td>
             <td className="numero">{money(e.price)}</td>
           </tr>

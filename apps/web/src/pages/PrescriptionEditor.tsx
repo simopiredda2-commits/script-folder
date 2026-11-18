@@ -28,6 +28,8 @@ export interface Drug {
   aifaNote: string | null;
   dpc: boolean;
   planRequired: boolean | null;
+  /** Ditta titolare dell'AIC: per i generici, il fornitore (D151). */
+  holder: string | null;
 }
 
 export interface Service {
@@ -124,10 +126,11 @@ function AlreadyPrescribed({
   );
 }
 
-/** Descrizione breve di un farmaco della banca dati: confezione, classe, nota, DPC, piano. */
+/** Descrizione breve di un farmaco della banca dati: confezione, ditta, classe, nota, DPC, piano. */
 export function drugFacts(d: Drug): string[] {
   return [
     d.pack,
+    d.holder && `ditta ${d.holder}`,
     d.drugClass && `classe ${d.drugClass}`,
     d.aifaNote && `Nota ${d.aifaNote}`,
     d.dpc && 'in DPC',

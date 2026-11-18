@@ -40,6 +40,8 @@ export interface DrugInfo {
   atc: string | null;
   form: string | null;
   supplyRegime: string | null;
+  /** Ditta titolare dell'AIC: per i generici, il fornitore (D151). */
+  holder: string | null;
   drugClass: string | null;
   price: string | null;
   equivalenceGroup: string | null;
@@ -200,6 +202,7 @@ export class ReferenceData {
         atc,
         form: pick(d.map((x) => x.form)),
         supplyRegime: pick(d.map((x) => x.supplyRegime)),
+        holder: pick(d.map((x) => x.holder)),
         drugClass: classA ? 'A' : pick(c.map((x) => x.drugClass)),
         price: pick((classA ? [classA] : c).map((x) => x.price)),
         equivalenceGroup: pick(c.map((x) => x.equivalenceGroup)),

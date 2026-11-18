@@ -77,6 +77,8 @@ export const refDrug = pgTable(
     atc: text(),
     form: text(),
     supplyRegime: text(),
+    /** Ditta titolare dell'AIC (D151). */
+    holder: text(),
   },
   (t) => [index().on(t.datasetId, t.aic)],
 );

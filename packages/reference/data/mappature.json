@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-18.2",
+  "versione": "2026-11-18.3",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -32,7 +32,8 @@
         "activeIngredient": "PA_ASSOCIATI",
         "atc": "CODICE_ATC",
         "form": "FORMA",
-        "supplyRegime": "FORNITURA"
+        "supplyRegime": "FORNITURA",
+        "holder": "RAGIONE_SOCIALE"
       },
       "vecchiaDopoGiorni": null,
       "nota": "Intestazioni lette il 18/11/2026 dal file AIFA confezioni_fornitura.csv (drive.aifa.gov.it/farmaci/, collegato dalla pagina «Liste dei farmaci»): 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Soglia di vecchiaia da completare."

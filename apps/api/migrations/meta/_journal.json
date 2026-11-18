@@ -113,6 +113,13 @@
       "when": 1795022252186,
       "tag": "0015_modelli_dei_certificati",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795030219357,
+      "tag": "0016_ditta_titolare",
+      "breakpoints": true
     }
   ]
 }

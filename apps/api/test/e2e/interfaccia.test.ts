@@ -425,6 +425,9 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByRole('button', { name: 'Mostra gli equivalenti' })
       .click();
     await page.getByRole('table').waitFor();
+    // La ditta di ogni generico, nella tabella degli equivalenti (D151).
+    await page.getByRole('columnheader', { name: 'Ditta' }).waitFor();
+    await page.getByRole('cell', { name: 'EG S.P.A.' }).waitFor();
     await page
       .getByText(/scaricata il/)
       .first()

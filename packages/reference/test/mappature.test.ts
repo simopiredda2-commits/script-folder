@@ -91,6 +91,7 @@ describe('estrazione dei record', () => {
       atc: 'C08CA01',
       form: 'Compressa',
       supplyRegime: 'Medicinali soggetti a prescrizione medica',
+      holder: 'DOC GENERICI SRL',
     });
   });
 

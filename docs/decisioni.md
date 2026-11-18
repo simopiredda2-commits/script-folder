@@ -578,3 +578,10 @@ Da ora una prova su tutto il codice (`packages/brand/test/provenienza.test.ts`) 
   - Al paziente principale (30 anni, diabete tipo 1) si aggiunge l'ipotiroidismo, con pressione e peso da trentenne.
   - Le estrazioni casuali sono le stesse di prima, quindi i pazienti delle schermate non cambiano.
 - **Che cosa non vale.** Le dosi (per esempio 14 unità di glargine la sera) sono dati inventati di pazienti inventati: non sono indicazioni terapeutiche (regola 3).
+
+**D151 · La ditta dei generici si vede.** Simone: «l'importante è che il nome dei fornitori possa essere mostrato sui farmaci generici». I generici si distinguono per la ditta, e il medico deve poterla vedere quando sceglie una confezione.
+
+- L'anagrafica AIFA ha la ditta titolare dell'AIC nella colonna `RAGIONE_SOCIALE`: la mappatura la importa nel campo `holder` (migrazione 0016).
+- La ditta si vede nei risultati della ricerca dei farmaci (pagina «Farmaci e prestazioni», ricetta, terapia) e in una colonna della tabella degli equivalenti.
+- Nelle schermate per il sito di SCRIPT le terapie restano per principio attivo, senza ditte (D149). Il programma la ditta la mostra, dove serve al medico.
+- Nella scheda di una terapia già salvata la ditta non è un dato a parte: per i generici è già nel nome della confezione (per esempio «AMLODIPINA EG»). Si può aggiungere se servirà.

@@ -174,6 +174,8 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       pack: '5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
       activeIngredient: 'AMLODIPINA BESILATO',
       atc: 'C08CA01',
+      // La ditta del generico, dall'anagrafica AIFA (D151).
+      holder: 'DOC GENERICI SRL',
       drugClass: 'A',
       price: '3.74',
       equivalenceGroup: 'DOB',
@@ -210,10 +212,10 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     expect(await aics('02742')).toEqual(['027428010']);
     expect(await aics('100%')).toEqual([]);
     const eq = await ref.equivalents('038092019', today);
-    expect(eq.map((x) => [x.aic, x.price])).toEqual([
-      ['037479060', '3.74'],
-      ['038548032', '3.74'],
-      ['027428010', '5.53'],
+    expect(eq.map((x) => [x.aic, x.price, x.holder])).toEqual([
+      ['037479060', '3.74', 'EG S.P.A.'],
+      ['038548032', '3.74', 'TEVA ITALIA S.R.L.'],
+      ['027428010', '5.53', 'VIATRIS PHARMA S.R.L.'],
     ]);
   });
 

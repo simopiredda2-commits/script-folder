@@ -41,13 +41,13 @@ Non importati per ora: liste di trasparenza, farmaci carenti, registri e piani A
 
 Stato al 18/11/2026:
 
-| Mappatura         | Stato                                                                                                                                                                                              |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `istat-comuni`    | Completa. Intestazioni lette dal file ISTAT al 21/02/2026 tramite un'estrazione testuale: da confermare (D56)                                                                                      |
-| `aifa-anagrafica` | Completa (D148). Intestazioni lette il 18/11/2026 da `confezioni_fornitura.csv`: 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa                                        |
-| `aifa-classe-a`   | Completa (D148). File del 30/6/2026 in cp1252: 10.766 righe, AIC e prezzi tutti validi. **Non ha la colonna della nota AIFA**                                                                      |
-| `aifa-classe-h`   | Completa (D148). File del 30/6/2026: 2.487 righe; l'intestazione «Codice AIC» va a capo dentro le virgolette; 117 prezzi senza valore («-» e il prezzo dell'ossigeno a metro cubo, `nessunValore`) |
-| `trascrizione-*`  | Complete: il formato è nostro (sotto)                                                                                                                                                              |
+| Mappatura         | Stato                                                                                                                                                                                                                 |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `istat-comuni`    | Completa. Intestazioni lette dal file ISTAT al 21/02/2026 tramite un'estrazione testuale: da confermare (D56)                                                                                                         |
+| `aifa-anagrafica` | Completa (D148). Intestazioni lette il 18/11/2026 da `confezioni_fornitura.csv`: 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Con la ditta titolare dell'AIC (`RAGIONE_SOCIALE`, D151) |
+| `aifa-classe-a`   | Completa (D148). File del 30/6/2026 in cp1252: 10.766 righe, AIC e prezzi tutti validi. **Non ha la colonna della nota AIFA**                                                                                         |
+| `aifa-classe-h`   | Completa (D148). File del 30/6/2026: 2.487 righe; l'intestazione «Codice AIC» va a capo dentro le virgolette; 117 prezzi senza valore («-» e il prezzo dell'ossigeno a metro cubo, `nessunValore`)                    |
+| `trascrizione-*`  | Complete: il formato è nostro (sotto)                                                                                                                                                                                 |
 
 **Se AIFA cambia le colonne.** `sync/` mette il file nuovo «da verificare» (colonne cambiate). Dopo il controllo: si correggono i nomi delle colonne nella mappatura, si alza la `versione` del file e si rilancia l'importazione. Con una colonna nulla il rapporto dice «mappatura da completare» e riporta l'intestazione vera, letta da `stato.json`.
 
