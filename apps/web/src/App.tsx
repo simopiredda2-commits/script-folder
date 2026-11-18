@@ -21,6 +21,7 @@ import { SchedulePage } from './pages/SchedulePage';
 import { ServiceCredentialsPage } from './pages/ServiceCredentialsPage';
 import { SignQueuePage } from './pages/SignQueuePage';
 import { SuppliesPage } from './pages/SuppliesPage';
+import { HealthProfilePage } from './pages/HealthProfilePage';
 import { TherapyForm } from './pages/TherapyForm';
 import { TodayPage } from './pages/TodayPage';
 
@@ -50,6 +51,7 @@ function Screens() {
           <Route path="/pazienti/:id/piani" element={<PlansPage />} />
           <Route path="/pazienti/:id/seguito" element={<FollowUpPage />} />
           <Route path="/pazienti/:id/presidi" element={<SuppliesPage />} />
+          <Route path="/pazienti/:id/profilo-sanitario" element={<HealthProfilePage />} />
           <Route path="/pazienti/:id/terapie/nuova" element={<TherapyForm />} />
           <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
           <Route path="/pazienti/:id/terapie/:therapyId/modifica" element={<TherapyForm />} />

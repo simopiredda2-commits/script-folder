@@ -1,5 +1,5 @@
 import { COMPANY_BRAND, PRODUCT_NAME } from '@mmg/brand';
-import { doctorIssues, patientIssues, PSS_STATUS_LABELS } from '@mmg/domain';
+import { can, doctorIssues, patientIssues, PSS_STATUS_LABELS } from '@mmg/domain';
 import {
   buildPssCda,
   pssSchematron,
@@ -286,7 +286,7 @@ export function createPssService(deps: PssDeps) {
 
   return {
     async overview(actor: Actor, patientId: string) {
-      const { patient } = await guardPatient(
+      const { patient, context } = await guardPatient(
         db,
         actor,
         patientId,
@@ -307,6 +307,8 @@ export function createPssService(deps: PssDeps) {
           }),
         inLavorazione: open ? view(open) : null,
         mancano,
+        /** Chi guarda può preparare, firmare e pubblicare (titolare o sostituto). */
+        puoFirmare: can(actor, 'fse.publish', { ...context, now: now() }).allowed,
       };
     },
 

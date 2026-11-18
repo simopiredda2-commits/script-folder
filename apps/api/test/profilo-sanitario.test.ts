@@ -10,7 +10,7 @@ import {
 } from '@mmg/integrations';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { fseTransmission, pssDocument, therapy } from '../src/db/schema';
+import { archiveGrant, fseTransmission, patient, pssDocument, therapy } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
 import { studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
@@ -260,8 +260,27 @@ describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
   });
 
   it('chi può: il collega di gruppo e la segreteria no; il contenuto validato non cambia nel database', async () => {
+    // Il collega della medicina di gruppo, autorizzato: legge la cartella, non firma il Profilo.
+    const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    await t.db.insert(archiveGrant).values({
+      archiveId: rich!.archiveId,
+      granteeUserId: s.users.collega.id,
+      kind: 'group_colleague',
+      validFrom: new Date(s.clock.now().getTime() - 86_400_000),
+      validTo: new Date(s.clock.now().getTime() + 86_400_000),
+      reason: 'Medicina di gruppo di prova',
+      grantedBy: s.users.titolare.id,
+    });
     const colleague = await login(s, 'collega');
-    expect((await req('POST', `${base()}/bozza`, undefined, colleague)).statusCode).toBe(403);
+    const seen = await req('GET', base(), undefined, colleague);
+    expect(seen.statusCode, seen.body).toBe(200);
+    expect(seen.json<{ puoFirmare: boolean }>().puoFirmare).toBe(false);
+    const denied = await req('POST', `${base()}/bozza`, undefined, colleague);
+    expect(denied.statusCode).toBe(403);
+    expect(denied.json<{ errore: string }>().errore).toBe(
+      'Il Profilo lo firma il medico di famiglia del paziente o il suo sostituto',
+    );
+    expect((await ok<{ puoFirmare: boolean }>('GET', base())).puoFirmare).toBe(true);
     const secretary = await login(s, 'segreteria');
     expect((await req('GET', base(), undefined, secretary)).statusCode).toBe(403);
     const [published] = await t.db

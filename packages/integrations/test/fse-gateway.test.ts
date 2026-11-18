@@ -63,7 +63,7 @@ const problemType = (r: FseResult) => (r.outcome === 'problem' ? r.problem.type 
 function setup(now = () => new Date('2026-11-18T10:00:00Z')) {
   const sim = new SimulatedFseGateway({ now });
   const credentials = sim.issueCredentials('Programma di prova');
-  return { sim, credentials, client: new FseGatewayClient(sim, credentials, now) };
+  return { sim, credentials, now, client: new FseGatewayClient(sim, credentials, now) };
 }
 
 describe('Gateway del Fascicolo: cliente e simulatore', () => {
@@ -206,7 +206,7 @@ describe('Gateway del Fascicolo: cliente e simulatore', () => {
   });
 
   it('i token: paziente diverso dal documento, certificati non rilasciati, token scaduti, file cambiato', async () => {
-    const { sim, client, credentials } = setup();
+    const { sim, client, credentials, now } = setup();
     const input = sampleInput();
     const pdf = await pdfOf(input);
     expect(problemType(await client.validate(caller, 'ALTRPZ70A41X001X', pdf))).toBe(
@@ -214,18 +214,23 @@ describe('Gateway del Fascicolo: cliente e simulatore', () => {
     );
     // Certificati fatti da sé, non rilasciati dal Gateway.
     const own = createTestCertificate({ commonName: 'Fatto in casa' });
-    const foreign = new FseGatewayClient(sim, {
-      ...credentials,
-      authentication: { der: own.der, privateKeyPem: own.privateKeyPem },
-    });
-    expect(problemType(await foreign.validate(caller, PATIENT, pdf))).toBe('/msg/unauthorized');
-    const unsignedTokens = new FseGatewayClient(sim, {
-      ...credentials,
-      signature: { der: own.der, privateKeyPem: own.privateKeyPem },
-    });
-    expect(problemType(await unsignedTokens.validate(caller, PATIENT, pdf))).toBe(
-      '/msg/jwt-validation',
+    // Stesso orologio del Gateway: il rifiuto deve venire dal certificato, non dall'ora dei token.
+    const foreign = new FseGatewayClient(
+      sim,
+      { ...credentials, authentication: { der: own.der, privateKeyPem: own.privateKeyPem } },
+      now,
     );
+    expect(problemType(await foreign.validate(caller, PATIENT, pdf))).toBe('/msg/unauthorized');
+    const unsignedTokens = new FseGatewayClient(
+      sim,
+      { ...credentials, signature: { der: own.der, privateKeyPem: own.privateKeyPem } },
+      now,
+    );
+    const r0 = await unsignedTokens.validate(caller, PATIENT, pdf);
+    expect(r0.outcome === 'problem' && [r0.problem.type, r0.problem.detail]).toEqual([
+      '/msg/jwt-validation',
+      'Certificato di firma del token non riconosciuto',
+    ]);
     // Orologio del programma indietro di un'ora: i token sono già scaduti per il Gateway.
     const late = new FseGatewayClient(sim, credentials, () => new Date('2026-11-18T09:00:00Z'));
     const r = await late.validate(caller, PATIENT, pdf);
