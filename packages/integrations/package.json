@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@mmg/domain": "workspace:*"
+    "@mmg/domain": "workspace:*",
+    "pdf-lib": "1.17.1"
   }
 }

@@ -56,6 +56,8 @@ export const doctorProfile = pgTable('doctor_profile', {
     .primaryKey()
     .references(() => appUser.id),
   regionalCode: text(),
+  /** Codice fiscale del medico: va sul promemoria (DM 2 novembre 2011, allegato 2, campo 20). */
+  fiscalCode: text(),
   asl: text(),
   headerText: text(),
   stampText: text(),

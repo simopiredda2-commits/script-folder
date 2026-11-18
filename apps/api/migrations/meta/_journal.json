@@ -57,6 +57,13 @@
       "when": 1794994948070,
       "tag": "0007_stato_erogazione",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795000681515,
+      "tag": "0008_promemoria",
+      "breakpoints": true
     }
   ]
 }

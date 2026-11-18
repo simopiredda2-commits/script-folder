@@ -44,6 +44,8 @@ export const PRESCRIPTION_TABLES = [
   'prescription_line',
   'external_submission',
   'prescription_check',
+  'prescription_document',
+  'reminder_delivery',
 ] as const;
 
 /**

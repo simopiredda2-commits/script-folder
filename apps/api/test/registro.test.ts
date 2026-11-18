@@ -207,18 +207,25 @@ describe('storico delle modifiche e dati mai cancellati', () => {
   it('ogni tabella con dati dei pazienti ha storico e divieto di cancellazione', async () => {
     const res = await s.db.execute<{ table_name: string }>(sql`
       select distinct table_name from information_schema.columns
-      where table_schema = 'public' and column_name in ('patient_id', 'entry_id', 'prescription_id')
-        and table_name not in ('access_log', 'external_submission', 'prescription_check')`);
+      where table_schema = 'public' and column_name in ('patient_id', 'entry_id', 'prescription_id')`);
     const triggers = await s.db.execute<{ name: string }>(
       sql`select tgname as name from pg_trigger where not tgisinternal`,
     );
     const names = new Set(triggers.rows.map((r) => r.name));
+    // Tabelle di sola aggiunta: non si modificano affatto (più dello storico).
+    const appendOnly = [
+      'access_log',
+      'external_submission',
+      'prescription_check',
+      'prescription_document',
+      'reminder_delivery',
+    ];
     for (const { table_name } of res.rows) {
+      if (appendOnly.includes(table_name)) continue;
       expect(names, table_name).toContain(`${table_name}_history`);
       expect(names, table_name).toContain(`${table_name}_no_delete`);
     }
-    // Tabelle di sola aggiunta: non si modificano affatto.
-    for (const t of ['access_log', 'external_submission', 'prescription_check']) {
+    for (const t of appendOnly) {
       expect(names, t).toContain(`${t}_immutable`);
       expect(names, t).toContain(`${t}_no_truncate`);
     }

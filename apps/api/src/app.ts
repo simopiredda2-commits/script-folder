@@ -11,13 +11,21 @@ import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
 import { registerReferenceRoutes } from './http/reference-routes';
+import { registerReminderRoutes } from './http/reminder-routes';
 import { registerTherapyRoutes } from './http/therapy-routes';
 import { registerTodayRoutes } from './http/today-routes';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
-import { SimulatedGateway, type GatewaySystem, type PrescriptionGateway } from '@mmg/integrations';
+import {
+  SimulatedGateway,
+  SimulatedReminderSender,
+  type GatewaySystem,
+  type PrescriptionGateway,
+  type ReminderSender,
+} from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
+import { createReminderService } from './reminders/service';
 
 // I messaggi di validazione arrivano all'interfaccia: in italiano, come il resto (D85).
 z.config(z.locales.it());
@@ -47,6 +55,10 @@ export interface AppDeps {
   gateways?: Record<GatewaySystem, PrescriptionGateway>;
   /** Controlli prima dell'invio delle ricette (regole di prescrizione). */
   preSendChecks?: PrescriptionDeps['preSendChecks'];
+  /** Email e SMS del promemoria. Per difetto il simulatore (regola 7). */
+  reminderSender?: ReminderSender;
+  /** Tempo massimo di attesa dell'invio delle ricette, in millisecondi (D94). */
+  sendTimeoutMs?: number;
 }
 
 export function buildApp({
@@ -56,6 +68,8 @@ export function buildApp({
   logger = false,
   gateways = { sar: new SimulatedGateway('sar'), sistema_ts: new SimulatedGateway('sistema_ts') },
   preSendChecks,
+  reminderSender = new SimulatedReminderSender(),
+  sendTimeoutMs,
 }: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
   const auth = createAuthService({
@@ -129,9 +143,11 @@ export function buildApp({
       now,
       // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
       preSendChecks: preSendChecks ?? createRulesCheck({ db, now, reference }),
+      sendTimeoutMs,
     }),
     db,
     now ?? (() => new Date()),
   );
+  registerReminderRoutes(app, createReminderService({ db, sender: reminderSender, now }));
   return app;
 }

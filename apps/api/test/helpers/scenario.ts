@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import type { Role } from '@mmg/domain';
+import { buildFiscalCode, type Role } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
 import type { FastifyInstance } from 'fastify';
 import { buildApp, type AppDeps } from '../../src/app';
@@ -68,12 +68,17 @@ export interface Scenario {
 export async function createScenario(
   db: Database,
   settings: Partial<typeof studio.$inferInsert> = {},
-  appOptions: Pick<AppDeps, 'gateways' | 'preSendChecks'> = {},
+  appOptions: Pick<AppDeps, 'gateways' | 'preSendChecks' | 'reminderSender' | 'sendTimeoutMs'> = {},
 ): Promise<Scenario> {
   const clock = new Clock();
   const [st] = await db
     .insert(studio)
-    .values({ name: 'Studio associato di prova', kind: 'group', ...settings })
+    .values({
+      name: 'Studio associato di prova',
+      kind: 'group',
+      regionName: 'PIEMONTE',
+      ...settings,
+    })
     .returning();
   const studioId = st!.id;
   const passwordHash = await hashPassword(PASSWORD);
@@ -94,9 +99,28 @@ export async function createScenario(
     sostituto: await mk('sostituto', 'Dott. Marco Fiore', ['substitute_doctor']),
     amministratore: await mk('amministratore', 'Andrea Conti', ['administrator']),
   };
+  // Codici fiscali inventati: luogo di nascita con la X, che nessun comune ha (D12).
+  const doctorCf = (surname: string, name: string, sex: 'M' | 'F') =>
+    buildFiscalCode({ surname, name, birthDate: '1970-01-01', sex, placeCode: 'X001' });
   await db.insert(doctorProfile).values([
-    { userId: users.titolare.id, regionalCode: 'MMG-PROVA-1', asl: 'ASL di prova' },
-    { userId: users.collega.id, regionalCode: 'MMG-PROVA-2', asl: 'ASL di prova' },
+    {
+      userId: users.titolare.id,
+      regionalCode: 'MMG-PROVA-1',
+      asl: 'ASL di prova',
+      fiscalCode: doctorCf('Marchi', 'Elena', 'F'),
+    },
+    {
+      userId: users.collega.id,
+      regionalCode: 'MMG-PROVA-2',
+      asl: 'ASL di prova',
+      fiscalCode: doctorCf('Serra', 'Paolo', 'M'),
+    },
+    {
+      userId: users.sostituto.id,
+      regionalCode: 'MMG-PROVA-3',
+      asl: 'ASL di prova',
+      fiscalCode: doctorCf('Fiore', 'Marco', 'M'),
+    },
   ]);
 
   const [a1] = await db

@@ -8,7 +8,7 @@
  * si attiva al primo accesso.
  */
 import { randomBytes } from 'node:crypto';
-import type { Role } from '@mmg/domain';
+import { buildFiscalCode, type Role } from '@mmg/domain';
 import { generatePatients, Random } from '@mmg/fixtures';
 import { inArray } from 'drizzle-orm';
 import { loadConfig } from '../config';
@@ -103,7 +103,7 @@ try {
 
   const [st] = await db
     .insert(studio)
-    .values({ name: 'Studio medico dimostrativo', kind: 'single' })
+    .values({ name: 'Studio medico dimostrativo', kind: 'single', regionName: 'PIEMONTE' })
     .returning();
   const passwords = new Map<string, string>();
   const users = new Map<string, string>();
@@ -117,9 +117,32 @@ try {
     users.set(u.username, row!.id);
   }
   const doctorId = users.get('medico')!;
-  await db
-    .insert(doctorProfile)
-    .values({ userId: doctorId, regionalCode: 'DEMO-0001', asl: 'ASL dimostrativa' });
+  await db.insert(doctorProfile).values({
+    userId: doctorId,
+    regionalCode: 'DEMO-0001',
+    asl: 'ASL dimostrativa',
+    // Inventato: luogo di nascita con la X, che nessun comune ha (D12).
+    fiscalCode: buildFiscalCode({
+      surname: 'Marchi',
+      name: 'Elena',
+      birthDate: '1970-01-01',
+      sex: 'F',
+      placeCode: 'X001',
+    }),
+  });
+  // Anche il sostituto firma a nome suo: gli serve il profilo con il codice fiscale (inventato).
+  await db.insert(doctorProfile).values({
+    userId: users.get('sostituto')!,
+    regionalCode: 'DEMO-0002',
+    asl: 'ASL dimostrativa',
+    fiscalCode: buildFiscalCode({
+      surname: 'Fiore',
+      name: 'Marco',
+      birthDate: '1970-01-01',
+      sex: 'M',
+      placeCode: 'X001',
+    }),
+  });
   const [arc] = await db
     .insert(archive)
     .values({ studioId: st!.id, ownerUserId: doctorId, name: 'Archivio della Dott.ssa Marchi' })

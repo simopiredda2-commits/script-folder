@@ -7,6 +7,7 @@ import type {
   SendResult,
   StatusResult,
 } from './prescription-gateway';
+import { simulatedWhiteReminderPdf } from './simulated-documents';
 
 export type SimulatedOutcome = 'accepted' | 'rejected' | 'unreachable' | 'timeout';
 
@@ -20,6 +21,10 @@ export interface SimulatorOptions {
    * annullata se è stata annullata qui.
    */
   decideStatus?: (nre: string) => DispensingState | 'unreachable' | 'timeout';
+  /** Ricetta SSN accettata ma senza codice di autenticazione: per provare che il promemoria non esce. */
+  omitAuthCode?: (message: PrescriptionMessage) => boolean;
+  /** Attesa prima della risposta, per provare il tempo massimo di attesa. */
+  delayMs?: number;
 }
 
 /**
@@ -39,33 +44,61 @@ export class SimulatedGateway implements PrescriptionGateway {
     private readonly options: SimulatorOptions = {},
   ) {}
 
-  send(message: PrescriptionMessage): Promise<SendResult> {
+  async send(message: PrescriptionMessage): Promise<SendResult> {
     this.received.push(message);
+    if (this.options.delayMs) await new Promise((ok) => setTimeout(ok, this.options.delayMs));
     const outcome = this.options.decide?.(message) ?? 'accepted';
     switch (outcome) {
       case 'accepted': {
         this.counter += 1;
         const nre = `SIM${this.system === 'sar' ? 'R' : 'B'}${String(this.counter).padStart(12, '0')}`;
         this.issued.set(nre, { cancelled: false });
-        return Promise.resolve({ outcome, nre, raw: { simulatore: this.system, nre } });
+        if (this.system === 'sar') {
+          // Codice di autenticazione di fantasia, riconoscibile come i numeri del simulatore.
+          const authCode = this.options.omitAuthCode?.(message)
+            ? null
+            : `SIMAUT${String(this.counter).padStart(24, '0')}`;
+          return {
+            outcome,
+            nre,
+            authCode,
+            doctorName: message.doctor.name,
+            raw: { simulatore: this.system, nre, codAutenticazione: authCode },
+          };
+        }
+        const pinNrbe = `S${String(this.counter % 10000).padStart(4, '0')}`;
+        const reminderPdf = await simulatedWhiteReminderPdf({
+          nrbe: nre,
+          pinNrbe,
+          patientFiscalCode: message.patientFiscalCode,
+          compiledAt: message.compiledAt,
+          lines: message.lines,
+        });
+        return {
+          outcome,
+          nre,
+          pinNrbe,
+          reminderPdf,
+          // Il PDF non entra nel registro degli invii: lì basta sapere che c'era e quanto pesa.
+          raw: {
+            simulatore: this.system,
+            nre,
+            pinNrbe,
+            pdfPromemoria: { byte: reminderPdf.length },
+          },
+        };
       }
       case 'rejected':
-        return Promise.resolve({
+        return {
           outcome,
           code: 'SIM-001',
           message: 'Simulatore: ricetta rifiutata per prova',
           raw: { simulatore: this.system, esito: 'rifiutata' },
-        });
+        };
       case 'unreachable':
-        return Promise.resolve({
-          outcome,
-          message: `${this.label()} non raggiungibile (simulato)`,
-        });
+        return { outcome, message: `${this.label()} non raggiungibile (simulato)` };
       case 'timeout':
-        return Promise.resolve({
-          outcome,
-          message: `${this.label()}: nessuna risposta in tempo (simulato)`,
-        });
+        return { outcome, message: `${this.label()}: nessuna risposta in tempo (simulato)` };
     }
   }
 

@@ -34,7 +34,10 @@ export type AccessAction =
   | 'ricetta_stato'
   | 'nuova_terapia'
   | 'modifica_terapia'
-  | 'sospensione_terapia';
+  | 'sospensione_terapia'
+  | 'stampa_promemoria'
+  | 'invio_promemoria'
+  | 'lettura_consegne_promemoria';
 
 export interface AccessEntry {
   studioId?: string | null;

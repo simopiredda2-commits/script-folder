@@ -15,6 +15,9 @@ const lineSchema = z
     notSubstitutable: z.boolean().optional(),
     notSubstitutableReason: z.string().max(500).nullable().optional(),
     posologyText: z.string().max(500).nullable().optional(),
+    /** Ricetta bianca ripetibile, solo se diverso dalla regola del farmaco (D93). */
+    repeatCount: z.number().int().min(0).max(99).nullable().optional(),
+    validityMonths: z.number().int().min(1).max(99).nullable().optional(),
   })
   .strict()
   .refine((l) => l.drugName || l.drugAic || l.serviceCode || l.serviceDescription, {
@@ -36,9 +39,20 @@ export const draftSchema = z
       .nullable()
       .optional(),
     reminderContact: z.string().trim().max(200).nullable().optional(),
+    /** Su richiesta del paziente: cognome, nome e indirizzo oscurati (oscuramDati). */
+    obscured: z.boolean().optional(),
     lines: z.array(lineSchema).min(1).max(10),
   })
-  .strict();
+  .strict()
+  .refine(
+    (d) =>
+      d.kind === 'white' || d.lines.every((l) => l.repeatCount == null && l.validityMonths == null),
+    { message: 'La ripetibilità si indica solo sulla ricetta bianca', path: ['lines'] },
+  )
+  .refine((d) => !d.obscured || d.kind === 'pharma_ssn' || d.kind === 'specialist_ssn', {
+    message: 'L’oscuramento di nome e indirizzo vale per le ricette SSN',
+    path: ['obscured'],
+  });
 
 export const repeatSchema = z.object({ terapie: z.array(z.uuid()).min(1).max(20) }).strict();
 
