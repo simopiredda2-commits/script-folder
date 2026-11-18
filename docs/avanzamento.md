@@ -13,7 +13,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
   2. tappa 9 (voci cliniche): fatta (D112–D120);
   3. tappa 10 (presidi e seguito delle prestazioni): fatta (D121–D124);
   4. `docs/fse.md` (D110): fatto, con le fonti ufficiali sul Profilo Sanitario Sintetico;
-  5. prossimo passo: la fermata finale con la pull request delle tappe 9 e 10.
+  5. fermata finale fatta (D125–D128): via all'unione della pull request #5; dettatura fuori; BMI scritto a mano; via alle tappe 11 e 12.
+- **Terzo giro** (D128): tappa 11 (Profilo Sanitario Sintetico con un simulatore del Gateway), poi tappa 12 (condivisione nell'AFT), nel branch `tappe-11-12`, con una fermata dopo la tappa 12.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -465,9 +466,17 @@ Durante la tappa 8:
 
 - **Net Medica Italia** (domanda della Dr.ssa Rocca): far comunicare medici con programmi diversi senza comprare quel servizio. Raccolte le informazioni pubbliche, fatta una proposta (D104). È una domanda della terza fermata; non è costruito nulla.
 
-## Domande per la fermata finale del secondo giro (aperte)
+## Risposte della fermata finale del secondo giro (18/11/2026)
 
-Annotate durante le tappe 9 e 10, da fare con il pulsante alla fermata:
+- **Via**: unire la pull request #5 (D125).
+- **Dettatura vocale**: fuori per ora (D126).
+- **BMI**: «se diventa dispositivo medico no; se ci sono gli estremi ok; altrimenti resta da compilare». Gli estremi non risultano dalle fonti trovate: resta scritto a mano (D127).
+- **Fascicolo e AFT**: via alla tappa 11, poi alla 12 (D128).
+- **Medicazioni avanzate**: resta il blocco (D123), non chiesto alla fermata per tenere poche domande.
+
+## Domande della fermata finale del secondo giro (chiuse)
+
+Annotate durante le tappe 9 e 10:
 
 1. **Via** per unire la pull request delle tappe 9 e 10.
 2. **Dettatura vocale del diario** (D119): fuori; dettatura del sistema operativo; riconoscimento solo nel browser da cercare.

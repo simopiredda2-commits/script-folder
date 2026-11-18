@@ -401,3 +401,17 @@ Da completare:
 - i percorsi dematerializzati (alimenti senza glutine, dispositivi per diabetici con il piano di automonitoraggio glicemico): non ho trovato specifiche pubbliche.
 
 **D124 · Modifiche del 2026 ai LEA da verificare.** La ricerca ha riportato una nota del Ministero della salute: il DPCM 12/1/2017 sarebbe stato integrato e modificato dal DM 3 agosto 2026 e dal DPCM 7 agosto 2026. La pagina del Ministero non si legge in modo automatico (controllo anti-robot), quindi non l'ho verificato. Gli articoli usati (10–14) sono quelli del testo del 2017: prima dell'uso vero vanno confrontati con il testo vigente.
+
+## Risposte della fermata finale del secondo giro (18/11/2026)
+
+Simone ha risposto con il pulsante.
+
+**D125 · Via all'unione della pull request #5** (tappe 9 e 10, SPID o CIE, documento sul Fascicolo).
+
+**D126 · Dettatura vocale del diario: fuori per ora.** Conferma D119. Si riprende quando ci sarà un riconoscimento vocale che non manda l'audio fuori dallo studio.
+
+**D127 · BMI: resta scritto a mano.** Risposta: «Se diventa dispositivo medico no. Se ci sono gli estremi per poterlo fare allora ok. Altrimenti resta da compilare». Ho cercato la fonte: la linea guida europea MDCG 2019-11 (rev. 1 del 2025) e il manuale sui casi di confine. Dalla ricerca risulta che il manuale tratta il calcolo di un punteggio con una formula come un'azione sui dati che va oltre la semplice ricerca (passo 3 della linea guida); gli esempi sono CHA₂DS₂-VASc e Cockcroft-Gault. Non ho trovato un caso sul BMI e non ho letto i testi integrali. Gli estremi non ci sono: il BMI resta da compilare, come oggi. Da riesaminare con il consulente regolatorio sui testi integrali.
+
+**D128 · Via alle tappe 11 e 12.** Prima il Profilo Sanitario Sintetico con un simulatore del Gateway (tappa 11), poi la condivisione tra i medici dell'AFT (tappa 12), con lo stesso metodo: fonti, simulatori, prove e sabotaggi, schermate. Branch `tappe-11-12`, una fermata dopo la tappa 12. Si parte dalle fonti non ancora lette elencate in `docs/fse.md`.
+
+**Medicazioni avanzate (D123)**: resta il blocco oltre i 6 mesi per il medico di famiglia, come deciso; si cambia se Simone lo chiede o se l'atto regionale dice altro.
