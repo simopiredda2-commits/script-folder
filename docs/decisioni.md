@@ -452,7 +452,7 @@ Tipo di attività clinica e regime si scelgono tra i valori delle tabelle 57 e 6
 
 - le patologie croniche, gli organi mancanti, i trapianti e le malformazioni;
 - le allergie attive;
-- le terapie in corso, se hanno l'AIC o l'ATC e la via;
+- le terapie croniche in corso, se hanno l'AIC o l'ATC e la via (le altre terapie in corso il medico le può aggiungere);
 - l'anamnesi familiare, se ha il parente e il codice della patologia;
 - gli ultimi parametri, gli stili di vita e la capacità motoria.
 
@@ -495,3 +495,11 @@ Nessuno può impedire a un terzo di avanzare una pretesa. Si può fare in modo c
 
 - la revisione di un avvocato prima del lancio (requisiti);
 - una proposta per la fermata: da ora le richieste arrivano a parole vostre, senza schermate di Next². Così la traccia resta pulita anche rispetto all'art. 7 della sua licenza, che vieta ogni analisi finalizzata a riprodurne i contenuti.
+
+## Modelli dei certificati (18/11/2026)
+
+**D143 · I modelli dei certificati entrano nel terzo giro.** Simone li chiede direttamente: certificato per l'attività sportiva non agonistica, porto d'armi, anamnestico per la patente «e via dicendo». Sono modelli fissi in cui cambiano solo i dati del paziente, in un menu «Modelli» degli strumenti, con caratteri, intestazione e dimensioni scelti dal medico, strutturati secondo le linee guida dove ci sono. Sono già nei requisiti («Altri certificati e moduli»).
+
+Ordine: prima si chiude la tappa 11, poi la tappa 13 (modelli), poi la 12 (condivisione nell'AFT). La fermata resta dopo la tappa 12 e copre tutte e tre. Motivo: i modelli poggiano su due pagine appena fatte, «Strumenti dello studio» e i recapiti del medico; e Simone li ha chiesti due volte.
+
+I testi dei modelli vengono solo dagli atti ufficiali (D142): dove un modello ufficiale non c'è, il testo lo scriviamo noi dai requisiti di legge, e lo segniamo da far verificare. Prima di costruire si leggono le fonti.

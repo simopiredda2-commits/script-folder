@@ -105,6 +105,10 @@ Condividere la cartella tra i medici dell'AFT che usano il programma: le voci os
 - **Oscuramento**: nel documento non entrano le voci oscurate (art. 4, c. 3). L'oscuramento di un documento intero si segnala con il codice P99 nei metadati della pubblicazione. Per il PSS ci sono anche il codice P81 («Versioni precedenti Profilo Sanitario Sintetico») e la riservatezza del documento (N, R o V).
 - **Flusso**: si valida prima di firmare. Poi si firma PAdES e si pubblica; il Gateway risponde «preso in carico» e manda i dati a INI ed EDS. La pubblicazione è rifiutata se il documento ha più di 5 giorni.
 
+## Che cosa è costruito (tappa 11)
+
+Il Profilo si compone dalla cartella. Il medico lo controlla, lo valida, lo firma e lo pubblica nel simulatore del Gateway; poi lo stato della transazione conferma l'invio a INI. Le scelte sono in `docs/decisioni.md` (D130–D141); che cosa manca e che cosa non è stato provato, in `docs/avanzamento.md`.
+
 ## Ancora da leggere
 
 - La guida HL7 Italia del PSS: il sito di HL7 Italia non si raggiunge da qui. Le regole da rispettare sono nello schematron ufficiale, che il simulatore applica (D132).

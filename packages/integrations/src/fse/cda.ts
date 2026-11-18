@@ -40,8 +40,11 @@ export type CdaStatus = 'active' | 'completed';
 
 export interface CdaAllergy {
   id: string;
-  /** Tipo dal dizionario ActCode (ObservationIntoleranceType): ALG, DALG, FALG, EALG, DINT… */
-  type: { code: string; display: string };
+  /**
+   * Tipo dal dizionario ActCode (ObservationIntoleranceType): ALG, DALG, FALG, EALG, DINT…
+   * `label` è il nome in italiano per il testo leggibile; il codice resta quello ufficiale.
+   */
+  type: { code: string; display: string; label?: string };
   /** Agente: codice AIC, ATC o del dizionario degli allergeni; senza codice, solo il testo. */
   agent: { code: string; system: 'AIC' | 'ATC' | 'ALLERGENI'; display: string } | { text: string };
   status: 'active' | 'inactive';
@@ -55,8 +58,8 @@ export interface CdaAllergy {
 export interface CdaTherapy {
   id: string;
   drug: { aic?: string | null; atc?: string | null; name: string; atcName?: string | null };
-  /** Via di somministrazione, codice HL7 RouteOfAdministration. */
-  route: { code: string; display: string };
+  /** Via di somministrazione, codice HL7 RouteOfAdministration; `label` in italiano per la lettura. */
+  route: { code: string; display: string; label?: string };
   startOn: string;
   endOn?: string | null;
   status: CdaStatus;
@@ -334,6 +337,16 @@ function section(
   );
 }
 
+/** Data del testo leggibile, come la legge un medico italiano: 2026-11-18 → 18/11/2026. */
+export function itDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+}
+
+/** Unità UCUM come si scrivono per chi legge (il valore codificato resta in UCUM). */
+const UCUM_LABELS: Record<string, string> = { 'mm[Hg]': 'mmHg', 'kg/m2': 'kg/m²' };
+export const unitLabel = (ucum: string) => UCUM_LABELS[ucum] ?? ucum;
+
 /** Tabella del testo leggibile; la prima colonna porta l'ID richiamato dalle voci. */
 function table(head: string[], rows: { id: string; cells: string[] }[]): string {
   return el(
@@ -466,7 +479,7 @@ function allergiesSection(input: PssCdaInput['allergies']): string {
     id: `all-${i + 1}`,
     cells: [
       'text' in a.agent ? a.agent.text : a.agent.display,
-      a.type.display,
+      a.type.label ?? a.type.display,
       a.status === 'active' ? 'Attiva' : 'Non attiva',
       a.criticality ? CRITICALITY_IT[a.criticality] : '',
       a.comment ?? '',
@@ -637,8 +650,8 @@ function therapiesSection(input: PssCdaInput['therapies']): string {
       t.drug.aic ?? '',
       t.drug.atc ?? '',
       t.dosage ?? '',
-      t.route.display,
-      `dal ${t.startOn}${t.endOn ? ` al ${t.endOn}` : ''}`,
+      t.route.label ?? t.route.display,
+      `dal ${itDate(t.startOn)}${t.endOn ? ` al ${itDate(t.endOn)}` : ''}`,
     ],
   }));
   const entries = input
@@ -783,7 +796,7 @@ function problemsSection(input: PssCdaInput['problems']): string {
       p.code.code,
       p.state === 'active' ? 'Attivo' : 'Risolto',
       p.chronic ? 'Cronico' : 'Acuto',
-      p.onsetOn ?? '',
+      p.onsetOn ? itDate(p.onsetOn) : '',
     ],
   }));
   const entries = input
@@ -1035,7 +1048,7 @@ function vitalsSection(input: CdaVital[]): string {
   if (!input.length) return '';
   const rows = input.map((v, i) => ({
     id: `par-${i + 1}`,
-    cells: [v.label, `${v.value} ${v.unit}`, v.measuredOn],
+    cells: [v.label, `${v.value} ${unitLabel(v.unit)}`, itDate(v.measuredOn)],
   }));
   const entries = input
     .map((v, i) =>
@@ -1076,7 +1089,7 @@ function lifestyleSection(input: CdaLifestyle[]): string {
   if (!input.length) return '';
   const rows = input.map((l, i) => ({
     id: `sti-${i + 1}`,
-    cells: [l.label, l.text, l.recordedOn],
+    cells: [l.label, l.text, itDate(l.recordedOn)],
   }));
   const entries = input
     .map((l, i) => {

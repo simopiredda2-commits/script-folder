@@ -268,9 +268,13 @@ try {
       };
       const problem = rnd.pick(PROBLEMS);
       const problemId = await entry('problem');
-      await tx
-        .insert(problemDetail)
-        .values({ entryId: problemId, icdCode: problem.code, description: problem.description });
+      await tx.insert(problemDetail).values({
+        entryId: problemId,
+        icdCode: problem.code,
+        description: problem.description,
+        // Ipertensione, diabete e ipercolesterolemia: patologie croniche (Profilo, D134).
+        chronic: true,
+      });
       await tx.insert(diaryDetail).values({
         entryId: await entry('diary'),
         contactType: 'office',

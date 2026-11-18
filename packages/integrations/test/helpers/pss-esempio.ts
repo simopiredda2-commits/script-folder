@@ -74,7 +74,7 @@ export function sampleInput(over: Partial<PssCdaInput> = {}): PssCdaInput {
           name: 'Farmaco di prova 20 mg',
           atcName: 'Enalapril',
         },
-        route: { code: 'PO', display: 'Swallow, oral' },
+        route: { code: 'PO', display: 'Swallow, oral', label: 'per bocca' },
         startOn: '2020-03-01',
         status: 'active',
         dosage: '1 compressa al mattino',

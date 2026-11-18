@@ -57,7 +57,7 @@ interface Overview {
 /** Le sezioni del Profilo, nell'ordine del documento; le prime quattro sono obbligatorie. */
 const SECTIONS: { key: SectionKey; title: string; mandatory: boolean }[] = [
   { key: 'allergie', title: 'Allergie e intolleranze', mandatory: true },
-  { key: 'terapie', title: 'Terapie croniche', mandatory: true },
+  { key: 'terapie', title: 'Terapie farmacologiche', mandatory: true },
   {
     key: 'problemi',
     title: 'Patologie croniche, organi mancanti, trapianti, malformazioni',
@@ -94,6 +94,10 @@ const outcome = (p: Pss) =>
   p.stato === 'published'
     ? 'Profilo firmato e pubblicato nel Fascicolo.'
     : 'Profilo firmato e preso in carico dal Gateway: è pubblicato quando i dati arrivano all’indice nazionale (INI).';
+
+/** Minuscola iniziale dentro una frase, ma non sulle sigle («AIC», «ICD-9-CM»). */
+const lowerFirst = (s: string) =>
+  s.length > 1 && s[1] === s[1]!.toLowerCase() ? s[0]!.toLowerCase() + s.slice(1) : s;
 
 const failure = (e: unknown) =>
   e instanceof ApiError ? e : new ApiError(0, 'Servizio non raggiungibile');
@@ -430,7 +434,7 @@ function Exclusions({ c }: { c: Content }) {
           <ul>
             {c.nonInseribili.map((n) => (
               <li key={`${n.etichetta}-${n.motivo}`}>
-                {n.etichetta}: {n.motivo.toLowerCase()}
+                {n.etichetta}: {lowerFirst(n.motivo)}
               </li>
             ))}
           </ul>
@@ -476,7 +480,7 @@ function Section({
           {i.manca.length > 0 && (
             <p id={`manca-${i.id}`} className="manca-voce">
               <Icon name="avviso" />{' '}
-              <span>Non può entrare: {i.manca.join('; ').toLowerCase()}.</span>
+              <span>Non può entrare: {i.manca.map(lowerFirst).join('; ')}.</span>
             </p>
           )}
         </div>

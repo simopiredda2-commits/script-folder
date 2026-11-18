@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib';
+import { unitLabel } from '@mmg/integrations';
 import type { PssAbsences, PssContent } from './compose';
 
 /**
@@ -164,7 +165,7 @@ export async function renderPssPdf(data: PssPrintData): Promise<Uint8Array> {
   if (!allergies.length) absent('allergie');
   for (const a of allergies)
     w.line(
-      `${'text' in a.agent ? a.agent.text : a.agent.display} – ${a.type.display}${
+      `${'text' in a.agent ? a.agent.text : a.agent.display} – ${a.type.label ?? a.type.display}${
         a.status === 'inactive' ? ' (non più attiva)' : ''
       }${a.criticality ? ` – criticità ${a.criticality}` : ''}${a.comment ? ` – ${a.comment}` : ''}`,
       { indent: 10 },
@@ -174,7 +175,7 @@ export async function renderPssPdf(data: PssPrintData): Promise<Uint8Array> {
   if (!therapies.length) absent('terapie');
   for (const t of therapies)
     w.line(
-      `${t.drug.name}${t.drug.aic ? ` (AIC ${t.drug.aic})` : ''}${t.dosage ? ` – ${t.dosage}` : ''} – ${t.route.display} – dal ${it(t.startOn)}`,
+      `${t.drug.name}${t.drug.aic ? ` (AIC ${t.drug.aic})` : ''}${t.dosage ? ` – ${t.dosage}` : ''} – ${t.route.label ?? t.route.display} – dal ${it(t.startOn)}`,
       { indent: 10 },
     );
   w.heading('Problemi e patologie croniche');
@@ -199,7 +200,7 @@ export async function renderPssPdf(data: PssPrintData): Promise<Uint8Array> {
   if (vitals.length) {
     w.heading('Parametri');
     for (const v of vitals)
-      w.line(`${v.label}: ${v.value} ${v.unit} (${it(v.measuredOn)})`, { indent: 10 });
+      w.line(`${v.label}: ${v.value} ${unitLabel(v.unit)} (${it(v.measuredOn)})`, { indent: 10 });
   }
   const lifestyle = included(s.stiliDiVita);
   if (lifestyle.length) {

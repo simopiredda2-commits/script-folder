@@ -151,6 +151,7 @@ Terzo giro (via del 18/11/2026, D128), branch `tappe-11-12`, stesso metodo:
 
 11. Profilo Sanitario Sintetico per il Fascicolo con un simulatore del Gateway, dalle fonti di `docs/fse.md` (prima quelle ancora da leggere).
 12. Condivisione tra i medici dell'AFT che usano il programma. **Fermata dopo la tappa 12**, con lo stesso giro (domande con il pulsante, via, unione), poi fermarsi.
+13. Modelli dei certificati (richiesta diretta di Simone, D143): sportivo non agonistico, porto d'armi, anamnestico per la patente e altri; testi solo dagli atti ufficiali; si compilano i dati del paziente; menu «Modelli» negli strumenti; caratteri, intestazione e dimensioni scelti dal medico. Si fa dopo la 11 e prima della 12; la fermata della 12 copre anche questa.
 
 ## Come si chiude
 

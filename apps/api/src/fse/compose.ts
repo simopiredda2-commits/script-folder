@@ -16,6 +16,7 @@ import {
 import {
   FSE_DICTIONARIES,
   fseDictionaryEntry,
+  itDate,
   type CdaAddress,
   type CdaAllergy,
   type CdaFamilyCondition,
@@ -273,7 +274,7 @@ export async function composePss(
     seenMeasures.add(d.measure);
     parametri.push({
       id: e.id,
-      etichetta: `${d.measure}: ${d.value} ${d.unit} (${e.occurredOn})`,
+      etichetta: `${d.measure}: ${d.value} ${d.unit} (${itDate(e.occurredOn)})`,
       incluso: true,
       manca: [],
       dati: {
@@ -324,7 +325,7 @@ export async function composePss(
     if (m)
       capacitaMotoria.push({
         id: latest.e.id,
-        etichetta: `${m.label} (dal ${latest.e.occurredOn})`,
+        etichetta: `${m.label} (dal ${itDate(latest.e.occurredOn)})`,
         incluso: true,
         manca: [],
         dati: { id: latest.e.id, code: m.code, display: m.label, since: latest.e.occurredOn },
@@ -363,7 +364,9 @@ export async function composePss(
       dati: {
         id: t.id,
         drug: { aic: t.drugAic, atc: t.atc, name: t.drugName, atcName: t.activeIngredient },
-        route: route ? { code: route.code, display: route.display } : { code: '', display: '' },
+        route: route
+          ? { code: route.code, display: route.display, label: route.label }
+          : { code: '', display: '' },
         startOn: t.startOn,
         endOn: t.endOn,
         status: 'active',

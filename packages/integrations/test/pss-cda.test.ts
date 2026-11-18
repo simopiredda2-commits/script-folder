@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPssCda, hl7Date, hl7Time, type PssCdaInput } from '../src/fse/cda';
+import { buildPssCda, hl7Date, hl7Time, itDate, unitLabel, type PssCdaInput } from '../src/fse/cda';
 import { sampleInput } from './helpers/pss-esempio';
 import { pssSchematron } from '../src/fse/schematron';
 
@@ -46,6 +46,22 @@ describe('documento CDA2 del Profilo Sanitario Sintetico', () => {
     const xml = buildPssCda(sampleInput());
     expect(xml).toContain('Orticaria diffusa &amp; prurito &lt;grave&gt;');
     expect(xml).not.toContain('<grave>');
+  });
+
+  it('il testo leggibile è in italiano; i codici restano quelli ufficiali', () => {
+    const xml = buildPssCda(sampleInput());
+    // Per chi legge: via in italiano, mmHg, date come le scrive un medico italiano.
+    expect(xml).toContain('<td>per bocca</td>');
+    expect(xml).toMatch(/<td>\d+ mmHg<\/td>/);
+    expect(xml).toContain('<td>01/11/2026</td>');
+    expect(xml).toContain('<td>dal 01/03/2020</td>');
+    expect(xml).not.toMatch(/<td>[^<]*mm\[Hg\][^<]*<\/td>/);
+    expect(xml).not.toMatch(/<td>[^<]*\d{4}-\d{2}-\d{2}[^<]*<\/td>/);
+    // Per la macchina: codici, nomi e unità dei dizionari ufficiali.
+    expect(xml).toContain('displayName="Swallow, oral"');
+    expect(xml).toContain('unit="mm[Hg]"');
+    expect(itDate('2026-11-18')).toBe('18/11/2026');
+    expect(unitLabel('mm[Hg]')).toBe('mmHg');
   });
 
   it('date e ore nel formato HL7, nel fuso di Roma', () => {

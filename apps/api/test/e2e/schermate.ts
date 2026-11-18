@@ -212,6 +212,7 @@ try {
   await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
   await page.getByLabel('Descrizione').fill('Ipertensione essenziale');
   await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+  await page.getByLabel(/Patologia cronica/).check();
   await page
     .getByLabel('Inizio', { exact: true })
     .fill(studioDate(new Date(Date.now() - 400 * 86_400_000)));
@@ -371,6 +372,45 @@ try {
     execFileSync('pdftoppm', ['-png', '-r', '96', '-singlefile', path, join(OUT, file)]);
     console.log(`  ${file}.png`);
   }
+
+  // Tappa 11: Profilo Sanitario Sintetico, dalla cartella al Fascicolo (simulatore del Gateway).
+  await page.goto(`${base}/pazienti/${patientId}`);
+  await page
+    .getByRole('navigation', { name: 'Sezioni della cartella' })
+    .getByRole('link', { name: 'Profilo sanitario sintetico' })
+    .click();
+  await page.getByRole('heading', { level: 1, name: 'Profilo sanitario sintetico' }).waitFor();
+  await page.getByRole('button', { name: 'Prepara il Profilo dalla cartella' }).click();
+  await page.getByText('Bozza preparata dalla cartella.').waitFor();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '30-profilo-sanitario-bozza', true);
+  await page.getByLabel('Ho controllato il contenuto del Profilo, voce per voce').check();
+  await page.getByRole('button', { name: 'Valida con il Gateway' }).click();
+  await page.getByText('Validato dal Gateway. Ora puoi firmarlo e pubblicarlo.').waitFor();
+  await page.getByRole('button', { name: 'Firma e pubblica' }).click();
+  await page.getByText('Profilo firmato e pubblicato nel Fascicolo.').waitFor();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '31-profilo-sanitario-pubblicato');
+  const pssHref = await page
+    .getByRole('link', { name: 'PDF firmato della versione 1' })
+    .getAttribute('href');
+  const pssPath = join(work, 'profilo-sanitario.pdf');
+  writeFileSync(pssPath, await (await page.request.get(`${base}${pssHref}`)).body());
+  execFileSync('pdftoppm', [
+    '-png',
+    '-r',
+    '96',
+    '-singlefile',
+    pssPath,
+    join(OUT, '32-profilo-sanitario-pdf'),
+  ]);
+  console.log('  32-profilo-sanitario-pdf.png');
+  await page.goto(`${base}/profilo/recapiti`);
+  await page.getByRole('heading', { level: 1, name: 'Recapiti di studio' }).waitFor();
+  await shot(page, '33-recapiti-di-studio');
+  await page.goto(`${base}/strumenti`);
+  await page.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
+  await shot(page, '34-strumenti', true);
 
   await page.goto(`${base}/archivio`);
   await page.getByRole('heading', { level: 1, name: 'Archivio' }).waitFor();

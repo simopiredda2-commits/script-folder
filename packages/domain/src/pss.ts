@@ -88,22 +88,22 @@ export const CRITICALITY_HL7 = { bassa: 'L', moderata: 'M', alta: 'H' } as const
 export function intoleranceType(
   kind: AllergyKind,
   agent: AllergyAgent,
-): { code: string; display: string } {
+): { code: string; display: string; label: string } {
   if (kind === 'allergia')
     return agent === 'farmaco'
-      ? { code: 'DALG', display: 'Drug Allergy' }
+      ? { code: 'DALG', display: 'Drug Allergy', label: 'Allergia a farmaci' }
       : agent === 'alimento'
-        ? { code: 'FALG', display: 'Food Allergy' }
+        ? { code: 'FALG', display: 'Food Allergy', label: 'Allergia ad alimenti' }
         : agent === 'ambiente'
-          ? { code: 'EALG', display: 'Environmental Allergy' }
-          : { code: 'ALG', display: 'Allergy' };
+          ? { code: 'EALG', display: 'Environmental Allergy', label: 'Allergia ambientale' }
+          : { code: 'ALG', display: 'Allergy', label: 'Allergia' };
   return agent === 'farmaco'
-    ? { code: 'DINT', display: 'Drug Intolerance' }
+    ? { code: 'DINT', display: 'Drug Intolerance', label: 'Intolleranza a farmaci' }
     : agent === 'alimento'
-      ? { code: 'FINT', display: 'Food Intolerance' }
+      ? { code: 'FINT', display: 'Food Intolerance', label: 'Intolleranza ad alimenti' }
       : agent === 'ambiente'
-        ? { code: 'EINT', display: 'Environmental Intolerance' }
-        : { code: 'OINT', display: 'intolerance' };
+        ? { code: 'EINT', display: 'Environmental Intolerance', label: 'Intolleranza ambientale' }
+        : { code: 'OINT', display: 'intolerance', label: 'Intolleranza' };
 }
 
 /* Anamnesi familiare ------------------------------------------------------------------------ */

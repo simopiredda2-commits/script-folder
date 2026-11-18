@@ -14,7 +14,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
   3. tappa 10 (presidi e seguito delle prestazioni): fatta (D121–D124);
   4. `docs/fse.md` (D110): fatto, con le fonti ufficiali sul Profilo Sanitario Sintetico;
   5. fermata finale fatta (D125–D128): via all'unione della pull request #5; dettatura fuori; BMI scritto a mano; via alle tappe 11 e 12.
-- **Terzo giro** (D128): tappa 11 (Profilo Sanitario Sintetico con un simulatore del Gateway), poi tappa 12 (condivisione nell'AFT), nel branch `tappe-11-12`, con una fermata dopo la tappa 12.
+- **Terzo giro** (D128), nel branch `tappe-11-12`: tappa 11 fatta (Profilo Sanitario Sintetico con un simulatore del Gateway, D130–D141). Poi la tappa 13 (modelli dei certificati, chiesti direttamente da Simone, D143) e la tappa 12 (condivisione nell'AFT). La fermata è dopo la tappa 12 e le copre tutte e tre.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -434,6 +434,39 @@ Domanda di Simone: «La schermata con più schede pazienti aperte l'hai testata?
 
 - Le bozze di piani, presidi, consensi, deleghe, seguito e certificato con la prova nel browser: usano lo stesso meccanismo delle voci e dei parametri, provati con i sabotaggi, ma non sono passate una per una.
 - Su tablet veri e con lettori di schermo.
+
+### Tappa 11 – Profilo Sanitario Sintetico (D130–D141)
+
+**Fatto**
+
+- Fonti lette (D130); file ufficiali copiati con le impronte (D131): schematron del PSS 4.0, 16 dizionari, estratto LOINC.
+- Motore dello schematron (D132): l'esempio ufficiale del Ministero passa senza errori; il nostro documento senza errori né avvisi.
+- Documento CDA2 con tutte le sezioni: allergie, terapie, problemi, anamnesi familiare, parametri, stili di vita, capacità motoria. Le assenze hanno i codici ufficiali, le versioni nuove sostituiscono le precedenti. Il testo leggibile è in italiano, con i codici dei dizionari.
+- PDF con il documento dentro e firma PAdES simulata (D137), verificata con OpenSSL.
+- Cliente del Gateway con i due token, i certificati e gli errori della specifica. Il simulatore fa validazione, pubblicazione, sostituzione e stato, applica il limite dei 5 giorni e può mandare a INI in due tempi (D136, D138).
+- Servizio: composizione dalla cartella (D134), scelte del medico, conferma, validazione, firma e pubblicazione, controllo dello stato, scarto. Registro degli invii, esportazione, registro degli accessi. Nel database, il contenuto si blocca dopo la bozza e sono ammessi solo i passaggi previsti.
+- Voci cliniche con i campi del Profilo (D135); scheda della terapia con le vie del dizionario.
+- Interfaccia: pagina del Profilo nella cartella; «Recapiti di studio» (D140); «Strumenti dello studio» con le impostazioni del Fascicolo (D133).
+- Permessi: firmano il medico di famiglia del paziente e il suo sostituto; il collega di gruppo legge ma non firma.
+- Prove del servizio, del simulatore, del documento, dei permessi e nel browser (accessibilità, 44 px, tablet). 35 sabotaggi, tutti rossi e poi verdi; tre controlli erano scritti male e sono stati corretti (registro qui sotto). Schermate 30–34.
+
+**Non fatto**
+
+- Collegamento al Gateway vero: accreditamento, certificati di Sogei, indirizzi (D138), con la Regione.
+- Firma digitale qualificata vera: il fornitore è da scegliere (D137).
+- Valori veri dell'accreditamento (D133) e uso del codice P81 (D139).
+- Indirizzo del paziente nel documento (D141).
+- Il servizio che valida e crea con una sola chiamata: lasciato fuori apposta (D136).
+
+**Non provato**
+
+- Lo schema XSD del CDA2: solo lo schematron.
+- I controlli di vocabolario del Gateway vero (D132): il simulatore controlla solo i dizionari copiati.
+- La guida HL7 Italia e le note del portale del Fascicolo: non raggiungibili da qui.
+- Il trasporto vero verso il Gateway (certificato di collegamento).
+- Su tablet veri e con lettori di schermo.
+
+**Prossimo passo**: tappa 13 (modelli dei certificati, D143), poi tappa 12, poi la fermata.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -882,3 +915,7 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | La casella del Profilo cambia subito (prova nel browser)          | Scelta in attesa ignorata                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | Provenienza di immagini, documenti e archivi (D142)               | Un'immagine estranea in `docs/`                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | Dipendenze solo con licenze permissive (D142)                     | MIT tolta dalle licenze ammesse                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| Senza la conferma del medico non si valida (prova nel browser)    | Pulsante attivo anche senza conferma                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| L'organo mancante solo dall'elenco ufficiale (prova nel browser)  | Campo del codice ICD-9-CM lasciato anche per l'organo mancante      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| Testo leggibile del Profilo in italiano: la via                   | Nome inglese del dizionario nel testo                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| Testo leggibile del Profilo in italiano: le date                  | Data dei parametri scritta all'inglese                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
