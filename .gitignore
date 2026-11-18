@@ -22,6 +22,7 @@ dati-pubblici/
 *.zip
 
 # Esportazioni e prove locali
+.tmp-*/
 esportazioni/
 test-results/
 playwright-report/

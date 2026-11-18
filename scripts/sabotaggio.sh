@@ -39,6 +39,7 @@ restore() {
   rm -rf "$backup"
 }
 trap restore EXIT
+trap 'restore; trap - EXIT; exit 130' INT TERM
 
 for i in "${!files[@]}"; do
   [ -e "${files[$i]}" ] && cp -p "${files[$i]}" "$backup/$i"
@@ -52,7 +53,7 @@ if bash -c "$check" >/tmp/sabotaggio.$$.log 2>&1; then
 fi
 echo "rosso durante il sabotaggio: ok"
 restore
-trap - EXIT
+trap - EXIT INT TERM
 if ! bash -c "$check" >/tmp/sabotaggio.$$.log 2>&1; then
   echo "DOPO IL RIPRISTINO LA PROVA È ROSSA" >&2
   tail -20 /tmp/sabotaggio.$$.log >&2
