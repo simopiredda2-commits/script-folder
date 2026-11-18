@@ -27,6 +27,7 @@ export const PATIENT_TABLES = [
   'service_execution',
   'supply_prescription',
   'pss_document',
+  'template_certificate',
 ] as const;
 
 export const ENTRY_TABLES = [
@@ -146,6 +147,11 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
       sql`select * from ${sql.identifier(t)} where document_id = any(${pgArray(pssIds)}::uuid[]) order by id`,
     );
   }
+  // Modelli scritti nello studio (tappa 13): anche questi sono dati del medico (regola 4).
+  tables.studio_template = await rows(
+    db,
+    sql`select * from studio_template where studio_id = ${a.studio.id} order by id`,
+  );
   // PDF del Profilo, con il CDA dentro e firmati: come gli allegati, nel JSON in base64.
   const pssFiles = pssIds.length
     ? (

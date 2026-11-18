@@ -25,6 +25,8 @@ import { registerReferenceRoutes } from './http/reference-routes';
 import { registerReminderRoutes } from './http/reminder-routes';
 import { registerTherapyRoutes } from './http/therapy-routes';
 import { registerTodayRoutes } from './http/today-routes';
+import { registerTemplateRoutes } from './http/template-routes';
+import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import type { CredentialService } from '@mmg/domain';
@@ -223,6 +225,8 @@ export function buildApp({
     now ?? (() => new Date()),
   );
   registerReminderRoutes(app, createReminderService({ db, sender: reminderSender, now }));
+  // Modelli dei certificati (tappa 13): modelli ufficiali dagli atti, modelli dello studio.
+  registerTemplateRoutes(app, createTemplateService({ db, now }));
   registerCertificateRoutes(
     app,
     createCertificateService({

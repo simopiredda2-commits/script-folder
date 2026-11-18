@@ -11,3 +11,4 @@ export * from './credentials';
 export * from './certificates';
 export * from './followup';
 export * from './fse';
+export * from './templates';

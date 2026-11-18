@@ -77,6 +77,11 @@ export type AccessAction =
   | 'validazione_profilo_sanitario'
   | 'pubblicazione_profilo_sanitario'
   | 'stato_profilo_sanitario'
+  | 'lettura_certificati_modelli'
+  | 'anteprima_certificato_modello'
+  | 'rilascio_certificato_modello'
+  | 'stampa_certificato_modello'
+  | 'annullamento_certificato_modello'
   | 'scarto_profilo_sanitario'
   | 'pdf_profilo_sanitario';
 
