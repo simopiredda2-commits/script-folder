@@ -326,6 +326,23 @@ Fonti ufficiali lette il 18/11/2026: specifiche INPS del Sistema TS, versione 3.
 - copia e attestato dai fac-simile; consegna per email e SMS;
 - credenziali RUPAR e Sistema TS, scadenza trimestrale della password RUPAR, secondo fattore e registrazione del programma presso la Regione (D100–D103).
 
+### Dopo la terza fermata – Accesso regionale con SPID o CIE (D109, D111)
+
+**Fatto**
+
+- Modalità OAuth2 del SIRPED con PKCE: pagina regionale simulata, ritorno con controlli (state del medico, scadenza, identità, profilo), token cifrato senza rinnovo, uso come Bearer per le ricette SSN al posto delle credenziali RUPAR, revoca.
+- Nella pagina «Credenziali dei servizi», scheda RUPAR: «Entra con SPID o CIE», con il codice via email come alternativa. Avvisi della pagina Oggi adeguati.
+- Migrazione 0011 (modalità della sessione, richieste di accesso regionale).
+
+**Provato**
+
+- 10 prove del servizio, 4 delle integrazioni (compreso il PKCE con l'esempio della RFC 7636), la prova nel browser con la pagina simulata (axe e 44 px).
+- 7 sabotaggi, tutti rossi e poi verdi.
+
+**Non provato**
+
+- Il servizio vero della Regione: firma del token (JWKS), durata vera, registrazione del programma (D103).
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:
@@ -623,3 +640,10 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Al datore di lavoro mai la diagnosi (D108)                | Diagnosi nel testo dell'email                             | Rosso, poi verde                                                                                                                                                                   |
 | Al datore di lavoro nome e cognome (D108)                 | Nome tolto dal testo                                      | Rosso, poi verde                                                                                                                                                                   |
 | Prova D68: scheda trovata per cognome e nome esatti       | (correzione di una prova fragile, non un controllo nuovo) | Caduta in CI: i nomi inventati cambiano a ogni giro e «Palma» era cognome di un paziente e nome di un altro. Ora l'etichetta si cerca dall'inizio, con cognome e nome interi       |
+| Accesso regionale: richiesta legata al medico (D111)      | Medico della richiesta non controllato                    | Rosso, poi verde                                                                                                                                                                   |
+| Accesso regionale: richiesta con scadenza                 | Scadenza ignorata                                         | Rosso, poi verde                                                                                                                                                                   |
+| Accesso regionale: chi entra è il medico collegato        | Controllo dell'identità tolto                             | Rosso, poi verde                                                                                                                                                                   |
+| Accesso regionale: profilo di prescrizione                | Controllo dello scope tolto                               | Rosso, poi verde                                                                                                                                                                   |
+| Accesso regionale: token scaduto, niente invio            | Scadenza del token ignorata                               | Rosso, poi verde                                                                                                                                                                   |
+| Accesso regionale: token al posto delle credenziali RUPAR | Token ignorato                                            | Rosso, poi verde                                                                                                                                                                   |
+| Pagina regionale simulata: solo ritorni interni           | Qualsiasi indirizzo di ritorno                            | Rosso, poi verde                                                                                                                                                                   |

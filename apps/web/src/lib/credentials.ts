@@ -12,7 +12,9 @@ export interface ServiceStatus {
   statoPassword: 'valida' | 'in_scadenza' | 'scaduta' | 'senza_scadenza' | null;
   aggiornateIl: string | null;
   secondoFattore: boolean;
-  sessione: { attiva: boolean; scadeIl: string | null };
+  sessione: { attiva: boolean; scadeIl: string | null; modalita?: 'email' | 'spid_cie' | null };
+  /** Ricette SSN in Piemonte: si entra con SPID o CIE (D109). */
+  accessoRegionale?: boolean;
   ambiente: 'simulator' | 'test' | 'production';
 }
 
@@ -41,7 +43,8 @@ export function credentialAlerts(
 ): { kind: 'avviso' | 'errore'; text: string }[] {
   const alerts: { kind: 'avviso' | 'errore'; text: string }[] = [];
   for (const s of servizi) {
-    if (!s.impostate) {
+    // Con l'accesso regionale (SPID o CIE) le credenziali RUPAR servono solo per il codice via email.
+    if (!s.impostate && !s.accessoRegionale) {
       alerts.push({
         kind: 'avviso',
         text: `Mancano le credenziali ${s.nome} (${s.uso.toLowerCase()}).`,
@@ -61,7 +64,9 @@ export function credentialAlerts(
     if (s.secondoFattore && !s.sessione.attiva)
       alerts.push({
         kind: 'avviso',
-        text: `Codice di sessione ${s.nome} non attivo: serve per mandare le ricette.`,
+        text: s.accessoRegionale
+          ? 'Accesso regionale per le ricette SSN non attivo: entra con SPID o CIE.'
+          : `Codice di sessione ${s.nome} non attivo: serve per mandare le ricette.`,
       });
   }
   return alerts;

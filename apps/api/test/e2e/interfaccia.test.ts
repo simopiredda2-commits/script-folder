@@ -643,22 +643,35 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await expect(rupar.getByLabel('Password', { exact: true }).inputValue()).resolves.toBe('');
     await expect(rupar.getByLabel('PIN', { exact: true }).inputValue()).resolves.toBe('');
     await check(page, 'credenziali dei servizi', true);
-    await rupar.getByRole('button', { name: 'Revoca il codice' }).click();
-    await rupar.getByText('Non attivo: serve per mandare le ricette.').waitFor();
+    const byEmail = rupar.getByRole('group', {
+      name: 'In alternativa: codice di sessione via email',
+    });
+    const regional = rupar.getByRole('group', { name: 'Accesso regionale con SPID o CIE' });
+    await byEmail.getByRole('button', { name: 'Revoca il codice' }).click();
+    await byEmail.getByText(/^Non attivo/).waitFor();
     // La pagina Oggi avvisa e porta alla pagina giusta.
     await page
       .getByRole('navigation', { name: 'Sezioni' })
       .getByRole('link', { name: 'Oggi' })
       .click();
     await page
-      .getByText('Codice di sessione RUPAR Piemonte non attivo: serve per mandare le ricette.')
+      .getByText('Accesso regionale per le ricette SSN non attivo: entra con SPID o CIE.')
       .waitFor();
     await check(page, 'oggi con gli avvisi dei servizi');
     await page.getByRole('link', { name: 'Apri «Credenziali dei servizi»' }).click();
-    await rupar.getByRole('button', { name: 'Chiedi il codice' }).click();
-    await rupar.getByText(/Ambiente di prova/).waitFor();
-    await rupar.getByRole('button', { name: 'Attiva' }).click();
-    await rupar.getByText(/^Attivo fino a/).waitFor();
+    // Codice via email: chiesto e attivato.
+    await byEmail.getByRole('button', { name: 'Chiedi il codice' }).click();
+    await byEmail.getByText(/Ambiente di prova/).waitFor();
+    await byEmail.getByRole('button', { name: 'Attiva' }).click();
+    await byEmail.getByText(/^Attivo fino a/).waitFor();
+    // Accesso regionale con SPID o CIE (D109): la pagina regionale simulata, poi il ritorno.
+    await regional.getByRole('button', { name: 'Entra con SPID o CIE' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Accesso regionale simulato' }).waitFor();
+    await check(page, 'pagina regionale simulata');
+    await page.getByRole('button', { name: 'Entra con SPID (simulato)' }).click();
+    await page.getByText('Accesso regionale attivo: puoi mandare le ricette SSN.').waitFor();
+    await regional.getByText(/^Attivo fino a/).waitFor();
+    expect(new URL(page.url()).search).toBe('');
   });
 
   it('certificato di malattia: compilato, controllato, inviato; copia in PDF e continuazione (tappa 8)', async () => {

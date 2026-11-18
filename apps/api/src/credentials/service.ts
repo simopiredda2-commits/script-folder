@@ -12,13 +12,23 @@ import {
   type Role,
   type ServiceUse,
 } from '@mmg/domain';
-import type { AuthProblem, SecondFactorGateway, ServiceAuth } from '@mmg/integrations';
-import { and, eq } from 'drizzle-orm';
+import {
+  newPkceVerifier,
+  pkceChallenge,
+  PRESCRIBER_SCOPE,
+  type AuthProblem,
+  type RegionalAuthorizationGateway,
+  type SecondFactorGateway,
+  type ServiceAuth,
+} from '@mmg/integrations';
+import { createHash, randomBytes } from 'node:crypto';
+import { and, eq, gt, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import {
   doctorProfile,
+  regionalAuthorizationRequest,
   serviceCredential,
   serviceCredentialEvent,
   serviceSession,
@@ -62,7 +72,20 @@ export interface CredentialDeps {
   encryptionKey: Buffer;
   now: () => Date;
   secondFactor: Record<CredentialService, SecondFactorGateway>;
+  /**
+   * Accesso regionale con SPID o CIE per le ricette in Piemonte (D109): servizio OAuth2 del
+   * SIRPED, codice del gestionale (client_id, da completare con la Regione, D103) e indirizzo di
+   * ritorno registrato presso la Regione.
+   */
+  regional?: {
+    gateway: RegionalAuthorizationGateway;
+    clientId: string;
+    redirectUri: string;
+  };
 }
+
+/** Minuti entro cui il medico deve tornare dalla pagina regionale (la Regione: «qualche minuto»). */
+export const REGIONAL_REQUEST_MINUTES = 10;
 
 const isDoctor = (roles: readonly Role[]) =>
   roles.includes('owner_doctor') || roles.includes('substitute_doctor');
@@ -121,7 +144,14 @@ export async function storeCredentials(
 export async function storeSession(
   db: Database,
   appKey: Buffer,
-  input: { userId: string; service: CredentialService; token: string; validUntil: Date },
+  input: {
+    userId: string;
+    service: CredentialService;
+    token: string;
+    validUntil: Date;
+    mode?: 'email' | 'spid_cie';
+    subject?: string | null;
+  },
 ) {
   const values = {
     userId: input.userId,
@@ -133,6 +163,8 @@ export async function storeSession(
     ),
     validUntil: input.validUntil,
     activatedAt: new Date(),
+    mode: input.mode ?? 'email',
+    subject: input.subject ?? null,
   };
   await db
     .insert(serviceSession)
@@ -219,6 +251,7 @@ export function createCredentialService(deps: CredentialDeps) {
         service: serviceSession.service,
         validUntil: serviceSession.validUntil,
         activatedAt: serviceSession.activatedAt,
+        mode: serviceSession.mode,
       })
       .from(serviceSession)
       .where(eq(serviceSession.userId, actor.userId));
@@ -238,7 +271,13 @@ export function createCredentialService(deps: CredentialDeps) {
           statoPassword: c ? passwordState(service, c.passwordChangedOn, today) : null,
           aggiornateIl: c?.updatedAt ?? null,
           secondoFattore: needsSecondFactor(service),
-          sessione: { attiva: active, scadeIl: active ? s.validUntil : null },
+          sessione: {
+            attiva: active,
+            scadeIl: active ? s.validUntil : null,
+            modalita: active ? s.mode : null,
+          },
+          /** Ricette SSN in Piemonte: si può entrare con SPID o CIE (D109). */
+          accessoRegionale: service === 'rupar_piemonte' && !!deps.regional,
           ambiente: deps.secondFactor[service].environment,
         };
       }),
@@ -381,8 +420,19 @@ export function createCredentialService(deps: CredentialDeps) {
     const [s] = await db.select().from(serviceSession).where(w.session);
     if (!s) return status(actor);
     const token = decryptSecret(key, s.tokenEnc, aad('sessione', actor.userId, service)).toString();
-    const secret = await loadSecret(actor.userId, service);
     let detail: string | null = null;
+    if (s.mode === 'spid_cie' && deps.regional) {
+      const r = await deps.regional.gateway.revoke({
+        clientId: deps.regional.clientId,
+        fiscalCode: s.subject ?? '',
+        accessToken: token,
+      });
+      if (r.outcome === 'unreachable') detail = `revoca solo locale: ${r.message}`;
+      await db.delete(serviceSession).where(w.session);
+      await event(actor, service, 'sessione_revocata', detail ?? 'SPID o CIE');
+      return status(actor);
+    }
+    const secret = await loadSecret(actor.userId, service);
     if (secret) {
       const r = await deps.secondFactor[service].revoke({
         auth: secret,
@@ -396,12 +446,153 @@ export function createCredentialService(deps: CredentialDeps) {
     return status(actor);
   }
 
+  const stateHash = (state: string) => createHash('sha256').update(state).digest('hex');
+  const pkceAad = (userId: string) => Buffer.from(`pkce:${userId}`);
+
+  /**
+   * Avvio dell'accesso regionale con SPID o CIE (D109): state casuale (se ne conserva
+   * l'impronta) e code_verifier cifrato; il medico va alla pagina di autorizzazione regionale.
+   */
+  async function startRegionalAccess(actor: Actor) {
+    requireDoctor(actor);
+    if (!deps.regional) throw new HttpError(404, 'Accesso regionale non disponibile');
+    const fiscalCode = await fiscalCodeOf(actor.userId);
+    const state = randomBytes(32).toString('base64url');
+    const verifier = newPkceVerifier();
+    await db.insert(regionalAuthorizationRequest).values({
+      userId: actor.userId,
+      stateHash: stateHash(state),
+      verifierEnc: encryptSecret(key, Buffer.from(verifier), pkceAad(actor.userId)),
+      redirectUri: deps.regional.redirectUri,
+      expiresAt: new Date(now().getTime() + REGIONAL_REQUEST_MINUTES * 60_000),
+    });
+    await event(actor, 'rupar_piemonte', 'accesso_regionale_avviato');
+    return {
+      indirizzo: deps.regional.gateway.authorizeUrl({
+        clientId: deps.regional.clientId,
+        redirectUri: deps.regional.redirectUri,
+        scope: [PRESCRIBER_SCOPE],
+        state,
+        codeChallenge: pkceChallenge(verifier),
+        loginHint: fiscalCode,
+      }),
+    };
+  }
+
+  const returnQuery = z.object({
+    code: z.string().max(2000).optional(),
+    state: z.string().max(500).optional(),
+    error: z.string().max(200).optional(),
+    error_description: z.string().max(1000).optional(),
+  });
+
+  /**
+   * Ritorno dalla pagina regionale: lo state deve essere quello di una richiesta di questo medico,
+   * non usata e non scaduta; poi scambio del codice con il code_verifier; chi è entrato con SPID o
+   * CIE deve essere il medico collegato, con il profilo di prescrizione.
+   */
+  async function completeRegionalAccess(
+    actor: Actor,
+    query: unknown,
+  ): Promise<{ esito: 'ok'; scadeIl: Date } | { esito: 'errore'; motivo: string }> {
+    requireDoctor(actor);
+    const regional = deps.regional;
+    if (!regional) throw new HttpError(404, 'Accesso regionale non disponibile');
+    const q = returnQuery.parse(query ?? {});
+    const fail = async (motivo: string, detail?: string) => {
+      await event(actor, 'rupar_piemonte', 'accesso_regionale_rifiutato', detail ?? motivo);
+      return { esito: 'errore' as const, motivo };
+    };
+    if (!q.state) return fail('Ritorno senza state: riprova l’accesso');
+    const claimed = await db
+      .update(regionalAuthorizationRequest)
+      .set({ usedAt: now() })
+      .where(
+        and(
+          eq(regionalAuthorizationRequest.stateHash, stateHash(q.state)),
+          eq(regionalAuthorizationRequest.userId, actor.userId),
+          isNull(regionalAuthorizationRequest.usedAt),
+          gt(regionalAuthorizationRequest.expiresAt, now()),
+        ),
+      )
+      .returning();
+    const request = claimed[0];
+    if (!request) return fail('Richiesta di accesso non riconosciuta o scaduta: riprova');
+    if (q.error)
+      return fail(
+        q.error === 'access_denied'
+          ? 'Accesso regionale annullato o negato'
+          : `La Regione ha risposto con un errore (${q.error})`,
+        `${q.error}: ${q.error_description ?? ''}`,
+      );
+    if (!q.code) return fail('Ritorno senza codice di autorizzazione: riprova');
+    const verifier = decryptSecret(key, request.verifierEnc, pkceAad(actor.userId)).toString();
+    const r = await regional.gateway.exchange({
+      code: q.code,
+      redirectUri: request.redirectUri,
+      clientId: regional.clientId,
+      codeVerifier: verifier,
+    });
+    if (r.outcome === 'unreachable')
+      return fail(`Servizio regionale non raggiungibile: ${r.message}`);
+    if (r.outcome === 'rejected')
+      return fail(
+        `La Regione non ha rilasciato il token (${r.error})`,
+        `${r.error}: ${r.description ?? ''}`,
+      );
+    const doctor = await fiscalCodeOf(actor.userId);
+    if (r.fiscalCode.toUpperCase() !== doctor.toUpperCase()) {
+      await regional.gateway.revoke({
+        clientId: regional.clientId,
+        fiscalCode: r.fiscalCode,
+        accessToken: r.accessToken,
+      });
+      return fail(
+        'L’accesso regionale è stato fatto con un’identità diversa da quella del medico collegato',
+      );
+    }
+    if (!r.scope.includes(PRESCRIBER_SCOPE))
+      return fail(
+        'La Regione non ha concesso il profilo di prescrizione: va abilitato nel configuratore regionale',
+      );
+    const validUntil = new Date(now().getTime() + r.expiresIn * 1000);
+    await storeSession(db, deps.encryptionKey, {
+      userId: actor.userId,
+      service: 'rupar_piemonte',
+      token: r.accessToken,
+      validUntil,
+      mode: 'spid_cie',
+      subject: r.fiscalCode,
+    });
+    await event(
+      actor,
+      'rupar_piemonte',
+      'sessione_attivata',
+      `SPID o CIE, fino a ${validUntil.toISOString()}`,
+    );
+    return { esito: 'ok', scadeIl: validUntil };
+  }
+
   /**
    * Per gli invii: credenziali e secondo fattore di chi firma. Se mancano, l'invio si ferma prima
    * di contattare il servizio, con un errore che porta alla pagina giusta.
    */
   async function authFor(userId: string, use: ServiceUse): Promise<ServiceAuth> {
     const service = SERVICE_FOR_USE[use];
+    // Accesso regionale con SPID o CIE: il token sostituisce utente, password e PIN RUPAR (D109).
+    if (NEEDS_SECOND_FACTOR[use]) {
+      const [s] = await db.select().from(serviceSession).where(where(userId, service).session);
+      if (s?.mode === 'spid_cie') {
+        if (s.validUntil <= now())
+          throw new HttpError(
+            422,
+            'L’accesso regionale con SPID o CIE è scaduto: entra di nuovo da «Credenziali dei servizi»',
+            { codice: 'SESSIONE_SCADUTA', servizio: slugOf(service) },
+          );
+        const bearer = decryptSecret(key, s.tokenEnc, aad('sessione', userId, service)).toString();
+        return { bearer, sessionId: null };
+      }
+    }
     const secret = await requireSecret(userId, service);
     if (!NEEDS_SECOND_FACTOR[use]) return { ...secret, sessionId: null };
     const [s] = await db.select().from(serviceSession).where(where(userId, service).session);
@@ -446,6 +637,8 @@ export function createCredentialService(deps: CredentialDeps) {
     requestSession,
     confirmSession,
     revokeSession,
+    startRegionalAccess,
+    completeRegionalAccess,
     authFor,
     authRefused,
   };

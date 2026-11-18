@@ -78,6 +78,13 @@
       "when": 1795004502741,
       "tag": "0010_certificati",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795007824016,
+      "tag": "0011_accesso_regionale",
+      "breakpoints": true
     }
   ]
 }

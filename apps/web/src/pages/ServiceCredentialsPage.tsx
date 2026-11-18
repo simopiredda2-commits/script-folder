@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
@@ -14,6 +15,16 @@ import { useApi } from '../lib/useApi';
 export function ServiceCredentialsPage() {
   const { isDoctor } = useSession();
   const st = useApi<CredentialsStatus>(isDoctor ? '/api/profilo/credenziali' : null);
+  // Ritorno dalla pagina regionale (D109): esito nell'indirizzo, letto una volta e poi tolto.
+  const [params, setParams] = useSearchParams();
+  const [regionalOutcome] = useState(() =>
+    params.get('accesso')
+      ? { ok: params.get('accesso') === 'ok', why: params.get('motivo') }
+      : null,
+  );
+  useEffect(() => {
+    if (params.get('accesso')) setParams({}, { replace: true });
+  }, [params, setParams]);
   if (!isDoctor)
     return (
       <>
@@ -33,6 +44,14 @@ export function ServiceCredentialsPage() {
         Servono a mandare ricette e certificati a tuo nome. Sono salvate cifrate e, una volta
         salvate, non si rileggono: né qui né altrove. Le vedi e le cambi solo tu.
       </p>
+      {regionalOutcome &&
+        (regionalOutcome.ok ? (
+          <Notice kind="fatto">Accesso regionale attivo: puoi mandare le ricette SSN.</Notice>
+        ) : (
+          <Notice kind="errore">
+            Accesso regionale non riuscito: {regionalOutcome.why ?? 'motivo non indicato'}.
+          </Notice>
+        ))}
       <div className="griglia-credenziali">
         {st.data.servizi.map((s) => (
           <ServiceCard key={s.servizio} s={s} onChange={st.reload} />
@@ -113,6 +132,16 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
 
   const revoke = () =>
     run(() => api(`${base}/sessione`, { method: 'DELETE' }), 'Codice di sessione revocato.');
+
+  /** Accesso regionale con SPID o CIE (D109): si va alla pagina della Regione e si torna qui. */
+  const startRegional = () =>
+    run(async () => {
+      const r = await api<{ indirizzo: string }>(`${base}/accesso-regionale`, { method: 'POST' });
+      window.location.assign(r.indirizzo);
+    }, 'Apertura della pagina regionale…');
+
+  const regionalActive = s.sessione.attiva && s.sessione.modalita === 'spid_cie';
+  const emailActive = s.sessione.attiva && s.sessione.modalita !== 'spid_cie';
 
   return (
     <section className="riquadro" aria-labelledby={id('titolo')}>
@@ -218,13 +247,47 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
         </fieldset>
       </form>
 
+      {s.accessoRegionale && (
+        <fieldset disabled={busy}>
+          <legend>Accesso regionale con SPID o CIE</legend>
+          <p>
+            {regionalActive
+              ? `Attivo fino a ${dateTime(s.sessione.scadeIl)}.`
+              : 'Non attivo: per le ricette SSN si entra con SPID o CIE sulla pagina della Regione.'}
+          </p>
+          <p className="aiuto">
+            La Regione riconosce il medico e autorizza il programma fino alla scadenza che indica;
+            poi si rientra. Con questo accesso le credenziali RUPAR non servono per le ricette.
+          </p>
+          <div className="azioni">
+            <button
+              type="button"
+              className="pulsante pulsante-primario"
+              onClick={() => void startRegional()}
+            >
+              <Icon name="apri" /> <span>Entra con SPID o CIE</span>
+            </button>
+            {regionalActive && (
+              <button type="button" className="pulsante" onClick={() => void revoke()}>
+                <Icon name="annulla" /> <span>Esci dall’accesso regionale</span>
+              </button>
+            )}
+          </div>
+        </fieldset>
+      )}
       {s.secondoFattore && (
         <fieldset disabled={busy || !s.impostate}>
-          <legend>Codice di sessione (secondo fattore)</legend>
+          <legend>
+            {s.accessoRegionale
+              ? 'In alternativa: codice di sessione via email'
+              : 'Codice di sessione (secondo fattore)'}
+          </legend>
           <p>
-            {s.sessione.attiva
+            {emailActive
               ? `Attivo fino a ${dateTime(s.sessione.scadeIl)}.`
-              : 'Non attivo: serve per mandare le ricette.'}
+              : s.accessoRegionale
+                ? 'Non attivo. Serve con le credenziali RUPAR, al posto dell’accesso con SPID o CIE.'
+                : 'Non attivo: serve per mandare le ricette.'}
           </p>
           <p className="aiuto">
             Il codice arriva all’email che hai certificato presso il servizio. Ne vale uno alla
@@ -234,7 +297,7 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
             <button type="button" className="pulsante" onClick={() => void requestCode()}>
               <Icon name="apri" /> <span>Chiedi il codice</span>
             </button>
-            {s.sessione.attiva && (
+            {emailActive && (
               <button type="button" className="pulsante" onClick={() => void revoke()}>
                 <Icon name="annulla" /> <span>Revoca il codice</span>
               </button>

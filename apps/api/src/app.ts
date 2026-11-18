@@ -11,6 +11,7 @@ import type { Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerCredentialRoutes } from './http/credentials-routes';
+import { registerRegionalSimulatorRoutes } from './http/regional-simulator-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
@@ -24,11 +25,13 @@ import type { CredentialService } from '@mmg/domain';
 import {
   SimulatedGateway,
   SimulatedReminderSender,
+  SimulatedRegionalAuthorization,
   SimulatedSecondFactor,
   SimulatedSickLeaveGateway,
   type GatewaySystem,
   type PrescriptionGateway,
   type ReminderSender,
+  type RegionalAuthorizationGateway,
   type SecondFactorGateway,
   type SickLeaveGateway,
 } from '@mmg/integrations';
@@ -69,6 +72,12 @@ export interface AppDeps {
   secondFactor?: Record<CredentialService, SecondFactorGateway>;
   /** Certificati di malattia all'INPS tramite il Sistema TS. Per difetto il simulatore. */
   sickLeaveGateway?: SickLeaveGateway;
+  /**
+   * Accesso regionale con SPID o CIE (D109). Per difetto il simulatore, con un codice del
+   * gestionale di prova e il ritorno interno al programma: quelli veri li assegna e li registra la
+   * Regione (D103).
+   */
+  regional?: { gateway: RegionalAuthorizationGateway; clientId: string; redirectUri: string };
   /** Controlli prima dell'invio delle ricette (regole di prescrizione). */
   preSendChecks?: PrescriptionDeps['preSendChecks'];
   /** Email e SMS del promemoria. Per difetto il simulatore (regola 7). */
@@ -86,7 +95,12 @@ export function buildApp({
     sistema_ts: new SimulatedSecondFactor('sistema_ts', { now }),
     rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now }),
   },
-  gateways = defaultGateways(secondFactor),
+  regional = {
+    gateway: new SimulatedRegionalAuthorization({ now }),
+    clientId: 'SIMULATORE_000',
+    redirectUri: '/api/profilo/credenziali/rupar/accesso-regionale/ritorno',
+  },
+  gateways = defaultGateways(secondFactor, regional.gateway),
   sickLeaveGateway = new SimulatedSickLeaveGateway({ now }),
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
@@ -155,8 +169,18 @@ export function buildApp({
     encryptionKey: config.encryptionKey,
     now: now ?? (() => new Date()),
     secondFactor,
+    regional,
   });
-  registerCredentialRoutes(app, credentials);
+  registerCredentialRoutes(app, credentials, {
+    sessionCookie: SESSION_COOKIE,
+    actorOf: async (token) => {
+      if (!token) return null;
+      const r = await auth.authenticate(token);
+      return r.status === 'ok' ? r.actor : null;
+    },
+  });
+  if (regional.gateway instanceof SimulatedRegionalAuthorization)
+    registerRegionalSimulatorRoutes(app, regional.gateway);
   registerPatientRoutes(app, db);
   registerTodayRoutes(app, db, now ?? (() => new Date()));
   registerTherapyRoutes(app, db, now ?? (() => new Date()));
@@ -195,10 +219,12 @@ export function buildApp({
 /** Simulatori del SAR e del Sistema TS che vogliono l'Id-Sessione dei rispettivi simulatori. */
 function defaultGateways(
   secondFactor: Record<CredentialService, SecondFactorGateway>,
+  regional: RegionalAuthorizationGateway,
 ): Record<GatewaySystem, PrescriptionGateway> {
+  const oauth = regional instanceof SimulatedRegionalAuthorization ? regional : undefined;
   const sessions = (s: SecondFactorGateway) => (s instanceof SimulatedSecondFactor ? s : undefined);
   return {
-    sar: new SimulatedGateway('sar', { sessions: sessions(secondFactor.rupar_piemonte) }),
+    sar: new SimulatedGateway('sar', { sessions: sessions(secondFactor.rupar_piemonte), oauth }),
     sistema_ts: new SimulatedGateway('sistema_ts', { sessions: sessions(secondFactor.sistema_ts) }),
   };
 }

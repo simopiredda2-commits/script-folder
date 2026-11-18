@@ -328,3 +328,15 @@ Sostituisce la parte di D88 sul solo protocollo. Resta da confermare con il cons
 - tappa 12: condivisione tra i medici dell’AFT che usano il programma.
 
 Con gli altri programmi solo formati pubblici (D104).
+
+## Dopo la terza fermata (18/11/2026)
+
+**D111 · Come è fatto l’accesso con SPID o CIE (D109).**
+
+- **Dove sta la richiesta**: nel database, legata al medico che la avvia, con l’impronta dello state (mai lo state in chiaro) e il code_verifier cifrato. Vale 10 minuti ed è monouso; la Regione dà al codice «qualche minuto».
+- **Identità**: il codice fiscale nel token deve essere quello del medico collegato. Se non lo è, il token si revoca e l’accesso non vale, perché altrimenti si manderebbero ricette a nome di un altro.
+- **Profilo**: serve lo scope `prescrizione` concesso dalla Regione (configuratore regionale).
+- **Token**: senza rinnovo, come chiede la Regione. Nel simulatore vale 8 ore; la durata vera viene dalla risposta, da verificare in collaudo per l’ambiguità di `expires_in`.
+- **Parametri da completare con la Regione**: codice del gestionale (`client_id`) e indirizzo di ritorno registrato (D103). Il simulatore usa `SIMULATORE_000` e un ritorno interno.
+- **Pagina simulata**: servita dal programma solo in simulazione. Chi entra lo dice il programma (`login_hint`, solo per il simulatore); il servizio vero lo ricava da SPID o CIE.
+- **Codice per email**: resta come alternativa, con le credenziali RUPAR.
