@@ -35,7 +35,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 ## Regole che non si discutono
 
 1. **Nessun dato reale**: test, demo, fixture e log usano solo pazienti inventati.
-2. **Sviluppo indipendente**: niente copie di schermate, documentazione o dati di altri software (in particolare Evolus Next²). Si parte dai requisiti, dalle specifiche pubbliche e da come lavora la dottoressa. Le schermate di Next² mandate da Simone o dalla Dr.ssa Rocca, che lo usano, possono suggerire campi e funzioni che loro chiedono perché servono (D89). I campi obbligatori si verificano sulle specifiche pubbliche. Non si copiano impaginazione, testi, codice, documentazione o dati di Next², e le schermate non entrano nel repository.
+2. **Sviluppo indipendente**: niente copie di schermate, documentazione o dati di altri software (in particolare Evolus Next²). Si parte dai requisiti, dalle specifiche pubbliche e da come lavora la dottoressa. Le schermate di Next² mandate da Simone o dalla Dr.ssa Rocca, che lo usano, possono suggerire campi e funzioni che loro chiedono perché servono (D89). I campi obbligatori si verificano sulle specifiche pubbliche. Non si copiano impaginazione, testi, codice, documentazione o dati di Next², e le schermate non entrano nel repository. Una prova controlla la provenienza di immagini, documenti e archivi e le licenze delle dipendenze; il registro è `docs/provenienze.md` (D142).
 3. **Non diventare un dispositivo medico**: niente suggerimenti diagnostici o terapeutici. Le regole di prescrizione sono solo controlli formali.
 4. **I dati sono del medico**: esportazione completa in formato aperto, sempre possibile.
 5. **Ruoli e tracciamento**: la segreteria prepara, il medico firma e invia; ogni accesso a una cartella viene registrato.
@@ -126,6 +126,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/credenziali.md`: credenziali dei servizi (Sistema TS, RUPAR) e secondo fattore.
 - `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.
 - `docs/fse.md`: Fascicolo Sanitario Elettronico 2.0 e Profilo Sanitario Sintetico, con le fonti (D110).
+- `docs/provenienze.md`: da dove viene ogni contenuto, a quali condizioni, chi lo controlla (D142).
 
 ## Le tappe
 

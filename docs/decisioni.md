@@ -482,3 +482,16 @@ Il Profilo è «pubblicato» solo quando lo stato dice che i dati sono arrivati 
 **D140 · Recapiti di studio del medico.** Il Profilo vuole nome e cognome del medico separati e almeno un recapito (schematron, ERRORE-38 ed ERRORE-40). Si inseriscono nella pagina «Recapiti di studio», raggiungibile da «Credenziali dei servizi» e dall'avviso del Profilo quando manca qualcosa. Li cambia solo il medico stesso. Il codice fiscale del medico resta quello del profilo creato con l'account: qui non si cambia.
 
 **D141 · Indirizzo del paziente fuori dal Profilo.** Lo schematron non lo chiede. Se c'è, però, deve avere anche il codice ISTAT del comune (ERRORE-11), che l'anagrafica non ha. Per ora non entra; il programma lo scrive solo se è completo. Da rivedere quando l'anagrafica avrà il codice ISTAT del comune di residenza.
+
+## Provenienza dimostrabile (18/11/2026)
+
+**D142 · Nessun appiglio per pretese di copyright o di reverse engineering.** Richiesta di Simone: «fai in modo che nessuno possa rivendicare violazione del copyright o reverse engineering». La regola c'era dall'inizio: requisiti («Sviluppo indipendente» e licenza di Next²), regola 2, D87 e D89. Ora è anche documentata e controllata:
+
+- `docs/provenienze.md` dice da dove viene ogni contenuto, a quali condizioni e chi lo controlla.
+- Una prova su tutto il repository (`packages/brand/test/provenienza.test.ts`) accetta immagini, documenti e archivi solo con una provenienza dichiarata: le schermate fotografate dal programma, i file inventati di `genera.py`, i marchi. Una schermata o un manuale di un altro programma la fa diventare rossa. La stessa prova ammette nelle dipendenze di produzione solo licenze permissive.
+- I cataloghi dello studio vengono dalle fonti pubbliche o li inserisce lo studio; nessun elenco si prende da altri programmi.
+
+Nessuno può impedire a un terzo di avanzare una pretesa. Si può fare in modo che sia infondata e che lo si possa dimostrare. Per questo restano due cose:
+
+- la revisione di un avvocato prima del lancio (requisiti);
+- una proposta per la fermata: da ora le richieste arrivano a parole vostre, senza schermate di Next². Così la traccia resta pulita anche rispetto all'art. 7 della sua licenza, che vieta ogni analisi finalizzata a riprodurne i contenuti.
