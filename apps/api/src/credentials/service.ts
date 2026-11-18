@@ -1,0 +1,452 @@
+import {
+  CREDENTIAL_SERVICE_LABELS,
+  CREDENTIAL_SERVICE_USES,
+  CREDENTIAL_SERVICES,
+  NEEDS_SECOND_FACTOR,
+  passwordExpiry,
+  passwordState,
+  SERVICE_FOR_USE,
+  SERVICE_USES,
+  usernameHint,
+  type CredentialService,
+  type Role,
+  type ServiceUse,
+} from '@mmg/domain';
+import type { AuthProblem, SecondFactorGateway, ServiceAuth } from '@mmg/integrations';
+import { and, eq } from 'drizzle-orm';
+import { z } from 'zod';
+import type { Actor } from '../auth/service';
+import type { Database } from '../db/client';
+import {
+  doctorProfile,
+  serviceCredential,
+  serviceCredentialEvent,
+  serviceSession,
+} from '../db/schema';
+import { HttpError } from '../http/errors';
+import { studioDate } from '../prescriptions/rules-check';
+import { decryptSecret, deriveKey, encryptSecret } from '../security/secrets';
+
+/**
+ * Credenziali dei servizi esterni del medico e secondo fattore (D100–D102).
+ *
+ * Utente, password e PIN si cifrano insieme con una chiave derivata solo per questo uso e legata
+ * a medico e servizio: copiati su un'altra riga non si aprono. Le rotte non li restituiscono mai.
+ * Li gestisce solo il medico a cui appartengono (regola 5). Ogni evento resta in
+ * `service_credential_event`, senza valori segreti.
+ */
+
+/** Il servizio nelle rotte: corto e leggibile. */
+export const SERVICE_SLUGS = { 'sistema-ts': 'sistema_ts', rupar: 'rupar_piemonte' } as const;
+export type ServiceSlug = keyof typeof SERVICE_SLUGS;
+const slugOf = (service: CredentialService): ServiceSlug =>
+  service === 'sistema_ts' ? 'sistema-ts' : 'rupar';
+
+/** Codici d'errore che portano il medico alla pagina delle credenziali. */
+export const CREDENTIAL_ERROR_CODES = [
+  'CREDENZIALI_MANCANTI',
+  'CREDENZIALI_RIFIUTATE',
+  'SESSIONE_MANCANTE',
+  'SESSIONE_SCADUTA',
+] as const;
+
+interface Secret {
+  username: string;
+  password: string;
+  pin: string;
+}
+
+export interface CredentialDeps {
+  db: Database;
+  /** Chiave dell'applicazione: se ne deriva una solo per le credenziali. */
+  encryptionKey: Buffer;
+  now: () => Date;
+  secondFactor: Record<CredentialService, SecondFactorGateway>;
+}
+
+const isDoctor = (roles: readonly Role[]) =>
+  roles.includes('owner_doctor') || roles.includes('substitute_doctor');
+
+const credentialKey = (appKey: Buffer) => deriveKey(appKey, 'credenziali-dei-servizi');
+const aad = (kind: 'credenziali' | 'sessione', userId: string, service: CredentialService) =>
+  Buffer.from(`${kind}:${userId}:${service}`);
+
+function seal(key: Buffer, userId: string, service: CredentialService, secret: Secret): Buffer {
+  return encryptSecret(
+    key,
+    Buffer.from(JSON.stringify(secret)),
+    aad('credenziali', userId, service),
+  );
+}
+
+function open(key: Buffer, userId: string, service: CredentialService, data: Buffer): Secret {
+  try {
+    return JSON.parse(
+      decryptSecret(key, data, aad('credenziali', userId, service)).toString(),
+    ) as Secret;
+  } catch {
+    // Testo cifrato copiato da un'altra riga, o chiave cambiata: non si apre, si reinseriscono.
+    throw new HttpError(
+      422,
+      'Le credenziali salvate non si possono leggere: inseriscile di nuovo in «Credenziali dei servizi»',
+      { codice: 'CREDENZIALI_MANCANTI' },
+    );
+  }
+}
+
+/** Scrive le credenziali senza passare dalle rotte: dati dimostrativi e prove. */
+export async function storeCredentials(
+  db: Database,
+  appKey: Buffer,
+  input: { userId: string; service: CredentialService; secret: Secret; passwordChangedOn: string },
+) {
+  const values = {
+    userId: input.userId,
+    service: input.service,
+    secretEnc: seal(credentialKey(appKey), input.userId, input.service, input.secret),
+    usernameHint: usernameHint(input.secret.username),
+    passwordChangedOn: input.passwordChangedOn,
+    updatedAt: new Date(),
+  };
+  await db
+    .insert(serviceCredential)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [serviceCredential.userId, serviceCredential.service],
+      set: values,
+    });
+}
+
+/** Scrive una sessione del secondo fattore: solo per le prove (simulatore). */
+export async function storeSession(
+  db: Database,
+  appKey: Buffer,
+  input: { userId: string; service: CredentialService; token: string; validUntil: Date },
+) {
+  const values = {
+    userId: input.userId,
+    service: input.service,
+    tokenEnc: encryptSecret(
+      credentialKey(appKey),
+      Buffer.from(input.token),
+      aad('sessione', input.userId, input.service),
+    ),
+    validUntil: input.validUntil,
+    activatedAt: new Date(),
+  };
+  await db
+    .insert(serviceSession)
+    .values(values)
+    .onConflictDoUpdate({ target: [serviceSession.userId, serviceSession.service], set: values });
+}
+
+const saveBody = z
+  .object({
+    utente: z.string().trim().min(1).max(100).optional(),
+    password: z.string().min(1).max(200).optional(),
+    pin: z.string().trim().min(1).max(20).optional(),
+    passwordCambiataIl: z.iso.date().optional(),
+  })
+  .strict();
+
+const codeBody = z.object({ codice: z.string().trim().min(1).max(100) }).strict();
+
+export function createCredentialService(deps: CredentialDeps) {
+  const { db, now } = deps;
+  const key = credentialKey(deps.encryptionKey);
+  const label = (s: CredentialService) => CREDENTIAL_SERVICE_LABELS[s];
+  const where = (userId: string, service: CredentialService) => ({
+    credential: and(eq(serviceCredential.userId, userId), eq(serviceCredential.service, service)),
+    session: and(eq(serviceSession.userId, userId), eq(serviceSession.service, service)),
+  });
+
+  function requireDoctor(actor: Actor) {
+    if (!isDoctor(actor.roles))
+      throw new HttpError(
+        403,
+        'Le credenziali dei servizi sono personali del medico: la segreteria e l’amministratore non le vedono e non le usano',
+      );
+  }
+
+  async function event(
+    who: { userId: string; workstation?: string | null },
+    service: CredentialService,
+    name: string,
+    detail?: string | null,
+  ) {
+    await db.insert(serviceCredentialEvent).values({
+      userId: who.userId,
+      service,
+      event: name,
+      workstation: who.workstation ?? null,
+      detail: detail ?? null,
+    });
+  }
+
+  async function loadSecret(userId: string, service: CredentialService): Promise<Secret | null> {
+    const [row] = await db
+      .select({ secretEnc: serviceCredential.secretEnc })
+      .from(serviceCredential)
+      .where(where(userId, service).credential);
+    return row ? open(key, userId, service, row.secretEnc) : null;
+  }
+
+  async function fiscalCodeOf(userId: string): Promise<string> {
+    const [p] = await db
+      .select({ cf: doctorProfile.fiscalCode })
+      .from(doctorProfile)
+      .where(eq(doctorProfile.userId, userId));
+    if (!p?.cf)
+      throw new HttpError(
+        422,
+        'Manca il codice fiscale del medico nel profilo: serve per il codice di sessione',
+      );
+    return p.cf;
+  }
+
+  const needsSecondFactor = (service: CredentialService) =>
+    SERVICE_USES.some((u) => SERVICE_FOR_USE[u] === service && NEEDS_SECOND_FACTOR[u]);
+
+  async function status(actor: Actor) {
+    requireDoctor(actor);
+    const today = studioDate(now());
+    const creds = await db
+      .select()
+      .from(serviceCredential)
+      .where(eq(serviceCredential.userId, actor.userId));
+    const sessions = await db
+      .select({
+        service: serviceSession.service,
+        validUntil: serviceSession.validUntil,
+        activatedAt: serviceSession.activatedAt,
+      })
+      .from(serviceSession)
+      .where(eq(serviceSession.userId, actor.userId));
+    return {
+      servizi: CREDENTIAL_SERVICES.map((service) => {
+        const c = creds.find((r) => r.service === service);
+        const s = sessions.find((r) => r.service === service);
+        const active = !!s && s.validUntil > now();
+        return {
+          servizio: slugOf(service),
+          nome: label(service),
+          uso: CREDENTIAL_SERVICE_USES[service],
+          impostate: !!c,
+          utente: c?.usernameHint ?? null,
+          passwordCambiataIl: c?.passwordChangedOn ?? null,
+          scadenzaPassword: c ? passwordExpiry(service, c.passwordChangedOn) : null,
+          statoPassword: c ? passwordState(service, c.passwordChangedOn, today) : null,
+          aggiornateIl: c?.updatedAt ?? null,
+          secondoFattore: needsSecondFactor(service),
+          sessione: { attiva: active, scadeIl: active ? s.validUntil : null },
+          ambiente: deps.secondFactor[service].environment,
+        };
+      }),
+    };
+  }
+
+  async function save(actor: Actor, service: CredentialService, body: unknown) {
+    requireDoctor(actor);
+    const b = saveBody.parse(body ?? {});
+    if (!b.utente && !b.password && !b.pin && !b.passwordCambiataIl)
+      throw new HttpError(400, 'Niente da cambiare');
+    const [existing] = await db
+      .select()
+      .from(serviceCredential)
+      .where(where(actor.userId, service).credential);
+    // Con utente, password e PIN insieme si sostituisce tutto, anche una riga illeggibile.
+    const full = !!(b.utente && b.password && b.pin);
+    const old = existing && !full ? open(key, actor.userId, service, existing.secretEnc) : null;
+    let secret: Secret;
+    if (full) {
+      secret = { username: b.utente!, password: b.password!, pin: b.pin! };
+    } else if (old) {
+      secret = {
+        username: b.utente ?? old.username,
+        password: b.password ?? old.password,
+        pin: b.pin ?? old.pin,
+      };
+    } else {
+      throw new HttpError(400, `Per ${label(service)} servono utente, password e PIN`);
+    }
+    const today = studioDate(now());
+    const changedOn =
+      b.passwordCambiataIl ?? (b.password || !existing ? today : existing.passwordChangedOn);
+    if (changedOn > today)
+      throw new HttpError(400, 'La data del cambio della password non può essere nel futuro');
+    // Un utente diverso non può usare la sessione dell'utente di prima (se non si sa, si toglie).
+    let previousUsername: string | null = old?.username ?? null;
+    if (existing && full) {
+      try {
+        previousUsername = open(key, actor.userId, service, existing.secretEnc).username;
+      } catch {
+        previousUsername = null;
+      }
+    }
+    await storeCredentials(db, deps.encryptionKey, {
+      userId: actor.userId,
+      service,
+      secret,
+      passwordChangedOn: changedOn,
+    });
+    if (existing && secret.username !== previousUsername)
+      await db.delete(serviceSession).where(where(actor.userId, service).session);
+    const changed = [
+      b.utente && 'utente',
+      b.password && 'password',
+      b.pin && 'PIN',
+      b.passwordCambiataIl && 'data del cambio della password',
+    ].filter(Boolean);
+    await event(actor, service, existing ? 'cambiate' : 'impostate', changed.join(', '));
+    return status(actor);
+  }
+
+  async function remove(actor: Actor, service: CredentialService) {
+    requireDoctor(actor);
+    const w = where(actor.userId, service);
+    await db.delete(serviceSession).where(w.session);
+    const gone = await db.delete(serviceCredential).where(w.credential).returning();
+    if (gone.length > 0) await event(actor, service, 'cancellate');
+    return status(actor);
+  }
+
+  async function requireSecret(userId: string, service: CredentialService): Promise<Secret> {
+    const secret = await loadSecret(userId, service);
+    if (!secret)
+      throw new HttpError(
+        422,
+        `Mancano le credenziali ${label(service)} del medico: inseriscile in «Credenziali dei servizi»`,
+        { codice: 'CREDENZIALI_MANCANTI', servizio: slugOf(service) },
+      );
+    return secret;
+  }
+
+  /** Chiede l'Id-Sessione: il servizio lo manda all'email certificata del medico. */
+  async function requestSession(actor: Actor, service: CredentialService) {
+    requireDoctor(actor);
+    const secret = await requireSecret(actor.userId, service);
+    const fiscalCode = await fiscalCodeOf(actor.userId);
+    const gateway = deps.secondFactor[service];
+    const r = await gateway.requestCode({ auth: secret, fiscalCode });
+    if (r.outcome === 'unreachable') {
+      await event(actor, service, 'codice_non_richiesto', r.message);
+      throw new HttpError(502, `${label(service)}: ${r.message}. Riprova tra poco.`);
+    }
+    if (r.outcome === 'rejected') {
+      await event(actor, service, 'codice_rifiutato', `${r.code}: ${r.message}`);
+      throw new HttpError(
+        422,
+        `${label(service)} ha rifiutato la richiesta del codice: ${r.message}. Controlla utente, password e PIN.`,
+        { codice: 'CREDENZIALI_RIFIUTATE', servizio: slugOf(service) },
+      );
+    }
+    await event(actor, service, 'codice_richiesto');
+    return {
+      inviato: true,
+      // Come nell'ambiente di prova del SIRPED (4.2.1): mai in produzione.
+      codiceDiProva: gateway.environment === 'production' ? null : r.testCode,
+    };
+  }
+
+  /** Il medico inserisce il codice ricevuto: si verifica col servizio e vale fino alla scadenza. */
+  async function confirmSession(actor: Actor, service: CredentialService, body: unknown) {
+    requireDoctor(actor);
+    const { codice } = codeBody.parse(body ?? {});
+    const secret = await requireSecret(actor.userId, service);
+    const fiscalCode = await fiscalCodeOf(actor.userId);
+    const r = await deps.secondFactor[service].check({
+      auth: secret,
+      fiscalCode,
+      sessionId: codice,
+    });
+    if (r.outcome === 'unreachable')
+      throw new HttpError(502, `${label(service)}: ${r.message}. Riprova tra poco.`);
+    if (r.outcome === 'invalid') {
+      await event(actor, service, 'sessione_rifiutata', r.message);
+      throw new HttpError(422, 'Il codice non è valido o è scaduto: chiedine uno nuovo');
+    }
+    await storeSession(db, deps.encryptionKey, {
+      userId: actor.userId,
+      service,
+      token: codice,
+      validUntil: new Date(r.validUntil),
+    });
+    await event(actor, service, 'sessione_attivata', `fino a ${r.validUntil}`);
+    return status(actor);
+  }
+
+  async function revokeSession(actor: Actor, service: CredentialService) {
+    requireDoctor(actor);
+    const w = where(actor.userId, service);
+    const [s] = await db.select().from(serviceSession).where(w.session);
+    if (!s) return status(actor);
+    const token = decryptSecret(key, s.tokenEnc, aad('sessione', actor.userId, service)).toString();
+    const secret = await loadSecret(actor.userId, service);
+    let detail: string | null = null;
+    if (secret) {
+      const r = await deps.secondFactor[service].revoke({
+        auth: secret,
+        fiscalCode: await fiscalCodeOf(actor.userId),
+        sessionId: token,
+      });
+      if (r.outcome === 'unreachable') detail = `revoca solo locale: ${r.message}`;
+    }
+    await db.delete(serviceSession).where(w.session);
+    await event(actor, service, 'sessione_revocata', detail);
+    return status(actor);
+  }
+
+  /**
+   * Per gli invii: credenziali e secondo fattore di chi firma. Se mancano, l'invio si ferma prima
+   * di contattare il servizio, con un errore che porta alla pagina giusta.
+   */
+  async function authFor(userId: string, use: ServiceUse): Promise<ServiceAuth> {
+    const service = SERVICE_FOR_USE[use];
+    const secret = await requireSecret(userId, service);
+    if (!NEEDS_SECOND_FACTOR[use]) return { ...secret, sessionId: null };
+    const [s] = await db.select().from(serviceSession).where(where(userId, service).session);
+    if (!s)
+      throw new HttpError(
+        422,
+        `Serve il codice di sessione ${label(service)} (secondo fattore): attivalo in «Credenziali dei servizi»`,
+        { codice: 'SESSIONE_MANCANTE', servizio: slugOf(service) },
+      );
+    if (s.validUntil <= now())
+      throw new HttpError(
+        422,
+        `Il codice di sessione ${label(service)} è scaduto: chiedine uno nuovo in «Credenziali dei servizi»`,
+        { codice: 'SESSIONE_SCADUTA', servizio: slugOf(service) },
+      );
+    const sessionId = decryptSecret(key, s.tokenEnc, aad('sessione', userId, service)).toString();
+    return { ...secret, sessionId };
+  }
+
+  /** Il servizio ha rifiutato l'accesso durante un invio: si annota; se è la sessione, si toglie. */
+  async function authRefused(
+    who: { userId: string; workstation?: string | null },
+    use: ServiceUse,
+    problem: AuthProblem,
+    detail: string,
+  ) {
+    const service = SERVICE_FOR_USE[use];
+    if (problem === 'session')
+      await db.delete(serviceSession).where(where(who.userId, service).session);
+    await event(
+      who,
+      service,
+      problem === 'session' ? 'sessione_rifiutata' : 'credenziali_rifiutate',
+      detail,
+    );
+  }
+
+  return {
+    status,
+    save,
+    remove,
+    requestSession,
+    confirmSession,
+    revokeSession,
+    authFor,
+    authRefused,
+  };
+}

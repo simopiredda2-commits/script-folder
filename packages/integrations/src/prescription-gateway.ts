@@ -9,6 +9,7 @@
  */
 
 import type { DispensingState } from '@mmg/domain';
+import type { AuthProblem, ServiceAuth } from './service-auth';
 
 export type GatewaySystem = 'sar' | 'sistema_ts';
 
@@ -70,7 +71,14 @@ export interface AcceptedSend {
 
 export type SendResult =
   | AcceptedSend
-  | { outcome: 'rejected'; code: string; message: string; raw: unknown }
+  | {
+      outcome: 'rejected';
+      code: string;
+      message: string;
+      /** Rifiuto per credenziali o secondo fattore: la ricetta è giusta, l'accesso no. */
+      authProblem?: AuthProblem;
+      raw: unknown;
+    }
   /** Il sistema non risponde: la ricetta certamente non è arrivata. */
   | { outcome: 'unreachable'; message: string }
   /** Nessuna risposta entro il tempo: non si sa se è arrivata. */
@@ -78,7 +86,13 @@ export type SendResult =
 
 export type CancelResult =
   | { outcome: 'accepted'; raw: unknown }
-  | { outcome: 'rejected'; code: string; message: string; raw: unknown }
+  | {
+      outcome: 'rejected';
+      code: string;
+      message: string;
+      authProblem?: AuthProblem;
+      raw: unknown;
+    }
   | { outcome: 'unreachable'; message: string }
   | { outcome: 'timeout'; message: string };
 
@@ -88,7 +102,13 @@ export type CancelResult =
  */
 export type StatusResult =
   | { outcome: 'ok'; state: DispensingState; raw: unknown }
-  | { outcome: 'rejected'; code: string; message: string; raw: unknown }
+  | {
+      outcome: 'rejected';
+      code: string;
+      message: string;
+      authProblem?: AuthProblem;
+      raw: unknown;
+    }
   | { outcome: 'unreachable'; message: string }
   | { outcome: 'timeout'; message: string };
 
@@ -96,14 +116,21 @@ export interface PrescriptionGateway {
   readonly system: GatewaySystem;
   /** Ambiente: un adattatore vero dichiara «collaudo» o «produzione». */
   readonly environment: 'simulator' | 'test' | 'production';
-  send(message: PrescriptionMessage): Promise<SendResult>;
-  cancel(input: {
-    nre: string;
-    reason: string;
-    doctor: PrescriptionMessage['doctor'];
-  }): Promise<CancelResult>;
+  /** Le credenziali del medico che firma passano a parte: non entrano nel messaggio conservato. */
+  send(message: PrescriptionMessage, auth: ServiceAuth): Promise<SendResult>;
+  cancel(
+    input: {
+      nre: string;
+      reason: string;
+      doctor: PrescriptionMessage['doctor'];
+    },
+    auth: ServiceAuth,
+  ): Promise<CancelResult>;
   /** Che cosa ne è stato della ricetta: presa in carico, prenotata, erogata… */
-  status(input: { nre: string; doctor: PrescriptionMessage['doctor'] }): Promise<StatusResult>;
+  status(
+    input: { nre: string; doctor: PrescriptionMessage['doctor'] },
+    auth: ServiceAuth,
+  ): Promise<StatusResult>;
 }
 
 /** Il sistema a cui va ogni tipo di ricetta. */

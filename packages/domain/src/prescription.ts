@@ -48,7 +48,12 @@ export type SendErrorKind =
   /** Il sistema non è raggiungibile: la ricetta certamente non è arrivata. */
   | 'unreachable'
   /** Nessuna risposta entro il tempo: non si sa se la ricetta è arrivata. */
-  | 'timeout';
+  | 'timeout'
+  /**
+   * Il sistema ha rifiutato le credenziali o il secondo fattore (D102): la ricetta è giusta,
+   * l'accesso no. Si rimanda dopo aver sistemato credenziali o codice di sessione.
+   */
+  | 'auth';
 
 export type PrescriptionEvent =
   /** Mettere nella coda «da firmare» del medico. */
@@ -86,7 +91,8 @@ export function transition(
       return from === 'draft' ? ok('to_sign') : no('Solo una bozza va nella coda «da firmare»');
     case 'edit':
       if (from === 'draft' || from === 'to_sign') return ok('draft');
-      if (from === 'error' && ctx.lastErrorKind === 'rejected') return ok('draft');
+      if (from === 'error' && (ctx.lastErrorKind === 'rejected' || ctx.lastErrorKind === 'auth'))
+        return ok('draft');
       if (from === 'error') {
         return no(
           'Una ricetta senza risposta del SAR non si modifica: riprova l’invio o annullala',
@@ -97,7 +103,9 @@ export function transition(
       if (from === 'draft' || from === 'to_sign') return ok('sending');
       if (
         from === 'error' &&
-        (ctx.lastErrorKind === 'unreachable' || ctx.lastErrorKind === 'timeout')
+        (ctx.lastErrorKind === 'unreachable' ||
+          ctx.lastErrorKind === 'timeout' ||
+          ctx.lastErrorKind === 'auth')
       ) {
         return ok('sending');
       }

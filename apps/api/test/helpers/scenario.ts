@@ -1,8 +1,11 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { buildFiscalCode, type Role } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
+import { SimulatedSecondFactor } from '@mmg/integrations';
 import type { FastifyInstance } from 'fastify';
 import { buildApp, type AppDeps } from '../../src/app';
+import { storeCredentials, storeSession } from '../../src/credentials/service';
+import { studioDate } from '../../src/prescriptions/rules-check';
 import type { Database } from '../../src/db/client';
 import {
   allergyDetail,
@@ -59,6 +62,10 @@ export interface Scenario {
   draftPrescription: string;
   /** Codici TOTP: il segreto di ogni utente dopo l'attivazione. */
   secrets: Map<string, Buffer>;
+  /** Chiave dell'applicazione delle prove (credenziali cifrate). */
+  encryptionKey: Buffer;
+  /** Simulatori del secondo fattore (D102). */
+  secondFactor: NonNullable<AppDeps['secondFactor']>;
 }
 
 /**
@@ -68,9 +75,17 @@ export interface Scenario {
 export async function createScenario(
   db: Database,
   settings: Partial<typeof studio.$inferInsert> = {},
-  appOptions: Pick<AppDeps, 'gateways' | 'preSendChecks' | 'reminderSender' | 'sendTimeoutMs'> = {},
+  appOptions: Pick<
+    AppDeps,
+    'gateways' | 'preSendChecks' | 'reminderSender' | 'sendTimeoutMs' | 'secondFactor'
+  > = {},
 ): Promise<Scenario> {
   const clock = new Clock();
+  const encryptionKey = randomBytes(32);
+  const secondFactor = appOptions.secondFactor ?? {
+    sistema_ts: new SimulatedSecondFactor('sistema_ts', { now: clock.now }),
+    rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now: clock.now }),
+  };
   const [st] = await db
     .insert(studio)
     .values({
@@ -122,6 +137,36 @@ export async function createScenario(
       fiscalCode: doctorCf('Fiore', 'Marco', 'M'),
     },
   ]);
+  // Credenziali inventate e un codice di sessione lungo, per le prove che non riguardano le
+  // credenziali (D100–D102). Le prove delle credenziali partono da medici senza.
+  const sessionUntil = new Date(clock.now().getTime() + 365 * 86_400_000);
+  for (const [who, cf] of [
+    [users.titolare, doctorCf('Marchi', 'Elena', 'F')],
+    [users.collega, doctorCf('Serra', 'Paolo', 'M')],
+    [users.sostituto, doctorCf('Fiore', 'Marco', 'M')],
+  ] as const) {
+    for (const service of ['sistema_ts', 'rupar_piemonte'] as const) {
+      await storeCredentials(db, encryptionKey, {
+        userId: who.id,
+        service,
+        secret: {
+          username: `${service}-${who.username}`,
+          password: 'parola-di-prova',
+          pin: '0000',
+        },
+        passwordChangedOn: studioDate(clock.now()),
+      });
+      const token = randomUUID();
+      await storeSession(db, encryptionKey, {
+        userId: who.id,
+        service,
+        token,
+        validUntil: sessionUntil,
+      });
+      const gw = secondFactor[service];
+      if (gw instanceof SimulatedSecondFactor) gw.register(token, cf, sessionUntil);
+    }
+  }
 
   const [a1] = await db
     .insert(archive)
@@ -258,9 +303,10 @@ export async function createScenario(
 
   const app = buildApp({
     db,
-    config: { encryptionKey: randomBytes(32), sessionMaxHours: 12, cookieSecure: false },
+    config: { encryptionKey, sessionMaxHours: 12, cookieSecure: false },
     now: clock.now,
     ...appOptions,
+    secondFactor,
   });
   return {
     db,
@@ -273,6 +319,8 @@ export async function createScenario(
     richPatient: rich,
     draftPrescription: draft!.id,
     secrets: new Map(),
+    encryptionKey,
+    secondFactor,
   };
 }
 

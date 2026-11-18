@@ -12,6 +12,7 @@ import { buildFiscalCode, type Role } from '@mmg/domain';
 import { generatePatients, Random } from '@mmg/fixtures';
 import { inArray } from 'drizzle-orm';
 import { loadConfig } from '../config';
+import { storeCredentials } from '../credentials/service';
 import { startOfStudioDay } from '../http/today-routes';
 import { studioDate } from '../prescriptions/rules-check';
 import { hashPassword } from '../security/password';
@@ -143,6 +144,26 @@ try {
       placeCode: 'X001',
     }),
   });
+  // Credenziali dei servizi inventate (D100): i simulatori ne controllano solo la forma. La
+  // password RUPAR del medico risulta cambiata 80 giorni fa, per mostrare l'avviso di scadenza.
+  const daysAgo = (n: number) => studioDate(new Date(Date.now() - n * 86_400_000));
+  for (const [username, ruparChangedOn] of [
+    ['medico', daysAgo(80)],
+    ['sostituto', daysAgo(0)],
+  ] as const) {
+    for (const service of ['sistema_ts', 'rupar_piemonte'] as const) {
+      await storeCredentials(db, config.encryptionKey, {
+        userId: users.get(username)!,
+        service,
+        secret: {
+          username: `${service === 'sistema_ts' ? 'TS' : 'RUPAR'}-DEMO-${username.toUpperCase()}`,
+          password: randomBytes(12).toString('base64url'),
+          pin: String(randomBytes(2).readUInt16BE() % 10_000).padStart(4, '0'),
+        },
+        passwordChangedOn: service === 'rupar_piemonte' ? ruparChangedOn : daysAgo(0),
+      });
+    }
+  }
   const [arc] = await db
     .insert(archive)
     .values({ studioId: st!.id, ownerUserId: doctorId, name: 'Archivio della Dott.ssa Marchi' })

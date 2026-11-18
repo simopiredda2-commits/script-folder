@@ -5,8 +5,10 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 import { createAuthService, type Actor } from './auth/service';
 import type { Config } from './config';
+import { createCredentialService } from './credentials/service';
 import type { Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
+import { registerCredentialRoutes } from './http/credentials-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
@@ -16,12 +18,15 @@ import { registerTherapyRoutes } from './http/therapy-routes';
 import { registerTodayRoutes } from './http/today-routes';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
+import type { CredentialService } from '@mmg/domain';
 import {
   SimulatedGateway,
   SimulatedReminderSender,
+  SimulatedSecondFactor,
   type GatewaySystem,
   type PrescriptionGateway,
   type ReminderSender,
+  type SecondFactorGateway,
 } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
@@ -51,8 +56,13 @@ export interface AppDeps {
   config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'>;
   now?: () => Date;
   logger?: boolean;
-  /** SAR e Sistema TS. Per difetto i simulatori: nessuna chiamata a servizi reali (regola 7). */
+  /**
+   * SAR e Sistema TS. Per difetto i simulatori, legati ai simulatori del secondo fattore: nessuna
+   * chiamata a servizi reali (regola 7).
+   */
   gateways?: Record<GatewaySystem, PrescriptionGateway>;
+  /** Secondo fattore (Id-Sessione) del Sistema TS e del SIRPED (D102). Per difetto i simulatori. */
+  secondFactor?: Record<CredentialService, SecondFactorGateway>;
   /** Controlli prima dell'invio delle ricette (regole di prescrizione). */
   preSendChecks?: PrescriptionDeps['preSendChecks'];
   /** Email e SMS del promemoria. Per difetto il simulatore (regola 7). */
@@ -66,7 +76,11 @@ export function buildApp({
   config,
   now,
   logger = false,
-  gateways = { sar: new SimulatedGateway('sar'), sistema_ts: new SimulatedGateway('sistema_ts') },
+  secondFactor = {
+    sistema_ts: new SimulatedSecondFactor('sistema_ts', { now }),
+    rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now }),
+  },
+  gateways = defaultGateways(secondFactor),
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
   sendTimeoutMs,
@@ -129,6 +143,13 @@ export function buildApp({
   });
 
   registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
+  const credentials = createCredentialService({
+    db,
+    encryptionKey: config.encryptionKey,
+    now: now ?? (() => new Date()),
+    secondFactor,
+  });
+  registerCredentialRoutes(app, credentials);
   registerPatientRoutes(app, db);
   registerTodayRoutes(app, db, now ?? (() => new Date()));
   registerTherapyRoutes(app, db, now ?? (() => new Date()));
@@ -140,6 +161,7 @@ export function buildApp({
     createPrescriptionService({
       db,
       gateways,
+      credentials,
       now,
       // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
       preSendChecks: preSendChecks ?? createRulesCheck({ db, now, reference }),
@@ -150,4 +172,15 @@ export function buildApp({
   );
   registerReminderRoutes(app, createReminderService({ db, sender: reminderSender, now }));
   return app;
+}
+
+/** Simulatori del SAR e del Sistema TS che vogliono l'Id-Sessione dei rispettivi simulatori. */
+function defaultGateways(
+  secondFactor: Record<CredentialService, SecondFactorGateway>,
+): Record<GatewaySystem, PrescriptionGateway> {
+  const sessions = (s: SecondFactorGateway) => (s instanceof SimulatedSecondFactor ? s : undefined);
+  return {
+    sar: new SimulatedGateway('sar', { sessions: sessions(secondFactor.rupar_piemonte) }),
+    sistema_ts: new SimulatedGateway('sistema_ts', { sessions: sessions(secondFactor.sistema_ts) }),
+  };
 }

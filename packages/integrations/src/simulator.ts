@@ -7,6 +7,7 @@ import type {
   SendResult,
   StatusResult,
 } from './prescription-gateway';
+import { authShapeProblem, type ServiceAuth, type SimulatedSecondFactor } from './service-auth';
 import { simulatedWhiteReminderPdf } from './simulated-documents';
 
 export type SimulatedOutcome = 'accepted' | 'rejected' | 'unreachable' | 'timeout';
@@ -25,6 +26,11 @@ export interface SimulatorOptions {
   omitAuthCode?: (message: PrescriptionMessage) => boolean;
   /** Attesa prima della risposta, per provare il tempo massimo di attesa. */
   delayMs?: number;
+  /**
+   * Secondo fattore: se c'è, ogni chiamata deve portare un Id-Sessione valido per quel
+   * simulatore (D102). Senza, il simulatore controlla solo la forma delle credenziali.
+   */
+  sessions?: SimulatedSecondFactor;
 }
 
 /**
@@ -38,15 +44,41 @@ export class SimulatedGateway implements PrescriptionGateway {
   private readonly issued = new Map<string, { cancelled: boolean }>();
   /** Messaggi ricevuti, per le prove. */
   readonly received: PrescriptionMessage[] = [];
+  /** Con quali credenziali: solo l'utente e l'Id-Sessione, mai password e PIN. */
+  readonly receivedAuth: { username: string; sessionId: string | null }[] = [];
 
   constructor(
     readonly system: GatewaySystem,
     private readonly options: SimulatorOptions = {},
   ) {}
 
-  async send(message: PrescriptionMessage): Promise<SendResult> {
+  /** Rifiuto per credenziali o secondo fattore, come farebbe il servizio vero. */
+  private authRefusal(auth: ServiceAuth) {
+    const shape = authShapeProblem(auth);
+    if (shape)
+      return {
+        outcome: 'rejected' as const,
+        ...shape,
+        authProblem: 'credentials' as const,
+        raw: { simulatore: this.system, esito: 'credenziali' },
+      };
+    if (this.options.sessions && !this.options.sessions.isValid(auth.sessionId))
+      return {
+        outcome: 'rejected' as const,
+        code: 'ID_SESSIONE',
+        message: 'Id-Sessione mancante, scaduto o revocato (simulato)',
+        authProblem: 'session' as const,
+        raw: { simulatore: this.system, esito: 'secondo fattore' },
+      };
+    return null;
+  }
+
+  async send(message: PrescriptionMessage, auth: ServiceAuth): Promise<SendResult> {
     this.received.push(message);
+    this.receivedAuth.push({ username: auth?.username ?? '', sessionId: auth?.sessionId ?? null });
     if (this.options.delayMs) await new Promise((ok) => setTimeout(ok, this.options.delayMs));
+    const refused = this.authRefusal(auth);
+    if (refused) return refused;
     const outcome = this.options.decide?.(message) ?? 'accepted';
     switch (outcome) {
       case 'accepted': {
@@ -102,11 +134,16 @@ export class SimulatedGateway implements PrescriptionGateway {
     }
   }
 
-  cancel(input: {
-    nre: string;
-    reason: string;
-    doctor: PrescriptionMessage['doctor'];
-  }): Promise<CancelResult> {
+  cancel(
+    input: {
+      nre: string;
+      reason: string;
+      doctor: PrescriptionMessage['doctor'];
+    },
+    auth: ServiceAuth,
+  ): Promise<CancelResult> {
+    const refused = this.authRefusal(auth);
+    if (refused) return Promise.resolve(refused);
     const outcome = this.options.decideCancel?.(input.nre) ?? 'accepted';
     if (outcome === 'unreachable' || outcome === 'timeout') {
       return Promise.resolve({ outcome, message: `${this.label()} non raggiungibile (simulato)` });
@@ -127,7 +164,12 @@ export class SimulatedGateway implements PrescriptionGateway {
     });
   }
 
-  status(input: { nre: string; doctor: PrescriptionMessage['doctor'] }): Promise<StatusResult> {
+  status(
+    input: { nre: string; doctor: PrescriptionMessage['doctor'] },
+    auth: ServiceAuth,
+  ): Promise<StatusResult> {
+    const refused = this.authRefusal(auth);
+    if (refused) return Promise.resolve(refused);
     const known = this.issued.get(input.nre);
     const decided = this.options.decideStatus?.(input.nre);
     if (decided === 'unreachable' || decided === 'timeout') {

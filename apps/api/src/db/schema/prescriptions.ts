@@ -30,7 +30,12 @@ export const prescriptionStatus = pgEnum('prescription_status', [
   'cancelled',
   'paper',
 ]);
-export const sendErrorKind = pgEnum('send_error_kind', ['rejected', 'unreachable', 'timeout']);
+export const sendErrorKind = pgEnum('send_error_kind', [
+  'rejected',
+  'unreachable',
+  'timeout',
+  'auth',
+]);
 export const priorityClass = pgEnum('priority_class', ['U', 'B', 'D', 'P']);
 export const accessType = pgEnum('access_type', ['first', 'subsequent']);
 

@@ -327,6 +327,12 @@ Durante la tappa 8:
 
    Se serve leggere per intero le pagine di Net Medica Italia, va aggiunto all'ambiente il sito `www.netmedicaitalia.it`.
 
+4. **Fascicolo Sanitario Elettronico 2.0** (domanda di Simone). Il Profilo Sanitario Sintetico è nei requisiti per la prima versione, «appena l'accreditamento lo permette», ma non è tra le tappe 7–10. Le opzioni:
+   - aggiungerlo dopo la tappa 10, con il simulatore del Gateway;
+   - lasciarlo per l'accreditamento.
+
+   Prima della fermata: leggere le fonti ufficiali (norme, linee guida FSE 2.0, specifiche del Gateway, guida HL7 Italia del PSS) e scrivere `docs/fse.md` con come funziona: contenuto, aggiornamento, firma, invio, accreditamento. Per capirlo, Simone e la Dr.ssa Rocca possono anche guardare il proprio Fascicolo da pazienti, senza mandare i dati (regola 1), e dire come lo usa oggi la Dr.ssa Rocca.
+
 ## Risposte della seconda fermata (18/11/2026)
 
 Simone ha risposto con il pulsante. **Applicate** su `tappe-3-4` (D49–D53) e via dato: la pull request #2 si unisce.
