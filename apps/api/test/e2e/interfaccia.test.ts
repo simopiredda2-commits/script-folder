@@ -12,7 +12,14 @@ import { join } from 'node:path';
 import { generatePatients } from '@mmg/fixtures';
 import { loadMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import {
+  chromium,
+  firefox,
+  webkit,
+  type Browser,
+  type BrowserContext,
+  type Page,
+} from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   appointment,
@@ -44,6 +51,21 @@ const TABLETS = [
   { width: 768, height: 1024 },
   { width: 1024, height: 768 },
 ];
+
+/**
+ * Motore del browser (D155): Chromium (Chrome, Edge) di solito; in CI anche WebKit, il motore di
+ * Safari su Mac e iPad, e Firefox. Si sceglie con E2E_BROWSER.
+ */
+const ENGINES = { chromium, webkit, firefox };
+const ENGINE = process.env.E2E_BROWSER ?? 'chromium';
+function engineOf(name: string) {
+  if (!Object.hasOwn(ENGINES, name)) {
+    throw new Error(`E2E_BROWSER=${name}: motore sconosciuto (${Object.keys(ENGINES).join(', ')})`);
+  }
+  return ENGINES[name as keyof typeof ENGINES];
+}
+// Un nome sbagliato ferma subito la prova, invece di farla girare con un altro motore.
+const engine = engineOf(ENGINE);
 describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   let t: TestDatabase;
   let s: Scenario;
@@ -237,7 +259,9 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     const dist = buildWeb(join(work, 'dist'));
     web = await serveWeb(dist, apiPort);
     base = `http://127.0.0.1:${(web.address() as AddressInfo).port}`;
-    browser = await chromium.launch();
+    browser = await engine.launch();
+    // Il motore avviato è quello chiesto: una prova su WebKit non deve girare su Chromium.
+    expect(browser.browserType().name()).toBe(ENGINE);
     doctor = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'it-IT' });
     page = await doctor.newPage();
   }, 120_000);
