@@ -419,6 +419,21 @@ try {
   await page.getByLabel(/La segreteria legge il riepilogo clinico/).waitFor();
   await shot(page, '16-archivio');
 
+  // Più cartelle aperte insieme (D68, D129): una scheda per paziente nella barra sotto il menu,
+  // quella attiva in giallo; ogni scheda riporta all'ultima pagina vista di quel paziente.
+  const others = await db.execute<{ id: string }>(sql`
+    select id from patient where id <> ${patientId} order by last_name, first_name limit 4`);
+  for (const { id } of others.rows) {
+    await page.goto(`${base}/pazienti/${id}`);
+    await page.getByRole('heading', { name: 'Problemi attivi' }).waitFor();
+  }
+  await page.goto(`${base}/pazienti/${patientId}`);
+  await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+  const tabs = page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link');
+  if ((await tabs.count()) < 5) throw new Error('Servono almeno cinque cartelle aperte');
+  await shot(page, '35-cartelle-aperte');
+
+  // Su tablet la barra delle cartelle scorre e tiene in vista quella attiva.
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto(`${base}/pazienti/${patientId}`);
   await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
