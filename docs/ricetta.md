@@ -30,7 +30,7 @@ Da verificare con la Dr.ssa Rocca alla seconda fermata. Fonte: «Prescrizioni e 
 
 ## Chi fa che cosa
 
-- La segreteria prepara le ripetizioni di terapie croniche non riservate: una ricetta per terapia, nella coda «da firmare». Non firma, non invia, non prepara ricette nuove.
+- La segreteria prepara le ripetizioni di terapie croniche non riservate, nella coda «da firmare». Le ripetizioni sono **raggruppate** (scelta della seconda fermata): più terapie nella stessa ricetta se hanno lo stesso tipo di ricetta e la stessa esenzione, senza superare il limite di confezioni di R2 in vigore. Non firma, non invia, non prepara ricette nuove.
 - Il medico prepara, firma e invia. Il sostituto e il collega autorizzato firmano **a nome loro**.
 - Ogni operazione passa dalla guardia sui dati del paziente e finisce nel registro degli accessi (`ricetta_bozza`, `ricetta_ripetizione`, `ricetta_da_firmare`, `ricetta_firma_invio`, `ricetta_annullamento`, `ricetta_cartacea`).
 

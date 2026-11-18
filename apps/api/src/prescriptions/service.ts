@@ -13,6 +13,7 @@ import type {
   SendResult,
 } from '@mmg/integrations';
 import { systemFor } from '@mmg/integrations';
+import { basePackLimit } from '@mmg/rules';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AccessAction } from '../audit/access-log';
@@ -31,6 +32,7 @@ import {
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
+import { studioDate } from './rules-check';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
 
 export interface LineInput {
@@ -258,30 +260,48 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       }
       if (t.status !== 'active') throw new HttpError(409, `Terapia non attiva: ${t.drugName}`);
     }
+    // Ripetizioni raggruppate (scelta della seconda fermata, D37): più terapie nella stessa
+    // ricetta, se hanno lo stesso tipo di ricetta e la stessa esenzione, senza superare il
+    // limite di confezioni di R2 in vigore oggi. Una terapia che da sola lo supera va in una
+    // ricetta sua, e le regole decideranno (R4).
+    const limit = basePackLimit(studioDate(now()));
+    const ordered = [...rows].sort((a, b) => therapyIds.indexOf(a.id) - therapyIds.indexOf(b.id));
+    const groups: { key: string; therapies: typeof rows; packs: number }[] = [];
+    for (const t of ordered) {
+      const key = `${t.notReimbursable ? 'white' : 'pharma_ssn'}|${t.habitualExemptionCode ?? ''}`;
+      const open = groups.find(
+        (g) => g.key === key && limit !== null && g.packs + t.packsPerPrescription <= limit,
+      );
+      if (open) {
+        open.therapies.push(t);
+        open.packs += t.packsPerPrescription;
+      } else {
+        groups.push({ key, therapies: [t], packs: t.packsPerPrescription });
+      }
+    }
     const created: string[] = [];
-    for (const t of rows) {
+    for (const g of groups) {
+      const first = g.therapies[0]!;
       created.push(
         await insertDraft(
           actor,
           patientId,
           p.archiveId,
           {
-            kind: t.notReimbursable ? 'white' : 'pharma_ssn',
-            exemptionCode: t.habitualExemptionCode,
-            lines: [
-              {
-                therapyId: t.id,
-                drugAic: t.drugAic,
-                drugName: t.drugName,
-                activeIngredient: t.activeIngredient,
-                quantity: t.packsPerPrescription,
-                aifaNote: t.aifaNote,
-                byActiveIngredient: t.byActiveIngredient,
-                notSubstitutable: t.notSubstitutable,
-                notSubstitutableReason: t.notSubstitutableReason,
-                posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
-              },
-            ],
+            kind: first.notReimbursable ? 'white' : 'pharma_ssn',
+            exemptionCode: first.habitualExemptionCode,
+            lines: g.therapies.map((t) => ({
+              therapyId: t.id,
+              drugAic: t.drugAic,
+              drugName: t.drugName,
+              activeIngredient: t.activeIngredient,
+              quantity: t.packsPerPrescription,
+              aifaNote: t.aifaNote,
+              byActiveIngredient: t.byActiveIngredient,
+              notSubstitutable: t.notSubstitutable,
+              notSubstitutableReason: t.notSubstitutableReason,
+              posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
+            })),
           },
           isDoctor ? 'draft' : 'to_sign',
         ),

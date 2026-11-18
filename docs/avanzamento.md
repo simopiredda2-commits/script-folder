@@ -140,7 +140,7 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 
 ## Risposte della seconda fermata (18/11/2026)
 
-Simone ha risposto con il pulsante. Da applicare su `tappe-3-4`, poi aggiornare la pull request #2 e **richiedere il via** prima di unire.
+Simone ha risposto con il pulsante. **Applicate** su `tappe-3-4` (D49–D51); poi si aggiorna la pull request #2 e si **richiede il via** prima di unire.
 
 - **Ciclo della ricetta**: ripetizioni raggruppate: la segreteria mette più terapie croniche nella stessa ricetta, entro il limite di confezioni.
 - **Confezioni (R1–R4)**: va bene così.
@@ -249,3 +249,7 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Controllo registrato                                      | Registrazione tolta                                | Rosso, poi verde                                                                                                                                                                   |
 | Avviso senza motivo blocca                                | Solo i blocchi fermano l'invio                     | Rosso, poi verde                                                                                                                                                                   |
 | Tabella di docs/regole.md allineata                       | Testo di una regola cambiato nei dati              | Rosso, poi verde                                                                                                                                                                   |
+| Ripetizioni entro il limite di confezioni                 | Limite ignorato nel raggruppamento                 | Rosso, poi verde                                                                                                                                                                   |
+| Ripetizioni con la stessa esenzione                       | Esenzione ignorata nel raggruppamento              | Rosso, poi verde                                                                                                                                                                   |
+| R11 informativo nella versione .2                         | R11 di nuovo «avvisa» nella .2                     | Rosso, poi verde                                                                                                                                                                   |
+| A parità di data vale la versione più alta                | Ordine delle versioni senza numero                 | Rosso, poi verde                                                                                                                                                                   |

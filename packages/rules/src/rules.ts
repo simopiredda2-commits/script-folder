@@ -326,14 +326,20 @@ const evaluators: Record<RuleId, Evaluator> = {
       if (elapsed >= coverageDays * threshold) continue;
       const until = addDays(last.sentOn, Math.ceil(coverageDays) - 1);
       const reason = ctx.reasons.R11?.trim();
+      // «Avvisa»: serve un motivo per procedere. «Informa» (scelta della seconda fermata): solo
+      // l'informazione; un motivo scritto resta comunque registrato.
+      const asksReason = severityOf(rule) === 'warn' && !reason;
+      const coverage = `la ricetta del ${italian(last.sentOn)} copre fino al ${italian(until)} compreso`;
       issues.push({
         ruleId: 'R11',
-        severity: reason ? 'info' : severityOf(rule),
+        severity: asksReason ? 'warn' : 'info',
         lineId: line.id,
-        ...(reason ? {} : { needs: 'reason' as const }),
-        message: reason
-          ? `${lineLabel(line)}: ricetta in anticipo sulla copertura (fino al ${italian(until)}); motivo registrato: ${reason}`
-          : `${lineLabel(line)}: la ricetta del ${italian(last.sentOn)} copre fino al ${italian(until)} compreso. Serve un motivo per procedere`,
+        ...(asksReason ? { needs: 'reason' as const } : {}),
+        message: asksReason
+          ? `${lineLabel(line)}: ${coverage}. Serve un motivo per procedere`
+          : reason
+            ? `${lineLabel(line)}: ${coverage}; motivo registrato: ${reason}`
+            : `${lineLabel(line)}: ${coverage}`,
       });
     }
     return issues;

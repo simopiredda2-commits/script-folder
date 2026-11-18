@@ -58,13 +58,13 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(res.statusCode).toBe(422);
     const body = res.json();
     expect(body.errore).toMatch(/R2/);
-    expect(body.dettagli.versioneRegole).toBe('2026-11-18.1');
+    expect(body.dettagli.versioneRegole).toBe('2026-11-18.2');
     expect(body.dettagli.problemi.some((p: { ruleId: string }) => p.ruleId === 'R2')).toBe(true);
     const [row] = await t.db.select().from(prescription).where(eq(prescription.id, id));
     expect(row!.status).toBe('draft');
     const [c] = await checks(id);
     expect(c!.outcome).toBe('bloccato');
-    expect(c!.rulesVersion).toBe('2026-11-18.1');
+    expect(c!.rulesVersion).toBe('2026-11-18.2');
   });
 
   it('R7: la nota AIFA va confermata; la conferma resta registrata con la versione delle regole', async () => {
@@ -83,7 +83,7 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(ok.statusCode, ok.body).toBe(200);
     const [row] = await t.db.select().from(prescription).where(eq(prescription.id, id));
     expect(row!.status).toBe('sent');
-    expect(row!.rulesVersion).toBe('2026-11-18.1');
+    expect(row!.rulesVersion).toBe('2026-11-18.2');
     const passed = (await checks(id)).find((c) => c.outcome === 'superato')!;
     expect(passed.confirmedAifaNotes).toEqual([l!.id]);
   });
@@ -123,7 +123,7 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(rules).toContain('R16');
   });
 
-  it('R11: ricetta in anticipo sulla copertura; si procede solo con un motivo, che resta registrato', async () => {
+  it('R11: ricetta in anticipo sulla copertura: solo un’informazione, registrata con il controllo', async () => {
     const [ther] = await t.db.select().from(therapy).where(eq(therapy.patientId, s.richPatient));
     await t.db.update(therapy).set({ unitsPerDay: '1' }).where(eq(therapy.id, ther!.id));
     const line = {
@@ -135,17 +135,12 @@ describe('regole di prescrizione prima dell’invio', () => {
     const first = await draft({ kind: 'pharma_ssn', lines: [line] });
     expect((await post(`/api/ricette/${first}/firma-e-invia`)).statusCode).toBe(200);
     const second = await draft({ kind: 'pharma_ssn', lines: [line] });
-    const warned = await post(`/api/ricette/${second}/firma-e-invia`);
-    expect(warned.statusCode).toBe(422);
-    const issue = warned
-      .json()
-      .dettagli.problemi.find((p: { ruleId: string }) => p.ruleId === 'R11');
-    expect(issue.needs).toBe('reason');
-    const ok = await post(`/api/ricette/${second}/firma-e-invia`, {
-      motivi: { R11: 'Confezione smarrita' },
-    });
-    expect(ok.statusCode, ok.body).toBe(200);
+    const sent = await post(`/api/ricette/${second}/firma-e-invia`);
+    expect(sent.statusCode, sent.body).toBe(200);
     const passed = (await checks(second)).find((c) => c.outcome === 'superato')!;
-    expect(passed.reasons).toEqual({ R11: 'Confezione smarrita' });
+    const issues = passed.issues as { ruleId: string; severity: string; message: string }[];
+    const r11 = issues.find((i) => i.ruleId === 'R11')!;
+    expect(r11.severity).toBe('info');
+    expect(r11.message).toMatch(/copre fino al/);
   });
 });

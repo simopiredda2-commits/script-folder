@@ -1,7 +1,13 @@
 import { SimulatedGateway, type SimulatedOutcome } from '@mmg/integrations';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { accessLog, externalSubmission, prescription, therapy } from '../src/db/schema';
+import {
+  accessLog,
+  externalSubmission,
+  prescription,
+  prescriptionLine,
+  therapy,
+} from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -106,6 +112,56 @@ describe('ciclo della ricetta', () => {
       'accepted',
     );
     expect((await status(id!)).signedBy).toBe(s.users.titolare.id);
+  });
+
+  it('ripetizioni raggruppate: stesso tipo ed esenzione, entro il limite di confezioni di R2', async () => {
+    const mk = async (name: string, extra: Partial<typeof therapy.$inferInsert> = {}) => {
+      const [row] = await t.db
+        .insert(therapy)
+        .values({
+          patientId: s.richPatient,
+          drugName: name,
+          activeIngredient: `principio ${name}`,
+          kind: 'chronic',
+          startOn: '2026-01-01',
+          createdBy: s.users.titolare.id,
+          ...extra,
+        })
+        .returning();
+      return row!.id;
+    };
+    const a = await mk('A');
+    const b = await mk('B');
+    const cc = await mk('C');
+    const d = await mk('D', { packsPerPrescription: 2 });
+    const w = await mk('W', { notReimbursable: true });
+    const e = await mk('E', { habitualExemptionCode: '048' });
+    const res = await post('segreteria', `/api/pazienti/${s.richPatient}/ricette/ripeti`, {
+      terapie: [a, b, cc, d, w, e],
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const ids = res.json<{ ricette: string[] }>().ricette;
+    const contents = [];
+    for (const id of ids) {
+      const row = await status(id);
+      const lines = await t.db
+        .select({ therapyId: prescriptionLine.therapyId })
+        .from(prescriptionLine)
+        .where(eq(prescriptionLine.prescriptionId, id));
+      contents.push({
+        kind: row.kind,
+        exemption: row.exemptionCode,
+        therapies: lines.map((l) => l.therapyId).sort(),
+      });
+      expect(row.status).toBe('to_sign');
+    }
+    expect(contents).toEqual([
+      { kind: 'pharma_ssn', exemption: null, therapies: [a, b].sort() },
+      { kind: 'pharma_ssn', exemption: null, therapies: [cc] },
+      { kind: 'pharma_ssn', exemption: null, therapies: [d] },
+      { kind: 'white', exemption: null, therapies: [w] },
+      { kind: 'pharma_ssn', exemption: '048', therapies: [e] },
+    ]);
   });
 
   it('la segreteria non ripete terapie riservate né prepara ricette nuove', async () => {

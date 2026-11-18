@@ -82,8 +82,16 @@ const blocks = (c: RuleContext, id: string) =>
 describe('dati delle regole', () => {
   const [ruleset] = loadRulesets();
 
-  it('il file è valido e contiene R1–R17 una volta ciascuna', () => {
-    expect(ruleset!.rules.map((r) => r.id).sort()).toEqual([...RULE_IDS].sort());
+  it('ogni versione è valida e contiene R1–R17 una volta ciascuna', () => {
+    const all = loadRulesets();
+    expect(all.map((r) => r.version)).toEqual(['2026-11-18.1', '2026-11-18.2']);
+    for (const rs of all) expect(rs.rules.map((r) => r.id).sort()).toEqual([...RULE_IDS].sort());
+  });
+
+  it('la versione .2 rende R11 solo informativo (seconda fermata); la .1 resta com’era', () => {
+    const [v1, v2] = loadRulesets();
+    expect(v1!.rules.find((r) => r.id === 'R11')!.behavior).toBe('warn');
+    expect(v2!.rules.find((r) => r.id === 'R11')!.behavior).toBe('inform');
   });
 
   it('ogni regola ha una fonte; le regole che bloccano hanno valori non vuoti', () => {
@@ -108,7 +116,8 @@ describe('dati delle regole', () => {
   });
 
   it('si usa la versione in vigore alla data della ricetta', () => {
-    expect(rulesetAt('2026-11-18').version).toBe('2026-11-18.1');
+    // A parità di data vale la versione con il numero più alto.
+    expect(rulesetAt('2026-11-18').version).toBe('2026-11-18.2');
     expect(() => rulesetAt('2026-11-17')).toThrow(/Nessuna versione/);
     const later = { ...ruleset!, version: '2027-01-01.1', effectiveFrom: '2027-01-01' };
     expect(rulesetAt('2026-12-31', [ruleset!, later]).version).toBe('2026-11-18.1');
@@ -116,7 +125,7 @@ describe('dati delle regole', () => {
   });
 
   it('la versione usata resta nel risultato', () => {
-    expect(run(ctx()).rulesVersion).toBe('2026-11-18.1');
+    expect(run(ctx()).rulesVersion).toBe('2026-11-18.2');
   });
 });
 
@@ -377,19 +386,26 @@ describe('R11 · contatore delle confezioni (esempio dei requisiti)', () => {
       reasons,
     });
 
-  it('in anticipo (prima dell’80% della copertura): avvisa e chiede un motivo', () => {
+  it('in anticipo (prima dell’80% della copertura): informa, senza chiedere un motivo', () => {
     const issue = of(at('2027-11-11'), 'R11')[0]!;
-    expect(issue.needs).toBe('reason');
+    expect(issue.severity).toBe('info');
+    expect(issue.needs).toBeUndefined();
     expect(issue.message).toMatch(/copre fino al 17\/11\/2027 compreso/);
+    expect(run(at('2027-11-11')).blocking.filter((i) => i.ruleId === 'R11')).toHaveLength(0);
   });
-  it('al giorno 22 (sotto 22,4) avvisa; al giorno 23 no', () => {
+  it('al giorno 22 (sotto 22,4) informa; al giorno 23 no', () => {
     expect(of(at('2027-11-12'), 'R11')).toHaveLength(1);
     expect(of(at('2027-11-13'), 'R11')).toHaveLength(0);
   });
-  it('con un motivo si procede e il motivo resta registrato', () => {
+  it('se il medico scrive un motivo, resta registrato', () => {
     const r = run(at('2027-11-11', { R11: 'Partenza per un viaggio' }));
-    expect(r.blocking.filter((i) => i.ruleId === 'R11')).toHaveLength(0);
     expect(r.reasonsUsed).toEqual({ R11: 'Partenza per un viaggio' });
+  });
+  it('con la versione .1 (avviso) il motivo era obbligatorio: le ricette di allora restano verificabili', () => {
+    const [v1] = loadRulesets();
+    const r = checkPrescription(at('2027-11-11'), [v1!]);
+    expect(r.rulesVersion).toBe('2026-11-18.1');
+    expect(r.blocking.find((i) => i.ruleId === 'R11')?.needs).toBe('reason');
   });
 });
 

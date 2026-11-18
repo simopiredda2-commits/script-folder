@@ -67,7 +67,15 @@ export function loadRulesets(dir: string = DATA_DIR): Ruleset[] {
   return readdirSync(dir)
     .filter((f) => /^regole-.*\.json$/.test(f))
     .map((f) => rulesetSchema.parse(JSON.parse(readFileSync(join(dir, f), 'utf8'))))
-    .sort((a, b) => a.effectiveFrom.localeCompare(b.effectiveFrom));
+    .sort(compareVersions);
+}
+
+/** Ordine delle versioni: data di efficacia, poi numero progressivo (a parità di data vince il più alto). */
+function compareVersions(a: Ruleset, b: Ruleset): number {
+  const byDate = a.effectiveFrom.localeCompare(b.effectiveFrom);
+  if (byDate !== 0) return byDate;
+  const n = (v: string) => Number(v.split('.').at(-1));
+  return n(a.version) - n(b.version);
 }
 
 /**
@@ -75,7 +83,7 @@ export function loadRulesets(dir: string = DATA_DIR): Ruleset[] {
  * alla data della ricetta, non quelli dell'ultimo aggiornamento).
  */
 export function rulesetAt(date: string, rulesets: Ruleset[] = loadRulesets()): Ruleset {
-  const valid = rulesets.filter((r) => r.effectiveFrom <= date);
+  const valid = [...rulesets].sort(compareVersions).filter((r) => r.effectiveFrom <= date);
   const found = valid.at(-1);
   if (!found) throw new Error(`Nessuna versione delle regole in vigore il ${date}`);
   return found;
@@ -84,4 +92,13 @@ export function rulesetAt(date: string, rulesets: Ruleset[] = loadRulesets()): R
 /** Valore numerico di una regola: se manca, la regola non si può applicare. */
 export function value(rule: Rule, key: string): number | null {
   return rule.values[key] ?? null;
+}
+
+/**
+ * Confezioni per ricetta secondo R2 alla data: serve a raggruppare le ripetizioni senza
+ * superare il limite. Null se la regola non ha il valore.
+ */
+export function basePackLimit(date: string, rulesets: Ruleset[] = loadRulesets()): number | null {
+  const r2 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R2');
+  return r2 && r2.status === 'active' ? value(r2, 'maxPacks') : null;
 }
