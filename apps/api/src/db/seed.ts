@@ -122,6 +122,12 @@ try {
     userId: doctorId,
     regionalCode: 'DEMO-0001',
     asl: 'ASL dimostrativa',
+    // Recapiti inventati, su domini riservati agli esempi (.invalid).
+    firstName: 'Elena',
+    lastName: 'Marchi',
+    phone: '000 0000001',
+    email: 'studio.marchi@esempio.invalid',
+    pec: 'elena.marchi@pec.esempio.invalid',
     // Inventato: luogo di nascita con la X, che nessun comune ha (D12).
     fiscalCode: buildFiscalCode({
       surname: 'Marchi',
@@ -136,6 +142,9 @@ try {
     userId: users.get('sostituto')!,
     regionalCode: 'DEMO-0002',
     asl: 'ASL dimostrativa',
+    firstName: 'Marco',
+    lastName: 'Fiore',
+    phone: '000 0000002',
     fiscalCode: buildFiscalCode({
       surname: 'Fiore',
       name: 'Marco',

@@ -7,3 +7,4 @@ export * from './service-credentials';
 export * from './clinical';
 export * from './privacy';
 export * from './supplies';
+export * from './pss';

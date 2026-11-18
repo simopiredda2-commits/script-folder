@@ -99,6 +99,13 @@
       "when": 1795011735386,
       "tag": "0013_seguito_e_presidi",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795016536744,
+      "tag": "0014_profilo_sanitario_sintetico",
+      "breakpoints": true
     }
   ]
 }

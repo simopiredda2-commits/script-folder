@@ -64,6 +64,13 @@ export const doctorProfile = pgTable('doctor_profile', {
   asl: text(),
   headerText: text(),
   stampText: text(),
+  /** Nome e cognome separati, come li vuole il Profilo Sanitario Sintetico (tappa 11). */
+  firstName: text(),
+  lastName: text(),
+  /** Recapiti di studio: il Profilo Sanitario Sintetico ne vuole almeno uno (tappa 11). */
+  phone: text(),
+  email: text(),
+  pec: text(),
 });
 
 /** Archivio dei pazienti di un medico titolare. In medicina di gruppo ce n'è uno per titolare. */

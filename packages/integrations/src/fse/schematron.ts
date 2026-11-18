@@ -105,8 +105,7 @@ export class Schematron {
   private readonly patterns: Pattern[] = [];
   private readonly functions: NonNullable<XPathOptions['functions']> = {
     /** `matches` di XPath 2: vero se l'espressione regolare trova una corrispondenza. */
-    matches: (_ctx, input, pattern) =>
-      new RegExp(pattern.stringValue()).test(input.stringValue()),
+    matches: (_ctx, input, pattern) => new RegExp(pattern.stringValue()).test(input.stringValue()),
     /** Confronto d'ordine come in XPath 2: numeri se uno dei due è un numero, se no testi. */
     'xp2-compare': (_ctx, a, b, op) => {
       const numeric = isNumber(a) || isNumber(b);

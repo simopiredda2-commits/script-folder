@@ -132,6 +132,11 @@ export async function createScenario(
       regionalCode: 'MMG-PROVA-1',
       asl: 'ASL di prova',
       fiscalCode: doctorCf('Marchi', 'Elena', 'F'),
+      // Nome, cognome e recapiti per il Profilo Sanitario Sintetico (tappa 11); domini .invalid.
+      firstName: 'Elena',
+      lastName: 'Marchi',
+      phone: '000 0000001',
+      email: 'studio.marchi@esempio.invalid',
     },
     {
       userId: users.collega.id,
@@ -144,6 +149,9 @@ export async function createScenario(
       regionalCode: 'MMG-PROVA-3',
       asl: 'ASL di prova',
       fiscalCode: doctorCf('Fiore', 'Marco', 'M'),
+      firstName: 'Marco',
+      lastName: 'Fiore',
+      pec: 'marco.fiore@pec.esempio.invalid',
     },
   ]);
   // Credenziali inventate e un codice di sessione lungo, per le prove che non riguardano le

@@ -478,6 +478,12 @@ Durante la tappa 8:
 
   Si costruiscono nella tappa 8, con i simulatori (D100–D103).
 
+Durante la tappa 11 (terzo giro):
+
+- **Modelli dei certificati** (richiesta di Simone, arrivata il 18/11/2026 tramite un'altra sessione). Le sue parole: «Devi anche prevedere la parte relativa ai vari certificati, medico sportivo non agonistico, porto d'armi, anamnestico patente e via dicendo. Dovranno essere dei template che si modificano solo per quanto riguarda la parte inerente i dati del paziente. Questi certificati solitamente si trovano nel pannello strumenti in un menu dedicato ai modelli, il professionista ovviamente ha la facoltà di impostare il layout di questi modelli sulla base di caratteri, intestazione, dimensione font e via dicendo, Ma ti chiederei di strutturare tu i template secondo le linee guida se per caso ce ne dovessero essere».
+  - È già nei requisiti («Certificati e moduli»: «modelli personalizzabili che si compilano da soli con i dati del paziente»), e i «modelli» sono tra i compiti dell'amministratore dello studio. Non era ancora costruito.
+  - Proposta: tappa 13, dopo la fermata della tappa 12, così la fermata resta dove era stata decisa (D130 e seguenti). Prima si leggono i modelli ufficiali dove ci sono: il certificato per l'attività sportiva non agonistica e i certificati anamnestici per il porto d'armi e per la patente. È una domanda per la fermata.
+
 - **Net Medica Italia** (domanda della Dr.ssa Rocca): far comunicare medici con programmi diversi senza comprare quel servizio. Raccolte le informazioni pubbliche, fatta una proposta (D104). È una domanda della terza fermata; non è costruito nulla.
 
 ## Risposte della fermata finale del secondo giro (18/11/2026)

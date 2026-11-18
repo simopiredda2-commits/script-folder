@@ -1,4 +1,8 @@
 import {
+  ALLERGY_AGENT_LABELS,
+  ALLERGY_AGENTS,
+  ALLERGY_CRITICALITIES,
+  ALLERGY_KINDS,
   ANAMNESIS_LABELS,
   ANAMNESIS_SECTIONS,
   CONSENT_KINDS,
@@ -8,8 +12,14 @@ import {
   ENTRY_TYPES,
   LIFESTYLE_FACTORS,
   MEASURES,
+  MOTOR_CAPACITIES,
+  PROBLEM_CATEGORIES,
+  PROBLEM_CATEGORY_LABELS,
+  RELATIVES,
+  THERAPY_ROUTES,
   can,
 } from '@mmg/domain';
+import { FSE_DICTIONARIES, fseDictionary } from '@mmg/integrations';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
@@ -55,6 +65,31 @@ export function registerClinicalRoutes(app: FastifyInstance, db: Database, now: 
     })),
     fattori: [...LIFESTYLE_FACTORS],
     consensi: CONSENT_KINDS.map((k) => ({ chiave: k.key, nome: k.label, fonte: k.source })),
+    // Per il Profilo Sanitario Sintetico (tappa 11): elenchi dai dizionari ufficiali.
+    categorieProblema: PROBLEM_CATEGORIES.map((k) => ({
+      chiave: k,
+      nome: PROBLEM_CATEGORY_LABELS[k],
+    })),
+    organiMancanti: fseDictionary(FSE_DICTIONARIES.missingOrgans).map((e) => ({
+      codice: e.code,
+      nome: e.description,
+    })),
+    nature: ALLERGY_KINDS.map((k) => ({
+      chiave: k,
+      nome: k === 'allergia' ? 'Allergia' : 'Intolleranza',
+    })),
+    agenti: ALLERGY_AGENTS.map((k) => ({ chiave: k, nome: ALLERGY_AGENT_LABELS[k] })),
+    criticita: ALLERGY_CRITICALITIES.map((k) => ({
+      chiave: k,
+      nome: k === 'bassa' ? 'Bassa' : k === 'moderata' ? 'Moderata' : 'Alta',
+    })),
+    allergeni: fseDictionary(FSE_DICTIONARIES.allergens).map((e) => ({
+      codice: e.code,
+      nome: e.description,
+    })),
+    parenti: RELATIVES.map((r) => ({ chiave: r.key, nome: r.label })),
+    capacitaMotorie: MOTOR_CAPACITIES.map((m) => ({ chiave: m.key, nome: m.label })),
+    vieSomministrazione: THERAPY_ROUTES.map((r) => r.label),
   }));
 
   app.get('/api/pazienti/:id/voci', scoped, async (req) => {

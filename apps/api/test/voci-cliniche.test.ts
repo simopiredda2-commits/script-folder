@@ -121,6 +121,8 @@ describe('voci cliniche dalla cartella (tappa 9)', () => {
       dal: day(-30),
       risoltoIl: null,
       quesitoAperto: true,
+      cronico: false,
+      categoria: 'diagnosi',
     });
     expect(byId.get(ids.diario)!.dettaglio).toEqual({
       contatto: 'domicilio',
@@ -137,6 +139,12 @@ describe('voci cliniche dalla cartella (tappa 9)', () => {
       sostanza: 'Principio di prova',
       reazione: 'Orticaria di prova',
       daFarmaco: true,
+      natura: 'allergia',
+      agente: 'farmaco',
+      codiceAgente: null,
+      sistemaAgente: null,
+      criticita: null,
+      attiva: true,
     });
     expect(byId.get(ids.esame_obiettivo)!.promemoria).toBe(day(90));
 

@@ -14,6 +14,7 @@ import { registerClinicalRoutes } from './http/clinical-routes';
 import { registerFollowUpRoutes } from './http/followup-routes';
 import { registerPrivacyRoutes } from './http/privacy-routes';
 import { registerCredentialRoutes } from './http/credentials-routes';
+import { registerDoctorProfileRoutes } from './http/doctor-profile-routes';
 import { registerRegionalSimulatorRoutes } from './http/regional-simulator-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
@@ -185,6 +186,7 @@ export function buildApp({
   if (regional.gateway instanceof SimulatedRegionalAuthorization)
     registerRegionalSimulatorRoutes(app, regional.gateway);
   registerPatientRoutes(app, db);
+  registerDoctorProfileRoutes(app, db);
   registerTodayRoutes(app, db, now ?? (() => new Date()));
   registerTherapyRoutes(app, db, now ?? (() => new Date()));
   registerClinicalRoutes(app, db, now ?? (() => new Date()));

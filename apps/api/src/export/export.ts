@@ -26,6 +26,7 @@ export const PATIENT_TABLES = [
   'sick_leave_certificate',
   'service_execution',
   'supply_prescription',
+  'pss_document',
 ] as const;
 
 export const ENTRY_TABLES = [
@@ -40,6 +41,7 @@ export const ENTRY_TABLES = [
   'lab_result_detail',
   'report_detail',
   'attachment',
+  'functional_status_detail',
 ] as const;
 
 /** Tabelle collegate per ricetta: righe e invii esterni (richiesta, risposta, esito). */
@@ -54,6 +56,9 @@ export const PRESCRIPTION_TABLES = [
 /** Tabelle collegate per certificato: invii all'INPS e consegne di copia e attestato. */
 export const CERTIFICATE_TABLES = ['certificate_submission', 'certificate_delivery'] as const;
 
+/** Tabelle collegate per Profilo Sanitario Sintetico: le chiamate al Gateway (tappa 11). */
+export const PSS_TABLES = ['fse_transmission'] as const;
+
 /**
  * Tabelle con una colonna `patient_id` o `entry_id` che non stanno nelle liste sopra, con il
  * motivo. Una prova controlla che ogni tabella del database sia in una delle tre liste.
@@ -63,6 +68,8 @@ export const HANDLED_SEPARATELY: Record<string, string> = {
   access_log: 'esportato nella sezione registro_accessi',
   attachment_content:
     'i file degli allegati: sezione allegati del JSON, cartella allegati/ nello ZIP',
+  pss_file:
+    'i PDF del Profilo Sanitario Sintetico: sezione documenti_profilo del JSON, cartella profilo-sanitario/ nello ZIP',
 };
 
 type Row = Record<string, unknown>;
@@ -131,6 +138,35 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
       sql`select * from ${sql.identifier(t)} where certificate_id = any(${pgArray(certificateIds)}::uuid[]) order by id`,
     );
   }
+
+  const pssIds = tables.pss_document!.map((d) => d.id as string);
+  for (const t of PSS_TABLES) {
+    tables[t] = await rows(
+      db,
+      sql`select * from ${sql.identifier(t)} where document_id = any(${pgArray(pssIds)}::uuid[]) order by id`,
+    );
+  }
+  // PDF del Profilo, con il CDA dentro e firmati: come gli allegati, nel JSON in base64.
+  const pssFiles = pssIds.length
+    ? (
+        await db.execute<{
+          id: string;
+          document_id: string;
+          kind: string;
+          sha256: string;
+          content: Buffer;
+        }>(
+          sql`select id, document_id, kind, sha256, content from pss_file
+              where document_id = any(${pgArray(pssIds)}::uuid[]) order by document_id, created_at`,
+        )
+      ).rows.map((f) => ({
+        id: f.id,
+        documento: f.document_id,
+        tipo: f.kind,
+        sha256: f.sha256,
+        contenuto_base64: Buffer.from(f.content).toString('base64'),
+      }))
+    : [];
 
   // File degli allegati (referti): nel JSON in base64, nello ZIP come file (D121).
   const attachmentIds = tables.attachment!.map((r) => r.id as string);
@@ -205,11 +241,13 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     storico_modifiche: history,
     registro_accessi: accessLog,
     allegati: files,
+    documenti_profilo: pssFiles,
     conteggi: {
       ...counts,
       storico_modifiche: history.length,
       registro_accessi: accessLog.length,
       allegati: files.length,
+      documenti_profilo: pssFiles.length,
     },
     impronte: Object.fromEntries(
       (
@@ -218,6 +256,7 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
           ['storico_modifiche', history],
           ['registro_accessi', accessLog],
           ['allegati', files],
+          ['documenti_profilo', pssFiles],
         ] as [string, unknown[]][]
       ).map(([k, v]) => [k, digest(v)]),
     ),
