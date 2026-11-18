@@ -13,7 +13,8 @@ export default async function setup(): Promise<void> {
     const { rows } = await c.query<{ datname: string }>(
       "select datname from pg_database where datname ~ '^mmg_test_[0-9a-f]{12}$'",
     );
-    for (const { datname } of rows) await c.query(`DROP DATABASE IF EXISTS ${datname} WITH (FORCE)`);
+    for (const { datname } of rows)
+      await c.query(`DROP DATABASE IF EXISTS ${datname} WITH (FORCE)`);
   } finally {
     await c.end();
   }

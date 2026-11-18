@@ -63,18 +63,18 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Struttura
 
-| Percorso | Contenuto |
-| --- | --- |
-| `apps/web` | Interfaccia per PC e tablet |
-| `apps/api` | Servizio applicativo |
-| `packages/brand` | Nome, marchi, colori e caratteri (unico posto con il nome del prodotto) |
-| `packages/domain` | Modello del dominio |
-| `packages/rules` | Regole di prescrizione: valori e fonti versionati come dati, mai scritti nel codice |
-| `packages/integrations` | Interfacce e simulatori (SAR/SIRPED, Sistema TS, AURA, INPS, FSE) |
-| `sync/` | Banche dati pubbliche (Python) |
-| `fixtures/` | Pazienti inventati (generatore deterministico) |
-| `docs/` | Requisiti, prototipi, decisioni, avanzamento, logo |
-| `scripts/` | `avvio-sessione.sh` (hook SessionStart) e utilità |
+| Percorso                | Contenuto                                                                           |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `apps/web`              | Interfaccia per PC e tablet                                                         |
+| `apps/api`              | Servizio applicativo                                                                |
+| `packages/brand`        | Nome, marchi, colori e caratteri (unico posto con il nome del prodotto)             |
+| `packages/domain`       | Modello del dominio                                                                 |
+| `packages/rules`        | Regole di prescrizione: valori e fonti versionati come dati, mai scritti nel codice |
+| `packages/integrations` | Interfacce e simulatori (SAR/SIRPED, Sistema TS, AURA, INPS, FSE)                   |
+| `sync/`                 | Banche dati pubbliche (Python)                                                      |
+| `fixtures/`             | Pazienti inventati (generatore deterministico)                                      |
+| `docs/`                 | Requisiti, prototipi, decisioni, avanzamento, logo                                  |
+| `scripts/`              | `avvio-sessione.sh` (hook SessionStart) e utilità                                   |
 
 ## Stack (provvisorio)
 
@@ -88,7 +88,21 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 
 ## Comandi
 
-Si completano alla tappa 1; l'elenco aggiornato è in `docs/avanzamento.md`.
+| Comando                                                | Cosa fa                                                                         |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `pnpm install`                                         | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                            |
+| `pnpm dev`                                             | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)  |
+| `pnpm test`                                            | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python) |
+| `pnpm lint`                                            | ESLint, Prettier in controllo, tipi di ogni pacchetto                           |
+| `pnpm format`                                          | Prettier in scrittura                                                           |
+| `pnpm db:migrate`                                      | Applica le migrazioni a `DATABASE_URL`                                          |
+| `pnpm --filter @mmg/api db:generate`                   | Genera una migrazione dallo schema Drizzle                                      |
+| `pnpm fixtures -- --seed 1 --count 20`                 | Pazienti inventati in JSON (stesso seme, stessi pazienti)                       |
+| `pnpm --filter @mmg/brand tokens:css`                  | Rigenera `tokens.css` da `tokens.ts`                                            |
+| `pnpm --filter @mmg/brand logo:proposte`               | Rigenera le proposte di logo e le tavole di `docs/logo.md`                      |
+| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'` | Prova un controllo: rosso col guasto, verde dopo il ripristino                  |
+
+Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano).
 
 ## Le tappe
 

@@ -70,7 +70,9 @@ describe('caratteri', () => {
     const imports = [...css.matchAll(/@import\s+'([^']+)'/g)].map((m) => m[1]!);
     expect(imports.length).toBeGreaterThan(0);
     for (const i of imports) {
-      expect(i).toMatch(/^@fontsource\/(special-gothic-expanded-one|ibm-plex-sans|ibm-plex-mono)\//);
+      expect(i).toMatch(
+        /^@fontsource\/(special-gothic-expanded-one|ibm-plex-sans|ibm-plex-mono)\//,
+      );
     }
   });
 

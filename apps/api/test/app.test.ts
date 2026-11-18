@@ -8,7 +8,7 @@ describe('servizio applicativo', () => {
     t = await createTestDatabase();
   });
   afterAll(async () => {
-    await t.drop();
+    await t?.drop();
   });
 
   it('risponde sullo stato di salute e raggiunge il database', async () => {

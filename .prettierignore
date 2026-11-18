@@ -8,5 +8,6 @@ packages/brand/assets/script/
 # Generati
 pnpm-lock.yaml
 apps/api/migrations/meta/
+packages/brand/tokens.css
 coverage/
 dist/

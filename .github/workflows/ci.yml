@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  typescript:
+    name: Lint, tipi e prove (TypeScript)
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mmg
+          POSTGRES_PASSWORD: mmg
+          POSTGRES_DB: mmg_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mmg -d mmg_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://mmg:mmg@localhost:5432/mmg_dev
+      TZ: Europe/Rome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint, formattazione e tipi
+        run: pnpm lint
+      - name: Prove
+        run: pnpm exec vitest run
+
+  sync:
+    name: Prove di sync/ (Python)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prove delle banche dati
+        working-directory: sync
+        run: python3 -m unittest -v test_banche_dati

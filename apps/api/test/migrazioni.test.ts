@@ -16,7 +16,7 @@ describe('migrazioni', () => {
     t = await createTestDatabase({ migrate: false });
   });
   afterAll(async () => {
-    await t.drop();
+    await t?.drop();
   });
 
   it('ogni file SQL è nel registro di drizzle-kit e viceversa', () => {
