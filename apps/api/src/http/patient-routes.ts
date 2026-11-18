@@ -21,6 +21,7 @@ import { withActor } from '../db/tx';
 import { buildCsvZip } from '../export/csv';
 import { buildExport } from '../export/export';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
+import { labResults, latestMeasurements, timeline } from '../patients/timeline';
 import { HttpError } from './errors';
 
 const idParams = z.object({ id: z.uuid() });
@@ -143,9 +144,10 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
             .from(therapeuticPlan)
             .where(eq(therapeuticPlan.patientId, id)),
           esenzioni: await db
-            .select({ codice: exemption.code, al: exemption.validTo })
+            .select({ codice: exemption.code, dal: exemption.validFrom, al: exemption.validTo })
             .from(exemption)
             .where(eq(exemption.patientId, id)),
+          parametri: await latestMeasurements(db, id, reservedAllowed),
         }
       : null;
     return { paziente: p, riepilogo: summary };
@@ -174,6 +176,16 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       )
       .orderBy(desc(clinicalEntry.occurredOn));
     return { diario: notes };
+  });
+
+  app.get('/api/pazienti/:id/cronologia', { config: { patientScoped: true } }, async (req) => {
+    const { id } = idParams.parse(req.params);
+    return timeline(db, req.actor!, id, req.query);
+  });
+
+  app.get('/api/pazienti/:id/esami', { config: { patientScoped: true } }, async (req) => {
+    const { id } = idParams.parse(req.params);
+    return labResults(db, req.actor!, id);
   });
 
   app.get('/api/pazienti/:id/terapie', { config: { patientScoped: true } }, async (req) => {

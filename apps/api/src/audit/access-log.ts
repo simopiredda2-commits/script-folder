@@ -27,7 +27,10 @@ export type AccessAction =
   | 'ricetta_cartacea'
   | 'lettura_ricette'
   | 'ricetta_controllo'
-  | 'lettura_registro';
+  | 'lettura_registro'
+  | 'lettura_storico_prescrizioni'
+  | 'lettura_cronologia'
+  | 'lettura_esami';
 
 export interface AccessEntry {
   studioId?: string | null;
