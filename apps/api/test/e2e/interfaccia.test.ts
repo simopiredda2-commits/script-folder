@@ -303,6 +303,40 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByText('Ricetta inviata').waitFor();
   });
 
+  it('promemoria dopo l’invio: PDF del modello, solo NRE, email al paziente (tappa 7)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
+    const panel = page.getByRole('region', { name: 'Promemoria della ricetta' });
+    await panel.waitFor();
+    const href = await panel.getByRole('link', { name: 'Promemoria (PDF)' }).getAttribute('href');
+    const pdf = await page.request.get(`${base}${href}`);
+    expect(pdf.status()).toBe(200);
+    expect(pdf.headers()['content-type']).toBe('application/pdf');
+    expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
+    expect((await page.request.get(`${base}${href}?formato=nre`)).status()).toBe(200);
+    await panel.getByRole('button', { name: 'Invia' }).click();
+    await panel.getByText(/Promemoria inviato per email a /).waitFor();
+    await panel.getByText(/Consegne \(\d+\)/).click();
+    await panel.getByText(/Email a .* · consegnato/).waitFor();
+    await check(page, 'promemoria dopo l’invio', true);
+  });
+
+  it('nell’editor: oscuramento per le SSN, ripetibilità per la ricetta bianca (tappa 7)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
+    await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
+    await page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ }).click();
+    await page.getByLabel(/Oscura nome e indirizzo/).waitFor();
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
+    const item = page.locator('.risultato').filter({ hasText: '28 compresse' });
+    await item.waitFor();
+    await item.getByRole('button', { name: 'Aggiungi' }).click();
+    await page.getByLabel('Bianca (a carico del paziente)').check();
+    await expect(page.getByLabel(/Oscura nome e indirizzo/).count()).resolves.toBe(0);
+    await page.getByLabel('Ripetibile (volte)').fill('2');
+    await page.getByLabel('Validità (mesi)').fill('6');
+    await check(page, 'ricetta bianca ripetibile', true);
+    await page.getByRole('button', { name: 'Ricomincia' }).click();
+  });
+
   it('scheda della terapia con lo storico delle prescrizioni (D65)', async () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/terapie/${therapyId}`);
     await page.getByRole('heading', { name: 'Storico delle prescrizioni' }).waitFor();

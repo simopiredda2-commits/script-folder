@@ -244,5 +244,32 @@ export function createReminderService(deps: ReminderDeps) {
     return { consegne: rows };
   }
 
-  return { print, send, deliveries };
+  /** Recapiti per il promemoria: quelli del paziente e le deleghe, con la validità di oggi (R16). */
+  async function contacts(actor: Actor, patientId: string) {
+    const { patient: pt } = await guardPatient(
+      db,
+      actor,
+      patientId,
+      'reminder.print',
+      'lettura_recapiti_promemoria',
+    );
+    const today = studioDate(now());
+    const rows = await db
+      .select()
+      .from(delegation)
+      .where(eq(delegation.patientId, pt.id))
+      .orderBy(asc(delegation.delegateName));
+    return {
+      paziente: { email: pt.email, telefono: pt.phone },
+      deleghe: rows.map((d) => ({
+        id: d.id,
+        nome: d.delegateName,
+        email: d.delegateEmail,
+        telefono: d.delegatePhone,
+        valida: !d.revokedOn && d.validFrom <= today && (d.validTo === null || today <= d.validTo),
+      })),
+    };
+  }
+
+  return { print, send, deliveries, contacts };
 }

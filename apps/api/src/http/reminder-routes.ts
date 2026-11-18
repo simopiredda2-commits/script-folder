@@ -29,4 +29,9 @@ export function registerReminderRoutes(
     const { id } = params.parse(req.params);
     return service.deliveries(req.actor!, id);
   });
+
+  app.get('/api/pazienti/:id/recapiti-promemoria', scoped, async (req) => {
+    const { id } = params.parse(req.params);
+    return service.contacts(req.actor!, id);
+  });
 }

@@ -58,11 +58,31 @@ Una ricetta inviata si annulla solo se l'ente non l'ha ancora lavorata. Prima di
 - In sviluppo e nelle prove c'è solo il **simulatore**, con quattro esiti: accettata, rifiutata, non raggiungibile, esito incerto. Una prova controlla che il pacchetto non contenga indirizzi di rete né richieste HTTP (regola 7).
 - Ogni chiamata, riuscita o no, resta in `external_submission` con richiesta, risposta, esito e durata: non si modifica e non si cancella.
 
+## Promemoria e invio (tappa 7)
+
+Fonti lette sul portale del Sistema TS e della Regione (18/11/2026):
+
+- **DM 2 novembre 2011, allegato 2** («Modello di promemoria» e «Descrizione dei campi del promemoria», GU n. 264 del 12/11/2011): i 20 campi del promemoria della ricetta SSN, il codice a barre 3-of-9 per NRE e codice fiscale, i caratteri OCR-A, «NON ESENTE», la dicitura per i dati oscurati, «Rilasciato ai sensi dell’art 11 comma 16 del DL 78 del 30 maggio 2010».
+- **Specifiche del Sistema TS, prescrizione (5/12/2024)**: senza il codice di autenticazione del SAC la ricetta non è valida e il promemoria non si dà; il codice va su ogni documento consegnato al paziente; il SAC restituisce cognome e nome del medico; il paziente può chiedere l’oscuramento di nome e indirizzo (`oscuramDati`).
+- **Regione Piemonte, SIRPE «Cartelle cliniche MMG e PLS» (4.4.3, 4.4.7)**: sotto il codice fiscale, senza etichetta, «codice regionale – nominativo del medico»; tempo massimo di attesa del codice di autenticazione «al momento definiti in 6-8 secondi», poi ricetta cartacea.
+- **Ricetta bianca, Disciplinare tecnico (1/12/2022)**: il SAC restituisce NRBE, PIN-NRBE e il PDF del promemoria; «l’unico promemoria della Ricetta Bianca Elettronica che il medico può rilasciare al paziente è quello prodotto dal SAC, non sono ammesse stampe prodotte in proprio dai gestionali dei medici o dai SAR»; ripetibilità con `numRipetibilita` e `validitaFarm`.
+- **DM 30 dicembre 2020, art. 3**: email con il promemoria allegato, SMS con il numero di ricetta, Fascicolo.
+
+Come funziona:
+
+- **All’invio** di una ricetta SSN si salvano il codice di autenticazione e i dati del promemoria (`prescription_document`, tipo `promemoria_dati`): ogni ristampa esce identica, anche se poi cambia l’anagrafica. Una risposta senza codice di autenticazione vale come rifiuto. Prima di inviare si controlla che il promemoria si possa fare: regione dello studio e codice fiscale del medico; se mancano, nessun invio.
+- **Ricetta bianca**: si conserva il PDF del SAC (`promemoria_sac`, in base64 con l’impronta SHA-256) e si consegna byte per byte; il foglio «solo NRE» non c’è.
+- **Stampa**: `GET /api/ricette/:id/promemoria` (completo) e `?formato=nre` (numero, codice fiscale e codice di autenticazione). Codice a barre: modulo 0,339 mm (minimo 0,240), largo 2,5 volte, barre alte 10 mm (minimo 7,5), asterischi di apertura e chiusura.
+- **Invio**: `POST /api/ricette/:id/promemoria/invio`, email con il PDF allegato o SMS con il solo numero, al paziente o a un delegato con delega valida oggi (R16). Nel testo dell’email nessun dato clinico. Simulatore, nessun invio vero.
+- **Consegne**: ogni stampa e ogni invio entrano in `reminder_delivery`, che non si modifica; `GET /api/ricette/:id/promemoria/consegne`.
+- **Tempo massimo di attesa** dell’invio al SAR: 8 secondi (il limite alto dei 6–8 del Piemonte); oltre, esito incerto (D94).
+
 ## Da completare (servono le specifiche e le credenziali di collaudo)
 
 - Formato vero dell'NRE e dell'NRBE: il simulatore usa numeri di fantasia che cominciano con `SIM`.
 - Adattatori veri per SAR e Sistema TS, con l'autenticazione forte (Id-Sessione) del Sistema TS.
 - Casi in cui l'annullamento è ammesso.
-- Modulo di stampa della ricetta rossa e del promemoria, conformi alle specifiche: oggi il servizio restituisce i dati da stampare.
-- Se il SAR comunica l'erogazione in farmacia.
-- Promemoria al paziente sul canale scelto (R15, R16): le regole arrivano alla tappa 4, l'invio vero con l'interfaccia.
+- Modulo di stampa della ricetta rossa.
+- Promemoria: posizioni sulla pagina, suddivisione dell’NRE nei codici a barre e dicitura aggiornata secondo le «Specifiche tecniche per la stampa del promemoria» (versione 1/3/2016, citata dalla Regione): il documento non è stato trovato sul portale. Carattere OCR-A per l’NRE in chiaro: oggi Courier, serve un carattere OCR-A con licenza compatibile. Frase regionale nell’ultima riga, comunicata dal SAC.
+- Fornitore vero di email e SMS, con le garanzie sul trattamento dei dati.
+- Se il SAR comunica l'erogazione in farmacia; lo stato «sospesa» (6) delle specifiche del Sistema TS nella tavola degli stati di processo, oggi non tra gli stati del prodotto (D70).

@@ -77,6 +77,11 @@ try {
   await shot(page, '04-ricette-da-firmare');
   await page.getByRole('button', { name: 'Firma e invia' }).first().click();
   await page.getByText(/Ricetta inviata per/).waitFor();
+  // Tappa 7: il promemoria subito dopo l'invio, con stampa e invio al paziente.
+  const reminder = page.getByRole('region', { name: 'Promemoria della ricetta' }).first();
+  await reminder.getByRole('button', { name: 'Invia' }).waitFor();
+  await reminder.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await shot(page, '17-promemoria');
 
   // Il paziente della ricetta appena inviata: cartella, scheda della terapia con lo storico.
   const sent = await db.execute<{ patient_id: string; therapy_id: string }>(sql`

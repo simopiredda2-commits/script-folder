@@ -37,7 +37,8 @@ export type AccessAction =
   | 'sospensione_terapia'
   | 'stampa_promemoria'
   | 'invio_promemoria'
-  | 'lettura_consegne_promemoria';
+  | 'lettura_consegne_promemoria'
+  | 'lettura_recapiti_promemoria';
 
 export interface AccessEntry {
   studioId?: string | null;

@@ -1337,3 +1337,35 @@ textarea[aria-invalid='true'] {
     break-inside: avoid;
   }
 }
+
+/* Promemoria della ricetta (tappa 7) ----------------------------------------------------- */
+
+.pannello-promemoria {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--color-divider);
+  border-left: 4px solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.pannello-promemoria h4 {
+  margin: 0 0 0.5rem;
+}
+
+.pannello-promemoria .azioni {
+  margin-bottom: 0.5rem;
+}
+
+.invio-promemoria {
+  margin: 0.5rem 0;
+}
+
+.consegne summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-min-target);
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--color-primary);
+}
