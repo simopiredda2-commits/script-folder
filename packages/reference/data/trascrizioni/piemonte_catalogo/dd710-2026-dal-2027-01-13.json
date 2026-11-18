@@ -1,0 +1,14 @@
+{
+  "tipo": "prestazioni",
+  "serie": "catalogo-piemonte",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "D.D. 30 ottobre 2026, n. 710/A1400B/2026, allegato B (BU Regione Piemonte n. 44 del 5/11/2026)",
+  "in_vigore_dal": "2027-01-13",
+  "trascritto_da": "Claude Code, estrazione automatica dal PDF",
+  "trascritto_il": "2026-11-19",
+  "controllato_da": null,
+  "solo_modifiche": true,
+  "nota": "Allegato B: 56 voci di radioterapia prescrivibili fino al 12/01/2027, tolte dal 13/01/2027 (la parte che determina dice 12 gennaio 2027, le premesse 2026: D157). Che cosa controllare: docs/catalogo-regionale.md."
+}

@@ -36,7 +36,8 @@ export type ImportOutcome =
   | 'trascrizione_superata'
   | 'trascrizione_non_valida'
   | 'origine_non_trovata'
-  | 'base_mancante';
+  | 'base_mancante'
+  | 'trascrizione_da_controllare';
 
 export interface ImportLine {
   /** fonte/chiave per i file di sync; percorso della scheda per le trascrizioni. */
@@ -69,6 +70,7 @@ export const NEEDS_ATTENTION: ReadonlySet<ImportOutcome> = new Set([
   'colonne_mancanti',
   'trascrizione_superata',
   'base_mancante',
+  'trascrizione_da_controllare',
 ]);
 /** Esiti che sono errori veri e propri. */
 export const ERRORS: ReadonlySet<ImportOutcome> = new Set([
@@ -440,6 +442,17 @@ export async function importReferenceData(opts: ImportOptions): Promise<ImportLi
     const mapping = mappingForTranscription(opts.mappings, s.tipo);
     if (!mapping) {
       report.push({ ...line, outcome: 'senza_mappatura' });
+      continue;
+    }
+    // A8: una trascrizione entra in uso solo dopo il controllo di una persona (D159).
+    if (s.controllato_da === null) {
+      report.push({
+        ...line,
+        outcome: 'trascrizione_da_controllare',
+        notes: [
+          `${s.atto}: nessuno l'ha ancora controllata. Entra in uso quando la scheda dice chi l'ha controllata (controllato_da)`,
+        ],
+      });
       continue;
     }
     let origin: string | null = null;

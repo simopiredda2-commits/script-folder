@@ -73,7 +73,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 | `packages/domain`       | Modello del dominio                                                                           |
 | `packages/rules`        | Regole di prescrizione: valori e fonti versionati come dati, mai scritti nel codice           |
 | `packages/integrations` | Interfacce e simulatori (SAR/SIRPED, Sistema TS, AURA, INPS, FSE)                             |
-| `packages/reference`    | Lettura dei file di `sync/` (CSV, XLSX), tipi di banca dati, mappature come dati              |
+| `packages/reference`    | Lettura dei file di `sync/` (CSV, XLSX), tipi di banca dati, mappature e trascrizioni (D159)  |
 | `sync/`                 | Banche dati pubbliche (Python)                                                                |
 | `fixtures/`             | Pazienti inventati (generatore deterministico); `banche-dati/`: sito e trascrizioni d'esempio |
 | `docs/`                 | Requisiti, prototipi, decisioni, avanzamento, logo                                            |
@@ -123,6 +123,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/regole.md`: regole di prescrizione, generate dai dati.
 - `docs/logo.md`: proposte di logo.
 - `docs/banche-dati.md`: importazione delle banche dati, mappature, trascrizioni, versioni.
+- `docs/catalogo-regionale.md`: catalogo regionale in vigore, trascritto dai PDF, e che cosa controllare (D159).
 - `docs/interfaccia.md`: schermate (in `docs/schermate/`), accessibilità, che cosa manca.
 - `docs/credenziali.md`: credenziali dei servizi (Sistema TS, RUPAR) e secondo fattore.
 - `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.

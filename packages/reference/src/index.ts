@@ -13,6 +13,12 @@ export * from './xlsx';
 
 export const DATA_DIR = join(import.meta.dirname, '..', 'data');
 
+/**
+ * Trascrizioni degli atti regionali che il programma porta con sé (D159): il catalogo delle
+ * prestazioni e gli atti che lo modificano. Entrano in uso quando una persona le ha controllate.
+ */
+export const REGIONAL_TRANSCRIPTIONS = join(DATA_DIR, 'trascrizioni');
+
 /** Sinonimi e sigle dei materiali per la ricerca delle prestazioni (D153). */
 export const SERVICE_SEARCH_DATA = join(DATA_DIR, 'ricerca-prestazioni.json');
 

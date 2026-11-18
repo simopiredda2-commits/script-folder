@@ -703,3 +703,19 @@ Nel testo dell'atto c'è un'incoerenza: le premesse dicono che l'allegato B vale
   «Unità sanitaria locale n.», «Regione» e «Numero tesserino assistito» sono voci del 1998. Restano come nell'atto, compilate dal medico; il tesserino è facoltativo, finché non si conferma con l'ASL che cosa scrivere oggi.
 
 - **Anamnestico per la patente**: nessun modello nazionale. L'art. 119, comma 3, del Codice della strada chiede solo che la certificazione tenga conto dei «precedenti morbosi del richiedente dichiarati da un certificato medico rilasciato da un medico di fiducia». Il modello proposto seguirà la struttura dei PDF mandati da Simone, con un testo nostro da far controllare a Chiara. Quei PDF però non sono più in questa sessione: servono di nuovo, oppure il modulo che usa Chiara.
+
+**D159 · Il catalogo regionale in vigore, trascritto dai PDF e da controllare.** Simone ha mandato il PDF della D.D. 590/A1400B/2026 del 20/9/2026 (BU n. 38 del 24/09/2026) in tre parti: testo, allegato A intero (il catalogo, 194 pagine) e allegato B. Il catalogo vale per le ricette prescritte dal 21/09/2026. Scelte:
+
+- **Base e modifiche.** L'allegato A della D.D. 590 è la versione intera dal 21/09/2026. Sopra, la D.D. 710/2026 come modifiche (D157): allegati A e C dal 30/10/2026, allegato B dal 13/01/2027. Il programma ricostruisce le tre versioni: 5107, 5149 e 5093 voci. La D.D. 444/2025 non serve più, perché la D.D. 590 ripubblica il catalogo intero.
+- **Estratto in automatico, entra in uso solo dopo il controllo di una persona (A8).** Una scheda con `controllato_da: null` è «da controllare»: non si importa e ogni importazione la segnala tra le cose da guardare a mano. Così il lavoro fatto resta nel programma e si vede, ma non si usa prima del controllo.
+- **Le trascrizioni stanno nel programma**, in `packages/reference/data/trascrizioni/`: è la cartella per difetto dell'importazione e dell'aggiornamento di ogni notte. `BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` la sostituiscono.
+- **Differenze dal PDF**, tutte elencate in `docs/catalogo-regionale.md`:
+  - le 2 voci non prescrivibili restano fuori (90418.1 e 90418.2, test reflex del TSH);
+  - 7 righe ripetute identiche nell'atto, anche nella D.D. 990/2024, ci sono una volta sola;
+  - 26 descrizioni e 16 note sono tagliate nel PDF, al bordo della cella. Sono completate con il testo della stessa voce, per codice e branca, nella D.D. 990/2024. È il testo di un altro atto ufficiale, non un testo ricostruito: in tutte le altre voci in comune le descrizioni dei due atti sono uguali;
+  - una parola che va a capo dopo il trattino si riunisce come la stessa parola dentro una riga, nei tre atti. Senza nessuna prova, si riunisce senza spazio, come quasi tutti i trattini dentro le righe;
+  - nella D.D. 710 le branche spezzate nella cella si scrivono come nel catalogo.
+- **Controlli all'importazione.** Il rapporto rifà la prova della regola delle visite (D152): 348 visite su 5107 voci. La voce 11.99.2 nomina le visite di controllo senza essere una visita, e resta da guardare.
+- **Fonte strutturata.** Il PDF dell'allegato A è stampato da un file Excel della Regione («Allegato A_Catalogo Ambulatoriale_092026_ALL.xlsx», scritto in testa a ogni pagina). Con quel file, o con il catalogo strutturato del CSI Piemonte, il confronto si fa da programma, riga per riga. È una domanda per la fermata, insieme a chi controlla la trascrizione.
+
+Non provato: il catalogo vero nelle schermate e nelle ricette, perché non è ancora controllato. Le prove usano copie delle schede con un nome di prova in `controllato_da`.

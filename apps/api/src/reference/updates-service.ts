@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { loadMappings } from '@mmg/reference';
+import { loadMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
 import { desc } from 'drizzle-orm';
 import type { ReferenceUpdateConfig } from '../config';
 import type { Database } from '../db/client';
@@ -151,9 +151,9 @@ export function referenceUpdatesFromConfig(
       ? exampleSourcesSync()
       : publicSourcesSync(config.sources === 'pubbliche' ? {} : { sourcesFile: config.sources }),
   };
-  const transcriptionsDir =
-    config.transcriptionsDir ?? (example ? EXAMPLE_TRANSCRIPTIONS : undefined);
-  if (transcriptionsDir) setup.transcriptionsDir = transcriptionsDir;
+  // Per difetto le trascrizioni che il programma porta con sé (D159), o quelle d'esempio.
+  setup.transcriptionsDir =
+    config.transcriptionsDir ?? (example ? EXAMPLE_TRANSCRIPTIONS : REGIONAL_TRANSCRIPTIONS);
   const sourcesFile = example
     ? join(EXAMPLES_DIR, 'fonti-prova.json')
     : config.sources === 'pubbliche'

@@ -1,0 +1,13 @@
+{
+  "tipo": "prestazioni",
+  "serie": "catalogo-piemonte",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "D.D. 20 settembre 2026, n. 590/A1400B/2026, allegato A: catalogo regionale delle prestazioni di specialistica ambulatoriale (BU Regione Piemonte n. 38 del 24/09/2026)",
+  "in_vigore_dal": "2026-09-21",
+  "trascritto_da": "Claude Code, estrazione automatica dal PDF",
+  "trascritto_il": "2026-11-19",
+  "controllato_da": null,
+  "nota": "Vale per le ricette prescritte dal 21/09/2026 (punto 3 della determina). PDF dell'atto in tre parti, mandate da Simone il 18/11/2026: impronte in docs/provenienze.md. Tolte le 2 voci non prescrivibili e 7 righe ripetute identiche; 26 descrizioni e 16 note tagliate nel PDF completate con il testo della D.D. 990/2024, stessa voce. Che cosa controllare: docs/catalogo-regionale.md."
+}

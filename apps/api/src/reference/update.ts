@@ -131,6 +131,7 @@ const IMPORT_LABELS: Record<ImportLine['outcome'], string> = {
   trascrizione_non_valida: 'trascrizione non valida',
   origine_non_trovata: 'PDF d’origine non trovato',
   base_mancante: 'manca la versione su cui l’atto è scritto',
+  trascrizione_da_controllare: 'trascrizione da controllare: non ancora in uso',
 };
 
 /** Esito del giro, con le stesse regole del comando d'importazione e di sync. */

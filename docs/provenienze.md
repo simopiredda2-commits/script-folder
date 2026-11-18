@@ -56,6 +56,16 @@ Nelle prove e nei dati della ricerca ci sono descrizioni del catalogo copiate pa
 
 Sigle dei materiali in `packages/reference/data/ricerca-prestazioni.json`: S, P, U e DU da Simone (18/11/2026); (SG)ER, SG, (SG), SA e LA da un elenco della Regione Campania delle prestazioni di laboratorio per settore di erogazione, che scrive per esteso i materiali degli stessi codici, letto solo negli estratti di una ricerca il 18/11/2026. [ALB] e [F] non sono sciolte: nessuna fonte trovata. L'interfaccia mostra le sigle per esteso senza la fonte, che resta qui e nel file.
 
+### Catalogo regionale in vigore (D159)
+
+Le trascrizioni in `packages/reference/data/trascrizioni/piemonte_catalogo/` sono estratte dai PDF qui sotto e dalla D.D. 710/2026 (tabella sopra). Sono atti pubblici della Regione: «Le disposizioni di questa legge non si applicano ai testi degli atti ufficiali dello stato e delle Amministrazioni pubbliche» (art. 5 della legge 633/1941, letto su Normattiva il 19/11/2026). I PDF restano fuori dal repository. Che cosa è diverso dal PDF: `docs/catalogo-regionale.md`.
+
+| Documento                                                                                                 | Indirizzo                                                                                                | Byte      | SHA-256                                                            |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
+| Regione Piemonte, D.D. 590/2026 (BU n. 38 del 24/09/2026), parte 1 di 3: testo e allegato A, branche 1–10 | Mandato da Simone il 18/11/2026 (file `DD590-2026_parte1di3_atto_branche01-10.pdf`, 44 pagine)           | 940.152   | `e13329ac66e8d2c4a20ec69326d6247c8300aa773caa5dfd171b35cca858348a` |
+| Regione Piemonte, D.D. 590/2026, parte 2 di 3: allegato A, laboratorio                                    | Mandato da Simone il 18/11/2026 (file `DD590-2026_parte2di3_laboratorio.pdf`, 87 pagine)                 | 1.286.532 | `0f44a555331e593b319c74f5b49a603c08ccd9153836fefe81aa33476a9401af` |
+| Regione Piemonte, D.D. 590/2026, parte 3 di 3: allegato A, branche 12–26, e allegato B                    | Mandato da Simone il 18/11/2026 (file `DD590-2026_parte3di3_branche12-26_coda_AllegatoB.pdf`, 77 pagine) | 1.616.458 | `8ef8f8c872b9a8d5093b07facff117fa9b514242158a85ab302022fb78d0aa4d` |
+
 ### Modelli ufficiali dei certificati (D158)
 
 Il testo dei file in `apps/api/modelli/` è copiato dagli atti, con la fonte in ogni file. Le pagine della Gazzetta sono state lette il 18/11/2026 e i PDF restano fuori dal repository.

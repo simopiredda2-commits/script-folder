@@ -126,7 +126,11 @@ const transcriptionSchema = z
     in_vigore_dal: isoDate,
     trascritto_da: z.string().min(1),
     trascritto_il: isoDate,
-    controllato_da: z.string().min(1),
+    /**
+     * Chi ha controllato la trascrizione. Null finché nessuno l'ha controllata: la scheda resta
+     * «da controllare» e non entra in uso (A8, D159).
+     */
+    controllato_da: z.string().min(1).nullable(),
     /**
      * Il CSV elenca solo le voci che l'atto aggiunge e toglie, con la colonna «operazione»: la
      * versione intera si ricostruisce dalla versione della serie in vigore il giorno prima (D157).

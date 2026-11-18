@@ -1,0 +1,97 @@
+operazione;codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note
+toglie;88.74.A;;;Chirurgia Vascolare;;
+toglie;39.99.4;;;Diagnostica Per Immagini;;
+toglie;87.06;;;Diagnostica Per Immagini;;
+toglie;87.06.1;;;Diagnostica Per Immagini;;
+toglie;88.73.7;;;Diagnostica Per Immagini;;
+toglie;88.74.A;;;Diagnostica Per Immagini;;
+toglie;88.99.5;;;Diagnostica Per Immagini;;
+toglie;88.73.7;;;Endocrinologia;;
+toglie;88.99.5;;;Endocrinologia;;
+toglie;88.74.A;;;Gastroenterologia;;
+toglie;90.41.4;;;Laboratorio;;
+toglie;90.68.C;;;Laboratorio;;
+toglie;91.02.8;;;Laboratorio;;
+toglie;91.20.5;;;Laboratorio;;
+toglie;3995DN.0;;;Nefrologia;;
+toglie;39.95.M;;;Nefrologia;;
+toglie;39.99.4;;;Nefrologia;;
+toglie;08.92;;;Oculistica;;
+toglie;95.45;;;Otorinolaringoiatria;;
+toglie;89.37.3;;;Pneumologia;;
+toglie;93.94;;;Pneumologia;;
+toglie;88741.5;;;Diagnostica Per Immagini;;
+toglie;90324.2;;;Laboratorio;;
+toglie;90324.1;;;Laboratorio;;
+toglie;90323.0;;;Laboratorio;;
+toglie;45.30.1;;;Gastroenterologia;;
+toglie;42.33.1;;;Gastroenterologia;;
+aggiunge;04.2;04.2;RADIOFREQUENZA PULSATA NEL TRATTAMENTO DELLE SINDROMI DOLOROSE;Anestesia/Analgesia;200,00;
+aggiunge;08.91.A;08.91;DEPILAZIONE ELETTROCHIRURGICA DELLA PALPEBRA - OCCHIO SN;Oculistica;26,75;
+aggiunge;24.80.9;24.80.9;INSERIMENTO DI DISPOSITIVO MOBILE INTRAORALE.;Odontostomatologia;240,00;Incluso: costo totale del manufatto. Riservato ai pazienti con sindrome di Lesch-Nyhan, codice RCG120, per prevenire comportamenti autolesionistici. Richiede prescrizione specialistica.
+aggiunge;42.33.5;42.33.5;MUCOSECTOMIA ESOFAGEA IN EGDS.;Gastroenterologia;400,00;Escluso: Biopsia dell' esofago in corso di EGDS (42.24.1)
+aggiunge;43.41.3;43.41.3;MUCOSECTOMIA GASTRICA IN EGDS.;Gastroenterologia;400,00;Escluso: Biopsia dello stomaco in corso di EGDS (44.14).
+aggiunge;45.30.3;45.30.3;MUCOSECTOMIA DEL DUODENO IN EGDS.;Gastroenterologia;400,00;Escluso: Biopsia del Duodeno in corso di EGDS (45.14.1)
+aggiunge;87.37.3;87.37.3;MAMMOGRAFIA MONO E/O BILATERALE SENZA E CON MDC.;Diagnostica Per Immagini;54,60;Non associabile a 88.92.9 RM MAMMARIA MONO E/O BILATERALE SENZA E CON MDC
+aggiunge;88.74.B;88.74.B;ELASTOGRAFIA TRANSIENTE EPATICA.;Diagnostica Per Immagini;49,75;Non associabile a 88.74.1 ECOGRAFIA DELL' ADDOME SUPERIORE e 88.76.1 ECOGRAFIA DELL'ADDOME COMPLETO. Esame di secondo livello, per diagnosticare o monitorare fibrosi epatica e/o ipertensione portale clinicamente significativa, in pazienti con epatopatia cronica avanzata o cirrosi epatica. Richiede indicazione specialistica.
+aggiunge;88.99.A;88.99.A;MULTISPETTROMETRIA ECOGRAFICA A RADIOFREQUENZA OSSEA, QUALSIASI METODO. INDAGINE LOMBARE;Diagnostica Per Immagini;31,50;Riservata a pazienti di genere femminile, in alternativa alla densitometria ossea del corrispondente distretto: lombare, femorale o ultradistale.
+aggiunge;88.99.B1;88.99.B;MULTISPETTROMETRIA ECOGRAFICA A RADIOFREQUENZA OSSEA, QUALSIASI METODO. INDAGINE FEMORALE - BILATERALE;Diagnostica Per Immagini;31,50;Escluso cod. 88.99.B2 e 88.99.B3. Riservata a pazienti di genere femminile, in alternativa alla densitometria ossea del corrispondente distretto: lombare, femorale o ultradistale.
+aggiunge;88.99.C1;88.99.C;MULTISPETTROMETRIA ECOGRAFICA A RADIOFREQUENZA OSSEA, QUALSIASI METODO. INDAGINE ULTRADISTALE BILATERALE;Diagnostica Per Immagini;31,50;Escluso cod. 88.99.C2 e 88.99.C3. Riservata a pazienti di genere femminile, in alternativa alla densitometria ossea del corrispondente distretto: lombare, femorale o ultradistale.
+aggiunge;90.05.6A;90.05.6;ALBUMINA GLICATA;Laboratorio;2,80;"Non utilizzabile per la diagnosi del diabete. Prescrivibile per il monitoraggio glicemico in alternativa all’HbA1c: nei pazienti diabetici con emoglobinopatia, emoglobina inferiore a 10 g/dl o gravidanza; inoltre nei pazienti con diabete gestazionale."
+aggiunge;90323.0;90.32.3;LUTEOTROPINA (LH) [S];Laboratorio;6,20;Non associabile a Ormoni dosaggi seriali (90.35.2)
+aggiunge;90.64.7;90.64.7;DOSAGGIO DELL’ATTIVITÀ FUNZIONALE ADAMTS13 (proteasi clivante il fattore von Willebrand);Laboratorio;78,90;
+aggiunge;91.20.8;91.20.8;VIRUS EPATITE D [HDV] ANALISI QUANTITATIVA DI HDV RNA,;Laboratorio;49,75;. Incluso: estrazione, retrotrascrizione, amplificazione, rilevazione. Indicazione di appropriatezza prescrittiva: esame da effettuare contestualmente alla positività dell’HBsAg.
+aggiunge;91.47.9;91.47.9;PANNELLO DI IMMUNOFENOTIPIZZAZIONE DI FATTORI PROGNOSTICI E PREDITTIVI PER PATOLOGIA TUMORALE DELLA MAMMELLA SUSCETTIBILE DI TRATTAMENTO CON FARMACI INIBITORI DEL CHECKPOINT IMMUNITARIO.;Laboratorio;222,00;Biomarcatori delle categorie: anti-PD-L1, anti-CTLA-4. Condizione di erogabilità aggiornata: patologia tumorale maligna già accertata, con esecuzione secondo note AIFA e linee guida del Sistema nazionale linee guida.
+aggiunge;91.30.6;91.30.6;STATO MUTAZIONALE PROGNOSTICO PER CARCINOMA MAMMARIO ORMONORESPONSIVO IN STADIO PRECOCE;Laboratorio;2.000,00;Condizione di erogabilità: rinvio all’Allegato 4 GEN, colonna E
+aggiunge;92.2A.1;92.2A.1;Radioterapia - Piano di cura cat. A;Radioterapia;614,55;
+aggiunge;92.2A.2;92.2A.2;Radioterapia - Trattamento breve cat. A 1-5 sedute;Radioterapia;391,80;
+aggiunge;92.2A.3;92.2A.3;Radioterapia - Trattamento corto cat. A 6-10 sedute;Radioterapia;765,70;
+aggiunge;92.2A.4;92.2A.4;Radioterapia - Trattamento intermedio cat. A 11-20 sedute;Radioterapia;1.448,50;
+aggiunge;92.2A.5;92.2A.5;Radioterapia - Trattamento lungo cat. A >20 sedute;Radioterapia;1.759,20;
+aggiunge;92.2B.1;92.2B.1;Radioterapia - Piano di cura cat. B;Radioterapia;819,95;
+aggiunge;92.2B.2;92.2B.2;Radioterapia - Trattamento breve cat. B 1-5 sedute;Radioterapia;1.280,80;
+aggiunge;92.2B.3;92.2B.3;Radioterapia - Trattamento corto cat. B 6-10 sedute;Radioterapia;2.543,70;
+aggiunge;92.2B.4;92.2B.4;Radioterapia - Trattamento intermedio cat. B 11-20 sedute;Radioterapia;4.695,50;
+aggiunge;92.2B.5;92.2B.5;Radioterapia - Trattamento lungo cat. B >20 sedute;Radioterapia;5.605,20;
+aggiunge;92.2C.1;92.2C.1;Radioterapia - Piano di cura cat. C;Radioterapia;1.100,90;
+aggiunge;92.2C.2;92.2C.2;Radioterapia - Trattamento breve cat. C 1-5 sedute;Radioterapia;5.945,30;
+aggiunge;92.2C.3;92.2C.3;Radioterapia - Trattamento corto cat. C 6-10 sedute;Radioterapia;7.442,76;
+aggiunge;92.2C.4;92.2C.4;Radioterapia - Trattamento intermedio cat. C 11-20 sedute;Radioterapia;9.133,50;
+aggiunge;92.2C.5;92.2C.5;Radioterapia - Trattamento lungo cat. C >20 sedute;Radioterapia;11.261,50;
+aggiunge;92.2D.1;92.2D.1;Radioterapia - Piano di cura cat. D;Radioterapia;2.841,40;
+aggiunge;92.2D.2;92.2D.2;Radioterapia - Trattamento breve cat. D 1-5 sedute;Radioterapia;7.410,97;
+aggiunge;92.2D.3;92.2D.3;Radioterapia - Trattamento corto cat. D 6-10 sedute;Radioterapia;9.918,00;
+aggiunge;92.2D.4;92.2D.4;Radioterapia - Trattamento intermedio cat. D 11-20 sedute;Radioterapia;11.733,70;
+aggiunge;92.2D.5;92.2D.5;Radioterapia - Trattamento lungo cat. D >20 sedute;Radioterapia;13.924,00;
+aggiunge;92.3A.1;92.3A.1;Brachiterapia - Trattamento breve cat. A <=2 sedute;Radioterapia;859,55;
+aggiunge;92.3A.2;92.3A.2;Brachiterapia - Trattamento intermedio cat. A 3-6 sedute;Radioterapia;1.441,75;
+aggiunge;92.3A.3;92.3A.3;Brachiterapia - Trattamento lungo cat. A > 6 sedute;Radioterapia;1.641,75;
+aggiunge;92.3B.1;92.3B.1;Brachiterapia - Trattamento breve cat. B <=2 sedute;Radioterapia;947,15;
+aggiunge;92.3B.2;92.3B.2;Brachiterapia - Trattamento intermedio cat. B 3-6 sedute;Radioterapia;1.697,15;
+aggiunge;92.3B.3;92.3B.3;Brachiterapia - Trattamento lungo cat. B > 6 sedute;Radioterapia;2.197,15;
+aggiunge;92.3C.1;92.3C.1;Brachiterapia - Trattamento breve cat. C <=2 sedute;Radioterapia;1.047,15;
+aggiunge;92.3C.2;92.3C.2;Brachiterapia - Trattamento intermedio cat. C 3-6 sedute;Radioterapia;1.947,15;
+aggiunge;92.3C.3;92.3C.3;Brachiterapia - Trattamento lungo cat. C > 6 sedute;Radioterapia;2.547,15;
+aggiunge;92.3D.1;92.3D.1;Brachiterapia - Trattamento breve cat. D <=2 sedute;Radioterapia;1.147,15;
+aggiunge;92.3D.2;92.3D.2;Brachiterapia - Trattamento intermedio cat. D 3-6 sedute;Radioterapia;2.197,15;
+aggiunge;92.3D.3;92.3D.3;Brachiterapia - Trattamento lungo cat. D > 6 sedute;Radioterapia;2.897,15;
+aggiunge;92.4C.1;92.4C.1;Irradiazione corporea o midollare totale (TBI/TMI) - Trattamento breve cat. C (1 seduta);Radioterapia;2.186,45;
+aggiunge;92.4C.2;92.4C.2;Irradiazione corporea o midollare totale (TBI/TMI) - Trattamento intermedio cat. C 2-3 sedute;Radioterapia;3.591,20;
+aggiunge;92.4C.3;92.4C.3;Irradiazione corporea o midollare totale (TBI/TMI) - Trattamento lungo cat. C > 3 sedute;Radioterapia;4.527,70;
+aggiunge;92.4D.1;92.4D.1;Irradiazione corporea o midollare totale (TBI/TMI) - Trattamento breve cat. D (1 seduta);Radioterapia;1.825,95;
+aggiunge;92.4D.2;92.4D.2;Irradiazione corporea o midollare totale (TBI/TMI) - Trattamento intermedio cat. D 2-3 sedute;Radioterapia;3.636,95;
+aggiunge;92.4D.3;92.4D.3;Irradiazione corporea o midollare totale (TBI/TMI) - Trattamento lungo cat. D > 3 sedute;Radioterapia;5.447,95;
+aggiunge;93.82.4;93.82.4;TERAPIA PSICOEDUCAZIONALE PER DISTURBI DELL’ALIMENTAZIONE E DELLA NUTRIZIONE.;Psichiatria/Psicologia- Psicoterapia;4,40;Per seduta individuale. Ciclo di 10 sedute, massimo 20 sedute all'anno.
+aggiunge;93.82.5;93.82.5;TERAPIA PSICOEDUCAZIONALE PER DISTURBI DELL’ALIMENTAZIONE E DELLA NUTRIZIONE.;Psichiatria/Psicologia- Psicoterapia;1,75;Per seduta collettiva. Ciclo di 10 sedute, massimo 20 sedute all'anno.
+aggiunge;99.99.4;99.99.4;APPLICAZIONE DI MICROINFUSORE SOTTOCUTE.;Endocrinologia;26,00;Escluso: costo del dispositivo
+aggiunge;G2.11;G2.11;TEST PRENATALE NON INVASIVO (NIPT) su DNA fetale libero nel sangue materno (cromosomi 13, 18, 21, X e Y). Qualunque metodo;Laboratorio;380,00;Screening contingente per trisomie 13, 18, 21 e aneuploidie X e Y, nelle gravidanze con rischio 1/11–1/1000 risultante dalla prima valutazione con 90.17.6 – HCG frazione libera e PAPP-A e 88.78.4 – ecografia per traslucenza nucale. Richiede prescrizione specialistica. È erogabile contestualmente alla consulenza genetica associata al test.
+aggiunge;G3.04;G3.04;RICERCA DI MUTAZIONI NOTE/POLIMORFISMI NOTI. Farmacogenetica dei geni del metabolismo dei farmaci: CYP2C9;Laboratorio;65,00;Diagnostica di accompagnamento riservata ad adulti con sclerosi multipla secondariamente progressiva attiva, documentata da recidive o attività infiammatoria radiologica. Serve a verificare una controindicazione al siponimod oppure la necessità di ridurne la dose di mantenimento, secondo il relativo RCP.
+aggiunge;88.74.B;88.74.B;ELASTOGRAFIA TRANSIENTE EPATICA.;Gastroenterologia;49,75;Non associabile a 88.74.1 ECOGRAFIA DELL' ADDOME SUPERIORE e 88.76.1 ECOGRAFIA DELL'ADDOME COMPLETO. Esame di secondo livello, per diagnosticare o monitorare fibrosi epatica e/o ipertensione portale clinicamente significativa, in pazienti con epatopatia cronica avanzata o cirrosi epatica. Richiede indicazione specialistica.
+aggiunge;08.91.B;08.91;DEPILAZIONE ELETTROCHIRURGICA DELLA PALPEBRA - OCCHIO DX;Oculistica;26,75;
+aggiunge;88.99.B2;88.99.B;MULTISPETTROMETRIA ECOGRAFICA A RADIOFREQUENZA OSSEA, QUALSIASI METODO. INDAGINE FEMORALE SN;Diagnostica Per Immagini;31,50;Escluso cod. 88.99.B3 e 88.99.B1. Riservata a pazienti di genere femminile, in alternativa alla densitometria ossea del corrispondente distretto: lombare, femorale o ultradistale.
+aggiunge;88.99.B3;88.99.B;MULTISPETTROMETRIA ECOGRAFICA A RADIOFREQUENZA OSSEA, QUALSIASI METODO. INDAGINE FEMORALE DX;Diagnostica Per Immagini;31,50;Escluso cod. 88.99.B2 e 88.99.B1. Riservata a pazienti di genere femminile, in alternativa alla densitometria ossea del corrispondente distretto: lombare, femorale o ultradistale.
+aggiunge;88.99.C2;88.99.C;MULTISPETTROMETRIA ECOGRAFICA A RADIOFREQUENZA OSSEA, QUALSIASI METODO. INDAGINE ULTRADISTALE SN;Diagnostica Per Immagini;31,50;Escluso cod. 88.99.C1 e 88.99.C3. Riservata a pazienti di genere femminile, in alternativa alla densitometria ossea del corrispondente distretto: lombare, femorale o ultradistale.
+aggiunge;88.99.C3;88.99.C;MULTISPETTROMETRIA ECOGRAFICA A RADIOFREQUENZA OSSEA, QUALSIASI METODO. INDAGINE ULTRADISTALE DX;Diagnostica Per Immagini;31,50;Escluso cod. 88.99.C1 e 88.99.C2. Riservata a pazienti di genere femminile, in alternativa alla densitometria ossea del corrispondente distretto: lombare, femorale o ultradistale.
+aggiunge;90324;90.32.4;LUTEOTROPINA (LH) e E FOLLITROPINA (FSH);Laboratorio;23,25;PRECISAZIONE: dosaggi seriati dopo gnrh o altro stimolo (da 3 a 6). per ciascuna curva. NON ASSOCIABILE A ormoni dosaggi seriali (90.35.2)
+aggiunge;45.30.1A;45.30.1;ASPORTAZIONE O DEMOLIZIONE DI LESIONE DEL DUODENO IN CORSO DI EGDS POLIPECTOMIA;Gastroenterologia;220,10;ESCLUSO: biopsia del duodeno (45.14.1)
+aggiunge;42.33.1A;42.33.1;ASPORTAZIONE O DEMOLIZIONE DI LESIONE O TESSUTO ESOFAGEO IN CORSO DI EGDS: POLIPECTOMIA ESOFAGEA;Gastroenterologia;194,40;ESCLUSO: biopsia dell'esofago in corso di egds (42.24.1)

@@ -73,6 +73,19 @@ I PDF non si estraggono da soli. Una persona copia i dati in un CSV (UTF-8, sepa
 - `fonte`, `chiave` e `sha256_origine` vanno indicati tutti e tre, oppure nessuno (atto che `sync/` non scarica: si importa con la nota «origine non verificabile»).
 - Se il PDF in uso in `sync/` ha un'impronta diversa, la trascrizione è **superata** e non entra: va trascritta la versione nuova.
 - `serie` (facoltativa) lega le versioni successive della stessa tabella, per esempio due determine sul catalogo.
+- **Da controllare (D159).** Finché nessuno l'ha controllata, `controllato_da` è `null`: la trascrizione non entra in uso e ogni importazione la segnala come «trascrizione da controllare», tra le cose da guardare a mano. Chi la controlla scrive nome e cognome; dal giro successivo entra, con il suo nome nella versione.
+
+### Trascrizioni che il programma porta con sé (D159)
+
+`packages/reference/data/trascrizioni/` contiene le trascrizioni degli atti regionali, ed è la cartella delle trascrizioni per difetto (`BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` la sostituiscono). Oggi:
+
+| File (in `piemonte_catalogo/`) | Atto                                     | In vigore dal | Voci in vigore |
+| ------------------------------ | ---------------------------------------- | ------------- | -------------- |
+| `dd590-2026-allegato-a`        | D.D. 590/2026, allegato A: il catalogo   | 21/09/2026    | 5107           |
+| `dd710-2026-dal-2026-10-30`    | D.D. 710/2026, allegati A e C, modifiche | 30/10/2026    | 5149           |
+| `dd710-2026-dal-2027-01-13`    | D.D. 710/2026, allegato B, modifiche     | 13/01/2027    | 5093           |
+
+Sono estratte in automatico dai PDF e restano **da controllare**. Che cosa è diverso dal PDF e che cosa controllare: `docs/catalogo-regionale.md`.
 
 ### Atti che modificano una tabella (D157)
 
