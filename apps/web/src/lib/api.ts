@@ -21,7 +21,7 @@ export function onAuthProblem(listener: Listener): () => void {
 /** Chiamata al servizio: stesso dominio, cookie di sessione, JSON. */
 export async function api<T>(
   path: string,
-  options: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH'; body?: unknown } = {},
+  options: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown } = {},
 ): Promise<T> {
   const res = await fetch(path, {
     method: options.method ?? 'GET',

@@ -270,6 +270,29 @@ Fonti ufficiali lette il 18/11/2026 (sessione nell'ambiente «Folder», D92): DM
 - Lettura del codice a barre con un lettore vero; stampa su carta.
 - Il promemoria con la Dr.ssa Rocca e con una farmacia.
 
+### Tappa 8 – Certificati INPS (in corso)
+
+Fonti ufficiali lette il 18/11/2026: specifiche INPS del Sistema TS, versione 3.2; DM 26/2/2010 (GU n. 65 del 19/3/2010) con gli allegati A e B; per le credenziali, le fonti di D100–D103.
+
+**Fatto**
+
+- **Controlli formali del certificato** nel dominio (`packages/domain/src/sick-leave.ts`): tipi, visita, agevolazioni, schema ICD-9-CM, codici d'errore dell'INPS ripetuti prima dell'invio (23–26, 43, 1003, 1004, 1007), rettifica e annullamento nei casi ammessi. Interfaccia e simulatore dell'invio all'INPS.
+- **Credenziali dei servizi e secondo fattore** (D100–D103, `docs/credenziali.md`), su domanda della Dr.ssa Rocca:
+  - credenziali Sistema TS e RUPAR del medico, cifrate, mai rilette, solo sue;
+  - avviso di scadenza della password RUPAR;
+  - codice di sessione chiesto, attivato e revocato con il simulatore;
+  - ogni invio prende credenziali e codice di chi firma prima di contattare il servizio;
+  - un rifiuto per l'accesso porta la ricetta nell'errore «auth», che si rimanda così com'è.
+
+  Pagina «Credenziali dei servizi», avvisi nella pagina «Oggi» e negli errori d'invio. Migrazione 0009.
+
+**Provato**
+
+- 12 prove del servizio sulle credenziali; prove del dominio e dei simulatori; 22 prove nel browser.
+- Sabotaggi: 11 nuovi, rossi e poi verdi, uno nel browser (registro sotto).
+
+**Da fare** in questa tappa: certificati (servizio, PDF degli allegati A e B, consegne, pagina del paziente), poi documenti, schermate e terza fermata.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:
@@ -531,3 +554,14 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Documenti del promemoria immutabili                       | Trigger solo sulla cancellazione                   | Rosso, poi verde                                                                                                                                                                   |
 | Code 39: largo 2,5 volte lo stretto                       | Rapporto 3                                         | Rosso, poi verde                                                                                                                                                                   |
 | Pannello del promemoria dopo l'invio (browser)            | Pannello tolto dall'editor                         | Rosso, poi verde                                                                                                                                                                   |
+| Credenziali legate a medico e servizio (D100)             | Legame tolto dalla cifratura                       | Rosso, poi verde                                                                                                                                                                   |
+| Credenziali mai rilette (D100)                            | Utente restituito per intero                       | Rosso, poi verde                                                                                                                                                                   |
+| Credenziali: solo il medico (D100)                        | Controllo del ruolo tolto                          | Rosso, poi verde                                                                                                                                                                   |
+| Invio fermato prima senza credenziali (D100)              | Credenziali vuote mandate al servizio              | Rosso, poi verde                                                                                                                                                                   |
+| Codice di sessione scaduto: niente invio (D102)           | Scadenza ignorata                                  | Rosso, poi verde                                                                                                                                                                   |
+| Eventi sulle credenziali non modificabili                 | Trigger solo sulla cancellazione                   | Rosso, poi verde                                                                                                                                                                   |
+| Rifiuto per l'accesso: la ricetta si rimanda così com'è   | Ripresa dell'invio tolta per l'errore «auth»       | Rosso, poi verde                                                                                                                                                                   |
+| Password RUPAR: tre mesi (D101)                           | Quattro mesi                                       | Rosso, poi verde                                                                                                                                                                   |
+| Simulatore: un codice nuovo annulla il precedente         | Annullamento tolto                                 | Rosso, poi verde                                                                                                                                                                   |
+| Simulatore del SAR: Id-Sessione a ogni chiamata           | Controllo della sessione tolto                     | Rosso, poi verde                                                                                                                                                                   |
+| Avviso dei servizi nella pagina Oggi (browser)            | Avvisi tolti dalla pagina                          | Rosso, poi verde                                                                                                                                                                   |

@@ -12,6 +12,7 @@ import { PatientsPage } from './pages/PatientsPage';
 import { PrescriptionEditor } from './pages/PrescriptionEditor';
 import { RecordPage } from './pages/RecordPage';
 import { SchedulePage } from './pages/SchedulePage';
+import { ServiceCredentialsPage } from './pages/ServiceCredentialsPage';
 import { SignQueuePage } from './pages/SignQueuePage';
 import { TherapyForm } from './pages/TherapyForm';
 import { TodayPage } from './pages/TodayPage';
@@ -43,6 +44,7 @@ function Screens() {
           <Route path="/ricette" element={<SignQueuePage />} />
           <Route path="/banche-dati" element={<DataSearchPage />} />
           <Route path="/archivio" element={<ArchivePage />} />
+          <Route path="/profilo/credenziali" element={<ServiceCredentialsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Shell>

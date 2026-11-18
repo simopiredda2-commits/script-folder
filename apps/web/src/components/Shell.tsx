@@ -87,7 +87,7 @@ function OpenRecordsBar() {
 
 /** Cornice: salto al contenuto, menu con simbolo e nome, utente, cartelle aperte, piede con «by SCRIPT». */
 export function Shell({ children }: { children: ReactNode }) {
-  const { state, logout } = useSession();
+  const { state, logout, isDoctor } = useSession();
   const location = useLocation();
   // Il numero accanto a «Ricette» si aggiorna a ogni cambio di pagina.
   const today = useApi<TodayCounts>(`/api/oggi?_=${encodeURIComponent(location.pathname)}`);
@@ -130,6 +130,12 @@ export function Shell({ children }: { children: ReactNode }) {
                 {me.postazione ? ` · ${me.postazione}` : ''}
               </span>
             </span>
+            {isDoctor && (
+              <NavLink to="/profilo/credenziali" className="pulsante pulsante-piatto">
+                <Icon name="lucchetto" />
+                <span>Credenziali</span>
+              </NavLink>
+            )}
             <button
               type="button"
               className="pulsante pulsante-piatto"

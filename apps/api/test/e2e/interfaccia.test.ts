@@ -624,6 +624,34 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect((await res.json()).formato).toBe('mmg-esportazione');
   });
 
+  it('credenziali dei servizi: mai rilette; codice di sessione revocato, chiesto e attivato (D100–D102)', async () => {
+    await page.goto(base);
+    await page.locator('.utente').getByRole('link', { name: 'Credenziali' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Credenziali dei servizi' }).waitFor();
+    const rupar = page.getByRole('region', { name: 'RUPAR Piemonte' });
+    await rupar.getByText(/Impostate: utente/).waitFor();
+    // Le credenziali salvate non tornano nei campi.
+    await expect(rupar.getByLabel('Password', { exact: true }).inputValue()).resolves.toBe('');
+    await expect(rupar.getByLabel('PIN', { exact: true }).inputValue()).resolves.toBe('');
+    await check(page, 'credenziali dei servizi', true);
+    await rupar.getByRole('button', { name: 'Revoca il codice' }).click();
+    await rupar.getByText('Non attivo: serve per mandare le ricette.').waitFor();
+    // La pagina Oggi avvisa e porta alla pagina giusta.
+    await page
+      .getByRole('navigation', { name: 'Sezioni' })
+      .getByRole('link', { name: 'Oggi' })
+      .click();
+    await page
+      .getByText('Codice di sessione RUPAR Piemonte non attivo: serve per mandare le ricette.')
+      .waitFor();
+    await check(page, 'oggi con gli avvisi dei servizi');
+    await page.getByRole('link', { name: 'Apri «Credenziali dei servizi»' }).click();
+    await rupar.getByRole('button', { name: 'Chiedi il codice' }).click();
+    await rupar.getByText(/Ambiente di prova/).waitFor();
+    await rupar.getByRole('button', { name: 'Attiva' }).click();
+    await rupar.getByText(/^Attivo fino a/).waitFor();
+  });
+
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {
     s.clock.advance(6 * 60_000);
     await page.goto(`${base}/pazienti`);

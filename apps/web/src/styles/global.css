@@ -1369,3 +1369,19 @@ textarea[aria-invalid='true'] {
   font-weight: 600;
   color: var(--color-primary);
 }
+
+/* Credenziali dei servizi (D100–D102): un riquadro per servizio, affiancati se c'è spazio. */
+.griglia-credenziali {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.griglia-credenziali fieldset {
+  margin-top: 1rem;
+}
+
+.avvisi-servizi {
+  margin-bottom: 1rem;
+}
