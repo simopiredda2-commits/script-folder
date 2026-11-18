@@ -679,3 +679,27 @@ Il catalogo in vigore è quindi il precedente più queste modifiche. Alcuni codi
 Il catalogo vero non è ancora nel programma. L'ultimo catalogo intero letto è quello della D.D. 990/2024, e mancano gli aggiornamenti della D.D. 444/2025 e della D.D. 590/2026. Applicata alla D.D. 990/2024, la D.D. 710 darebbe un catalogo senza le modifiche del 2025 e del 2026. Serve il catalogo strutturato del CSI Piemonte, già domanda della fermata, oppure i PDF delle due determine. La trascrizione della D.D. 710 si prepara appena c'è la base, e una persona la controlla prima dell'uso (A8).
 
 Nel testo dell'atto c'è un'incoerenza: le premesse dicono che l'allegato B vale «sino al 12 gennaio 2026», la parte che determina «sino al 12 gennaio 2027». Vale la parte che determina, ed è coerente con il resto dell'atto.
+
+**D158 · Struttura comune dei modelli e i primi due modelli ufficiali.** Simone: «la struttura e i font dei modelli deve essere standardizzato. Poi modificabile, ma comunque con una formattazione iniziale standard fra tutti». Scelte:
+
+- **Una struttura per tutti i modelli**, ufficiali e dello studio:
+  - intestazione del medico;
+  - titolo;
+  - riferimento normativo, sotto il titolo. Per i modelli ufficiali, per difetto, è l'atto della fonte con la pubblicazione;
+  - testo;
+  - luogo e data;
+  - firme: il medico a destra con il timbro, le altre firme a sinistra;
+  - note in fondo, in corpo più piccolo, come nei moduli cartacei.
+
+  Caratteri e dimensioni restano quelli dell'impaginazione del medico (D145). La riga di luogo e data non si ripete se il testo li scrive già.
+
+- **Pagine**: un paragrafo che sta in una pagina non si spezza. L'ultimo paragrafo, la dichiarazione finale, resta sulla pagina di luogo, data e firme. Le note restano insieme. Una prova stampa testi da 15 a 45 righe e controlla ogni volta che la dichiarazione finale sia con le firme.
+- **Caselle**: una scelta con `boxes` si stampa come nel modello cartaceo, «[X] No [ ] Pregressa [ ] In atto». Sullo schermo è una riga di pulsanti. Il testo del modello resta quello dell'atto; cambia solo come si segna la scelta.
+- **Le parti restano con il certificato** (migrazione 0019): riferimento, note, luogo e data e altre firme si conservano al rilascio come il testo. La ristampa è identica anche se il modello cambia.
+- **Modelli ufficiali**, dal testo degli atti confrontato con le immagini della Gazzetta:
+  - sportivo non agonistico: allegato 2 del DM 8/8/2014, valido un anno. La frase dell'atto «Luogo, data, timbro e firma del medico certificatore.» sta sotto la firma;
+  - porto d'armi: allegato 1 del DM 28/4/1998, con le firme del dichiarante e del medico e con le note dell'atto. È valido tre mesi, perché l'atto lo vuole «di data non anteriore a tre mesi». Accenti e «Post-operatorie» come nella scansione; il refuso «sostenze» dell'atto resta.
+
+  «Unità sanitaria locale n.», «Regione» e «Numero tesserino assistito» sono voci del 1998. Restano come nell'atto, compilate dal medico; il tesserino è facoltativo, finché non si conferma con l'ASL che cosa scrivere oggi.
+
+- **Anamnestico per la patente**: nessun modello nazionale. L'art. 119, comma 3, del Codice della strada chiede solo che la certificazione tenga conto dei «precedenti morbosi del richiedente dichiarati da un certificato medico rilasciato da un medico di fiducia». Il modello proposto seguirà la struttura dei PDF mandati da Simone, con un testo nostro da far controllare a Chiara. Quei PDF però non sono più in questa sessione: servono di nuovo, oppure il modulo che usa Chiara.

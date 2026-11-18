@@ -20,8 +20,25 @@ Il servizio legge e controlla i file all'avvio (`apps/api/src/templates/catalog.
 | `validityMonths`| Validità in mesi, se l'atto la fissa; altrimenti `null`                                                         |
 | `forDoctor`     | Note per il medico, non stampate: che cosa chiede l'atto prima del rilascio                                     |
 | `fields`        | Campi che il medico compila: `key`, `label`, `type` (`testo`, `testo_lungo`, `data`, `scelta`, `numero`), `required`, `options`, `help`, `max` |
-| `body`          | Paragrafi del testo, con i segnaposto                                                                           |
-| `signature`     | Riga sotto lo spazio della firma                                                                                |
+| `body`          | Paragrafi del testo, con i segnaposto; dentro un paragrafo `\n` va a capo senza spazio in più                    |
+| `signature`     | Riga sotto lo spazio della firma del medico                                                                     |
+| `reference`     | Facoltativo: riferimento normativo sotto il titolo; per difetto l'atto e la pubblicazione della fonte           |
+| `notes`         | Facoltativo: note del modello, stampate in fondo in corpo più piccolo, senza segnaposto                         |
+| `placeDateLabel`| Facoltativo: parola davanti a luogo e data (per difetto «Luogo e data:»; vuota per non scriverla)               |
+| `otherSignatures`| Facoltativo: altre firme, a sinistra di quella del medico (per esempio «In fede, il dichiarante»)              |
+
+Una scelta con `"boxes": true` si stampa come nel modello cartaceo, una casella per valore con la X su quello scelto («[X] No   [ ] Pregressa   [ ] In atto»); sullo schermo è una riga di pulsanti.
+
+## Struttura comune (D158)
+
+Tutti i modelli si stampano con la stessa struttura: intestazione del medico, titolo, riferimento normativo, testo, luogo e data, firme, note in fondo. Se il testo scrive già luogo e data con i segnaposto `{{rilascio.…}}`, la riga comune non si ripete. Regole delle pagine: un paragrafo che sta in una pagina non si spezza; l'ultimo paragrafo resta sulla pagina di luogo, data e firme; le note restano insieme.
+
+## Modelli ufficiali presenti
+
+| File                            | Atto                                                    | Validità |
+| ------------------------------- | ------------------------------------------------------- | -------- |
+| `sportivo-non-agonistico.json`  | DM Salute 8 agosto 2014, allegato 2 (GU n. 243/2014)     | 12 mesi  |
+| `porto-armi-anamnestico.json`   | DM Sanità 28 aprile 1998, allegato 1 (GU n. 143/1998)    | 3 mesi   |
 
 ## Segnaposto
 

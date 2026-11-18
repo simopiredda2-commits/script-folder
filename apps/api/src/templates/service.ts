@@ -11,6 +11,7 @@ import {
   type PrintFont,
   type PrintLayout,
   type TemplateContext,
+  type FilledParts,
 } from '@mmg/domain';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
@@ -126,6 +127,14 @@ const certificateView = (r: typeof templateCertificate.$inferSelect) => ({
   validoFinoAl: r.validUntil,
   annullatoIl: r.annulledAt,
   motivoAnnullamento: r.annulReason,
+});
+
+/** Le parti della struttura comune di un certificato compilato (D158). */
+const partsOf = (f: FilledParts): FilledParts => ({
+  reference: f.reference,
+  notes: f.notes,
+  placeDate: f.placeDate,
+  otherSignatures: f.otherSignatures,
 });
 
 /** Validità di N mesi dal rilascio: fino al giorno prima della stessa data, N mesi dopo (D144). */
@@ -352,16 +361,23 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
     /** Prova di stampa con un'impaginazione (anche non ancora salvata). */
     async layoutPreview(actor: Actor, body: unknown) {
       if (!isDoctor(actor)) throw new HttpError(403, 'L’impaginazione è del medico');
+      const layout = parseLayout(body);
       return renderTemplatePdf({
         title: 'Prova di impaginazione',
         paragraphs: [
           'Questo testo serve solo a vedere come si stampano i certificati: intestazione, carattere, dimensione, margini e timbro.',
           'Il testo dei certificati viene dal modello; i dati del paziente, dalla cartella.',
-          `Luogo, ${italianDate(studioDate(now()))}`,
         ],
         signature: 'Timbro e firma del medico',
-        layout: parseLayout(body),
+        layout,
         createdAt: now(),
+        // La struttura comune a tutti i modelli (D158), con testi di prova.
+        parts: {
+          reference: 'Riferimento normativo del modello',
+          notes: ['Note del modello, in corpo più piccolo.'],
+          placeDate: `Luogo e data: ${layout.place || 'Luogo'}, ${italianDate(studioDate(now()))}`,
+          otherSignatures: [],
+        },
       });
     },
 
@@ -394,6 +410,7 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
         signature: template.signature,
         layout: layoutOf(await profileOf(actor.userId)),
         createdAt: now(),
+        parts: partsOf(filled),
       });
     },
 
@@ -422,6 +439,7 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
             })),
             paragraphs: filled.paragraphs,
             signature: template.signature,
+            parts: partsOf(filled),
             layout,
             issuedOn,
             validUntil: template.validityMonths
@@ -450,6 +468,7 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
         signature: r.signature,
         layout: r.layout,
         createdAt: r.issuedAt,
+        parts: r.parts,
         annulled: r.annulledAt
           ? { on: italianDate(studioDate(r.annulledAt)), reason: r.annulReason ?? '' }
           : null,

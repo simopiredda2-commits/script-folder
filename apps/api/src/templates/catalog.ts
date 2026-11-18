@@ -21,6 +21,7 @@ const fieldSchema = z
     options: z.array(z.string().min(1)).optional(),
     help: z.string().optional(),
     max: z.number().int().positive().optional(),
+    boxes: z.boolean().optional(),
   })
   .strict();
 
@@ -44,6 +45,11 @@ const templateSchema = z
     fields: z.array(fieldSchema),
     body: z.array(z.string().min(1)).min(1),
     signature: z.string().min(1),
+    // Struttura comune (D158): riferimento, note, luogo e data, altre firme.
+    reference: z.string().min(1).optional(),
+    notes: z.array(z.string().min(1)).optional(),
+    placeDateLabel: z.string().optional(),
+    otherSignatures: z.array(z.string().min(1)).optional(),
   })
   .strict();
 

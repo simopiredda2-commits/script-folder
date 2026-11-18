@@ -56,6 +56,15 @@ Nelle prove e nei dati della ricerca ci sono descrizioni del catalogo copiate pa
 
 Sigle dei materiali in `packages/reference/data/ricerca-prestazioni.json`: S, P, U e DU da Simone (18/11/2026); (SG)ER, SG, (SG), SA e LA da un elenco della Regione Campania delle prestazioni di laboratorio per settore di erogazione, che scrive per esteso i materiali degli stessi codici, letto solo negli estratti di una ricerca il 18/11/2026. [ALB] e [F] non sono sciolte: nessuna fonte trovata. L'interfaccia mostra le sigle per esteso senza la fonte, che resta qui e nel file.
 
+### Modelli ufficiali dei certificati (D158)
+
+Il testo dei file in `apps/api/modelli/` è copiato dagli atti, con la fonte in ogni file. Le pagine della Gazzetta sono state lette il 18/11/2026 e i PDF restano fuori dal repository.
+
+| Modello                        | Atto                                                          | Confronto                                                                                 |
+| ------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `sportivo-non-agonistico.json` | DM Salute 8 agosto 2014, allegato 2, GU n. 243 del 18/10/2014 | Pagina 26 del PDF della GU, solo immagine: trascrizione a mano confrontata con l'immagine |
+| `porto-armi-anamnestico.json`  | DM Sanità 28 aprile 1998, allegato 1, GU n. 143 del 22/6/1998 | Testo della pagina HTML della GU confrontato con la scansione del fascicolo (pagina 16)   |
+
 ## Fuori dal repository
 
 Le banche dati pubbliche non sono nel repository. Le scarica `sync/` nello studio e le importa il programma: AIFA, ISTAT, Regione Piemonte, DPCM LEA. Fonti e versioni sono in `sync/fonti.json` e in `docs/banche-dati.md`. Le condizioni d'uso di ciascuna fonte sono da verificare e scrivere qui prima del lancio.

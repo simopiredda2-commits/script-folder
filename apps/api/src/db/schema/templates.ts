@@ -1,4 +1,4 @@
-import type { PrintLayout, TemplateSource } from '@mmg/domain';
+import type { FilledParts, PrintLayout, TemplateSource } from '@mmg/domain';
 import { boolean, date, index, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { patient } from './patients';
 import { studio } from './studio';
@@ -56,6 +56,11 @@ export const templateCertificate = pgTable(
     fields: jsonb().$type<IssuedField[]>().notNull(),
     paragraphs: jsonb().$type<string[]>().notNull(),
     signature: text().notNull(),
+    /**
+     * Le parti della struttura comune com'erano al rilascio (D158): riferimento normativo, note,
+     * luogo e data, altre firme. Vuoto per i certificati rilasciati prima.
+     */
+    parts: jsonb().$type<FilledParts>(),
     layout: jsonb().$type<PrintLayout>().notNull(),
     issuedOn: date().notNull(),
     /** Fino a quando vale, se il modello ha una validità. */

@@ -1,0 +1,1 @@
+ALTER TABLE "template_certificate" ADD COLUMN "parts" jsonb;

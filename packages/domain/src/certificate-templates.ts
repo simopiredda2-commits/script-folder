@@ -47,6 +47,11 @@ export interface TemplateField {
   help?: string;
   /** Lunghezza massima del testo. */
   max?: number;
+  /**
+   * Per una scelta: si stampa come nel modello cartaceo, una casella per valore con la X su quello
+   * scelto («[X] No   [ ] Pregressa   [ ] In atto»), invece del solo valore (D158).
+   */
+  boxes?: boolean;
 }
 
 /** La fonte di un modello ufficiale. */
@@ -79,6 +84,18 @@ export interface CertificateTemplate {
   body: string[];
   /** Riga sotto lo spazio della firma. */
   signature: string;
+  /*
+   * Struttura comune a tutti i modelli (D158): intestazione, titolo, riferimento normativo, testo,
+   * note, luogo e data, firme. Le parti qui sotto sono facoltative.
+   */
+  /** Riferimento normativo sotto il titolo; per i modelli ufficiali, per difetto l'atto della fonte. */
+  reference?: string;
+  /** Note del modello, stampate dopo il testo in corpo più piccolo (senza segnaposto). */
+  notes?: string[];
+  /** Parola davanti a luogo e data; per difetto «Luogo e data:», vuota per non scriverla. */
+  placeDateLabel?: string;
+  /** Altre firme, a sinistra di quella del medico: per esempio «In fede, il dichiarante». */
+  otherSignatures?: string[];
 }
 
 /** I segnaposto di un testo: `{{paziente.cognome}}`, `{{campo.data_ecg}}`. */
@@ -131,7 +148,35 @@ export function templateIssues(t: CertificateTemplate): string[] {
   }
   for (const k of keys)
     if (!used.has(k)) out.push(`Campo «${k}» dichiarato ma non usato nel testo`);
+  for (const f of t.fields)
+    if (f.boxes && f.type !== 'scelta')
+      out.push(`Campo «${f.label}»: le caselle sono per le scelte`);
+  if (t.notes?.some((n) => !n.trim())) out.push('Le note hanno righe vuote');
+  if (t.notes?.some((n) => placeholdersOf(n).length))
+    out.push('Le note non hanno segnaposto: sono uguali in ogni certificato');
+  if (t.otherSignatures?.some((n) => !n.trim())) out.push('Una delle altre firme è vuota');
   return out;
+}
+
+/** Il riferimento normativo stampato sotto il titolo (D158). */
+export function referenceOf(t: CertificateTemplate): string | null {
+  if (t.reference?.trim()) return t.reference.trim();
+  if (!t.source) return null;
+  return t.source.publication ? `${t.source.act} (${t.source.publication})` : t.source.act;
+}
+
+/** Il valore di una scelta stampato con le caselle del modello cartaceo. */
+export function boxesOf(options: readonly string[], value: string): string {
+  return options.map((o) => `[${o === value ? 'X' : ' '}] ${o}`).join('   ');
+}
+
+/** Le parti del certificato oltre al testo, come si stampano (D158). */
+export interface FilledParts {
+  reference: string | null;
+  notes: string[];
+  /** Riga di luogo e data; null se il testo li scrive già con i suoi segnaposto. */
+  placeDate: string | null;
+  otherSignatures: string[];
 }
 
 /** Che cosa manca o non va nei valori dei campi; vuoto se vanno bene. */
@@ -186,20 +231,31 @@ export function fillTemplate(
   t: CertificateTemplate,
   ctx: TemplateContext,
   values: Record<string, string>,
-): { title: string; paragraphs: string[] } {
+): { title: string; paragraphs: string[] } & FilledParts {
   const field = new Map(t.fields.map((f) => [f.key, f]));
   const value = (group: string, key: string): string => {
     if (group === 'paziente') return ctx.patient[key as PatientPlaceholder] ?? '';
     if (group === 'medico') return ctx.doctor[key as DoctorPlaceholder] ?? '';
     if (group === 'rilascio') return ctx.issue[key as IssuePlaceholder] ?? '';
     const v = (values[key] ?? '').trim();
-    return field.get(key)?.type === 'data' ? italianDate(v) : v;
+    const f = field.get(key);
+    if (f?.type === 'data') return italianDate(v);
+    if (f?.type === 'scelta' && f.boxes && f.options) return boxesOf(f.options, v);
+    return v;
   };
+  const writesPlaceDate = t.body.some((p) => placeholdersOf(p).some((x) => x.group === 'rilascio'));
+  const label = t.placeDateLabel ?? 'Luogo e data:';
   return {
     title: t.title,
     paragraphs: t.body.map((p) =>
       p.replace(PLACEHOLDER, (_m, group: string, key: string) => value(group, key)),
     ),
+    reference: referenceOf(t),
+    notes: t.notes ?? [],
+    placeDate: writesPlaceDate
+      ? null
+      : `${label ? `${label} ` : ''}${ctx.issue.luogo}, ${ctx.issue.data}`,
+    otherSignatures: t.otherSignatures ?? [],
   };
 }
 

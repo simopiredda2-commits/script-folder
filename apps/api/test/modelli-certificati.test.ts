@@ -228,6 +228,83 @@ describe('modelli dei certificati (tappa 13)', () => {
     ).toEqual(['Times-Bold', 'Times-Roman']);
   });
 
+  it('modelli ufficiali (D158): porto d’armi con le caselle, le note e la firma del dichiarante', async () => {
+    const scelte = Object.fromEntries(
+      officialTemplates()
+        .find((x) => x.key === 'porto-armi-anamnestico')!
+        .fields.filter((f) => f.type === 'scelta')
+        .map((f) => [f.key, 'No']),
+    );
+    const values = {
+      modello: 'porto-armi-anamnestico',
+      valori: {
+        ...scelte,
+        a_epilessia: 'Pregressa',
+        a_epilessia_ultima_crisi: '2019-05-04',
+        professione: 'Impiegata di prova',
+        usl: 'ASL di prova',
+        regione: 'Piemonte',
+      },
+      luogo: 'Comune di prova',
+    };
+    const issued = await req('POST', base(), values);
+    expect(issued.statusCode, issued.body).toBe(201);
+    const c = issued.json<{ id: string; rilasciatoIl: string; validoFinoAl: string }>();
+    // «di data non anteriore a tre mesi» (art. 3).
+    expect(c.validoFinoAl).toBe(validityEnd(c.rilasciatoIl, 3));
+    const text = await pdfText(
+      new Uint8Array((await req('GET', `${base()}/${c.id}/pdf`)).rawPayload),
+    );
+    const flat = text.replace(/\s+/g, ' ');
+    expect(flat).toContain(
+      'DM Sanità 28 aprile 1998, allegato 1 (GU Serie generale n. 143 del 22/6/1998)',
+    );
+    expect(flat).toContain('Centrale [X] No [ ] Pregressa [ ] In atto');
+    expect(flat).toContain('Epilessia (2) [ ] No [X] Pregressa [ ] In atto 04/05/2019');
+    expect(flat).toContain('Uso di sostenze psicotrope (3) [X] No');
+    expect(flat).toContain('(1) Barrare con una X le caselle interessate.');
+    expect(flat).toContain('(Luogo e data del rilascio) Comune di prova,');
+    expect(flat).toContain('In fede, il dichiarante');
+    expect(flat).toContain('In fede, il medico');
+    // La dichiarazione finale resta sulla pagina di luogo, data e firme; le note in fondo.
+    const signed = text.split('\n').find((page) => page.includes('In fede, il medico'))!;
+    expect(signed).toContain('Il sottoscritto afferma');
+    expect(signed).toContain('(Luogo e data del rilascio)');
+    expect(flat.indexOf('In fede, il medico')).toBeLessThan(flat.indexOf('Note per la corretta'));
+    // Le parti restano con il certificato: la ristampa è identica anche se il modello cambiasse.
+    const [row] = await t.db
+      .select()
+      .from(templateCertificate)
+      .where(eq(templateCertificate.id, c.id));
+    expect(row!.parts).toMatchObject({
+      reference: 'DM Sanità 28 aprile 1998, allegato 1 (GU Serie generale n. 143 del 22/6/1998)',
+      otherSignatures: ['In fede, il dichiarante'],
+    });
+    expect(row!.parts!.notes).toHaveLength(5);
+  });
+
+  it('modelli ufficiali (D158): sportivo non agonistico, valido un anno, luogo e data sopra la firma', async () => {
+    const issued = await req('POST', base(), {
+      modello: 'sportivo-non-agonistico',
+      valori: { data_ecg: '2026-10-01' },
+      luogo: 'Comune di prova',
+    });
+    expect(issued.statusCode, issued.body).toBe(201);
+    const c = issued.json<{ id: string; rilasciatoIl: string; validoFinoAl: string }>();
+    expect(c.validoFinoAl).toBe(validityEnd(c.rilasciatoIl, 12));
+    const flat = (
+      await pdfText(new Uint8Array((await req('GET', `${base()}/${c.id}/pdf`)).rawPayload))
+    ).replace(/\s+/g, ' ');
+    expect(flat).toContain(
+      'DM Salute 8 agosto 2014, allegato 2 (GU Serie generale n. 243 del 18/10/2014)',
+    );
+    expect(flat).toContain('referto del tracciato ECG eseguito in data 01/10/2026');
+    expect(flat).toContain('Il presente certificato ha validità annuale dalla data del rilascio.');
+    // Senza la parola davanti: la frase dell'atto sta sotto la firma.
+    expect(flat).not.toContain('Luogo e data:');
+    expect(flat).toContain('Luogo, data, timbro e firma del medico certificatore.');
+  });
+
   it('il certificato rilasciato non cambia nel database; si annulla una volta con un motivo', async () => {
     const [c] = await t.db
       .select()

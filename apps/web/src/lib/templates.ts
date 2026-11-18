@@ -9,6 +9,8 @@ export interface TemplateField {
   options?: string[];
   help?: string;
   max?: number;
+  /** Scelta stampata con le caselle del modello cartaceo: sullo schermo, una riga di pulsanti. */
+  boxes?: boolean;
 }
 
 export interface TemplateSource {

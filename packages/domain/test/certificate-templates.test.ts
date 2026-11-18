@@ -123,6 +123,63 @@ describe('modelli dei certificati (tappa 13)', () => {
     ]);
   });
 
+  it('struttura comune (D158): riferimento dalla fonte, note, luogo e data, altre firme', () => {
+    // Il testo di prova scrive già luogo e data con i suoi segnaposto: la riga comune non si ripete.
+    const filled = fillTemplate(sample(), context(), {
+      data_esame: '2026-11-10',
+      esito: 'primo esito',
+    });
+    expect(filled).toMatchObject({
+      reference: 'Atto di prova, allegato A',
+      notes: [],
+      placeDate: null,
+      otherSignatures: [],
+    });
+    // Senza segnaposto di luogo e data, la riga comune c'è; con la parola scelta dal modello.
+    const t: CertificateTemplate = {
+      ...sample(),
+      body: ['{{paziente.cognome}}: {{campo.esito}}, {{campo.data_esame}}. {{campo.note}}'],
+      source: { ...sample().source!, publication: 'Gazzetta di prova n. 1' },
+      notes: ['(1) Nota del modello.'],
+      otherSignatures: ['In fede, il dichiarante'],
+    };
+    expect(
+      fillTemplate(t, context(), { data_esame: '2026-11-10', esito: 'primo esito' }),
+    ).toMatchObject({
+      reference: 'Atto di prova, allegato A (Gazzetta di prova n. 1)',
+      notes: ['(1) Nota del modello.'],
+      placeDate: 'Luogo e data: Comune di prova, 18/11/2026',
+      otherSignatures: ['In fede, il dichiarante'],
+    });
+    const plain = { ...t, placeDateLabel: '', reference: 'Riferimento scritto nel modello' };
+    expect(
+      fillTemplate(plain, context(), { data_esame: '2026-11-10', esito: 'primo esito' }),
+    ).toMatchObject({
+      reference: 'Riferimento scritto nel modello',
+      placeDate: 'Comune di prova, 18/11/2026',
+    });
+  });
+
+  it('le scelte con le caselle si stampano come nel modello cartaceo, con la X sulla scelta', () => {
+    const t = sample();
+    t.fields[1] = { ...t.fields[1]!, boxes: true };
+    const filled = fillTemplate(t, context(), { data_esame: '2026-11-10', esito: 'secondo esito' });
+    expect(filled.paragraphs[0]).toContain(': [ ] primo esito   [X] secondo esito.');
+  });
+
+  it('caselle solo sulle scelte; note senza segnaposto e senza righe vuote', () => {
+    const t = sample();
+    t.fields[0] = { ...t.fields[0]!, boxes: true };
+    t.notes = ['Nota con {{paziente.cognome}}', ' '];
+    t.otherSignatures = [''];
+    expect(templateIssues(t)).toEqual([
+      'Campo «Data dell’esame»: le caselle sono per le scelte',
+      'Le note hanno righe vuote',
+      'Le note non hanno segnaposto: sono uguali in ogni certificato',
+      'Una delle altre firme è vuota',
+    ]);
+  });
+
   it('impaginazione: carattere, dimensione, margini, righe dell’intestazione', () => {
     expect(layoutIssues(DEFAULT_PRINT_LAYOUT)).toEqual([]);
     expect(

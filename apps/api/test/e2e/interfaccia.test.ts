@@ -1254,6 +1254,33 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'altri certificati, rilasciati', true);
   });
 
+  it('modello ufficiale del porto d’armi: le caselle come pulsanti in riga, poi il rilascio (D158)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/certificati-modelli`);
+    await page.getByRole('heading', { level: 1, name: 'Altri certificati' }).waitFor();
+    await page.getByLabel('Modello').selectOption('porto-armi-anamnestico');
+    const groups = page.locator('form fieldset.scelta-in-riga');
+    await expect(groups.count()).resolves.toBe(17);
+    for (const g of await groups.all()) await g.getByLabel('No', { exact: true }).check();
+    await page
+      .getByRole('group', { name: 'Malattie del sistema nervoso: epilessia' })
+      .getByLabel('Pregressa', { exact: true })
+      .check();
+    await page.getByLabel('Professione').fill('Impiegata di prova');
+    await page.getByLabel('Unità sanitaria locale n.').fill('ASL di prova');
+    await page.getByLabel('Regione').fill('Piemonte');
+    await page.getByLabel('Luogo del rilascio').fill('Comune di prova');
+    await check(page, 'altri certificati, porto d’armi', true);
+    await page.getByRole('button', { name: 'Rilascia il certificato' }).click();
+    await page
+      .getByText('Certificato rilasciato: è nella cartella, da stampare e firmare.')
+      .waitFor();
+    const item = page.locator('.voce').filter({ hasText: 'PORTO D' }).first();
+    const href = await item.getByRole('link', { name: /PDF/ }).getAttribute('href');
+    expect((await page.request.get(`${base}${href}`)).headers()['content-type']).toBe(
+      'application/pdf',
+    );
+  });
+
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {
     // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20. Senza
     // omonimi: il seme cambia a ogni giro, e due «Neri Ada» farebbero cercare la scheda sbagliata.

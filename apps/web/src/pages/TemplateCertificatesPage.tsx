@@ -219,57 +219,89 @@ function IssueForm({
         {t.campi.length === 0 && (
           <p className="tenue">Questo modello non ha campi: i dati li mette il programma.</p>
         )}
-        {t.campi.map((f) => (
-          <div key={f.key} className="campo">
-            <label htmlFor={fid(f.key)}>
-              {f.label}
-              {f.required ? '' : ' (facoltativo)'}
-            </label>
-            {f.type === 'testo_lungo' ? (
-              <textarea
-                id={fid(f.key)}
-                rows={4}
-                required={f.required}
-                maxLength={f.max}
-                aria-describedby={f.help ? `${fid(f.key)}-aiuto` : undefined}
-                value={value(f.key)}
-                onChange={(e) => set(f.key, e.target.value)}
-              />
-            ) : f.type === 'scelta' ? (
-              <select
-                id={fid(f.key)}
-                required={f.required}
-                aria-describedby={f.help ? `${fid(f.key)}-aiuto` : undefined}
-                value={value(f.key)}
-                onChange={(e) => set(f.key, e.target.value)}
-              >
-                <option value="">Scegli</option>
-                {f.options?.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                id={fid(f.key)}
-                type={f.type === 'data' ? 'date' : 'text'}
-                inputMode={f.type === 'numero' ? 'decimal' : undefined}
-                max={f.type === 'data' ? studioToday() : undefined}
-                required={f.required}
-                maxLength={f.type === 'data' ? undefined : f.max}
-                aria-describedby={f.help ? `${fid(f.key)}-aiuto` : undefined}
-                value={value(f.key)}
-                onChange={(e) => set(f.key, e.target.value)}
-              />
-            )}
-            {f.help && (
-              <p className="aiuto" id={`${fid(f.key)}-aiuto`}>
-                {f.help}
-              </p>
-            )}
-          </div>
-        ))}
+        {t.campi.map((f) =>
+          f.type === 'scelta' && f.boxes ? (
+            // Le caselle del modello cartaceo: una riga di pulsanti, uno per valore.
+            <fieldset
+              key={f.key}
+              className="scelta scelta-in-riga"
+              aria-describedby={f.help ? `${fid(f.key)}-aiuto` : undefined}
+            >
+              <legend>
+                {f.label}
+                {f.required ? '' : ' (facoltativo)'}
+              </legend>
+              {f.options?.map((o, i) => (
+                <div key={o} className="casella">
+                  <input
+                    type="radio"
+                    id={`${fid(f.key)}-${i}`}
+                    name={fid(f.key)}
+                    required={f.required}
+                    checked={value(f.key) === o}
+                    onChange={() => set(f.key, o)}
+                  />
+                  <label htmlFor={`${fid(f.key)}-${i}`}>{o}</label>
+                </div>
+              ))}
+              {f.help && (
+                <p className="aiuto" id={`${fid(f.key)}-aiuto`}>
+                  {f.help}
+                </p>
+              )}
+            </fieldset>
+          ) : (
+            <div key={f.key} className="campo">
+              <label htmlFor={fid(f.key)}>
+                {f.label}
+                {f.required ? '' : ' (facoltativo)'}
+              </label>
+              {f.type === 'testo_lungo' ? (
+                <textarea
+                  id={fid(f.key)}
+                  rows={4}
+                  required={f.required}
+                  maxLength={f.max}
+                  aria-describedby={f.help ? `${fid(f.key)}-aiuto` : undefined}
+                  value={value(f.key)}
+                  onChange={(e) => set(f.key, e.target.value)}
+                />
+              ) : f.type === 'scelta' ? (
+                <select
+                  id={fid(f.key)}
+                  required={f.required}
+                  aria-describedby={f.help ? `${fid(f.key)}-aiuto` : undefined}
+                  value={value(f.key)}
+                  onChange={(e) => set(f.key, e.target.value)}
+                >
+                  <option value="">Scegli</option>
+                  {f.options?.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  id={fid(f.key)}
+                  type={f.type === 'data' ? 'date' : 'text'}
+                  inputMode={f.type === 'numero' ? 'decimal' : undefined}
+                  max={f.type === 'data' ? studioToday() : undefined}
+                  required={f.required}
+                  maxLength={f.type === 'data' ? undefined : f.max}
+                  aria-describedby={f.help ? `${fid(f.key)}-aiuto` : undefined}
+                  value={value(f.key)}
+                  onChange={(e) => set(f.key, e.target.value)}
+                />
+              )}
+              {f.help && (
+                <p className="aiuto" id={`${fid(f.key)}-aiuto`}>
+                  {f.help}
+                </p>
+              )}
+            </div>
+          ),
+        )}
         <div className="campo">
           <label htmlFor="certificato-luogo">Luogo del rilascio</label>
           <input

@@ -1,4 +1,4 @@
-import type { PrintFont, PrintLayout } from '@mmg/domain';
+import type { FilledParts, PrintFont, PrintLayout } from '@mmg/domain';
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib';
 
 /**
@@ -16,6 +16,11 @@ export interface TemplatePrintData {
   createdAt: Date;
   /** Certificato annullato: si stampa la dicitura in testa. */
   annulled?: { on: string; reason: string } | null;
+  /**
+   * Struttura comune (D158): riferimento normativo sotto il titolo, note dopo il testo, luogo e
+   * data, altre firme a sinistra. Assente per i certificati rilasciati prima.
+   */
+  parts?: FilledParts | null;
 }
 
 const A4: [number, number] = [595.28, 841.89];
@@ -124,38 +129,96 @@ export async function renderTemplatePdf(d: TemplatePrintData): Promise<Uint8Arra
     text(l, { font: bold, size: size + 3, align: 'center' });
     y -= lead * 1.3;
   }
+  // Riferimento normativo, sotto il titolo.
+  const small = Math.max(8, size - 2);
+  const smallLead = small * 1.4;
+  if (d.parts?.reference) {
+    for (const l of wrap(regular, d.parts.reference, small, width)) {
+      ensure(smallLead);
+      text(l, { size: small, align: 'center' });
+      y -= smallLead;
+    }
+  }
   y -= lead / 2;
 
-  // Testo: un paragrafo dopo l'altro.
-  for (const p of d.paragraphs) {
-    for (const l of wrap(regular, p, size, width)) {
+  // Testo: un paragrafo dopo l'altro. Un paragrafo che sta in una pagina non si spezza: se non
+  // c'è posto va alla pagina dopo, così una dichiarazione resta intera accanto alla sua firma.
+  const usable = A4[1] - 2 * margin;
+  // L'ultimo paragrafo resta sulla pagina di luogo, data e firme: la dichiarazione finale va con
+  // chi la firma.
+  const stamp = d.layout.stamp
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const others = d.parts?.otherSignatures ?? [];
+  const signatures = lead * (4 + Math.max(stamp.length, others.length * 3));
+  const closing = signatures + (d.parts?.placeDate ? lead : 0);
+  d.paragraphs.forEach((p, i) => {
+    const lines = wrap(regular, p, size, width);
+    const block = lines.length * lead + (i === d.paragraphs.length - 1 ? closing : 0);
+    if (block <= usable) ensure(block);
+    else if (lines.length * lead <= usable) ensure(lines.length * lead);
+    for (const l of lines) {
       ensure(lead);
       text(l);
       y -= lead;
     }
     y -= lead / 2;
+  });
+
+  // Luogo e data, sulla stessa pagina delle firme.
+  if (d.parts?.placeDate) {
+    ensure(lead + signatures);
+    text(safe(regular, d.parts.placeDate));
+    y -= lead;
   }
 
-  // Firma e timbro, a destra.
-  const stamp = d.layout.stamp
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-  ensure(lead * (4 + stamp.length));
+  // Firme: il medico a destra, con il timbro; le altre firme a sinistra, alla stessa altezza.
+  ensure(signatures);
   y -= lead * 2;
-  const signWidth = Math.min(220, width / 2);
-  page.drawLine({
-    start: { x: margin + width - signWidth, y },
-    end: { x: margin + width, y },
-    thickness: 0.6,
-    color: rgb(0, 0, 0),
-  });
-  y -= lead;
+  const signWidth = Math.min(220, width / 2 - 10);
+  const line = (x: number, at: number) =>
+    page.drawLine({
+      start: { x, y: at },
+      end: { x: x + signWidth, y: at },
+      thickness: 0.6,
+      color: rgb(0, 0, 0),
+    });
+  const top = y;
+  let left = top;
+  for (const label of others) {
+    line(margin, left);
+    page.drawText(safe(regular, label), {
+      x: margin,
+      y: left - lead,
+      size,
+      font: regular,
+      color: rgb(0, 0, 0),
+    });
+    left -= lead * 3;
+  }
+  line(margin + width - signWidth, top);
+  y = top - lead;
   text(safe(regular, d.signature), { align: 'right' });
   y -= lead;
   for (const l of stamp) {
     text(safe(regular, l), { align: 'right', size: size - 1 });
     y -= lead;
+  }
+  y = Math.min(y, left);
+
+  // Note del modello, in fondo e in corpo più piccolo, come nei modelli cartacei.
+  if (d.parts?.notes.length) y -= lead;
+  // Le note restano insieme, se stanno in una pagina.
+  const noteLines = (d.parts?.notes ?? []).map((n) => wrap(regular, n, small, width));
+  const notesHeight = noteLines.flat().length * smallLead;
+  if (notesHeight <= usable) ensure(notesHeight);
+  for (const lines of noteLines) {
+    for (const l of lines) {
+      ensure(smallLead);
+      text(l, { size: small });
+      y -= smallLead;
+    }
   }
 
   const pages = doc.getPages();

@@ -134,6 +134,13 @@
       "when": 1795036688054,
       "tag": "0018_aggiornamenti_banche_dati",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795041405591,
+      "tag": "0019_parti_dei_certificati",
+      "breakpoints": true
     }
   ]
 }
