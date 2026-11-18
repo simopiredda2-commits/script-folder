@@ -133,7 +133,11 @@ describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
       code: 'EA01',
       authProblem: 'credentials',
     });
-    expect(sar.receivedAuth.at(-1)).toEqual({ username: 'utente-di-prova', sessionId: null });
+    expect(sar.receivedAuth.at(-1)).toEqual({
+      username: 'utente-di-prova',
+      sessionId: null,
+      bearer: false,
+    });
     expect(JSON.stringify(sar.receivedAuth)).not.toMatch(/parola-di-prova|1234/);
   });
 

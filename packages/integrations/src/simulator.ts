@@ -7,6 +7,7 @@ import type {
   SendResult,
   StatusResult,
 } from './prescription-gateway';
+import type { SimulatedRegionalAuthorization } from './regional-authorization';
 import { authShapeProblem, type ServiceAuth, type SimulatedSecondFactor } from './service-auth';
 import { simulatedWhiteReminderPdf } from './simulated-documents';
 
@@ -31,6 +32,8 @@ export interface SimulatorOptions {
    * simulatore (D102). Senza, il simulatore controlla solo la forma delle credenziali.
    */
   sessions?: SimulatedSecondFactor;
+  /** Accesso regionale con SPID o CIE: se c'è, il token deve essere valido per quel simulatore. */
+  oauth?: SimulatedRegionalAuthorization;
 }
 
 /**
@@ -44,8 +47,8 @@ export class SimulatedGateway implements PrescriptionGateway {
   private readonly issued = new Map<string, { cancelled: boolean }>();
   /** Messaggi ricevuti, per le prove. */
   readonly received: PrescriptionMessage[] = [];
-  /** Con quali credenziali: solo l'utente e l'Id-Sessione, mai password e PIN. */
-  readonly receivedAuth: { username: string; sessionId: string | null }[] = [];
+  /** Con quali credenziali: utente, Id-Sessione e se c'era un token; mai password, PIN o token. */
+  readonly receivedAuth: { username: string; sessionId: string | null; bearer: boolean }[] = [];
 
   constructor(
     readonly system: GatewaySystem,
@@ -54,6 +57,17 @@ export class SimulatedGateway implements PrescriptionGateway {
 
   /** Rifiuto per credenziali o secondo fattore, come farebbe il servizio vero. */
   private authRefusal(auth: ServiceAuth) {
+    if (auth?.bearer) {
+      if (this.options.oauth && !this.options.oauth.isValid(auth.bearer))
+        return {
+          outcome: 'rejected' as const,
+          code: 'TOKEN',
+          message: 'Token dell’accesso regionale non valido, scaduto o revocato (simulato)',
+          authProblem: 'session' as const,
+          raw: { simulatore: this.system, esito: 'token' },
+        };
+      return null;
+    }
     const shape = authShapeProblem(auth);
     if (shape)
       return {
@@ -75,7 +89,11 @@ export class SimulatedGateway implements PrescriptionGateway {
 
   async send(message: PrescriptionMessage, auth: ServiceAuth): Promise<SendResult> {
     this.received.push(message);
-    this.receivedAuth.push({ username: auth?.username ?? '', sessionId: auth?.sessionId ?? null });
+    this.receivedAuth.push({
+      username: auth?.username ?? '',
+      sessionId: auth?.sessionId ?? null,
+      bearer: !!auth?.bearer,
+    });
     if (this.options.delayMs) await new Promise((ok) => setTimeout(ok, this.options.delayMs));
     const refused = this.authRefusal(auth);
     if (refused) return refused;
