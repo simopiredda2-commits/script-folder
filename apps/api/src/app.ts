@@ -2,7 +2,7 @@ import cookie from '@fastify/cookie';
 import { PRODUCT_NAME } from '@mmg/brand';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import { createAuthService, type Actor } from './auth/service';
 import type { Config } from './config';
 import type { Database } from './db/client';
@@ -10,9 +10,17 @@ import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
+import { registerReferenceRoutes } from './http/reference-routes';
+import { registerTherapyRoutes } from './http/therapy-routes';
+import { registerTodayRoutes } from './http/today-routes';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import { SimulatedGateway, type GatewaySystem, type PrescriptionGateway } from '@mmg/integrations';
+import { loadMappings } from '@mmg/reference';
+import { ReferenceData } from './reference/lookup';
+
+// I messaggi di validazione arrivano all'interfaccia: in italiano, come il resto (D85).
+z.config(z.locales.it());
 
 declare module 'fastify' {
   interface FastifyContextConfig {
@@ -108,15 +116,22 @@ export function buildApp({
 
   registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
   registerPatientRoutes(app, db);
+  registerTodayRoutes(app, db, now ?? (() => new Date()));
+  registerTherapyRoutes(app, db, now ?? (() => new Date()));
+  // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
+  const reference = new ReferenceData(db, loadMappings());
+  registerReferenceRoutes(app, reference, now ?? (() => new Date()));
   registerPrescriptionRoutes(
     app,
     createPrescriptionService({
       db,
       gateways,
       now,
-      // Per difetto le regole di prescrizione vere (tappa 4).
-      preSendChecks: preSendChecks ?? createRulesCheck({ db, now }),
+      // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
+      preSendChecks: preSendChecks ?? createRulesCheck({ db, now, reference }),
     }),
+    db,
+    now ?? (() => new Date()),
   );
   return app;
 }

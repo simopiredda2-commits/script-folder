@@ -21,6 +21,7 @@ import { withActor } from '../db/tx';
 import { buildCsvZip } from '../export/csv';
 import { buildExport } from '../export/export';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
+import { labResults, latestMeasurements, timeline } from '../patients/timeline';
 import { HttpError } from './errors';
 
 const idParams = z.object({ id: z.uuid() });
@@ -42,13 +43,19 @@ const registryPatch = z
   .strict();
 
 export function registerPatientRoutes(app: FastifyInstance, db: Database) {
-  app.get('/api/io', (req) => {
+  app.get('/api/io', async (req) => {
     const actor = req.actor!;
+    // L'archivio di cui l'utente è titolare: impostazioni ed esportazione dall'interfaccia.
+    const [own] = await db
+      .select({ id: archive.id, nome: archive.name })
+      .from(archive)
+      .where(and(eq(archive.studioId, actor.studioId), eq(archive.ownerUserId, actor.userId)));
     return {
       id: actor.userId,
       nome: actor.displayName,
       ruoli: actor.roles.map((r) => ({ codice: r, nome: ROLE_LABELS[r] })),
       postazione: actor.workstation,
+      archivio: own ?? null,
     };
   });
 
@@ -124,6 +131,7 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
             ),
           problemiAttivi: await db
             .select({
+              id: problemDetail.entryId,
               descrizione: problemDetail.description,
               codice: problemDetail.icdCode,
               dal: problemDetail.onsetOn,
@@ -143,9 +151,10 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
             .from(therapeuticPlan)
             .where(eq(therapeuticPlan.patientId, id)),
           esenzioni: await db
-            .select({ codice: exemption.code, al: exemption.validTo })
+            .select({ codice: exemption.code, dal: exemption.validFrom, al: exemption.validTo })
             .from(exemption)
             .where(eq(exemption.patientId, id)),
+          parametri: await latestMeasurements(db, id, reservedAllowed),
         }
       : null;
     return { paziente: p, riepilogo: summary };
@@ -174,6 +183,16 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       )
       .orderBy(desc(clinicalEntry.occurredOn));
     return { diario: notes };
+  });
+
+  app.get('/api/pazienti/:id/cronologia', { config: { patientScoped: true } }, async (req) => {
+    const { id } = idParams.parse(req.params);
+    return timeline(db, req.actor!, id, req.query);
+  });
+
+  app.get('/api/pazienti/:id/esami', { config: { patientScoped: true } }, async (req) => {
+    const { id } = idParams.parse(req.params);
+    return labResults(db, req.actor!, id);
   });
 
   app.get('/api/pazienti/:id/terapie', { config: { patientScoped: true } }, async (req) => {

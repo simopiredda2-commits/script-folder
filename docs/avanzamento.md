@@ -4,9 +4,18 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 ## Dove siamo
 
-- `main` contiene le tappe 0–2 (pull request #1 unita il 18/11/2026 con il via di Simone).
-- Branch attivo: `tappe-3-4`, con le tappe 3 e 4 fatte e la pull request #2 per la **seconda fermata**.
-- Seconda fermata: risposte annotate qui sotto, da applicare; poi richiedere il via, unire la #2 e partire con le tappe 5–6 su `tappe-5-6`.
+- **Primo giro (tappe 0–6) chiuso.** Pull request #1, #2 e #3 su `main`, l'ultima con la terapia completa e i collegamenti pronti (D79–D88), unita con il via di Simone del 18/11/2026.
+- **Secondo giro (tappe 7–10) avviato** con il via di Simone: «fai tutto, nell'ordine che ritieni giusto» (D90). Ordine: promemoria e invio, certificati INPS (terza fermata), voci cliniche, presidi e seguito delle prestazioni (fermata finale). Branch `tappe-7-8`, poi `tappe-9-10`.
+
+**Fuori dal secondo giro, da fare dopo** (nessuno avviato):
+
+1. Primo giro di `sync/` dal computer dello studio; completare le mappature AIFA con le intestazioni vere e confermare quelle ISTAT (D55, D56).
+2. Specifiche e credenziali di collaudo di SAR, Sistema TS e AURA: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo della ricetta rossa e del promemoria.
+3. Decisione su Ready! e sulla versione «Full» (D78).
+4. Riepiloghi, agenda (dopo la decisione su Ready!), AURA e FSE, importazione dei dati dal software attuale (serve il formato dell'esportazione di Next² con un file d'esempio senza dati veri).
+5. A7 e le altre liste AIFA (trasparenza, carenze, registri); soglie di vecchiaia (D62).
+6. Collegamento alla segnalazione di farmacovigilanza (D82); dicitura del tipo di accesso nella versione viva dei requisiti (D79).
+7. Prove con lettori di schermo e tablet veri, e una giornata di lavoro con la Dr.ssa Rocca.
 
 ## Come provarlo
 
@@ -17,9 +26,10 @@ pnpm lint             # ESLint, Prettier, tipi
 pnpm dev              # migrazioni, servizio su :3001, interfaccia su :5173
 pnpm db:seed          # dati dimostrativi inventati; stampa una volta le password
 pnpm fixtures -- --seed 1 --count 5
+pnpm banche-dati:importa -- --esempio   # banche dati dimostrative: sync sul sito d'esempio, poi importazione
 ```
 
-Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente, password e postazione; la risposta dà il segreto da inserire in un'app di autenticazione; poi `POST /api/accesso/codice` con il codice. L'interfaccia di accesso arriva alla tappa 6.
+Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente, password e postazione; la risposta dà il segreto da inserire in un'app di autenticazione; poi `POST /api/accesso/codice` con il codice. Dalla tappa 6 lo stesso si fa dall'interfaccia (`pnpm dev`, porta 5173).
 
 ## Tappe
 
@@ -138,6 +148,128 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 - Le regole con i dati veri della banca dati farmaci e dei cataloghi: arrivano alla tappa 5 (file d'esempio) e con la licenza Farmadati.
 - I controlli formali completi del Sistema TS (R10): manca il documento ufficiale dei controlli.
 
+### Tappa 5 – Banche dati pubbliche
+
+**Fatto** (dettagli in `docs/banche-dati.md`, decisioni D54–D64)
+
+- `packages/reference`: lettura dei CSV come `sync/` (codifica, separatore, virgolette), lettore XLSX minimo, intestazioni senza date come `sync/`, tipi di banca dati con i controlli dei valori, mappature come dati (`data/mappature.json`).
+- Importazione (`apps/api/src/reference`): legge `stato.json` e `correnti/` di `sync/`, controlla l'impronta, mappature, colonne e valori; i PDF entrano solo da trascrizioni controllate legate all'impronta del PDF (A8). Ogni importazione è una versione immutabile (migrazione 0006).
+- Consultazione alla data (A5): fatti per le regole (R5, R7, R8, R9, R17) collegati al controllo prima dell'invio; ricerche di farmaci (nome, principio attivo, AIC, ATC, equivalenti), prestazioni, esenzioni e comuni; versioni in uso con la loro data in ogni risposta (A6).
+- Comando `pnpm banche-dati:importa`, con `--esempio` per i dati dimostrativi.
+- Controllo della D12 sui comuni veri (lettera X).
+
+**Provato**
+
+- 18 prove di lettura e mappature, con il confronto cella per cella contro Python (`sync/`) su CSV veri d'esempio e casi difficili.
+- 20 prove sul database: `sync/` vero lanciato su un sito d'esempio in locale, importazione, idempotenza, catalogo che cambia il 30/10/2026, fatti dei farmaci, ricerche, versioni e vecchiaia, immutabilità, impronta manomessa, trascrizione superata dopo un PDF nuovo, righe non valide e scarti accettati, schede incomplete, lettera X; via HTTP le ricerche e le regole R5, R7, R9 e R17 alimentate dalle banche dati.
+- 9 sabotaggi (registro sotto).
+
+**Non fatto / da completare**
+
+- **Mappature AIFA da completare** (D55): dal cloud i file AIFA non si leggono. Al primo giro di `sync/` dal computer dello studio, l'importazione mostra le intestazioni vere da copiare in `packages/reference/data/mappature.json`.
+- Intestazioni ISTAT da confermare sul file vero (D56).
+- Soglie di vecchiaia (A6) da completare (D62).
+- Non importati: liste di trasparenza, farmaci carenti, registri e piani AIFA, ICD-9-CM e ICD-10-IM. A7 (aggiornamento che tocca un farmaco in terapia → «Da fare») non fatto: richiede la coda «Da fare» dell'interfaccia e le carenze.
+- Prescrivibilità dal medico di medicina generale, regime di fornitura, unità per confezione e antibiotici iniettabili restano non noti senza una fonte strutturata (D59).
+
+**Non provato**
+
+- File veri AIFA e ISTAT completi; XLSX scritto da Excel; tempi su file grandi (vedi `docs/banche-dati.md`).
+
+### Tappa 6 – Interfaccia per PC e tablet
+
+**Fatto** (dettagli in `docs/interfaccia.md`, schermate in `docs/schermate/`, decisioni D65–D75)
+
+- Accesso con password e secondo fattore, sblocco con il codice a 6 cifre, uscita che svuota il browser.
+- Oggi, Pazienti con ricerca, Cartella (testata, riepilogo, terapia con «Ripeti», prestazioni prescritte, cronologia filtrabile), Scheda della terapia con lo storico delle prescrizioni (D65), storico di ogni prestazione (D66), Esami senza giudizio (D71), Ricerca farmaci e prestazioni con equivalenti e data della banca dati (A6), Ricetta farmaceutica e specialistica con controlli, conferme, motivi, firma e invio, Ricette da firmare e invii non riusciti con ricetta rossa.
+- Richieste di Simone durante la tappa: simboli accanto ai nomi (D67), fino a 20 cartelle aperte insieme con la ricetta in corso ricordata (D68), evidenziatore giallo con avvisi in arancio (D69), annullamento solo se l'ente non ha lavorato la ricetta, con lo storico che conserva tutto e l'avviso di prestazione già prescritta (D70).
+- Rotte nuove: storico delle prescrizioni, cronologia, esami, oggi, stato di erogazione (migrazione 0007).
+- Dati dimostrativi più ricchi e script delle schermate.
+
+**Provato**
+
+- 13 prove nel browser (Chromium): accesso con attivazione del secondo fattore, ogni schermata con axe-core (WCAG 2.2 A e AA), bersagli di almeno 44 px, tablet in verticale e in orizzontale, ricetta dalla banca dati fino all'NRE, segreteria che prepara e medico che firma, cartelle aperte e ricetta ricordata, verifica dello stato e annullamento, avviso di prestazione già prescritta, blocco e sblocco.
+- Prove del servizio per storico, cronologia, esami, oggi e annullamento (D70); prove dell'interfaccia (jsdom) per accesso, blocco, menu, cartelle aperte e uscita.
+- 13 sabotaggi (registro sotto): due non hanno fatto diventare rossa la prova al primo colpo e sono stati sistemati (prova rafforzata per D65; sabotaggio degli esami rifatto perché il primo non si era applicato davvero).
+
+**Non fatto**
+
+- Agenda (in attesa della decisione su Ready!), riepiloghi, certificati, nuove voci cliniche, stampe conformi, tema scuro. Nuova terapia, modifiche, anagrafica e impostazioni: fatte dopo la fermata finale (sezione sotto).
+- A7 (aggiornamento delle banche dati che tocca un farmaco in terapia) e le altre liste AIFA (tappa 5).
+
+**Non provato**
+
+- Lettori di schermo veri, tablet veri, una giornata di lavoro con la Dr.ssa Rocca.
+- Il servizio di stato di erogazione vero: esiste solo nel simulatore, finché non arrivano le specifiche.
+
+### Dopo la fermata finale – Terapia completa e collegamenti pronti
+
+Scelta di Simone con il pulsante: «Terapia + collegamenti pronti». Decisioni D79–D87.
+
+**Fatto**
+
+- Scheda della terapia: nuova, modifica (si salva la scheda intera), sospensione con motivo, reazione avversa che entra tra le allergie e va in testata, ripresa. Rotte `POST` e `PUT /api/pazienti/:id/terapie`, `…/sospendi`, `…/riprendi`.
+- Nella scheda: farmaco dalla banca dati o scritto a mano, «come la legge il paziente», unità al giorno proposte per il contatore e correggibili, gli stessi controlli formali del servizio detti prima di salvare (D80, D81).
+- Schema orario stampabile per momento della giornata, con le riservate fuori per difetto (D83).
+- Cartella: «Nuova terapia», «Schema orario», terapie sospese con il motivo, anagrafica e recapiti modificabili (D86).
+- Pagina **Archivio** per il titolare: che cosa vede la segreteria ed esportazione completa in JSON o CSV (D84).
+- Tipo di accesso con le parole del Sistema TS (D79); messaggi di validazione in italiano (D85).
+
+**Provato**
+
+- Servizio: 8 prove nuove (`apps/api/test/terapie.test.ts`). Coprono creazione con indicazione, controlli formali, messaggi in italiano, segreteria rifiutata e registrata, modifica, sospensione con allergia e ripresa, terapia riservata, `/api/io` con l'archivio.
+- La prova esistente «ogni rotta su un paziente scrive il registro» ha trovato un difetto delle rotte nuove: l'identificativo della terapia era validato prima della guardia, quindi una richiesta sbagliata non entrava nel registro. Corretto.
+- Interfaccia (jsdom): calcoli della scheda, controlli, corpo per il servizio, recapiti.
+- Browser: 6 prove nuove, 19 in tutto. Coprono nuova terapia con gli errori, modifica con le unità corrette a mano, sospensione con reazione avversa e ripresa, schema orario (riservate e stampa), recapiti con l'errore spiegato, archivio con impostazioni ed esportazione. Su ognuna: axe, bersagli di 44 px e tablet.
+- Le schermate nuove hanno mostrato un difetto della tappa 6 (D68): sulle pagine corte la barra delle cartelle aperte si allungava fino a riempire lo schermo, perché la griglia della pagina dava la riga elastica al secondo elemento. Ora le righe hanno posti fissi, e una prova nel browser misura la barra sulla pagina Archivio.
+- Nelle schermate i campi data ora si leggono gg/mm/aaaa: il browser delle schermate parte con la lingua italiana.
+- La CI ha trovato una prova del menu (jsdom) che dipendeva dai tempi: cercava «Ricette» in tutta la pagina, e se «Oggi» aveva già caricato trovava anche «Ricette da firmare». Ora aspetta «Oggi» e cerca nel menu; un sabotaggio con la ricerca in tutta la pagina la fa diventare rossa ogni volta.
+- 14 sabotaggi nuovi, tutti rossi e poi verdi (registro sotto).
+
+**Non fatto**
+
+- Collegamento alla segnalazione di farmacovigilanza: da completare (D82).
+- Schema orario come PDF conforme a un modello: i requisiti non ne indicano uno.
+- Piani terapeutici, allergie e problemi nuovi dall'interfaccia (voci cliniche).
+
+**Non provato**
+
+- Stampa su una stampante vera; lettori di schermo veri; la scheda con la Dr.ssa Rocca.
+
+## Richieste di Simone tra le fermate (18/11/2026)
+
+Annotate come decisioni per la tappa 6:
+
+- **Storico delle prescrizioni di ogni farmaco** (D65): toccando un farmaco nella scheda delle terapie, tutte le sue ricette con data, confezioni, note, esenzione, autori, controlli.
+- **Lo stesso per le prestazioni** (D66), per esempio «visita chirurgica – primo accesso».
+- **Simboli nei menu** (D67): sì, accanto al nome e mai al suo posto.
+- **Più cartelle aperte insieme, fino a 20** (D68).
+- **Palette dei prototipi con il giallo** (D69): applicata in prova, da confermare.
+- **Annullamento solo se la prestazione non è ancora lavorata dall'ente, e storico che conserva tutto** (D70).
+- **Ready!**: prodotti nati separati, da rendere complementari (domanda 2 qui sotto).
+
+Dopo la fermata finale:
+
+- **«Terapia + collegamenti pronti»**: fatto (sezione sopra).
+- **«Altra tipologia di accesso»**: verificato sulle specifiche del Sistema TS e applicato (D79).
+- **Email al datore di lavoro**: facoltativa, e solo con il numero di protocollo, nessun dato clinico (D88).
+- **Esempi di documenti veri** (promemoria di una ricetta SSN, promemoria di una ricetta bianca elettronica, email di conferma di un certificato INPS con il numero di protocollo). Sono dati veri di Simone: letti solo nella conversazione, per capire le voci; non entrano nel repository né nelle prove (regola 1). Confermano funzioni già nei requisiti: stampa del promemoria (completo o solo NRE) e invio per email; copia del certificato al lavoratore. Si faranno sui modelli pubblici, con pazienti inventati. Voce nuova da verificare sulla norma: ricetta bianca ripetibile (quante volte, fino a quando).
+- **Sessione di Next² e schermate** (procedura diagnostica, procedura terapeutica, presidio, certificato INPS, menu). La sessione non è stata aperta; le schermate sono servite solo al confronto con i requisiti e non sono nel repository (D87). Il confronto:
+
+| Nelle schermate                                 | Nei requisiti                                                                                                   | Stato                                             |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Certificato INPS                                | «Certificati e moduli» e «Certificati INPS, dettaglio»                                                          | Non fatto                                         |
+| «Giornata lavorata», «trauma», agevolazioni     | «Campi esatti da verificare sulle specifiche del Sistema TS»                                                    | Da verificare sulle specifiche pubbliche          |
+| Procedure diagnostiche e terapeutiche           | Prestazioni dal catalogo regionale; dopo la prescrizione: data di esecuzione, struttura, esito, referto; sedute | Ricerca e prescrizione fatte; seguito e sedute no |
+| «Segmento» (distretto anatomico)                | Assente                                                                                                         | Da capire se il catalogo piemontese lo prevede    |
+| Presidi e assistenza integrativa                | «Terapie» e «Prescrizioni»                                                                                      | Non fatto; manca una fonte pubblica dei codici    |
+| Privacy, anamnesi, stili di vita, esame clinico | «La cartella» (voce clinica con un dettaglio per tipo)                                                          | Nel modello; non nell'interfaccia                 |
+| Agenda                                          | «Agenda»                                                                                                        | Proposta Ready! (D78)                             |
+| Statistiche                                     | «Riepiloghi» per periodo; statistiche avanzate in fase 2                                                        | Non fatto                                         |
+| Portale paziente                                | Fase 2                                                                                                          | Fuori dalla prima versione                        |
+| Prontuario                                      | Banca dati farmaci                                                                                              | Fatto: «Farmaci e prestazioni»                    |
+| Strumenti                                       | Amministratore: utenti, stampanti, intestazioni, modelli                                                        | Archivio fatto; il resto no                       |
+
 ## Risposte della seconda fermata (18/11/2026)
 
 Simone ha risposto con il pulsante. **Applicate** su `tappe-3-4` (D49–D53) e via dato: la pull request #2 si unisce.
@@ -164,9 +296,39 @@ Simone ha risposto con il pulsante. **Applicate** sul branch `tappe-0-2` (decisi
 - **Registro degli accessi**: va bene così.
 - **Esportazione**: aggiungere anche il CSV (una tabella per file).
 
-## Domande per la fermata finale
+## Risposte della fermata finale (18/11/2026)
+
+Simone ha risposto con il pulsante. Applicate prima dell'unione della #3 (D76–D78).
+
+- **Colori**: giallo e avvisi in arancio, confermati.
+- **R15, R16**: blocco spiegato, confermato.
+- **Ready!**: Simone chiede se tutte le funzioni di Ready! possano entrare nel prodotto, in una versione «Full», e come gestire la palette. Proposta in D78 (integrazione, non riscrittura; palette con due pubblici e colori di stato comuni); decisione rimandata.
+- **Via libera**: unire la #3 e fermarsi.
+
+## Domande della fermata finale (chiuse)
 
 1. **R15, R16 (D52)**: «alert con motivazione» letto come avviso che spiega il blocco. Se invece si voleva poter procedere scrivendo un motivo, è in conflitto con i requisiti (le regole da norma non hanno deroghe): da decidere.
+2. **Appuntamenti da Ready!** (richiesta di Simone del 18/11/2026). I requisiti prevedono l'agenda dentro il prodotto («la segreteria prenota»); Simone propone di prendere gli appuntamenti da Ready!, il prodotto di prenotazione di SCRIPT. Dalla sessione «Ready! (prodotto)» (letta il 18/11/2026, solo come dati): installazione per studio su Aruba (per lo studio Rocca `prenota.studiomedicorocca.it`, prenotazioni dall'1/12/2026); l'elenco degli assistiti si importa dall'esportazione del gestionale con `src/Pazienti/ImportaCsv.php`, che riconosce le colonne per nome (codice fiscale, cognome, nome, email, cellulare) in CSV o Excel; il paziente si riconosce con codice fiscale e cognome; non ho visto un'esportazione o un'API degli appuntamenti. Proposta in due versi: (a) il prodotto esporta l'elenco degli assistiti nel formato di `ImportaCsv`, al posto di Next2; (b) Ready! espone gli appuntamenti (lavoro da fare in Ready!) e il prodotto li legge con un'interfaccia e un simulatore (regola 7), in copia con l'identificativo di Ready!, senza cambiare «Oggi». Da chiedere: conferma (cambia il perimetro dei requisiti), priorità di (a) e (b), nomi esatti delle colonne da verificare su `ImportaCsv.php`. Oggi non c'è nessuna agenda da rifare: «Oggi» legge la tabella degli appuntamenti e il seed ne mette alcuni dimostrativi.
+   Ready! e il prodotto sono nati come prodotti separati (Simone, 18/11/2026): la separazione è data, resta da decidere come renderli **complementari**. Parere dato: buona idea, a tre condizioni. (1) Un solo proprietario per dato: pazienti e dati clinici al prodotto, appuntamenti e regole dell'agenda a Ready!, copie solo in un verso. (2) Collegamenti aperti e versionati, ognuno dei due usabile da solo. (3) Ready! senza dati clinici: una richiesta di ripetizione delle terapie fatta in Ready! va passata al prodotto senza conservarla in Ready!. Vantaggi: superficie esposta ai pazienti separata dalla cartella, mercati e tempi indipendenti (Ready! dall'1/12), fine della sovrapposizione con la «prenotazione online in fase 2» dei requisiti. Costo: doppia manutenzione, due informative e due contratti art. 28.
+
+3. **Palette (D69)**: evidenziatore giallo dei prototipi per contatori, cartella attiva e selezioni, avvisi in arancio bruciato. Alternative: menta, pesca, azzurro. Da confermare con le schermate in `docs/schermate/`.
+4. **Stato di erogazione (D70)**: i cinque stati sono del prodotto; vanno verificati sulle specifiche del SAR e del Sistema TS. Da chiedere solo come promemoria: chi può procurare le specifiche e le credenziali di collaudo.
+
+## Risposte della fermata «terapia e collegamenti» (18/11/2026)
+
+Simone ha risposto con il pulsante (D89–D91):
+
+- **Via libera**: unire la #3.
+- **Next²**: «prendi spunto anche dai campi»: lui e la Dr.ssa Rocca, utenti di Next², possono chiedere i campi che servono. Regola 2 aggiornata (D89).
+- **Prossimo blocco**: «fai tutto! nell'ordine che ritieni giusto e opportuno». Ordine in D90.
+- **Campi nuovi**: prima la verifica sulla fonte, poi i requisiti (D91).
+
+## Domande per la fermata (terapia e collegamenti, chiuse)
+
+1. **Via libera**: unire la #3 con la terapia completa e i collegamenti, e fermarsi.
+2. **Next² e regola 2 (D87)**: le schermate servono solo al confronto con i requisiti, i campi vengono dalle specifiche pubbliche; oppure si usano anche per i campi (cambia la regola 2).
+3. **Prossimo blocco**: priorità tra promemoria (stampa sul modello ufficiale e invio per email), certificati INPS, seguito delle prestazioni con le sedute, presidi e assistenza integrativa, voci cliniche (anamnesi, stili di vita, esame obiettivo, privacy e consensi), riepiloghi.
+4. **Campi nuovi da verificare** prima di entrare nei requisiti: «segmento» nelle prestazioni; «giornata lavorata», «trauma» e agevolazioni nel certificato INPS; ricetta bianca ripetibile.
 
 ## Cose irreversibili non fatte
 
@@ -262,3 +424,37 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | A parità di data vale la versione più alta                | Ordine delle versioni senza numero                 | Rosso, poi verde                                                                                                                                                                   |
 | Ogni blocco porta la fonte della regola                   | Fonte non aggiunta dal motore                      | Rosso, poi verde                                                                                                                                                                   |
 | R15 spiega che cosa fare                                  | Rimedio tolto                                      | Rosso, poi verde                                                                                                                                                                   |
+| Date compatte tolte dalle intestazioni come in sync       | Date di 8 cifre lasciate                           | Rosso, poi verde                                                                                                                                                                   |
+| Virgolette raddoppiate nei CSV come Python                | Virgolette doppie ignorate                         | Rosso, poi verde                                                                                                                                                                   |
+| Mappatura incompleta non si usa                           | Nessun campo mancante mai                          | Rosso, poi verde                                                                                                                                                                   |
+| Impronta del file in uso uguale a stato.json              | Controllo dell'impronta saltato                    | Rosso, poi verde                                                                                                                                                                   |
+| Trascrizione superata se il PDF cambia                    | Controllo dell'impronta del PDF saltato            | Rosso, poi verde                                                                                                                                                                   |
+| A5: vale la versione più recente alla data                | Ordine per data invertito                          | Rosso, poi verde                                                                                                                                                                   |
+| Assenza dalla classe A non diventa «non a carico SSN»     | reimbursableSsn falso per assenza                  | Rosso, poi verde                                                                                                                                                                   |
+| D12: comuni veri con la lettera X segnalati               | Lettera cercata sbagliata                          | Rosso, poi verde                                                                                                                                                                   |
+| Banche dati importate immutabili                          | Trigger di ref_drug tolto dalla migrazione         | Rosso, poi verde                                                                                                                                                                   |
+| D70: ricetta già lavorata non annullabile                 | Rifiuto tolto                                      | Rosso, poi verde                                                                                                                                                                   |
+| D70: presa in carico non annullabile                      | Presa in carico ammessa                            | Rosso, poi verde                                                                                                                                                                   |
+| D70: le annullate restano nello storico                   | Annullate filtrate                                 | Rosso, poi verde                                                                                                                                                                   |
+| D65: nello storico solo la terapia scelta                 | Righe di ogni terapia                              | **Non rilevato la prima volta** (nello scenario nessuna altra terapia aveva ricette): prova rafforzata con un secondo farmaco; poi rosso, poi verde                                |
+| Esami senza giudizio (D71)                                | Campo «sopra» aggiunto                             | **Non applicato la prima volta** (il comando non aveva inserito il campo); rifatto con un controllo che il campo ci sia: rosso, poi verde                                          |
+| D67: simboli decorativi                                   | aria-hidden tolto                                  | Rosso, poi verde                                                                                                                                                                   |
+| D68: al massimo 20 cartelle                               | Limite 21                                          | Rosso, poi verde                                                                                                                                                                   |
+| Uscita che svuota il browser                              | Pulizia tolta                                      | Rosso, poi verde                                                                                                                                                                   |
+| Bersagli di almeno 44 px                                  | Pulsanti alti 30 px                                | Rosso, poi verde                                                                                                                                                                   |
+| Tablet senza scorrimento di lato                          | Griglia della pagina senza limite                  | Rosso, poi verde                                                                                                                                                                   |
+| Scheda: R13 nel servizio                                  | Motivazione non richiesta                          | Rosso, poi verde                                                                                                                                                                   |
+| Sospensione per reazione avversa → allergia               | Allergia non registrata                            | Rosso, poi verde                                                                                                                                                                   |
+| Indicazione: solo un problema del paziente                | Controllo dell'indicazione tolto                   | Rosso, poi verde                                                                                                                                                                   |
+| La segreteria non scrive le terapie                       | Guardia con therapy.read                           | Rosso, poi verde                                                                                                                                                                   |
+| Si sospende solo una terapia in corso                     | Controllo dello stato tolto                        | Rosso, poi verde                                                                                                                                                                   |
+| D85: messaggi di validazione in italiano                  | Traduzione tolta                                   | Rosso, poi verde                                                                                                                                                                   |
+| Registro anche con l'identificativo sbagliato             | Identificativo validato prima della guardia        | Rosso, poi verde                                                                                                                                                                   |
+| D80: una volta a settimana = ⅐                            | Diviso per 5                                       | Rosso, poi verde                                                                                                                                                                   |
+| D80: al bisogno senza contatore                           | Controllo tolto                                    | Rosso, poi verde                                                                                                                                                                   |
+| R13 detto prima di salvare                                | Controllo tolto nell'interfaccia                   | Rosso, poi verde                                                                                                                                                                   |
+| Recapiti: provincia in maiuscolo                          | Maiuscolo tolto                                    | Rosso, poi verde                                                                                                                                                                   |
+| D83: riservate fuori dallo schema                         | Filtro delle riservate tolto                       | Rosso, poi verde                                                                                                                                                                   |
+| D83: su carta solo il foglio                              | Regola di stampa tolta                             | Rosso, poi verde                                                                                                                                                                   |
+| Barra delle cartelle corta sulle pagine corte             | Righe della griglia come prima                     | Rosso, poi verde                                                                                                                                                                   |
+| Prova del menu senza dipendere dai tempi                  | Ricerca in tutta la pagina                         | Rosso, poi verde                                                                                                                                                                   |

@@ -1,6 +1,7 @@
 import { checkPrescription, type DrugFacts, type LineContext, type RuleContext } from '@mmg/rules';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/client';
+import type { ReferenceData } from '../reference/lookup';
 import {
   delegation,
   exemption,
@@ -15,11 +16,13 @@ import type { CheckOutcome, SignInput } from './service';
 export interface RulesCheckDeps {
   db: Database;
   now?: () => Date;
-  /** Banca dati farmaci (tappa 5). Per difetto nessun farmaco è noto: le regole lo dicono. */
+  /** Banche dati pubbliche importate (tappa 5), consultate alla data della ricetta (A5). */
+  reference?: ReferenceData;
+  /** Sostituisce la banca dati farmaci (prove). Senza nessuna delle due, nessun farmaco è noto. */
   drugFacts?: (aic: string | null) => DrugFacts | undefined;
-  /** Catalogo delle esenzioni (tappa 5). */
+  /** Sostituisce il catalogo delle esenzioni (prove). */
   exemptionExists?: (code: string) => boolean | undefined;
-  /** Elenco regionale esenzione → prestazioni (R17, tappa 5). */
+  /** Sostituisce l'elenco regionale esenzione → prestazioni (R17, prove). */
   exemptionServices?: (code: string) => ReadonlySet<string> | undefined;
 }
 
@@ -85,8 +88,26 @@ export async function buildRuleContext(
     };
   });
 
+  const date = studioDate((deps.now ?? (() => new Date()))());
+  let drugFacts = deps.drugFacts;
+  let { exemptionExists, exemptionServices } = deps;
+  if (deps.reference) {
+    if (!drugFacts) {
+      const known = await deps.reference.drugs(
+        lines.map((l) => l.drugAic).filter((x): x is string => !!x),
+        date,
+      );
+      drugFacts = (aic) => (aic ? known.get(aic)?.facts : undefined);
+    }
+    if (!exemptionExists || !exemptionServices) {
+      const lookups = await deps.reference.exemptionLookups(date);
+      exemptionExists ??= lookups.exemptionExists;
+      exemptionServices ??= lookups.exemptionServices;
+    }
+  }
+
   return {
-    date: studioDate((deps.now ?? (() => new Date()))()),
+    date,
     prescription: {
       id: p.id,
       kind: p.kind,
@@ -140,9 +161,9 @@ export async function buildRuleContext(
         quantity: s.line.quantity,
         sentOn: studioDate(s.sentAt!),
       })),
-    drugFacts: deps.drugFacts ?? (() => undefined),
-    exemptionExists: deps.exemptionExists,
-    exemptionServices: deps.exemptionServices,
+    drugFacts: drugFacts ?? (() => undefined),
+    exemptionExists,
+    exemptionServices,
     confirmedAifaNotes: new Set(input.confirmedAifaNotes),
     reasons: input.reasons,
   };

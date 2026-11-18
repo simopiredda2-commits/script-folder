@@ -1,0 +1,11 @@
+{
+  "tipo": "farmaci_dpc",
+  "fonte": "piemonte_dpc",
+  "chiave": "farmaci_pht_dpc.pdf",
+  "sha256_origine": "cd74fb08853481b46a5c86cd1b5a8843868acc7c6561ac8f89b4d2130dd940c2",
+  "atto": "Elenco di prova dei farmaci PHT in DPC",
+  "in_vigore_dal": "2026-07-09",
+  "trascritto_da": "Persona di prova",
+  "trascritto_il": "2026-11-18",
+  "controllato_da": "Seconda persona di prova"
+}

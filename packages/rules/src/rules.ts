@@ -382,7 +382,8 @@ const evaluators: Record<RuleId, Evaluator> = {
     const issues: Issue[] = [];
     const block = (message: string) =>
       issues.push({ ruleId: 'R14', severity: severityOf(rule), message });
-    if (!p.accessType) block('Manca il tipo di accesso (primo accesso o accesso successivo)');
+    if (!p.accessType)
+      block('Manca il tipo di accesso (primo accesso o altra tipologia di accesso)');
     if (p.accessType === 'first' && !p.priority)
       block('Primo accesso: manca la classe di priorità (U, B, D, P)');
     if (!p.diagnosticQuestion?.trim()) block('Manca il quesito diagnostico');

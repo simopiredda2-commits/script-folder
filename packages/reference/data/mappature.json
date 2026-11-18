@@ -1,0 +1,125 @@
+{
+  "versione": "2026-11-18.1",
+  "mappature": [
+    {
+      "id": "istat-comuni",
+      "titolo": "ISTAT: elenco dei comuni",
+      "tipo": "comuni",
+      "origine": "sync",
+      "fonte": "istat_comuni",
+      "chiave": "Elenco-comuni-italiani.xlsx",
+      "colonne": {
+        "istatCode": "Codice Comune formato alfanumerico",
+        "name": "Denominazione in italiano",
+        "region": "Denominazione Regione",
+        "provinceAbbr": "Sigla automobilistica",
+        "cadastralCode": "Codice Catastale del Comune"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Intestazioni lette il 18/11/2026 dal file ISTAT aggiornato al 21/02/2026, con un'estrazione testuale del foglio: da confermare sul file che sync scarica al primo giro. Soglia di vecchiaia da completare."
+    },
+    {
+      "id": "aifa-anagrafica",
+      "titolo": "AIFA: anagrafica delle confezioni",
+      "tipo": "farmaci",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "confezioni_fornitura.csv",
+      "colonne": {
+        "aic": null,
+        "name": null,
+        "pack": null,
+        "activeIngredient": null,
+        "atc": null,
+        "form": null,
+        "supplyRegime": null
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Da completare: dal cloud i file AIFA non si leggono. Dopo il primo giro di sync le intestazioni vere sono in stato.json (campo intestazione); l'importazione le mostra finché la mappatura non è completa."
+    },
+    {
+      "id": "aifa-classe-a",
+      "titolo": "AIFA: farmaci di classe A per principio attivo",
+      "tipo": "farmaci_classe",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "*_Classe-A_per_principio-attivo.csv",
+      "colonne": {
+        "aic": null,
+        "activeIngredient": null,
+        "price": null,
+        "equivalenceGroup": null,
+        "aifaNote": null
+      },
+      "costanti": { "drugClass": "A" },
+      "vecchiaDopoGiorni": null,
+      "nota": "Da completare come l'anagrafica. Il numero davanti alla chiave è la cartella AIFA di pubblicazione e può cambiare: per questo la chiave ha «*»."
+    },
+    {
+      "id": "aifa-classe-h",
+      "titolo": "AIFA: farmaci di classe H per principio attivo",
+      "tipo": "farmaci_classe",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "*_Classe-H_per_principio-attivo.csv",
+      "colonne": {
+        "aic": null,
+        "activeIngredient": null,
+        "price": null,
+        "equivalenceGroup": null,
+        "aifaNote": null
+      },
+      "costanti": { "drugClass": "H" },
+      "vecchiaDopoGiorni": null,
+      "nota": "Da completare come l'anagrafica."
+    },
+    {
+      "id": "trascrizione-farmaci-dpc",
+      "titolo": "Regione Piemonte: farmaci PHT in DPC (trascrizione)",
+      "tipo": "farmaci_dpc",
+      "origine": "trascrizione",
+      "colonne": {
+        "activeIngredient": "principio_attivo",
+        "atc": "atc",
+        "aifaNote": "nota_aifa",
+        "planRequired": "piano_terapeutico"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md."
+    },
+    {
+      "id": "trascrizione-prestazioni",
+      "titolo": "Regione Piemonte: catalogo delle prestazioni (trascrizione)",
+      "tipo": "prestazioni",
+      "origine": "trascrizione",
+      "colonne": {
+        "regionalCode": "codice_regionale",
+        "nationalCode": "codice_nomenclatore",
+        "description": "descrizione",
+        "branch": "branca",
+        "fee": "tariffa",
+        "notes": "note"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md."
+    },
+    {
+      "id": "trascrizione-esenzioni",
+      "titolo": "Catalogo delle esenzioni (trascrizione)",
+      "tipo": "esenzioni",
+      "origine": "trascrizione",
+      "colonne": { "code": "codice", "description": "descrizione" },
+      "vecchiaDopoGiorni": null,
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md."
+    },
+    {
+      "id": "trascrizione-esenzioni-prestazioni",
+      "titolo": "Esenzioni e prestazioni associate (trascrizione)",
+      "tipo": "esenzioni_prestazioni",
+      "origine": "trascrizione",
+      "colonne": { "exemptionCode": "esenzione", "serviceCode": "prestazione" },
+      "vecchiaDopoGiorni": null,
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md."
+    }
+  ]
+}

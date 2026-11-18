@@ -1,0 +1,12 @@
+{
+  "tipo": "prestazioni",
+  "serie": "catalogo-piemonte",
+  "fonte": "piemonte_catalogo",
+  "chiave": "catalogo_prova_allegato_c.pdf",
+  "sha256_origine": "b3c66e374d56d3094a9743b0ccf51edd9233907507d2717818676a3d388de84e",
+  "atto": "Catalogo di prova delle prestazioni",
+  "in_vigore_dal": "2026-10-30",
+  "trascritto_da": "Persona di prova",
+  "trascritto_il": "2026-11-18",
+  "controllato_da": "Seconda persona di prova"
+}

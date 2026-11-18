@@ -1,9 +1,11 @@
+import type { DispensingState } from '@mmg/domain';
 import type {
   CancelResult,
   GatewaySystem,
   PrescriptionGateway,
   PrescriptionMessage,
   SendResult,
+  StatusResult,
 } from './prescription-gateway';
 
 export type SimulatedOutcome = 'accepted' | 'rejected' | 'unreachable' | 'timeout';
@@ -13,6 +15,11 @@ export interface SimulatorOptions {
   decide?: (message: PrescriptionMessage) => SimulatedOutcome;
   /** Esito di ogni annullamento. Per difetto: accettato se il numero è noto. */
   decideCancel?: (nre: string) => SimulatedOutcome;
+  /**
+   * Stato di erogazione di ogni ricetta. Per difetto: non ancora presa in carico, oppure già
+   * annullata se è stata annullata qui.
+   */
+  decideStatus?: (nre: string) => DispensingState | 'unreachable' | 'timeout';
 }
 
 /**
@@ -84,6 +91,31 @@ export class SimulatedGateway implements PrescriptionGateway {
     return Promise.resolve({
       outcome: 'accepted',
       raw: { simulatore: this.system, annullata: input.nre },
+    });
+  }
+
+  status(input: { nre: string; doctor: PrescriptionMessage['doctor'] }): Promise<StatusResult> {
+    const known = this.issued.get(input.nre);
+    const decided = this.options.decideStatus?.(input.nre);
+    if (decided === 'unreachable' || decided === 'timeout') {
+      return Promise.resolve({
+        outcome: decided,
+        message: `${this.label()} non raggiungibile (simulato)`,
+      });
+    }
+    if (!known && !decided) {
+      return Promise.resolve({
+        outcome: 'rejected',
+        code: 'SIM-003',
+        message: 'Simulatore: ricetta sconosciuta',
+        raw: { simulatore: this.system, nre: input.nre },
+      });
+    }
+    const state: DispensingState = decided ?? (known!.cancelled ? 'annullata' : 'non_erogata');
+    return Promise.resolve({
+      outcome: 'ok',
+      state,
+      raw: { simulatore: this.system, nre: input.nre, stato: state },
     });
   }
 

@@ -12,11 +12,14 @@ import type { Role } from '@mmg/domain';
 import { generatePatients, Random } from '@mmg/fixtures';
 import { inArray } from 'drizzle-orm';
 import { loadConfig } from '../config';
+import { startOfStudioDay } from '../http/today-routes';
+import { studioDate } from '../prescriptions/rules-check';
 import { hashPassword } from '../security/password';
 import { createDatabase, createPool } from './client';
 import { runMigrations } from './migrate';
 import {
   allergyDetail,
+  appointment,
   appUser,
   archive,
   archiveGrant,
@@ -24,8 +27,11 @@ import {
   diaryDetail,
   doctorProfile,
   exemption,
+  labResultDetail,
   measurementDetail,
   patient,
+  prescription,
+  prescriptionLine,
   problemDetail,
   studio,
   therapy,
@@ -49,11 +55,31 @@ const PROBLEMS = [
   { code: '250.00', description: 'Diabete mellito tipo 2 senza complicanze' },
   { code: '272.0', description: 'Ipercolesterolemia pura' },
 ];
+// Con principio attivo: la ricetta lo riporta sempre (R13). Il primo è un farmaco della banca dati
+// d'esempio (pnpm banche-dati:importa -- --esempio), con il suo AIC.
 const DRUGS = [
-  'Farmaco dimostrativo A 5 mg',
-  'Farmaco dimostrativo B 10 mg',
-  'Farmaco dimostrativo C 20 mg',
+  {
+    drugName: 'PROVALINA 28 compresse 5 mg',
+    drugAic: '900000011',
+    activeIngredient: 'principio di prova',
+  },
+  {
+    drugName: 'Farmaco dimostrativo B 10 mg',
+    drugAic: null,
+    activeIngredient: 'principio dimostrativo B',
+  },
+  {
+    drugName: 'Farmaco dimostrativo C 20 mg',
+    drugAic: null,
+    activeIngredient: 'principio dimostrativo C',
+  },
 ];
+/** Primi pazienti con un appuntamento oggi, ogni quarto d'ora dalle 8:30. */
+const APPOINTMENTS_TODAY = 8;
+const QUARTER_MS = 15 * 60_000;
+const FIRST_APPOINTMENT_MS = 8.5 * 3_600_000;
+/** Pazienti per cui la segreteria ha preparato una ricetta da firmare. */
+const TO_SIGN = 3;
 
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
@@ -111,8 +137,11 @@ try {
 
   const people = generatePatients({ seed: 'demo', count: 40 });
   const rnd = new Random('demo-clinica');
+  const midnight = startOfStudioDay(studioDate(new Date())).getTime();
+  const secretaryId = users.get('segreteria')!;
+  const toSign: { patientId: string; therapyId: string; drug: (typeof DRUGS)[number] }[] = [];
   await withActor(db, doctorId, async (tx) => {
-    for (const p of people) {
+    for (const [index, p] of people.entries()) {
       const [row] = await tx
         .insert(patient)
         .values({
@@ -135,7 +164,20 @@ try {
         })
         .returning();
       const pid = row!.id;
-      if (!rnd.chance(0.6)) continue;
+      if (index < APPOINTMENTS_TODAY) {
+        const startsAt = new Date(midnight + FIRST_APPOINTMENT_MS + index * QUARTER_MS);
+        await tx.insert(appointment).values({
+          studioId: st!.id,
+          patientId: pid,
+          doctorUserId: doctorId,
+          startsAt,
+          endsAt: new Date(startsAt.getTime() + QUARTER_MS),
+          kind: index % 4 === 3 ? 'home' : 'office',
+          notes: 'Appuntamento dimostrativo',
+          createdBy: secretaryId,
+        });
+      }
+      if (index >= APPOINTMENTS_TODAY && !rnd.chance(0.6)) continue;
       const entry = async (kind: typeof clinicalEntry.$inferInsert.kind, reserved = false) => {
         const [e] = await tx
           .insert(clinicalEntry)
@@ -161,7 +203,7 @@ try {
       });
       await tx.insert(measurementDetail).values({
         entryId: await entry('measurement'),
-        measure: 'pressione_sistolica',
+        measure: 'Pressione sistolica',
         value: String(rnd.int(115, 160)),
         unit: 'mmHg',
       });
@@ -177,22 +219,81 @@ try {
           .insert(exemption)
           .values({ patientId: pid, code: 'DEMO', validFrom: '2026-01-01', source: 'manual' });
       }
-      await tx.insert(therapy).values({
-        patientId: pid,
-        drugName: rnd.pick(DRUGS),
-        kind: 'chronic',
-        startOn: '2026-01-01',
-        dose: '1',
-        doseUnit: 'compressa',
-        frequency: 'una volta al giorno',
-        indicationEntryId: problemId,
-        reserved: rnd.chance(0.1),
-        createdBy: doctorId,
+      if (rnd.chance(0.4)) {
+        for (const [occurredOn, value] of [
+          ['2026-05-12', String(rnd.int(80, 130))],
+          ['2026-11-10', String(rnd.int(80, 130))],
+        ]) {
+          const [lab] = await tx
+            .insert(clinicalEntry)
+            .values({
+              patientId: pid,
+              kind: 'lab_result',
+              occurredOn: occurredOn!,
+              authorUserId: doctorId,
+            })
+            .returning();
+          await tx.insert(labResultDetail).values({
+            entryId: lab!.id,
+            analyte: 'Esame dimostrativo',
+            value: value!,
+            unit: 'unità',
+            referenceText: 'intervallo dimostrativo',
+          });
+        }
+      }
+      const drug = rnd.pick(DRUGS);
+      const [ther] = await tx
+        .insert(therapy)
+        .values({
+          patientId: pid,
+          ...drug,
+          kind: 'chronic',
+          startOn: '2026-01-01',
+          dose: '1',
+          doseUnit: 'compressa',
+          frequency: 'una volta al giorno',
+          indicationEntryId: problemId,
+          reserved: rnd.chance(0.1),
+          createdBy: doctorId,
+        })
+        .returning();
+      if (toSign.length < TO_SIGN && !ther!.reserved) {
+        toSign.push({ patientId: pid, therapyId: ther!.id, drug });
+      }
+    }
+  });
+
+  // Ripetizioni preparate dalla segreteria, in attesa della firma del medico.
+  await withActor(db, secretaryId, async (tx) => {
+    for (const r of toSign) {
+      const [rx] = await tx
+        .insert(prescription)
+        .values({
+          patientId: r.patientId,
+          archiveId: arc!.id,
+          kind: 'pharma_ssn',
+          status: 'to_sign',
+          preparedBy: secretaryId,
+        })
+        .returning();
+      await tx.insert(prescriptionLine).values({
+        prescriptionId: rx!.id,
+        position: 1,
+        therapyId: r.therapyId,
+        drugAic: r.drug.drugAic,
+        drugName: r.drug.drugName,
+        activeIngredient: r.drug.activeIngredient,
+        quantity: 1,
+        posologyText: '1 compressa una volta al giorno',
       });
     }
   });
 
-  console.log('Dati dimostrativi creati: studio, 4 utenti, 40 pazienti inventati.\n');
+  console.log(
+    `Dati dimostrativi creati: studio, 4 utenti, 40 pazienti inventati, ${APPOINTMENTS_TODAY} appuntamenti oggi, ${toSign.length} ricette da firmare.`,
+  );
+  console.log('Banche dati d’esempio: pnpm banche-dati:importa -- --esempio\n');
   console.log('Credenziali (mostrate solo ora; il secondo fattore si attiva al primo accesso):');
   for (const u of DEMO_USERS)
     console.log(`  ${u.username.padEnd(15)} ${passwords.get(u.username)}`);

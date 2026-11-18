@@ -1,0 +1,60 @@
+{
+  "versione": "prova-1",
+  "mappature": [
+    {
+      "id": "aifa-anagrafica",
+      "titolo": "AIFA: anagrafica delle confezioni (intestazioni di prova)",
+      "tipo": "farmaci",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "confezioni_fornitura.csv",
+      "colonne": {
+        "aic": "AIC di prova",
+        "name": "Denominazione di prova",
+        "pack": "Confezione di prova",
+        "activeIngredient": "Principio attivo di prova",
+        "atc": "ATC di prova",
+        "form": "Forma di prova",
+        "supplyRegime": "Fornitura di prova"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Solo per le prove: le intestazioni sono quelle dei file d'esempio, non quelle AIFA."
+    },
+    {
+      "id": "aifa-classe-a",
+      "titolo": "AIFA: farmaci di classe A (intestazioni di prova)",
+      "tipo": "farmaci_classe",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "*_Classe-A_per_principio-attivo.csv",
+      "colonne": {
+        "aic": "AIC di prova",
+        "activeIngredient": "Principio attivo di prova",
+        "price": "Prezzo di prova al 30/6/2026",
+        "equivalenceGroup": "Gruppo di equivalenza di prova",
+        "aifaNote": "Nota di prova"
+      },
+      "costanti": { "drugClass": "A" },
+      "vecchiaDopoGiorni": null,
+      "nota": "Solo per le prove. La data nell'intestazione è diversa da quella del file apposta: le date non contano."
+    },
+    {
+      "id": "aifa-classe-h",
+      "titolo": "AIFA: farmaci di classe H (intestazioni di prova)",
+      "tipo": "farmaci_classe",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "*_Classe-H_per_principio-attivo.csv",
+      "colonne": {
+        "aic": "AIC di prova",
+        "activeIngredient": "Principio attivo di prova",
+        "price": "Prezzo di prova al 30/6/2026",
+        "equivalenceGroup": "Gruppo di equivalenza di prova",
+        "aifaNote": "Nota di prova"
+      },
+      "costanti": { "drugClass": "H" },
+      "vecchiaDopoGiorni": null,
+      "nota": "Solo per le prove."
+    }
+  ]
+}

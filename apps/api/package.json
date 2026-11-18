@@ -8,8 +8,9 @@
     "start": "tsx src/server.ts",
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "db:generate": "drizzle-kit generate",
-    "typecheck": "tsc --noEmit -p .",
-    "db:seed": "tsx src/db/seed.ts"
+    "typecheck": "tsc --noEmit -p . && tsc --noEmit -p test/e2e",
+    "db:seed": "tsx src/db/seed.ts",
+    "banche-dati:importa": "tsx src/reference/cli.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
@@ -17,6 +18,7 @@
     "@mmg/domain": "workspace:*",
     "@mmg/fixtures": "workspace:*",
     "@mmg/integrations": "workspace:*",
+    "@mmg/reference": "workspace:*",
     "@mmg/rules": "workspace:*",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.12.8",
@@ -26,6 +28,8 @@
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
-    "drizzle-kit": "^0.31.11"
+    "axe-core": "4.14.0",
+    "drizzle-kit": "^0.31.11",
+    "playwright": "1.63.0"
   }
 }

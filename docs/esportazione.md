@@ -4,7 +4,7 @@
 
 ## Come si fa
 
-Il medico titolare, dopo l'accesso, chiede `GET /api/esportazione` (nell'interfaccia arriverà un pulsante) e riceve un file `esportazione-AAAA-MM-GG.json` con **tutti** i dati del suo archivio. Con `GET /api/esportazione?formato=csv` riceve gli stessi dati in CSV, dentro un archivio ZIP (vedi sotto). L'esportazione entra nel registro degli accessi. Sostituti, colleghi, segreteria e amministratore non esportano: i dati sono del titolare.
+Il medico titolare, dopo l'accesso, chiede `GET /api/esportazione` (nell'interfaccia: pagina **Archivio**, D84) e riceve un file `esportazione-AAAA-MM-GG.json` con **tutti** i dati del suo archivio. Con `GET /api/esportazione?formato=csv` riceve gli stessi dati in CSV, dentro un archivio ZIP (vedi sotto). L'esportazione entra nel registro degli accessi. Sostituti, colleghi, segreteria e amministratore non esportano: i dati sono del titolare.
 
 ## Il formato
 
@@ -35,7 +35,7 @@ Separatore **punto e virgola** e codifica **UTF-8 con BOM**, perché un foglio d
 
 ## Che cosa non c'è, apposta
 
-Password, segreti del secondo fattore e credenziali verso Sistema TS e Regione: sono dello studio, non dati dei pazienti, e una prova controlla che non escano. Gli allegati sono elencati con nome, tipo e impronta; i file stessi si aggiungeranno quando ci sarà l'archiviazione degli allegati.
+Password, segreti del secondo fattore e credenziali verso Sistema TS e Regione: sono dello studio, non dati dei pazienti, e una prova controlla che non escano. Gli allegati sono elencati con nome, tipo e impronta; i file stessi si aggiungeranno quando ci sarà l'archiviazione degli allegati. Le banche dati pubbliche (farmaci, cataloghi, comuni) non sono dati del medico: non entrano nell'esportazione e si riscaricano dalle fonti.
 
 ## Garanzie
 

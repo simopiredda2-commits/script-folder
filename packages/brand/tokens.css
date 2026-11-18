@@ -17,10 +17,12 @@
   --color-on-primary: #FFFFFF;
   --color-accent: #4D6BFE;
   --color-focus: #4D6BFE;
+  --color-mark: #FFE45C;
+  --color-on-mark: #0E1435;
   --color-danger: #A4161A;
   --color-danger-surface: #FCE9EA;
-  --color-warning: #7A4A00;
-  --color-warning-surface: #FFF3DC;
+  --color-warning: #8A3B00;
+  --color-warning-surface: #FFE9D6;
   --color-success: #17663A;
   --color-success-surface: #E5F4EA;
   --color-info: #1B237A;

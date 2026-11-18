@@ -1,0 +1,208 @@
+import { can, DISPENSING_STATE_LABELS, type DispensingState } from '@mmg/domain';
+import { desc, eq, inArray } from 'drizzle-orm';
+import { z } from 'zod';
+import type { Actor } from '../auth/service';
+import type { Database } from '../db/client';
+import {
+  appUser,
+  externalSubmission,
+  prescription,
+  prescriptionCheck,
+  prescriptionLine,
+  therapy,
+} from '../db/schema';
+import { HttpError } from '../http/errors';
+import { guardPatient } from '../patients/access';
+
+/**
+ * Storico delle prescrizioni di un farmaco o di una prestazione (D65, D66): tutte le ricette
+ * del paziente che lo contengono, con la riga, chi ha preparato e firmato, e i controlli.
+ */
+export const historyQuery = z
+  .object({
+    /** Terapia della scheda: le sue righe e, per le righe senza terapia, stesso AIC o principio. */
+    terapia: z.uuid().optional(),
+    aic: z
+      .string()
+      .regex(/^\d{9}$/)
+      .optional(),
+    principio: z.string().trim().min(1).max(300).optional(),
+    /** Prestazione: codice regionale; per le righe senza codice, la descrizione. */
+    prestazione: z.string().trim().min(1).max(40).optional(),
+    descrizione: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict()
+  .refine((q) => Object.values(q).some((v) => v !== undefined), {
+    message: 'Indica una terapia, un farmaco o una prestazione',
+  });
+
+/** Stati in cui la ricetta è stata davvero prescritta (inviata o stampata su carta). */
+const PRESCRIBED = new Set(['sent', 'paper']);
+const MONTHS_FOR_TOTAL = 12;
+
+const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+
+export async function prescriptionHistory(
+  db: Database,
+  now: () => Date,
+  actor: Actor,
+  patientId: string,
+  rawQuery: unknown,
+) {
+  const { context } = await guardPatient(
+    db,
+    actor,
+    patientId,
+    'therapy.read',
+    'lettura_storico_prescrizioni',
+  );
+  const q = historyQuery.parse(rawQuery);
+  const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
+  const therapies = await db.select().from(therapy).where(eq(therapy.patientId, patientId));
+  const reservedIds = new Set(therapies.filter((t) => t.reserved).map((t) => t.id));
+
+  let aic = q.aic ?? null;
+  let ingredient = q.principio ?? null;
+  if (q.terapia) {
+    const t = therapies.find((x) => x.id === q.terapia);
+    if (!t || (t.reserved && !reservedAllowed)) throw new HttpError(404, 'Terapia non trovata');
+    aic ??= t.drugAic;
+    ingredient ??= t.activeIngredient;
+  }
+
+  const rows = await db
+    .select({ line: prescriptionLine, p: prescription })
+    .from(prescriptionLine)
+    .innerJoin(prescription, eq(prescription.id, prescriptionLine.prescriptionId))
+    .where(eq(prescription.patientId, patientId))
+    .orderBy(desc(prescription.preparedAt));
+
+  const matches = rows.filter(({ line }) => {
+    if (line.therapyId && reservedIds.has(line.therapyId) && !reservedAllowed) return false;
+    if (q.terapia && line.therapyId) return line.therapyId === q.terapia;
+    if (q.prestazione || q.descrizione) {
+      if (q.prestazione && line.serviceCode) return line.serviceCode === q.prestazione;
+      return (
+        !!q.descrizione &&
+        !line.serviceCode &&
+        lower(line.serviceDescription) === lower(q.descrizione)
+      );
+    }
+    if (aic && line.drugAic) return line.drugAic === aic;
+    return !!ingredient && lower(line.activeIngredient) === lower(ingredient);
+  });
+
+  const ids = [...new Set(matches.map((m) => m.p.id))];
+  const userIds = [
+    ...new Set(
+      matches.flatMap((m) => [m.p.preparedBy, m.p.signedBy, m.p.cancelledBy].filter(Boolean)),
+    ),
+  ] as string[];
+  const users = userIds.length
+    ? new Map(
+        (
+          await db
+            .select({ id: appUser.id, name: appUser.displayName })
+            .from(appUser)
+            .where(inArray(appUser.id, userIds))
+        ).map((u) => [u.id, u.name]),
+      )
+    : new Map<string, string>();
+  const checks = ids.length
+    ? await db
+        .select()
+        .from(prescriptionCheck)
+        .where(inArray(prescriptionCheck.prescriptionId, ids))
+        .orderBy(prescriptionCheck.at)
+    : [];
+
+  // Passaggi con l'ente (invio, stato, annullamento), dal registro degli invii che non si modifica.
+  const exchanges = ids.length
+    ? await db
+        .select()
+        .from(externalSubmission)
+        .where(inArray(externalSubmission.prescriptionId, ids))
+        .orderBy(externalSubmission.at)
+    : [];
+
+  const since = new Date(now());
+  since.setMonth(since.getMonth() - MONTHS_FOR_TOTAL);
+  const recent = matches.filter(({ p }) => (p.sentAt ?? p.paperPrintedAt ?? p.preparedAt) >= since);
+  const total = recent
+    .filter(({ p }) => PRESCRIBED.has(p.status))
+    .reduce((n, { line }) => n + line.quantity, 0);
+  // Le annullate restano nello storico e si contano a parte: prescritte, ma poi annullate.
+  const cancelled = recent
+    .filter(({ p }) => p.status === 'cancelled' && p.sentAt)
+    .reduce((n, { line }) => n + line.quantity, 0);
+
+  return {
+    /** Confezioni (o quantità) prescritte negli ultimi 12 mesi, ricette inviate o su carta. */
+    ultimi12Mesi: total,
+    /** Inviate e poi annullate negli ultimi 12 mesi: restano nello storico (D70). */
+    annullateUltimi12Mesi: cancelled,
+    voci: matches.map(({ line, p }) => ({
+      ricetta: {
+        id: p.id,
+        tipo: p.kind,
+        stato: p.status,
+        nre: p.nre,
+        preparataIl: p.preparedAt,
+        preparataDa: users.get(p.preparedBy) ?? null,
+        firmataIl: p.signedAt,
+        firmataDa: p.signedBy ? (users.get(p.signedBy) ?? null) : null,
+        inviataIl: p.sentAt,
+        cartaceaIl: p.paperPrintedAt,
+        esenzione: p.exemptionCode,
+        priorita: p.priority,
+        accesso: p.accessType,
+        quesito: p.diagnosticQuestion,
+        versioneRegole: p.rulesVersion,
+        annullataIl: p.cancelledAt,
+        annullataDa: p.cancelledBy ? (users.get(p.cancelledBy) ?? null) : null,
+        motivoAnnullamento: p.cancelReason,
+        /** Ultimo stato di erogazione noto presso l'ente (D70). */
+        statoErogazione: p.dispensingState,
+        etichettaErogazione: p.dispensingState
+          ? DISPENSING_STATE_LABELS[p.dispensingState as DispensingState]
+          : null,
+        statoVerificatoIl: p.dispensingCheckedAt,
+        errore: p.lastErrorMessage,
+      },
+      riga: {
+        id: line.id,
+        terapia: line.therapyId,
+        aic: line.drugAic,
+        farmaco: line.drugName,
+        principioAttivo: line.activeIngredient,
+        codicePrestazione: line.serviceCode,
+        prestazione: line.serviceDescription,
+        quantita: line.quantity,
+        posologia: line.posologyText,
+        notaAifa: line.aifaNote,
+        perPrincipioAttivo: line.byActiveIngredient,
+        nonSostituibile: line.notSubstitutable,
+        motivoNonSostituibile: line.notSubstitutableReason,
+      },
+      enti: exchanges
+        .filter((x) => x.prescriptionId === p.id)
+        .map((x) => ({
+          il: x.at,
+          ente: x.system,
+          operazione: x.operation,
+          esito: x.outcome,
+          messaggio: x.errorMessage,
+        })),
+      controlli: checks
+        .filter((c) => c.prescriptionId === p.id)
+        .map((c) => ({
+          il: c.at,
+          esito: c.outcome,
+          versioneRegole: c.rulesVersion,
+          problemi: c.issues,
+          motivi: c.reasons,
+          noteConfermate: c.confirmedAifaNotes,
+        })),
+    })),
+  };
+}

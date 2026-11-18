@@ -15,7 +15,8 @@
     "typecheck": "pnpm -r --no-bail typecheck",
     "format": "prettier --write .",
     "fixtures": "pnpm --filter @mmg/fixtures generate",
-    "db:seed": "pnpm --filter @mmg/api db:seed"
+    "db:seed": "pnpm --filter @mmg/api db:seed",
+    "banche-dati:importa": "pnpm --filter @mmg/api banche-dati:importa"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

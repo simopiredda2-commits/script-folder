@@ -38,6 +38,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Chromium per le prove dell'interfaccia
+        run: pnpm --filter @mmg/api exec playwright install --with-deps chromium
       - name: Lint, formattazione e tipi
         run: pnpm lint
       - name: Prove

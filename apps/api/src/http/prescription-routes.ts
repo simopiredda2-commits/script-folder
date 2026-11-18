@@ -1,12 +1,26 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { Database } from '../db/client';
+import { prescriptionHistory } from '../prescriptions/history';
 import type { PrescriptionService } from '../prescriptions/service';
 
 const idParams = z.object({ id: z.uuid() });
 
 /** Rotte delle ricette. Quelle con :id passano dalla guardia sul paziente e scrivono il registro. */
-export function registerPrescriptionRoutes(app: FastifyInstance, service: PrescriptionService) {
+export function registerPrescriptionRoutes(
+  app: FastifyInstance,
+  service: PrescriptionService,
+  db: Database,
+  now: () => Date,
+) {
   const scoped = { config: { patientScoped: true } };
+
+  // Storico delle prescrizioni di un farmaco o di una prestazione (D65, D66).
+  app.get('/api/pazienti/:id/storico-prescrizioni', scoped, async (req) => {
+    const { id } = idParams.parse(req.params);
+    // La richiesta si valida dopo la guardia, come le altre: anche una richiesta sbagliata è registrata.
+    return prescriptionHistory(db, now, req.actor!, id, req.query);
+  });
 
   app.get('/api/pazienti/:id/ricette', scoped, async (req) => {
     const { id } = idParams.parse(req.params);
@@ -45,6 +59,11 @@ export function registerPrescriptionRoutes(app: FastifyInstance, service: Prescr
   app.post('/api/ricette/:id/firma-e-invia', scoped, async (req) => {
     const r = await service.signAndSend(req.actor!, idParams.parse(req.params).id, req.body);
     return { esito: r.outcome, nre: r.nre };
+  });
+
+  // Stato di erogazione presso l'ente e possibilità di annullare (D70).
+  app.get('/api/ricette/:id/stato-erogazione', scoped, async (req) => {
+    return service.dispensingStatus(req.actor!, idParams.parse(req.params).id);
   });
 
   app.post('/api/ricette/:id/annulla', scoped, async (req) => {
