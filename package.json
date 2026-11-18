@@ -1,0 +1,35 @@
+{
+  "name": "mmg-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22 <23"
+  },
+  "scripts": {
+    "dev": "pnpm db:migrate && pnpm --parallel --filter \"./apps/*\" dev",
+    "db:migrate": "pnpm --filter @mmg/api db:migrate",
+    "test": "vitest run && pnpm test:sync",
+    "test:sync": "cd sync && python3 -m unittest -v test_banche_dati",
+    "lint": "eslint . && prettier --check . && pnpm typecheck",
+    "typecheck": "pnpm -r --no-bail typecheck",
+    "format": "prettier --write .",
+    "fixtures": "pnpm --filter @mmg/fixtures generate"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "prettier": "^3.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

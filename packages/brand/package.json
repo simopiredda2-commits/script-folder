@@ -1,0 +1,25 @@
+{
+  "name": "@mmg/brand",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./fonts.css": "./fonts.css",
+    "./tokens.css": "./tokens.css",
+    "./assets/*": "./assets/*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "tokens:css": "tsx scripts/genera-tokens-css.ts",
+    "logo:proposte": "tsx scripts/genera-proposte-logo.ts"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/special-gothic-expanded-one": "^5.3.0"
+  },
+  "devDependencies": {
+    "opentype.js": "^2.0.0"
+  }
+}

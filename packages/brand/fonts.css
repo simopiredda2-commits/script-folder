@@ -1,0 +1,17 @@
+/*
+ * Caratteri di SCRIPT, licenza OFL 1.1, dai pacchetti @fontsource.
+ * Il bundler copia i file dei caratteri tra le risorse dell'applicazione: sono serviti dal nostro
+ * dominio, mai da Google Fonts o da altre CDN. Solo i sottoinsiemi latin e latin-ext.
+ */
+@import '@fontsource/special-gothic-expanded-one/latin-400.css';
+@import '@fontsource/special-gothic-expanded-one/latin-ext-400.css';
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-ext-400.css';
+@import '@fontsource/ibm-plex-sans/latin-400-italic.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-ext-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/ibm-plex-sans/latin-ext-600.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-ext-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
