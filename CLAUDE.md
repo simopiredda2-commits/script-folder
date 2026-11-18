@@ -45,7 +45,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Come si lavora con Simone
 
-- In italiano: documenti, commit e PR. Codice in inglese, tranne i termini normativi senza equivalente (impegnativa, esenzione, DPC); interfaccia in italiano.
+- **Regola: con Simone si scrive sempre e solo in italiano.** Vale per ogni messaggio, compresi gli aggiornamenti intermedi, le domande e le descrizioni dei comandi, e per documenti, commit e PR. Codice in inglese, tranne i termini normativi senza equivalente (impegnativa, esenzione, DPC); interfaccia in italiano.
 - Alle fermate le domande si fanno con il pulsante (AskUserQuestion): poche, ognuna con le opzioni e quella consigliata, mai «dimmi tu» in prosa. **Tra le fermate nessuna domanda**: si annotano in `docs/avanzamento.md`.
 - Se un dettaglio non è deciso: scegli, scrivi scelta e motivo in `docs/decisioni.md`, vai avanti.
 - Se qualcosa è irreversibile: non farlo, annotalo in `docs/avanzamento.md` e prosegui con il resto.
