@@ -11,8 +11,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Terza fermata fatta**: via di Simone, pull request #4 unita (D108–D110). Nel branch `tappe-9-10`:
   1. secondo fattore con SPID o CIE dal programma (D109): fatto;
   2. tappa 9 (voci cliniche): fatta (D112–D120);
-  3. prossimo passo: tappa 10 (presidi e seguito delle prestazioni) e `docs/fse.md` (D110);
-  4. poi la fermata finale.
+  3. tappa 10 (presidi e seguito delle prestazioni): fatta (D121–D124);
+  4. prossimo passo: `docs/fse.md` (D110), poi la fermata finale con la pull request delle tappe 9 e 10.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -386,6 +386,39 @@ Fonti lette il 18/11/2026: DM 7 settembre 2023 sul Fascicolo sanitario elettroni
 - Lettori di schermo veri sul grafico (solo axe e la prova con la tastiera).
 - Con la Dr.ssa Rocca: i tipi di voce, le sezioni dell'anamnesi e i parametri vanno visti con lei.
 
+### Tappa 10 – Presidi e seguito delle prestazioni
+
+Fonti lette il 18/11/2026: DPCM 12/1/2017 sui LEA, art. 10–14 (GU n. 65 del 18/3/2017, S.O. n. 15); vademecum per i malati cronici sul sito della Regione Piemonte (gennaio 2023), cap. 6.
+
+**Fatto**
+
+- **Seguito delle prestazioni** (D122): per ogni prestazione della ricetta specialistica inviata o stampata, data di esecuzione, struttura, esito, sedute dei cicli entro quelle prescritte, referto; annullamento con motivo, anche del referto. Il referto è una voce della cronologia.
+- **Allegati** (D121): PDF, JPEG e PNG fino a 5 MB, tipo controllato dai primi byte, salvati nel database e serviti senza script; nell'esportazione JSON in base64 e nello ZIP come file.
+- **Presidi e assistenza integrativa** (D123): categorie del decreto con la fonte, prodotto, codice, fabbisogno al mese, mesi, dal–al, chi prescrive, prima prescrizione dello specialista, indicazione, riservato; rinnovo e annullamento. Medicazioni avanzate: prima lo specialista, poi il medico per al massimo 6 mesi.
+- **Interfaccia**: pagine «Seguito delle prestazioni» e «Presidi», collegate dalla cartella.
+- Migrazione 0013.
+
+**Come provarlo**
+
+- `pnpm test`: `seguito-presidi.test.ts`, prove del dominio, prova nel browser.
+- `pnpm dev`: da una cartella con una ricetta specialistica inviata, «Seguito delle prestazioni»; poi «Presidi». Schermate 28 e 29 in `docs/interfaccia.md`.
+
+**Provato**
+
+- 14 prove nuove del servizio, 5 del dominio, una prova nel browser (25 in tutto) con axe, bersagli di 44 px e tablet. Giro completo: 785 prove TypeScript e 5 di `sync/`, verdi; lint verde.
+- 25 sabotaggi, tutti rossi e poi verdi (registro sotto).
+
+**Non fatto**
+
+- Stampa della prescrizione dei presidi: il modulo dipende dall'ASL (D123).
+- Codici del nomenclatore dei presidi (allegati 2 e 3) come banca dati; percorsi dematerializzati dell'assistenza integrativa (nessuna specifica pubblica trovata).
+- Referti strutturati dal Fascicolo.
+
+**Non provato**
+
+- Le modifiche del 2026 ai LEA (D124): da confrontare con il testo vigente.
+- Referti grandi o scansionati veri: il limite di 5 MB è da vedere con la Dr.ssa Rocca.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:
@@ -439,6 +472,7 @@ Annotate durante le tappe 9 e 10, da fare con il pulsante alla fermata:
 2. **Dettatura vocale del diario** (D119): fuori; dettatura del sistema operativo; riconoscimento solo nel browser da cercare.
 3. **BMI** (D113): scritto a mano come oggi, oppure calcolato dal programma (calcolo clinico, R12 e regola 3).
 4. **Fascicolo e AFT** (D110): via alle tappe 11 e 12 dopo aver letto `docs/fse.md`.
+5. **Medicazioni avanzate** (D123): la regola dei 6 mesi viene da una guida per i cittadini; blocco come oggi, oppure solo avviso finché non si legge l'atto regionale.
 
 ## Risposte della terza fermata (18/11/2026)
 
@@ -736,3 +770,28 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Piano annullato non si modifica                            | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
 | Contrasto della seconda serie dei grafici (≥ 3:1)          | Magenta schiarito in `tokens.ts`                                    | Rosso, poi verde                                                                                                                                                                   |
 | Grafico raggiungibile con la tastiera (browser)            | Riquadro dei valori non aperto al fuoco                             | Rosso, poi verde                                                                                                                                                                   |
+| Seguito: scrive solo il medico                             | Permesso di lettura dell'anagrafica al posto di quello di scrittura | Rosso, poi verde                                                                                                                                                                   |
+| Seguito: lo legge chi legge il diario                      | Permesso dell'anagrafica                                            | Rosso, poi verde                                                                                                                                                                   |
+| Referti: li scarica chi legge il diario                    | Permesso dell'anagrafica                                            | Rosso, poi verde                                                                                                                                                                   |
+| Referti serviti senza script                               | Intestazione `sandbox` tolta                                        | Rosso, poi verde                                                                                                                                                                   |
+| Esecuzione non nel futuro                                  | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
+| Esecuzione non prima della prescrizione                    | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
+| Sedute entro quelle prescritte                             | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
+| Seduta registrata una volta                                | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
+| Tipo del file dai primi byte                               | Controllo della firma tolto                                         | Rosso, poi verde                                                                                                                                                                   |
+| File al più 5 MB                                           | Limite tolto                                                        | Rosso, poi verde                                                                                                                                                                   |
+| Seguito solo della ricetta specialistica                   | Controllo del tipo di ricetta tolto                                 | Rosso, poi verde                                                                                                                                                                   |
+| Riga del paziente della cartella                           | Paziente della riga non controllato                                 | Rosso, poi verde                                                                                                                                                                   |
+| Esecuzione annullata una volta                             | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
+| Con l'esecuzione si annulla il referto                     | Annullamento del referto tolto                                      | Rosso, poi verde                                                                                                                                                                   |
+| Referti nell'esportazione JSON                             | Sezione degli allegati vuota                                        | Rosso, poi verde                                                                                                                                                                   |
+| Referti nello ZIP come file                                | File non scritti nello ZIP                                          | Rosso, poi verde                                                                                                                                                                   |
+| Presidi: scrive chi modifica le terapie                    | Permesso di lettura delle terapie                                   | Rosso, poi verde                                                                                                                                                                   |
+| Medicazioni avanzate: prima lo specialista                 | Controllo tolto nel dominio                                         | Rosso, poi verde                                                                                                                                                                   |
+| Medicazioni avanzate: al massimo 6 mesi                    | Limite tolto nel dominio                                            | Rosso, poi verde                                                                                                                                                                   |
+| Prima prescrizione dello specialista non dopo l'inizio     | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
+| Rinnovo: la precedente si conclude                         | Stato della precedente lasciato                                     | Rosso, poi verde                                                                                                                                                                   |
+| Si rinnova solo una prescrizione in corso                  | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
+| Presidi riservati solo a chi li legge                      | Filtro tolto                                                        | Rosso, poi verde                                                                                                                                                                   |
+| Presidio annullato una volta                               | Controllo tolto                                                     | Rosso, poi verde                                                                                                                                                                   |
+| Indicazione del paziente della cartella                    | Paziente dell'indicazione non controllato                           | Rosso, poi verde                                                                                                                                                                   |

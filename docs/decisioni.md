@@ -375,3 +375,29 @@ In cartella: un'espressione per riga (dato o negato, con la data e chi l'ha espr
 - cercare un riconoscimento vocale che lavori solo nel browser.
 
 **D120 · Database delle prove che non si cancellano.** A volte, alla fine di un file di prova, Postgres è ancora collegato al database temporaneo per la sua manutenzione automatica, e l'utente delle prove non può interromperlo. La cancellazione allora riprova per qualche secondo, invece di far fallire una prova già passata. Una prova su tre falliva così.
+
+## Tappa 10 – Presidi e seguito delle prestazioni (18/11/2026)
+
+**D121 · Allegati nel database, e nell'esportazione.** I referti (PDF, JPEG o PNG, al più 5 MB) si salvano nel database, non in una cartella a parte: così stanno nei salvataggi e nell'esportazione come il resto. Il tipo si controlla dai primi byte del file, non solo dal nome. Il file si serve con `Content-Security-Policy: sandbox`, quindi niente script. Non si modifica e non si cancella; non ha lo storico delle modifiche (il file intero finirebbe nello storico). Nell'esportazione:
+
+- JSON: sezione `allegati` con il contenuto in base64 e l'impronta;
+- ZIP: i file nella cartella `allegati/`, con l'indice `allegati.csv` e le impronte nel manifesto.
+
+Il limite di 5 MB è una nostra scelta, da rivedere con la Dr.ssa Rocca se i referti scansionati sono più grandi.
+
+**D122 · Seguito delle prestazioni.** Vale per le prestazioni della ricetta specialistica inviata o stampata. Per ogni prestazione si registrano data di esecuzione, struttura, esito e referto. Per i cicli (quantità maggiore di 1) si registrano le sedute, numerate fino a quelle prescritte, una per numero. Lo scrive il medico e lo legge chi legge il diario: l'esito è un dato clinico. Il referto è anche una voce «referto» della cronologia. Si annulla con un motivo, e con l'esecuzione si annulla il suo referto. Controlli: la data non è nel futuro e non viene prima della prescrizione. L'acquisizione dei referti strutturati dal Fascicolo resta da verificare (requisiti, «Esami di laboratorio»).
+
+**D123 · Presidi e assistenza integrativa.** Fonti lette il 18/11/2026:
+
+- DPCM 12/1/2017 sui LEA, art. 10–14 (GU n. 65 del 18/3/2017, S.O. n. 15): dispositivi medici monouso (allegato 2), presidi per diabetici (allegato 3), prodotti dietetici. Le Regioni decidono modalità e quantità massime.
+- Vademecum per i malati cronici sul sito della Regione Piemonte (gennaio 2023, rivisto dalla Direzione Sanità), cap. 6.
+
+Che cosa si registra: categoria, prodotto, codice del nomenclatore (facoltativo), fabbisogno al mese con l'unità, mesi, dal–al; chi prescrive; la prima prescrizione dello specialista; l'indicazione. Il rinnovo riparte dal giorno dopo la fine della precedente, che si conclude; si annulla con un motivo; può essere riservato. Unico controllo di sostanza, dal vademecum: per le medicazioni avanzate la prima prescrizione è dello specialista, e il medico di famiglia le prescrive per al massimo 6 mesi. La fonte è una guida per i cittadini: la regola va verificata sull'atto regionale. I limiti numerici (fabbisogno fino a 9999, fino a 99 mesi) sono solo di formato, come in D93.
+
+Da completare:
+
+- il modulo da consegnare all'ASL: la guida dice che dipende dalle procedure di ciascuna ASL; il decreto parla del ricettario standardizzato del SSN per i monouso;
+- i codici del nomenclatore (allegati 2 e 3), da importare come banca dati;
+- i percorsi dematerializzati (alimenti senza glutine, dispositivi per diabetici con il piano di automonitoraggio glicemico): non ho trovato specifiche pubbliche.
+
+**D124 · Modifiche del 2026 ai LEA da verificare.** La ricerca ha riportato una nota del Ministero della salute: il DPCM 12/1/2017 sarebbe stato integrato e modificato dal DM 3 agosto 2026 e dal DPCM 7 agosto 2026. La pagina del Ministero non si legge in modo automatico (controllo anti-robot), quindi non l'ho verificato. Gli articoli usati (10–14) sono quelli del testo del 2017: prima dell'uso vero vanno confrontati con il testo vigente.

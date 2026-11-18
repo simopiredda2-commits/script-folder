@@ -789,6 +789,53 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'piani terapeutici', true);
   });
 
+  it('seguito delle prestazioni con il referto in PDF, e presidi (tappa 10)', async () => {
+    // La ricetta specialistica inviata da una prova precedente (D66) è nel seguito.
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Seguito delle prestazioni' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Seguito delle prestazioni' }).waitFor();
+    await page
+      .getByRole('button', { name: /Registra (l’esecuzione|una seduta)/ })
+      .first()
+      .click();
+    await page.getByLabel('Struttura').fill('Struttura di prova');
+    await page.getByLabel('Esito').fill('Esito di prova, paziente inventato.');
+    await page.getByLabel(/Referto \(PDF o immagine/).setInputFiles({
+      name: 'referto-di-prova.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n% referto di prova\n%%EOF\n', 'latin1'),
+    });
+    await check(page, 'esecuzione da registrare');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Esecuzione registrata.').waitFor();
+    const link = page.getByRole('link', { name: /Referto/ }).first();
+    const res = await page.request.get(`${base}${await link.getAttribute('href')}`);
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toBe('application/pdf');
+    await check(page, 'seguito delle prestazioni', true);
+
+    await page.goto(`${base}/pazienti/${s.richPatient}/presidi`);
+    await page
+      .getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' })
+      .waitFor();
+    await page.getByLabel('Categoria').selectOption('diabetici');
+    await page.getByText(/Fonte: DPCM 12\/1\/2017 \(LEA\), art\. 13/).waitFor();
+    await page.getByLabel('Prodotto').fill('Strisce reattive di prova');
+    await page.getByLabel('Fabbisogno al mese').fill('50');
+    await page.getByLabel('Unità').fill('strisce');
+    await page.getByRole('button', { name: 'Registra la prescrizione' }).click();
+    await page.getByText('Prescrizione registrata.').waitFor();
+    await page
+      .locator('.voce')
+      .filter({ hasText: 'Strisce reattive di prova' })
+      .getByText('In corso')
+      .waitFor();
+    await check(page, 'presidi', true);
+  });
+
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {
     s.clock.advance(6 * 60_000);
     await page.goto(`${base}/pazienti`);

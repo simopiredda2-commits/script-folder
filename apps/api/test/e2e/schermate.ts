@@ -276,6 +276,61 @@ try {
   await page.evaluate(() => window.scrollTo(0, 0));
   await shot(page, '27-piani-terapeutici', true);
 
+  // Tappa 10: una ricetta specialistica inviata (dal catalogo d'esempio), poi il suo seguito con
+  // un referto inventato; presidi per diabetici.
+  const found = await page.request.get(`${base}/api/prestazioni?q=prova`);
+  const service = (
+    (await found.json()) as { prestazioni: { regionalCode: string; description: string }[] }
+  ).prestazioni[0]!;
+  const draft = await page.request.post(`${base}/api/pazienti/${patientId}/ricette`, {
+    data: {
+      kind: 'specialist_ssn',
+      accessType: 'first',
+      priority: 'P',
+      diagnosticQuestion: 'Controllo dimostrativo',
+      lines: [
+        {
+          serviceCode: service.regionalCode,
+          serviceDescription: service.description,
+          quantity: 1,
+        },
+      ],
+    },
+  });
+  const draftId = ((await draft.json()) as { id: string }).id;
+  const sentVisit = await page.request.post(`${base}/api/ricette/${draftId}/firma-e-invia`, {
+    data: {},
+  });
+  if (!sentVisit.ok()) throw new Error(`Invio della specialistica: ${await sentVisit.text()}`);
+  await page.goto(`${base}/pazienti/${patientId}/seguito`);
+  await page.getByRole('heading', { level: 1, name: 'Seguito delle prestazioni' }).waitFor();
+  await page
+    .getByRole('button', { name: /Registra (l’esecuzione|una seduta)/ })
+    .first()
+    .click();
+  await page.getByLabel('Struttura').fill('Poliambulatorio dimostrativo');
+  await page.getByLabel('Esito').fill('Esito dimostrativo: paziente inventato.');
+  await page.getByLabel(/Referto \(PDF o immagine/).setInputFiles({
+    name: 'referto-dimostrativo.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4\n% referto dimostrativo\n%%EOF\n', 'latin1'),
+  });
+  await page.getByRole('button', { name: 'Registra', exact: true }).click();
+  await page.getByText('Esecuzione registrata.').waitFor();
+  await shot(page, '28-seguito-prestazioni');
+
+  await page.goto(`${base}/pazienti/${patientId}/presidi`);
+  await page.getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' }).waitFor();
+  await page.getByLabel('Categoria').selectOption('diabetici');
+  await page.getByLabel('Prodotto').fill('Strisce reattive per glicemia');
+  await page.getByLabel('Fabbisogno al mese').fill('50');
+  await page.getByLabel('Unità').fill('strisce');
+  await page.getByRole('button', { name: 'Registra la prescrizione' }).click();
+  await page.getByText('Prescrizione registrata.').waitFor();
+  await page.getByLabel('Categoria').selectOption('medicazione_avanzata');
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '29-presidi', true);
+
   // Tappa 8: certificato di malattia di un lavoratore adulto con la residenza in anagrafica.
   const adult = await db.execute<{ id: string }>(sql`
     select id from patient

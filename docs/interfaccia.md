@@ -41,6 +41,8 @@ All'accesso si sceglie un utente del seed (`medico`, `segreteria`, `sostituto`);
 | ![](schermate/25-parametri.png)                | Parametri della stessa visita scritti insieme; andamento nel tempo: pressione in un solo grafico (sistolica e diastolica), un grafico per gli altri; il cursore con le frecce; la tabella con gli stessi valori (D113, D118)       |
 | ![](schermate/26-privacy.png)                  | Privacy: consensi alla consultazione del Fascicolo per finalità, con la fonte (DM 7 settembre 2023, art. 8 e 16), revoca; deleghe (R16); voci oscurate (D115, D116)                                                                |
 | ![](schermate/27-piani-terapeutici.png)        | Piani terapeutici: rilascio, scadenza, confezioni autorizzate, centro; validità alla data e giorni alla scadenza; modifica e annullamento con motivo (D117)                                                                        |
+| ![](schermate/28-seguito-prestazioni.png)      | Seguito delle prestazioni (tappa 10): per ogni prestazione prescritta data, struttura, esito, sedute fatte su quelle prescritte, referto in PDF o immagine da aprire; annullamento con motivo (D121, D122)                         |
+| ![](schermate/29-presidi.png)                  | Presidi e assistenza integrativa: categoria con la fonte (DPCM 12/1/2017), fabbisogno al mese, durata; per le medicazioni avanzate la prima prescrizione dello specialista; rinnovo e annullamento (D123)                          |
 
 Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al file), su un database appena preparato con il seed.
 
@@ -54,6 +56,7 @@ Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al f
 - **Terapia**: nuova, modifica, sospensione con motivo (la reazione avversa va tra le allergie), ripresa, schema orario da stampare (D80–D83). I controlli formali si vedono prima di salvare, vicino al campo, e il servizio li ripete.
 - **Promemoria** (tappa 7): dopo l’invio, nell’editor, nella coda delle ricette e nello storico. La ricetta bianca consegna solo il PDF del SAC (D93).
 - **Voci cliniche** (tappa 9): dalla cartella, sotto la testata, «Voci cliniche», «Parametri», «Piani terapeutici», «Privacy». Le voci le scrive il medico; non si cancellano, si annullano con un motivo e restano in elenco, barrate. Nessun giudizio sui valori e nessun calcolo (regola 3, R12).
+- **Seguito e presidi** (tappa 10): dalla cartella, «Seguito delle prestazioni» e «Presidi». Il referto si allega dal computer (PDF o immagine) e si apre in una scheda nuova, senza script.
 - **Grafico dei parametri**: una scala per grafico; colori validati per il contrasto e per chi confonde i colori, forma del punto come seconda codifica, valore in fondo alla linea; il cursore si muove anche con le frecce (il grafico si raggiunge con il tasto Tab) e annuncia i valori; la tabella sotto ha gli stessi numeri (D118).
 - **Accesso**: password e secondo fattore; dopo 5 minuti senza attività la sessione si blocca e si sblocca con il codice. All'uscita il browser non conserva dati dei pazienti.
 
@@ -70,7 +73,8 @@ Le pagine hanno il salto al contenuto, titoli in ordine, etichette per ogni camp
 
 ## Che cosa non c'è ancora
 
-- Agenda e prenotazione (proposta: da Ready!), riepiloghi, presidi, seguito delle prestazioni (esecuzione, struttura, esito, referto).
+- Agenda e prenotazione (proposta: da Ready!), riepiloghi.
+- Stampa della prescrizione dei presidi nel modulo dell'ASL e codici del nomenclatore (D123).
 - Dettatura vocale del diario: non c'è, per le regole 7 e 8 (D119, domanda per la fermata finale).
 - Ricerca dei codici ICD-9-CM per descrizione: manca il catalogo (D114).
 - Vaccinazioni, schede UVG regionali, percorsi (diabete, BPCO, scompenso): nel modello dei dati, non nell'interfaccia.
