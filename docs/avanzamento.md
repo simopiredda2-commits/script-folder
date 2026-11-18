@@ -12,7 +12,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
   1. secondo fattore con SPID o CIE dal programma (D109): fatto;
   2. tappa 9 (voci cliniche): fatta (D112–D120);
   3. tappa 10 (presidi e seguito delle prestazioni): fatta (D121–D124);
-  4. prossimo passo: `docs/fse.md` (D110), poi la fermata finale con la pull request delle tappe 9 e 10.
+  4. `docs/fse.md` (D110): fatto, con le fonti ufficiali sul Profilo Sanitario Sintetico;
+  5. prossimo passo: la fermata finale con la pull request delle tappe 9 e 10.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
