@@ -48,7 +48,13 @@ export type AccessAction =
   | 'certificato_annullamento'
   | 'stampa_certificato'
   | 'consegna_certificato'
-  | 'lettura_consegne_certificato';
+  | 'lettura_consegne_certificato'
+  | 'lettura_voci'
+  | 'nuova_voce'
+  | 'modifica_voce'
+  | 'annullamento_voce'
+  | 'nuovi_parametri'
+  | 'lettura_parametri';
 
 export interface AccessEntry {
   studioId?: string | null;
