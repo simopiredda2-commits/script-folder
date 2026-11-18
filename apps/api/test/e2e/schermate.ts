@@ -123,7 +123,20 @@ try {
   await page.locator('table').getByText(/NRE/).first().waitFor();
   await shot(page, '06-scheda-terapia-e-storico');
 
-  await page.goto(`${base}/pazienti/${patientId}/ricetta`);
+  // Pazienti con un quadro adatto al farmaco della schermata (D150): dulaglutide a chi ha il
+  // diabete tipo 2, l'amlodipina a un iperteso; il paziente principale ha il diabete tipo 1.
+  const withProblem = async (code: string) => {
+    const rows = await db.execute<{ id: string }>(sql`
+      select p.id, p.last_name from patient p
+      join clinical_entry c on c.patient_id = p.id and c.kind = 'problem'
+      join problem_detail d on d.entry_id = c.id and d.icd_code = ${code}
+      where p.id <> ${patientId} group by p.id, p.last_name order by p.last_name limit 1`);
+    return rows.rows[0]!.id;
+  };
+  const diabetes2PatientId = await withProblem('250.00');
+  const hypertensionPatientId = await withProblem('401.9');
+
+  await page.goto(`${base}/pazienti/${diabetes2PatientId}/ricetta`);
   // Dulaglutide: in DPC con nota AIFA 100 e piano terapeutico (elenco della Regione Piemonte).
   await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('dulaglutide');
   // Si aspetta il risultato della ricerca, non la terapia in corso (anche lei è un risultato).
@@ -164,13 +177,9 @@ try {
   await shot(page, '10-farmaci-ed-equivalenti');
 
   // Terapia completa (D80–D83), recapiti (D86) e archivio (D84). La terapia nuova, scelta dalla
-  // banca dati con il nome della confezione, va a un altro paziente: le schermate della cartella
-  // del paziente principale restano senza nomi di ditte, per il sito (D149).
-  const second = await db.execute<{ id: string }>(sql`
-    select distinct p.id, p.last_name from patient p
-    join clinical_entry c on c.patient_id = p.id and c.kind = 'problem'
-    where p.id <> ${patientId} order by p.last_name limit 1`);
-  const otherPatientId = second.rows[0]!.id;
+  // banca dati con il nome della confezione, va a un paziente iperteso: le schermate della
+  // cartella del paziente principale restano senza nomi di ditte, per il sito (D149, D150).
+  const otherPatientId = hypertensionPatientId;
   await page.goto(`${base}/pazienti/${otherPatientId}/terapie/nuova`);
   await page.getByRole('heading', { level: 1, name: 'Nuova terapia' }).waitFor();
   const restart = page.getByRole('button', { name: 'Annulla le modifiche' });
@@ -219,8 +228,9 @@ try {
   // Tappa 9: voci cliniche, parametri con l'andamento, privacy, piani terapeutici (dati inventati).
   await page.goto(`${base}/pazienti/${patientId}/voci?tipo=problema`);
   await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
-  await page.getByLabel('Descrizione').fill('Ipertensione essenziale');
-  await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+  // Una voce credibile per un trentenne con il diabete tipo 1 (D150).
+  await page.getByLabel('Descrizione').fill('Ipotiroidismo');
+  await page.getByLabel('Codice ICD-9-CM').fill('244.9');
   await page.getByLabel(/Patologia cronica/).check();
   await page
     .getByLabel('Inizio', { exact: true })
@@ -234,10 +244,10 @@ try {
   await page.goto(`${base}/pazienti/${patientId}/parametri`);
   await page.getByRole('heading', { level: 1, name: 'Parametri' }).waitFor();
   for (const [days, pas, pad, weight] of [
-    [270, '152', '96', '81,5'],
-    [180, '146', '92', '80'],
-    [90, '138', '88', '78,4'],
-    [7, '132', '84', '77'],
+    [270, '126', '82', '74,8'],
+    [180, '124', '80', '75,2'],
+    [90, '120', '78', '75,6'],
+    [7, '118', '76', '76'],
   ] as const) {
     await page
       .getByLabel('Data', { exact: true })
@@ -273,7 +283,7 @@ try {
   await page.evaluate(() => window.scrollTo(0, 0));
   await shot(page, '26-privacy');
 
-  await page.goto(`${base}/pazienti/${patientId}/piani`);
+  await page.goto(`${base}/pazienti/${diabetes2PatientId}/piani`);
   await page.getByRole('heading', { level: 1, name: 'Piani terapeutici' }).waitFor();
   // Per principio attivo, con la descrizione AIFA del gruppo: nessun marchio a schermo (D149).
   await page

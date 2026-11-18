@@ -563,3 +563,18 @@ Da ora una prova su tutto il codice (`packages/brand/test/provenienza.test.ts`) 
   - La terapia nuova scelta dalla banca dati (schermate 12 e 13) va a un altro paziente, così la cartella del paziente principale resta senza ditte.
   - I nomi delle confezioni restano dove sono il punto della schermata: ricerca ed equivalenti (10), controlli della ricetta (07), terapia dalla banca dati (12 e 13). Quelle schermate servono alla documentazione, non al sito.
 - **Difetto messo in luce.** Nel promemoria, una riga per principio attivo stampa solo il principio attivo, senza dosaggio né confezione (schermata 18). La descrizione giusta è quella AIFA del gruppo di equivalenza. È nelle liste di classe (colonna «Descrizione gruppo») ma non è ancora importata: da correggere, con le specifiche del promemoria alla mano.
+
+**D150 · Quadri clinici dimostrativi credibili per l'età.** La Dr.ssa Rocca: un paziente nato nel 1995 difficilmente prende la metformina, è più credibile l'insulina. Simone: «nelle screenshot tieni conto delle condizioni che effettivamente un paziente sia probabile possa avere».
+
+- **Quadri per età e sesso** (`apps/api/src/db/demo.ts`). Il seed sceglie il quadro clinico così:
+  - sotto i 40 anni: diabete tipo 1 con insulina glargine e insulina aspart per gli uomini, ipotiroidismo con levotiroxina per le donne;
+  - fra 40 e 64 anni: ipertensione con amlodipina, ipercolesterolemia con atorvastatina, oppure diabete tipo 2 con metformina;
+  - dai 65 anni: ipertensione insieme al diabete tipo 2 o all'ipercolesterolemia.
+- **Prove.** Anche la pressione dimostrativa dipende dall'età. Una prova controlla due cose: sotto i 40 anni non ci sono diabete tipo 2, ipertensione o ipercolesterolemia, e dai 40 anni non c'è il diabete tipo 1.
+- **Codici e farmaci.** I codici ICD-9-CM (250.01, 244.9, 401.9, 250.00, 272.0) sono verificati il 18/11/2026 sulle edizioni inglesi dell'ICD-9-CM, che hanno gli stessi codici della versione italiana 2007. Le descrizioni sono quelle che scriverebbe il medico. I farmaci sono per principio attivo, con la descrizione AIFA del gruppo (D149).
+- **Schermate.**
+  - Dulaglutide, nella ricetta con i controlli e nel piano terapeutico, va a un paziente con diabete tipo 2.
+  - L'amlodipina scelta dalla banca dati va a un iperteso.
+  - Al paziente principale (30 anni, diabete tipo 1) si aggiunge l'ipotiroidismo, con pressione e peso da trentenne.
+  - Le estrazioni casuali sono le stesse di prima, quindi i pazienti delle schermate non cambiano.
+- **Che cosa non vale.** Le dosi (per esempio 14 unità di glargine la sera) sono dati inventati di pazienti inventati: non sono indicazioni terapeutiche (regola 3).

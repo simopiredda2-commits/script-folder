@@ -9,7 +9,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { buildFiscalCode, type Role } from '@mmg/domain';
-import { generatePatients, Random } from '@mmg/fixtures';
+import { ageAt, generatePatients, Random } from '@mmg/fixtures';
 import { inArray } from 'drizzle-orm';
 import { loadConfig } from '../config';
 import { storeCredentials } from '../credentials/service';
@@ -38,7 +38,14 @@ import {
   studio,
   therapy,
 } from './schema';
-import { DEMO_PATIENTS, DRUGS, PROBLEMS } from './demo';
+import {
+  DEMO_PATIENTS,
+  DEMO_REFERENCE_DATE,
+  posologyText,
+  profilesFor,
+  systolicRange,
+  type DemoTherapy,
+} from './demo';
 import { withActor } from './tx';
 
 const DEMO_USERS: { username: string; displayName: string; roles: Role[] }[] = [
@@ -190,7 +197,7 @@ try {
   const rnd = new Random('demo-clinica');
   const midnight = startOfStudioDay(studioDate(new Date())).getTime();
   const secretaryId = users.get('segreteria')!;
-  const toSign: { patientId: string; therapyId: string; drug: (typeof DRUGS)[number] }[] = [];
+  const toSign: { patientId: string; therapyId: string; drug: DemoTherapy }[] = [];
   await withActor(db, doctorId, async (tx) => {
     for (const [index, p] of people.entries()) {
       const [row] = await tx
@@ -242,15 +249,22 @@ try {
           .returning();
         return e!.id;
       };
-      const problem = rnd.pick(PROBLEMS);
-      const problemId = await entry('problem');
-      await tx.insert(problemDetail).values({
-        entryId: problemId,
-        icdCode: problem.code,
-        description: problem.description,
-        // Ipertensione, diabete e ipercolesterolemia: patologie croniche (Profilo, D134).
-        chronic: true,
-      });
+      // Un quadro clinico credibile per età e sesso (D150). Una sola estrazione, come prima: le
+      // estrazioni che seguono restano le stesse e i pazienti delle schermate non cambiano.
+      const age = ageAt(p.birthDate, DEMO_REFERENCE_DATE);
+      const profile = rnd.pick(profilesFor(age, p.sex));
+      const problemIds: string[] = [];
+      for (const problem of profile.problems) {
+        const problemId = await entry('problem');
+        await tx.insert(problemDetail).values({
+          entryId: problemId,
+          icdCode: problem.code,
+          description: problem.description,
+          // Tutti i quadri dimostrativi sono patologie croniche (Profilo, D134).
+          chronic: true,
+        });
+        problemIds.push(problemId);
+      }
       await tx.insert(diaryDetail).values({
         entryId: await entry('diary'),
         contactType: 'office',
@@ -259,7 +273,7 @@ try {
       await tx.insert(measurementDetail).values({
         entryId: await entry('measurement'),
         measure: 'Pressione sistolica',
-        value: String(rnd.int(115, 160)),
+        value: String(rnd.int(...systolicRange(age))),
         unit: 'mmHg',
       });
       if (rnd.chance(0.3)) {
@@ -298,25 +312,31 @@ try {
           });
         }
       }
-      const drug = DRUGS[PROBLEMS.indexOf(problem)]!;
-      const [ther] = await tx
-        .insert(therapy)
-        .values({
+      // Riservata o no: un'estrazione sola, per la prima terapia, come prima.
+      const reserved = rnd.chance(0.1);
+      const therapyIds: string[] = [];
+      for (const [i, { therapy: t, problem }] of profile.therapies.entries()) {
+        const [ther] = await tx
+          .insert(therapy)
+          .values({
+            patientId: pid,
+            ...t,
+            byActiveIngredient: true,
+            kind: 'chronic',
+            startOn: '2026-01-01',
+            indicationEntryId: problemIds[problem]!,
+            reserved: i === 0 && reserved,
+            createdBy: doctorId,
+          })
+          .returning();
+        therapyIds.push(ther!.id);
+      }
+      if (toSign.length < TO_SIGN && !reserved) {
+        toSign.push({
           patientId: pid,
-          ...drug,
-          byActiveIngredient: true,
-          kind: 'chronic',
-          startOn: '2026-01-01',
-          dose: '1',
-          doseUnit: 'compressa',
-          frequency: 'una volta al giorno',
-          indicationEntryId: problemId,
-          reserved: rnd.chance(0.1),
-          createdBy: doctorId,
-        })
-        .returning();
-      if (toSign.length < TO_SIGN && !ther!.reserved) {
-        toSign.push({ patientId: pid, therapyId: ther!.id, drug });
+          therapyId: therapyIds[0]!,
+          drug: profile.therapies[0]!.therapy,
+        });
       }
     }
   });
@@ -342,7 +362,7 @@ try {
         activeIngredient: r.drug.activeIngredient,
         byActiveIngredient: true,
         quantity: 1,
-        posologyText: '1 compressa una volta al giorno',
+        posologyText: posologyText(r.drug),
       });
     }
   });
