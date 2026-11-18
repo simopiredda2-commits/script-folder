@@ -1,0 +1,209 @@
+import {
+  SUPPLY_CATEGORY_KEYS,
+  supplyCategory,
+  supplyEndOn,
+  supplyIssues,
+  supplyState,
+} from '@mmg/domain';
+import { and, desc, eq } from 'drizzle-orm';
+import { z } from 'zod';
+import type { Database } from '../db/client';
+import { appUser, clinicalEntry, problemDetail, supplyPrescription } from '../db/schema';
+import type { Tx } from '../db/tx';
+import { HttpError } from '../http/errors';
+
+const isoDate = z.iso.date();
+const optionalText = (max: number) => z.string().trim().max(max).optional();
+
+/**
+ * Prescrizione di presidi e assistenza integrativa (tappa 10). I limiti numerici sono solo di
+ * formato (come D93): le quantità massime le decide la Regione (DPCM 12/1/2017, art. 13 e 14).
+ */
+export const supplyBody = z
+  .object({
+    categoria: z.enum(SUPPLY_CATEGORY_KEYS),
+    prodotto: z.string().trim().min(1).max(300),
+    /** Codice del nomenclatore, se noto (allegati 2 e 3 del DPCM): da completare nel programma. */
+    codice: optionalText(30),
+    quantitaMensile: z.number().int().min(1).max(9999),
+    unita: z.string().trim().min(1).max(50),
+    mesi: z.number().int().min(1).max(99),
+    dal: isoDate,
+    prescrittore: z.enum(['mmg', 'specialista']).default('mmg'),
+    primoSpecialista: optionalText(200),
+    primoSpecialistaIl: isoDate.optional(),
+    indicazione: z.uuid().optional(),
+    note: optionalText(1000),
+    riservato: z.boolean().optional(),
+  })
+  .strict();
+export type SupplyBody = z.infer<typeof supplyBody>;
+
+export const renewBody = z
+  .object({
+    /** Dal giorno dopo la fine della precedente, se non si dice altro. */
+    dal: isoDate.optional(),
+    mesi: z.number().int().min(1).max(99).optional(),
+  })
+  .strict();
+
+export function bodyIssues(b: SupplyBody): string[] {
+  return supplyIssues({
+    category: b.categoria,
+    months: b.mesi,
+    prescriber: b.prescrittore,
+    firstSpecialist: b.primoSpecialista,
+    firstSpecialistOn: b.primoSpecialistaIl,
+    startOn: b.dal,
+  });
+}
+
+/** L'indicazione dev'essere un problema di questo paziente. */
+export async function checkIndication(db: Database | Tx, patientId: string, entryId?: string) {
+  if (!entryId) return;
+  const [row] = await db
+    .select({ id: clinicalEntry.id })
+    .from(clinicalEntry)
+    .innerJoin(problemDetail, eq(problemDetail.entryId, clinicalEntry.id))
+    .where(and(eq(clinicalEntry.id, entryId), eq(clinicalEntry.patientId, patientId)));
+  if (!row) throw new HttpError(400, 'Indicazione: non è un problema di questo paziente');
+}
+
+export async function insertSupply(
+  tx: Tx,
+  patientId: string,
+  userId: string,
+  b: SupplyBody,
+  renewsId: string | null = null,
+) {
+  const [row] = await tx
+    .insert(supplyPrescription)
+    .values({
+      patientId,
+      category: b.categoria,
+      product: b.prodotto,
+      code: b.codice || null,
+      monthlyQuantity: b.quantitaMensile,
+      unit: b.unita,
+      months: b.mesi,
+      startOn: b.dal,
+      endOn: supplyEndOn(b.dal, b.mesi),
+      prescriber: b.prescrittore,
+      firstSpecialist: b.primoSpecialista || null,
+      firstSpecialistOn: b.primoSpecialistaIl ?? null,
+      indicationEntryId: b.indicazione ?? null,
+      renewsId,
+      notes: b.note || null,
+      reserved: b.riservato ?? false,
+      createdBy: userId,
+    })
+    .returning({ id: supplyPrescription.id });
+  return row!.id;
+}
+
+/** La prescrizione del paziente, se chi la chiede può vederla; altrimenti 404. */
+export async function loadSupply(
+  db: Database | Tx,
+  patientId: string,
+  supplyId: string,
+  reservedAllowed: boolean,
+) {
+  const [s] = await db
+    .select()
+    .from(supplyPrescription)
+    .where(and(eq(supplyPrescription.id, supplyId), eq(supplyPrescription.patientId, patientId)));
+  if (!s || (s.reserved && !reservedAllowed)) throw new HttpError(404, 'Prescrizione non trovata');
+  return s;
+}
+
+/** Il corpo di un rinnovo: la prescrizione di prima, con le date nuove. */
+export function renewalOf(s: typeof supplyPrescription.$inferSelect, r: z.infer<typeof renewBody>) {
+  const next = new Date(Date.parse(`${s.endOn}T12:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  return supplyBody.parse({
+    categoria: s.category,
+    prodotto: s.product,
+    ...(s.code ? { codice: s.code } : {}),
+    quantitaMensile: s.monthlyQuantity,
+    unita: s.unit,
+    mesi: r.mesi ?? s.months,
+    dal: r.dal ?? next,
+    prescrittore: 'mmg',
+    ...(s.firstSpecialist ? { primoSpecialista: s.firstSpecialist } : {}),
+    ...(s.firstSpecialistOn ? { primoSpecialistaIl: s.firstSpecialistOn } : {}),
+    ...(s.indicationEntryId ? { indicazione: s.indicationEntryId } : {}),
+    ...(s.notes ? { note: s.notes } : {}),
+    riservato: s.reserved,
+  });
+}
+
+export async function renewSupply(
+  tx: Tx,
+  s: typeof supplyPrescription.$inferSelect,
+  userId: string,
+  body: SupplyBody,
+  at: Date,
+) {
+  if (s.status !== 'active') throw new HttpError(409, 'Si rinnova solo una prescrizione in corso');
+  const id = await insertSupply(tx, s.patientId, userId, body, s.id);
+  await tx
+    .update(supplyPrescription)
+    .set({ status: 'ended', updatedAt: at })
+    .where(eq(supplyPrescription.id, s.id));
+  return id;
+}
+
+export async function annulSupply(
+  tx: Tx,
+  s: typeof supplyPrescription.$inferSelect,
+  userId: string,
+  reason: string,
+  at: Date,
+) {
+  if (s.status === 'annulled') throw new HttpError(409, 'La prescrizione è già annullata');
+  await tx
+    .update(supplyPrescription)
+    .set({ status: 'annulled', annulledAt: at, annulledBy: userId, annulReason: reason })
+    .where(eq(supplyPrescription.id, s.id));
+}
+
+export async function listSupplies(
+  db: Database,
+  patientId: string,
+  reservedAllowed: boolean,
+  today: string,
+) {
+  const rows = await db
+    .select({ s: supplyPrescription, by: appUser.displayName })
+    .from(supplyPrescription)
+    .innerJoin(appUser, eq(appUser.id, supplyPrescription.createdBy))
+    .where(
+      and(
+        eq(supplyPrescription.patientId, patientId),
+        reservedAllowed ? undefined : eq(supplyPrescription.reserved, false),
+      ),
+    )
+    .orderBy(desc(supplyPrescription.startOn), desc(supplyPrescription.createdAt));
+  return rows.map(({ s, by }) => ({
+    id: s.id,
+    categoria: s.category,
+    nomeCategoria: supplyCategory(s.category)?.label ?? s.category,
+    fonte: supplyCategory(s.category)?.source ?? null,
+    prodotto: s.product,
+    codice: s.code,
+    quantitaMensile: s.monthlyQuantity,
+    unita: s.unit,
+    mesi: s.months,
+    dal: s.startOn,
+    al: s.endOn,
+    prescrittore: s.prescriber,
+    primoSpecialista: s.firstSpecialist,
+    primoSpecialistaIl: s.firstSpecialistOn,
+    indicazione: s.indicationEntryId,
+    rinnovaId: s.renewsId,
+    note: s.notes,
+    riservato: s.reserved,
+    stato: supplyState(s, today),
+    motivoAnnullamento: s.annulReason,
+    registrataDa: by,
+  }));
+}

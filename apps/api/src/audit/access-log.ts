@@ -63,7 +63,15 @@ export type AccessAction =
   | 'lettura_piani'
   | 'nuovo_piano'
   | 'modifica_piano'
-  | 'annullamento_piano';
+  | 'annullamento_piano'
+  | 'lettura_seguito'
+  | 'nuova_esecuzione'
+  | 'annullamento_esecuzione'
+  | 'lettura_allegato'
+  | 'lettura_presidi'
+  | 'nuovo_presidio'
+  | 'rinnovo_presidio'
+  | 'annullamento_presidio';
 
 export interface AccessEntry {
   studioId?: string | null;

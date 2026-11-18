@@ -11,6 +11,7 @@ import type { Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
+import { registerFollowUpRoutes } from './http/followup-routes';
 import { registerPrivacyRoutes } from './http/privacy-routes';
 import { registerCredentialRoutes } from './http/credentials-routes';
 import { registerRegionalSimulatorRoutes } from './http/regional-simulator-routes';
@@ -188,6 +189,7 @@ export function buildApp({
   registerTherapyRoutes(app, db, now ?? (() => new Date()));
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
+  registerFollowUpRoutes(app, db, now ?? (() => new Date()));
   // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
   const reference = new ReferenceData(db, loadMappings());
   registerReferenceRoutes(app, reference, now ?? (() => new Date()));

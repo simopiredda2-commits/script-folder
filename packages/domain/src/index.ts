@@ -6,3 +6,4 @@ export * from './sick-leave';
 export * from './service-credentials';
 export * from './clinical';
 export * from './privacy';
+export * from './supplies';

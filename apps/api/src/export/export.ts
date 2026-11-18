@@ -24,6 +24,8 @@ export const PATIENT_TABLES = [
   'patient_request',
   'prescription',
   'sick_leave_certificate',
+  'service_execution',
+  'supply_prescription',
 ] as const;
 
 export const ENTRY_TABLES = [
@@ -59,6 +61,8 @@ export const CERTIFICATE_TABLES = ['certificate_submission', 'certificate_delive
 export const HANDLED_SEPARATELY: Record<string, string> = {
   patient: 'esportata per prima, filtrata per archivio',
   access_log: 'esportato nella sezione registro_accessi',
+  attachment_content:
+    'i file degli allegati: sezione allegati del JSON, cartella allegati/ nello ZIP',
 };
 
 type Row = Record<string, unknown>;
@@ -128,6 +132,26 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     );
   }
 
+  // File degli allegati (referti): nel JSON in base64, nello ZIP come file (D121).
+  const attachmentIds = tables.attachment!.map((r) => r.id as string);
+  const files = attachmentIds.length
+    ? (
+        await db.execute<{ id: string; content: Buffer }>(
+          sql`select attachment_id as id, content from attachment_content
+              where attachment_id = any(${pgArray(attachmentIds)}::uuid[]) order by attachment_id`,
+        )
+      ).rows.map((f) => {
+        const meta = tables.attachment!.find((a) => a.id === f.id)!;
+        return {
+          id: f.id,
+          nome: meta.filename as string,
+          tipo: meta.media_type as string,
+          sha256: meta.sha256 as string,
+          contenuto_base64: Buffer.from(f.content).toString('base64'),
+        };
+      })
+    : [];
+
   const exportedIds = Object.values(tables).flatMap((list) =>
     list.map((r) => String(r.id ?? r.entry_id)),
   );
@@ -180,14 +204,21 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     colonne,
     storico_modifiche: history,
     registro_accessi: accessLog,
-    conteggi: { ...counts, storico_modifiche: history.length, registro_accessi: accessLog.length },
+    allegati: files,
+    conteggi: {
+      ...counts,
+      storico_modifiche: history.length,
+      registro_accessi: accessLog.length,
+      allegati: files.length,
+    },
     impronte: Object.fromEntries(
       (
         [
           ...Object.entries(tables),
           ['storico_modifiche', history],
           ['registro_accessi', accessLog],
-        ] as [string, Row[]][]
+          ['allegati', files],
+        ] as [string, unknown[]][]
       ).map(([k, v]) => [k, digest(v)]),
     ),
   };

@@ -37,6 +37,9 @@ Valori con punto e virgola, virgolette o a capo tra virgolette doppie (RFC 4180)
 Cella vuota = nessun valore. Valori composti (per esempio i dettagli del registro) in JSON.
 Date come AAAA-MM-GG; istanti come li scrive il database, in UTC.
 
+allegati.csv elenca i referti e i documenti allegati; i file sono nella cartella allegati/,
+così come sono arrivati (PDF o immagini), con l'impronta SHA-256 di ciascuno.
+
 manifest.json elenca i file con il numero di righe e l'impronta SHA-256 di ciascuno.
 Il significato delle tabelle e delle colonne è in docs/modello-dati.md e docs/esportazione.md.
 `;
@@ -61,6 +64,22 @@ export function buildCsvZip(doc: ExportDocument): Uint8Array {
       sha256: createHash('sha256').update(bytes).digest('hex'),
     });
   }
+  // I file degli allegati, così come sono arrivati; un indice in allegati.csv.
+  const index: Row[] = [];
+  for (const a of doc.allegati) {
+    const bytes = Buffer.from(a.contenuto_base64, 'base64');
+    const file = `allegati/${a.id}-${a.nome.replace(/[^\p{L}\p{N}._-]+/gu, '_')}`;
+    files[file] = new Uint8Array(bytes);
+    index.push({ id: a.id, nome: a.nome, tipo: a.tipo, sha256: a.sha256, file });
+    manifest.push({ file, righe: 0, sha256: createHash('sha256').update(bytes).digest('hex') });
+  }
+  const indexBytes = strToU8(toCsv(['id', 'nome', 'tipo', 'sha256', 'file'], index));
+  files['allegati.csv'] = indexBytes;
+  manifest.push({
+    file: 'allegati.csv',
+    righe: index.length,
+    sha256: createHash('sha256').update(indexBytes).digest('hex'),
+  });
   files['LEGGIMI.txt'] = strToU8(README);
   files['manifest.json'] = strToU8(
     `${JSON.stringify(
