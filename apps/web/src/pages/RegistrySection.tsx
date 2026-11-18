@@ -20,10 +20,16 @@ const FIELDS = [
   { key: 'occupation', label: 'Professione', type: 'text' },
   {
     key: 'employerEmail',
-    label: 'Email del datore di lavoro (certificati INPS)',
+    label: 'Email del datore di lavoro (facoltativa)',
     type: 'email',
   },
 ] as const;
+
+/** Spiegazioni sotto il campo, dove servono. */
+const HELP: Partial<Record<(typeof FIELDS)[number]['key'], string>> = {
+  employerEmail:
+    'Per i certificati INPS: al datore di lavoro va solo il numero di protocollo, nessun dato clinico (D88).',
+};
 
 type Key = (typeof FIELDS)[number]['key'];
 export type Registry = Record<Key, string | null>;
@@ -158,7 +164,13 @@ export function RegistrySection({
                   maxLength={f.key === 'residenceProvince' ? 2 : undefined}
                   value={values[f.key]}
                   onChange={(e) => setValues({ ...values, [f.key]: e.target.value })}
+                  aria-describedby={HELP[f.key] ? `anagrafica-${f.key}-aiuto` : undefined}
                 />
+                {HELP[f.key] && (
+                  <p className="aiuto" id={`anagrafica-${f.key}-aiuto`}>
+                    {HELP[f.key]}
+                  </p>
+                )}
               </div>
             ))}
           </div>

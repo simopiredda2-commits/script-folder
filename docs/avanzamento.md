@@ -251,6 +251,7 @@ Dopo la fermata finale:
 
 - **«Terapia + collegamenti pronti»**: fatto (sezione sopra).
 - **«Altra tipologia di accesso»**: verificato sulle specifiche del Sistema TS e applicato (D79).
+- **Email al datore di lavoro**: facoltativa, e solo con il numero di protocollo, nessun dato clinico (D88).
 - **Esempi di documenti veri** (promemoria di una ricetta SSN, promemoria di una ricetta bianca elettronica, email di conferma di un certificato INPS con il numero di protocollo). Sono dati veri di Simone: letti solo nella conversazione, per capire le voci; non entrano nel repository né nelle prove (regola 1). Confermano funzioni già nei requisiti: stampa del promemoria (completo o solo NRE) e invio per email; copia del certificato al lavoratore. Si faranno sui modelli pubblici, con pazienti inventati. Voce nuova da verificare sulla norma: ricetta bianca ripetibile (quante volte, fino a quando).
 - **Sessione di Next² e schermate** (procedura diagnostica, procedura terapeutica, presidio, certificato INPS, menu). La sessione non è stata aperta; le schermate sono servite solo al confronto con i requisiti e non sono nel repository (D87). Il confronto:
 
