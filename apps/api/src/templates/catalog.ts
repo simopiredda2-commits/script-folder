@@ -4,9 +4,10 @@ import { TEMPLATE_FIELD_TYPES, templateIssues, type CertificateTemplate } from '
 import { z } from 'zod';
 
 /**
- * Modelli ufficiali dei certificati (tappa 13): uno per file in `apps/api/modelli/`, con il testo
- * dell'atto, la fonte e la versione (D142, D143). Si leggono una volta; un file sbagliato ferma
- * l'avvio, invece di dare un certificato sbagliato.
+ * Modelli dei certificati del programma (tappa 13): uno per file in `apps/api/modelli/`. Gli
+ * ufficiali hanno il testo dell'atto, con la fonte e la versione (D142, D143); i proposti un testo
+ * nostro dai requisiti di legge, con che cosa resta da verificare (D160). Si leggono una volta; un
+ * file sbagliato ferma l'avvio, invece di dare un certificato sbagliato.
  */
 export const OFFICIAL_TEMPLATES_DIR = join(import.meta.dirname, '..', '..', 'modelli');
 
@@ -30,7 +31,7 @@ const templateSchema = z
     key: z.string(),
     title: z.string().min(1),
     version: isoDate,
-    official: z.literal(true),
+    official: z.boolean(),
     source: z
       .object({
         act: z.string().min(1),
@@ -50,10 +51,16 @@ const templateSchema = z
     notes: z.array(z.string().min(1)).optional(),
     placeDateLabel: z.string().optional(),
     otherSignatures: z.array(z.string().min(1)).optional(),
+    // Modello proposto (D160): che cosa resta da verificare.
+    proposal: z.string().min(1).optional(),
   })
-  .strict();
+  .strict()
+  .refine((t) => t.official !== (t.proposal !== undefined), {
+    message:
+      'un modello del programma è ufficiale (official true) oppure proposto (official false, con proposal)',
+  });
 
-/** Legge e controlla i modelli ufficiali di una cartella. */
+/** Legge e controlla i modelli del programma di una cartella, ufficiali e proposti. */
 export function loadOfficialTemplates(dir = OFFICIAL_TEMPLATES_DIR): CertificateTemplate[] {
   const files = readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
@@ -72,7 +79,7 @@ export function loadOfficialTemplates(dir = OFFICIAL_TEMPLATES_DIR): Certificate
 
 let cache: CertificateTemplate[] | null = null;
 
-/** I modelli ufficiali del programma. */
+/** I modelli del programma, ufficiali e proposti. */
 export function officialTemplates(): CertificateTemplate[] {
   cache ??= loadOfficialTemplates();
   return cache;

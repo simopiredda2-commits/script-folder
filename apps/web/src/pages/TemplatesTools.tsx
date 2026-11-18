@@ -34,9 +34,26 @@ export function Problems({ error }: { error: ApiError | null }) {
   );
 }
 
-/** Fonte di un modello ufficiale, con il collegamento all'atto. */
+/** Fonte di un modello ufficiale, con il collegamento all'atto; base di legge di un proposto. */
 export function SourceLine({ t }: { t: Template }) {
   if (!t.fonte) return <p className="tenue">Modello dello studio.</p>;
+  if (t.proposto)
+    return (
+      <>
+        <p className="tenue">
+          Base di legge:{' '}
+          <a href={t.fonte.url} target="_blank" rel="noreferrer">
+            {t.fonte.act}
+          </a>
+          {t.fonte.publication ? ` (${t.fonte.publication})` : ''}. Testo scritto dai requisiti di
+          legge il {date(t.fonte.checkedOn)}.
+          {t.validitaMesi ? ` Validità: ${t.validitaMesi} mesi dal rilascio.` : ''}
+        </p>
+        <p className="tenue">
+          <strong>Modello proposto, da verificare:</strong> {t.proposto}
+        </p>
+      </>
+    );
   return (
     <p className="tenue">
       Fonte:{' '}
@@ -75,12 +92,13 @@ export function TemplatesSection() {
     <>
       <section className="riquadro" aria-labelledby="titolo-modelli-ufficiali">
         <h2 id="titolo-modelli-ufficiali">
-          <Icon name="archivio" /> Modelli ufficiali
+          <Icon name="archivio" /> Modelli ufficiali e proposti
         </h2>
         <p>
-          Il testo viene dall’atto indicato e non si cambia. Al rilascio si compilano i dati del
-          paziente e i campi che il modello prevede; carattere, intestazione e margini sono quelli
-          dell’impaginazione del medico.
+          Il testo viene dall’atto indicato e non si cambia. Dove un modello ufficiale non c’è, il
+          programma propone un testo scritto dai requisiti di legge, da verificare. Al rilascio si
+          compilano i dati del paziente e i campi che il modello prevede; carattere, intestazione e
+          margini sono quelli dell’impaginazione del medico.
         </p>
         {c.ufficiali.length === 0 ? (
           <p className="tenue">

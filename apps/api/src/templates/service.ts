@@ -106,6 +106,7 @@ const templateView = (t: CertificateTemplate) => ({
   chiave: t.key,
   titolo: t.title,
   ufficiale: t.official,
+  proposto: t.proposal ?? null,
   versione: t.version,
   fonte: t.source,
   validitaMesi: t.validityMonths,

@@ -103,6 +103,36 @@ describe('modelli dei certificati (tappa 13)', () => {
     }
     // I modelli del programma si leggono tutti, e ognuno ha la sua fonte.
     for (const m of officialTemplates()) expect(m.source?.url, m.key).toMatch(/^https:\/\//);
+    // Ufficiali, con il testo dell'atto, o proposti, con che cosa resta da verificare (D160).
+    expect(officialTemplates().map((m) => [m.key, m.official, Boolean(m.proposal)])).toEqual([
+      ['patente-anamnestico', false, true],
+      ['porto-armi-anamnestico', true, false],
+      ['sportivo-non-agonistico', true, false],
+    ]);
+  });
+
+  it('modello proposto (D160): ufficiale oppure proposto, mai tutti e due e mai nessuno', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mmg-modelli-'));
+    try {
+      const file = join(dir, 'prova-ufficiale.json');
+      writeFileSync(file, JSON.stringify(sampleOfficial({ official: false })));
+      expect(() => loadOfficialTemplates(dir)).toThrow(
+        /ufficiale \(official true\) oppure proposto/,
+      );
+      writeFileSync(file, JSON.stringify(sampleOfficial({ proposal: 'Da verificare.' })));
+      expect(() => loadOfficialTemplates(dir)).toThrow(
+        /ufficiale \(official true\) oppure proposto/,
+      );
+      writeFileSync(
+        file,
+        JSON.stringify(sampleOfficial({ official: false, proposal: 'Da verificare.' })),
+      );
+      expect(loadOfficialTemplates(dir).map((x) => [x.key, x.official, x.proposal])).toEqual([
+        ['prova-ufficiale', false, 'Da verificare.'],
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('modelli dello studio: li scrivono i medici e l’amministratore, non la segreteria; segnaposto controllati', async () => {
@@ -303,6 +333,55 @@ describe('modelli dei certificati (tappa 13)', () => {
     // Senza la parola davanti: la frase dell'atto sta sotto la firma.
     expect(flat).not.toContain('Luogo e data:');
     expect(flat).toContain('Luogo, data, timbro e firma del medico certificatore.');
+  });
+
+  it('modello proposto (D160): anamnestico per la patente, con i gruppi di malattie della legge', async () => {
+    const patente = officialTemplates().find((x) => x.key === 'patente-anamnestico')!;
+    const scelte = Object.fromEntries(
+      patente.fields.filter((f) => f.type === 'scelta').map((f) => [f.key, f.options![0]!]),
+    );
+    const issued = await req('POST', base(), {
+      modello: 'patente-anamnestico',
+      valori: {
+        ...scelte,
+        in_cura: 'da un anno o più',
+        cardio: 'Sì',
+        cardio_note: 'Ipertensione arteriosa di prova, in terapia',
+      },
+      luogo: 'Comune di prova',
+    });
+    expect(issued.statusCode, issued.body).toBe(201);
+    const c = issued.json<{
+      id: string;
+      ufficiale: boolean;
+      fonte: { act: string } | null;
+      rilasciatoIl: string;
+      validoFinoAl: string;
+    }>();
+    // Non ufficiale, ma con la sua base di legge: nella lista è un «modello proposto».
+    expect(c.ufficiale).toBe(false);
+    expect(c.fonte?.act).toMatch(/art\. 119, comma 3/);
+    expect(c.validoFinoAl).toBe(validityEnd(c.rilasciatoIl, 3));
+    const text = await pdfText(
+      new Uint8Array((await req('GET', `${base()}/${c.id}/pdf`)).rawPayload),
+    );
+    const flat = text.replace(/\s+/g, ' ');
+    expect(flat).toContain('CERTIFICATO ANAMNESTICO DEL MEDICO DI FIDUCIA PER LA PATENTE DI GUIDA');
+    expect(flat).toContain('Art. 119, comma 3, del D.Lgs. 30 aprile 1992, n. 285');
+    expect(flat).toContain('In cura presso il medico [ ] da meno di un anno [X] da un anno o più');
+    expect(flat).toContain(
+      'Patologie cardiovascolari [ ] No [X] Sì Ipertensione arteriosa di prova, in terapia',
+    );
+    expect(flat).toContain('Epilessia o crisi convulsive [X] No [ ] Sì Malattie neurologiche');
+    expect(flat).toContain('Sostanze stupefacenti o psicotrope, medicinali [X] No [ ] Sì');
+    expect(flat).toContain('Firma dell’interessato'.replace('’', "'"));
+    expect(flat).toContain('Timbro e firma del medico di fiducia');
+    // La dichiarazione dell'interessato resta con le firme; le note in fondo.
+    const signed = text.split('\n').find((page) => page.includes('Timbro e firma del medico'))!;
+    expect(signed).toContain('L’interessato dichiara'.replace('’', "'"));
+    expect(flat.indexOf('Timbro e firma del medico')).toBeLessThan(
+      flat.indexOf('Il giudizio di idoneità alla guida spetta'),
+    );
   });
 
   it('il certificato rilasciato non cambia nel database; si annulla una volta con un motivo', async () => {

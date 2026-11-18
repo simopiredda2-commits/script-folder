@@ -1,6 +1,11 @@
-# Modelli ufficiali dei certificati
+# Modelli dei certificati del programma
 
-Un file per modello: `<chiave>.json`. Il testo viene solo dall'atto ufficiale indicato nella fonte (D142, D143). Le regole:
+Un file per modello: `<chiave>.json`. Due tipi:
+
+- **ufficiali** (`"official": true`): il testo viene solo dall'atto ufficiale indicato nella fonte (D142, D143);
+- **proposti** (`"official": false` con `proposal`, D160): per un certificato che non ha un modello ufficiale. Il testo lo scrive il programma dai requisiti di legge della fonte, e `proposal` dice che cosa resta da verificare. Nell'interfaccia si vedono come «modello proposto, da verificare».
+
+Le regole:
 
 - non si riformula e non si completa a memoria;
 - i dati del paziente e del medico sono segnaposto che il programma riempie;
@@ -14,8 +19,9 @@ Il servizio legge e controlla i file all'avvio (`apps/api/src/templates/catalog.
 | --------------- | --------------------------------------------------------------------------------------------------------------- |
 | `key`           | Chiave stabile, uguale al nome del file: minuscole, cifre e trattini                                            |
 | `title`         | Titolo stampato                                                                                                 |
-| `version`       | Data dell'atto da cui viene il testo (AAAA-MM-GG)                                                               |
-| `official`      | Sempre `true`                                                                                                   |
+| `version`       | Data dell'atto da cui viene il testo (AAAA-MM-GG); per i proposti, la data in cui è stato scritto               |
+| `official`      | `true` per i modelli ufficiali, `false` per i proposti                                                          |
+| `proposal`      | Solo per i proposti: che cosa resta da verificare prima dell'uso                                                |
 | `source`        | Fonte: `act` (atto e allegato), `publication` (GU o BUR), `url`, `checkedOn` (data del confronto), `note`       |
 | `validityMonths`| Validità in mesi, se l'atto la fissa; altrimenti `null`                                                         |
 | `forDoctor`     | Note per il medico, non stampate: che cosa chiede l'atto prima del rilascio                                     |
@@ -39,6 +45,12 @@ Tutti i modelli si stampano con la stessa struttura: intestazione del medico, ti
 | ------------------------------- | ------------------------------------------------------- | -------- |
 | `sportivo-non-agonistico.json`  | DM Salute 8 agosto 2014, allegato 2 (GU n. 243/2014)     | 12 mesi  |
 | `porto-armi-anamnestico.json`   | DM Sanità 28 aprile 1998, allegato 1 (GU n. 143/1998)    | 3 mesi   |
+
+## Modelli proposti presenti
+
+| File                         | Base di legge                                                                         | Validità |
+| ---------------------------- | ------------------------------------------------------------------------------------- | -------- |
+| `patente-anamnestico.json`   | Art. 119, comma 3, del Codice della strada; allegato III del D.Lgs. 59/2011; artt. 320–323 del DPR 495/1992 | 3 mesi   |
 
 ## Segnaposto
 

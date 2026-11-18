@@ -719,3 +719,13 @@ Nel testo dell'atto c'è un'incoerenza: le premesse dicono che l'allegato B vale
 - **Fonte strutturata.** Il PDF dell'allegato A è stampato da un file Excel della Regione («Allegato A_Catalogo Ambulatoriale_092026_ALL.xlsx», scritto in testa a ogni pagina). Con quel file, o con il catalogo strutturato del CSI Piemonte, il confronto si fa da programma, riga per riga. È una domanda per la fermata, insieme a chi controlla la trascrizione.
 
 Non provato: il catalogo vero nelle schermate e nelle ricette, perché non è ancora controllato. Le prove usano copie delle schede con un nome di prova in `controllato_da`.
+
+**D160 · Modelli proposti: il certificato anamnestico per la patente.** Per la patente non c'è un modello ufficiale, né nazionale né della Regione Piemonte (art. 119, comma 3, del Codice della strada: il certificato del medico di fiducia, senza modello). Simone: «per l'anamnestico patente prendi comunque spunto dai pdf allegati». Come previsto in D143, il testo lo scriviamo noi dai requisiti di legge e lo segniamo da verificare. Scelte:
+
+- **Un terzo tipo di modello, «proposto».** Sta con gli ufficiali in `apps/api/modelli/`, con `"official": false` e `proposal`, cioè che cosa resta da verificare. Ha la base di legge come fonte. Il catalogo vuole o l'uno o l'altro; il dominio controlla fonte e nota. Nell'interfaccia si vede come «modello proposto, da verificare»; il certificato rilasciato è un «modello proposto».
+- **Gruppi di malattie dalla legge**: allegato III del D.Lgs. 59/2011 (vista, cardiovascolari, diabete, epilessia, alcol, sostanze e medicinali, turbe psichiche, malattie neurologiche e apnee nel sonno), artt. 321–323 del DPR 495/1992 (arti, vista, udito). Le «altre malattie» dell'appendice II all'art. 320 (per esempio endocrine, del sangue, renali) sono una voce sola: l'appendice non è stata letta.
+- **Struttura dai moduli in uso**: un gruppo per riga con «No/Sì» e le note, da quanto tempo il medico ha in cura la persona, la dichiarazione dell'interessato, le due firme. Il testo è nostro; dei moduli non si copia nulla.
+- **Niente giudizio di idoneità.** Uno dei moduli chiede al medico «compatibile/incompatibile con la guida». Il certificato riporta l'anamnesi; il giudizio spetta al medico accertatore o alla Commissione medica locale, e la nota stampata lo dice.
+- **Validità tre mesi**, dalla scheda del Ministero della Salute («in data non anteriore ai tre mesi precedenti»), che dice anche che serve solo per il primo rilascio e il primo rinnovo.
+
+Da verificare con la Dr.ssa Rocca prima dell'uso: il testo, i gruppi e le «altre malattie». È una domanda per la fermata, insieme ai moduli che usa oggi.

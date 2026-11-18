@@ -72,7 +72,7 @@ export interface CertificateTemplate {
   title: string;
   /** Versione: la data dell'atto da cui viene il testo (AAAA-MM-GG). */
   version: string;
-  /** I modelli ufficiali hanno la fonte; quelli dello studio no. */
+  /** I modelli ufficiali e quelli proposti hanno la fonte; quelli dello studio no. */
   official: boolean;
   source: TemplateSource | null;
   /** Validità del certificato in mesi, se l'atto la fissa. */
@@ -96,6 +96,11 @@ export interface CertificateTemplate {
   placeDateLabel?: string;
   /** Altre firme, a sinistra di quella del medico: per esempio «In fede, il dichiarante». */
   otherSignatures?: string[];
+  /**
+   * Modello proposto (D160): per un certificato senza modello ufficiale, il testo lo scriviamo noi
+   * dai requisiti di legge della fonte. Qui c'è che cosa resta da verificare; mai sugli ufficiali.
+   */
+  proposal?: string;
 }
 
 /** I segnaposto di un testo: `{{paziente.cognome}}`, `{{campo.data_ecg}}`. */
@@ -113,12 +118,22 @@ const FIELD_KEY = /^[a-z][a-z0-9_]*$/;
 export function templateIssues(t: CertificateTemplate): string[] {
   const out: string[] = [];
   // La chiave dei modelli dello studio la genera il programma; quella degli ufficiali è il nome del file.
-  if (t.official && !KEY.test(t.key)) out.push(`Chiave del modello non valida: «${t.key}»`);
+  if ((t.official || t.proposal) && !KEY.test(t.key))
+    out.push(`Chiave del modello non valida: «${t.key}»`);
   if (!t.title.trim()) out.push('Il modello non ha un titolo');
   if (!ISO_DATE.test(t.version)) out.push('Versione del modello: serve la data AAAA-MM-GG');
   if (!t.body.length || t.body.some((p) => !p.trim())) out.push('Il testo ha paragrafi vuoti');
-  if (t.official) {
-    if (!t.source) out.push('Un modello ufficiale ha sempre la sua fonte');
+  if (t.official && t.proposal !== undefined)
+    out.push('Un modello ufficiale ha il testo dell’atto: non è un modello proposto');
+  if (t.proposal !== undefined && !t.proposal.trim())
+    out.push('Modello proposto: manca che cosa resta da verificare');
+  if (t.official || t.proposal !== undefined) {
+    if (!t.source)
+      out.push(
+        t.official
+          ? 'Un modello ufficiale ha sempre la sua fonte'
+          : 'Un modello proposto ha sempre la sua base di legge',
+      );
     else {
       if (!t.source.act.trim()) out.push('Fonte: manca l’atto');
       if (!/^https:\/\//.test(t.source.url)) out.push('Fonte: serve l’indirizzo https dell’atto');

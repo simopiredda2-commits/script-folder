@@ -1,0 +1,229 @@
+{
+  "key": "patente-anamnestico",
+  "title": "CERTIFICATO ANAMNESTICO DEL MEDICO DI FIDUCIA PER LA PATENTE DI GUIDA",
+  "version": "2026-11-19",
+  "official": false,
+  "proposal": "Nessun modello ufficiale, nazionale o della Regione Piemonte. Il testo lo ha scritto il programma: i gruppi di malattie vengono dall'allegato III del D.Lgs. 59/2011 e dagli artt. 320-323 del DPR 495/1992, la struttura dai moduli in uso. Da verificare con il medico prima dell'uso, in particolare le «altre malattie»: l'appendice II all'art. 320, che le elenca, non è stata letta.",
+  "source": {
+    "act": "D.Lgs. 30 aprile 1992, n. 285 (Codice della strada), art. 119, comma 3",
+    "publication": "GU Serie generale n. 114 del 18/5/1992, S.O. n. 74",
+    "url": "https://www.gazzettaufficiale.it/atto/serie_generale/caricaArticolo?art.versione=14&art.idGruppo=10&art.flagTipoArticolo=0&art.codiceRedazionale=092G0306&art.idArticolo=119&art.idSottoArticolo=1&art.idSottoArticolo1=10&art.dataPubblicazioneGazzetta=1992-05-18&art.progressivo=0",
+    "checkedOn": "2026-11-19",
+    "note": "Art. 119, comma 3: «La certificazione deve tener conto dei precedenti morbosi del richiedente dichiarati da un certificato medico rilasciato da un medico di fiducia» (versione 14 della GU multivigente). Gruppi di malattie: D.Lgs. 18 aprile 2011, n. 59, allegato III, testo in vigore dal 1/1/2018, e titoli degli artt. 320 (malattie invalidanti), 321 (efficienza degli arti), 322 (requisiti visivi) e 323 (requisiti uditivi) del DPR 16 dicembre 1992, n. 495, letti su Normattiva il 19/11/2026. Struttura dai moduli mandati da Simone il 18/11/2026; il testo è nostro."
+  },
+  "validityMonths": 3,
+  "forDoctor": [
+    "Serve al medico accertatore o alla Commissione medica locale, che devono tenere conto dei precedenti morbosi «dichiarati da un certificato medico rilasciato da un medico di fiducia» (art. 119, comma 3, del Codice della strada).",
+    "Secondo la scheda del Ministero della Salute serve solo per il primo rilascio e per il primo rinnovo della patente, con data non anteriore a tre mesi.",
+    "Il certificato riporta l'anamnesi: il giudizio di idoneità alla guida spetta al medico accertatore o alla Commissione medica locale.",
+    "L'interessato firma la dichiarazione sulle informazioni date: il certificato si stampa con lo spazio per la sua firma accanto a quella del medico."
+  ],
+  "fields": [
+    {
+      "key": "in_cura",
+      "label": "In cura presso il medico",
+      "type": "scelta",
+      "required": true,
+      "options": ["da meno di un anno", "da un anno o più"],
+      "boxes": true
+    },
+    {
+      "key": "vista",
+      "label": "Vista: malattie o difetti della vista",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "vista_note",
+      "label": "Vista: malattie o difetti della vista: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "udito",
+      "label": "Udito: malattie o difetti dell'udito",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "udito_note",
+      "label": "Udito: malattie o difetti dell'udito: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "cardio",
+      "label": "Patologie cardiovascolari",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "cardio_note",
+      "label": "Patologie cardiovascolari: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "diabete",
+      "label": "Diabete mellito",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "diabete_note",
+      "label": "Diabete mellito: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "epilessia",
+      "label": "Epilessia o crisi convulsive",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "epilessia_note",
+      "label": "Epilessia o crisi convulsive: se sì, data dell'ultima crisi, diagnosi e terapia in atto",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "neuro",
+      "label": "Malattie neurologiche",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "neuro_note",
+      "label": "Malattie neurologiche: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "apnee",
+      "label": "Sindrome delle apnee ostruttive nel sonno",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "apnee_note",
+      "label": "Sindrome delle apnee ostruttive nel sonno: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "psichiche",
+      "label": "Turbe psichiche",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "psichiche_note",
+      "label": "Turbe psichiche: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "alcol",
+      "label": "Abuso o dipendenza da alcol",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "alcol_note",
+      "label": "Abuso o dipendenza da alcol: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "sostanze",
+      "label": "Uso di sostanze stupefacenti o psicotrope, abuso o consumo abituale di medicinali",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "sostanze_note",
+      "label": "Uso di sostanze stupefacenti o psicotrope, abuso o consumo abituale di medicinali: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "arti",
+      "label": "Alterazioni anatomiche o funzionali degli arti o della colonna vertebrale",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "arti_note",
+      "label": "Alterazioni anatomiche o funzionali degli arti o della colonna vertebrale: se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    },
+    {
+      "key": "altre",
+      "label": "Altre malattie rilevanti per la guida (per esempio endocrine, del sangue, renali)",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Sì"],
+      "boxes": true
+    },
+    {
+      "key": "altre_note",
+      "label": "Altre malattie rilevanti per la guida (per esempio endocrine, del sangue, renali): se sì, diagnosi, terapia in atto e date utili",
+      "type": "testo",
+      "required": false,
+      "max": 300
+    }
+  ],
+  "body": [
+    "Medico di fiducia: {{medico.nome_cognome}}.",
+    "Si certificano, sulla base dei dati anamnestici e clinici in possesso del medico e di quanto riferito dall'interessato, i precedenti morbosi di:",
+    "Cognome e nome {{paziente.cognome}} {{paziente.nome}}\nNata/o a {{paziente.nato_a}} il {{paziente.nato_il}}\nCodice fiscale {{paziente.codice_fiscale}}\nResidente in {{paziente.residenza}}\nIn cura presso il medico {{campo.in_cura}}",
+    "Organi di senso, cuore e metabolismo:\nVista {{campo.vista}} {{campo.vista_note}}\nUdito {{campo.udito}} {{campo.udito_note}}\nPatologie cardiovascolari {{campo.cardio}} {{campo.cardio_note}}\nDiabete mellito {{campo.diabete}} {{campo.diabete_note}}",
+    "Sistema nervoso e salute mentale:\nEpilessia o crisi convulsive {{campo.epilessia}} {{campo.epilessia_note}}\nMalattie neurologiche {{campo.neuro}} {{campo.neuro_note}}\nApnee ostruttive nel sonno {{campo.apnee}} {{campo.apnee_note}}\nTurbe psichiche {{campo.psichiche}} {{campo.psichiche_note}}",
+    "Alcol, sostanze e medicinali:\nAlcol: abuso o dipendenza {{campo.alcol}} {{campo.alcol_note}}\nSostanze stupefacenti o psicotrope, medicinali {{campo.sostanze}} {{campo.sostanze_note}}",
+    "Altre condizioni:\nArti e colonna vertebrale {{campo.arti}} {{campo.arti_note}}\nAltre malattie rilevanti per la guida {{campo.altre}} {{campo.altre_note}}",
+    "L'interessato dichiara di aver riferito al medico tutte le informazioni a sua conoscenza sul proprio stato di salute e sulle terapie in corso."
+  ],
+  "signature": "Timbro e firma del medico di fiducia",
+  "reference": "Art. 119, comma 3, del D.Lgs. 30 aprile 1992, n. 285 (Codice della strada)",
+  "otherSignatures": ["Firma dell'interessato"],
+  "notes": [
+    "Per ogni voce è segnato «No» o «Sì»; se sì, la diagnosi, la terapia in atto e le date utili.",
+    "Il certificato riporta i precedenti morbosi dichiarati e noti al medico di fiducia. Il giudizio di idoneità alla guida spetta al medico accertatore o alla Commissione medica locale.",
+    "Gruppi di malattie: allegato III del D.Lgs. 18 aprile 2011, n. 59; artt. 320-323 del DPR 16 dicembre 1992, n. 495."
+  ]
+}

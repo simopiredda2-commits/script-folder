@@ -80,6 +80,20 @@ describe('modelli dei certificati (tappa 13)', () => {
     expect(templateIssues({ ...sample(), official: false, source: null })).toEqual([]);
   });
 
+  it('modello proposto (D160): testo nostro con la base di legge e che cosa resta da verificare', () => {
+    const proposed = { ...sample(), official: false, proposal: 'Da verificare con il medico.' };
+    expect(templateIssues(proposed)).toEqual([]);
+    expect(templateIssues({ ...proposed, source: null })).toEqual([
+      'Un modello proposto ha sempre la sua base di legge',
+    ]);
+    expect(templateIssues({ ...proposed, proposal: ' ' })).toEqual([
+      'Modello proposto: manca che cosa resta da verificare',
+    ]);
+    expect(templateIssues({ ...proposed, official: true })).toEqual([
+      'Un modello ufficiale ha il testo dell’atto: non è un modello proposto',
+    ]);
+  });
+
   it('i valori dei campi: obbligatori, date, scelte, lunghezza, campi sconosciuti', () => {
     expect(fieldIssues(sample(), { data_esame: '2026-11-10', esito: 'primo esito' })).toEqual([]);
     expect(

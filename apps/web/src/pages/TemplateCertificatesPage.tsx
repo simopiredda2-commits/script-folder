@@ -116,7 +116,7 @@ export function TemplateCertificatesPage() {
               >
                 <option value="">Scegli il modello</option>
                 {catalog.data && catalog.data.ufficiali.length > 0 && (
-                  <optgroup label="Modelli ufficiali">
+                  <optgroup label="Modelli ufficiali e proposti">
                     {catalog.data.ufficiali.map((t) => (
                       <option key={t.chiave} value={t.chiave}>
                         {t.titolo}
@@ -367,7 +367,13 @@ function IssuedItem({
         {c.validoFinoAl && !annulled && (
           <span className="etichetta">Valido fino al {date(c.validoFinoAl)}</span>
         )}
-        <span className="tenue">{c.ufficiale ? 'Modello ufficiale' : 'Modello dello studio'}</span>
+        <span className="tenue">
+          {c.ufficiale
+            ? 'Modello ufficiale'
+            : c.fonte
+              ? 'Modello proposto'
+              : 'Modello dello studio'}
+        </span>
       </p>
       {c.campi.filter((f) => f.value).length > 0 && (
         <p className="tenue">

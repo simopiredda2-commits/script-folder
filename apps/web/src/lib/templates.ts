@@ -25,6 +25,8 @@ export interface Template {
   chiave: string;
   titolo: string;
   ufficiale: boolean;
+  /** Modello proposto (D160): che cosa resta da verificare; null per gli altri. */
+  proposto?: string | null;
   versione: string;
   fonte: TemplateSource | null;
   validitaMesi: number | null;

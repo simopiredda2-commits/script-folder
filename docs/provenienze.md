@@ -70,10 +70,19 @@ Le trascrizioni in `packages/reference/data/trascrizioni/piemonte_catalogo/` son
 
 Il testo dei file in `apps/api/modelli/` è copiato dagli atti, con la fonte in ogni file. Le pagine della Gazzetta sono state lette il 18/11/2026 e i PDF restano fuori dal repository.
 
-| Modello                        | Atto                                                          | Confronto                                                                                 |
-| ------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `sportivo-non-agonistico.json` | DM Salute 8 agosto 2014, allegato 2, GU n. 243 del 18/10/2014 | Pagina 26 del PDF della GU, solo immagine: trascrizione a mano confrontata con l'immagine |
-| `porto-armi-anamnestico.json`  | DM Sanità 28 aprile 1998, allegato 1, GU n. 143 del 22/6/1998 | Testo della pagina HTML della GU confrontato con la scansione del fascicolo (pagina 16)   |
+| Modello                                     | Atto                                                                                                                                                                                                                    | Confronto                                                                                                      |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `sportivo-non-agonistico.json`              | DM Salute 8 agosto 2014, allegato 2, GU n. 243 del 18/10/2014                                                                                                                                                           | Pagina 26 del PDF della GU, solo immagine: trascrizione a mano confrontata con l'immagine                      |
+| `porto-armi-anamnestico.json`               | DM Sanità 28 aprile 1998, allegato 1, GU n. 143 del 22/6/1998                                                                                                                                                           | Testo della pagina HTML della GU confrontato con la scansione del fascicolo (pagina 16)                        |
+| `patente-anamnestico.json` (proposto, D160) | Art. 119, comma 3, del Codice della strada (GU multivigente, versione 14); D.Lgs. 59/2011, allegato III, testo in vigore dal 1/1/2018, e titoli degli artt. 320–323 del DPR 495/1992, letti su Normattiva il 19/11/2026 | Nessun modello ufficiale: testo scritto da noi. Dei moduli in uso si è presa solo la struttura (tabella sotto) |
+
+Moduli dell'anamnestico per la patente mandati da Simone il 18/11/2026, usati solo per la struttura (un gruppo di malattie per riga, «sì/no» con le note, dichiarazione del richiedente, firme). Non dicono chi li ha pubblicati; non sono nel repository e non se ne copia il testo.
+
+| File                                           | Pagine | Byte    | SHA-256                                                            |
+| ---------------------------------------------- | ------ | ------- | ------------------------------------------------------------------ |
+| `Certificato-anamnestico-patente-di-guida.pdf` | 2      | 24.032  | `017663a2708da1ffce4c0dbe95fc93cbdf28126a98fd622ae5fec578a561a268` |
+| `ANAMNESTICO_web.pdf` (solo immagini)          | 3      | 226.831 | `d559c4ef5031c99cd929768499c845a199634ddfd7d2977d289248790c056cf3` |
+| `anamnestico-MMG.pdf`                          | 1      | 14.646  | `d3a6cdd70003b63d15a9beaa3678f4e488890fd8ae0eb70f828379a785e72e61` |
 
 ## Fuori dal repository
 
