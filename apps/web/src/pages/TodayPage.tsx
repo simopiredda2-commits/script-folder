@@ -130,7 +130,9 @@ export function TodayPage() {
 function CredentialAlerts() {
   const { isDoctor } = useSession();
   const st = useApi<CredentialsStatus>(isDoctor ? '/api/profilo/credenziali' : null);
-  const alerts = st.data ? credentialAlerts(st.data.servizi) : [];
+  // Una risposta inattesa non deve far cadere la pagina Oggi: niente avvisi.
+  const servizi = st.data?.servizi;
+  const alerts = Array.isArray(servizi) ? credentialAlerts(servizi) : [];
   if (alerts.length === 0) return null;
   return (
     <section aria-labelledby="titolo-servizi" className="riquadro avvisi-servizi">

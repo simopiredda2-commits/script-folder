@@ -17,6 +17,7 @@ import { chromium, type Page } from 'playwright';
 import { buildApp } from '../../src/app';
 import { loadConfig } from '../../src/config';
 import { createDatabase, createPool } from '../../src/db/client';
+import { studioDate } from '../../src/prescriptions/rules-check';
 import { base32Decode } from '../../src/security/base32';
 import { totp } from '../../src/security/totp';
 import { buildWeb, serveWeb } from './serve-web';
@@ -68,6 +69,18 @@ try {
   await page.getByRole('button', { name: 'Entra' }).click();
   await page.getByRole('heading', { level: 1, name: 'Oggi' }).waitFor();
   await shot(page, '02-oggi');
+
+  // Tappa 8: credenziali dei servizi; il codice di sessione serve prima di mandare le ricette.
+  await page.locator('.utente').getByRole('link', { name: 'Credenziali' }).click();
+  await page.getByRole('heading', { level: 1, name: 'Credenziali dei servizi' }).waitFor();
+  await shot(page, '19-credenziali');
+  for (const name of ['RUPAR Piemonte', 'Sistema TS']) {
+    const card = page.getByRole('region', { name });
+    await card.getByRole('button', { name: 'Chiedi il codice' }).click();
+    await card.getByText(/Ambiente di prova/).waitFor();
+    await card.getByRole('button', { name: 'Attiva' }).click();
+    await card.getByText(/^Attivo fino a/).waitFor();
+  }
 
   await page.goto(`${base}/pazienti`);
   await page.locator('.paziente-riga').first().waitFor();
@@ -193,6 +206,47 @@ try {
     .evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await page.evaluate(() => window.scrollBy(0, -120));
   await shot(page, '15-recapiti');
+
+  // Tappa 8: certificato di malattia di un lavoratore adulto con la residenza in anagrafica.
+  const adult = await db.execute<{ id: string }>(sql`
+    select id from patient
+    where birth_date < current_date - interval '18 years'
+      and residence_street is not null and residence_town is not null
+      and residence_province ~ '^[A-Za-z]{2}$'
+    order by last_name, first_name limit 1`);
+  const worker = adult.rows[0]!.id;
+  // Dalla cartella, come fa il medico: così il paziente è tra le cartelle aperte.
+  await page.goto(`${base}/pazienti/${worker}`);
+  await page.getByRole('link', { name: 'Certificati' }).click();
+  await page.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
+  await page.getByRole('button', { name: 'Nuovo certificato' }).click();
+  await page
+    .getByLabel('Prognosi a tutto il')
+    .fill(studioDate(new Date(Date.now() + 2 * 86_400_000)));
+  await page.getByLabel('Codice ICD-9-CM').fill('487.1');
+  await page.getByLabel('Diagnosi', { exact: true }).fill('Sindrome influenzale');
+  // I dati dimostrativi non hanno il CAP: il medico lo completa nel certificato (inventato).
+  await page
+    .getByRole('group', { name: 'Residenza o domicilio abituale' })
+    .getByLabel('CAP')
+    .fill('00000');
+  await page.getByRole('button', { name: 'Salva e controlla' }).click();
+  await page.getByText('Nessun problema nei controlli: si può inviare.').waitFor();
+  await shot(page, '20-certificato');
+  await page.getByRole('button', { name: 'Firma e invia all’INPS' }).click();
+  const certificate = page.locator('.scheda-certificato').filter({ hasText: 'Inviato' }).first();
+  await certificate.getByText(/protocollo SIM\d+/).waitFor();
+  await shot(page, '21-certificati');
+  for (const [link, file] of [
+    ['Copia per il lavoratore (PDF)', '22-certificato-copia'],
+    ['Attestato (PDF)', '23-certificato-attestato'],
+  ] as const) {
+    const url = await certificate.getByRole('link', { name: link }).getAttribute('href');
+    const path = join(work, `${file}.pdf`);
+    writeFileSync(path, await (await page.request.get(`${base}${url}`)).body());
+    execFileSync('pdftoppm', ['-png', '-r', '96', '-singlefile', path, join(OUT, file)]);
+    console.log(`  ${file}.png`);
+  }
 
   await page.goto(`${base}/archivio`);
   await page.getByRole('heading', { level: 1, name: 'Archivio' }).waitFor();

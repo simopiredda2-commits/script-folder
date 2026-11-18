@@ -3,7 +3,7 @@ import {
   SimulatedSickLeaveGateway,
   type SimulatedSickLeaveOutcome,
 } from '@mmg/integrations';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   accessLog,
@@ -385,7 +385,12 @@ describe('certificati di malattia INPS (tappa 8)', () => {
     const toEmployer = sender.emails.at(-1)!;
     expect(toEmployer.attachments).toEqual([]);
     expect(toEmployer.text).toContain(cert.protocollo!);
-    expect(toEmployer.text).not.toMatch(/487|influenzale|diagnosi|Cambiato|Marchi/i);
+    expect(toEmployer.text).not.toMatch(/487|influenzale|diagnosi|Marchi/i);
+    // Nemmeno il nome del lavoratore: solo il protocollo (D88).
+    const [w] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    expect(toEmployer.text).not.toContain(w!.lastName);
+    expect(toEmployer.text).not.toContain(w!.firstName);
+    expect(toEmployer.subject).not.toContain(w!.lastName);
     const list = (await req('GET', `/api/certificati/${cert.id}/consegne`)).json<{
       consegne: { canale: string }[];
     }>();
@@ -421,6 +426,21 @@ describe('certificati di malattia INPS (tappa 8)', () => {
     expect((await req('GET', `/api/certificati/${fresh.id}`)).json<CertView>().stato).toBe(
       'cancelled',
     );
+  });
+
+  it('invii all’INPS e consegne non si modificano e non si cancellano', async () => {
+    for (const table of ['certificate_submission', 'certificate_delivery']) {
+      for (const statement of [`update ${table} set outcome = 'x'`, `delete from ${table}`]) {
+        let message = '';
+        try {
+          await t.db.execute(sql.raw(statement));
+        } catch (err) {
+          const e = err as { message: string; cause?: { message: string } };
+          message = e.cause?.message ?? e.message;
+        }
+        expect(message, statement).toMatch(/non si modificano/);
+      }
+    }
   });
 
   it('rettifica dopo la fine della prognosi: non ammessa', async () => {

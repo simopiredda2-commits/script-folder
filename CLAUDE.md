@@ -123,6 +123,8 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/logo.md`: proposte di logo.
 - `docs/banche-dati.md`: importazione delle banche dati, mappature, trascrizioni, versioni.
 - `docs/interfaccia.md`: schermate (in `docs/schermate/`), accessibilità, che cosa manca.
+- `docs/credenziali.md`: credenziali dei servizi (Sistema TS, RUPAR) e secondo fattore.
+- `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.
 
 ## Le tappe
 

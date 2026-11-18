@@ -297,3 +297,13 @@ Proposta, nel rispetto della regola 2:
 - con chi usa altri programmi, solo formati pubblici (il Profilo Sanitario Sintetico dell’FSE 2.0) o accordi con i produttori.
 
 I requisiti mettono la medicina di gruppo con più archivi in fase 2, quindi è una domanda della terza fermata. Non è stato costruito nulla.
+
+**D105 · Tempo massimo di attesa dell’INPS: lo stesso delle ricette.** Per i certificati le fonti lette non indicano un tempo. Si usa lo stesso parametro delle ricette, 8 secondi (D94), configurabile (`sendTimeoutMs`). Oltre quel tempo l’esito è incerto e il certificato va in errore; si può riprovare.
+
+**D106 · Luogo sulla copia.** I fac-simile hanno «Luogo» accanto a protocollo e data, ma lo schema XSD non ha il campo. Si stampa:
+
+- l’indirizzo dello studio per la visita ambulatoriale;
+- il comune della casa (reperibilità o residenza) per la domiciliare;
+- niente per il pronto soccorso.
+
+**D107 · Esito incerto dei certificati.** Come per le ricette, dopo un tempo scaduto si può riprovare l’invio o annullare il certificato nel programma. Se l’INPS rifiuti un certificato doppio va verificato con l’adattatore vero e con il servizio di ricerca delle specifiche (RicercaMalattia), che oggi non si usa.

@@ -6,7 +6,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 - **Primo giro (tappe 0–6) chiuso.** Pull request #1, #2 e #3 su `main`, l'ultima con la terapia completa e i collegamenti pronti (D79–D88), unita con il via di Simone del 18/11/2026.
 - **Secondo giro (tappe 7–10) avviato** con il via di Simone: «fai tutto, nell'ordine che ritieni giusto» (D90). Ordine: promemoria e invio, certificati INPS (terza fermata), voci cliniche, presidi e seguito delle prestazioni (fermata finale). Branch `tappe-7-8`, poi `tappe-9-10`.
-- **Tappa 7 fatta** (promemoria e invio, D92–D99); si prosegue con la tappa 8 sullo stesso branch.
+- **Tappa 7 fatta** (promemoria e invio, D92–D99).
+- **Tappa 8 fatta** (certificati INPS, D105–D107), con le credenziali dei servizi e il secondo fattore (D100–D103) chiesti dalla Dr.ssa Rocca. Prossimo passo: pull request `tappe-7-8` e terza fermata.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -270,7 +271,7 @@ Fonti ufficiali lette il 18/11/2026 (sessione nell'ambiente «Folder», D92): DM
 - Lettura del codice a barre con un lettore vero; stampa su carta.
 - Il promemoria con la Dr.ssa Rocca e con una farmacia.
 
-### Tappa 8 – Certificati INPS (in corso)
+### Tappa 8 – Certificati INPS
 
 Fonti ufficiali lette il 18/11/2026: specifiche INPS del Sistema TS, versione 3.2; DM 26/2/2010 (GU n. 65 del 19/3/2010) con gli allegati A e B; per le credenziali, le fonti di D100–D103.
 
@@ -291,7 +292,34 @@ Fonti ufficiali lette il 18/11/2026: specifiche INPS del Sistema TS, versione 3.
 - 12 prove del servizio sulle credenziali; prove del dominio e dei simulatori; 22 prove nel browser.
 - Sabotaggi: 11 nuovi, rossi e poi verdi, uno nel browser (registro sotto).
 
-**Da fare** in questa tappa: certificati (servizio, PDF degli allegati A e B, consegne, pagina del paziente), poi documenti, schermate e terza fermata.
+- **Certificati di malattia** (`docs/certificati.md`, D105–D107):
+  - bozza dalla residenza in anagrafica e continuazione dal giorno dopo;
+  - controlli formali con i codici dell'INPS, compresi quelli dell'indirizzo dallo schema XSD;
+  - invio al simulatore con le credenziali del Sistema TS di chi firma;
+  - rettifica e annullamento nei tempi del decreto;
+  - copia per il lavoratore (allegato A) e attestato (allegato B) in PDF dai fac-simile, fissati all'invio;
+  - email e SMS al lavoratore; al datore di lavoro solo il protocollo, se lo chiede il lavoratore (D88).
+
+  Pagina «Certificati» nella cartella, solo per il medico. Migrazione 0010; certificati, invii e consegne nell'esportazione.
+
+**Provato (certificati)**
+
+- 17 prove del servizio, prove del dominio (controlli, indirizzo, ciclo), prova nel browser (23 in tutto).
+- Sabotaggi: 11 nuovi sul servizio e uno nel browser (registro sotto).
+
+- Schermate 19–23 in `docs/interfaccia.md`.
+
+**Non provato**
+
+- Adattatori veri del Sistema TS e del SIRPED; stampa su carta; email e SMS reali.
+- Il giro completo con la Dr.ssa Rocca (credenziali vere, codice di sessione vero).
+
+**Da riportare nella versione viva dei requisiti** (verificato sulle fonti, D91). La copia in `docs/requisiti.md` resta quella della revisione 45:
+
+- ricetta bianca ripetibile (D93);
+- giornata lavorata, trauma e agevolazioni del certificato (schema XSD 3.2);
+- copia e attestato dai fac-simile; consegna per email e SMS;
+- credenziali RUPAR e Sistema TS, scadenza trimestrale della password RUPAR, secondo fattore e registrazione del programma presso la Regione (D100–D103).
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -565,3 +593,16 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Simulatore: un codice nuovo annulla il precedente         | Annullamento tolto                                 | Rosso, poi verde                                                                                                                                                                   |
 | Simulatore del SAR: Id-Sessione a ogni chiamata           | Controllo della sessione tolto                     | Rosso, poi verde                                                                                                                                                                   |
 | Avviso dei servizi nella pagina Oggi (browser)            | Avvisi tolti dalla pagina                          | Rosso, poi verde                                                                                                                                                                   |
+| Certificati: solo il medico                               | Guardia con therapy.read                           | Rosso, poi verde                                                                                                                                                                   |
+| Controlli dell'INPS prima dell'invio                      | Controlli ignorati                                 | Rosso, poi verde                                                                                                                                                                   |
+| Civico «SNC» quando manca                                 | Civico vuoto mandato all'INPS                      | Rosso, poi verde                                                                                                                                                                   |
+| Attestato senza diagnosi né visita                        | Diagnosi e visita anche nell'attestato             | Rosso, poi verde                                                                                                                                                                   |
+| Copia fissata all'invio                                   | Cognome preso dall'anagrafica di oggi              | Rosso, poi verde                                                                                                                                                                   |
+| Rettifica solo per anticipare la fine                     | Controllo della rettifica tolto                    | Rosso, poi verde                                                                                                                                                                   |
+| Annullamento entro il giorno dopo il rilascio             | Controllo del tempo tolto                          | Rosso, poi verde                                                                                                                                                                   |
+| Al datore di lavoro solo se lo chiede il lavoratore (D88) | Richiesta del lavoratore ignorata                  | Rosso, poi verde                                                                                                                                                                   |
+| Al datore di lavoro solo il protocollo (D88)              | Nome del lavoratore nel testo                      | Rosso, poi verde                                                                                                                                                                   |
+| Certificati senza secondo fattore (D102)                  | Secondo fattore richiesto anche per l'INPS         | Rosso, poi verde                                                                                                                                                                   |
+| Invii all'INPS immutabili                                 | Trigger solo sulla cancellazione                   | Rosso, poi verde                                                                                                                                                                   |
+| Certificati raggiungibili dalla cartella (browser)        | Collegamento rinominato                            | Rosso, poi verde                                                                                                                                                                   |
+| Pagina Oggi robusta a una risposta inattesa               | Elenco dei servizi letto senza controllo           | Rosso, poi verde. Trovato dal giro completo delle prove: la prova dell'uscita cadeva solo sotto carico, quando la risposta arrivava prima del clic                                 |
