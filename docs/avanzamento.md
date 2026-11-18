@@ -4,15 +4,15 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 ## Dove siamo
 
-- **Tappe 0–6 fatte; manca l'unione della #3.** `main` contiene le pull request #1 e #2. La #3 (tappe 5–6) è aperta sul branch `tappe-5-6`.
-- Alla fermata finale (risposte qui sotto, D76–D78) Simone aveva dato il via. Poi, leggendo `docs/interfaccia.md`, ha scelto «Terapia + collegamenti pronti»: terapia completa, e anagrafica, esportazione e impostazioni collegate all'interfaccia. Il lavoro è fatto sullo stesso branch (D79–D87, sezione «Dopo la fermata finale»). Ora si richiede il via, poi si unisce la #3 e ci si ferma.
+- **Primo giro (tappe 0–6) chiuso.** Pull request #1, #2 e #3 su `main`, l'ultima con la terapia completa e i collegamenti pronti (D79–D88), unita con il via di Simone del 18/11/2026.
+- **Secondo giro (tappe 7–10) avviato** con il via di Simone: «fai tutto, nell'ordine che ritieni giusto» (D90). Ordine: promemoria e invio, certificati INPS (terza fermata), voci cliniche, presidi e seguito delle prestazioni (fermata finale). Branch `tappe-7-8`, poi `tappe-9-10`.
 
-**Prossimi passi** (nessuno avviato):
+**Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
 1. Primo giro di `sync/` dal computer dello studio; completare le mappature AIFA con le intestazioni vere e confermare quelle ISTAT (D55, D56).
 2. Specifiche e credenziali di collaudo di SAR, Sistema TS e AURA: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo della ricetta rossa e del promemoria.
 3. Decisione su Ready! e sulla versione «Full» (D78).
-4. Il prossimo blocco di funzioni dei requisiti, nell'ordine che sceglierà Simone: certificati INPS, seguito delle prestazioni, presidi e assistenza integrativa, voci cliniche, riepiloghi (confronto più sotto).
+4. Riepiloghi, agenda (dopo la decisione su Ready!), AURA e FSE, importazione dei dati dal software attuale (serve il formato dell'esportazione di Next² con un file d'esempio senza dati veri).
 5. A7 e le altre liste AIFA (trasparenza, carenze, registri); soglie di vecchiaia (D62).
 6. Collegamento alla segnalazione di farmacovigilanza (D82); dicitura del tipo di accesso nella versione viva dei requisiti (D79).
 7. Prove con lettori di schermo e tablet veri, e una giornata di lavoro con la Dr.ssa Rocca.
@@ -313,7 +313,16 @@ Simone ha risposto con il pulsante. Applicate prima dell'unione della #3 (D76–
 3. **Palette (D69)**: evidenziatore giallo dei prototipi per contatori, cartella attiva e selezioni, avvisi in arancio bruciato. Alternative: menta, pesca, azzurro. Da confermare con le schermate in `docs/schermate/`.
 4. **Stato di erogazione (D70)**: i cinque stati sono del prodotto; vanno verificati sulle specifiche del SAR e del Sistema TS. Da chiedere solo come promemoria: chi può procurare le specifiche e le credenziali di collaudo.
 
-## Domande per la fermata (terapia e collegamenti)
+## Risposte della fermata «terapia e collegamenti» (18/11/2026)
+
+Simone ha risposto con il pulsante (D89–D91):
+
+- **Via libera**: unire la #3.
+- **Next²**: «prendi spunto anche dai campi»: lui e la Dr.ssa Rocca, utenti di Next², possono chiedere i campi che servono. Regola 2 aggiornata (D89).
+- **Prossimo blocco**: «fai tutto! nell'ordine che ritieni giusto e opportuno». Ordine in D90.
+- **Campi nuovi**: prima la verifica sulla fonte, poi i requisiti (D91).
+
+## Domande per la fermata (terapia e collegamenti, chiuse)
 
 1. **Via libera**: unire la #3 con la terapia completa e i collegamenti, e fermarsi.
 2. **Next² e regola 2 (D87)**: le schermate servono solo al confronto con i requisiti, i campi vengono dalle specifiche pubbliche; oppure si usano anche per i campi (cambia la regola 2).

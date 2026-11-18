@@ -35,7 +35,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 ## Regole che non si discutono
 
 1. **Nessun dato reale**: test, demo, fixture e log usano solo pazienti inventati.
-2. **Sviluppo indipendente**: niente copie di schermate, documentazione o dati di altri software (in particolare Evolus Next²). Si parte dai requisiti, dalle specifiche pubbliche e da come lavora la dottoressa.
+2. **Sviluppo indipendente**: niente copie di schermate, documentazione o dati di altri software (in particolare Evolus Next²). Si parte dai requisiti, dalle specifiche pubbliche e da come lavora la dottoressa. Le schermate di Next² mandate da Simone o dalla Dr.ssa Rocca, che lo usano, possono suggerire campi e funzioni che loro chiedono perché servono (D89). I campi obbligatori si verificano sulle specifiche pubbliche. Non si copiano impaginazione, testi, codice, documentazione o dati di Next², e le schermate non entrano nel repository.
 3. **Non diventare un dispositivo medico**: niente suggerimenti diagnostici o terapeutici. Le regole di prescrizione sono solo controlli formali.
 4. **I dati sono del medico**: esportazione completa in formato aperto, sempre possibile.
 5. **Ruoli e tracciamento**: la segreteria prepara, il medico firma e invia; ogni accesso a una cartella viene registrato.
@@ -57,10 +57,11 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Come si procede
 
-- Un branch per blocco di tappe: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato).
+- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`.
 - Dopo ogni tappa: test e lint verdi, commit e push (la macchina in cloud può essere riciclata), poi aggiornare `docs/avanzamento.md` con fatto, non fatto, non provato e prossimo passo.
 - **Fermate**: dopo la tappa 2 e dopo la tappa 4. Domande con il pulsante a Simone; spiegare in parole semplici cosa devono verificare lui e la Dr.ssa Rocca (dopo la 2: struttura, modello dei dati, ruoli e permessi; dopo la 4: ciclo della ricetta e regole di prescrizione con le loro fonti) e chiedere il via. Alla prima fermata chiedere anche quale proposta di logo preferisce, con il collegamento a `docs/logo.md` su GitHub, indicando quella consigliata. Se chiede modifiche: farle, aggiornare la PR, richiedere il via. Con il via: unire la PR e continuare. Simone non interviene su GitHub: le PR le unisce Claude.
-- Dopo la tappa 6: stesso giro per l'ultima PR, poi fermarsi.
+- Dopo la tappa 6: stesso giro per l'ultima PR (fatto).
+- **Secondo giro** (via di Simone del 18/11/2026: «fai tutto, nell'ordine che ritieni giusto»): fermata dopo la tappa 8 (promemoria e certificati, con i modelli e le fonti) e fermata finale dopo la tappa 10, con lo stesso giro (domande con il pulsante, via, unione), poi fermarsi.
 
 ## Struttura
 
@@ -132,6 +133,13 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 4. Regole di prescrizione: motore con le regole dei requisiti (quelle fuori perimetro restano fuori), valori e fonti versionati come dati; blocco per le regole normative, avviso con motivo registrato per quelle di buona pratica. **Seconda fermata.**
 5. Banche dati pubbliche: importare nel database l'output di `sync/` (farmaci AIFA, DPC, catalogo delle prestazioni, esenzioni, comuni), provando con piccoli file d'esempio nel formato documentato in `sync/`.
 6. Interfaccia per PC e tablet: oggi, elenco pazienti con ricerca, cartella (riepilogo e cronologia), ricetta, terapia, esami, specialistica, ricerca farmaco e coda «da firmare». WCAG 2.2 AA, bersagli di almeno 44 px.
+
+Secondo giro (D90), con lo stesso metodo: requisiti, specifiche pubbliche, simulatori, prove e sabotaggi, schermate.
+
+7. Promemoria e invio: promemoria sul modello ufficiale, per la ricetta SSN e per la ricetta bianca elettronica, completo o solo NRE; invio per email al paziente o al delegato registrato con un simulatore, secondo R15 e R16.
+8. Certificati INPS: inizio, continuazione o ricaduta; visita ambulatoriale o domiciliare; prognosi; diagnosi ICD-9-CM e testo; reperibilità; invio con il simulatore del Sistema TS e numero di protocollo; copia al lavoratore; al datore di lavoro solo il protocollo (D88); rettifica e annullamento nei casi ammessi. **Terza fermata.**
+9. Voci cliniche dall'interfaccia: problemi, allergie e reazioni, diario, parametri, anamnesi, stili di vita, esame obiettivo, privacy (consensi, deleghe, oscuramento), piani terapeutici.
+10. Presidi e assistenza integrativa; seguito delle prestazioni (esecuzione, struttura, esito, referto, sedute); voci nuove solo dopo la verifica sulla fonte (D91). **Fermata finale del secondo giro.**
 
 ## Come si chiude
 
