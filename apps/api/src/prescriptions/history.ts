@@ -1,9 +1,16 @@
-import { can } from '@mmg/domain';
+import { can, DISPENSING_STATE_LABELS, type DispensingState } from '@mmg/domain';
 import { desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
-import { appUser, prescription, prescriptionCheck, prescriptionLine, therapy } from '../db/schema';
+import {
+  appUser,
+  externalSubmission,
+  prescription,
+  prescriptionCheck,
+  prescriptionLine,
+  therapy,
+} from '../db/schema';
 import { HttpError } from '../http/errors';
 import { guardPatient } from '../patients/access';
 
@@ -109,18 +116,31 @@ export async function prescriptionHistory(
         .orderBy(prescriptionCheck.at)
     : [];
 
+  // Passaggi con l'ente (invio, stato, annullamento), dal registro degli invii che non si modifica.
+  const exchanges = ids.length
+    ? await db
+        .select()
+        .from(externalSubmission)
+        .where(inArray(externalSubmission.prescriptionId, ids))
+        .orderBy(externalSubmission.at)
+    : [];
+
   const since = new Date(now());
   since.setMonth(since.getMonth() - MONTHS_FOR_TOTAL);
-  const total = matches
-    .filter(
-      ({ p }) =>
-        PRESCRIBED.has(p.status) && (p.sentAt ?? p.paperPrintedAt ?? p.preparedAt) >= since,
-    )
+  const recent = matches.filter(({ p }) => (p.sentAt ?? p.paperPrintedAt ?? p.preparedAt) >= since);
+  const total = recent
+    .filter(({ p }) => PRESCRIBED.has(p.status))
+    .reduce((n, { line }) => n + line.quantity, 0);
+  // Le annullate restano nello storico e si contano a parte: prescritte, ma poi annullate.
+  const cancelled = recent
+    .filter(({ p }) => p.status === 'cancelled' && p.sentAt)
     .reduce((n, { line }) => n + line.quantity, 0);
 
   return {
     /** Confezioni (o quantità) prescritte negli ultimi 12 mesi, ricette inviate o su carta. */
     ultimi12Mesi: total,
+    /** Inviate e poi annullate negli ultimi 12 mesi: restano nello storico (D70). */
+    annullateUltimi12Mesi: cancelled,
     voci: matches.map(({ line, p }) => ({
       ricetta: {
         id: p.id,
@@ -139,7 +159,14 @@ export async function prescriptionHistory(
         quesito: p.diagnosticQuestion,
         versioneRegole: p.rulesVersion,
         annullataIl: p.cancelledAt,
+        annullataDa: p.cancelledBy ? (users.get(p.cancelledBy) ?? null) : null,
         motivoAnnullamento: p.cancelReason,
+        /** Ultimo stato di erogazione noto presso l'ente (D70). */
+        statoErogazione: p.dispensingState,
+        etichettaErogazione: p.dispensingState
+          ? DISPENSING_STATE_LABELS[p.dispensingState as DispensingState]
+          : null,
+        statoVerificatoIl: p.dispensingCheckedAt,
         errore: p.lastErrorMessage,
       },
       riga: {
@@ -157,6 +184,15 @@ export async function prescriptionHistory(
         nonSostituibile: line.notSubstitutable,
         motivoNonSostituibile: line.notSubstitutableReason,
       },
+      enti: exchanges
+        .filter((x) => x.prescriptionId === p.id)
+        .map((x) => ({
+          il: x.at,
+          ente: x.system,
+          operazione: x.operation,
+          esito: x.outcome,
+          messaggio: x.errorMessage,
+        })),
       controlli: checks
         .filter((c) => c.prescriptionId === p.id)
         .map((c) => ({

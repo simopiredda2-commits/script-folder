@@ -128,3 +128,38 @@ export function transition(
 
 /** Stati in cui la ricetta è chiusa: nessun evento la cambia più. */
 export const FINAL_STATUSES: readonly PrescriptionStatus[] = ['cancelled', 'paper'];
+
+/**
+ * Stato di erogazione di una ricetta inviata, come lo comunica il SAR o il Sistema TS. Sono i
+ * nomi del nostro prodotto: i codici ufficiali vanno mappati dalle specifiche (da completare).
+ */
+export const DISPENSING_STATES = [
+  'non_erogata',
+  'presa_in_carico',
+  'erogata_in_parte',
+  'erogata',
+  'annullata',
+] as const;
+export type DispensingState = (typeof DISPENSING_STATES)[number];
+
+export const DISPENSING_STATE_LABELS: Record<DispensingState, string> = {
+  non_erogata: 'Non ancora presa in carico',
+  presa_in_carico: 'Presa in carico o prenotata',
+  erogata_in_parte: 'Erogata in parte',
+  erogata: 'Erogata',
+  annullata: 'Già annullata',
+};
+
+/**
+ * Una ricetta inviata si annulla solo se l'ente non l'ha ancora lavorata: né presa in carico o
+ * prenotata, né erogata (D70, richiesta di Simone). Resta comunque nello storico.
+ */
+export function cancellableState(
+  state: DispensingState,
+): { ok: true } | { ok: false; reason: string } {
+  if (state === 'non_erogata') return { ok: true };
+  return {
+    ok: false,
+    reason: `Non annullabile: per l'ente la ricetta risulta «${DISPENSING_STATE_LABELS[state].toLowerCase()}». Resta nello storico come prescritta.`,
+  };
+}

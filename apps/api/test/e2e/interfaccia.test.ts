@@ -308,6 +308,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     // La ricetta appena inviata ha lo stesso principio attivo: è nello storico, con l'NRE.
     await page.locator('table').getByText(/NRE/).first().waitFor();
     await check(page, 'scheda della terapia', true);
+    // D70: si verifica lo stato presso l'ente e, se non è ancora lavorata, si annulla.
+    await page.getByRole('button', { name: 'Verifica lo stato presso l’ente' }).first().click();
+    await page.getByText('Presso l’ente: Non ancora presa in carico.').waitFor();
+    await page.getByLabel('Motivo dell’annullamento').first().fill('Prescritta per errore');
+    await page.getByRole('button', { name: 'Annulla la ricetta' }).first().click();
+    // La ricetta resta nello storico, marcata come annullata, con chi e perché.
+    await page
+      .locator('tr.riga-annullata')
+      .getByText(/Annullata il .* da /)
+      .first()
+      .waitFor();
+    await page.locator('tr.riga-annullata').getByText('Prescritta per errore').first().waitFor();
+    await check(page, 'storico con una ricetta annullata');
   });
 
   it('ricetta specialistica dal catalogo, poi lo storico della prestazione (D66)', async () => {
@@ -329,6 +342,20 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('heading', { name: 'Storico delle prescrizioni' }).waitFor();
     await page.getByText('Primo accesso').waitFor();
     await check(page, 'storico della prestazione');
+  });
+
+  it('la stessa prestazione già prescritta: l’editor lo dice subito, con data e NRE', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/specialistica`);
+    await page.getByRole('heading', { level: 1, name: 'Ricetta specialistica' }).waitFor();
+    const restart = page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    await page.getByLabel('Prestazione, branca o codice').fill('visita');
+    const item = page.locator('.risultato').filter({ hasText: 'Visita di prova' });
+    await item.waitFor();
+    await item.getByRole('button', { name: 'Aggiungi' }).click();
+    await page.getByText(/Già prescritta.*il \d{2}\/\d{2}\/\d{4}/).waitFor();
+    await page.getByRole('link', { name: 'storico della prestazione' }).waitFor();
+    await check(page, 'avviso di prestazione già prescritta');
   });
 
   it('esami: valori e intervallo del referto, senza giudizio', async () => {

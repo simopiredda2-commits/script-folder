@@ -61,6 +61,11 @@ export function registerPrescriptionRoutes(
     return { esito: r.outcome, nre: r.nre };
   });
 
+  // Stato di erogazione presso l'ente e possibilità di annullare (D70).
+  app.get('/api/ricette/:id/stato-erogazione', scoped, async (req) => {
+    return service.dispensingStatus(req.actor!, idParams.parse(req.params).id);
+  });
+
   app.post('/api/ricette/:id/annulla', scoped, async (req) => {
     const { id } = idParams.parse(req.params);
     return { esito: (await service.cancel(req.actor!, id, req.body)).outcome };

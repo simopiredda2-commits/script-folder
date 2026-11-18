@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, PageHeader, type RuleIssue } from '../components/common';
 import { Icon } from '../components/Icon';
-import { query } from '../lib/api';
+import { api, ApiError, query } from '../lib/api';
+import { useSession } from '../lib/session';
 import {
   ACCESS_TYPE,
   date,
@@ -31,8 +33,12 @@ interface HistoryEntry {
     accesso: string | null;
     quesito: string | null;
     annullataIl: string | null;
+    annullataDa: string | null;
     motivoAnnullamento: string | null;
     errore: string | null;
+    statoErogazione: string | null;
+    etichettaErogazione: string | null;
+    statoVerificatoIl: string | null;
   };
   riga: {
     farmaco: string | null;
@@ -54,17 +60,127 @@ interface HistoryEntry {
     problemi: RuleIssue[];
     motivi: Record<string, string>;
   }[];
+  /** Passaggi con l'ente: invio, verifica dello stato, annullamento. */
+  enti: { il: string; ente: string; operazione: string; esito: string; messaggio: string | null }[];
 }
 
 interface History {
   ultimi12Mesi: number;
+  annullateUltimi12Mesi: number;
   voci: HistoryEntry[];
+}
+
+const OPERATION: Record<string, string> = {
+  invio: 'Invio',
+  stato: 'Verifica dello stato',
+  annullamento: 'Annullamento',
+};
+const EXCHANGE_OUTCOME: Record<string, string> = {
+  accepted: 'accettato',
+  ok: 'fatta',
+  rejected: 'rifiutato',
+  unreachable: 'ente non raggiungibile',
+  timeout: 'nessuna risposta',
+};
+
+interface DispensingInfo {
+  inviata: boolean;
+  stato: string | null;
+  etichetta: string | null;
+  annullabile: boolean | null;
+  motivo: string | null;
+}
+
+/**
+ * Stato presso l'ente e annullamento (D70): si verifica lo stato e si propone l'annullamento
+ * solo se l'ente non ha ancora lavorato la ricetta. Annullata, la ricetta resta nello storico.
+ */
+function DispensingControl({
+  prescriptionId,
+  onChange,
+}: {
+  prescriptionId: string;
+  onChange: () => void;
+}) {
+  const { isDoctor } = useSession();
+  const [info, setInfo] = useState<DispensingInfo | null>(null);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<ApiError | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function verify() {
+    setError(null);
+    try {
+      setInfo(await api<DispensingInfo>(`/api/ricette/${prescriptionId}/stato-erogazione`));
+      onChange();
+    } catch (e) {
+      setError(e instanceof ApiError ? e : null);
+    }
+  }
+
+  async function cancel() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/ricette/${prescriptionId}/annulla`, {
+        method: 'POST',
+        body: { motivo: reason.trim() },
+      });
+      onChange();
+    } catch (e) {
+      setError(e instanceof ApiError ? e : null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="controllo-erogazione">
+      <button type="button" className="pulsante pulsante-piatto" onClick={() => void verify()}>
+        <Icon name="ripeti" /> <span>Verifica lo stato presso l’ente</span>
+      </button>
+      {info && (
+        <p role="status">
+          {info.etichetta ? `Presso l’ente: ${info.etichetta}.` : info.motivo}
+          {info.annullabile === false && info.etichetta && <> {info.motivo}</>}
+        </p>
+      )}
+      {info && info.annullabile !== false && isDoctor && (
+        <div className="campo">
+          <label htmlFor={`motivo-annullamento-${prescriptionId}`}>Motivo dell’annullamento</label>
+          <input
+            id={`motivo-annullamento-${prescriptionId}`}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <p className="aiuto">La ricetta resta nello storico, come prescritta e annullata.</p>
+          <button
+            type="button"
+            className="pulsante"
+            disabled={busy || !reason.trim()}
+            onClick={() => void cancel()}
+          >
+            <Icon name="annulla" /> <span>Annulla la ricetta</span>
+          </button>
+        </div>
+      )}
+      <ErrorMessage error={error} />
+    </div>
+  );
 }
 
 const OUTCOME: Record<string, string> = { superato: 'superato', bloccato: 'bloccato' };
 
 /** Tabella dello storico: una riga per ogni ricetta che contiene il farmaco o la prestazione. */
-function HistoryTable({ history, kind }: { history: History; kind: 'farmaco' | 'prestazione' }) {
+function HistoryTable({
+  history,
+  kind,
+  onChange,
+}: {
+  history: History;
+  kind: 'farmaco' | 'prestazione';
+  onChange: () => void;
+}) {
   if (history.voci.length === 0) return <p className="tenue">Nessuna prescrizione finora.</p>;
   return (
     <div className="tabella-scorrevole">
@@ -77,12 +193,16 @@ function HistoryTable({ history, kind }: { history: History; kind: 'farmaco' | '
             <th scope="col">{kind === 'farmaco' ? 'Confezioni' : 'Quantità'}</th>
             <th scope="col">Dettagli</th>
             <th scope="col">Chi</th>
+            <th scope="col">Ente</th>
             <th scope="col">Controlli</th>
           </tr>
         </thead>
         <tbody>
-          {history.voci.map(({ ricetta: r, riga: l, controlli }) => (
-            <tr key={`${r.id}-${l.farmaco ?? l.prestazione}`}>
+          {history.voci.map(({ ricetta: r, riga: l, controlli, enti }) => (
+            <tr
+              key={`${r.id}-${l.farmaco ?? l.prestazione}`}
+              className={r.stato === 'cancelled' ? 'riga-annullata' : undefined}
+            >
               <td>{date(r.inviataIl ?? r.cartaceaIl ?? r.preparataIl)}</td>
               <td>
                 <span className="etichetta">{PRESCRIPTION_STATUS[r.stato] ?? r.stato}</span>
@@ -90,8 +210,26 @@ function HistoryTable({ history, kind }: { history: History; kind: 'farmaco' | '
                 {r.nre && <div className="codice">NRE {r.nre}</div>}
                 {r.annullataIl && (
                   <div>
-                    Annullata il {date(r.annullataIl)}: {r.motivoAnnullamento}
+                    <strong>
+                      Annullata il {date(r.annullataIl)}
+                      {r.annullataDa ? ` da ${r.annullataDa}` : ''}
+                    </strong>
+                    {r.motivoAnnullamento && <> · {r.motivoAnnullamento}</>}
                   </div>
+                )}
+                {r.etichettaErogazione && (
+                  <div>
+                    Presso l’ente: {r.etichettaErogazione}
+                    {r.statoVerificatoIl && (
+                      <span className="tenue">
+                        {' '}
+                        (verificato il {dateTime(r.statoVerificatoIl)})
+                      </span>
+                    )}
+                  </div>
+                )}
+                {r.stato === 'sent' && (
+                  <DispensingControl prescriptionId={r.id} onChange={onChange} />
                 )}
                 {r.errore && <div>Errore: {r.errore}</div>}
               </td>
@@ -117,6 +255,16 @@ function HistoryTable({ history, kind }: { history: History; kind: 'farmaco' | '
                     {r.firmataIl && `, ${dateTime(r.firmataIl)}`}
                   </div>
                 )}
+              </td>
+              <td>
+                {enti.length === 0 && <span className="tenue">nessuno</span>}
+                {enti.map((e) => (
+                  <div key={`${e.il}-${e.operazione}`}>
+                    {dateTime(e.il)}: {OPERATION[e.operazione] ?? e.operazione}{' '}
+                    {EXCHANGE_OUTCOME[e.esito] ?? e.esito}
+                    {e.messaggio && <div className="tenue">{e.messaggio}</div>}
+                  </div>
+                ))}
               </td>
               <td>
                 {controlli.length === 0 && <span className="tenue">nessuno</span>}
@@ -306,8 +454,11 @@ export function TherapyPage() {
             <p>
               Confezioni prescritte negli ultimi 12 mesi:{' '}
               <strong>{history.data.ultimi12Mesi}</strong>
+              {history.data.annullateUltimi12Mesi > 0 && (
+                <> · inviate e poi annullate: {history.data.annullateUltimi12Mesi}</>
+              )}
             </p>
-            <HistoryTable history={history.data} kind="farmaco" />
+            <HistoryTable history={history.data} kind="farmaco" onChange={history.reload} />
           </>
         )}
       </section>
@@ -353,8 +504,11 @@ export function ServiceHistoryPage() {
           <>
             <p>
               Prescritta negli ultimi 12 mesi: <strong>{history.data.ultimi12Mesi}</strong>
+              {history.data.annullateUltimi12Mesi > 0 && (
+                <> · inviata e poi annullata: {history.data.annullateUltimi12Mesi}</>
+              )}
             </p>
-            <HistoryTable history={history.data} kind="prestazione" />
+            <HistoryTable history={history.data} kind="prestazione" onChange={history.reload} />
           </>
         )}
       </section>

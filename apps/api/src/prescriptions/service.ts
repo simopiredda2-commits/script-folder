@@ -1,5 +1,7 @@
 import {
   can,
+  cancellableState,
+  DISPENSING_STATE_LABELS,
   transition,
   type PrescriptionEvent,
   type PrescriptionKind,
@@ -11,6 +13,7 @@ import type {
   PrescriptionGateway,
   PrescriptionMessage,
   SendResult,
+  StatusResult,
 } from '@mmg/integrations';
 import { systemFor } from '@mmg/integrations';
 import { basePackLimit } from '@mmg/rules';
@@ -503,7 +506,95 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return { outcome: result.outcome, nre: result.outcome === 'accepted' ? result.nre : null };
   }
 
-  /** Annullamento: prima dell'invio è locale; dopo passa dal SAR, nei casi ammessi. */
+  /**
+   * Chiede all'ente lo stato di erogazione (D70) e lo registra: la chiamata nel registro degli
+   * invii, l'ultimo stato noto nella ricetta.
+   */
+  async function askDispensing(
+    actor: Actor,
+    p: PrescriptionRow,
+    doctor: PrescriptionMessage['doctor'],
+  ): Promise<StatusResult> {
+    const system = systemFor(p.kind);
+    const gateway = deps.gateways[system];
+    const request = { nre: p.nre!, doctor };
+    const started = Date.now();
+    let result: StatusResult;
+    try {
+      result = await gateway.status(request);
+    } catch (err) {
+      result = { outcome: 'timeout', message: `Errore dell'adattatore: ${String(err)}` };
+    }
+    await withActor(db, actor.userId, async (tx) => {
+      await tx.insert(externalSubmission).values({
+        system,
+        environment: gateway.environment,
+        operation: 'stato',
+        prescriptionId: p.id,
+        userId: actor.userId,
+        request,
+        response: 'raw' in result ? result.raw : null,
+        outcome: result.outcome,
+        errorCode: result.outcome === 'rejected' ? result.code : null,
+        errorMessage: result.outcome === 'ok' ? null : result.message,
+        durationMs: Date.now() - started,
+      });
+      if (result.outcome === 'ok') {
+        await tx
+          .update(prescription)
+          .set({ dispensingState: result.state, dispensingCheckedAt: now(), updatedAt: now() })
+          .where(eq(prescription.id, p.id));
+      }
+    });
+    return result;
+  }
+
+  /**
+   * Stato di erogazione e possibilità di annullare, prima di proporre l'annullamento (D70).
+   * Una ricetta non ancora inviata si annulla nel prodotto, secondo il suo ciclo.
+   */
+  async function dispensingStatus(actor: Actor, id: string) {
+    const p = await load(id, actor.studioId);
+    await guardPatient(db, actor, p.patientId, 'therapy.read', 'ricetta_stato');
+    if (p.status !== 'sent') {
+      const r = transition(p.status, 'cancel', { lastErrorKind: p.lastErrorKind });
+      return {
+        inviata: false,
+        stato: null,
+        etichetta: null,
+        annullabile: r.ok,
+        motivo: r.ok ? null : r.reason,
+        controllataIl: null,
+      };
+    }
+    const result = await askDispensing(actor, p, await doctorInfo(actor.userId));
+    if (result.outcome !== 'ok') {
+      // Lo stato non si sa: all'annullamento deciderà comunque l'ente.
+      return {
+        inviata: true,
+        stato: null,
+        etichetta: null,
+        annullabile: null,
+        motivo: `Stato non disponibile (${result.message}): se si chiede l'annullamento, decide l'ente`,
+        controllataIl: null,
+      };
+    }
+    const c = cancellableState(result.state);
+    return {
+      inviata: true,
+      stato: result.state,
+      etichetta: DISPENSING_STATE_LABELS[result.state],
+      annullabile: c.ok,
+      motivo: c.ok ? null : c.reason,
+      controllataIl: now().toISOString(),
+    };
+  }
+
+  /**
+   * Annullamento: prima dell'invio è locale; dopo si chiede all'ente lo stato e, se l'ha già
+   * lavorata (presa in carico, prenotata, erogata), non si annulla (D70). La ricetta resta sempre
+   * nello storico: l'annullamento cambia solo lo stato.
+   */
   async function cancel(actor: Actor, id: string, body: unknown) {
     const p = await load(id, actor.studioId);
     if (p.status !== 'sent') {
@@ -523,6 +614,12 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const system = systemFor(p.kind);
     const gateway = deps.gateways[system];
     const doctor = await doctorInfo(actor.userId);
+    // Prima lo stato: se l'ente ha già lavorato la ricetta non si chiede nemmeno l'annullamento.
+    const status = await askDispensing(actor, p, doctor);
+    if (status.outcome === 'ok') {
+      const c = cancellableState(status.state);
+      if (!c.ok) throw new HttpError(409, c.reason);
+    }
     const request = { nre: p.nre!, reason, doctor };
     const started = Date.now();
     const result = await gateway.cancel(request);
@@ -690,6 +787,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     toSignQueue,
     failedQueue,
     listForPatient,
+    dispensingStatus,
     load,
   };
 }

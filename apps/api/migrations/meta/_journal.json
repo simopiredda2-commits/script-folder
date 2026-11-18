@@ -50,6 +50,13 @@
       "when": 1794991223718,
       "tag": "0006_banche_dati",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794994948070,
+      "tag": "0007_stato_erogazione",
+      "breakpoints": true
     }
   ]
 }

@@ -76,6 +76,12 @@ export const prescription = pgTable(
     paperPrintedBy: uuid().references(() => appUser.id),
     /** Versione delle regole di prescrizione con cui è stata controllata (tappa 4). */
     rulesVersion: text(),
+    /**
+     * Ultimo stato di erogazione noto, chiesto all'ente (D70): «non_erogata», «presa_in_carico»,
+     * «erogata_in_parte», «erogata», «annullata». Decide se la ricetta si può annullare.
+     */
+    dispensingState: text(),
+    dispensingCheckedAt: timestamp({ withTimezone: true }),
     /** Canale del promemoria al paziente e recapito usato (R15, R16; tappa 4). */
     reminderChannel: reminderChannel(),
     reminderContact: text(),

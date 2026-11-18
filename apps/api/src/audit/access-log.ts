@@ -30,7 +30,8 @@ export type AccessAction =
   | 'lettura_registro'
   | 'lettura_storico_prescrizioni'
   | 'lettura_cronologia'
-  | 'lettura_esami';
+  | 'lettura_esami'
+  | 'ricetta_stato';
 
 export interface AccessEntry {
   studioId?: string | null;

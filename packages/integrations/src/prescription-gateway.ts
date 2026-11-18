@@ -8,6 +8,8 @@
  * servizi reali).
  */
 
+import type { DispensingState } from '@mmg/domain';
+
 export type GatewaySystem = 'sar' | 'sistema_ts';
 
 export interface PrescriptionLineMessage {
@@ -51,6 +53,16 @@ export type CancelResult =
   | { outcome: 'unreachable'; message: string }
   | { outcome: 'timeout'; message: string };
 
+/**
+ * Stato di erogazione chiesto all'ente (D70). Da verificare sulle specifiche del SAR e del Sistema
+ * TS che il servizio esista e quali codici restituisce: qui i nomi del nostro prodotto.
+ */
+export type StatusResult =
+  | { outcome: 'ok'; state: DispensingState; raw: unknown }
+  | { outcome: 'rejected'; code: string; message: string; raw: unknown }
+  | { outcome: 'unreachable'; message: string }
+  | { outcome: 'timeout'; message: string };
+
 export interface PrescriptionGateway {
   readonly system: GatewaySystem;
   /** Ambiente: un adattatore vero dichiara «collaudo» o «produzione». */
@@ -61,6 +73,8 @@ export interface PrescriptionGateway {
     reason: string;
     doctor: PrescriptionMessage['doctor'];
   }): Promise<CancelResult>;
+  /** Che cosa ne è stato della ricetta: presa in carico, prenotata, erogata… */
+  status(input: { nre: string; doctor: PrescriptionMessage['doctor'] }): Promise<StatusResult>;
 }
 
 /** Il sistema a cui va ogni tipo di ricetta. */

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cancellableState,
+  DISPENSING_STATE_LABELS,
+  DISPENSING_STATES,
   PRESCRIPTION_STATUSES,
   transition,
   type PrescriptionEvent,
@@ -80,5 +83,17 @@ describe('ciclo della ricetta', () => {
   it('un invio in corso non si ripete né si annulla', () => {
     expect(transition('sending', 'start_sending').ok).toBe(false);
     expect(transition('sending', 'cancel').ok).toBe(false);
+  });
+});
+
+describe('annullamento secondo lo stato di erogazione (D70)', () => {
+  it('si annulla solo una ricetta che l’ente non ha ancora lavorato', () => {
+    expect(cancellableState('non_erogata')).toEqual({ ok: true });
+    for (const s of ['presa_in_carico', 'erogata_in_parte', 'erogata', 'annullata'] as const) {
+      const r = cancellableState(s);
+      expect(r.ok, s).toBe(false);
+      if (!r.ok) expect(r.reason).toMatch(/Resta nello storico/);
+    }
+    expect(DISPENSING_STATES.every((s) => DISPENSING_STATE_LABELS[s])).toBe(true);
   });
 });

@@ -296,9 +296,12 @@ describe('ciclo della ricetta', () => {
       .select({ op: externalSubmission.operation, outcome: externalSubmission.outcome })
       .from(externalSubmission)
       .where(eq(externalSubmission.prescriptionId, id));
+    // Ogni annullamento chiede prima lo stato all'ente (D70): anche la verifica resta registrata.
     expect(ops).toEqual([
       { op: 'invio', outcome: 'accepted' },
+      { op: 'stato', outcome: 'ok' },
       { op: 'annullamento', outcome: 'unreachable' },
+      { op: 'stato', outcome: 'ok' },
       { op: 'annullamento', outcome: 'accepted' },
     ]);
   });

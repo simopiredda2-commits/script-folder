@@ -1009,6 +1009,15 @@ a.coda:hover {
   background: var(--color-surface-muted);
 }
 
+/* Ricetta annullata: resta nello storico, riconoscibile a colpo d'occhio (D70). */
+.riga-annullata td {
+  background: var(--color-surface-muted);
+}
+
+.controllo-erogazione {
+  margin-top: 0.5rem;
+}
+
 .numero {
   font-variant-numeric: tabular-nums;
   text-align: right;

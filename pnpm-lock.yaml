@@ -152,7 +152,11 @@ importers:
 
   packages/domain: {}
 
-  packages/integrations: {}
+  packages/integrations:
+    dependencies:
+      '@mmg/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/reference:
     dependencies:

@@ -11,7 +11,7 @@ import {
 import { Icon } from '../components/Icon';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
-import { money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
+import { date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
 import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, posology, type Patient, type Summary, type TherapyRow } from './RecordPage';
@@ -66,6 +66,58 @@ export function useDebounced(value: string, ms = SEARCH_DELAY_MS): string {
     return () => clearTimeout(t);
   }, [value, ms]);
   return v;
+}
+
+interface PriorVoice {
+  ricetta: {
+    id: string;
+    stato: string;
+    nre: string | null;
+    inviataIl: string | null;
+    cartaceaIl: string | null;
+    preparataIl: string;
+    etichettaErogazione: string | null;
+  };
+}
+
+/**
+ * La stessa prestazione già prescritta (il caso di Simone: il paziente dice di non averla
+ * prenotata). Si vede subito quando e con che NRE, e lo stato presso l'ente se è stato verificato.
+ */
+function AlreadyPrescribed({
+  patientId,
+  code,
+  description,
+}: {
+  patientId: string;
+  code: string | null;
+  description: string | null;
+}) {
+  const q = query({ prestazione: code, descrizione: code ? null : description });
+  const h = useApi<{ voci: PriorVoice[] }>(`/api/pazienti/${patientId}/storico-prescrizioni${q}`);
+  const prior = (h.data?.voci ?? []).filter(
+    (v) => v.ricetta.stato === 'sent' || v.ricetta.stato === 'paper',
+  );
+  const last = prior[0];
+  if (!last) return null;
+  const r = last.ricetta;
+  return (
+    <Notice kind="avviso">
+      Già prescritta{prior.length > 1 ? ` ${prior.length} volte; l’ultima` : ''} il{' '}
+      {date(r.inviataIl ?? r.cartaceaIl ?? r.preparataIl)}
+      {r.nre && (
+        <>
+          {' '}
+          (NRE <span className="codice">{r.nre}</span>)
+        </>
+      )}
+      {r.etichettaErogazione
+        ? `. Presso l’ente: ${r.etichettaErogazione.toLowerCase()}.`
+        : '. Stato presso l’ente non ancora verificato.'}{' '}
+      Prima di prescriverla di nuovo, verifica lo stato nello{' '}
+      <Link to={`/pazienti/${patientId}/prestazioni${q}`}>storico della prestazione</Link>.
+    </Notice>
+  );
 }
 
 /** Descrizione breve di un farmaco della banca dati: confezione, classe, nota, DPC, piano. */
@@ -355,6 +407,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                     {n + 1}. {l.drugName ?? l.serviceDescription}
                     {l.aifaNote && <span className="etichetta">Nota {l.aifaNote}</span>}
                   </legend>
+                  {mode === 'specialistica' && (l.serviceCode || l.serviceDescription) && (
+                    <AlreadyPrescribed
+                      patientId={id!}
+                      code={l.serviceCode ?? null}
+                      description={l.serviceDescription ?? null}
+                    />
+                  )}
                   <div className="campi-riga">
                     <div className="campo campo-stretto">
                       <label htmlFor={`q-${l.key}`}>

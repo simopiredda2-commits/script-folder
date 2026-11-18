@@ -64,3 +64,37 @@ describe('nessuna chiamata a servizi reali (regola 7)', () => {
     }
   });
 });
+
+describe('stato di erogazione (D70)', () => {
+  const doctor = { userId: 'u1', name: 'Medico inventato' };
+  it('per difetto non ancora presa in carico; annullata dopo l’annullamento; sconosciuta se l’NRE non c’è', async () => {
+    const g = new SimulatedGateway('sar');
+    const sent = await g.send({
+      localId: 'r1',
+      kind: 'specialist_ssn',
+      patientFiscalCode: 'XXXXXX00X00X000X',
+      doctor,
+      lines: [{ serviceDescription: 'Visita di prova', quantity: 1 }],
+      compiledAt: '2026-11-18',
+    });
+    if (sent.outcome !== 'accepted') throw new Error('invio non accettato');
+    expect(await g.status({ nre: sent.nre, doctor })).toMatchObject({
+      outcome: 'ok',
+      state: 'non_erogata',
+    });
+    await g.cancel({ nre: sent.nre, reason: 'prova', doctor });
+    expect(await g.status({ nre: sent.nre, doctor })).toMatchObject({
+      outcome: 'ok',
+      state: 'annullata',
+    });
+    expect((await g.status({ nre: 'SCONOSCIUTO', doctor })).outcome).toBe('rejected');
+  });
+
+  it('nelle prove si sceglie lo stato, anche «non raggiungibile»', async () => {
+    const g = new SimulatedGateway('sar', {
+      decideStatus: (nre) => (nre === 'A' ? 'erogata' : 'unreachable'),
+    });
+    expect(await g.status({ nre: 'A', doctor })).toMatchObject({ outcome: 'ok', state: 'erogata' });
+    expect((await g.status({ nre: 'B', doctor })).outcome).toBe('unreachable');
+  });
+});
