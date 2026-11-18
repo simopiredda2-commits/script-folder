@@ -223,6 +223,7 @@ Scelta di Simone con il pulsante: «Terapia + collegamenti pronti». Decisioni D
 - Browser: 6 prove nuove, 19 in tutto. Coprono nuova terapia con gli errori, modifica con le unità corrette a mano, sospensione con reazione avversa e ripresa, schema orario (riservate e stampa), recapiti con l'errore spiegato, archivio con impostazioni ed esportazione. Su ognuna: axe, bersagli di 44 px e tablet.
 - Le schermate nuove hanno mostrato un difetto della tappa 6 (D68): sulle pagine corte la barra delle cartelle aperte si allungava fino a riempire lo schermo, perché la griglia della pagina dava la riga elastica al secondo elemento. Ora le righe hanno posti fissi, e una prova nel browser misura la barra sulla pagina Archivio.
 - Nelle schermate i campi data ora si leggono gg/mm/aaaa: il browser delle schermate parte con la lingua italiana.
+- La CI ha trovato una prova del menu (jsdom) che dipendeva dai tempi: cercava «Ricette» in tutta la pagina, e se «Oggi» aveva già caricato trovava anche «Ricette da firmare». Ora aspetta «Oggi» e cerca nel menu; un sabotaggio con la ricerca in tutta la pagina la fa diventare rossa ogni volta.
 - 14 sabotaggi nuovi, tutti rossi e poi verdi (registro sotto).
 
 **Non fatto**
@@ -456,3 +457,4 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D83: riservate fuori dallo schema                         | Filtro delle riservate tolto                       | Rosso, poi verde                                                                                                                                                                   |
 | D83: su carta solo il foglio                              | Regola di stampa tolta                             | Rosso, poi verde                                                                                                                                                                   |
 | Barra delle cartelle corta sulle pagine corte             | Righe della griglia come prima                     | Rosso, poi verde                                                                                                                                                                   |
+| Prova del menu senza dipendere dai tempi                  | Ricerca in tutta la pagina                         | Rosso, poi verde                                                                                                                                                                   |

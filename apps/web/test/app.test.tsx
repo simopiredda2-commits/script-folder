@@ -1,5 +1,5 @@
 import { COMPANY_BRAND, PRODUCT_NAME, productMark } from '@mmg/brand';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 
@@ -70,8 +70,11 @@ describe('interfaccia', () => {
     });
     render(<App />);
     const nav = await screen.findByRole('navigation', { name: 'Sezioni' });
+    // «Oggi» caricato: la prova non dipende più da chi arriva prima.
+    await screen.findByRole('link', { name: /^Ricette da firmare/ });
     for (const label of ['Oggi', 'Pazienti', 'Ricette', 'Farmaci e prestazioni']) {
-      const link = screen.getByRole('link', { name: new RegExp(`^${label}`) });
+      // Cercato nel menu: «Oggi» può avere già caricato «Ricette da firmare», un altro collegamento.
+      const link = within(nav).getByRole('link', { name: new RegExp(`^${label}`) });
       expect(nav.contains(link)).toBe(true);
       // Il simbolo è decorativo: il nome del collegamento è il testo.
       expect(link.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
