@@ -18,6 +18,7 @@ import {
   exemption,
   patient,
   prescription,
+  sickLeaveCertificate,
   prescriptionLine,
   problemDetail,
   studio,
@@ -60,6 +61,8 @@ export interface Scenario {
   richPatient: string;
   /** Bozza di ricetta del paziente ricco. */
   draftPrescription: string;
+  /** Bozza di certificato di malattia del paziente ricco. */
+  draftCertificate: string;
   /** Codici TOTP: il segreto di ogni utente dopo l'attivazione. */
   secrets: Map<string, Buffer>;
   /** Chiave dell'applicazione delle prove (credenziali cifrate). */
@@ -77,7 +80,12 @@ export async function createScenario(
   settings: Partial<typeof studio.$inferInsert> = {},
   appOptions: Pick<
     AppDeps,
-    'gateways' | 'preSendChecks' | 'reminderSender' | 'sendTimeoutMs' | 'secondFactor'
+    | 'gateways'
+    | 'preSendChecks'
+    | 'reminderSender'
+    | 'sendTimeoutMs'
+    | 'secondFactor'
+    | 'sickLeaveGateway'
   > = {},
 ): Promise<Scenario> {
   const clock = new Clock();
@@ -300,6 +308,28 @@ export async function createScenario(
     });
     return rows;
   });
+  const [certificate] = await withActor(db, users.titolare.id, (tx) =>
+    tx
+      .insert(sickLeaveCertificate)
+      .values({
+        patientId: rich,
+        archiveId: a1!.id,
+        preparedBy: users.titolare.id,
+        type: 'I',
+        visit: 'A',
+        releaseDate: studioDate(clock.now()),
+        startDate: studioDate(clock.now()),
+        endDate: studioDate(clock.now()),
+        residence: {
+          street: 'Via di Prova',
+          number: '1',
+          postalCode: '10100',
+          town: 'Torino',
+          province: 'TO',
+        },
+      })
+      .returning({ id: sickLeaveCertificate.id }),
+  );
 
   const app = buildApp({
     db,
@@ -318,6 +348,7 @@ export async function createScenario(
     patients: { titolare: p1, collega: p2 },
     richPatient: rich,
     draftPrescription: draft!.id,
+    draftCertificate: certificate!.id,
     secrets: new Map(),
     encryptionKey,
     secondFactor,

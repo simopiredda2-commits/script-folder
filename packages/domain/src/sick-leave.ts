@@ -152,3 +152,131 @@ export function canCancelSickLeave(
         reason: 'L’annullamento è ammesso solo entro il giorno successivo alla data di rilascio',
       };
 }
+
+/**
+ * Ciclo del certificato nel programma: bozza → in invio → inviato, oppure errore. Inviato →
+ * annullato (entro il giorno dopo il rilascio) o rettificato (entro la fine della prognosi, con un
+ * certificato nuovo e un protocollo nuovo). Gli stati sono del prodotto; i tempi sono del DM.
+ */
+export const CERTIFICATE_STATUSES = [
+  'draft',
+  'sending',
+  'sent',
+  'error',
+  'cancelled',
+  'rectified',
+] as const;
+export type CertificateStatus = (typeof CERTIFICATE_STATUSES)[number];
+
+export const CERTIFICATE_STATUS_LABELS: Record<CertificateStatus, string> = {
+  draft: 'Bozza',
+  sending: 'In invio',
+  sent: 'Inviato',
+  error: 'Errore',
+  cancelled: 'Annullato',
+  rectified: 'Rettificato',
+};
+
+export type CertificateEvent =
+  'edit' | 'start_sending' | 'send_succeeded' | 'send_failed' | 'cancel' | 'rectify';
+
+/** Perché l'ultimo invio non è andato: come per le ricette (rifiuto, rete, tempo, accesso). */
+export type CertificateErrorKind = 'rejected' | 'unreachable' | 'timeout' | 'auth';
+
+export type CertificateTransition =
+  { ok: true; to: CertificateStatus } | { ok: false; reason: string };
+
+export function certificateTransition(
+  from: CertificateStatus,
+  event: CertificateEvent,
+  ctx: { lastErrorKind?: CertificateErrorKind | null } = {},
+): CertificateTransition {
+  const ok = (to: CertificateStatus): CertificateTransition => ({ ok: true, to });
+  const no = (reason: string): CertificateTransition => ({ ok: false, reason });
+  const kind = ctx.lastErrorKind ?? null;
+  switch (event) {
+    case 'edit':
+      if (from === 'draft') return ok('draft');
+      if (from === 'error' && (kind === 'rejected' || kind === 'auth')) return ok('draft');
+      if (from === 'error')
+        return no('Un certificato senza risposta dell’INPS non si modifica: riprova l’invio');
+      return no('Un certificato inviato non si modifica: si rettifica o si annulla');
+    case 'start_sending':
+      if (from === 'draft') return ok('sending');
+      if (from === 'error' && (kind === 'unreachable' || kind === 'timeout' || kind === 'auth'))
+        return ok('sending');
+      if (from === 'error')
+        return no('L’INPS l’ha rifiutato: correggilo prima di inviarlo di nuovo');
+      if (from === 'sending') return no('Invio già in corso');
+      return no('Questo certificato non si può inviare');
+    case 'send_succeeded':
+      return from === 'sending' ? ok('sent') : no('Nessun invio in corso');
+    case 'send_failed':
+      return from === 'sending' ? ok('error') : no('Nessun invio in corso');
+    case 'cancel':
+      if (from === 'draft' || from === 'error' || from === 'sent') return ok('cancelled');
+      if (from === 'sending') return no('Invio in corso: aspetta la risposta');
+      return no('Già annullato o rettificato');
+    case 'rectify':
+      return from === 'sent' ? ok('rectified') : no('Si rettifica solo un certificato inviato');
+  }
+}
+
+/** Il giorno dopo, in AAAA-MM-GG: inizio di una continuazione. */
+export function nextDay(iso: string): string {
+  return addDays(iso, 1);
+}
+
+/** Giorni di prognosi, estremi compresi. */
+export function prognosisDays(startDate: string, endDate: string): number {
+  return Math.round((toTime(endDate) - toTime(startDate)) / DAY) + 1;
+}
+
+/** Indirizzo del certificato: residenza o reperibilità (schema XSD, tipo `indirizzo`). */
+export interface SickLeaveAddressInput {
+  street?: string | null;
+  number?: string | null;
+  postalCode?: string | null;
+  town?: string | null;
+  province?: string | null;
+  cadastralCode?: string | null;
+}
+
+/** Numero civico quando non c'è (specifiche, elemento civico). */
+export const NO_HOUSE_NUMBER = 'SNC';
+
+/** Nominativo presso l'abitazione: tipo `cognome` dello schema (2–24 lettere, spazi, apostrofo). */
+export const AVAILABILITY_NAME_PATTERN = /^[a-zA-Z ']{2,24}$/;
+
+/**
+ * Controlli di forma dell'indirizzo, con i codici d'errore dell'INPS: 421–437 per la residenza,
+ * 461–477 per la reperibilità. Formati dallo schema XSD delle specifiche 3.2: via 2–50 caratteri,
+ * civico 1–15 (SNC se manca), CAP di 5 cifre, comune fino a 25 caratteri, provincia di 2 lettere,
+ * codice catastale una lettera e tre cifre; serve il codice catastale o comune e provincia.
+ */
+export function checkSickLeaveAddress(
+  a: SickLeaveAddressInput,
+  kind: 'residenza' | 'reperibilita',
+): SickLeaveIssue[] {
+  const rep = kind === 'reperibilita';
+  const where = rep ? ' (reperibilità)' : '';
+  const issues: SickLeaveIssue[] = [];
+  const add = (residence: string, availability: string, message: string) =>
+    issues.push({ code: rep ? availability : residence, message: `${message}${where}` });
+  const street = a.street?.trim() ?? '';
+  const town = a.town?.trim() ?? '';
+  const province = a.province?.trim() ?? '';
+  const cadastral = a.cadastralCode?.trim() ?? '';
+  const number = a.number?.trim() ?? '';
+  if (street.length < 2 || street.length > 50) add('421', '461', 'Via: da 2 a 50 caratteri');
+  if (number.length > 15) add('422', '462', 'Numero civico: al più 15 caratteri (SNC se manca)');
+  if (cadastral && !/^[A-Za-z][0-9]{3}$/.test(cadastral))
+    add('434', '474', 'Codice catastale del comune: una lettera e tre cifre, per esempio H501');
+  if (!cadastral && (!town || !province))
+    add('433', '473', 'Serve il comune con la provincia, oppure il codice catastale');
+  if (town.length > 25) add('431', '471', 'Comune: al più 25 caratteri');
+  if (province && !/^[A-Za-z]{2}$/.test(province))
+    add('436', '476', 'Provincia: due lettere (EE per l’estero)');
+  if (!/^[0-9]{5}$/.test(a.postalCode?.trim() ?? '')) add('437', '477', 'CAP: cinque cifre');
+  return issues;
+}

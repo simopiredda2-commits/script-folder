@@ -3,6 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { accessLog } from '../src/db/schema';
 import {
+  CERTIFICATE_TABLES,
   ENTRY_TABLES,
   HANDLED_SEPARATELY,
   PATIENT_TABLES,
@@ -64,11 +65,13 @@ describe('esportazione completa dei dati del medico', () => {
   it('ogni tabella del database con dati dei pazienti è esportata', async () => {
     const res = await s.db.execute<{ table_name: string }>(sql`
       select distinct table_name from information_schema.columns
-      where table_schema = 'public' and column_name in ('patient_id', 'entry_id', 'prescription_id')`);
+      where table_schema = 'public'
+        and column_name in ('patient_id', 'entry_id', 'prescription_id', 'certificate_id')`);
     const known = new Set<string>([
       ...PATIENT_TABLES,
       ...ENTRY_TABLES,
       ...PRESCRIPTION_TABLES,
+      ...CERTIFICATE_TABLES,
       ...Object.keys(HANDLED_SEPARATELY),
     ]);
     for (const { table_name } of res.rows) expect(known, table_name).toContain(table_name);
@@ -76,6 +79,7 @@ describe('esportazione completa dei dati del medico', () => {
       ...PATIENT_TABLES,
       ...ENTRY_TABLES,
       ...PRESCRIPTION_TABLES,
+      ...CERTIFICATE_TABLES,
       'patient',
       'family',
     ]) {

@@ -41,7 +41,10 @@ describe('registro degli accessi', () => {
   it('ogni rotta sui dati di un paziente è marcata e passa dalla guardia', () => {
     const scoped = new Set(s.app.patientScopedRoutes.map((r) => `${r.method} ${r.url}`));
     const patientRoutes = s.app.allRoutes.filter(
-      (r) => r.url.startsWith('/api/pazienti/:id') || r.url.startsWith('/api/ricette/:id'),
+      (r) =>
+        r.url.startsWith('/api/pazienti/:id') ||
+        r.url.startsWith('/api/ricette/:id') ||
+        r.url.startsWith('/api/certificati/:id'),
     );
     expect(patientRoutes.length).toBeGreaterThanOrEqual(5);
     for (const r of patientRoutes)
@@ -57,7 +60,11 @@ describe('registro degli accessi', () => {
           method: route.method as 'GET',
           url: route.url.replace(
             ':id',
-            route.url.startsWith('/api/ricette/') ? s.draftPrescription : id,
+            route.url.startsWith('/api/ricette/')
+              ? s.draftPrescription
+              : route.url.startsWith('/api/certificati/')
+                ? s.draftCertificate
+                : id,
           ),
           headers: { cookie },
           payload:
@@ -207,7 +214,8 @@ describe('storico delle modifiche e dati mai cancellati', () => {
   it('ogni tabella con dati dei pazienti ha storico e divieto di cancellazione', async () => {
     const res = await s.db.execute<{ table_name: string }>(sql`
       select distinct table_name from information_schema.columns
-      where table_schema = 'public' and column_name in ('patient_id', 'entry_id', 'prescription_id')`);
+      where table_schema = 'public'
+        and column_name in ('patient_id', 'entry_id', 'prescription_id', 'certificate_id')`);
     const triggers = await s.db.execute<{ name: string }>(
       sql`select tgname as name from pg_trigger where not tgisinternal`,
     );
@@ -219,6 +227,8 @@ describe('storico delle modifiche e dati mai cancellati', () => {
       'prescription_check',
       'prescription_document',
       'reminder_delivery',
+      'certificate_submission',
+      'certificate_delivery',
     ];
     for (const { table_name } of res.rows) {
       if (appendOnly.includes(table_name)) continue;

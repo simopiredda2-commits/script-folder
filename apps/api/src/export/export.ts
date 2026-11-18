@@ -23,6 +23,7 @@ export const PATIENT_TABLES = [
   'appointment',
   'patient_request',
   'prescription',
+  'sick_leave_certificate',
 ] as const;
 
 export const ENTRY_TABLES = [
@@ -47,6 +48,9 @@ export const PRESCRIPTION_TABLES = [
   'prescription_document',
   'reminder_delivery',
 ] as const;
+
+/** Tabelle collegate per certificato: invii all'INPS e consegne di copia e attestato. */
+export const CERTIFICATE_TABLES = ['certificate_submission', 'certificate_delivery'] as const;
 
 /**
  * Tabelle con una colonna `patient_id` o `entry_id` che non stanno nelle liste sopra, con il
@@ -113,6 +117,14 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     tables[t] = await rows(
       db,
       sql`select * from ${sql.identifier(t)} where prescription_id = any(${pgArray(prescriptionIds)}::uuid[]) order by id`,
+    );
+  }
+
+  const certificateIds = tables.sick_leave_certificate!.map((c) => c.id as string);
+  for (const t of CERTIFICATE_TABLES) {
+    tables[t] = await rows(
+      db,
+      sql`select * from ${sql.identifier(t)} where certificate_id = any(${pgArray(certificateIds)}::uuid[]) order by id`,
     );
   }
 

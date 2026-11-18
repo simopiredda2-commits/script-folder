@@ -71,6 +71,13 @@
       "when": 1795003277939,
       "tag": "0009_credenziali_dei_servizi",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795004502741,
+      "tag": "0010_certificati",
+      "breakpoints": true
     }
   ]
 }

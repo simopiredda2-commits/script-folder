@@ -4,10 +4,12 @@ import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 import { createAuthService, type Actor } from './auth/service';
+import { createCertificateService } from './certificates/service';
 import type { Config } from './config';
 import { createCredentialService } from './credentials/service';
 import type { Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
+import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerCredentialRoutes } from './http/credentials-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
@@ -23,10 +25,12 @@ import {
   SimulatedGateway,
   SimulatedReminderSender,
   SimulatedSecondFactor,
+  SimulatedSickLeaveGateway,
   type GatewaySystem,
   type PrescriptionGateway,
   type ReminderSender,
   type SecondFactorGateway,
+  type SickLeaveGateway,
 } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
@@ -63,6 +67,8 @@ export interface AppDeps {
   gateways?: Record<GatewaySystem, PrescriptionGateway>;
   /** Secondo fattore (Id-Sessione) del Sistema TS e del SIRPED (D102). Per difetto i simulatori. */
   secondFactor?: Record<CredentialService, SecondFactorGateway>;
+  /** Certificati di malattia all'INPS tramite il Sistema TS. Per difetto il simulatore. */
+  sickLeaveGateway?: SickLeaveGateway;
   /** Controlli prima dell'invio delle ricette (regole di prescrizione). */
   preSendChecks?: PrescriptionDeps['preSendChecks'];
   /** Email e SMS del promemoria. Per difetto il simulatore (regola 7). */
@@ -81,6 +87,7 @@ export function buildApp({
     rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now }),
   },
   gateways = defaultGateways(secondFactor),
+  sickLeaveGateway = new SimulatedSickLeaveGateway({ now }),
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
   sendTimeoutMs,
@@ -171,6 +178,17 @@ export function buildApp({
     now ?? (() => new Date()),
   );
   registerReminderRoutes(app, createReminderService({ db, sender: reminderSender, now }));
+  registerCertificateRoutes(
+    app,
+    createCertificateService({
+      db,
+      gateway: sickLeaveGateway,
+      sender: reminderSender,
+      credentials,
+      reference,
+      now,
+    }),
+  );
   return app;
 }
 
