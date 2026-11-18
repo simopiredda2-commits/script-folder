@@ -1,0 +1,14 @@
+# Materiali ricevuti: non si riformattano
+LEGGIMI.md
+docs/requisiti.md
+docs/prototipi/
+sync/
+packages/brand/assets/script/
+
+# Generati
+pnpm-lock.yaml
+apps/api/migrations/meta/
+packages/brand/tokens.css
+coverage/
+dist/
+docs/ruoli-permessi.md

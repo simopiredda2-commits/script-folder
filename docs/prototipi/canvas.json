@@ -1,0 +1,22 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-17T18:55:00Z" },
+  "title": "Folder – Prime schermate",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 1440, "title": "Oggi", "expand": "fill", "is_interactive": true },
+    "Cartella.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 1440, "title": "Cartella paziente", "expand": "fill", "is_interactive": true },
+    "Ricetta.dc.html": { "x": 0, "y": 1560, "w": 1440, "h": 1320, "title": "Nuova ricetta", "expand": "fill", "is_interactive": true },
+    "Firma.dc.html": { "x": 1520, "y": 1560, "w": 1440, "h": 1720, "title": "Ricette da firmare", "expand": "fill", "is_interactive": true },
+    "Terapia.dc.html": { "x": 0, "y": 3400, "w": 1440, "h": 1680, "title": "Scheda della terapia", "expand": "fill", "is_interactive": true },
+    "CercaFarmaco.dc.html": { "x": 1520, "y": 3400, "w": 1440, "h": 1360, "title": "Cerca farmaco", "expand": "fill", "is_interactive": true },
+    "Specialistica.dc.html": { "x": 0, "y": 5200, "w": 1440, "h": 1560, "title": "Ricetta specialistica", "expand": "fill", "is_interactive": true },
+    "Esami.dc.html": { "x": 1520, "y": 5200, "w": 1440, "h": 1400, "title": "Esami di laboratorio", "expand": "fill", "is_interactive": true }
+  },
+  "order": ["Main.dc.html", "Cartella.dc.html", "Ricetta.dc.html", "Firma.dc.html", "Terapia.dc.html", "CercaFarmaco.dc.html", "Specialistica.dc.html", "Esami.dc.html"],
+  "notes": {
+    "titolo": { "x": 0, "y": -300, "text": "Folder — prime schermate (bozza, pazienti inventati)", "kind": "title1", "maxW": 2960 }
+  },
+  "designSystems": []
+}

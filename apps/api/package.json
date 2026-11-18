@@ -1,0 +1,29 @@
+{
+  "name": "@mmg/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "db:migrate": "tsx src/db/migrate-cli.ts",
+    "db:generate": "drizzle-kit generate",
+    "typecheck": "tsc --noEmit -p .",
+    "db:seed": "tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@mmg/brand": "workspace:*",
+    "@mmg/domain": "workspace:*",
+    "@mmg/fixtures": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "fastify": "^5.12.8",
+    "fflate": "^0.8.3",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11"
+  }
+}

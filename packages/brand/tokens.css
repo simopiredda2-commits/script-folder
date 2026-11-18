@@ -1,0 +1,34 @@
+/* File generato da tokens.ts con `pnpm --filter @mmg/brand tokens:css`: non modificarlo a mano. */
+:root {
+  --script-light-luce: #4D6BFE;
+  --script-light-ombra: #1B237A;
+  --script-light-testo: #0E1435;
+  --script-dark-luce: #8FA0FF;
+  --script-dark-ombra: #3B4DE0;
+  --script-dark-testo: #FFFFFF;
+  --color-background: #F5F6FA;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #ECEEF5;
+  --color-text: #0E1435;
+  --color-text-muted: #4A5070;
+  --color-border: #7A809C;
+  --color-divider: #D5D8E5;
+  --color-primary: #1B237A;
+  --color-on-primary: #FFFFFF;
+  --color-accent: #4D6BFE;
+  --color-focus: #4D6BFE;
+  --color-danger: #A4161A;
+  --color-danger-surface: #FCE9EA;
+  --color-warning: #7A4A00;
+  --color-warning-surface: #FFF3DC;
+  --color-success: #17663A;
+  --color-success-surface: #E5F4EA;
+  --color-info: #1B237A;
+  --color-info-surface: #E8ECFF;
+  --font-display: 'Special Gothic Expanded One', 'IBM Plex Sans', system-ui, sans-serif;
+  --font-text: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --size-min-target: 44px;
+  --size-base-font: 17px;
+  --radius: 8px;
+}

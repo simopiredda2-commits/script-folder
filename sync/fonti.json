@@ -1,0 +1,136 @@
+{
+  "versione": 1,
+  "verificate_il": "2026-11-17",
+  "legenda": "verificata=true: pagina e link controllati il 17/11/2026. verificata=false: indirizzo o link da confermare al primo giro; se non tornano, il rapporto lo segnala come errore.",
+  "fonti": [
+    {
+      "id": "aifa_liste",
+      "ente": "AIFA",
+      "titolo": "Liste dei farmaci: anagrafica, classe A e H, liste di trasparenza, carenze, registri e piani",
+      "tipo": "pagina",
+      "url": "https://www.aifa.gov.it/liste-dei-farmaci",
+      "filtro": "\\.csv(?:$|[/?#])",
+      "licenza": "CC BY 4.0: citare AIFA come fonte",
+      "cadenza_alla_fonte": "anagrafica ogni giorno; liste di trasparenza ogni mese, il 15; le altre quando AIFA le aggiorna",
+      "alimenta": "ricerca farmaci, gruppi di equivalenza, prezzi, carenze, registri e piani AIFA (R5, R6, R8, R13)",
+      "verificata": true,
+      "nota": "Il 17/11/2026 la pagina aveva 18 file CSV. AIFA avverte che i dati dell'anagrafica sono provvisori e hanno finalità solo descrittive.",
+      "soglia_righe": 0.2
+    },
+    {
+      "id": "aifa_note_pt",
+      "ente": "AIFA",
+      "titolo": "Note AIFA: piani terapeutici che sostituiscono alcune note",
+      "tipo": "pagina",
+      "url": "https://www.aifa.gov.it/note-aifa",
+      "filtro": "\\.pdf(?:$|[/?#])",
+      "licenza": "da verificare",
+      "cadenza_alla_fonte": "quando AIFA modifica una nota",
+      "alimenta": "R5, R7",
+      "verificata": true,
+      "nota": "Il 17/11/2026 la pagina aveva 4 PDF (piani ex note 12, 30, 30 bis, 32, 32 bis). L'elenco completo delle note è in un'altra pagina, da aggiungere dopo averne verificato l'indirizzo. Non ho trovato un elenco aperto che associ farmaci e note.",
+      "max_file": 20
+    },
+    {
+      "id": "piemonte_dpc",
+      "ente": "Regione Piemonte",
+      "titolo": "Farmaci PHT in distribuzione per conto (DPC)",
+      "tipo": "pagina",
+      "url": "https://www.regione.piemonte.it/web/node/964",
+      "filtro": "/media/\\d+/download",
+      "chiave": "farmaci_pht_dpc.pdf",
+      "licenza": "da verificare",
+      "cadenza_alla_fonte": "quando la Regione aggiorna l'elenco (ultimo aggiornamento 9/7/2026)",
+      "alimenta": "R5, R7, R8",
+      "verificata": true,
+      "nota": "Un PDF con principio attivo, ATC, nota AIFA e obbligo di piano terapeutico o scheda. Se la pagina mostra più di un file, il rapporto dà errore."
+    },
+    {
+      "id": "piemonte_catalogo",
+      "ente": "Regione Piemonte",
+      "titolo": "Catalogo regionale delle prestazioni di specialistica (D.D. 710 del 30/10/2026)",
+      "tipo": "pagina",
+      "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/2026/44/siste/00000074.htm",
+      "filtro": "\\.pdf(?:$|[/?#])",
+      "licenza": "da verificare",
+      "cadenza_alla_fonte": "con ogni nuova determina sul Bollettino ufficiale",
+      "alimenta": "R14, ricerca prestazioni ed esami",
+      "verificata": false,
+      "nota": "Pagina dell'atto presa dall'indice del BUR n. 44 del 5/11/2026; non ho visto i link agli allegati A, B, C, D in PDF. Il nuovo catalogo (allegato C) vale per le ricette dal 30/10/2026.",
+      "max_file": 10
+    },
+    {
+      "id": "piemonte_esenzioni_prestazioni",
+      "ente": "Regione Piemonte",
+      "titolo": "Esenzioni e prestazioni associate per il controllo bloccante del SAR (D.D. 1167/2022, allegato 1)",
+      "tipo": "file",
+      "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/2022/28/attach/dda1410001167_10100.pdf",
+      "licenza": "da verificare",
+      "cadenza_alla_fonte": "con gli atti regionali e nazionali sulle esenzioni (per esempio 068, 069 e 070 dal 30/10/2026)",
+      "alimenta": "R9, R17",
+      "verificata": true,
+      "nota": "PDF con ogni esenzione e le prestazioni associate (codici del catalogo regionale e del nomenclatore). È del 2022: gli aggiornamenti vanno cercati negli atti successivi (fonte piemonte_bur_osserva)."
+    },
+    {
+      "id": "piemonte_bur_osserva",
+      "ente": "Regione Piemonte",
+      "titolo": "Bollettino ufficiale: atti nuovi su catalogo, esenzioni, DPC e ricette",
+      "tipo": "osserva",
+      "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/{anno}/corrente/siste/index.htm",
+      "parole": ["catalogo regionale", "nomenclatore", "esenzion", "distribuzione per conto", "PHT", "ricetta", "prescrizion", "piano terapeutico", "nota AIFA", "specialistica ambulatoriale", "fascicolo sanitario"],
+      "licenza": "da verificare",
+      "cadenza_alla_fonte": "un numero ogni settimana",
+      "alimenta": "avviso: nuove regole regionali da recepire",
+      "verificata": false,
+      "nota": "Indirizzo del numero corrente da verificare. Non scarica nulla: segnala gli atti nuovi da leggere."
+    },
+    {
+      "id": "salute_nsis_class",
+      "ente": "Ministero della Salute",
+      "titolo": "ICD-10-IM e CIPI: elenchi e tabelle di transcodifica da ICD-9-CM",
+      "tipo": "pagina",
+      "url": "https://www.salute.gov.it/new/it/tema/assistenza-ospedaliera-sdo/il-progetto-nsis-class/",
+      "filtro": "\\.(?:xlsx|xls|zip|pdf)(?:$|[/?#])",
+      "licenza": "da verificare",
+      "cadenza_alla_fonte": "versione finale attesa a dicembre 2026; poi aggiornamenti almeno ogni due anni",
+      "alimenta": "problemi del paziente, certificati, transcodifica ICD-9-CM → ICD-10-IM",
+      "verificata": false,
+      "nota": "Pagina citata nei materiali della Regione Emilia-Romagna; link non controllati. Dal 1/1/2027 ICD-10-IM e CIPI sostituiscono ICD-9-CM nei flussi NSIS (DM 23/10/2025).",
+      "max_file": 40
+    },
+    {
+      "id": "istat_comuni",
+      "ente": "ISTAT",
+      "titolo": "Elenco dei comuni italiani (link permanente)",
+      "tipo": "file",
+      "url": "https://www.istat.it/storage/codici-unita-amministrative/Elenco-comuni-italiani.xlsx",
+      "licenza": "da verificare",
+      "cadenza_alla_fonte": "almeno ogni sei mesi (ultimo aggiornamento al 21/2/2026)",
+      "alimenta": "anagrafica, controllo del codice fiscale (la colonna del codice catastale è da confermare nel file)",
+      "verificata": true,
+      "nota": "Il link resta lo stesso a ogni aggiornamento del file."
+    }
+  ],
+  "non_scaricabili": [
+    {
+      "nome": "Banca dati Farmadati Italia (anche Codifa)",
+      "perche": "a licenza: serve un contratto",
+      "serve_per": "produzione: posologia strutturata, classe C, note per farmaco, interazioni"
+    },
+    {
+      "nome": "AURA, SAR e SAC (Sistema TS), Fascicolo sanitario, INPS",
+      "perche": "servizi in tempo reale con credenziali e accreditamento; non sono banche dati da scaricare",
+      "serve_per": "assistiti, esenzioni in corso, invio e controllo delle ricette, certificati"
+    },
+    {
+      "nome": "Codici di esenzione e prestazioni associate",
+      "perche": "non ho trovato un file strutturato ufficiale: sono negli allegati in PDF dei decreti sui LEA e negli atti regionali (il PDF regionale lo scarica la fonte piemonte_esenzioni_prestazioni)",
+      "serve_per": "R9"
+    },
+    {
+      "nome": "ICD-9-CM 2007 (versione italiana)",
+      "perche": "non ho trovato un file strutturato ufficiale; i codici compaiono nelle tabelle di transcodifica del Ministero (fonte salute_nsis_class)",
+      "serve_per": "problemi del paziente"
+    }
+  ]
+}

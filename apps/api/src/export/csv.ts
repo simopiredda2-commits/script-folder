@@ -1,0 +1,82 @@
+import { createHash } from 'node:crypto';
+import { strToU8, zipSync } from 'fflate';
+import type { ExportDocument } from './export';
+
+/**
+ * Esportazione in CSV, chiesta da Simone alla prima fermata (D32): un archivio ZIP con un file
+ * per tabella, apribile in un foglio di calcolo. Separatore «;» e UTF-8 con BOM, come si
+ * aspetta un foglio di calcolo in italiano; virgolette secondo la RFC 4180.
+ */
+export const CSV_SEPARATOR = ';';
+const BOM = '﻿';
+
+type Row = Record<string, unknown>;
+
+function cell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  let text: string;
+  if (value instanceof Date) text = value.toISOString();
+  else if (typeof value === 'string') text = value;
+  else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    text = String(value);
+  } else text = JSON.stringify(value);
+  return /[";\r\n]/.test(text) || text !== text.trim() ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+export function toCsv(columns: string[], rows: Row[]): string {
+  const lines = [columns.map(cell).join(CSV_SEPARATOR)];
+  for (const r of rows) lines.push(columns.map((c) => cell(r[c])).join(CSV_SEPARATOR));
+  return `${BOM}${lines.join('\r\n')}\r\n`;
+}
+
+const README = `Esportazione completa dei dati dell'archivio, in CSV.
+
+Un file per tabella, con la prima riga di intestazione (nomi delle colonne del database).
+Separatore: punto e virgola. Codifica: UTF-8 con BOM. Righe terminate da CRLF.
+Valori con punto e virgola, virgolette o a capo tra virgolette doppie (RFC 4180).
+Cella vuota = nessun valore. Valori composti (per esempio i dettagli del registro) in JSON.
+Date come AAAA-MM-GG; istanti come li scrive il database, in UTC.
+
+manifest.json elenca i file con il numero di righe e l'impronta SHA-256 di ciascuno.
+Il significato delle tabelle e delle colonne è in docs/modello-dati.md e docs/esportazione.md.
+`;
+
+/** Archivio ZIP con i CSV di tutte le sezioni dell'esportazione. */
+export function buildCsvZip(doc: ExportDocument): Uint8Array {
+  const sections: [string, Row[]][] = [
+    ...Object.entries(doc.tabelle),
+    ['storico_modifiche', doc.storico_modifiche],
+    ['registro_accessi', doc.registro_accessi],
+  ];
+  const files: Record<string, Uint8Array> = {};
+  const manifest: { file: string; righe: number; sha256: string }[] = [];
+  for (const [name, rows] of sections) {
+    const columns = doc.colonne[name] ?? [...new Set(rows.flatMap((r) => Object.keys(r)))];
+    const bytes = strToU8(toCsv(columns, rows));
+    const file = `${name}.csv`;
+    files[file] = bytes;
+    manifest.push({
+      file,
+      righe: rows.length,
+      sha256: createHash('sha256').update(bytes).digest('hex'),
+    });
+  }
+  files['LEGGIMI.txt'] = strToU8(README);
+  files['manifest.json'] = strToU8(
+    `${JSON.stringify(
+      {
+        formato: `${doc.formato}-csv`,
+        versione: doc.versione,
+        generato_il: doc.generato_il,
+        studio: doc.studio,
+        archivio: doc.archivio,
+        medico: doc.medico,
+        separatore: CSV_SEPARATOR,
+        file: manifest,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  return zipSync(files, { level: 6 });
+}
