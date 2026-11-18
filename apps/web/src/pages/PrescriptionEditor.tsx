@@ -12,6 +12,7 @@ import { Icon } from '../components/Icon';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
 import { money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
+import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, posology, type Patient, type Summary, type TherapyRow } from './RecordPage';
 
@@ -54,8 +55,8 @@ interface Line {
 }
 
 const SEARCH_DELAY_MS = 250;
-let counter = 0;
-const newKey = () => `riga-${++counter}`;
+/** Chiave stabile di una riga, anche dopo un ricaricamento (lo stato è ricordato). */
+const newKey = () => crypto.randomUUID();
 
 /** Ricerca con un piccolo ritardo, per non interrogare il servizio a ogni tasto. */
 export function useDebounced(value: string, ms = SEARCH_DELAY_MS): string {
@@ -85,13 +86,18 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const therapies = useApi<{ terapie: TherapyRow[] }>(
     mode === 'farmaci' ? `/api/pazienti/${id}/terapie` : null,
   );
-  const [kind, setKind] = useState(mode === 'farmaci' ? 'pharma_ssn' : 'specialist_ssn');
-  const [lines, setLines] = useState<Line[]>([]);
-  const [exemption, setExemption] = useState('');
-  const [channel, setChannel] = useState('');
-  const [accessType, setAccessType] = useState('first');
-  const [priority, setPriority] = useState('P');
-  const [question, setQuestion] = useState('');
+  // La ricetta in corso è ricordata per paziente (D68): si passa a un'altra cartella e si torna.
+  const k = (field: string) => `ricetta:${id}:${mode}:${field}`;
+  const [kind, setKind, resetKind] = usePersistentState(
+    k('tipo'),
+    mode === 'farmaci' ? 'pharma_ssn' : 'specialist_ssn',
+  );
+  const [lines, setLines, resetLines] = usePersistentState<Line[]>(k('righe'), []);
+  const [exemption, setExemption, resetExemption] = usePersistentState(k('esenzione'), '');
+  const [channel, setChannel, resetChannel] = usePersistentState(k('canale'), '');
+  const [accessType, setAccessType, resetAccess] = usePersistentState(k('accesso'), 'first');
+  const [priority, setPriority, resetPriority] = usePersistentState(k('priorita'), 'P');
+  const [question, setQuestion, resetQuestion] = usePersistentState(k('quesito'), '');
   const [text, setText] = useState('');
   const q = useDebounced(text);
   const search = useApi<{ farmaci?: Drug[]; prestazioni?: Service[]; versioni: DatasetVersion[] }>(
@@ -100,11 +106,16 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
       : null,
   );
   const versions = useApi<{ versioni: DatasetVersion[] }>(`/api/banche-dati`);
-  const [draft, setDraft] = useState<{
+  const [draft, setDraft, resetDraft] = usePersistentState<{
     id: string;
     status: string;
     lineIds: Record<string, string>;
-  } | null>(null);
+    nre?: string;
+  } | null>(k('bozza'), null);
+  const startOver = () => {
+    for (const reset of [resetKind, resetLines, resetExemption, resetChannel, resetAccess]) reset();
+    for (const reset of [resetPriority, resetQuestion, resetDraft]) reset();
+  };
   const [error, setError] = useState<ApiError | null>(null);
 
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
@@ -519,16 +530,37 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               </button>
             </div>
           )}
-          {draft && (
+          {draft && draft.status === 'sent' && (
+            <Notice kind="fatto">
+              Ricetta inviata.
+              {draft.nre && (
+                <>
+                  {' '}
+                  NRE <span className="codice">{draft.nre}</span>
+                </>
+              )}
+            </Notice>
+          )}
+          {draft && draft.status === 'paper' && (
+            <Notice kind="fatto">Ricetta rossa pronta per la stampa.</Notice>
+          )}
+          {draft && draft.status !== 'sent' && draft.status !== 'paper' && (
             <>
               <Notice kind="fatto">Ricetta preparata in bozza. Si controlla e poi si firma.</Notice>
               <SendPanel
                 prescriptionId={draft.id}
                 status={draft.status}
                 lineNames={draft.lineIds}
-                onChange={(status) => setDraft({ ...draft, status })}
+                onChange={(status, nre) => setDraft({ ...draft, status, ...(nre ? { nre } : {}) })}
               />
             </>
+          )}
+          {(draft || lines.length > 0) && (
+            <div className="azioni">
+              <button type="button" className="pulsante" onClick={startOver}>
+                <Icon name="ripeti" /> <span>{draft ? 'Nuova ricetta da capo' : 'Ricomincia'}</span>
+              </button>
+            </div>
           )}
         </section>
       </div>

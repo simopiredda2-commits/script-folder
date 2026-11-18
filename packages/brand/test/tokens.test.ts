@@ -39,6 +39,9 @@ describe('contrasti WCAG 2.2 AA dell’interfaccia', () => {
     ['warning', 'warningSurface', 'avviso'],
     ['success', 'successSurface', 'esito positivo'],
     ['info', 'infoSurface', 'informazione'],
+    ['onMark', 'mark', 'testo sull’evidenziatore'],
+    ['textMuted', 'mark', 'testo secondario sull’evidenziatore'],
+    ['warning', 'surface', 'avviso su scheda'],
   ];
   it.each(text)('%s su %s (%s) ≥ 4,5:1', (fg, bg) => {
     const ratio = contrastRatio(

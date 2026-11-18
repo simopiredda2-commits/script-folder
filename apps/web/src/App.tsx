@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { Loading } from './components/common';
 import { Shell } from './components/Shell';
+import { OpenRecordsProvider } from './lib/openRecords';
 import { SessionProvider, useSession } from './lib/session';
 import { DataSearchPage } from './pages/DataSearchPage';
 import { ExamsPage } from './pages/ExamsPage';
@@ -19,24 +20,26 @@ function Screens() {
   if (state.status === 'anonymous') return <LoginPage />;
   if (state.status === 'locked') return <LockScreen />;
   return (
-    <Shell>
-      <Routes>
-        <Route path="/" element={<TodayPage />} />
-        <Route path="/pazienti" element={<PatientsPage />} />
-        <Route path="/pazienti/:id" element={<RecordPage />} />
-        <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
-        <Route
-          path="/pazienti/:id/specialistica"
-          element={<PrescriptionEditor mode="specialistica" />}
-        />
-        <Route path="/pazienti/:id/esami" element={<ExamsPage />} />
-        <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
-        <Route path="/pazienti/:id/prestazioni" element={<ServiceHistoryPage />} />
-        <Route path="/ricette" element={<SignQueuePage />} />
-        <Route path="/banche-dati" element={<DataSearchPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Shell>
+    <OpenRecordsProvider>
+      <Shell>
+        <Routes>
+          <Route path="/" element={<TodayPage />} />
+          <Route path="/pazienti" element={<PatientsPage />} />
+          <Route path="/pazienti/:id" element={<RecordPage />} />
+          <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
+          <Route
+            path="/pazienti/:id/specialistica"
+            element={<PrescriptionEditor mode="specialistica" />}
+          />
+          <Route path="/pazienti/:id/esami" element={<ExamsPage />} />
+          <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
+          <Route path="/pazienti/:id/prestazioni" element={<ServiceHistoryPage />} />
+          <Route path="/ricette" element={<SignQueuePage />} />
+          <Route path="/banche-dati" element={<DataSearchPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Shell>
+    </OpenRecordsProvider>
   );
 }
 

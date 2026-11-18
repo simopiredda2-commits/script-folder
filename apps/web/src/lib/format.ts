@@ -30,15 +30,16 @@ export function time(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** «martedì 18 novembre 2026» */
+/** «Mercoledì 18 novembre 2026»: maiuscola solo all'inizio, i mesi restano minuscoli. */
 export function longDate(isoDate: string): string {
-  return new Intl.DateTimeFormat('it-IT', {
+  const text = new Intl.DateTimeFormat('it-IT', {
     timeZone: 'UTC',
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     year: 'numeric',
   }).format(new Date(`${isoDate}T12:00:00Z`));
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** Età in anni compiuti alla data di oggi. */

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
+import { useOpenRecords } from '../lib/openRecords';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError, query } from '../lib/api';
@@ -65,7 +66,10 @@ export const posology = (t: TherapyRow) =>
     .filter(Boolean)
     .join(', ');
 
-/** Testata della cartella: chi è il paziente, allergie ed esenzioni sempre in vista. */
+/**
+ * Testata della cartella: chi è il paziente, allergie ed esenzioni sempre in vista. Ogni pagina
+ * di un paziente la mostra, e aprendola il paziente entra tra le cartelle aperte (D68).
+ */
 export function PatientBanner({
   patient,
   summary,
@@ -74,6 +78,18 @@ export function PatientBanner({
   summary?: Summary | null;
 }) {
   const [showCf, setShowCf] = useState(false);
+  const { open } = useOpenRecords();
+  const location = useLocation();
+  useEffect(() => {
+    open({
+      id: patient.id,
+      lastName: patient.lastName,
+      firstName: patient.firstName,
+      birthDate: patient.birthDate,
+      lastPath: location.pathname + location.search,
+    });
+    // Solo all'apertura del paziente: i cambi di pagina li segue la barra delle cartelle.
+  }, [patient.id]);
   return (
     <div className="testata-paziente">
       <p className="testata-dati">
@@ -258,7 +274,8 @@ export function RecordPage() {
                   <div key={x.parametro}>
                     <dt>{x.parametro}</dt>
                     <dd>
-                      {x.valore} {x.unita} <span className="tenue">· {date(x.data)}</span>
+                      {x.valore} {x.unita}
+                      <span className="parametro-data">{date(x.data)}</span>
                     </dd>
                   </div>
                 ))}

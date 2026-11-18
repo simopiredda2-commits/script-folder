@@ -3,13 +3,12 @@
  * accesso con password e secondo fattore, le schermate della tappa 6, accessibilità (axe-core,
  * WCAG 2.2 AA), bersagli di almeno 44 px, impaginazione su tablet. Nessun sito esterno.
  */
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { createServer, request, type Server } from 'node:http';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import type { Server } from 'node:http';
 import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { extname, join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { loadMappings, overrideMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
@@ -36,9 +35,8 @@ import { base32Decode } from '../../src/security/base32';
 import { totp } from '../../src/security/totp';
 import { createScenario, PASSWORD, type Scenario } from '../helpers/scenario';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db';
+import { buildWeb, serveWeb } from './serve-web';
 
-const ROOT = resolve(import.meta.dirname, '..', '..', '..', '..');
-const WEB = join(ROOT, 'apps', 'web');
 const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf-8');
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 const MIN_TARGET = 44;
@@ -46,46 +44,6 @@ const TABLETS = [
   { width: 768, height: 1024 },
   { width: 1024, height: 768 },
 ];
-const TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.svg': 'image/svg+xml',
-  '.woff2': 'font/woff2',
-  '.woff': 'font/woff',
-};
-
-/** Serve dist/ e passa /api al servizio, come farà il dominio dello studio. */
-function serveWeb(dist: string, apiPort: number): Promise<Server> {
-  const server = createServer((req, res) => {
-    if (req.url?.startsWith('/api/')) {
-      const upstream = request(
-        {
-          host: '127.0.0.1',
-          port: apiPort,
-          path: req.url,
-          method: req.method,
-          headers: req.headers,
-        },
-        (r) => {
-          res.writeHead(r.statusCode ?? 502, r.headers);
-          r.pipe(res);
-        },
-      );
-      req.pipe(upstream);
-      return;
-    }
-    const path = join(dist, decodeURIComponent(new URL(req.url ?? '/', 'http://x').pathname));
-    const file =
-      path.startsWith(dist) && existsSync(path) && statSync(path).isFile()
-        ? path
-        : join(dist, 'index.html');
-    res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream' });
-    res.end(readFileSync(file));
-  });
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(server)));
-}
-
 describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   let t: TestDatabase;
   let s: Scenario;
@@ -181,7 +139,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       const wide = await p.evaluate(() =>
         [...document.querySelectorAll('body *')]
           .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 0.5)
-          .filter((el) => !el.closest('.tabella-scorrevole'))
+          // Le tabelle larghe e la barra delle cartelle aperte scorrono nel loro riquadro.
+          .filter((el) => !el.closest('.tabella-scorrevole, .schede-aperte'))
           .slice(0, 5)
           .map(
             (el) =>
@@ -272,15 +231,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
     await s.app.listen({ port: 0, host: '127.0.0.1' });
     const apiPort = (s.app.server.address() as AddressInfo).port;
-    const dist = join(work, 'dist');
-    execFileSync(
-      join(WEB, 'node_modules', '.bin', 'vite'),
-      ['build', '--outDir', dist, '--emptyOutDir'],
-      {
-        cwd: WEB,
-        stdio: 'pipe',
-      },
-    );
+    const dist = buildWeb(join(work, 'dist'));
     web = await serveWeb(dist, apiPort);
     base = `http://127.0.0.1:${(web.address() as AddressInfo).port}`;
     browser = await chromium.launch();
@@ -427,6 +378,38 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'ricette da firmare', true);
     await page.getByRole('button', { name: 'Firma e invia' }).first().click();
     await page.getByText(/Ricetta inviata per/).waitFor();
+  });
+
+  it('più cartelle aperte insieme (D68): schede, ritorno alla pagina lasciata, ricetta ricordata', async () => {
+    const otherId = s.patients.titolare.find((x) => x !== s.richPatient)!;
+    const [other] = await t.db.select().from(patient).where(eq(patient.id, otherId));
+    // Ricetta in corso per il primo paziente, non ancora preparata.
+    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
+    await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
+    // La ricetta inviata in una prova precedente è ricordata: si ricomincia da capo.
+    const restart = page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
+    const item = page.locator('.risultato').filter({ hasText: '14 compresse' });
+    await item.waitFor();
+    await item.getByRole('button', { name: 'Aggiungi' }).click();
+    // Il secondo paziente: la sua cartella diventa quella attiva.
+    await page.goto(`${base}/pazienti/${otherId}`);
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    const bar = page.getByRole('navigation', { name: 'Cartelle aperte' });
+    await expect(bar.locator('a[aria-current="page"]').innerText()).resolves.toContain(
+      other!.lastName,
+    );
+    await check(page, 'cartelle aperte', true);
+    // Dalla scheda si torna alla ricetta lasciata a metà, con la riga ancora lì.
+    await bar.getByRole('link', { name: new RegExp(lastName) }).click();
+    await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
+    await page.locator('.riga-ricetta').filter({ hasText: '14 compresse' }).waitFor();
+    // Chiudere una scheda non tocca le altre.
+    await bar
+      .getByRole('button', { name: `Chiudi la cartella di ${other!.lastName} ${other!.firstName}` })
+      .click();
+    await expect(bar.getByRole('link').count()).resolves.toBe(1);
   });
 
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {

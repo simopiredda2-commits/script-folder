@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api, ApiError, onAuthProblem } from './api';
+import { clearStored } from './storage';
 
 export interface Me {
   id: string;
@@ -47,12 +48,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
     return onAuthProblem((status) => {
+      // Sessione finita: niente dati dei pazienti resta nel browser. Bloccata: si riprende da lì.
+      if (status === 401) clearStored();
       setState(status === 423 ? { status: 'locked' } : { status: 'anonymous' });
     });
   }, [refresh]);
 
   const logout = useCallback(async () => {
     await api('/api/uscita', { method: 'POST', body: {} });
+    clearStored();
     setState({ status: 'anonymous' });
   }, []);
 

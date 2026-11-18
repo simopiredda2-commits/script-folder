@@ -42,11 +42,19 @@ export const uiColors = {
   accent: scriptColors.light.luce,
   /** Anello di messa a fuoco. */
   focus: scriptColors.light.luce,
+  /**
+   * Evidenziatore giallo dei prototipi, ripreso su richiesta di Simone (D69): solo come sfondo
+   * (contatori, cartella attiva, selezioni), sempre con onMark per il testo. Mai per il testo né
+   * per gli avvisi: il giallo vuol dire «in evidenza», non «attenzione».
+   */
+  mark: '#FFE45C',
+  onMark: scriptColors.light.testo,
   /** Stati: sempre accompagnati da una parola, mai solo colore. */
   danger: '#A4161A',
   dangerSurface: '#FCE9EA',
-  warning: '#7A4A00',
-  warningSurface: '#FFF3DC',
+  /** Attenzione: arancio bruciato, per non confondersi con l'evidenziatore giallo (D69). */
+  warning: '#8A3B00',
+  warningSurface: '#FFE9D6',
   success: '#17663A',
   successSurface: '#E5F4EA',
   info: scriptColors.light.ombra,
