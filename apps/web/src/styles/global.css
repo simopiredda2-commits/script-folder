@@ -1717,3 +1717,36 @@ textarea[aria-invalid='true'] {
 .dati-fissi dd {
   margin: 0;
 }
+
+/* Modelli dei certificati (tappa 13) ------------------------------------------------------- */
+
+.segnaposto {
+  margin: 0 0 1rem;
+}
+
+.segnaposto summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-min-target);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.segnaposto dl {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 0;
+}
+
+.segnaposto dl > div {
+  display: contents;
+}
+
+.segnaposto dt {
+  overflow-wrap: anywhere;
+}
+
+.segnaposto dd {
+  margin: 0;
+}

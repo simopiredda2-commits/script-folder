@@ -46,3 +46,31 @@ export function query(params: Record<string, string | undefined | null>): string
   const s = p.toString();
   return s ? `?${s}` : '';
 }
+
+/**
+ * PDF dal servizio (anteprime, prove di stampa): lo stesso errore in chiaro di `api` se qualcosa
+ * non va, altrimenti il file da aprire.
+ */
+export async function apiPdf(path: string, body?: unknown): Promise<Blob> {
+  const res = await fetch(path, {
+    method: body === undefined ? 'GET' : 'POST',
+    credentials: 'same-origin',
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    const err = (text ? JSON.parse(text) : {}) as { errore?: string; dettagli?: unknown };
+    if (res.status === 401 || res.status === 423) for (const l of listeners) l(res.status);
+    throw new ApiError(res.status, err.errore ?? `Errore ${res.status}`, err.dettagli);
+  }
+  return res.blob();
+}
+
+/** Apre un PDF in una scheda nuova del browser. */
+export function openPdf(blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  // Il browser ha già aperto il file: l'indirizzo temporaneo si libera dopo un po'.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

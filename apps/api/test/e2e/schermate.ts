@@ -342,7 +342,7 @@ try {
   const worker = adult.rows[0]!.id;
   // Dalla cartella, come fa il medico: così il paziente è tra le cartelle aperte.
   await page.goto(`${base}/pazienti/${worker}`);
-  await page.getByRole('link', { name: 'Certificati' }).click();
+  await page.getByRole('link', { name: 'Certificati', exact: true }).click();
   await page.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
   await page.getByRole('button', { name: 'Nuovo certificato' }).click();
   await page

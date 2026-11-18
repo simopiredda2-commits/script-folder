@@ -436,6 +436,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await check(sec, 'cartella vista dalla segreteria');
       // La segreteria non scrive le terapie e non ha un archivio suo.
       await expect(sec.getByRole('link', { name: 'Nuova terapia' }).count()).resolves.toBe(0);
+      // Né gli strumenti dello studio (modelli, impaginazione, Fascicolo).
+      await expect(
+        sec
+          .getByRole('navigation', { name: 'Sezioni' })
+          .getByRole('link', { name: 'Strumenti' })
+          .count(),
+      ).resolves.toBe(0);
       await expect(
         sec
           .getByRole('navigation', { name: 'Sezioni' })
@@ -691,7 +698,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .where(eq(patient.id, s.richPatient)),
     );
     await page.goto(`${base}/pazienti/${s.richPatient}`);
-    await page.getByRole('link', { name: 'Certificati' }).click();
+    await page.getByRole('link', { name: 'Certificati', exact: true }).click();
     await page.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
     await page.getByRole('button', { name: 'Nuovo certificato' }).click();
     const end = studioDate(new Date(s.clock.now().getTime() + 2 * 86_400_000));
@@ -939,13 +946,6 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('button', { name: 'Salva i recapiti' }).click();
     await page.getByText('Recapiti salvati.').waitFor();
     await check(page, 'recapiti di studio', true);
-    // Il medico non ha «Strumenti» nel menu.
-    await expect(
-      page
-        .getByRole('navigation', { name: 'Sezioni' })
-        .getByRole('link', { name: 'Strumenti' })
-        .count(),
-    ).resolves.toBe(0);
 
     const ctx = await browser.newContext({
       viewport: { width: 1280, height: 900 },
@@ -959,6 +959,9 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .getByRole('link', { name: 'Strumenti' })
         .click();
       await admin.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
+      // L'amministratore non è medico: niente impaginazione, che è del medico.
+      await expect(admin.getByRole('button', { name: 'Impaginazione' }).count()).resolves.toBe(0);
+      await admin.getByRole('button', { name: 'Fascicolo sanitario' }).click();
       await admin.getByText('Impostazioni complete.').waitFor();
       expect(await admin.getByLabel('Tipo di attività clinica').inputValue()).toBe('OBS');
       await admin.getByLabel('Regime').selectOption('SSN');
@@ -968,6 +971,81 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     } finally {
       await ctx.close();
     }
+  });
+
+  it('modelli dei certificati: impaginazione del medico, modello dello studio, rilascio e annullamento (tappa 13)', async () => {
+    // Impaginazione del medico, con la prova di stampa.
+    await page
+      .getByRole('navigation', { name: 'Sezioni' })
+      .getByRole('link', { name: 'Strumenti' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
+    await page.getByRole('button', { name: 'Impaginazione' }).click();
+    await page.getByRole('heading', { name: 'Impaginazione dei certificati' }).waitFor();
+    await page.getByLabel('Con grazie (Times)').check();
+    await page
+      .getByLabel('Intestazione', { exact: true })
+      .fill('Dott.ssa Medica Inventata\nMedicina generale – Via di prova 1');
+    await page.getByLabel('Al centro').check();
+    await page.getByLabel('Luogo proposto per «luogo e data»').fill('Comune di prova');
+    await page.getByLabel('Timbro').fill('Timbro di prova');
+    const [proof] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/api/profilo/impaginazione/anteprima')),
+      page.getByRole('button', { name: 'Prova di stampa (PDF)' }).click(),
+    ]);
+    expect(proof.headers()['content-type']).toBe('application/pdf');
+    for (const other of doctor.pages()) if (other !== page) await other.close();
+    await page.getByRole('button', { name: 'Salva l’impaginazione' }).click();
+    await page.getByText('Impaginazione salvata.').waitFor();
+    await check(page, 'impaginazione dei certificati', true);
+
+    // Un modello dello studio, con i segnaposto.
+    await page.getByRole('button', { name: 'Modelli dei certificati' }).click();
+    await page.getByRole('heading', { name: 'Modelli dello studio' }).waitFor();
+    await page.getByLabel('Titolo').fill('Certificato di prova nel browser');
+    await page
+      .getByLabel('Testo', { exact: true })
+      .fill(
+        'Si certifica che {{paziente.cognome}} {{paziente.nome}}, nato/a il {{paziente.nato_il}}: {{campo.testo}}\n\n{{rilascio.luogo}}, {{rilascio.data}}',
+      );
+    await page.getByRole('button', { name: 'Salva il modello' }).click();
+    await page.getByText('Modello salvato.').waitFor();
+    await page.locator('.voce').filter({ hasText: 'Certificato di prova nel browser' }).waitFor();
+    await page.getByText('Segnaposto che si possono usare').click();
+    await check(page, 'modelli dei certificati', true);
+
+    // Dalla cartella: anteprima, rilascio, PDF, annullamento.
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Altri certificati' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Altri certificati' }).waitFor();
+    await page.getByLabel('Modello').selectOption({ label: 'Certificato di prova nel browser' });
+    expect(await page.getByLabel('Luogo del rilascio').inputValue()).toBe('Comune di prova');
+    await page.getByLabel('Testo', { exact: true }).fill('testo scritto nel browser.');
+    const [preview] = await Promise.all([
+      page.waitForResponse((r) => r.url().endsWith('/certificati-modelli/anteprima')),
+      page.getByRole('button', { name: 'Anteprima (PDF)' }).click(),
+    ]);
+    expect(preview.headers()['content-type']).toBe('application/pdf');
+    for (const other of doctor.pages()) if (other !== page) await other.close();
+    await check(page, 'altri certificati, prima del rilascio', true);
+    await page.getByRole('button', { name: 'Rilascia il certificato' }).click();
+    await page
+      .getByText('Certificato rilasciato: è nella cartella, da stampare e firmare.')
+      .waitFor();
+    const item = page.locator('.voce').filter({ hasText: 'Certificato di prova nel browser' });
+    const href = await item.getByRole('link', { name: /PDF/ }).getAttribute('href');
+    const pdf = await page.request.get(`${base}${href}`);
+    expect(pdf.headers()['content-type']).toBe('application/pdf');
+    // La bozza si cancella dopo il rilascio.
+    expect(await page.getByLabel('Modello').inputValue()).toBe('');
+    await item.getByRole('button', { name: /Annulla/ }).click();
+    await item.getByLabel('Motivo dell’annullamento').fill('Rilasciato per prova');
+    await item.getByRole('button', { name: 'Conferma l’annullamento' }).click();
+    await item.locator('.etichetta', { hasText: 'Annullato' }).waitFor();
+    await check(page, 'altri certificati, rilasciati', true);
   });
 
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {

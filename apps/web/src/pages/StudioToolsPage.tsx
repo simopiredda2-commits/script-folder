@@ -1,8 +1,11 @@
 import { useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
+import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { LayoutSection, TemplatesSection } from './TemplatesTools';
 
 interface Option {
   codice: string;
@@ -68,32 +71,79 @@ function initial(s: Settings | null): Record<FieldKey, string> {
   };
 }
 
+const SECTIONS = [
+  { key: 'modelli', label: 'Modelli dei certificati', doctorOnly: false },
+  { key: 'impaginazione', label: 'Impaginazione', doctorOnly: true },
+  { key: 'fascicolo', label: 'Fascicolo sanitario', doctorOnly: false },
+] as const;
+
 /**
- * Strumenti dello studio: per ora le impostazioni del Fascicolo Sanitario Elettronico (tappa 11).
- * Sono i valori che lo studio riceve con l'accreditamento presso il Gateway: li inserisce
- * l'amministratore; chi lavora nello studio li legge.
+ * Strumenti dello studio: modelli dei certificati e impaginazione del medico (tappa 13),
+ * impostazioni del Fascicolo Sanitario Elettronico (tappa 11). Le impostazioni del Fascicolo sono i
+ * valori dell'accreditamento presso il Gateway: le inserisce l'amministratore, gli altri le leggono.
  */
 export function StudioToolsPage() {
-  const current = useApi<FseSettings>('/api/studio/fascicolo');
-  if (current.loading && !current.data) return <Loading what="impostazioni dello studio" />;
-  if (!current.data) return <ErrorMessage error={current.error} />;
+  const { isDoctor } = useSession();
+  const [params, setParams] = useSearchParams();
+  const sections = SECTIONS.filter((x) => !x.doctorOnly || isDoctor);
+  const current = sections.find((x) => x.key === params.get('sezione')) ?? sections[0]!;
   return (
     <>
       <PageHeader title="Strumenti dello studio" />
-      <FseSettingsForm
-        key={JSON.stringify(current.data.impostazioni)}
-        data={current.data}
-        onSaved={current.reload}
-      />
+      <div className="schede" role="group" aria-label="Sezione degli strumenti">
+        {sections.map((x) => (
+          <button
+            key={x.key}
+            type="button"
+            className="scheda"
+            aria-pressed={current.key === x.key}
+            onClick={() => setParams({ sezione: x.key }, { replace: true })}
+          >
+            {x.label}
+          </button>
+        ))}
+      </div>
+      {current.key === 'modelli' && <TemplatesSection />}
+      {current.key === 'impaginazione' && <LayoutSection />}
+      {current.key === 'fascicolo' && <FseSection />}
     </>
   );
 }
 
-function FseSettingsForm({ data, onSaved }: { data: FseSettings; onSaved: () => void }) {
+function FseSection() {
+  const current = useApi<FseSettings>('/api/studio/fascicolo');
+  // Il messaggio sta fuori dal modulo, che si rifà con i dati salvati.
+  const [saved, setSaved] = useState(false);
+  if (current.loading && !current.data) return <Loading what="impostazioni dello studio" />;
+  if (!current.data) return <ErrorMessage error={current.error} />;
+  return (
+    <>
+      <FseSettingsForm
+        key={JSON.stringify(current.data.impostazioni)}
+        data={current.data}
+        onSaving={() => setSaved(false)}
+        onSaved={() => {
+          setSaved(true);
+          current.reload();
+        }}
+      />
+      {saved && <Notice kind="fatto">Impostazioni salvate.</Notice>}
+    </>
+  );
+}
+
+function FseSettingsForm({
+  data,
+  onSaving,
+  onSaved,
+}: {
+  data: FseSettings;
+  onSaving: () => void;
+  onSaved: () => void;
+}) {
   const [f, setF] = useState(() => initial(data.impostazioni));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
-  const [saved, setSaved] = useState(false);
   const s = data.impostazioni;
   const readOnly = !data.puoModificare;
   const set = (k: FieldKey, v: string) => setF((x) => ({ ...x, [k]: v }));
@@ -102,7 +152,7 @@ function FseSettingsForm({ data, onSaved }: { data: FseSettings; onSaved: () => 
     e.preventDefault();
     setBusy(true);
     setError(null);
-    setSaved(false);
+    onSaving();
     try {
       await api('/api/studio/fascicolo', {
         method: 'PUT',
@@ -124,7 +174,6 @@ function FseSettingsForm({ data, onSaved }: { data: FseSettings; onSaved: () => 
           regime: f.regime,
         },
       });
-      setSaved(true);
       onSaved();
     } catch (err) {
       setError(err instanceof ApiError ? err : new ApiError(0, 'Servizio non raggiungibile'));
@@ -271,7 +320,6 @@ function FseSettingsForm({ data, onSaved }: { data: FseSettings; onSaved: () => 
         </div>
       )}
       <ErrorMessage error={error} />
-      {saved && <Notice kind="fatto">Impostazioni salvate.</Notice>}
     </form>
   );
 }

@@ -290,6 +290,9 @@ export function RecordPage() {
         <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/privacy`}>
           <Icon name="lucchetto" /> <span>Privacy</span>
         </Link>
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/certificati-modelli`}>
+          <Icon name="ricette" /> <span>Altri certificati</span>
+        </Link>
         <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/profilo-sanitario`}>
           <Icon name="archivio" /> <span>Profilo sanitario sintetico</span>
         </Link>

@@ -503,3 +503,27 @@ Nessuno può impedire a un terzo di avanzare una pretesa. Si può fare in modo c
 Ordine: prima si chiude la tappa 11, poi la tappa 13 (modelli), poi la 12 (condivisione nell'AFT). La fermata resta dopo la tappa 12 e copre tutte e tre. Motivo: i modelli poggiano su due pagine appena fatte, «Strumenti dello studio» e i recapiti del medico; e Simone li ha chiesti due volte.
 
 I testi dei modelli vengono solo dagli atti ufficiali (D142): dove un modello ufficiale non c'è, il testo lo scriviamo noi dai requisiti di legge, e lo segniamo da far verificare. Prima di costruire si leggono le fonti.
+
+**D144 · Come sono fatti i modelli.** Ci sono due tipi di modello.
+
+- **Modelli ufficiali.** Il testo è quello dell'atto, copiato parola per parola. Stanno in `apps/api/modelli/`, un file per modello, con fonte e versione; il servizio li controlla all'avvio, e un file sbagliato lo ferma (`apps/api/modelli/LEGGIMI.md`).
+- **Modelli dello studio.** Per i certificati che non hanno un modello ufficiale. Li scrivono i medici o l'amministratore (requisiti: «modelli» tra i compiti dell'amministratore). I segnaposto sono controllati.
+
+Al rilascio il programma mette i dati del paziente (dalla cartella) e del medico (dal profilo). Il medico compila i campi che il modello prevede e il luogo; la data è quella del giorno. Il programma non decide niente di clinico: ogni dichiarazione è del medico (regola 3). Rilascia solo il medico, con il permesso «firmare i certificati», come per i certificati INPS; la segreteria no.
+
+Il certificato rilasciato si conserva com'era: testo, campi, fonte e versione del modello, impaginazione. Non si modifica: si annulla una volta, con un motivo (protezione nel database). Il PDF si rifà identico dal certificato conservato.
+
+Se il modello fissa una validità in mesi, «valido fino al» è il giorno prima della stessa data, tanti mesi dopo. È un'interpretazione, da confermare con la Dr.ssa Rocca.
+
+**D145 · Impaginazione scelta dal medico.** Simone: il professionista imposta caratteri, intestazione e dimensione. Si sceglie:
+
+- il carattere, fra quelli standard del PDF: Helvetica, Times o Courier. Non vanno incorporati e non hanno licenze da rispettare (D142);
+- la dimensione, da 9 a 14 punti;
+- l'intestazione, fino a 6 righe (la prima in neretto), a sinistra o al centro;
+- i margini, da 10 a 40 mm;
+- il luogo proposto per «luogo e data»;
+- il timbro, sotto lo spazio della firma.
+
+C'è la prova di stampa prima di salvare. Vale per i certificati dai modelli; il testo dei modelli non cambia. Un certificato già rilasciato tiene l'impaginazione che aveva.
+
+**D146 · «Strumenti» anche per i medici.** La pagina degli strumenti ha tre schede: modelli dei certificati, impaginazione (solo per i medici) e Fascicolo sanitario. La vedono i medici e l'amministratore, la segreteria no. Le impostazioni del Fascicolo le cambia solo l'amministratore.
