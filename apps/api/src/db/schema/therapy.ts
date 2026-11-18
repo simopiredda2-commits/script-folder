@@ -8,7 +8,7 @@ import {
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { clinicalEntry } from './clinical';
+import { clinicalEntry, entryStatus } from './clinical';
 import { patient } from './patients';
 import { appUser } from './users';
 
@@ -29,7 +29,17 @@ export const therapeuticPlan = pgTable('therapeutic_plan', {
   posologyText: text(),
   /** In Piemonte alcuni piani sono ancora cartacei (es. Nota 85). */
   paperOnly: boolean().notNull().default(false),
+  /** Come la terapia riservata: visibile solo al medico (tappa 9). */
+  reserved: boolean().notNull().default(false),
+  notes: text(),
+  /** I piani non si cancellano: si annullano con un motivo (tappa 9). */
+  status: entryStatus().notNull().default('active'),
+  annulledAt: timestamp({ withTimezone: true }),
+  annulledBy: uuid().references(() => appUser.id),
+  annulReason: text(),
+  createdBy: uuid().references(() => appUser.id),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp({ withTimezone: true }),
 });
 
 export const therapyKind = pgEnum('therapy_kind', ['chronic', 'as_needed', 'cycle']);

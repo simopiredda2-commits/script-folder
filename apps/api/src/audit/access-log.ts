@@ -54,7 +54,16 @@ export type AccessAction =
   | 'modifica_voce'
   | 'annullamento_voce'
   | 'nuovi_parametri'
-  | 'lettura_parametri';
+  | 'lettura_parametri'
+  | 'lettura_privacy'
+  | 'nuovo_consenso'
+  | 'revoca_consenso'
+  | 'nuova_delega'
+  | 'revoca_delega'
+  | 'lettura_piani'
+  | 'nuovo_piano'
+  | 'modifica_piano'
+  | 'annullamento_piano';
 
 export interface AccessEntry {
   studioId?: string | null;

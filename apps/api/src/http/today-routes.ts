@@ -1,5 +1,5 @@
 import { rulesetAt, value } from '@mmg/rules';
-import { and, asc, count, eq, gte, inArray, lt, lte } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, lt, lte, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { Database } from '../db/client';
 import { appointment, patient, patientRequest, prescription, therapeuticPlan } from '../db/schema';
@@ -94,6 +94,8 @@ export function registerTodayRoutes(app: FastifyInstance, db: Database, now: () 
     const r5 = rulesetAt(date).rules.find((r) => r.id === 'R5');
     const warnDays = r5 ? value(r5, 'expiryWarningDays') : null;
     const summaryArchives = await visibleArchives(db, actor, 'clinical.summary.read');
+    // I piani riservati, come le terapie riservate, solo a chi le legge (tappa 9).
+    const reservedArchives = await visibleArchives(db, actor, 'reserved.read');
     const plans =
       warnDays !== null && summaryArchives.length
         ? await db
@@ -109,6 +111,13 @@ export function registerTodayRoutes(app: FastifyInstance, db: Database, now: () 
             .where(
               and(
                 inArray(patient.archiveId, summaryArchives),
+                eq(therapeuticPlan.status, 'active'),
+                reservedArchives.length
+                  ? or(
+                      eq(therapeuticPlan.reserved, false),
+                      inArray(patient.archiveId, reservedArchives),
+                    )
+                  : eq(therapeuticPlan.reserved, false),
                 gte(therapeuticPlan.expiresOn, date),
                 lte(
                   therapeuticPlan.expiresOn,

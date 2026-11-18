@@ -149,7 +149,13 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
           pianiTerapeutici: await db
             .select({ farmaco: therapeuticPlan.drugName, scadenza: therapeuticPlan.expiresOn })
             .from(therapeuticPlan)
-            .where(eq(therapeuticPlan.patientId, id)),
+            .where(
+              and(
+                eq(therapeuticPlan.patientId, id),
+                eq(therapeuticPlan.status, 'active'),
+                reservedAllowed ? undefined : eq(therapeuticPlan.reserved, false),
+              ),
+            ),
           esenzioni: await db
             .select({ codice: exemption.code, dal: exemption.validFrom, al: exemption.validTo })
             .from(exemption)

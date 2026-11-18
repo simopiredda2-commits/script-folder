@@ -11,6 +11,9 @@ export interface TestDatabase {
   drop: () => Promise<void>;
 }
 
+const DROP_ATTEMPTS = 20;
+const DROP_RETRY_MS = 250;
+
 /** URL del database di sviluppo, usato solo per creare e cancellare i database di prova. */
 function adminUrl(): string {
   const url = process.env.DATABASE_URL;
@@ -49,8 +52,22 @@ export async function createTestDatabase(
       await pool.end();
       const c = new pg.Client({ connectionString: adminUrl() });
       await c.connect();
-      await c.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
-      await c.end();
+      try {
+        // La manutenzione automatica di Postgres può essere ancora collegata al database appena
+        // usato, e l'utente delle prove non può interromperla: si riprova dopo una breve attesa.
+        for (let attempt = 1; ; attempt++) {
+          try {
+            await c.query(`DROP DATABASE IF EXISTS ${name} WITH (FORCE)`);
+            break;
+          } catch (err) {
+            const insufficientPrivilege = (err as { code?: string }).code === '42501';
+            if (!insufficientPrivilege || attempt >= DROP_ATTEMPTS) throw err;
+            await new Promise((r) => setTimeout(r, DROP_RETRY_MS));
+          }
+        }
+      } finally {
+        await c.end();
+      }
     },
   };
 }
