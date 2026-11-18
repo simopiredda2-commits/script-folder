@@ -6,7 +6,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 - Branch attivo: `tappe-0-2`, con la pull request verso `main` aperta per la prima fermata.
 - Tappe fatte: 0, 1, 2.
-- **Prima fermata**: in attesa delle risposte di Simone (domande qui sotto). Con il via si unisce la pull request e si parte con la tappa 3 su un branch nuovo, `tappe-3-4`.
+- **Prima fermata fatta**: risposte qui sotto. Si applicano su `tappe-0-2`, si unisce la pull request #1 e si parte con la tappa 3 su `tappe-3-4`.
 
 ## Come provarlo
 
@@ -99,16 +99,19 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 - Il servizio collegato al database con un utente che non possiede le tabelle (vedi «Cose irreversibili non fatte»).
 - Interfaccia di accesso e blocco schermo: arrivano alla tappa 6.
 
-## Domande per la prossima fermata
+## Risposte della prima fermata (18/11/2026)
 
-Prima fermata, dopo la tappa 2:
+Simone ha risposto con il pulsante. Da applicare sul branch `tappe-0-2` prima di unire la pull request #1; poi si prosegue con le tappe 3–4 **senza fermarsi di nuovo** (via già dato).
 
-1. **Via libera** su struttura, modello dei dati, ruoli e permessi (`docs/modello-dati.md`, `docs/ruoli-permessi.md`).
-2. **Logo**: A, B (consigliata), C o nessuna (`docs/logo.md`).
-3. **Soglie di sicurezza** (D20): minuti di inattività prima del blocco, tentativi falliti e durata del blocco.
-4. **Medicina di gruppo** (D18): a quali condizioni un collega vede i pazienti di un altro titolare.
-
-Annotate per dopo, da chiedere a Chiara quando servirà: che cosa deve vedere la segreteria oltre alle terapie (D22).
+- **Logo**: B, linguetta a picco. Va nell'interfaccia al posto del segno di oggi.
+- **Segreteria**: aggiungere ciò che si può se la normativa lo consente, altrimenti filtro del medico. Applicato come: riepilogo clinico e diario alla segreteria solo se il titolare li abilita per il suo archivio, spenti per difetto; da confermare con il consulente privacy.
+- **Sostituto**: va bene così.
+- **Accesso**: va bene, ma lo sblocco dopo l'inattività si fa con il codice a 6 cifre, non con la password.
+- **Soglie**: blocco dopo 5 minuti di inattività; 5 password sbagliate bloccano l'utente per 15 minuti.
+- **Medicina di gruppo**: autorizzazione del titolare con periodo e motivo, com'è ora.
+- **Dati clinici e storico**: va bene così.
+- **Registro degli accessi**: va bene così.
+- **Esportazione**: aggiungere anche il CSV (una tabella per file).
 
 ## Cose irreversibili non fatte
 
