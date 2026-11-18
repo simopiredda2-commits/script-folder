@@ -74,6 +74,36 @@ I PDF non si estraggono da soli. Una persona copia i dati in un CSV (UTF-8, sepa
 - Se il PDF in uso in `sync/` ha un'impronta diversa, la trascrizione è **superata** e non entra: va trascritta la versione nuova.
 - `serie` (facoltativa) lega le versioni successive della stessa tabella, per esempio due determine sul catalogo.
 
+### Atti che modificano una tabella (D157)
+
+La Regione non ripubblica il catalogo intero. Pubblica le voci che finiscono e quelle che cominciano. Esempio, la D.D. 710/2026:
+
+- l'allegato A elenca le voci prescrivibili fino al 29/10/2026;
+- l'allegato B elenca la radioterapia prescrivibile fino al 12/01/2027;
+- l'allegato C elenca le voci dal 30/10/2026, nuove o al posto di altre: per esempio 45.30.1 diventa 45.30.1A.
+
+Si trascrivono solo queste voci, con `"solo_modifiche": true` nella scheda (e la `serie` che modificano) e una prima colonna `operazione`:
+
+```csv
+operazione;codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note
+toglie;45.30.1;;;Gastroenterologia;;
+aggiunge;45.30.1A;45.30.1;ASPORTAZIONE O DEMOLIZIONE DI LESIONE DEL DUODENO IN CORSO DI EGDS POLIPECTOMIA;Gastroenterologia;220,10;
+```
+
+- **Ricostruzione.** All'importazione la versione intera si ricostruisce dalla versione della serie in vigore il giorno prima dell'atto. Prima si tolgono le voci tolte, poi si aggiungono le nuove. Una voce aggiunta con la chiave di una voce presente la sostituisce. Il risultato è una versione come le altre, immutabile, che vale dalla data dell'atto (A5).
+- **Chiave delle voci.**
+  - Prestazioni: codice del catalogo e branca. Se la branca manca, valgono tutte le righe del codice.
+  - Esenzioni: codice.
+  - Esenzioni e prestazioni: le due colonne.
+  - DPC: principio attivo e ATC.
+
+  Maiuscole, accenti e spazi non contano: nel PDF «Gastroenterologia» va a capo dentro la cella e diventa «Gastroentero logia».
+
+- **Un atto per data.** Se le voci cominciano o finiscono in date diverse, servono atti diversi. Per la D.D. 710/2026: A e C dal 30/10/2026 in un atto, B dal 13/01/2027 in un altro. Gli atti si applicano in ordine di data, dopo le versioni intere.
+- **Controlli.**
+  - Senza una versione prima dell'atto: «manca la versione su cui l'atto è scritto».
+  - Una voce da togliere che la base non ha: «righe non valide», e l'atto non si applica. Vuol dire che la base non è quella su cui l'atto è scritto.
+
 Colonne dei CSV trascritti:
 
 | Tipo                    | Colonne                                                                | Note                                        |

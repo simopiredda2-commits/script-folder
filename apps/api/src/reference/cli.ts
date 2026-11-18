@@ -36,6 +36,7 @@ const LABELS: Record<ImportLine['outcome'], string> = {
   trascrizione_superata: 'trascrizione superata',
   trascrizione_non_valida: 'ERRORE: trascrizione non valida',
   origine_non_trovata: 'ERRORE: PDF d’origine non trovato',
+  base_mancante: 'manca la versione su cui l’atto è scritto',
 };
 
 const { values } = parseArgs({

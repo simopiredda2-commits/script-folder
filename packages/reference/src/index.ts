@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { type MappingSet, parseMappings } from './mapping';
 
+export * from './changes';
 export * from './csv';
 export * from './files';
 export * from './kinds';

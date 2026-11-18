@@ -3,11 +3,10 @@ import { supplyEndOn } from '@mmg/domain';
 import { sql } from 'drizzle-orm';
 import { unzipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { studioDayFrom } from './helpers/dates';
 
-const DAY = 86_400_000;
 /** Un PDF minimo inventato: basta la firma %PDF- e un po' di testo. */
 const PDF = Buffer.from('%PDF-1.4\n% referto di prova, paziente inventato\n%%EOF\n', 'latin1');
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
@@ -76,7 +75,7 @@ describe('seguito delle prestazioni prescritte (tappa 10)', () => {
     await t?.drop();
   });
 
-  const day = (offset: number) => studioDate(new Date(s.clock.now().getTime() + offset * DAY));
+  const day = (offset: number) => studioDayFrom(s.clock.now(), offset);
   function req(method: 'GET' | 'POST', url: string, cookie: string, payload?: object) {
     return s.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
   }
@@ -290,7 +289,7 @@ describe('presidi e assistenza integrativa (tappa 10)', () => {
     await t?.drop();
   });
 
-  const day = (offset: number) => studioDate(new Date(s.clock.now().getTime() + offset * DAY));
+  const day = (offset: number) => studioDayFrom(s.clock.now(), offset);
   const req = (method: 'GET' | 'POST', url: string, cookie: string, payload?: object) =>
     s.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
   const url = () => `/api/pazienti/${s.richPatient}/presidi`;

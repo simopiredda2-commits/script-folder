@@ -127,7 +127,15 @@ const transcriptionSchema = z
     trascritto_da: z.string().min(1),
     trascritto_il: isoDate,
     controllato_da: z.string().min(1),
+    /**
+     * Il CSV elenca solo le voci che l'atto aggiunge e toglie, con la colonna «operazione»: la
+     * versione intera si ricostruisce dalla versione della serie in vigore il giorno prima (D157).
+     */
+    solo_modifiche: z.boolean().default(false),
     nota: z.string().optional(),
+  })
+  .refine((t) => !t.solo_modifiche || t.serie !== undefined, {
+    message: 'una trascrizione con solo_modifiche deve dire la serie che modifica',
   })
   .refine(
     (t) =>

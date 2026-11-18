@@ -46,6 +46,7 @@ import { totp } from '../../src/security/totp';
 import { createScenario, PASSWORD, type Scenario } from '../helpers/scenario';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db';
 import { buildWeb, serveWeb } from './serve-web';
+import { studioDayFrom } from '../helpers/dates';
 
 const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf-8');
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
@@ -868,7 +869,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('link', { name: 'Certificati', exact: true }).click();
     await page.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
     await page.getByRole('button', { name: 'Nuovo certificato' }).click();
-    const end = studioDate(new Date(s.clock.now().getTime() + 2 * 86_400_000));
+    const end = studioDayFrom(s.clock.now(), 2);
     await page.getByLabel('Prognosi a tutto il').fill(end);
     await page.getByLabel('Codice ICD-9-CM').fill('487.1');
     await page.getByLabel('Diagnosi', { exact: true }).fill('Sindrome influenzale di prova');
@@ -951,9 +952,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/piani`);
     await page.getByRole('heading', { level: 1, name: 'Piani terapeutici' }).waitFor();
     await page.getByLabel('Farmaco', { exact: true }).fill('Piano di prova nel browser');
-    await page
-      .getByLabel('Scade il')
-      .fill(studioDate(new Date(s.clock.now().getTime() + 90 * 86_400_000)));
+    await page.getByLabel('Scade il').fill(studioDayFrom(s.clock.now(), 90));
     await page.getByRole('button', { name: 'Registra il piano' }).click();
     await page.getByText('Piano registrato.').waitFor();
     await page

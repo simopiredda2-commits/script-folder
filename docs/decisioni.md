@@ -661,3 +661,21 @@ L'aggiornamento quotidiano del catalogo è nell'aggiornamento automatico (attivi
 - **Regola 7**: senza `BANCHE_DATI_DIR` il servizio non aggiorna nulla, ed è il caso dello sviluppo e delle prove. Le prove usano il sito d'esempio in locale. In produzione le fonti sono quelle pubbliche di `sync/fonti.json`, scaricate per leggere dati aperti, come chiedono i requisiti.
 
 Non provato: il giro sulle fonti vere (il primo va fatto da un computer dello studio, come dicono i requisiti) e due istanze del servizio insieme. I moduli dei certificati entreranno tra le fonti controllate con i loro atti, alla tappa 13.
+
+**D157 · Gli atti che modificano il catalogo si trascrivono come modifiche.** Simone ha mandato il PDF della D.D. 710/A1400B/2026 (BUR n. 44 del 5/11/2026): testo e allegati A, B, C e D. L'allegato C non è il catalogo intero, sono 69 righe di 3 pagine. Gli allegati sono tre elenchi di voci:
+
+- A: 27 voci prescrivibili fino al 29/10/2026;
+- B: 56 voci di radioterapia prescrivibili fino al 12/01/2027;
+- C: 69 voci dal 30/10/2026, nuove o al posto di voci di A.
+
+Il catalogo in vigore è quindi il precedente più queste modifiche. Alcuni codici del catalogo cambiano a parità di prestazione: 45.30.1 diventa 45.30.1A, 42.33.1 diventa 42.33.1A, 90324.1 e 90324.2 diventano 90324. È il caso di cui parlava Simone, delle strutture che rifiutano un codice cambiato. Scelte:
+
+- **Trascrizione «solo modifiche»** (`solo_modifiche` nella scheda, colonna `operazione` con `aggiunge` o `toglie`). La versione intera si ricostruisce dalla versione della serie in vigore il giorno prima e si salva come le altre: immutabile, dalla data dell'atto. La consultazione alla data (A5) non cambia. Trascrivere 69 righe invece di più di 3000 rende possibile tenere il catalogo al passo con ogni atto, anche senza il catalogo strutturato.
+- **Un atto per data**: per la D.D. 710, A e C dal 30/10/2026, B dal 13/01/2027. Gli atti si applicano per data, dopo le versioni intere.
+- **Chiave**: codice del catalogo e branca. Senza branca valgono tutte le righe del codice, e l'allegato A le elenca tutte. Maiuscole, accenti e spazi non contano: nel PDF le branche vanno a capo dentro le celle.
+- **Controlli**: senza una versione prima dell'atto non si applica nulla. Una voce da togliere che la base non ha ferma l'atto, perché la base non è quella su cui l'atto è scritto.
+- Il PDF resta fuori dal repository. Nelle prove ci sono righe copiate parola per parola dagli allegati A e C, con le pagine; la provenienza è in `docs/provenienze.md`.
+
+Il catalogo vero non è ancora nel programma. L'ultimo catalogo intero letto è quello della D.D. 990/2024, e mancano gli aggiornamenti della D.D. 444/2025 e della D.D. 590/2026. Applicata alla D.D. 990/2024, la D.D. 710 darebbe un catalogo senza le modifiche del 2025 e del 2026. Serve il catalogo strutturato del CSI Piemonte, già domanda della fermata, oppure i PDF delle due determine. La trascrizione della D.D. 710 si prepara appena c'è la base, e una persona la controlla prima dell'uso (A8).
+
+Nel testo dell'atto c'è un'incoerenza: le premesse dicono che l'allegato B vale «sino al 12 gennaio 2026», la parte che determina «sino al 12 gennaio 2027». Vale la parte che determina, ed è coerente con il resto dell'atto.
