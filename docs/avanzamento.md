@@ -534,6 +534,30 @@ Durante la tappa 11 (terzo giro):
 
 - **Copyright e reverse engineering** (richiesta di Simone, stesso giorno): «fai in modo che nessuno possa rivendicare violazione del copyright o reverse engineering». Fatto (D142): il registro `docs/provenienze.md` e una prova su tutto il repository (provenienza di immagini, documenti e archivi; licenze delle dipendenze), provata con due sabotaggi. Restano la revisione di un avvocato prima del lancio e una proposta per la fermata: le richieste a parole vostre, senza schermate di Next².
 
+- **Modelli dei certificati: verifica sulle fonti** (tappa 13, D143). Fonti ufficiali lette e salvate fuori dal repository. Testi confrontati con le immagini della Gazzetta Ufficiale.
+
+  | Certificato                 | Che cosa dicono le fonti                                                                                                                                                                               |
+  | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | Sportivo non agonistico     | Modello ufficiale: allegato 2 del DM 8/8/2014 (GU n. 243/2014), che conferma l'allegato C del DM 24/4/2013                                                                                             |
+  | Porto d'armi                | Modello ufficiale: allegato 1 del DM 28/4/1998 (GU n. 143/1998)                                                                                                                                        |
+  | Patente                     | Nessun modello nazionale: il Codice della strada (art. 119, comma 3) chiede solo i «precedenti morbosi» certificati dal medico di fiducia                                                              |
+  | Sana e robusta costituzione | Abolita dal DL 69/2013 (art. 42) nei casi elencati e, in Piemonte, dalla L.R. 15/2008 (art. 3 e allegato B), che la consente solo a chi deve presentarla in un'altra regione; nessun modello ufficiale |
+
+  La Dr.ssa Rocca dice che questi modelli sono obsoleti. Le ricerche non trovano atti che li sostituiscano:
+  - il decreto previsto dal D.Lgs. 204/2010, art. 6, comma 2, per gli accertamenti sulle armi non risulta adottato;
+  - per lo sportivo dopo il 2014 risultano solo una nota del Ministero del 2015 e il decreto del 2018 sui bambini fino a 6 anni, da leggere.
+
+  Le ASL hanno però moduli propri, per esempio l'ASL CN1 per il porto d'armi, che non si sono potuti leggere. Quattro siti sono stati aggiunti all'ambiente: Normattiva, ASL Vercelli, ASL CN1, servizi della Regione. Lo scaricamento è stato però fermato dai permessi della sessione, e lo strumento di lettura delle pagine non li raggiunge.
+
+  Finché la verifica non è chiusa, i modelli ufficiali non entrano nel programma. Il motore dei modelli e quelli dello studio sono fatti. Serve sapere quali moduli usa oggi la Dr.ssa Rocca (senza dati di pazienti).
+
+- **Catalogo delle diagnosi ICD-9-CM** (richiesta della Dr.ssa Rocca). Fonti lette:
+  - il certificato INPS vuole la codifica «ICD9_CM - 2007» (DM 18/4/2012, disciplinare; lo schema del Sistema TS rifiuta i codici ICD-10);
+  - il DM 28/10/2020 aggiunge 17 codici per il COVID-19;
+  - dall'1/1/2027 c'è ICD-10-IM (DM 23/10/2025), ma per il certificato INPS non risultano ancora specifiche nuove.
+
+  I file ufficiali non si sono potuti scaricare: il sito del Ministero blocca questa sessione e la copia della Regione è fra i siti appena aggiunti. Da fare dal computer dello studio con `sync/`, oppure con il permesso di scaricare. La licenza di ICD-10-IM (forse CC BY-NC-ND) è da verificare: domanda per la fermata.
+
 - **Net Medica Italia** (domanda della Dr.ssa Rocca): far comunicare medici con programmi diversi senza comprare quel servizio. Raccolte le informazioni pubbliche, fatta una proposta (D104). È una domanda della terza fermata; non è costruito nulla.
 
 ## Risposte della fermata finale del secondo giro (18/11/2026)
