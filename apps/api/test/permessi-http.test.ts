@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { allergyDetail, clinicalEntry } from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -69,6 +70,51 @@ describe('ruoli e permessi attraverso il servizio', () => {
       'Farmaco di prova 5 mg',
     ]);
     expect((await get('segreteria', `/api/pazienti/${s.richPatient}/diario`)).statusCode).toBe(403);
+  });
+
+  it('il titolare decide che cosa vede la segreteria del suo archivio (riepilogo e diario)', async () => {
+    const url = `/api/archivi/${s.archives.titolare}/impostazioni`;
+    const patch = (who: string, payload: object) =>
+      s.app.inject({ method: 'PATCH', url, payload, headers: { cookie: cookies[who]! } });
+    for (const who of ['segreteria', 'sostituto', 'collega', 'amministratore']) {
+      expect((await patch(who, { segreteriaLeggeRiepilogo: true })).statusCode, who).toBe(403);
+    }
+    const on = await patch('titolare', {
+      segreteriaLeggeRiepilogo: true,
+      segreteriaLeggeDiario: true,
+    });
+    expect(on.json()).toEqual({ segreteriaLeggeDiario: true, segreteriaLeggeRiepilogo: true });
+
+    // Un'allergia riservata: la vede il medico, non la segreteria.
+    const [e] = await s.db
+      .insert(clinicalEntry)
+      .values({
+        patientId: s.richPatient,
+        kind: 'allergy',
+        occurredOn: '2026-11-12',
+        authorUserId: s.users.titolare.id,
+        reserved: true,
+      })
+      .returning();
+    await s.db
+      .insert(allergyDetail)
+      .values({ entryId: e!.id, substance: 'Allergia riservata di prova' });
+    const doctorView = (await get('titolare', `/api/pazienti/${s.richPatient}`)).json();
+    expect(doctorView.riepilogo.allergie).toHaveLength(2);
+    const rec = (await get('segreteria', `/api/pazienti/${s.richPatient}`)).json();
+    expect(rec.riepilogo.allergie).toHaveLength(1);
+    const diario = await get('segreteria', `/api/pazienti/${s.richPatient}/diario`);
+    expect(diario.statusCode).toBe(200);
+    // La nota riservata resta visibile solo al medico.
+    expect(diario.json().diario).toHaveLength(1);
+
+    const off = await patch('titolare', {
+      segreteriaLeggeRiepilogo: false,
+      segreteriaLeggeDiario: false,
+    });
+    expect(off.json()).toEqual({ segreteriaLeggeDiario: false, segreteriaLeggeRiepilogo: false });
+    expect((await get('segreteria', `/api/pazienti/${s.richPatient}`)).json().riepilogo).toBeNull();
+    expect((await get('titolare', url)).json().segreteriaLeggeRiepilogo).toBe(false);
   });
 
   it('il sostituto, nel periodo, lavora sull’archivio del titolare ma non esporta', async () => {

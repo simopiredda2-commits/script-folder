@@ -5,9 +5,9 @@ Da verificare con la Dr.ssa Rocca alla prima fermata. Fonte: la tabella «Utenti
 ## I ruoli
 
 - **Medico titolare.** Ha un archivio, cioè i pazienti che lo hanno scelto. Sul proprio archivio può tutto: firma e invia ricette e certificati, legge il registro degli accessi, esporta i dati.
-- **Segreteria.** È condivisa dallo studio e lavora su tutti gli archivi: anagrafiche, agenda, richieste dei pazienti, bozze di ricette ripetute, stampa dei promemoria. Non firma, non invia, non legge il diario clinico. Lo studio può consentirle la lettura del diario: per difetto è spenta.
+- **Segreteria.** È condivisa dallo studio e lavora su tutti gli archivi: anagrafiche, agenda, richieste dei pazienti, terapie non riservate, bozze di ricette ripetute di terapie croniche, stampa dei promemoria. Non firma e non invia. Il **riepilogo clinico** (allergie, problemi, scadenze) e il **diario** li vede solo se il titolare li abilita per il suo archivio: per difetto sono spenti (scelta della prima fermata, da confermare con il consulente privacy). I dati riservati non li vede mai.
 - **Medico sostituto.** Lavora sull'archivio del titolare solo nel periodo autorizzato, con le proprie credenziali. Ricette e certificati restano a nome suo. Non esporta i dati e non legge il registro: i dati sono del titolare.
-- **Medicina di gruppo.** Non è un ruolo dell'utente ma un modo di organizzare lo studio: più titolari, ognuno con il suo archivio, e una segreteria condivisa. Un collega vede i pazienti di un altro titolare solo con un'**autorizzazione** che il titolare gli dà, con periodo e motivo. Le condizioni vere sono «da definire» nei requisiti: è una domanda della fermata.
+- **Medicina di gruppo.** Non è un ruolo dell'utente ma un modo di organizzare lo studio: più titolari, ognuno con il suo archivio, e una segreteria condivisa. Un collega vede i pazienti di un altro titolare solo con un'**autorizzazione** che il titolare gli dà, con periodo e motivo: confermato da Simone alla prima fermata.
 - **Amministratore dello studio.** Gestisce utenti, stampanti, intestazioni e modelli. Non ha accesso clinico, a meno che non sia anche medico: un utente può avere più ruoli, per esempio titolare e amministratore.
 - **Paziente.** Fase 2, non c'è ancora.
 
@@ -23,8 +23,8 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Modificare anagrafica, recapiti, esenzioni, consensi e deleghe | Sì | Sì | Sì | Sì | No | No |
 | Gestire l’agenda | Sì | Sì | Sì | Sì | No | No |
 | Gestire le richieste dei pazienti | Sì | Sì | Sì | Sì | No | No |
-| Leggere il riepilogo clinico (allergie, problemi, scadenze) | Sì | No | Sì | Sì | No | No |
-| Leggere il diario clinico | Sì | Se lo studio lo consente | Sì | Sì | No | No |
+| Leggere il riepilogo clinico (allergie, problemi, scadenze) | Sì | Se il titolare lo consente | Sì | Sì | No | No |
+| Leggere il diario clinico | Sì | Se il titolare lo consente | Sì | Sì | No | No |
 | Scrivere voci cliniche | Sì | No | Sì | Sì | No | No |
 | Leggere le terapie non riservate | Sì | Solo non riservate | Sì | Sì | No | No |
 | Leggere terapie e voci riservate | Sì | No | Sì | Sì | No | No |
@@ -36,6 +36,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Stampare i promemoria | Sì | Sì | Sì | Sì | No | No |
 | Leggere il registro degli accessi | Sì | No | No | No | No | No |
 | Esportare tutti i dati dell’archivio | Sì | No | No | No | No | No |
+| Decidere che cosa vede la segreteria dell’archivio | Sì | No | No | No | No | No |
 | Gestire gli utenti dello studio | No | No | No | No | No | Sì |
 | Gestire le stampanti | No | No | No | No | No | Sì |
 | Gestire le intestazioni | No | No | No | No | No | Sì |
@@ -55,4 +56,4 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 - Nome utente e password, poi il **secondo fattore obbligatorio per tutti** (codice a 6 cifre da un'app di autenticazione, standard TOTP). Al primo accesso il secondo fattore si attiva. SPID e CIE arriveranno più avanti.
 - Messaggio uguale per utente sconosciuto e password sbagliata, per non rivelare quali utenti esistono.
 - Lo stesso codice non vale due volte; il passaggio fra password e codice scade dopo 5 minuti; una sessione dura al massimo 12 ore.
-- **Da completare**, sono impostazioni dello studio senza valore: dopo quanti minuti di inattività la sessione si blocca (i requisiti dicono «pochi minuti»), dopo quanti tentativi falliti l'utente si blocca e per quanto tempo. I meccanismi ci sono e sono provati; finché i valori sono vuoti, i blocchi non scattano.
+- Dopo **5 minuti** di inattività la sessione si blocca e si sblocca con il **codice a 6 cifre** dell'app. **5** tentativi falliti (password o codice) bloccano l'utente per **15 minuti**. Valori scelti da Simone alla prima fermata; sono impostazioni dello studio e si possono cambiare.

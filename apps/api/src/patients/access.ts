@@ -9,7 +9,7 @@ import { HttpError } from '../http/errors';
 export interface ArchiveContext {
   archive: { id: string; studioId: string; ownerUserId: string };
   grants: ArchiveGrant[];
-  settings: { secretaryCanReadDiary: boolean };
+  settings: { secretaryCanReadDiary: boolean; secretaryCanReadSummary: boolean };
 }
 
 export async function loadArchiveContext(db: Database, archiveId: string): Promise<ArchiveContext> {
@@ -30,7 +30,10 @@ export async function loadArchiveContext(db: Database, archiveId: string): Promi
       validTo: g.validTo,
       revokedAt: g.revokedAt,
     })),
-    settings: { secretaryCanReadDiary: a.studio.secretaryCanReadDiary },
+    settings: {
+      secretaryCanReadDiary: a.archive.secretaryCanReadDiary,
+      secretaryCanReadSummary: a.archive.secretaryCanReadSummary,
+    },
   };
 }
 

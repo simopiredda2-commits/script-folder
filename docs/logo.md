@@ -2,7 +2,7 @@
 
 Il segno di oggi, nei prototipi, è un tratto di ECG accanto al nome: nasce da quando il prodotto si chiamava Polso. Qui ci sono tre proposte per portarlo verso l'idea di cartella, tenendo il carattere del segno: linea continua, spessore costante, estremi arrotondati e il ritmo piatto–su–giù–piatto.
 
-**Finché non scegli, nell'interfaccia resta il segno di oggi con il nome.**
+**Scelta: B, linguetta a picco** (Simone, prima fermata, 18/11/2026). È nell'interfaccia; i file definitivi sono in `packages/brand/assets/logo/` (segno, segno su scuro, con il nome, con il nome su scuro, favicon).
 
 ## Confronto alla stessa misura
 
@@ -76,6 +76,6 @@ Tutto è generato da `packages/brand/scripts/genera-proposte-logo.ts` (`pnpm --f
 
 ## Dopo la scelta
 
-1. Si aggiorna `packages/brand/mark.ts` con il segno scelto e il componente `Logo` dell'interfaccia.
-2. Si generano favicon e icona dell'app dal segno.
-3. Le proposte scartate restano qui come traccia.
+1. Fatto: `packages/brand/mark.ts` usa la geometria della B (da `logo-proposals.ts`) e il componente `Logo` dell'interfaccia la disegna, con il nome da `PRODUCT_NAME`.
+2. Fatto: favicon dell'interfaccia (`apps/web/public/favicon.svg`) generata dal segno. L'icona dell'app per tablet arriva con l'interfaccia (tappa 6).
+3. Le proposte scartate e il segno di oggi restano qui come traccia.

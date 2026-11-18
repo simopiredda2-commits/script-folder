@@ -47,6 +47,8 @@ export const ACTIONS = [
   'access_log.read',
   /** Esportazione completa dei dati dell'archivio. */
   'data.export',
+  /** Impostazioni dell'archivio: che cosa vede la segreteria. */
+  'archive.settings',
   'admin.users',
   'admin.printers',
   'admin.headers',
@@ -73,6 +75,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'reminder.print': 'Stampare i promemoria',
   'access_log.read': 'Leggere il registro degli accessi',
   'data.export': 'Esportare tutti i dati dell’archivio',
+  'archive.settings': 'Decidere che cosa vede la segreteria dell’archivio',
   'admin.users': 'Gestire gli utenti dello studio',
   'admin.printers': 'Gestire le stampanti',
   'admin.headers': 'Gestire le intestazioni',
@@ -97,6 +100,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'reminder.print',
   'access_log.read',
   'data.export',
+  'archive.settings',
 ];
 
 /**
@@ -105,7 +109,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
  * i dati sono del titolare (decisione D21).
  */
 const DOCTOR_ON_GRANTED_ARCHIVE: Action[] = DOCTOR_ON_OWN_ARCHIVE.filter(
-  (a) => a !== 'data.export' && a !== 'access_log.read',
+  (a) => a !== 'data.export' && a !== 'access_log.read' && a !== 'archive.settings',
 );
 
 /** Segreteria condivisa dello studio: lavora su tutti gli archivi dello studio. */
@@ -150,7 +154,8 @@ export interface AccessContext {
   /** Archivio su cui si agisce; assente per le azioni di amministrazione dello studio. */
   archive?: { id: string; studioId: string; ownerUserId: string };
   grants?: readonly ArchiveGrant[];
-  settings?: { secretaryCanReadDiary: boolean };
+  /** Impostazioni dell'archivio decise dal titolare (D30). Assenti = spente. */
+  settings?: { secretaryCanReadDiary: boolean; secretaryCanReadSummary?: boolean };
   /** Risorsa toccata, quando conta. */
   resource?: { reserved?: boolean; therapyKind?: 'chronic' | 'as_needed' | 'cycle' };
   now?: Date;
@@ -222,11 +227,17 @@ export function can(actor: Actor, action: Action, ctx: AccessContext = {}): Deci
     if (action === 'clinical.diary.read') {
       candidates.push(
         ctx.settings?.secretaryCanReadDiary
-          ? allow('Lo studio consente alla segreteria di leggere il diario')
-          : deny('La segreteria non legge il diario clinico (impostazione dello studio)'),
+          ? allow('Il titolare consente alla segreteria di leggere il diario')
+          : deny('La segreteria non legge il diario clinico (impostazione del titolare)'),
       );
     } else if (reserved) {
       candidates.push(deny('Dato riservato: visibile solo al medico'));
+    } else if (action === 'clinical.summary.read') {
+      candidates.push(
+        ctx.settings?.secretaryCanReadSummary
+          ? allow('Il titolare consente alla segreteria il riepilogo clinico')
+          : deny('La segreteria non legge il riepilogo clinico (impostazione del titolare)'),
+      );
     } else if (action === 'prescription.draft_repeat' && ctx.resource?.therapyKind !== 'chronic') {
       candidates.push(deny('La segreteria prepara solo ripetizioni di terapie croniche'));
     } else {

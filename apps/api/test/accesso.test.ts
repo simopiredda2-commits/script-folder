@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { accessLog, appUser, studio } from '../src/db/schema';
+import { accessLog, appUser, archive, studio } from '../src/db/schema';
 import { base32Decode } from '../src/security/base32';
 import { totp } from '../src/security/totp';
 import { createScenario, login, PASSWORD, type Scenario } from './helpers/scenario';
@@ -138,8 +138,12 @@ describe('soglie dello studio: blocco per inattività e tentativi falliti', () =
     await t?.drop();
   });
 
-  it('senza valori (da completare) i blocchi non sono attivi', async () => {
-    const s = await createScenario(t.db);
+  it('con le soglie vuote i blocchi non scattano', async () => {
+    const s = await createScenario(t.db, {
+      idleLockMinutes: null,
+      maxFailedLogins: null,
+      failedLoginLockMinutes: null,
+    });
     const cookie = await login(s, 'titolare');
     s.clock.advance(60 * 60_000);
     const me = await s.app.inject({ method: 'GET', url: '/api/io', headers: { cookie } });
@@ -147,38 +151,37 @@ describe('soglie dello studio: blocco per inattività e tentativi falliti', () =
     await s.app.close();
   });
 
-  it('con il valore impostato, la sessione inattiva si blocca e si sblocca con la password', async () => {
-    const s = await createScenario(t.db, { idleLockMinutes: 5 });
+  it('dopo 5 minuti di inattività la sessione si blocca e si sblocca con il codice a 6 cifre', async () => {
+    const s = await createScenario(t.db);
     const cookie = await login(s, 'titolare');
+    const io = () => s.app.inject({ method: 'GET', url: '/api/io', headers: { cookie } });
+    const unlock = (codice: string) =>
+      s.app.inject({
+        method: 'POST',
+        url: '/api/accesso/sblocca',
+        payload: { codice },
+        headers: { cookie },
+      });
     s.clock.advance(4 * 60_000);
-    expect(
-      (await s.app.inject({ method: 'GET', url: '/api/io', headers: { cookie } })).statusCode,
-    ).toBe(200);
+    expect((await io()).statusCode).toBe(200);
     s.clock.advance(5 * 60_000 + 1);
-    const locked = await s.app.inject({ method: 'GET', url: '/api/io', headers: { cookie } });
-    expect(locked.statusCode).toBe(423);
-    const wrong = await s.app.inject({
-      method: 'POST',
-      url: '/api/accesso/sblocca',
-      payload: { password: 'sbagliata' },
-      headers: { cookie },
-    });
-    expect(wrong.statusCode).toBe(401);
-    const ok = await s.app.inject({
-      method: 'POST',
-      url: '/api/accesso/sblocca',
-      payload: { password: PASSWORD },
-      headers: { cookie },
-    });
-    expect(ok.statusCode).toBe(200);
-    expect(
-      (await s.app.inject({ method: 'GET', url: '/api/io', headers: { cookie } })).statusCode,
-    ).toBe(200);
+    expect((await io()).statusCode).toBe(423);
+    expect((await unlock('000000')).statusCode).toBe(401);
+    // La password non sblocca: serve il codice dell'app.
+    expect((await unlock(PASSWORD)).statusCode).toBe(401);
+    s.clock.advance(30_000);
+    const code = totp(s.secrets.get(s.users.titolare.id)!, s.clock.now().getTime());
+    expect((await unlock(code)).statusCode).toBe(200);
+    expect((await io()).statusCode).toBe(200);
+    // Lo stesso codice non sblocca una seconda volta.
+    s.clock.advance(5 * 60_000 + 1);
+    expect((await io()).statusCode).toBe(423);
+    expect((await unlock(code)).statusCode).toBe(401);
     await s.app.close();
   });
 
-  it('con le soglie impostate, troppi tentativi falliti bloccano l’utente per un tempo', async () => {
-    const s = await createScenario(t.db, { maxFailedLogins: 3, failedLoginLockMinutes: 10 });
+  it('5 password sbagliate bloccano l’utente per 15 minuti', async () => {
+    const s = await createScenario(t.db);
     const username = s.users.segreteria.username;
     const attempt = (password: string) =>
       s.app.inject({
@@ -186,21 +189,30 @@ describe('soglie dello studio: blocco per inattività e tentativi falliti', () =
         url: '/api/accesso',
         payload: { username, password, postazione: 'x' },
       });
-    for (let i = 0; i < 3; i++) expect((await attempt('sbagliata')).statusCode).toBe(401);
+    for (let i = 0; i < 4; i++) expect((await attempt('sbagliata')).statusCode).toBe(401);
+    // Al quarto errore l'utente non è ancora bloccato.
+    expect((await attempt(PASSWORD)).statusCode).toBe(200);
+    for (let i = 0; i < 5; i++) expect((await attempt('sbagliata')).statusCode).toBe(401);
     const blocked = await attempt(PASSWORD);
     expect(blocked.statusCode).toBe(401);
     expect(blocked.json().errore).toMatch(/bloccato/);
-    s.clock.advance(11 * 60_000);
+    s.clock.advance(14 * 60_000);
+    expect((await attempt(PASSWORD)).json().errore).toMatch(/bloccato/);
+    s.clock.advance(2 * 60_000);
     expect((await attempt(PASSWORD)).statusCode).toBe(200);
     await s.app.close();
   });
 
-  it('le soglie sono impostazioni dello studio, vuote per difetto', async () => {
+  it('per difetto: 5 minuti, 5 tentativi, 15 minuti; la segreteria non vede diario né riepilogo', async () => {
     const [row] = await t.db.insert(studio).values({ name: 'Nuovo studio' }).returning();
-    expect(row!.idleLockMinutes).toBeNull();
-    expect(row!.maxFailedLogins).toBeNull();
-    expect(row!.failedLoginLockMinutes).toBeNull();
-    expect(row!.secretaryCanReadDiary).toBe(false);
+    expect(row!.idleLockMinutes).toBe(5);
+    expect(row!.maxFailedLogins).toBe(5);
+    expect(row!.failedLoginLockMinutes).toBe(15);
+    const s = await createScenario(t.db);
+    const [a] = await t.db.select().from(archive).where(eq(archive.id, s.archives.titolare));
+    expect(a!.secretaryCanReadDiary).toBe(false);
+    expect(a!.secretaryCanReadSummary).toBe(false);
+    await s.app.close();
   });
 
   it('il segreto restituito all’attivazione è in Base32 valido', async () => {

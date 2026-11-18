@@ -1,5 +1,6 @@
 import {
   bigint,
+  boolean,
   customType,
   index,
   integer,
@@ -72,6 +73,12 @@ export const archive = pgTable('archive', {
     .notNull()
     .references(() => appUser.id),
   name: text().notNull(),
+  /**
+   * Il titolare decide che cosa vede la segreteria del suo archivio, oltre ad anagrafica e
+   * terapie non riservate (D30). Spenti per difetto; da confermare con il consulente privacy.
+   */
+  secretaryCanReadDiary: boolean().notNull().default(false),
+  secretaryCanReadSummary: boolean().notNull().default(false),
 });
 
 export const grantKind = pgEnum('grant_kind', ['substitution', 'group_colleague']);

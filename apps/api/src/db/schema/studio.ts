@@ -1,4 +1,4 @@
-import { boolean, integer, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { integer, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 /** Tipo di studio: medico singolo o medicina di gruppo (più titolari, archivi separati). */
 export const studioKind = pgEnum('studio_kind', ['single', 'group']);
@@ -10,15 +10,13 @@ export const studio = pgTable('studio', {
   address: text(),
   kind: studioKind().notNull().default('single'),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-  /** «Leggere il diario clinico (configurabile)» per la segreteria: per difetto no. */
-  secretaryCanReadDiary: boolean().notNull().default(false),
   /**
-   * Blocco della sessione dopo «pochi minuti» di inattività. Valore da completare: i requisiti
-   * non lo fissano. Vuoto = blocco non attivo, segnalato dallo stato di salute.
+   * Blocco della sessione dopo «pochi minuti» di inattività: 5, scelti da Simone alla prima
+   * fermata (D29). Vuoto = blocco non attivo.
    */
-  idleLockMinutes: integer(),
-  /** Tentativi di accesso falliti prima del blocco temporaneo dell'utente. Da completare. */
-  maxFailedLogins: integer(),
-  /** Durata del blocco temporaneo dopo troppi tentativi falliti. Da completare. */
-  failedLoginLockMinutes: integer(),
+  idleLockMinutes: integer().default(5),
+  /** Tentativi di accesso falliti prima del blocco temporaneo dell'utente: 5 (D29). */
+  maxFailedLogins: integer().default(5),
+  /** Durata del blocco temporaneo dopo troppi tentativi falliti: 15 minuti (D29). */
+  failedLoginLockMinutes: integer().default(15),
 });

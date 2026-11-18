@@ -114,6 +114,30 @@ describe('segreteria: «anagrafiche, agenda, richieste, bozze di ricette ripetut
   });
 });
 
+describe('scelte della prima fermata: il titolare decide che cosa vede la segreteria', () => {
+  it('per difetto la segreteria non vede il riepilogo clinico', () => {
+    expect(ok(segreteria, 'clinical.summary.read')).toBe(false);
+  });
+  it('se il titolare lo consente, vede il riepilogo ma non i dati riservati', () => {
+    const consentito = ctx({
+      settings: { secretaryCanReadDiary: false, secretaryCanReadSummary: true },
+    });
+    expect(ok(segreteria, 'clinical.summary.read', consentito)).toBe(true);
+    const riservato = ctx({
+      settings: { secretaryCanReadDiary: false, secretaryCanReadSummary: true },
+      resource: { reserved: true },
+    });
+    expect(ok(segreteria, 'clinical.summary.read', riservato)).toBe(false);
+  });
+  it('solo il titolare cambia le impostazioni del proprio archivio', () => {
+    expect(ok(titolare, 'archive.settings')).toBe(true);
+    expect(ok(sostituto, 'archive.settings')).toBe(false);
+    expect(ok(collega, 'archive.settings')).toBe(false);
+    expect(ok(segreteria, 'archive.settings')).toBe(false);
+    expect(ok(amministratore, 'archive.settings')).toBe(false);
+  });
+});
+
 describe('medico sostituto: «lavora sull’archivio del titolare per un periodo»', () => {
   it('nel periodo lavora sull’archivio, firma e invia (a nome suo)', () => {
     expect(ok(sostituto, 'clinical.diary.read')).toBe(true);

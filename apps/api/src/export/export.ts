@@ -112,6 +112,22 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
         order by seq`,
   );
 
+  // Colonne di ogni sezione nell'ordine del database: servono al CSV anche per le tabelle vuote.
+  const columnRows = await rows(
+    db,
+    sql`select table_name, column_name from information_schema.columns
+        where table_schema = 'public'
+          and table_name = any(${pgArray([...Object.keys(tables), 'change_history', 'access_log'])}::text[])
+        order by table_name, ordinal_position`,
+  );
+  const columnsOf = (t: string) =>
+    columnRows.filter((r) => r.table_name === t).map((r) => r.column_name as string);
+  const colonne: Record<string, string[]> = Object.fromEntries(
+    Object.keys(tables).map((t) => [t, columnsOf(t)]),
+  );
+  colonne.storico_modifiche = columnsOf('change_history');
+  colonne.registro_accessi = columnsOf('access_log');
+
   const counts = Object.fromEntries(Object.entries(tables).map(([k, v]) => [k, v.length]));
   return {
     formato: EXPORT_FORMAT,
@@ -131,6 +147,7 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
       asl: a.profile?.asl ?? null,
     },
     tabelle: tables,
+    colonne,
     storico_modifiche: history,
     registro_accessi: accessLog,
     conteggi: { ...counts, storico_modifiche: history.length, registro_accessi: accessLog.length },

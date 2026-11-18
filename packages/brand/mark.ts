@@ -1,10 +1,18 @@
+import { chosenMarkDesign } from './logo-proposals';
+import { scriptColors } from './tokens';
+
+export { previousMark } from './mark-previous';
+
 /**
- * Segno di oggi accanto al nome: il tratto di ECG dei prototipi.
- * Resta nell'interfaccia finché Simone non sceglie una delle proposte in assets/proposte-logo/.
+ * Segno del prodotto: la proposta B, «linguetta a picco», scelta da Simone alla prima fermata
+ * (D33). Linea continua, spessore costante, estremi arrotondati; tavolozza di SCRIPT.
  */
-export const currentMark = {
-  viewBox: '0 0 30 30',
-  points: '2,16 9,16 12,7 16,23 19,16 28,16',
-  strokeWidth: 2.8,
-  color: '#1F3A9E',
+export const productMark = {
+  viewBox: `0 0 ${chosenMarkDesign.viewBox} ${chosenMarkDesign.viewBox}`,
+  paths: chosenMarkDesign.paths,
+  strokeWidth: chosenMarkDesign.stroke,
+  /** Su fondo chiaro. */
+  color: scriptColors.light.luce,
+  /** Su fondo scuro. */
+  colorOnDark: scriptColors.dark.luce,
 } as const;

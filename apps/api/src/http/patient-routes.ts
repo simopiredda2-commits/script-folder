@@ -3,6 +3,7 @@ import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
+import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import {
   accessLog,
@@ -17,6 +18,7 @@ import {
   therapy,
 } from '../db/schema';
 import { withActor } from '../db/tx';
+import { buildCsvZip } from '../export/csv';
 import { buildExport } from '../export/export';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
 import { HttpError } from './errors';
@@ -113,7 +115,13 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
             .select({ sostanza: allergyDetail.substance, reazione: allergyDetail.reaction })
             .from(allergyDetail)
             .innerJoin(clinicalEntry, eq(clinicalEntry.id, allergyDetail.entryId))
-            .where(and(eq(clinicalEntry.patientId, id), eq(clinicalEntry.status, 'active'))),
+            .where(
+              and(
+                eq(clinicalEntry.patientId, id),
+                eq(clinicalEntry.status, 'active'),
+                reservedAllowed ? undefined : eq(clinicalEntry.reserved, false),
+              ),
+            ),
           problemiAttivi: await db
             .select({
               descrizione: problemDetail.description,
@@ -217,9 +225,70 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
     return { registro: rows };
   });
 
+  const archiveParams = z.object({ id: z.uuid() });
+  const settingsBody = z
+    .object({
+      segreteriaLeggeDiario: z.boolean(),
+      segreteriaLeggeRiepilogo: z.boolean(),
+    })
+    .partial()
+    .strict();
+
+  /** Che cosa vede la segreteria di questo archivio: lo decide il titolare (D30). */
+  const guardArchiveSettings = async (actor: Actor, archiveId: string) => {
+    const ctx = await loadArchiveContext(db, archiveId);
+    const decision = can(actor, 'archive.settings', { ...ctx, now: new Date() });
+    await logAccess(db, {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      action: 'impostazioni_archivio',
+      outcome: decision.allowed ? 'consentito' : 'negato',
+      workstation: actor.workstation,
+      details: { archivio: archiveId, motivo: decision.reason },
+    });
+    if (!decision.allowed) throw new HttpError(403, decision.reason);
+    return ctx;
+  };
+
+  app.get('/api/archivi/:id/impostazioni', async (req) => {
+    const { id } = archiveParams.parse(req.params);
+    const ctx = await guardArchiveSettings(req.actor!, id);
+    return {
+      segreteriaLeggeDiario: ctx.settings.secretaryCanReadDiary,
+      segreteriaLeggeRiepilogo: ctx.settings.secretaryCanReadSummary,
+    };
+  });
+
+  app.patch('/api/archivi/:id/impostazioni', async (req) => {
+    const { id } = archiveParams.parse(req.params);
+    await guardArchiveSettings(req.actor!, id);
+    const body = settingsBody.parse(req.body);
+    const [row] = await withActor(db, req.actor!.userId, (tx) =>
+      tx
+        .update(archive)
+        .set({
+          ...(body.segreteriaLeggeDiario !== undefined
+            ? { secretaryCanReadDiary: body.segreteriaLeggeDiario }
+            : {}),
+          ...(body.segreteriaLeggeRiepilogo !== undefined
+            ? { secretaryCanReadSummary: body.segreteriaLeggeRiepilogo }
+            : {}),
+        })
+        .where(eq(archive.id, id))
+        .returning(),
+    );
+    return {
+      segreteriaLeggeDiario: row!.secretaryCanReadDiary,
+      segreteriaLeggeRiepilogo: row!.secretaryCanReadSummary,
+    };
+  });
+
   /** Esportazione completa dell'archivio del medico titolare. */
   app.get('/api/esportazione', async (req, reply) => {
     const actor = req.actor!;
+    const { formato: format } = z
+      .object({ formato: z.enum(['json', 'csv']).default('json') })
+      .parse(req.query);
     const own = await db
       .select({ id: archive.id })
       .from(archive)
@@ -234,11 +303,16 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       action: 'esportazione',
       outcome: decision.allowed ? 'consentito' : 'negato',
       workstation: actor.workstation,
-      details: { archivio: target?.id ?? null, motivo: decision.reason },
+      details: { archivio: target?.id ?? null, formato: format, motivo: decision.reason },
     });
     if (!target || !decision.allowed) throw new HttpError(403, decision.reason);
     const doc = await buildExport(db, target.id, new Date());
     const day = doc.generato_il.slice(0, 10);
+    if (format === 'csv') {
+      reply.header('content-type', 'application/zip');
+      reply.header('content-disposition', `attachment; filename="esportazione-${day}-csv.zip"`);
+      return reply.send(Buffer.from(buildCsvZip(doc)));
+    }
     reply.header('content-disposition', `attachment; filename="esportazione-${day}.json"`);
     return doc;
   });

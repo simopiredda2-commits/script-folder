@@ -17,6 +17,7 @@ export type AccessAction =
   | 'lettura_terapie'
   | 'modifica_anagrafica'
   | 'esportazione'
+  | 'impostazioni_archivio'
   | 'lettura_registro';
 
 export interface AccessEntry {

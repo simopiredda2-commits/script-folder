@@ -11,7 +11,7 @@ const loginBody = z.object({
   postazione: z.string().min(1).max(100),
 });
 const codeBody = z.object({ passaggio: z.string().min(1), codice: z.string().min(1) });
-const unlockBody = z.object({ password: z.string().min(1) });
+const unlockBody = z.object({ codice: z.string().min(1) });
 
 export function registerAuthRoutes(
   app: FastifyInstance,
@@ -56,8 +56,8 @@ export function registerAuthRoutes(
   app.post('/api/accesso/sblocca', { config: { public: true } }, async (req) => {
     const token = req.cookies[SESSION_COOKIE];
     const body = unlockBody.parse(req.body);
-    if (!token || !(await auth.unlock(token, body.password))) {
-      throw new HttpError(401, 'Password non valida');
+    if (!token || !(await auth.unlock(token, body.codice))) {
+      throw new HttpError(401, 'Codice non valido');
     }
     return { stato: 'ok' };
   });

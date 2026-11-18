@@ -300,32 +300,53 @@ export function createAuthService(deps: AuthDeps) {
     return { status: 'ok', actor };
   }
 
-  async function unlock(sessionToken: string, password: string): Promise<boolean> {
+  /**
+   * Sblocco della sessione dopo l'inattività: con il codice a 6 cifre dell'app di
+   * autenticazione (scelta di Simone alla prima fermata, D31). Lo stesso codice non vale due
+   * volte; i codici sbagliati contano come tentativi falliti.
+   */
+  async function unlock(sessionToken: string, code: string): Promise<boolean> {
     const row = await loadSession(sessionToken);
     if (!row || row.session.revokedAt || row.session.expiresAt <= now()) return false;
-    const ok = await verifyPassword(password, row.user.passwordHash);
-    if (!ok) {
-      await registerFailure(row.user, row.studio);
+    const { user, studio: st } = row;
+    if (user.lockedUntil && user.lockedUntil > now()) return false;
+    const step =
+      user.totpSecretEnc && user.totpEnabledAt
+        ? verifyTotp(
+            decryptSecret(encryptionKey, user.totpSecretEnc),
+            code.trim(),
+            now().getTime(),
+            user.totpLastStep ?? null,
+          )
+        : null;
+    if (step === null) {
+      await registerFailure(user, st);
       await logAccess(db, {
-        studioId: row.user.studioId,
-        userId: row.user.id,
-        action: 'accesso_fallito',
+        studioId: user.studioId,
+        userId: user.id,
+        action: 'secondo_fattore_fallito',
         outcome: 'fallito',
         workstation: row.session.workstation,
-        details: { motivo: 'password errata allo sblocco' },
+        details: { motivo: 'codice errato allo sblocco' },
       });
       return false;
     }
-    await db
-      .update(session)
-      .set({ lockedAt: null, lastActivityAt: now() })
-      .where(eq(session.id, row.session.id));
-    await logAccess(db, {
-      studioId: row.user.studioId,
-      userId: row.user.id,
-      action: 'sessione_sbloccata',
-      outcome: 'riuscito',
-      workstation: row.session.workstation,
+    await db.transaction(async (tx) => {
+      await tx
+        .update(appUser)
+        .set({ totpLastStep: step, failedLogins: 0 })
+        .where(eq(appUser.id, user.id));
+      await tx
+        .update(session)
+        .set({ lockedAt: null, lastActivityAt: now() })
+        .where(eq(session.id, row.session.id));
+      await logAccess(tx, {
+        studioId: user.studioId,
+        userId: user.id,
+        action: 'sessione_sbloccata',
+        outcome: 'riuscito',
+        workstation: row.session.workstation,
+      });
     });
     return true;
   }

@@ -12,68 +12,18 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import opentype from 'opentype.js';
 import { PRODUCT_NAME } from '../brand';
-import { currentMark } from '../mark';
+import {
+  chosenMarkDesign,
+  previousMarkDesign as current,
+  proposals,
+  type MarkDesign,
+} from '../logo-proposals';
+import { previousMark } from '../mark-previous';
 import { scriptColors } from '../tokens';
 
 const pkg = join(import.meta.dirname, '..');
 const outDir = join(pkg, 'assets', 'proposte-logo');
 const boardDir = join(outDir, 'tavole');
-
-/** Un segno: tracciati con linea continua, spessore costante, estremi arrotondati. */
-export interface MarkDesign {
-  id: string;
-  title: string;
-  idea: string;
-  viewBox: number;
-  stroke: number;
-  /** Ogni elemento è un attributo `d` di <path>. */
-  paths: string[];
-}
-
-/** Il segno di oggi, identico all'originale (viewBox 30). */
-const current: MarkDesign = {
-  id: 'segno-attuale',
-  title: 'Segno di oggi',
-  idea: 'Il tratto di ECG dei prototipi, accanto al nome.',
-  viewBox: 30,
-  stroke: currentMark.strokeWidth,
-  paths: [`M${currentMark.points.split(' ').join(' L')}`],
-};
-
-/**
- * Proposte su griglia 32×32, spessore 3 (lo stesso rapporto del segno di oggi: 2,8 su 30).
- * Il ritmo del battito resta piatto–su–giù–piatto, con le proporzioni del tratto originale:
- * salita breve, discesa lunga, risalita breve.
- */
-export const proposals: MarkDesign[] = [
-  {
-    id: 'proposta-a',
-    title: 'A · Battito sulla cartella',
-    idea: 'La sagoma della cartella con la linguetta; il battito la attraversa da un lato all’altro.',
-    viewBox: 32,
-    stroke: 3,
-    paths: [
-      'M5 26.5 V8 H12 L14.5 10.5 H27 V26.5 Z',
-      'M5 18.5 H10 L12.5 13.5 L15.5 23.5 L17.5 18.5 H27',
-    ],
-  },
-  {
-    id: 'proposta-b',
-    title: 'B · Linguetta a picco',
-    idea: 'Una sola linea chiusa: la linguetta della cartella è il picco del battito.',
-    viewBox: 32,
-    stroke: 3,
-    paths: ['M5 27 V13 H10 L12.5 5 L16 20 L18.5 13 H27 V27 Z'],
-  },
-  {
-    id: 'proposta-c',
-    title: 'C · Tratto che diventa cartella',
-    idea: 'Il battito entra da sinistra come nel segno di oggi e prosegue disegnando la cartella.',
-    viewBox: 32,
-    stroke: 3,
-    paths: ['M2.5 13 H8 L10.5 5.5 L14 20 L16.5 13 H28.5 V27 H6.5 V17.5'],
-  },
-];
 
 interface Palette {
   background: string;
@@ -93,7 +43,7 @@ const dark: Palette = {
   name: scriptColors.dark.testo,
 };
 /** Il segno di oggi resta nel suo blu dei prototipi, per il confronto. */
-const currentLight: Palette = { ...light, mark: currentMark.color };
+const currentLight: Palette = { ...light, mark: previousMark.color };
 const currentDark: Palette = { ...dark, mark: '#8FA0FF' };
 
 const require = createRequire(import.meta.url);
@@ -217,5 +167,21 @@ write(boardDir, `${current.id}-chiaro.svg`, board(current, currentLight));
 write(boardDir, `${current.id}-scuro.svg`, board(current, currentDark));
 write(boardDir, 'confronto-16.svg', comparison(16));
 write(boardDir, 'confronto-32.svg', comparison(32));
+
+// Logo scelto (D33): file definitivi in assets/logo/ e favicon dell'interfaccia.
+const logoDir = join(pkg, 'assets', 'logo');
+mkdirSync(logoDir, { recursive: true });
+const chosen = chosenMarkDesign;
+const view = chosen.viewBox;
+const favicon = svgDoc(view, view, markGroup(chosen, light.mark, 0, 0, view));
+write(logoDir, 'segno.svg', favicon);
+write(logoDir, 'segno-su-scuro.svg', svgDoc(view, view, markGroup(chosen, dark.mark, 0, 0, view)));
+write(logoDir, 'con-nome.svg', lockup(chosen, light, 64).svg);
+write(logoDir, 'con-nome-su-scuro.svg', lockup(chosen, dark, 64).svg);
+write(logoDir, 'favicon.svg', favicon);
+const webPublic = join(pkg, '..', '..', 'apps', 'web', 'public');
+mkdirSync(webPublic, { recursive: true });
+writeFileSync(join(webPublic, 'favicon.svg'), favicon);
+written.push('../../apps/web/public/favicon.svg');
 
 console.log(`Scritti ${written.length} file:\n${written.join('\n')}`);

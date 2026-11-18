@@ -66,14 +66,26 @@ function cell(col: Column, action: Action): string {
   const isAdmin = action.startsWith('admin.');
   const base: AccessContext = isAdmin
     ? { now: at }
-    : { archive: own, grants: col.grants, settings: { secretaryCanReadDiary: false }, now: at };
+    : {
+        archive: own,
+        grants: col.grants,
+        settings: { secretaryCanReadDiary: false, secretaryCanReadSummary: false },
+        now: at,
+      };
   if (!can(col.actor, action, base).allowed) {
+    if (action === 'clinical.summary.read') {
+      const configurable = can(col.actor, action, {
+        ...base,
+        settings: { secretaryCanReadDiary: false, secretaryCanReadSummary: true },
+      });
+      if (configurable.allowed) return 'Se il titolare lo consente';
+    }
     if (action === 'clinical.diary.read') {
       const configurable = can(col.actor, action, {
         ...base,
-        settings: { secretaryCanReadDiary: true },
+        settings: { secretaryCanReadDiary: true, secretaryCanReadSummary: false },
       });
-      if (configurable.allowed) return 'Se lo studio lo consente';
+      if (configurable.allowed) return 'Se il titolare lo consente';
     }
     if (action === 'prescription.draft_repeat') {
       const chronic = can(col.actor, action, { ...base, resource: { therapyKind: 'chronic' } });

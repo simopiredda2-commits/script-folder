@@ -75,6 +75,17 @@ describe('esportazione completa dei dati del medico', () => {
     }
   });
 
+  it('le date restano date: nessuno spostamento di fuso orario', async () => {
+    const [p] = (
+      await s.db.execute<{ id: string; birth_date: string }>(
+        sql`select id, birth_date::text from patient where id = ${s.richPatient}`,
+      )
+    ).rows;
+    const exported = doc.tabelle.patient!.find((r) => r.id === s.richPatient)!;
+    expect(exported.birth_date).toBe(p!.birth_date);
+    expect(String(exported.birth_date)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
   it('non contiene password né segreti', () => {
     for (const secret of [
       'password_hash',

@@ -22,6 +22,13 @@
       "when": 1794966257681,
       "tag": "0002_registro_e_storico",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794986865154,
+      "tag": "0003_scelte_prima_fermata",
+      "breakpoints": true
     }
   ]
 }

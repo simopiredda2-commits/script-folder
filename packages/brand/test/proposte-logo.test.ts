@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PRODUCT_NAME } from '../brand';
-import { currentMark } from '../mark';
+import { previousMark } from '../mark';
 import { scriptColors } from '../tokens';
 
 const dir = join(import.meta.dirname, '..', 'assets', 'proposte-logo');
@@ -18,7 +18,7 @@ const allowed = new Set(
   [
     ...Object.values(scriptColors.light),
     ...Object.values(scriptColors.dark),
-    currentMark.color,
+    previousMark.color,
     '#FFFFFF',
   ].map((c) => c.toUpperCase()),
 );
@@ -63,8 +63,8 @@ describe('proposte di logo', () => {
 
   it('il segno di oggi è identico all’originale', () => {
     const svg = readFileSync(join(dir, 'segno-attuale.svg'), 'utf8');
-    expect(svg).toContain(`points="${currentMark.points}"`);
-    expect(svg).toContain(`stroke="${currentMark.color}"`);
-    expect(svg).toContain(`stroke-width="${currentMark.strokeWidth}"`);
+    expect(svg).toContain(`points="${previousMark.points}"`);
+    expect(svg).toContain(`stroke="${previousMark.color}"`);
+    expect(svg).toContain(`stroke-width="${previousMark.strokeWidth}"`);
   });
 });

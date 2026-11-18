@@ -1,24 +1,28 @@
-import { currentMark, PRODUCT_NAME } from '@mmg/brand';
+import { PRODUCT_NAME, productMark } from '@mmg/brand';
 
-/** Segno di oggi con il nome del prodotto, preso da PRODUCT_NAME. */
+/** Segno del prodotto (proposta B, scelta alla prima fermata) con il nome da PRODUCT_NAME. */
 export function Logo({ size = 30 }: { size?: number }) {
   return (
     <span className="brand-logo">
       <svg
         width={size}
         height={size}
-        viewBox={currentMark.viewBox}
+        viewBox={productMark.viewBox}
         aria-hidden="true"
         focusable="false"
+        data-segno="prodotto"
       >
-        <polyline
-          points={currentMark.points}
-          fill="none"
-          stroke={currentMark.color}
-          strokeWidth={currentMark.strokeWidth}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        {productMark.paths.map((d) => (
+          <path
+            key={d}
+            d={d}
+            fill="none"
+            stroke={productMark.color}
+            strokeWidth={productMark.strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
       </svg>
       <span>{PRODUCT_NAME}</span>
     </span>

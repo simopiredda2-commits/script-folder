@@ -73,7 +73,7 @@ export function buildApp({ db, config, now, logger = false }: AppDeps): FastifyI
     const r = await auth.authenticate(token);
     if (r.status === 'invalid') throw new HttpError(401, 'Sessione non valida o scaduta');
     if (r.status === 'locked') {
-      throw new HttpError(423, 'Sessione bloccata per inattività: inserisci la password');
+      throw new HttpError(423, 'Sessione bloccata per inattività: inserisci il codice a 6 cifre');
     }
     req.actor = r.actor;
   });
