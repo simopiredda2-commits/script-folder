@@ -50,8 +50,18 @@ describe('seguito delle prestazioni prescritte (tappa 10)', () => {
       priority: 'P',
       diagnosticQuestion: 'Quesito di prova',
       lines: [
-        { serviceCode: 'PROVA.V', serviceDescription: 'Visita di prova', quantity: 1 },
-        { serviceCode: 'PROVA.R', serviceDescription: 'Ciclo di prova', quantity: 3 },
+        {
+          serviceCode: 'PROVA.V',
+          serviceNationalCode: 'PROVA.V',
+          serviceDescription: 'Visita di prova',
+          quantity: 1,
+        },
+        {
+          serviceCode: 'PROVA.R',
+          serviceNationalCode: 'PROVA.R',
+          serviceDescription: 'Ciclo di prova',
+          quantity: 3,
+        },
       ],
     });
     expect(res.statusCode, res.body).toBe(201);

@@ -52,6 +52,7 @@ export interface LineInput {
   drugName?: string | null;
   activeIngredient?: string | null;
   serviceCode?: string | null;
+  serviceNationalCode?: string | null;
   serviceDescription?: string | null;
   quantity: number;
   aifaNote?: string | null;
@@ -134,6 +135,13 @@ export interface PrescriptionDeps {
    * autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto 8000 (D94).
    */
   sendTimeoutMs?: number;
+  /**
+   * Catalogo regionale delle prestazioni in uso alla data (D154): dà il codice del nomenclatore
+   * delle righe che hanno solo quello del catalogo. Per difetto nessun catalogo.
+   */
+  serviceCatalog?: (
+    date: string,
+  ) => Promise<((code: string) => { nationalCode: string | null } | null) | undefined>;
 }
 
 /** Tempo massimo di attesa dell'invio per difetto: il limite alto dei 6–8 secondi del Piemonte. */
@@ -150,6 +158,19 @@ const authMessage = (problem: AuthProblem, message: string) =>
     : `${message}. Controlla utente, password e PIN in «Credenziali dei servizi» e rimanda.`;
 
 type PrescriptionRow = typeof prescription.$inferSelect;
+
+/**
+ * Codice del nomenclatore di una riga di specialistica: quello scritto sulla riga, altrimenti
+ * quello della voce del catalogo in uso (D154). Null se non si sa: allora R10 ferma l'invio.
+ */
+function nationalCodeOf(
+  l: { serviceCode?: string | null; serviceNationalCode?: string | null },
+  catalog: ((code: string) => { nationalCode: string | null } | null) | undefined,
+): string | null {
+  const written = l.serviceNationalCode?.trim();
+  if (written) return written;
+  return l.serviceCode ? (catalog?.(l.serviceCode)?.nationalCode ?? null) : null;
+}
 
 export function createPrescriptionService(deps: PrescriptionDeps) {
   const { db } = deps;
@@ -204,6 +225,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     status: PrescriptionStatus,
   ): Promise<string> {
     if (input.lines.length === 0) throw new HttpError(400, 'La ricetta non ha righe');
+    // Le righe di specialistica conservano anche il codice del nomenclatore (D154).
+    const catalog =
+      input.kind === 'specialist_ssn' ? await deps.serviceCatalog?.(studioDate(now())) : undefined;
     return withActor(db, actor.userId, async (tx) => {
       const [p] = await tx
         .insert(prescription)
@@ -234,6 +258,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           drugName: l.drugName ?? null,
           activeIngredient: l.activeIngredient ?? null,
           serviceCode: l.serviceCode ?? null,
+          serviceNationalCode: nationalCodeOf(l, catalog),
           serviceDescription: l.serviceDescription ?? null,
           quantity: l.quantity,
           aifaNote: l.aifaNote ?? null,
@@ -395,6 +420,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
 
   async function buildMessage(p: PrescriptionRow, actor: Actor): Promise<PrescriptionMessage> {
     const [pt] = await db.select().from(patient).where(eq(patient.id, p.patientId));
+    const catalog =
+      p.kind === 'specialist_ssn' ? await deps.serviceCatalog?.(studioDate(now())) : undefined;
     const lines = await db
       .select()
       .from(prescriptionLine)
@@ -415,6 +442,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         drugName: l.drugName,
         activeIngredient: l.activeIngredient,
         serviceCode: l.serviceCode,
+        serviceNationalCode: nationalCodeOf(l, catalog),
         serviceDescription: l.serviceDescription,
         quantity: l.quantity,
         aifaNote: l.aifaNote,

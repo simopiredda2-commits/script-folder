@@ -7,7 +7,10 @@ const lineSchema = z
     drugAic: z.string().max(20).nullable().optional(),
     drugName: z.string().max(300).nullable().optional(),
     activeIngredient: z.string().max(300).nullable().optional(),
+    /** Codice del catalogo regionale (codCatalogoPrescr). */
     serviceCode: z.string().max(40).nullable().optional(),
+    /** Codice del nomenclatore, «codice DM» (codProdPrest): dal catalogo o scritto a mano (D154). */
+    serviceNationalCode: z.string().trim().max(40).nullable().optional(),
     serviceDescription: z.string().max(500).nullable().optional(),
     quantity: z.number().int().min(1).max(99),
     aifaNote: z.string().max(20).nullable().optional(),

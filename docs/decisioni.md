@@ -624,3 +624,20 @@ Da ora una prova su tutto il codice (`packages/brand/test/provenienza.test.ts`) 
   - **Sigle che il catalogo non scrive**: HbA1c, INR, PTT, GGT, PCR, TAC, RMN, EEG, MOC e DEXA.
   - **Regola generale per i nomi in «-emia» e «-uria»**: si cerca anche la radice (colesterolemia → colesterolo, proteinuria → proteine), se ha almeno 5 lettere.
 - **Provata sul catalogo intero** (4739 voci della D.D. 990/2024): l'indice si costruisce in circa 60 millisecondi e una ricerca dura da 1 a 25. L'indice sta in memoria per ogni versione del catalogo, che dopo l'importazione non cambia (A2).
+
+**D154 · I due codici della specialistica e il codice scritto a mano.** Simone: i codici regionali vanno aggiornati ogni giorno, perché se un codice cambia alcune strutture rifiutano la ricetta; quando l'aggiornamento non c'è ancora, il medico deve poter scrivere il codice a mano, se è consentito. Le specifiche del Sistema TS (prescrizione, 5/12/2024, pp. 28 e 40–42) dicono quattro cose:
+
+- per la specialistica sono obbligatori il codice del nomenclatore (`codProdPrest`, il «codice DM») e quello del catalogo regionale (`codCatalogoPrescr`), coerenti tra loro, più la descrizione del catalogo, che è ciò che vede la struttura;
+- il Sistema TS, e prima di lui il SAR, controlla la coppia sul catalogo che la Regione gli ha trasmesso, non sulla copia del programma;
+- un codice nuovo scritto a mano viene quindi accettato, se la Regione lo ha già trasmesso;
+- la nota libera (`descrTestoLiberoNote`) non sostituisce il codice.
+
+Scelte:
+
+- **La riga conserva entrambi i codici** (migrazione 0017). Scegliendo dal catalogo, il codice del nomenclatore viene dalla voce del catalogo; se la riga non lo porta, il programma lo ricava dal catalogo in uso, quando la prepara e quando la invia. Al SAR arrivano entrambi.
+- **R10**, nella versione 2026-11-18.3 delle regole: blocca se manca il codice del nomenclatore, e se quello scritto non è quello del catalogo in uso. Punti e spazi non contano. Le ricette controllate con le versioni precedenti restano com'erano: la regola lo legge da un valore della versione.
+- **R18**, regola nuova: avvisa se il codice non è nel catalogo regionale in uso e chiede un motivo, che resta registrato con il controllo. Il controllo finale è del SAR. Tace se nessun catalogo è importato. La numerazione dei requisiti finisce a R17: R18 c'è dalla versione .3.
+- **Modulo «scritta a mano»** nella ricetta specialistica: codice del catalogo, codice del nomenclatore (DM) e descrizione come nel catalogo della Regione, con la spiegazione di quando usarlo.
+- **Simulatore del SAR**: può avere il «catalogo della Regione» e allora rifiuta le coppie che non conosce, dicendo quale prestazione.
+
+L'aggiornamento quotidiano del catalogo è nell'aggiornamento automatico (attività a parte). In produzione la fonte giusta è il catalogo strutturato del CSI Piemonte, se esiste per le software house: è una domanda per la fermata.

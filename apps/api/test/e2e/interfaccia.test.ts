@@ -452,6 +452,36 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'visite ed esami prescritti', true);
   });
 
+  it('prestazione non ancora nel catalogo, scritta a mano: avviso R18 con il motivo, poi inviata (D154)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/specialistica`);
+    await page.getByRole('heading', { level: 1, name: 'Ricetta specialistica' }).waitFor();
+    // L'editor ricorda la ricetta appena inviata: se ne comincia una nuova.
+    const restart = page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    await page
+      .getByRole('button', { name: 'Prestazione non ancora nel catalogo: scrivila a mano' })
+      .click();
+    await page.getByLabel('Codice del catalogo regionale').fill('NUOVO.1');
+    await page.getByLabel('Codice del nomenclatore (DM)').fill('99.99.1');
+    await page
+      .getByLabel('Descrizione, come nel catalogo della Regione')
+      .fill('PRESTAZIONE NUOVA DI PROVA');
+    await check(page, 'prestazione scritta a mano');
+    await page.getByRole('button', { name: 'Aggiungi in ricetta' }).click();
+    await page
+      .locator('.riga-ricetta')
+      .filter({ hasText: 'PRESTAZIONE NUOVA DI PROVA' })
+      .getByText('Catalogo NUOVO.1 · nomenclatore (DM) 99.99.1')
+      .waitFor();
+    await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
+    await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    await page
+      .getByLabel('Motivo per procedere nonostante l’avviso R18')
+      .fill('Codice nuovo, il catalogo del programma non è ancora aggiornato');
+    await page.getByRole('button', { name: 'Firma e invia' }).click();
+    await page.getByText('Ricetta inviata').waitFor();
+  });
+
   it('la stessa prestazione già prescritta: l’editor lo dice subito, con data e NRE', async () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/specialistica`);
     await page.getByRole('heading', { level: 1, name: 'Ricetta specialistica' }).waitFor();

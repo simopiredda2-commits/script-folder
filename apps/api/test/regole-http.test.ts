@@ -58,13 +58,13 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(res.statusCode).toBe(422);
     const body = res.json();
     expect(body.errore).toMatch(/R2/);
-    expect(body.dettagli.versioneRegole).toBe('2026-11-18.2');
+    expect(body.dettagli.versioneRegole).toBe('2026-11-18.3');
     expect(body.dettagli.problemi.some((p: { ruleId: string }) => p.ruleId === 'R2')).toBe(true);
     const [row] = await t.db.select().from(prescription).where(eq(prescription.id, id));
     expect(row!.status).toBe('draft');
     const [c] = await checks(id);
     expect(c!.outcome).toBe('bloccato');
-    expect(c!.rulesVersion).toBe('2026-11-18.2');
+    expect(c!.rulesVersion).toBe('2026-11-18.3');
   });
 
   it('R7: la nota AIFA va confermata; la conferma resta registrata con la versione delle regole', async () => {
@@ -83,7 +83,7 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(ok.statusCode, ok.body).toBe(200);
     const [row] = await t.db.select().from(prescription).where(eq(prescription.id, id));
     expect(row!.status).toBe('sent');
-    expect(row!.rulesVersion).toBe('2026-11-18.2');
+    expect(row!.rulesVersion).toBe('2026-11-18.3');
     const passed = (await checks(id)).find((c) => c.outcome === 'superato')!;
     expect(passed.confirmedAifaNotes).toEqual([l!.id]);
   });

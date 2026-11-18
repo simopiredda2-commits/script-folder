@@ -220,6 +220,7 @@ export function buildApp({
       // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
       preSendChecks: preSendChecks ?? createRulesCheck({ db, now, reference }),
       sendTimeoutMs,
+      serviceCatalog: (date) => reference.serviceLookup(date),
     }),
     db,
     now ?? (() => new Date()),

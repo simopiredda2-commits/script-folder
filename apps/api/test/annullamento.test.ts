@@ -49,7 +49,14 @@ describe('annullamento secondo lo stato di erogazione (D70)', () => {
       accessType: 'first',
       priority: 'P',
       diagnosticQuestion: 'Quesito di prova',
-      lines: [{ serviceCode: 'PROVA.CH', serviceDescription: description, quantity: 1 }],
+      lines: [
+        {
+          serviceCode: 'PROVA.CH',
+          serviceNationalCode: 'PROVA.CH',
+          serviceDescription: description,
+          quantity: 1,
+        },
+      ],
     });
     expect(res.statusCode, res.body).toBe(201);
     const id = res.json<{ id: string }>().id;

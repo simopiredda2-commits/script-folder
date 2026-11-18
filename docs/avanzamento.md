@@ -606,16 +606,14 @@ Durante la tappa 11 (terzo giro):
 
   Poco utili al medico di famiglia: allegati 4B, 4C, 4RAD, 5, 6A, 6B, 12. I file restano fuori dal repository; i dati entreranno come trascrizioni controllate, con la provenienza.
 
-- **Codici regionali aggiornati ogni giorno; codice scritto a mano** (Simone: alcune strutture rifiutano la ricetta se il codice è cambiato). Dalle specifiche del Sistema TS (prescrizione, 5/12/2024, pp. 28 e 40–42):
-  - il SAR e il Sistema TS controllano la coppia «codice del nomenclatore – codice del catalogo» sul catalogo che la Regione ha mandato a loro. Un codice nuovo scritto a mano dal medico, se la Regione lo ha già trasmesso, viene accettato;
-  - la nota libera (`descrTestoLiberoNote`) non sostituisce il codice.
+- **Codici regionali aggiornati ogni giorno; codice scritto a mano** (Simone: alcune strutture rifiutano la ricetta se il codice è cambiato). Fatto (D154):
+  - la riga di specialistica conserva il codice del catalogo e quello del nomenclatore (DM), e al SAR arrivano entrambi;
+  - R10 (versione delle regole .3) vuole il codice del nomenclatore;
+  - R18 avvisa se il codice non è nel catalogo in uso e chiede un motivo;
+  - nell'editor c'è il modulo «scritta a mano»;
+  - il SAR simulato rifiuta le coppie che la Regione non conosce.
 
-  Da fare:
-  - codice scritto a mano, con avviso e motivo registrato, senza blocco locale;
-  - entrambi i codici sulla riga: oggi ne conserviamo uno solo;
-  - aggiornamento quotidiano del catalogo, nell'aggiornamento automatico.
-
-  Domanda per la fermata: il catalogo in formato strutturato da CSI Piemonte per le software house (già tra i «Da verificare» dei requisiti).
+  Resta da fare l'aggiornamento quotidiano (attività dell'aggiornamento automatico). Domanda per la fermata: il catalogo in formato strutturato da CSI Piemonte per le software house (già tra i «Da verificare» dei requisiti).
 
 - **Ricerca per parole chiave, per tutti gli esami** (Simone: «rachide», «potassio, oppure K», «glicemia o glucosio», varianti dei codici regionali, ricerca per codice DM). Fatto (D153):
   - parole in qualunque ordine, all'inizio di una parola; codici del catalogo e del nomenclatore con o senza punti; varianti dello stesso codice vicine;
@@ -1055,3 +1053,8 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D153: il codice del nomenclatore                                                      | Solo il codice del catalogo nella ricerca per codice                                | **Non rilevabile all'inizio** (in Piemonte molti codici regionali sono quelli nazionali senza punti): prova rafforzata con 88.38.A e 89.01.G; poi rosso, poi verde                                                                                                                                               |
 | D153: parole scritte attaccate o staccate                                             | Coppie di parole unite tolte                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D153: prima la voce che comincia con la parola cercata                                | Punti in più tolti                                                                  | Rosso, poi verde (prova con una riga inventata più corta delle voci vere)                                                                                                                                                                                                                                        |
+| D154: R10 vuole il codice del nomenclatore (versione .3)                              | Controllo del codice del nomenclatore spento                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D154: R18 avvisa se il codice non è nel catalogo in uso                               | R18 che non dice mai niente                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D154: la riga conserva il codice del nomenclatore preso dal catalogo                  | Riga salvata senza il codice ricavato                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D154: al SAR arrivano entrambi i codici                                               | Messaggio senza il codice del nomenclatore                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D154: il SAR simulato rifiuta le coppie che la Regione non conosce                    | Controllo del catalogo della Regione spento nel simulatore                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

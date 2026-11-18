@@ -29,6 +29,8 @@ const severityOf = (rule: Rule): Issue['severity'] =>
   rule.behavior === 'block' ? 'block' : rule.behavior === 'warn' ? 'warn' : 'info';
 
 const isSsnPharma = (ctx: RuleContext) => ctx.prescription.kind === 'pharma_ssn';
+/** Codici confrontati senza punti né spazi: 89.7 e 897 sono lo stesso codice. */
+const compactCode = (code: string) => code.replace(/[\s.]/g, '').toUpperCase();
 const lineLabel = (l: LineContext) => l.drugName ?? l.drugAic ?? l.serviceCode ?? 'riga';
 
 function validExemption(ctx: RuleContext, code: string | null) {
@@ -308,6 +310,24 @@ const evaluators: Record<RuleId, Evaluator> = {
       const isService = ctx.prescription.kind === 'specialist_ssn';
       if (isService && !line.serviceCode)
         block(`${lineLabel(line)}: manca il codice della prestazione`, line.id);
+      // Dalla versione che lo dice: anche il codice del nomenclatore (codProdPrest), obbligatorio
+      // per la specialistica; se la riga non lo porta, quello della voce del catalogo in uso.
+      if (isService && line.serviceCode && value(rule, 'requireNationalServiceCode') === 1) {
+        const entry = ctx.serviceCatalog?.(line.serviceCode) ?? null;
+        const written = line.serviceNationalCode?.trim() || null;
+        if (!written && !entry?.nationalCode) {
+          block(`${lineLabel(line)}: manca il codice del nomenclatore (codice DM)`, line.id);
+        } else if (
+          written &&
+          entry?.nationalCode &&
+          compactCode(written) !== compactCode(entry.nationalCode)
+        ) {
+          block(
+            `${lineLabel(line)}: il codice del nomenclatore ${written} non corrisponde a quello del catalogo in uso (${entry.nationalCode})`,
+            line.id,
+          );
+        }
+      }
       if (!isService && !line.drugAic && !line.drugName) block('Riga senza farmaco', line.id);
     }
     return issues;
@@ -443,6 +463,25 @@ const evaluators: Record<RuleId, Evaluator> = {
               'Usa un recapito del paziente, oppure registra la delega in cartella prima di inviare a un’altra persona',
           },
         ];
+  },
+
+  R18: (rule, ctx) => {
+    const p = ctx.prescription;
+    const catalog = ctx.serviceCatalog;
+    if (p.kind !== 'specialist_ssn' || !catalog) return [];
+    const reason = ctx.reasons.R18?.trim();
+    const asksReason = severityOf(rule) === 'warn' && !reason;
+    return p.lines
+      .filter((l) => l.serviceCode && catalog(l.serviceCode) === null)
+      .map((l) => ({
+        ruleId: 'R18' as const,
+        severity: asksReason ? ('warn' as const) : ('info' as const),
+        lineId: l.id,
+        ...(asksReason ? { needs: 'reason' as const } : {}),
+        message: asksReason
+          ? `${lineLabel(l)}: codice non presente nel catalogo regionale in uso. Se è un codice nuovo, il SAR lo controlla sul catalogo aggiornato della Regione e rifiuta la ricetta se non lo trova. Serve un motivo per procedere`
+          : `${lineLabel(l)}: codice non presente nel catalogo regionale in uso; motivo registrato: ${reason}`,
+      }));
   },
 
   R17: (rule, ctx) => {

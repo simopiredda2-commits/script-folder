@@ -120,6 +120,13 @@
       "when": 1795030219357,
       "tag": "0016_ditta_titolare",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795035043138,
+      "tag": "0017_codice_nomenclatore",
+      "breakpoints": true
     }
   ]
 }

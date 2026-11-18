@@ -326,6 +326,25 @@ export class ReferenceData {
     }));
   }
 
+  /**
+   * Il catalogo delle prestazioni in uso alla data, per le regole e per la ricetta (D154): la voce
+   * del codice del catalogo, o null se il codice non c'è; undefined se nessun catalogo è importato.
+   */
+  async serviceLookup(
+    date: string,
+  ): Promise<((code: string) => { nationalCode: string | null } | null) | undefined> {
+    const ids = await this.ids('prestazioni', date);
+    if (!ids.length) return undefined;
+    const index = await this.serviceIndex(ids);
+    const byCode = new Map(
+      index.entries.map((e) => [e.item.regionalCode.trim().toUpperCase(), e.item.nationalCode]),
+    );
+    return (code) => {
+      const key = code.trim().toUpperCase();
+      return byCode.has(key) ? { nationalCode: byCode.get(key) ?? null } : null;
+    };
+  }
+
   private async serviceIndex(ids: string[]) {
     const key = [...ids].sort().join(',');
     const cached = SERVICE_INDEXES.get(key);

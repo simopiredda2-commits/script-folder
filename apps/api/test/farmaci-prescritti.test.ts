@@ -219,16 +219,36 @@ describe('farmaci e prestazioni prescritti nella cartella (D152)', () => {
         lines,
       });
     await send(
-      await spec([{ serviceCode: '89.7', serviceDescription: 'Visita di prova', quantity: 1 }]),
+      await spec([
+        {
+          serviceCode: '89.7',
+          serviceNationalCode: '89.7',
+          serviceDescription: 'Visita di prova',
+          quantity: 1,
+        },
+      ]),
     );
-    await spec([{ serviceCode: '89.7', serviceDescription: 'Visita di prova', quantity: 1 }]);
+    await spec([
+      {
+        serviceCode: '89.7',
+        serviceNationalCode: '89.7',
+        serviceDescription: 'Visita di prova',
+        quantity: 1,
+      },
+    ]);
     // Senza codice la ricetta non parte (R10): resta in bozza, ma resta nella cartella.
     await spec([{ serviceDescription: 'Visita chirurgica - primo accesso', quantity: 1 }]);
     await send(
       await spec([
-        { serviceCode: 'PR.01', serviceDescription: 'ESAME DI PROVA DEL SANGUE', quantity: 1 },
+        {
+          serviceCode: 'PR.01',
+          serviceNationalCode: 'PR.01',
+          serviceDescription: 'ESAME DI PROVA DEL SANGUE',
+          quantity: 1,
+        },
         {
           serviceCode: 'PR.02',
+          serviceNationalCode: 'PR.02',
           serviceDescription: 'INTERVENTO DI PROVA. INCLUSO: DUE VISITE DI CONTROLLO',
           quantity: 1,
         },
