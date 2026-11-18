@@ -66,6 +66,25 @@ export const uiColors = {
    */
   chartSeries1: scriptColors.light.luce,
   chartSeries2: '#D55181',
+  /**
+   * Farmaci nella cartella (D152): lo sfondo della riga dice come si prende il farmaco, la barra
+   * a sinistra lo ripete in colore pieno; sempre con la parola, mai solo colore. Tinte tenui, con
+   * il testo scuro sopra; il giallo è più chiaro dell'evidenziatore e non ha mai il bordo scuro
+   * delle selezioni.
+   * - Cronica: azzurro, la continuità (il blu di SCRIPT è il colore della struttura).
+   * - Ciclo con data di fine: verde, un percorso che si chiude.
+   * - Al bisogno: giallo, il più leggero, per l'uso saltuario.
+   */
+  therapyChronicSurface: '#D3E8FA',
+  therapyChronicEdge: '#1F6FB2',
+  therapyCycleSurface: '#D8EFCC',
+  therapyCycleEdge: '#3B7D28',
+  therapyAsNeededSurface: '#FFEDA8',
+  therapyAsNeededEdge: '#866A00',
+  /** Tipologia sulla ricetta, S suggerita o H ricovero: viola, proposta da un altro medico. */
+  therapyOrigin: '#5B2C91',
+  therapyOriginSurface: '#E8DCFA',
+  therapyOriginEdge: '#7445B3',
 } as const;
 
 export type UiColor = keyof typeof uiColors;

@@ -129,6 +129,10 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     expect(r['esenzioni/catalogo-esenzioni.json']!.notes.join()).toMatch(
       /origine non verificabile/,
     );
+    // D152: a ogni catalogo nuovo il rapporto ripete la prova della regola delle visite.
+    expect(r['piemonte_catalogo/catalogo_prova_allegato_c.json']!.notes).toContain(
+      'visite secondo la regola di D152: 1 su 2 voci',
+    );
     const [dpc] = await t.db
       .select()
       .from(referenceDataset)

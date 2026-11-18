@@ -912,6 +912,128 @@ a.coda:hover {
   font-weight: 600;
 }
 
+/* Farmaci nella cartella (D152): lo sfondo tenue dice come si prende il farmaco e la barra a
+   sinistra lo ripete in colore pieno; la parola c'è sempre. Senza colore: non in corso. */
+.farmaco {
+  --farmaco-sfondo: var(--color-surface);
+  --farmaco-barra: var(--color-border);
+  background: var(--farmaco-sfondo);
+  border-left: 6px solid var(--farmaco-barra);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.farmaco-cronica {
+  --farmaco-sfondo: var(--color-therapy-chronic-surface);
+  --farmaco-barra: var(--color-therapy-chronic-edge);
+}
+
+.farmaco-ciclo {
+  --farmaco-sfondo: var(--color-therapy-cycle-surface);
+  --farmaco-barra: var(--color-therapy-cycle-edge);
+}
+
+.farmaco-al-bisogno {
+  --farmaco-sfondo: var(--color-therapy-as-needed-surface);
+  --farmaco-barra: var(--color-therapy-as-needed-edge);
+}
+
+.farmaco-non-in-corso {
+  border-top: 1px solid var(--color-divider);
+  border-right: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.terapia-riga.farmaco,
+.elenco-farmaci .farmaco {
+  margin-bottom: 0.375rem;
+  padding: 0.375rem 0.75rem 0.375rem 0.25rem;
+}
+
+.terapia-riga.farmaco:not(.farmaco-non-in-corso) {
+  border-bottom: none;
+}
+
+/* Sulle tinte le etichette grigie sparirebbero: fondo bianco e bordo. */
+.farmaco .etichetta {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.etichetta-tipologia,
+.farmaco .etichetta-tipologia {
+  background: var(--color-therapy-origin-surface);
+  border: 1px solid var(--color-therapy-origin-edge);
+  color: var(--color-therapy-origin);
+  font-weight: 600;
+}
+
+.legenda-colori {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+.legenda-titolo {
+  margin: 0;
+  font-weight: 600;
+}
+
+.legenda-colori ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legenda-colori li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.legenda-colori .etichetta {
+  margin-right: 0;
+}
+
+/* I campioni della legenda prendono i colori dalle stesse classi delle righe. */
+.campione {
+  display: inline-block;
+  width: 1.75rem;
+  height: 1.125rem;
+  background: var(--farmaco-sfondo, var(--color-surface));
+  border-left: 4px solid var(--farmaco-barra, var(--color-border));
+  border-radius: 0 3px 3px 0;
+}
+
+.elenco-farmaci {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.elenco-farmaci .farmaco {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 1rem;
+  align-items: center;
+}
+
+.farmaco-conti {
+  display: block;
+}
+
+/* Collegamenti nelle tabelle delle prestazioni prescritte: bersaglio alto 44 px. */
+.tabella-prescritte a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-min-target);
+}
+
 .parametri {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));

@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Database } from '../db/client';
 import { prescriptionHistory } from '../prescriptions/history';
+import { prescribedDrugs, prescribedServices } from '../prescriptions/prescribed';
 import type { PrescriptionService } from '../prescriptions/service';
 
 const idParams = z.object({ id: z.uuid() });
@@ -20,6 +21,17 @@ export function registerPrescriptionRoutes(
     const { id } = idParams.parse(req.params);
     // La richiesta si valida dopo la guardia, come le altre: anche una richiesta sbagliata è registrata.
     return prescriptionHistory(db, now, req.actor!, id, req.query);
+  });
+
+  // Tutti i farmaci e tutte le prestazioni prescritti, ognuno con il suo storico (D152).
+  app.get('/api/pazienti/:id/farmaci-prescritti', scoped, async (req) => {
+    const { id } = idParams.parse(req.params);
+    return prescribedDrugs(db, now, req.actor!, id);
+  });
+
+  app.get('/api/pazienti/:id/prestazioni-prescritte', scoped, async (req) => {
+    const { id } = idParams.parse(req.params);
+    return prescribedServices(db, now, req.actor!, id);
   });
 
   app.get('/api/pazienti/:id/ricette', scoped, async (req) => {

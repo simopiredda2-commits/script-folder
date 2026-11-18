@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
+import { serviceGroup } from '@mmg/domain';
 import { FICTITIOUS_PLACE_LETTER } from '@mmg/fixtures';
 import {
   type DataRecord,
@@ -147,6 +148,26 @@ async function store(
   });
 }
 
+/**
+ * D152: a ogni catalogo nuovo si ripete la prova della regola delle visite sull'elenco intero.
+ * Il rapporto dice quante voci sono visite e quali nominano la visita senza esserlo (interventi
+ * che la comprendono, note), perché una persona le controlli.
+ */
+function visitNotes(records: DataRecord[]): string[] {
+  const text = (r: DataRecord) => (typeof r.description === 'string' ? r.description : '');
+  const visits = records.filter((r) => serviceGroup(text(r)) === 'visita').length;
+  const named = records.filter((r) => /VISIT/i.test(text(r)) && serviceGroup(text(r)) !== 'visita');
+  const listed = named.slice(0, MAX_LISTED_PROBLEMS).map((r) => String(r.regionalCode));
+  return [
+    `visite secondo la regola di D152: ${visits} su ${records.length} voci`,
+    ...(named.length
+      ? [
+          `${named.length} voci nominano la visita senza essere visite, da controllare: ${listed.join(', ')}${named.length > listed.length ? ', …' : ''}`,
+        ]
+      : []),
+  ];
+}
+
 /** Estrae, controlla e salva: la parte comune a file di sync e trascrizioni. */
 async function importRecords(
   opts: ImportOptions,
@@ -191,6 +212,7 @@ async function importRecords(
   const discarded = new Set(out.problems.map((p) => p.line)).size;
   await store(opts, meta, out.records, discarded);
   const warnings = warningsFor(meta.kind, out.records);
+  const visits = meta.kind === 'prestazioni' ? visitNotes(out.records) : [];
   const noValue = Object.entries(out.noValue).map(
     ([field, n]) => `${field}: ${n} celle senza valore secondo la mappatura ${mapping.id}`,
   );
@@ -201,6 +223,7 @@ async function importRecords(
     notes: [
       ...line.notes,
       ...noValue,
+      ...visits,
       ...(discarded ? [`${discarded} righe scartate e accettate`] : []),
     ],
     ...(warnings.length ? { warnings } : {}),

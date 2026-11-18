@@ -29,6 +29,8 @@ export type AccessAction =
   | 'ricetta_controllo'
   | 'lettura_registro'
   | 'lettura_storico_prescrizioni'
+  | 'lettura_farmaci_prescritti'
+  | 'lettura_prestazioni_prescritte'
   | 'lettura_cronologia'
   | 'lettura_esami'
   | 'ricetta_stato'

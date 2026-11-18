@@ -27,6 +27,8 @@ export const historyQuery = z
       .regex(/^\d{9}$/)
       .optional(),
     principio: z.string().trim().min(1).max(300).optional(),
+    /** Farmaco scritto a mano, senza AIC né principio attivo: il nome (D152). */
+    farmaco: z.string().trim().min(1).max(300).optional(),
     /** Prestazione: codice regionale; per le righe senza codice, la descrizione. */
     prestazione: z.string().trim().min(1).max(40).optional(),
     descrizione: z.string().trim().min(1).max(500).optional(),
@@ -41,6 +43,75 @@ const PRESCRIBED = new Set(['sent', 'paper']);
 const MONTHS_FOR_TOTAL = 12;
 
 const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+
+/** Che cosa apre lo storico: una terapia, un farmaco o una prestazione. */
+export interface HistoryTarget {
+  therapyId: string | null;
+  aic: string | null;
+  ingredient: string | null;
+  /** Il nome, solo per le righe senza AIC né principio attivo (D152). */
+  name: string | null;
+  serviceCode: string | null;
+  serviceDescription: string | null;
+}
+
+export type LineFields = Pick<
+  typeof prescriptionLine.$inferSelect,
+  'therapyId' | 'drugAic' | 'drugName' | 'activeIngredient' | 'serviceCode' | 'serviceDescription'
+>;
+
+/** Riga di prestazione (specialistica) o di farmaco. */
+export const isServiceLine = (l: LineFields) => !!(l.serviceCode || l.serviceDescription);
+
+export const emptyTarget = (): HistoryTarget => ({
+  therapyId: null,
+  aic: null,
+  ingredient: null,
+  name: null,
+  serviceCode: null,
+  serviceDescription: null,
+});
+
+/** Lo storico di una terapia: le sue righe e quelle senza terapia dello stesso farmaco. */
+export const therapyTarget = (t: {
+  id: string;
+  drugAic: string | null;
+  activeIngredient: string | null;
+  drugName: string;
+}): HistoryTarget => ({
+  ...emptyTarget(),
+  therapyId: t.id,
+  aic: t.drugAic,
+  ingredient: t.activeIngredient,
+  name: t.drugName,
+});
+
+/**
+ * Le regole di D65 e D66, una sola volta: valgono per lo storico e per gli elenchi della
+ * cartella (D152), così il numero di ricette di un elenco è quello che lo storico mostra.
+ * - Una riga con terapia appartiene solo alla sua terapia.
+ * - Prestazioni: per codice regionale; le righe senza codice, per descrizione.
+ * - Farmaci senza terapia: per AIC se la riga ce l'ha; altrimenti per principio attivo; le righe
+ *   senza AIC né principio (scritte a mano), per nome.
+ */
+export function matchesTarget(t: HistoryTarget, line: LineFields): boolean {
+  if (t.therapyId && line.therapyId) return line.therapyId === t.therapyId;
+  if (t.serviceCode || t.serviceDescription) {
+    if (t.serviceCode && line.serviceCode) return line.serviceCode === t.serviceCode;
+    return (
+      !!t.serviceDescription &&
+      !line.serviceCode &&
+      lower(line.serviceDescription) === lower(t.serviceDescription)
+    );
+  }
+  if (isServiceLine(line)) return false;
+  if (t.aic && line.drugAic) return line.drugAic === t.aic;
+  if (t.ingredient) return lower(line.activeIngredient) === lower(t.ingredient);
+  if (t.name && !line.drugAic && !line.activeIngredient) {
+    return lower(line.drugName) === lower(t.name);
+  }
+  return false;
+}
 
 export async function prescriptionHistory(
   db: Database,
@@ -61,13 +132,25 @@ export async function prescriptionHistory(
   const therapies = await db.select().from(therapy).where(eq(therapy.patientId, patientId));
   const reservedIds = new Set(therapies.filter((t) => t.reserved).map((t) => t.id));
 
-  let aic = q.aic ?? null;
-  let ingredient = q.principio ?? null;
+  let target: HistoryTarget = {
+    ...emptyTarget(),
+    aic: q.aic ?? null,
+    ingredient: q.principio ?? null,
+    name: q.farmaco ?? null,
+    serviceCode: q.prestazione ?? null,
+    serviceDescription: q.descrizione ?? null,
+  };
   if (q.terapia) {
     const t = therapies.find((x) => x.id === q.terapia);
     if (!t || (t.reserved && !reservedAllowed)) throw new HttpError(404, 'Terapia non trovata');
-    aic ??= t.drugAic;
-    ingredient ??= t.activeIngredient;
+    const own = therapyTarget(t);
+    target = {
+      ...target,
+      therapyId: t.id,
+      aic: target.aic ?? own.aic,
+      ingredient: target.ingredient ?? own.ingredient,
+      name: target.name ?? own.name,
+    };
   }
 
   const rows = await db
@@ -79,17 +162,7 @@ export async function prescriptionHistory(
 
   const matches = rows.filter(({ line }) => {
     if (line.therapyId && reservedIds.has(line.therapyId) && !reservedAllowed) return false;
-    if (q.terapia && line.therapyId) return line.therapyId === q.terapia;
-    if (q.prestazione || q.descrizione) {
-      if (q.prestazione && line.serviceCode) return line.serviceCode === q.prestazione;
-      return (
-        !!q.descrizione &&
-        !line.serviceCode &&
-        lower(line.serviceDescription) === lower(q.descrizione)
-      );
-    }
-    if (aic && line.drugAic) return line.drugAic === aic;
-    return !!ingredient && lower(line.activeIngredient) === lower(ingredient);
+    return matchesTarget(target, line);
   });
 
   const ids = [...new Set(matches.map((m) => m.p.id))];

@@ -392,6 +392,58 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'storico della prestazione');
   });
 
+  it('farmaci prescritti con i colori e la legenda; visite ed esami nei loro menu (D152)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    // La legenda è sempre nello stesso punto: subito sotto «Terapia in corso».
+    await expect(page.locator('#titolo-terapia + .legenda-colori').count()).resolves.toBe(1);
+    const chronic = page.locator('li.farmaco-cronica').filter({ hasText: 'Farmaco di prova 5 mg' });
+    await chronic.first().waitFor();
+    // Il colore viene davvero dai token: sfondo azzurro e barra blu, con la parola «Cronica».
+    await expect(
+      chronic.first().evaluate((el) => {
+        const css = getComputedStyle(el);
+        return [css.backgroundColor, css.borderLeftColor];
+      }),
+    ).resolves.toEqual(['rgb(211, 232, 250)', 'rgb(31, 111, 178)']);
+    await chronic.first().getByText('Cronica', { exact: true }).waitFor();
+
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Farmaci prescritti' })
+      .click();
+    await page.getByRole('heading', { name: 'Farmaci prescritti', level: 1 }).waitFor();
+    await page.getByText('Legenda dei colori').waitFor();
+    const occasional = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Prescritti senza terapia in cartella' }) });
+    const amlodipine = occasional
+      .locator('li.farmaco-non-in-corso')
+      .filter({ hasText: /AMLODIPINA/ });
+    await amlodipine.first().waitFor();
+    await amlodipine
+      .first()
+      .getByText(/inviate o su carta/)
+      .waitFor();
+    await check(page, 'farmaci prescritti', true);
+    await amlodipine.first().getByRole('link', { name: 'Storico' }).click();
+    await page.getByRole('heading', { name: 'Storico delle prescrizioni' }).waitFor();
+    await page.locator('table').getByText(/NRE/).first().waitFor();
+    await check(page, 'storico di un farmaco senza terapia');
+
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Visite ed esami prescritti' })
+      .click();
+    await page.getByRole('heading', { name: 'Visite ed esami prescritti', level: 1 }).waitFor();
+    const visits = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Visite', exact: true }) });
+    await visits.getByRole('link', { name: 'Visita di prova' }).waitFor();
+    await check(page, 'visite ed esami prescritti', true);
+  });
+
   it('la stessa prestazione già prescritta: l’editor lo dice subito, con data e NRE', async () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/specialistica`);
     await page.getByRole('heading', { level: 1, name: 'Ricetta specialistica' }).waitFor();

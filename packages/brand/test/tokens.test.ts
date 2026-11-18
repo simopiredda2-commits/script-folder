@@ -42,6 +42,15 @@ describe('contrasti WCAG 2.2 AA dell’interfaccia', () => {
     ['onMark', 'mark', 'testo sull’evidenziatore'],
     ['textMuted', 'mark', 'testo secondario sull’evidenziatore'],
     ['warning', 'surface', 'avviso su scheda'],
+    // Farmaci nella cartella (D152): testo, testo secondario e collegamenti sopra ogni tinta.
+    ...(
+      ['therapyChronicSurface', 'therapyCycleSurface', 'therapyAsNeededSurface'] as const
+    ).flatMap((bg): [string, string, string][] => [
+      ['text', bg, 'testo sulla riga del farmaco'],
+      ['textMuted', bg, 'testo secondario sulla riga del farmaco'],
+      ['primary', bg, 'collegamento sulla riga del farmaco'],
+    ]),
+    ['therapyOrigin', 'therapyOriginSurface', 'tipologia S o H'],
   ];
   it.each(text)('%s su %s (%s) ≥ 4,5:1', (fg, bg) => {
     const ratio = contrastRatio(
@@ -58,6 +67,14 @@ describe('contrasti WCAG 2.2 AA dell’interfaccia', () => {
     ['focus', 'background', 'anello di messa a fuoco su pagina'],
     ['chartSeries1', 'surface', 'prima serie dei grafici'],
     ['chartSeries2', 'surface', 'seconda serie dei grafici'],
+    ['therapyChronicEdge', 'surface', 'barra della terapia cronica'],
+    ['therapyChronicEdge', 'therapyChronicSurface', 'barra sulla sua tinta'],
+    ['therapyCycleEdge', 'surface', 'barra del ciclo'],
+    ['therapyCycleEdge', 'therapyCycleSurface', 'barra sulla sua tinta'],
+    ['therapyAsNeededEdge', 'surface', 'barra della terapia al bisogno'],
+    ['therapyAsNeededEdge', 'therapyAsNeededSurface', 'barra sulla sua tinta'],
+    ['therapyOriginEdge', 'surface', 'bordo della tipologia S o H'],
+    ['therapyOriginEdge', 'therapyOriginSurface', 'bordo sulla sua tinta'],
   ];
   it.each(graphics)('%s su %s (%s) ≥ 3:1', (fg, bg) => {
     const ratio = contrastRatio(

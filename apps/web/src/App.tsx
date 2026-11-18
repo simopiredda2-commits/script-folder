@@ -10,7 +10,8 @@ import { FollowUpPage } from './pages/FollowUpPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { CertificatesPage } from './pages/CertificatesPage';
 import { ClinicalEntriesPage } from './pages/ClinicalEntriesPage';
-import { ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
+import { DrugHistoryPage, ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
+import { PrescribedDrugsPage, PrescribedServicesPage } from './pages/PrescribedPages';
 import { LockScreen, LoginPage } from './pages/LoginPage';
 import { MeasurementsPage } from './pages/MeasurementsPage';
 import { PatientsPage } from './pages/PatientsPage';
@@ -61,6 +62,9 @@ function Screens() {
           <Route path="/pazienti/:id/terapie/:therapyId/modifica" element={<TherapyForm />} />
           <Route path="/pazienti/:id/schema-orario" element={<SchedulePage />} />
           <Route path="/pazienti/:id/prestazioni" element={<ServiceHistoryPage />} />
+          <Route path="/pazienti/:id/farmaci" element={<PrescribedDrugsPage />} />
+          <Route path="/pazienti/:id/farmaci/storico" element={<DrugHistoryPage />} />
+          <Route path="/pazienti/:id/visite-ed-esami" element={<PrescribedServicesPage />} />
           <Route path="/ricette" element={<SignQueuePage />} />
           <Route path="/banche-dati" element={<DataSearchPage />} />
           <Route path="/archivio" element={<ArchivePage />} />

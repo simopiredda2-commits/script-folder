@@ -585,3 +585,23 @@ Da ora una prova su tutto il codice (`packages/brand/test/provenienza.test.ts`) 
 - La ditta si vede nei risultati della ricerca dei farmaci (pagina «Farmaci e prestazioni», ricetta, terapia) e in una colonna della tabella degli equivalenti.
 - Nelle schermate per il sito di SCRIPT le terapie restano per principio attivo, senza ditte (D149). Il programma la ditta la mostra, dove serve al medico.
 - Nella scheda di una terapia già salvata la ditta non è un dato a parte: per i generici è già nel nome della confezione (per esempio «AMLODIPINA EG»). Si può aggiungere se servirà.
+
+**D152 · Tutti i farmaci e tutte le prestazioni restano nella cartella, ognuno con il suo storico; i farmaci hanno un colore per tipo.** Richiesta di Simone del 18/11/2026, sopra D65 e D66: ogni farmaco prescritto con il suo storico, i cronici e i suggeriti distinti dal colore, «visite o esami» nei loro menu. Simone: niente formattazione elementare del testo, meglio lo sfondo, con una piccola legenda sempre nello stesso punto, e colori scelti secondo il significato.
+
+- **Farmaci prescritti** (menu della cartella e pagina propria): le terapie in corso, quelle sospese o terminate e i farmaci prescritti senza una terapia in cartella. Le righe senza terapia si raggruppano per AIC; senza AIC, per principio attivo; senza nessuno dei due (scritte a mano), per nome. Ogni voce apre il suo storico: quello della terapia (D65) o uno nuovo per AIC, principio o nome. La regola di corrispondenza è una sola, per lo storico e per l'elenco: il numero di ricette di una voce è quello che il suo storico mostra, e una prova lo controlla voce per voce. Le terapie riservate, e le loro righe, le vede solo chi può (come nello storico).
+- **Colori**, sempre con la parola accanto e mai al suo posto. Lo sfondo tenue della riga, con una barra a sinistra nello stesso colore pieno, dice come si prende il farmaco:
+  - **cronica: azzurro**, la continuità; è il blu di SCRIPT, il colore della struttura;
+  - **ciclo con data di fine: verde**, un percorso che si chiude;
+  - **al bisogno: giallo**, il più leggero, per l'uso saltuario. È più chiaro dell'evidenziatore e non ha mai il bordo scuro delle selezioni (D69).
+
+  La tipologia sulla ricetta ha un'etichetta **viola**: «S · suggerita dallo specialista» o «H · da ricovero». Il viola vuol dire «proposta da un altro medico». Sfondo ed etichetta stanno insieme, senza regole di precedenza: una terapia cronica suggerita dallo specialista ha lo sfondo azzurro e l'etichetta S. **Senza colore**: non in corso (sospesa, terminata, o prescritta senza terapia). Contrasti provati sui token (testo ≥ 4,5:1 su ogni tinta, barre ≥ 3:1).
+
+- **Legenda**: piccola, uguale per ogni paziente, sempre in testa all'elenco dei farmaci (nella cartella subito sotto «Terapia in corso», nella pagina dei farmaci sotto la testata).
+- **Visite ed esami prescritti** (menu della cartella e pagina propria): due gruppi, «Visite» ed «Esami e altre prestazioni». È una visita la prestazione la cui descrizione comincia con «VISITA», «PRIMA VISITA» o «TELEVISITA», oppure nomina la visita dopo un trattino. La regola è verificata il 18/11/2026 su tre elenchi interi, senza eccezioni:
+  - catalogo regionale della D.D. 868/2024: 349 visite;
+  - catalogo regionale della D.D. 990/2024: 356 visite. Le uniche due che non cominciano con «VISITA» sono le rivalutazioni al centro demenze, 8901.85 e 9412.85;
+  - nomenclatore nazionale, allegato 4 del DPCM LEA, PDF del Ministero in 5 parti scaricato da Simone: 61 visite su 2113 prestazioni.
+
+  Cercare la parola in qualunque punto della descrizione non basta: il nomenclatore la usa nelle note. Esempi: «ELETTROCARDIOGRAMMA. Non associabile a Prima visita cardiologica», «Incluso: Visita anestesiologica» negli interventi, e la spiegazione della consulenza genetica. Consulti, colloqui e valutazioni non sono chiamati visite dalle fonti e stanno tra gli esami e le altre prestazioni. A ogni catalogo nuovo il rapporto d'importazione ripete la prova: conta le visite ed elenca le voci che nominano la visita senza esserlo, perché una persona le controlli.
+
+- Il catalogo in vigore dal 30/10/2026 (allegato C della D.D. 710/2026) non è pubblicato con l'atto: la pagina del Bollettino collega solo il testo. Va chiesto o scaricato da Simone (vedi `docs/avanzamento.md`); quando entrerà, il rapporto rifarà la prova.

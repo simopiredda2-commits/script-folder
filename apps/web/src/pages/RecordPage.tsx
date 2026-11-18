@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { useOpenRecords } from '../lib/openRecords';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { ColourLegend, drugRowClass, originOf, OriginTag } from '../components/DrugColours';
+import { ServicesSection, type PrescribedService } from '../components/Prescribed';
 import { Icon } from '../components/Icon';
 import { api, ApiError, query } from '../lib/api';
 import { age, date, maskedFiscalCode, THERAPY_KIND, TIMELINE_KIND } from '../lib/format';
@@ -72,14 +74,6 @@ export interface TherapyFull extends TherapyRow {
   suggestedS: boolean;
   hospitalH: boolean;
   suspendedReason: string | null;
-}
-
-interface PrescriptionRow {
-  id: string;
-  kind: string;
-  status: string;
-  preparedAt: string;
-  righe: { serviceCode: string | null; serviceDescription: string | null; quantity: number }[];
 }
 
 const STATUS: Record<string, string> = {
@@ -180,7 +174,9 @@ export function RecordPage() {
     `/api/pazienti/${id}`,
   );
   const therapies = useApi<{ terapie: TherapyFull[] }>(`/api/pazienti/${id}/terapie`);
-  const prescriptions = useApi<{ ricette: PrescriptionRow[] }>(`/api/pazienti/${id}/ricette`);
+  const services = useApi<{ prestazioni: PrescribedService[] }>(
+    `/api/pazienti/${id}/prestazioni-prescritte`,
+  );
   const [filter, setFilter] = useState<(typeof FILTERS)[number][0]>('tutto');
   const timeline = useApi<{
     cronologia: {
@@ -196,25 +192,6 @@ export function RecordPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [repeatError, setRepeatError] = useState<ApiError | null>(null);
   const [repeatDone, setRepeatDone] = useState<string | null>(null);
-
-  // Prestazioni già prescritte (D66): una voce per codice, o per descrizione se il codice manca.
-  const services = useMemo(() => {
-    const map = new Map<string, { codice: string | null; descrizione: string; volte: number }>();
-    for (const p of prescriptions.data?.ricette ?? []) {
-      if (p.kind !== 'specialist_ssn') continue;
-      for (const l of p.righe) {
-        const key = l.serviceCode ?? `desc:${(l.serviceDescription ?? '').toLowerCase()}`;
-        const v = map.get(key) ?? {
-          codice: l.serviceCode,
-          descrizione: l.serviceDescription ?? l.serviceCode ?? '',
-          volte: 0,
-        };
-        v.volte++;
-        map.set(key, v);
-      }
-    }
-    return [...map.values()].sort((a, b) => a.descrizione.localeCompare(b.descrizione));
-  }, [prescriptions.data]);
 
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
@@ -235,7 +212,6 @@ export function RecordPage() {
           ? `${r.ricette.length === 1 ? 'Preparata 1 ricetta' : `Preparate ${r.ricette.length} ricette`} in bozza.`
           : `${r.ricette.length === 1 ? 'Preparata 1 ricetta' : `Preparate ${r.ricette.length} ricette`}: sono nella coda «da firmare» del medico.`,
       );
-      prescriptions.reload();
     } catch (e) {
       setRepeatError(e instanceof ApiError ? e : null);
     }
@@ -272,6 +248,12 @@ export function RecordPage() {
       />
       <PatientBanner patient={p} summary={riepilogo} />
       <nav className="collegamenti-cartella" aria-label="Sezioni della cartella">
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/farmaci`}>
+          <Icon name="terapia" /> <span>Farmaci prescritti</span>
+        </Link>
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/visite-ed-esami`}>
+          <Icon name="specialistica" /> <span>Visite ed esami prescritti</span>
+        </Link>
         <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/voci`}>
           <Icon name="storico" /> <span>Voci cliniche</span>
         </Link>
@@ -361,6 +343,7 @@ export function RecordPage() {
           <h2 id="titolo-terapia">
             <Icon name="terapia" /> Terapia in corso
           </h2>
+          <ColourLegend />
           <div className="azioni">
             {isDoctor && (
               <Link className="pulsante" to={`/pazienti/${id}/terapie/nuova`}>
@@ -381,7 +364,10 @@ export function RecordPage() {
               <legend className="visivamente-nascosto">Terapie da ripetere</legend>
               <ul>
                 {active.map((t) => (
-                  <li key={t.id} className="terapia-riga">
+                  <li
+                    key={t.id}
+                    className={`terapia-riga ${drugRowClass({ tipo: t.kind, stato: t.status })}`}
+                  >
                     {t.kind === 'chronic' ? (
                       // L'etichetta intorno alla casella porta il bersaglio a 44 px.
                       <label className="bersaglio-casella">
@@ -407,6 +393,7 @@ export function RecordPage() {
                       <span className="tenue">{posology(t)}</span>
                       <span>
                         <span className="etichetta">{THERAPY_KIND[t.kind]}</span>
+                        <OriginTag origin={originOf(t)} />
                         {t.aifaNote && <span className="etichetta">Nota {t.aifaNote}</span>}
                         {t.reserved && <span className="etichetta">Riservata</span>}
                       </span>
@@ -472,28 +459,14 @@ export function RecordPage() {
             </>
           )}
 
-          <h3>Prestazioni prescritte</h3>
-          {services.length === 0 ? (
-            <p className="tenue">Nessuna ricetta specialistica.</p>
-          ) : (
-            <ul className="elenco-semplice">
-              {services.map((x) => (
-                <li key={x.codice ?? x.descrizione}>
-                  <Link
-                    to={`/pazienti/${id}/prestazioni${query({ prestazione: x.codice, descrizione: x.codice ? null : x.descrizione })}`}
-                  >
-                    {x.descrizione}
-                  </Link>
-                  {x.codice && <span className="codice tenue"> {x.codice}</span>}
-                  <span className="tenue">
-                    {' '}
-                    · {x.volte === 1 ? '1 ricetta' : `${x.volte} ricette`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <p>
+            <Link to={`/pazienti/${id}/farmaci`}>
+              Tutti i farmaci prescritti, con il loro storico
+            </Link>
+          </p>
         </section>
+
+        <ServicesSection patientId={id!} services={services} />
       </div>
 
       <RegistrySection patient={p} onSaved={record.reload} />
