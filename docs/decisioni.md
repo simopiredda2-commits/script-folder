@@ -605,3 +605,22 @@ Da ora una prova su tutto il codice (`packages/brand/test/provenienza.test.ts`) 
   Cercare la parola in qualunque punto della descrizione non basta: il nomenclatore la usa nelle note. Esempi: «ELETTROCARDIOGRAMMA. Non associabile a Prima visita cardiologica», «Incluso: Visita anestesiologica» negli interventi, e la spiegazione della consulenza genetica. Consulti, colloqui e valutazioni non sono chiamati visite dalle fonti e stanno tra gli esami e le altre prestazioni. A ogni catalogo nuovo il rapporto d'importazione ripete la prova: conta le visite ed elenca le voci che nominano la visita senza esserlo, perché una persona le controlli.
 
 - Il catalogo in vigore dal 30/10/2026 (allegato C della D.D. 710/2026) non è pubblicato con l'atto: la pagina del Bollettino collega solo il testo. Va chiesto o scaricato da Simone (vedi `docs/avanzamento.md`); quando entrerà, il rapporto rifarà la prova.
+
+**D153 · Ricerca delle prestazioni per parole chiave, per tutti gli esami.** Simone: scrivendo «rachide» si devono trovare tutte le prestazioni che lo coinvolgono; lo stesso per gli esami, «potassio, oppure K», «glicemia o glucosio»; le varianti con codici regionali diversi devono comparire; si cerca anche iniziando a scrivere il codice. Regole generali, non un elenco di casi:
+
+- **Parole**: tutte le parole della domanda, in qualunque ordine, ognuna all'inizio di una parola della descrizione. Non contano maiuscole, accenti e segni. Le parole di una o due lettere (K, RX, TC) valgono solo intere. «rachide» non trova «ARACHIDE». «lombo sacrale», «lombo-sacrale» e «lombosacrale» si trovano a vicenda. La branca trova la prestazione, ma conta meno.
+- **Codici**: l'inizio del codice del catalogo o del nomenclatore («codice DM»), con o senza punti, anche quando comincia con una lettera (G9.01). Il codice vale più delle parole.
+- **Varianti**: le voci con lo stesso codice del nomenclatore restano vicine, per esempio le sei del glucosio, 90.27.1. Prima viene la voce che comincia con la parola cercata («glicemia» dà il glucosio prima delle dialisi «con soluzioni di glucosio»); a parità di punti, il gruppo con la descrizione più corta.
+- **Materiali**: la sigla tra quadre in fondo alla descrizione si mostra per esteso e si può cercare («glucosio urine» trova [U] e [DU]):
+  - S siero/sangue, P plasma, U urine e DU urine 24 ore vengono da Simone;
+  - (SG)ER eritrociti, SG e (SG) sangue, SA saliva e LA liquido amniotico vengono da un elenco regionale campano, letto negli estratti di una ricerca. Simone ha chiesto di non scriverlo nell'interfaccia: la fonte resta nei dati e in `docs/provenienze.md`;
+  - [ALB] e [F] restano come sono scritte, senza fonte.
+
+  Il DM 22/7/1996, da cui vengono le sigle, dice solo che la parentesi quadra indica «il materiale nel quale si dosa l'analita» (S.O. n. 150, p. 7).
+
+- **Sinonimi** come dati, in `packages/reference/data/ricerca-prestazioni.json`. Ogni gruppo ha un codice d'esempio verificato sul catalogo intero della D.D. 990/2024 e la fonte.
+  - **Simboli chimici** degli elementi che compaiono nel catalogo: K, Na, Cl, Ca, Mg, Fe, Li, Ni, Cu, Zn, Cd, Pb. Sono «sigle»: valgono quando il medico le scrive, ma «potassio» non si allarga a ogni parola «K» (le catene K delle immunoglobuline). Esclusi Cr (per molti è la creatinina), Se e Al (sono parole italiane) e Co.
+  - **Nomi d'uso**: glicemia e glicosuria per glucosio, azotemia per urea, uricemia e acido urico per urato, sideremia per ferro, natremia, kaliemia, transaminasi.
+  - **Sigle che il catalogo non scrive**: HbA1c, INR, PTT, GGT, PCR, TAC, RMN, EEG, MOC e DEXA.
+  - **Regola generale per i nomi in «-emia» e «-uria»**: si cerca anche la radice (colesterolemia → colesterolo, proteinuria → proteine), se ha almeno 5 lettere.
+- **Provata sul catalogo intero** (4739 voci della D.D. 990/2024): l'indice si costruisce in circa 60 millisecondi e una ricerca dura da 1 a 25. L'indice sta in memoria per ogni versione del catalogo, che dopo l'importazione non cambia (A2).

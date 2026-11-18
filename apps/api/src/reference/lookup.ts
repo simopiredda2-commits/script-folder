@@ -1,4 +1,13 @@
-import { type DatasetKind, KINDS, type MappingSet } from '@mmg/reference';
+import {
+  type DatasetKind,
+  indexServices,
+  KINDS,
+  loadServiceSearchData,
+  type MappingSet,
+  SERVICE_SEARCH_DATA,
+  searchServices,
+  type ServiceIndex,
+} from '@mmg/reference';
 import type { DrugFacts } from '@mmg/rules';
 import { and, desc, eq, ilike, inArray, lte, or, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client';
@@ -53,6 +62,25 @@ export interface DrugInfo {
 }
 
 const SEARCH_LIMIT = 30;
+
+/** Sinonimi e sigle dei materiali (D153), letti una volta. */
+const SERVICE_SEARCH = loadServiceSearchData(SERVICE_SEARCH_DATA);
+
+interface ServiceRow {
+  regionalCode: string;
+  nationalCode: string | null;
+  description: string;
+  branch: string | null;
+  fee: string | null;
+  notes: string | null;
+}
+
+/**
+ * Indici della ricerca delle prestazioni, per versione del catalogo. Una versione importata non
+ * cambia più (A2): l'indice non va mai rifatto, e una versione nuova ha il suo.
+ */
+const SERVICE_INDEXES = new Map<string, ServiceIndex<ServiceRow>>();
+const MAX_SERVICE_INDEXES = 8;
 const MS_PER_DAY = 86_400_000;
 
 function daysBetween(from: string, to: string): number {
@@ -282,14 +310,27 @@ export class ReferenceData {
     return [...found.values()].sort(compareEquivalents);
   }
 
-  /** Catalogo regionale: descrizione, branca, codice regionale o del nomenclatore. */
+  /**
+   * Catalogo regionale per parole chiave (D153): parole in qualunque ordine, sinonimi, sigle dei
+   * materiali per esteso, codice del catalogo o del nomenclatore. Le varianti dello stesso codice
+   * del nomenclatore restano vicine.
+   */
   async searchServices(q: string, date: string, limit = SEARCH_LIMIT) {
-    const text = q.trim();
     const ids = await this.ids('prestazioni', date);
-    if (!text || !ids.length) return [];
-    const like = `%${likeText(text)}%`;
-    const prefix = `${likeText(text)}%`;
-    return this.db
+    if (!q.trim() || !ids.length) return [];
+    const index = await this.serviceIndex(ids);
+    return searchServices(index, q, limit).map((h) => ({
+      ...h.item,
+      /** Il materiale tra quadre, per esteso se la sigla è nota. */
+      material: h.material,
+    }));
+  }
+
+  private async serviceIndex(ids: string[]) {
+    const key = [...ids].sort().join(',');
+    const cached = SERVICE_INDEXES.get(key);
+    if (cached) return cached;
+    const rows = await this.db
       .select({
         regionalCode: refService.regionalCode,
         nationalCode: refService.nationalCode,
@@ -299,19 +340,13 @@ export class ReferenceData {
         notes: refService.notes,
       })
       .from(refService)
-      .where(
-        and(
-          inArray(refService.datasetId, ids),
-          or(
-            ilike(refService.regionalCode, prefix),
-            ilike(refService.nationalCode, prefix),
-            ilike(refService.description, like),
-            ilike(refService.branch, like),
-          ),
-        ),
-      )
-      .orderBy(refService.description)
-      .limit(limit);
+      .where(inArray(refService.datasetId, ids));
+    const index = indexServices(rows, SERVICE_SEARCH);
+    if (SERVICE_INDEXES.size >= MAX_SERVICE_INDEXES) {
+      SERVICE_INDEXES.delete(SERVICE_INDEXES.keys().next().value!);
+    }
+    SERVICE_INDEXES.set(key, index);
+    return index;
   }
 
   async searchExemptions(q: string, date: string, limit = SEARCH_LIMIT) {

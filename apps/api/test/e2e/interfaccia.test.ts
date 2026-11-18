@@ -373,8 +373,16 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
   it('ricetta specialistica dal catalogo, poi lo storico della prestazione (D66)', async () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/specialistica`);
+    // D153: parole in qualunque ordine; nel risultato i due codici della ricetta.
+    await page.getByLabel('Prestazione, branca o codice').fill('prova esame');
+    await page.locator('.risultato').filter({ hasText: 'Esame di prova' }).waitFor();
     await page.getByLabel('Prestazione, branca o codice').fill('visita');
     await page.locator('.risultato').filter({ hasText: 'Visita di prova' }).waitFor();
+    await page
+      .locator('.risultato')
+      .filter({ hasText: 'Visita di prova' })
+      .getByText('Catalogo 89.7 · nomenclatore (DM) 89.7')
+      .waitFor();
     await check(page, 'ricetta specialistica', true);
     await page
       .locator('.risultato')

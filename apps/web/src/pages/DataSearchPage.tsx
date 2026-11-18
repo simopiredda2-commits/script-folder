@@ -7,6 +7,7 @@ import {
   type DatasetVersion,
 } from '../components/common';
 import { Icon } from '../components/Icon';
+import { ServiceResultText } from '../components/ServiceResult';
 import { query } from '../lib/api';
 import { money } from '../lib/format';
 import { useApi } from '../lib/useApi';
@@ -180,16 +181,7 @@ export function DataSearchPage() {
             )}
             {services.data.prestazioni.map((s) => (
               <li key={s.regionalCode} className="risultato">
-                <div>
-                  <strong>{s.description}</strong>
-                  <div className="tenue">
-                    {[s.branch, s.fee && money(s.fee), s.notes].filter(Boolean).join(' · ')}
-                  </div>
-                  <div className="codice tenue">
-                    {s.regionalCode}
-                    {s.nationalCode ? ` · nomenclatore ${s.nationalCode}` : ''}
-                  </div>
-                </div>
+                <ServiceResultText s={s} />
               </li>
             ))}
           </ul>

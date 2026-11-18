@@ -167,6 +167,17 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     });
   });
 
+  it('D153: parole in qualunque ordine, codice senza punti, materiale per esteso', async () => {
+    const ref = new ReferenceData(t.db, repo);
+    const codes = async (q: string) =>
+      (await ref.searchServices(q, today)).map((s) => s.regionalCode);
+    expect(await codes('prova esame')).toEqual(['PROVA.02']);
+    expect(await codes('esame di prova')).toEqual(['PROVA.02']);
+    expect(await codes('897')).toEqual(['89.7']);
+    // Nessuna sigla di materiale nel catalogo d'esempio: niente per esteso.
+    expect((await ref.searchServices('visita', today))[0]).toMatchObject({ material: null });
+  });
+
   it('i fatti per le regole hanno una fonte; l’assenza da un elenco non diventa un «no»', async () => {
     const ref = new ReferenceData(t.db, repo);
     const d = await ref.drugs(

@@ -9,6 +9,7 @@ import {
   type DatasetVersion,
 } from '../components/common';
 import { Icon } from '../components/Icon';
+import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
@@ -32,14 +33,7 @@ export interface Drug {
   holder: string | null;
 }
 
-export interface Service {
-  regionalCode: string;
-  nationalCode: string | null;
-  description: string;
-  branch: string | null;
-  fee: string | null;
-  notes: string | null;
-}
+export type Service = ServiceResultData;
 
 interface Line {
   key: string;
@@ -345,18 +339,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             ))}
             {search.data?.prestazioni?.map((s) => (
               <li key={s.regionalCode} className="risultato">
-                <div>
-                  <strong>{s.description}</strong>
-                  <div className="tenue">
-                    {[s.branch, s.fee && money(s.fee), s.notes].filter(Boolean).join(' · ')}
-                  </div>
-                  <div className="codice tenue">
-                    {s.regionalCode}
-                    {s.nationalCode && s.nationalCode !== s.regionalCode
-                      ? ` · nomenclatore ${s.nationalCode}`
-                      : ''}
-                  </div>
-                </div>
+                <ServiceResultText s={s} />
                 <button
                   type="button"
                   className="pulsante"
