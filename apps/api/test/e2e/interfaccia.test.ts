@@ -55,6 +55,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   let work: string;
   let therapyId: string;
   let lastName: string;
+  let firstName: string;
   let newTherapyUrl: string;
 
   /** Codice a 6 cifre: ogni accesso usa l'intervallo di 30 secondi successivo. */
@@ -181,6 +182,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     s = await createScenario(t.db);
     const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
     lastName = rich!.lastName;
+    firstName = rich!.firstName;
     therapyId = (
       await t.db.select().from(therapy).where(eq(therapy.patientId, s.richPatient))
     ).find((x) => !x.reserved)!.id;
@@ -472,7 +474,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     );
     await check(page, 'cartelle aperte', true);
     // Dalla scheda si torna alla ricetta lasciata a metà, con la riga ancora lì.
-    await bar.getByRole('link', { name: new RegExp(lastName) }).click();
+    // Etichetta esatta: cognome e nome all'inizio. I nomi inventati cambiano a ogni giro e un
+    // altro paziente può avere lo stesso nome come cognome (o viceversa).
+    const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await bar
+      .getByRole('link', {
+        name: new RegExp(`^${escape(lastName)} ${escape(firstName)}(?![\\p{L}'])`, 'u'),
+      })
+      .click();
     await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
     await page.locator('.riga-ricetta').filter({ hasText: '14 compresse' }).waitFor();
     // Chiudere una scheda non tocca le altre.
