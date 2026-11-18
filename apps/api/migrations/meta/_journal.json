@@ -8,6 +8,20 @@
       "when": 1794964970948,
       "tag": "0000_prima_migrazione",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794966257032,
+      "tag": "0001_modello_del_dominio",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794966257681,
+      "tag": "0002_registro_e_storico",
+      "breakpoints": true
     }
   ]
 }

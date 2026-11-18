@@ -4,7 +4,7 @@ import { createDatabase, createPool } from './db/client';
 
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
-const app = buildApp({ db: createDatabase(pool), logger: true });
+const app = buildApp({ db: createDatabase(pool), config, logger: true });
 
 const shutdown = async () => {
   await app.close();

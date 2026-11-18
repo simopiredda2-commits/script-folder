@@ -1,1 +1,2 @@
 export * from './codice-fiscale';
+export * from './permissions';
