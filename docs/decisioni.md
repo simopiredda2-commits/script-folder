@@ -422,3 +422,20 @@ Simone ha risposto con il pulsante.
 
 - **Scheda attiva fuori vista**: con molte schede la barra scorre, e la scheda del paziente attivo poteva restare fuori dalla parte visibile, soprattutto su tablet. Ora la barra scorre da sola fino alla scheda attiva, anche quando cambia la larghezza dello schermo; la pagina non si sposta.
 - **Scritti persi cambiando paziente**: nelle pagine nuove, e nel certificato di malattia, quello che si stava scrivendo si perdeva passando a un altro paziente e tornando. Ora resta ricordato per paziente come la ricetta e la terapia (D68, D80), nella memoria della scheda del browser, che si svuota all'uscita. Vale per voci cliniche, parametri, piani terapeutici, presidi, consensi, deleghe, seguito delle prestazioni e certificato. Si cancella quando si registra; il file del referto no, perché il browser non lo conserva e va scelto di nuovo.
+
+## Tappa 11 – Profilo Sanitario Sintetico (18/11/2026)
+
+**D130 · Fonti della tappa 11.** Prima di costruire ho letto le fonti che `docs/fse.md` dava ancora da leggere:
+
+- le specifiche di integrazione del Gateway (versione 2.26 del 30/10/2026), con i servizi, i due token JWT, gli errori e le tabelle dei valori;
+- il modello del nodo regionale e le domande frequenti del Ministero;
+- l'esempio di PSS che passa la validazione;
+- lo schematron del PSS (versione 4.0) e i dizionari ufficiali;
+- la DGR piemontese 19-1912 del 2025: il Piemonte usa il Gateway nazionale centralizzato;
+- l'art. 20 del DM 2023 (accesso in emergenza).
+
+Non si raggiungono da qui la guida HL7 Italia e il portale del Fascicolo; al loro posto valgono le regole dello schematron, che sono quelle che il Gateway applica. Che cosa ne è venuto è in `docs/fse.md`.
+
+**D131 · Copie dei file ufficiali nel repository.** Lo schematron del PSS, sedici dizionari e un estratto LOINC sono in `packages/integrations/fse-ufficiale/`. Ogni file ha la sua provenienza (repository e commit del Ministero) e l'impronta SHA-256, e una prova controlla che nessuno li cambi a mano. Motivo: le prove e il simulatore devono girare senza rete, e il documento del programma va controllato con le regole vere. Il repository del Ministero non indica una licenza: è una domanda per la fermata. Per LOINC c'è l'avviso di licenza.
+
+**D132 · Il simulatore del Gateway applica lo schematron ufficiale.** Come il Gateway vero, la validazione del simulatore controlla il documento con lo schematron e risponde con gli stessi tipi di errore (RFC 7807). Lo schematron usa XPath 1.0 più una funzione di XPath 2 (`matches`). Lo esegue un piccolo motore nostro su due librerie con licenza MIT, `@xmldom/xmldom` e `xpath`. Non provato: i controlli sui dizionari (errore «vocabolario») che il Gateway fa oltre allo schematron. Il simulatore controlla solo i codici dei dizionari copiati.

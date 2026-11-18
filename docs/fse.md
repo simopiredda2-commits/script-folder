@@ -20,6 +20,11 @@ Documento preparato durante le tappe 9 e 10 (D110), per decidere alla fermata fi
 | DM 11 novembre 2025 (GU n. 286 del 10/12/2025)                                                                                                   | Modifica gli art. 22 (notifiche) e 27-bis (fasi: 30/6/2025, 31/12/2025, 31/3/2026) e l'allegato D; non tocca gli art. 4, 8 e 9                                                                                                                              |
 | DM 27 giugno 2025, «Indicazioni attuative per la definizione dei contenuti informativi del Profilo sanitario sintetico» (GU n. 202 del 1/9/2025) | Allegato 1: per ogni dato, obbligatorio o facoltativo, da dove può arrivare, che cosa sarà compilabile solo con i servizi dell'Ecosistema dati sanitari (EDS). La tabella è stampata con un carattere codificato: l'ho decodificata e riletta riga per riga |
 | Ministero della salute, repository pubblico `ministero-salute/it-fse-support` su GitHub: `README.md` e `doc/accreditamento/README.md`            | Gateway: certificati X.509 di autenticazione e di firma (Sogei), validazione dei CDA, pubblicazione; accreditamento in tre fasi                                                                                                                             |
+| Stesso repository, `doc/integrazione-gateway/README.md`, versione 2.26 del 30/10/2026 (tappa 11)                                                 | Servizi del Gateway (validazione, pubblicazione, sostituzione, eliminazione, stato), i due token JWT e i loro campi, gli errori (RFC 7807), le tabelle dei valori (16.3) e la correlazione tra tipo di documento e classe (16.4)                            |
+| Stesso repository, `doc/middleware-regionale`, `doc/faq`, `doc/esempi/CDA/PSS.xml` (tappa 11)                                                    | Una Regione può mettere un suo nodo tra il programma e il Gateway, con le stesse interfacce; si valida prima di firmare; documento PDF con il CDA dentro, firmato PAdES; esempio di PSS che passa la validazione                                            |
+| Repository pubblico `ministero-salute/it-fse-catalogs`, commit `25b7b6b` (tappa 11)                                                              | Lo schematron del PSS (versione 4.0) e i dizionari dei codici con cui il Gateway controlla i documenti. Copiati in `packages/integrations/fse-ufficiale/` (D131)                                                                                            |
+| DGR Regione Piemonte 1 dicembre 2025, n. 19-1912 (BU 49S2 del 4/12/2025) (tappa 11)                                                              | Il Piemonte usa il Gateway nazionale centralizzato (nota della Direzione sanità del 4/7/2025 al Dipartimento per la trasformazione digitale)                                                                                                                |
+| DM 7 settembre 2023, art. 20 (tappa 11)                                                                                                          | Accesso in emergenza: chi cura un paziente che non può esprimere il consenso legge per primo il PSS, mai i dati oscurati                                                                                                                                    |
 
 ## Che cosa contiene il PSS e dove sta nel programma
 
@@ -85,15 +90,24 @@ Sono passi esterni e con impegni di SCRIPT come fornitore: li decide e li fa Sim
 
 Condividere la cartella tra i medici dell'AFT che usano il programma: le voci oscurate mai; le riservate solo al medico titolare; la base giuridica e le regole dell'AFT vanno lette sull'accordo collettivo nazionale e sugli atti regionali prima di costruire. Con gli altri programmi solo formati pubblici (D104).
 
-## Da verificare prima della tappa 11
+## Che cosa si è chiarito per la tappa 11
 
-- **Non letti**:
-  - il DM 30/12/2024 (art. 27-bis e allegato D: fasi e scadenze);
-  - il DM 31/12/2024 sull'Ecosistema dati sanitari (GU n. 53 del 5/3/2025), paragrafo 5.2;
-  - le note tecniche per la gestione del PSS pubblicate sul portale del Fascicolo;
-  - la guida HL7 Italia del PSS;
-  - le specifiche OpenAPI del Gateway;
-  - l'art. 20 del DM 2023 (accesso in emergenza).
-- **In Piemonte**: se i medici pubblicano dal Gateway nazionale o dal sistema regionale (CSI Piemonte), e con quali credenziali.
-- **Codifiche**: quali sistemi di codici vuole il CDA del PSS per patologie, allergie e farmaci (oggi in cartella: ICD-9-CM e AIC).
-- **Oscuramento e dati a maggiore tutela** (art. 6 e art. 12, c. 4): come si segnalano nel documento.
+- **In Piemonte**: la Regione usa il Gateway nazionale centralizzato (DGR 19-1912/2025). Le specifiche ammettono un nodo regionale tra il programma e il Gateway, con le stesse interfacce: l'indirizzo del servizio è un'impostazione, non un valore scritto nel codice.
+- **Codifiche** (dallo schematron 4.0 e dai dizionari ufficiali):
+  - problemi in ICD-9-CM;
+  - organi mancanti con il dizionario ICD-10 «Organi mancanti»;
+  - farmaci in AIC con l'ATC come traduzione;
+  - allergeni non farmaci con il dizionario «Allergeni (No Farmaci)», dove ci sono anche i veleni di vespa e d'api;
+  - parentela con RoleCode HL7;
+  - capacità motoria con il suo dizionario (autonomo, assistito, allettato, su sedia a rotelle);
+  - vie di somministrazione con HL7 RouteOfAdministration.
+- **Sezioni obbligatorie del documento**: allergie e intolleranze, terapie farmacologiche, lista dei problemi, anamnesi familiare. Se una sezione non ha dati si scrive l'assenza con i codici ufficiali («nessuna allergia nota», «nessuna informazione»), mai una sezione vuota.
+- **Oscuramento**: nel documento non entrano le voci oscurate (art. 4, c. 3). L'oscuramento di un documento intero si segnala con il codice P99 nei metadati della pubblicazione. Per il PSS ci sono anche il codice P81 («Versioni precedenti Profilo Sanitario Sintetico») e la riservatezza del documento (N, R o V).
+- **Flusso**: si valida prima di firmare. Poi si firma PAdES e si pubblica; il Gateway risponde «preso in carico» e manda i dati a INI ed EDS. La pubblicazione è rifiutata se il documento ha più di 5 giorni.
+
+## Ancora da leggere
+
+- La guida HL7 Italia del PSS: il sito di HL7 Italia non si raggiunge da qui. Le regole da rispettare sono nello schematron ufficiale, che il simulatore applica (D132).
+- Le note tecniche sul PSS del portale del Fascicolo: sito non raggiungibile da qui.
+- Il DM 30/12/2024 (GU n. 33 del 10/2/2025) e il paragrafo 5.2 del DM 31/12/2024 sull'EDS: riguardano fasi e servizi dell'EDS, non servono a costruire la tappa 11.
+- Con la Regione, durante l'accreditamento: gli identificativi (OID) dei documenti e del repository, il custode del documento, la struttura del medico nel formato XON e l'uso del codice P81.
