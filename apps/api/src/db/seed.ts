@@ -57,23 +57,27 @@ const PROBLEMS = [
   { code: '250.00', description: 'Diabete mellito tipo 2 senza complicanze' },
   { code: '272.0', description: 'Ipercolesterolemia pura' },
 ];
-// Con principio attivo: la ricetta lo riporta sempre (R13). Il primo è un farmaco della banca dati
-// d'esempio (pnpm banche-dati:importa -- --esempio), con il suo AIC.
+// Un farmaco per problema, nello stesso ordine. Sono confezioni vere della banca dati d'esempio
+// (pnpm banche-dati:importa -- --esempio): righe AIFA lette il 18/11/2026, con AIC, nome e
+// confezione come li compone l'interfaccia, e il principio attivo dell'anagrafica, che la ricetta
+// riporta sempre (R13).
 const DRUGS = [
   {
-    drugName: 'PROVALINA 28 compresse 5 mg',
-    drugAic: '900000011',
-    activeIngredient: 'principio di prova',
+    drugName: 'AMLODIPINA DOC GENERICI 5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
+    drugAic: '038092019',
+    activeIngredient: 'AMLODIPINA BESILATO',
   },
   {
-    drugName: 'Farmaco dimostrativo B 10 mg',
-    drugAic: null,
-    activeIngredient: 'principio dimostrativo B',
+    drugName:
+      'METFORMINA AUROBINDO 500 MG COMPRESSE RIVESTITE CON FILM- 30 COMPRESSE IN BLISTER PVC/AL',
+    drugAic: '040592103',
+    activeIngredient: 'METFORMINA CLORIDRATO',
   },
   {
-    drugName: 'Farmaco dimostrativo C 20 mg',
-    drugAic: null,
-    activeIngredient: 'principio dimostrativo C',
+    drugName:
+      'ATORVASTATINA DOC GENERICS 20 MG COMPRESSE RIVESTITE CON FILM- 30 COMPRESSE IN BLISTER PVC-PE-PVDC/AL',
+    drugAic: '048247023',
+    activeIngredient: 'ATORVASTATINA',
   },
 ];
 /** Primi pazienti con un appuntamento oggi, ogni quarto d'ora dalle 8:30. */
@@ -289,7 +293,8 @@ try {
       if (rnd.chance(0.3)) {
         await tx.insert(allergyDetail).values({
           entryId: await entry('allergy'),
-          substance: 'Sostanza dimostrativa',
+          // Un principio attivo vero, che nessun farmaco dimostrativo contiene.
+          substance: 'AMOXICILLINA',
           drugRelated: true,
         });
       }
@@ -321,7 +326,7 @@ try {
           });
         }
       }
-      const drug = rnd.pick(DRUGS);
+      const drug = DRUGS[PROBLEMS.indexOf(problem)]!;
       const [ther] = await tx
         .insert(therapy)
         .values({

@@ -1,6 +1,6 @@
 # Interfaccia per PC e tablet (tappa 6)
 
-Le schermate della tappa 6, con i dati dimostrativi: pazienti inventati e banche dati d'esempio. Per provarle:
+Le schermate della tappa 6, con i dati dimostrativi: pazienti inventati e banche dati d'esempio. I farmaci sono veri: righe delle liste AIFA del 30/6/2026 (amlodipina, metformina, atorvastatina, dulaglutide…), con fonte e licenza (D148). Prestazioni, esami ed esenzioni restano di prova. Per provarle:
 
 ```sh
 pnpm db:seed                               # dati dimostrativi; stampa una volta le password

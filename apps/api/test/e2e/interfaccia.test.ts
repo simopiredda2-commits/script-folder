@@ -10,7 +10,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generatePatients } from '@mmg/fixtures';
-import { loadMappings, overrideMappings } from '@mmg/reference';
+import { loadMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -26,7 +26,6 @@ import { withActor } from '../../src/db/tx';
 import { startOfStudioDay } from '../../src/http/today-routes';
 import { studioDate } from '../../src/prescriptions/rules-check';
 import {
-  EXAMPLE_MAPPINGS,
   EXAMPLE_TRANSCRIPTIONS,
   runSyncOnExample,
   serveExampleSite,
@@ -174,7 +173,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         db: t.db,
         syncDir,
         transcriptionsDir: EXAMPLE_TRANSCRIPTIONS,
-        mappings: overrideMappings(loadMappings(), loadMappings(EXAMPLE_MAPPINGS)),
+        mappings: loadMappings(),
         importedBy: 'prova',
       });
     } finally {
@@ -288,16 +287,27 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
   it('nuova ricetta dalla banca dati: controlli, firma e invio con NRE', async () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
-    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
-    await page.locator('.risultato').filter({ hasText: '28 compresse' }).waitFor();
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
+    await page.locator('.risultato').filter({ hasText: 'TEVA ITALIA' }).waitFor();
     await page.getByText('Banche dati dei farmaci in uso').waitFor();
     await check(page, 'nuova ricetta con risultati', true);
     await page
       .locator('.risultato')
-      .filter({ hasText: '28 compresse' })
+      .filter({ hasText: 'TEVA ITALIA' })
       .getByRole('button', { name: 'Aggiungi' })
       .click();
-    await page.getByLabel('Confezioni').fill('1');
+    await page
+      .locator('.riga-ricetta')
+      .filter({ hasText: 'TEVA ITALIA' })
+      .getByLabel('Confezioni')
+      .fill('1');
+    // Anche la terapia in corso: la ricetta inviata finisce nel suo storico (D65).
+    await page
+      .locator('.risultato')
+      .filter({ hasText: 'Farmaco di prova 5 mg' })
+      .getByRole('button', { name: 'Aggiungi' })
+      .click();
+    await page.locator('.riga-ricetta').filter({ hasText: 'Farmaco di prova 5 mg' }).waitFor();
     await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
     await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await page.getByText(/Regole di prescrizione, versione/).waitFor();
@@ -328,8 +338,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
     await page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ }).click();
     await page.getByLabel(/Oscura nome e indirizzo/).waitFor();
-    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
-    const item = page.locator('.risultato').filter({ hasText: '28 compresse' });
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
+    const item = page.locator('.risultato').filter({ hasText: 'TEVA ITALIA' });
     await item.waitFor();
     await item.getByRole('button', { name: 'Aggiungi' }).click();
     await page.getByLabel('Bianca (a carico del paziente)').check();
@@ -405,11 +415,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
   it('ricerca farmaci con filtri, equivalenti e data della banca dati (A6)', async () => {
     await page.goto(`${base}/banche-dati`);
-    await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('provalina');
+    await page
+      .getByLabel('Nome commerciale, principio attivo, codice AIC o ATC')
+      .fill('amlodipina');
     await page.locator('.risultato').first().waitFor();
     await page
       .locator('.risultato')
-      .filter({ hasText: '28 compresse' })
+      .filter({ hasText: 'DOC GENERICI' })
       .getByRole('button', { name: 'Mostra gli equivalenti' })
       .click();
     await page.getByRole('table').waitFor();
@@ -469,8 +481,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     // La ricetta inviata in una prova precedente è ricordata: si ricomincia da capo.
     const restart = page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
     if (await restart.count()) await restart.click();
-    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
-    const item = page.locator('.risultato').filter({ hasText: '14 compresse' });
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
+    const item = page.locator('.risultato').filter({ hasText: 'NORVASC' });
     await item.waitFor();
     await item.getByRole('button', { name: 'Aggiungi' }).click();
     // Il secondo paziente: la sua cartella diventa quella attiva.
@@ -491,7 +503,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       })
       .click();
     await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
-    await page.locator('.riga-ricetta').filter({ hasText: '14 compresse' }).waitFor();
+    await page.locator('.riga-ricetta').filter({ hasText: 'NORVASC' }).waitFor();
     // Chiudere una scheda non tocca le altre.
     await bar
       .getByRole('button', { name: `Chiudi la cartella di ${other!.lastName} ${other!.firstName}` })
@@ -510,8 +522,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByText('Scegli un farmaco dalla banca dati o scrivine il nome.')
       .first()
       .waitFor();
-    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
-    const item = page.locator('.risultato').filter({ hasText: '28 compresse' });
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
+    const item = page.locator('.risultato').filter({ hasText: 'AMLODIPINA EG' });
     await item.waitFor();
     await item.getByRole('button', { name: 'Scegli' }).click();
     await page.getByRole('button', { name: 'Cambia farmaco' }).waitFor();
@@ -536,7 +548,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel(/Non sostituibile/).uncheck();
     await page.getByRole('button', { name: 'Salva la scheda' }).click();
     await page.getByText('Terapia aggiunta.').waitFor();
-    await page.getByRole('heading', { level: 1, name: /PROVALINA 28 compresse/ }).waitFor();
+    await page.getByRole('heading', { level: 1, name: /AMLODIPINA EG 5 MG/ }).waitFor();
     newTherapyUrl = page.url();
     await check(page, 'scheda della terapia nuova', true);
   });
@@ -544,7 +556,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   it('modifica della scheda: unità al giorno corrette a mano, poi salvate', async () => {
     await page.goto(newTherapyUrl);
     await page.getByRole('link', { name: 'Modifica', exact: true }).click();
-    await page.getByRole('heading', { level: 1, name: /Modifica: PROVALINA/ }).waitFor();
+    await page.getByRole('heading', { level: 1, name: /Modifica: AMLODIPINA EG/ }).waitFor();
     await page.getByLabel('Dose', { exact: true }).fill('1/2');
     await expect(
       page.getByLabel('Unità al giorno, per il contatore (R11)').inputValue(),
@@ -570,14 +582,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'sospensione della terapia');
     await page.getByRole('button', { name: 'Sospendi la terapia' }).click();
     await page
-      .getByText(/Terapia sospesa\. La reazione a principio di prova è ora tra le allergie/)
+      .getByText(/Terapia sospesa\. La reazione a AMLODIPINA BESILATO è ora tra le allergie/)
       .waitFor();
-    await page.locator('.testata-avvisi').getByText('Allergia: principio di prova').waitFor();
+    await page.locator('.testata-avvisi').getByText('Allergia: AMLODIPINA BESILATO').waitFor();
     await page.getByText(/Motivo: Reazione cutanea di prova/).waitFor();
     await check(page, 'terapia sospesa', true);
     await page.goto(`${base}/pazienti/${s.richPatient}`);
     await page.getByRole('heading', { name: 'Terapie sospese' }).waitFor();
-    await page.getByRole('link', { name: /PROVALINA 28 compresse/ }).click();
+    await page.getByRole('link', { name: /AMLODIPINA EG 5 MG/ }).click();
     await page.getByRole('button', { name: 'Riprendi' }).click();
     await page.getByText('Terapia ripresa: è di nuovo tra quelle in corso.').waitFor();
   });
@@ -586,7 +598,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/schema-orario`);
     await page.getByRole('heading', { name: 'Schema orario della terapia' }).waitFor();
     const evening = page.getByRole('region', { name: 'Sera' });
-    await evening.getByText(/PROVALINA 28 compresse/).waitFor();
+    await evening.getByText(/AMLODIPINA EG/).waitFor();
     await evening.getByText('Dopo cena.').waitFor();
     // La terapia riservata resta fuori finché il medico non la include.
     await expect(page.getByText('Farmaco riservato di prova').count()).resolves.toBe(0);

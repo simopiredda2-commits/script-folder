@@ -47,16 +47,12 @@ describe('intestazioni: la stessa normalizzazione di sync', () => {
 });
 
 describe('CSV: la stessa lettura di sync', () => {
+  // Estratti dei file AIFA veri: utf-8 con \n; cp1252 con \r\n; intestazione che va a capo.
+  const aifa = (...p: string[]) => join(SITE, 'aifa', ...p);
   const files = [
-    join(SITE, 'aifa', 'farmaci', 'confezioni_fornitura.csv'),
-    join(
-      SITE,
-      'aifa',
-      'documents',
-      '20142',
-      '3815901',
-      'Classe-A_per_principio-attivo_30-6-2026.csv',
-    ),
+    aifa('farmaci', 'confezioni_fornitura.csv'),
+    aifa('documents', '20142', '3815901', 'Classe-A_per_principio-attivo_30-6-2026.csv'),
+    aifa('documents', '20142', '3815901', 'Classe-H_per_principio-attivo_30-6-2026.csv'),
   ];
   // Casi difficili scritti qui: virgolette, separatori dentro i campi, a capo dentro i campi.
   const tricky = [
@@ -117,16 +113,31 @@ print(json.dumps([list(csv.reader(io.StringIO(t), delimiter=s)) for t, s in json
     expect(tricky.map((t) => parseCsv(t, detectSeparator(t)!))).toEqual(expected);
   });
 
-  it('il file in cp1252 si legge con le lettere accentate giuste', () => {
-    const t = readCsv(new Uint8Array(readFileSync(files[0]!)));
-    expect(t.encoding).toBe('cp1252');
-    expect(t.rows.some((r) => r.includes('20 compresse (più forti)'))).toBe(true);
-    expect(t.rows.some((r) => r.includes('PROVALINA "FORTE"'))).toBe(true);
+  it('le liste di classe, in cp1252, si leggono con l’euro e il metro cubo giusti', () => {
+    const a = readCsv(new Uint8Array(readFileSync(files[1]!)));
+    expect(a.encoding).toBe('cp1252');
+    expect(a.rows[0]).toContain('Prezzo al pubblico €');
+    const h = readCsv(new Uint8Array(readFileSync(files[2]!)));
+    expect(h.rows.some((r) => r.includes('6,55/m³'))).toBe(true);
+  });
+
+  it('l’intestazione che va a capo dentro le virgolette resta una sola cella', () => {
+    const t = readCsv(new Uint8Array(readFileSync(files[2]!)));
+    expect(t.rows[0]).toContain('Codice \nAIC');
+    expect(normalizeHeader('Codice \nAIC')).toBe('codice aic');
+    expect(t.rows[1]![7]).toBe('025202096');
   });
 
   it('il BOM iniziale non entra nel primo nome di colonna', () => {
-    const t = readCsv(new Uint8Array(readFileSync(files[1]!)));
-    expect(t.rows[0]![0]).toBe('AIC di prova');
+    const bom = new Uint8Array([
+      0xef,
+      0xbb,
+      0xbf,
+      ...strToU8('Principio attivo;AIC\nAmlodipina;038092019\n'),
+    ]);
+    const t = readCsv(bom);
+    expect(t.encoding).toBe('utf-8');
+    expect(t.rows[0]![0]).toBe('Principio attivo');
   });
 
   it('con un byte che cp1252 non conosce si passa a latin-1, come Python', () => {

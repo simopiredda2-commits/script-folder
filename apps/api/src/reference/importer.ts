@@ -191,11 +191,18 @@ async function importRecords(
   const discarded = new Set(out.problems.map((p) => p.line)).size;
   await store(opts, meta, out.records, discarded);
   const warnings = warningsFor(meta.kind, out.records);
+  const noValue = Object.entries(out.noValue).map(
+    ([field, n]) => `${field}: ${n} celle senza valore secondo la mappatura ${mapping.id}`,
+  );
   return {
     ...line,
     outcome: 'importato',
     rows: out.records.length,
-    notes: [...line.notes, ...(discarded ? [`${discarded} righe scartate e accettate`] : [])],
+    notes: [
+      ...line.notes,
+      ...noValue,
+      ...(discarded ? [`${discarded} righe scartate e accettate`] : []),
+    ],
     ...(warnings.length ? { warnings } : {}),
   };
 }

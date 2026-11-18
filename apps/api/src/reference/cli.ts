@@ -20,12 +20,7 @@ import { parseArgs } from 'node:util';
 import { loadMappings, overrideMappings } from '@mmg/reference';
 import { createDatabase, createPool } from '../db/client';
 import { runMigrations } from '../db/migrate';
-import {
-  EXAMPLE_MAPPINGS,
-  EXAMPLE_TRANSCRIPTIONS,
-  runSyncOnExample,
-  serveExampleSite,
-} from './example-site';
+import { EXAMPLE_TRANSCRIPTIONS, runSyncOnExample, serveExampleSite } from './example-site';
 import { ERRORS, importReferenceData, NEEDS_ATTENTION, type ImportLine } from './importer';
 
 const LABELS: Record<ImportLine['outcome'], string> = {
@@ -73,8 +68,8 @@ if (values.esempio) {
   } finally {
     await site.close();
   }
+  // Il sito d'esempio ha le intestazioni vere AIFA: valgono le mappature del repository.
   transcriptionsDir ??= EXAMPLE_TRANSCRIPTIONS;
-  mappings = overrideMappings(mappings, loadMappings(EXAMPLE_MAPPINGS));
 }
 
 const pool = createPool(databaseUrl);

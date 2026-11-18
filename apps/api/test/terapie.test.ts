@@ -31,9 +31,9 @@ describe('scheda della terapia: nuova, modifica, sospensione, ripresa', () => {
   const req = (method: 'GET' | 'POST' | 'PUT', url: string, cookie: string, payload?: object) =>
     s.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
   const base = {
-    drugAic: '900000011',
-    drugName: 'PROVALINA 28 compresse 5 mg',
-    activeIngredient: 'principio di prova',
+    drugAic: '038092019',
+    drugName: 'AMLODIPINA DOC GENERICI 5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
+    activeIngredient: 'AMLODIPINA BESILATO',
     dose: '1',
     doseUnit: 'compressa',
     frequency: '1 volta al giorno',
@@ -52,7 +52,7 @@ describe('scheda della terapia: nuova, modifica, sospensione, ripresa', () => {
     const list = (await req('GET', url(), doctor)).json().terapie;
     const created = list.find((x: { id: string }) => x.id === res.json().id);
     expect(created).toMatchObject({
-      drugName: 'PROVALINA 28 compresse 5 mg',
+      drugName: 'AMLODIPINA DOC GENERICI 5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
       unitsPerDay: '1',
       status: 'active',
       indicationEntryId: problemId,
@@ -139,7 +139,7 @@ describe('scheda della terapia: nuova, modifica, sospensione, ripresa', () => {
     });
     const summary = (await req('GET', `/api/pazienti/${s.richPatient}`, doctor)).json().riepilogo;
     expect(summary.allergie).toContainEqual({
-      sostanza: 'principio di prova',
+      sostanza: 'AMLODIPINA BESILATO',
       reazione: 'Eritema di prova',
     });
     expect(

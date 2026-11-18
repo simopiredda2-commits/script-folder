@@ -87,7 +87,7 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 
 - `scripts/avvio-sessione.sh` è l'hook SessionStart (`.claude/settings.json`). Solo se `CLAUDE_CODE_REMOTE=true`: avvia Postgres 16, crea se mancano l'utente `mmg` (password locale `mmg`, con CREATEDB) e il database `mmg_dev`, scrive `DATABASE_URL` e `TZ=Europe/Rome` in `$CLAUDE_ENV_FILE`, installa le dipendenze solo se è cambiato un file che le decide (impronte in `node_modules/.avvio-sessione.sha256`).
 - `DATABASE_URL=postgres://mmg:mmg@localhost:5432/mmg_dev` (valore locale, non un segreto; vedi `.env.example`).
-- La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e sette siti pubblici, solo per leggere specifiche e decreti (Sistema TS, Gazzetta Ufficiale, INPS, AIFA, Regione Piemonte, Ministero della Salute; D92). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7).
+- La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e alcuni siti pubblici, solo per leggere specifiche, decreti e dati aperti (Sistema TS, Gazzetta Ufficiale, Normattiva, INPS, AIFA anche `drive.aifa.gov.it`, Regione Piemonte, Ministero della Salute, due ASL; D92, D148). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7).
 
 ## Comandi
 

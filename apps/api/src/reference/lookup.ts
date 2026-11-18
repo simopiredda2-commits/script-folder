@@ -64,6 +64,18 @@ function likeText(q: string): string {
 
 const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
 
+/** Ordine degli equivalenti: prima il prezzo; a parità, nome e AIC, lo stesso a ogni ricerca. */
+export function compareEquivalents(
+  a: Pick<DrugInfo, 'aic' | 'name' | 'price'>,
+  b: Pick<DrugInfo, 'aic' | 'name' | 'price'>,
+): number {
+  return (
+    (a.price ?? '').localeCompare(b.price ?? '', 'it', { numeric: true }) ||
+    lower(a.name).localeCompare(lower(b.name)) ||
+    a.aic.localeCompare(b.aic)
+  );
+}
+
 /**
  * Banche dati alla data: per ogni serie vale la versione con la data di inizio più recente non
  * successiva alla data chiesta; a parità di data, l'ultima importata (A5).
@@ -264,9 +276,7 @@ export class ReferenceData {
       rows.map((r) => r.aic).filter((x) => x !== aic),
       date,
     );
-    return [...found.values()].sort((a, b) =>
-      (a.price ?? '').localeCompare(b.price ?? '', 'it', { numeric: true }),
-    );
+    return [...found.values()].sort(compareEquivalents);
   }
 
   /** Catalogo regionale: descrizione, branca, codice regionale o del nomenclatore. */

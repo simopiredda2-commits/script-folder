@@ -13,7 +13,6 @@ import { join, normalize, resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '..', '..', '..', '..');
 export const EXAMPLES_DIR = join(ROOT, 'fixtures', 'banche-dati');
 export const EXAMPLE_TRANSCRIPTIONS = join(EXAMPLES_DIR, 'trascrizioni');
-export const EXAMPLE_MAPPINGS = join(EXAMPLES_DIR, 'mappature-prova.json');
 const SYNC_SCRIPT = join(ROOT, 'sync', 'banche_dati.py');
 
 const TYPES: Record<string, string> = {

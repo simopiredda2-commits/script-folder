@@ -9,9 +9,12 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
 endobj
 4 0 obj
-<< /Length 69 >>
+<< /Length 352 >>
 stream
-BT /F1 14 Tf 72 760 Td (Elenco di prova dei farmaci PHT in DPC) Tj ET
+BT /F1 14 Tf 72 760 Td (Farmaci PHT - oggetto di DPC (estratto di prova)) Tj ET
+BT /F1 10 Tf 72 730 Td (Regione Piemonte, ultimo aggiornamento 9 luglio 2026) Tj ET
+BT /F1 10 Tf 72 714 Td (PRINCIPIO ATTIVO | ATC | NOTA AIFA | PRESCRIZIONE CON PT/SCHEDA) Tj ET
+BT /F1 10 Tf 72 698 Td (DULAGLUTIDE (14) | A10BJ05 | 100 | PT elettronico - Sistema TS) Tj ET
 endstream
 endobj
 5 0 obj
@@ -24,9 +27,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000241 00000 n 
-0000000360 00000 n 
+0000000644 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-430
+714
 %%EOF

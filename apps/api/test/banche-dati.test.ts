@@ -1,21 +1,20 @@
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadMappings, overrideMappings, readSyncState, sha256 } from '@mmg/reference';
+import { loadMappings, readSyncState, sha256 } from '@mmg/reference';
 import { eq, sql } from 'drizzle-orm';
 import { strToU8, zipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { exemption, referenceDataset } from '../src/db/schema';
 import { studioDate } from '../src/prescriptions/rules-check';
 import {
-  EXAMPLE_MAPPINGS,
   EXAMPLE_TRANSCRIPTIONS,
   runSyncOnExample,
   serveExampleSite,
   type ExampleSite,
 } from '../src/reference/example-site';
 import { importReferenceData, type ImportLine } from '../src/reference/importer';
-import { ReferenceData } from '../src/reference/lookup';
+import { compareEquivalents, ReferenceData } from '../src/reference/lookup';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -37,14 +36,14 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
   let site: ExampleSite;
   let work: string;
   let syncDir: string;
+  // Il sito d'esempio ha le intestazioni vere AIFA: valgono le mappature del repository.
   const repo = loadMappings();
-  const withExamples = overrideMappings(repo, loadMappings(EXAMPLE_MAPPINGS));
   const today = studioDate(new Date());
   const imp = (extra: Partial<Parameters<typeof importReferenceData>[0]> = {}) =>
     importReferenceData({
       db: t.db,
       syncDir,
-      mappings: withExamples,
+      mappings: repo,
       transcriptionsDir: EXAMPLE_TRANSCRIPTIONS,
       importedBy: 'prova',
       ...extra,
@@ -77,31 +76,53 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     ]);
   });
 
-  it('con le sole mappature del repository: ISTAT entra, AIFA è da completare e mostra le intestazioni, i PDF chiedono una trascrizione', async () => {
-    const r = byFile(await imp({ mappings: repo, transcriptionsDir: undefined }));
+  it('con le mappature del repository entrano ISTAT e AIFA; i PDF chiedono una trascrizione', async () => {
+    const r = byFile(await imp({ transcriptionsDir: undefined }));
     expect(r['istat_comuni/Elenco-comuni-italiani.xlsx']).toMatchObject({
       outcome: 'importato',
       rows: 2,
     });
-    const aifa = r['aifa_liste/confezioni_fornitura.csv']!;
-    expect(aifa.outcome).toBe('mappatura_da_completare');
-    expect(aifa.notes.join('\n')).toMatch(
-      /intestazione del file: AIC di prova \| Denominazione di prova/,
+    expect(r['aifa_liste/confezioni_fornitura.csv']).toMatchObject({
+      outcome: 'importato',
+      rows: 11,
+    });
+    expect(r['aifa_liste/3815901_Classe-A_per_principio-attivo.csv']).toMatchObject({
+      outcome: 'importato',
+      rows: 9,
+    });
+    // Classe H: «-» e il prezzo dell'ossigeno a metro cubo non sono prezzi; il rapporto lo dice.
+    const h = r['aifa_liste/3815901_Classe-H_per_principio-attivo.csv']!;
+    expect(h).toMatchObject({ outcome: 'importato', rows: 3 });
+    expect(h.notes.join('\n')).toMatch(
+      /price: 2 celle senza valore secondo la mappatura aifa-classe-h/,
     );
     expect(r['piemonte_dpc/farmaci_pht_dpc.pdf']!.outcome).toBe('serve_trascrizione');
   });
 
-  it('con le mappature d’esempio e le trascrizioni entra tutto; ISTAT non si importa due volte', async () => {
+  it('una mappatura da completare ferma il file e il rapporto mostra le intestazioni vere', async () => {
+    const pending = {
+      ...repo,
+      mappings: repo.mappings.map((m) =>
+        m.id === 'aifa-anagrafica'
+          ? { ...m, colonne: Object.fromEntries(Object.keys(m.colonne).map((k) => [k, null])) }
+          : m,
+      ),
+    };
+    const r = byFile(await imp({ mappings: pending, transcriptionsDir: undefined }));
+    const aifa = r['aifa_liste/confezioni_fornitura.csv']!;
+    expect(aifa.outcome).toBe('mappatura_da_completare');
+    expect(aifa.notes.join('\n')).toMatch(
+      /intestazione del file: CODICE_AIC \| COD_FARMACO \| COD_CONFEZIONE \| DENOMINAZIONE/,
+    );
+  });
+
+  it('con le trascrizioni entrano anche i PDF trascritti; ISTAT e AIFA non si importano due volte', async () => {
     const r = byFile(await imp());
     expect(r['istat_comuni/Elenco-comuni-italiani.xlsx']!.outcome).toBe('gia_importato');
-    expect(r['aifa_liste/confezioni_fornitura.csv']).toMatchObject({
-      outcome: 'importato',
-      rows: 5,
-    });
-    expect(r['aifa_liste/3815901_Classe-A_per_principio-attivo.csv']).toMatchObject({
-      outcome: 'importato',
-      rows: 3,
-    });
+    expect(r['aifa_liste/confezioni_fornitura.csv']!.outcome).toBe('gia_importato');
+    expect(r['aifa_liste/3815901_Classe-A_per_principio-attivo.csv']!.outcome).toBe(
+      'gia_importato',
+    );
     expect(r['piemonte_dpc/farmaci_pht_dpc.json']).toMatchObject({ outcome: 'importato', rows: 1 });
     // Un PDF trascritto non chiede più la trascrizione.
     expect(r['piemonte_dpc/farmaci_pht_dpc.pdf']).toBeUndefined();
@@ -130,7 +151,7 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
   });
 
   it('A5: il catalogo in vigore dipende dalla data della ricetta', async () => {
-    const ref = new ReferenceData(t.db, withExamples);
+    const ref = new ReferenceData(t.db, repo);
     const at = async (d: string) =>
       (await ref.searchServices('visita', d)).map((s) => s.description);
     expect(await at('2024-12-29')).toEqual([]);
@@ -143,47 +164,75 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
   });
 
   it('i fatti per le regole hanno una fonte; l’assenza da un elenco non diventa un «no»', async () => {
-    const ref = new ReferenceData(t.db, withExamples);
-    const d = await ref.drugs(['900000011', '900000035', '900000047', '999999999'], today);
-    expect(d.get('900000011')).toMatchObject({
-      name: 'PROVALINA',
+    const ref = new ReferenceData(t.db, repo);
+    const d = await ref.drugs(
+      ['038092019', '025202096', '034330047', '043783075', '012745093', '999999999'],
+      today,
+    );
+    expect(d.get('038092019')).toMatchObject({
+      name: 'AMLODIPINA DOC GENERICI',
+      pack: '5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
+      activeIngredient: 'AMLODIPINA BESILATO',
+      atc: 'C08CA01',
       drugClass: 'A',
-      price: '5.20',
-      equivalenceGroup: 'GP-01',
+      price: '3.74',
+      equivalenceGroup: 'DOB',
       dpc: false,
       facts: { reimbursableSsn: true },
     });
     // Classe H: non dice da sola che cosa può prescrivere il medico di famiglia.
-    expect(d.get('900000035')!.drugClass).toBe('H');
-    expect(d.get('900000035')!.facts).toEqual({});
-    // In DPC con piano obbligatorio e nota.
-    expect(d.get('900000047')).toMatchObject({
+    expect(d.get('025202096')).toMatchObject({ drugClass: 'H', price: '9.92', facts: {} });
+    // «-» al posto del prezzo: nessun prezzo, non zero.
+    expect(d.get('034330047')).toMatchObject({ drugClass: 'H', price: null });
+    // In DPC (elenco della Regione) con nota AIFA e piano terapeutico obbligatorio.
+    expect(d.get('043783075')).toMatchObject({
+      activeIngredient: 'DULAGLUTIDE',
       dpc: true,
       planRequired: true,
-      facts: { requiresPlan: true, aifaNote: '13' },
+      aifaNote: '100',
+      facts: { reimbursableSsn: true, requiresPlan: true, aifaNote: '100' },
     });
-    expect(d.get('900000047')!.facts.reimbursableSsn).toBeUndefined();
-    expect(d.get('900000047')!.pack).toBe('20 compresse (più forti)');
+    // Fuori dalle liste di classe A e H: nessun fatto, nemmeno «non a carico del SSN».
+    expect(d.get('012745093')).toMatchObject({ drugClass: null, facts: {} });
     expect(d.has('999999999')).toBe(false);
   });
 
   it('ricerca per nome, principio attivo, AIC e ATC; equivalenti dal gruppo', async () => {
-    const ref = new ReferenceData(t.db, withExamples);
+    const ref = new ReferenceData(t.db, repo);
     const aics = async (q: string) => (await ref.searchDrugs(q, today)).map((x) => x.aic);
-    expect(await aics('provalina')).toEqual(['900000023', '900000011', '900000059'].sort());
-    expect(await aics('Z97')).toEqual(['900000047']);
-    expect(await aics('esempio attivo')).toEqual(['900000047']);
-    expect((await aics('90000003')).length).toBe(1);
+    // Per nome: prima i generici, poi il medicinale di marca.
+    expect(await aics('amlodipina')).toEqual(['038092019', '037479060', '038548032', '027428010']);
+    expect(await aics('norvasc')).toEqual(['027428010']);
+    expect(await aics('C10AA05')).toEqual(['048247023', '033007042']);
+    expect(await aics('dulaglutide')).toEqual(['043783075']);
+    // Solo nelle liste di classe (nessuna riga in anagrafica): si trova lo stesso.
+    expect(await aics('ossigeno')).toEqual(['038901524']);
+    expect(await aics('02742')).toEqual(['027428010']);
     expect(await aics('100%')).toEqual([]);
-    const eq = await ref.equivalents('900000011', today);
+    const eq = await ref.equivalents('038092019', today);
     expect(eq.map((x) => [x.aic, x.price])).toEqual([
-      ['900000023', '3.10'],
-      ['900000059', '4.00'],
+      ['037479060', '3.74'],
+      ['038548032', '3.74'],
+      ['027428010', '5.53'],
     ]);
   });
 
+  it('equivalenti: prima il prezzo, poi il nome, poi l’AIC, qualunque sia l’ordine di partenza', () => {
+    const list = [
+      { aic: '000000003', name: 'B', price: '3.74' },
+      { aic: '000000002', name: 'A', price: '3.74' },
+      { aic: '000000004', name: 'A', price: '10.51' },
+      { aic: '000000001', name: 'A', price: '3.74' },
+      { aic: '000000005', name: 'C', price: null },
+    ];
+    const order = (l: typeof list) => [...l].sort(compareEquivalents).map((x) => x.aic);
+    const expected = ['000000005', '000000001', '000000002', '000000003', '000000004'];
+    expect(order(list)).toEqual(expected);
+    expect(order([...list].reverse())).toEqual(expected);
+  });
+
   it('esenzioni e comuni', async () => {
-    const ref = new ReferenceData(t.db, withExamples);
+    const ref = new ReferenceData(t.db, repo);
     const ex = await ref.exemptionLookups(today);
     expect(ex.exemptionExists('DEMO')).toBe(true);
     expect(ex.exemptionExists('ZZZ')).toBe(false);
@@ -199,7 +248,7 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
   });
 
   it('A6: ogni versione in uso ha la sua data; la vecchiaia si segnala solo con una soglia', async () => {
-    const versions = await new ReferenceData(t.db, withExamples).versions(today);
+    const versions = await new ReferenceData(t.db, repo).versions(today);
     const comuni = versions.find((v) => v.kind === 'comuni')!;
     expect(comuni).toMatchObject({
       validFrom: today,
@@ -212,8 +261,8 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       act: 'Catalogo di prova delle prestazioni',
     });
     const thirty = {
-      ...withExamples,
-      mappings: withExamples.mappings.map((m) =>
+      ...repo,
+      mappings: repo.mappings.map((m) =>
         m.id === 'istat-comuni' ? { ...m, vecchiaDopoGiorni: 30 } : m,
       ),
     };
@@ -238,7 +287,7 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     const copy = join(work, 'manomesso');
     cpSync(syncDir, copy, { recursive: true });
     const p = join(copy, 'correnti', 'aifa_liste', '3815901_Classe-H_per_principio-attivo.csv');
-    writeFileSync(p, readFileSync(p, 'utf-8').replace('120,00', '1,00'));
+    writeFileSync(p, readFileSync(p, 'latin1').replace('9,92', '1,00'), 'latin1');
     const r = byFile(await imp({ syncDir: copy }));
     expect(r['aifa_liste/3815901_Classe-H_per_principio-attivo.csv']!.outcome).toBe(
       'impronta_diversa',
@@ -370,7 +419,7 @@ describe('banche dati via HTTP e nelle regole', () => {
       db: t.db,
       syncDir,
       transcriptionsDir: EXAMPLE_TRANSCRIPTIONS,
-      mappings: overrideMappings(loadMappings(), loadMappings(EXAMPLE_MAPPINGS)),
+      mappings: loadMappings(),
       importedBy: 'prova',
     });
     // Senza preSendChecks: le regole vere, con le banche dati importate.
@@ -390,13 +439,13 @@ describe('banche dati via HTTP e nelle regole', () => {
     s.app.inject({ method: 'POST', url, payload, headers: { cookie } });
 
   it('le ricerche rispondono con i risultati e con le versioni in uso (A6)', async () => {
-    const res = await get('/api/farmaci?q=provalina');
+    const res = await get('/api/farmaci?q=amlodipina');
     expect(res.statusCode, res.body).toBe(200);
-    expect(res.json().farmaci).toHaveLength(3);
+    expect(res.json().farmaci).toHaveLength(4);
     expect(res.json().versioni.map((v: { kind: string }) => v.kind)).toContain('farmaci');
-    const one = (await get('/api/farmaci/900000011')).json();
-    expect(one.farmaco.name).toBe('PROVALINA');
-    expect(one.equivalenti).toHaveLength(2);
+    const one = (await get('/api/farmaci/038092019')).json();
+    expect(one.farmaco.name).toBe('AMLODIPINA DOC GENERICI');
+    expect(one.equivalenti).toHaveLength(3);
     const old = (await get('/api/prestazioni?q=visita&data=2026-10-29')).json();
     expect(old.prestazioni[0].description).toBe('Visita di prova (catalogo precedente)');
     expect((await get('/api/esenzioni?q=T0')).json().esenzioni).toHaveLength(2);
@@ -406,7 +455,7 @@ describe('banche dati via HTTP e nelle regole', () => {
   });
 
   it('servono una sessione', async () => {
-    expect((await get('/api/farmaci?q=provalina', {})).statusCode).toBe(401);
+    expect((await get('/api/farmaci?q=amlodipina', {})).statusCode).toBe(401);
     expect((await get('/api/banche-dati', {})).statusCode).toBe(401);
   });
 
@@ -415,9 +464,9 @@ describe('banche dati via HTTP e nelle regole', () => {
       kind: 'pharma_ssn',
       lines: [
         {
-          drugAic: '900000047',
-          drugName: 'ESEMPINA',
-          activeIngredient: 'esempio attivo',
+          drugAic: '043783075',
+          drugName: 'TRULICITY',
+          activeIngredient: 'DULAGLUTIDE',
           quantity: 1,
         },
       ],

@@ -13,7 +13,7 @@ sync/banche_dati.py  →  dati-pubblici/correnti/…, stato.json  →  importazi
 | Tipo                    | Da dove                                            | Come            | Serve per                       |
 | ----------------------- | -------------------------------------------------- | --------------- | ------------------------------- |
 | `farmaci`               | AIFA, anagrafica delle confezioni (CSV)            | file di `sync/` | ricerca farmaci                 |
-| `farmaci_classe`        | AIFA, classe A e H per principio attivo (CSV)      | file di `sync/` | R8, prezzo, equivalenti, nota   |
+| `farmaci_classe`        | AIFA, classe A e H per principio attivo (CSV)      | file di `sync/` | R8, prezzo, equivalenti         |
 | `farmaci_dpc`           | Regione Piemonte, farmaci PHT in DPC (PDF)         | trascrizione    | R5, R7, indicazione DPC         |
 | `comuni`                | ISTAT, elenco dei comuni (XLSX)                    | file di `sync/` | anagrafica, codice fiscale, D12 |
 | `prestazioni`           | Regione Piemonte, catalogo delle prestazioni (PDF) | trascrizione    | ricerca prestazioni, R14        |
@@ -36,19 +36,20 @@ Non importati per ora: liste di trasparenza, farmaci carenti, registri e piani A
 - `fonte` e `chiave`: il file in `correnti/<fonte>/<chiave>`; `*` vale qualsiasi testo (la cartella AIFA davanti alla chiave può cambiare);
 - `colonne`: campo → intestazione; `null` = **da completare**;
 - `costanti`: campo → valore uguale per tutto il file (la classe di un elenco);
+- `nessunValore`: campo facoltativo → espressioni (su tutta la cella) dei valori che nel file vogliono dire «nessun valore», per esempio «-» al posto di un prezzo. Solo quelli visti nei file veri, con il motivo nella nota; il rapporto d'importazione dice quante celle sono state lette così (D148);
 - `vecchiaDopoGiorni`: soglia di A6; `null` = da completare (D62).
 
 Stato al 18/11/2026:
 
-| Mappatura         | Stato                                                                                                         |
-| ----------------- | ------------------------------------------------------------------------------------------------------------- |
-| `istat-comuni`    | Completa. Intestazioni lette dal file ISTAT al 21/02/2026 tramite un'estrazione testuale: da confermare (D56) |
-| `aifa-anagrafica` | **Da completare**: dal cloud i file AIFA non si leggono (D55)                                                 |
-| `aifa-classe-a`   | **Da completare**                                                                                             |
-| `aifa-classe-h`   | **Da completare**                                                                                             |
-| `trascrizione-*`  | Complete: il formato è nostro (sotto)                                                                         |
+| Mappatura         | Stato                                                                                                                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `istat-comuni`    | Completa. Intestazioni lette dal file ISTAT al 21/02/2026 tramite un'estrazione testuale: da confermare (D56)                                                                                      |
+| `aifa-anagrafica` | Completa (D148). Intestazioni lette il 18/11/2026 da `confezioni_fornitura.csv`: 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa                                        |
+| `aifa-classe-a`   | Completa (D148). File del 30/6/2026 in cp1252: 10.766 righe, AIC e prezzi tutti validi. **Non ha la colonna della nota AIFA**                                                                      |
+| `aifa-classe-h`   | Completa (D148). File del 30/6/2026: 2.487 righe; l'intestazione «Codice AIC» va a capo dentro le virgolette; 117 prezzi senza valore («-» e il prezzo dell'ossigeno a metro cubo, `nessunValore`) |
+| `trascrizione-*`  | Complete: il formato è nostro (sotto)                                                                                                                                                              |
 
-**Come completare le mappature AIFA.** Lanciare `sync/` dal computer dello studio, poi `pnpm banche-dati:importa -- --dati ~/dati-pubblici`. Per ogni file AIFA il rapporto dice «mappatura da completare» e riporta l'intestazione vera, letta da `stato.json`. Si copiano i nomi delle colonne nella mappatura, si alza la `versione` del file e si rilancia l'importazione.
+**Se AIFA cambia le colonne.** `sync/` mette il file nuovo «da verificare» (colonne cambiate). Dopo il controllo: si correggono i nomi delle colonne nella mappatura, si alza la `versione` del file e si rilancia l'importazione. Con una colonna nulla il rapporto dice «mappatura da completare» e riporta l'intestazione vera, letta da `stato.json`.
 
 ## Trascrizioni dei PDF (A8)
 
@@ -94,7 +95,7 @@ Colonne dei CSV trascritti:
 | Una versione nuova in attesa di verifica in `sync/`                         | segnalata; resta in uso quella precedente                                                                 |
 | Comuni con un codice catastale che inizia con X                             | avviso: è la lettera dei luoghi inventati (D12, D64)                                                      |
 
-Le forme dei codici: AIC di 9 cifre (esempi letti: «012745016» nei dati AIFA citati da terzi, e i file di prova di `sync/`); codice catastale con una lettera e tre cifre (DM 23/12/1976 e file ISTAT); codice ISTAT di 6 cifre e sigla di due lettere (file ISTAT); ATC con la struttura a livelli lettera, due cifre, lettera, lettera, due cifre (struttura dell'OMS, verificata solo sull'esempio «N02BE01»).
+Le forme dei codici: AIC di 9 cifre (tutti i 160.101 dell'anagrafica AIFA letta il 18/11/2026; la lista di trasparenza li scrive invece senza lo zero iniziale, a 8 cifre, e per questo non è ancora mappata); codice catastale con una lettera e tre cifre (DM 23/12/1976 e file ISTAT); codice ISTAT di 6 cifre e sigla di due lettere (file ISTAT); ATC con la struttura a livelli lettera, due cifre, lettera, lettera, due cifre (struttura dell'OMS; tutti gli ATC dell'anagrafica AIFA la rispettano).
 
 ## Versioni e date (A5, A6)
 
@@ -107,16 +108,17 @@ Le forme dei codici: AIC di 9 cifre (esempi letti: «012745016» nei dati AIFA c
 
 Solo fatti che hanno una fonte; l'assenza da un elenco non diventa mai un «no» (D59).
 
-| Fatto                                                              | Da dove                                        | Regola  |
-| ------------------------------------------------------------------ | ---------------------------------------------- | ------- |
-| A carico del SSN                                                   | il farmaco è nell'elenco di classe A in vigore | R8      |
-| Nota AIFA                                                          | elenco di classe (se mappata) o DPC            | R7      |
-| Piano terapeutico obbligatorio                                     | DPC, solo se dice `sì`                         | R5      |
-| Esenzione esistente                                                | catalogo delle esenzioni                       | R9      |
-| Prestazioni di un'esenzione                                        | elenco esenzione → prestazioni                 | R17     |
-| Prescrivibile dal medico di medicina generale, regime di fornitura | **non noto**: serve una fonte strutturata      | R8      |
-| Unità per confezione                                               | **non noto**                                   | R4, R11 |
-| Antibiotico iniettabile o infusione                                | **non noto**                                   | R3      |
+| Fatto                                         | Da dove                                                        | Regola  |
+| --------------------------------------------- | -------------------------------------------------------------- | ------- |
+| A carico del SSN                              | il farmaco è nell'elenco di classe A in vigore                 | R8      |
+| Nota AIFA                                     | DPC (le liste di classe non hanno la colonna)                  | R7      |
+| Piano terapeutico obbligatorio                | DPC, solo se dice `sì`                                         | R5      |
+| Esenzione esistente                           | catalogo delle esenzioni                                       | R9      |
+| Prestazioni di un'esenzione                   | elenco esenzione → prestazioni                                 | R17     |
+| Prescrivibile dal medico di medicina generale | **non noto**: serve una fonte strutturata                      | R8      |
+| Regime di fornitura                           | anagrafica (`FORNITURA`): letto, non ancora usato dalle regole | —       |
+| Unità per confezione                          | **non noto**                                                   | R4, R11 |
+| Antibiotico iniettabile o infusione           | **non noto**                                                   | R3      |
 
 Con un fatto non noto le regole si comportano come senza banca dati (D42): non bloccano e lo dicono.
 
@@ -146,15 +148,15 @@ Codici d'uscita come `sync/`: `0` tutto a posto, `1` almeno un errore, `2` qualc
 
 ## Esempi e prove
 
-- `fixtures/banche-dati/sito/`: sito d'esempio con le stesse fonti di `sync/fonti.json` (`fonti-prova.json`). Contenuto inventato, tranne le intestazioni del file ISTAT e le righe di Agliè e Airasca.
-- `fixtures/banche-dati/trascrizioni/`: trascrizioni d'esempio, con le impronte vere dei PDF d'esempio.
-- `fixtures/banche-dati/mappature-prova.json`: mappature AIFA per le intestazioni **di prova** dei file d'esempio, non per quelle AIFA.
+- `fixtures/banche-dati/sito/`: sito d'esempio con le stesse fonti di `sync/fonti.json` (`fonti-prova.json`). I file AIFA sono estratti dei file veri, con le intestazioni vere: righe copiate senza cambiare un byte (D148; fonte AIFA, licenza CC BY 4.0). Valgono le mappature del repository: le mappature di prova non ci sono più.
+- Gli estratti coprono i casi dei file veri: anagrafica in utf-8 con `\n`, liste di classe in cp1252 con `\r\n` e il simbolo dell'euro, l'intestazione della classe H che va a capo, due prezzi della classe H che non sono numeri, un farmaco (paracetamolo) fuori dalle liste di classe.
+- `fixtures/banche-dati/trascrizioni/`: trascrizioni d'esempio, con le impronte vere dei PDF d'esempio. La riga DPC (dulaglutide, nota 100, piano terapeutico) è quella dell'elenco della Regione Piemonte del 9/7/2026; catalogo ed esenzioni sono inventati.
 - `fixtures/banche-dati/genera.py`: rigenera gli esempi (serve `openpyxl`).
 - Le prove (`apps/api/test/banche-dati.test.ts`) servono il sito in locale, lanciano `sync/banche_dati.py` vero e importano il suo output (D63).
 
 ## Che cosa non è stato provato
 
-- Nessun file vero AIFA, né il file ISTAT completo: dal cloud i siti istituzionali non si raggiungono. Il primo giro vero va fatto dal computer dello studio.
+- L'importazione nel database dei file AIFA interi: le mappature sono state controllate sui file interi del 18/11/2026 (forme di AIC, ATC e prezzi), ma `sync/` sul sito vero e l'importazione completa non sono stati lanciati da qui. Il file ISTAT completo non si raggiunge dal cloud.
 - Le intestazioni ISTAT vengono da un'estrazione testuale, non dai byte del file: da confermare al primo giro.
 - Un XLSX scritto da Excel: l'esempio lo scrive `openpyxl`, che usa testi in linea. I testi condivisi, tipici di Excel, sono provati con un file costruito nella prova.
 - I tempi d'importazione del file ISTAT completo e dell'anagrafica AIFA, che supera i 50 MB: l'importazione procede a blocchi di 1000 righe, ma non è stata misurata su file così grandi.

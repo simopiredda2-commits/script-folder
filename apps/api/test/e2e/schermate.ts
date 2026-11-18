@@ -124,11 +124,12 @@ try {
   await shot(page, '06-scheda-terapia-e-storico');
 
   await page.goto(`${base}/pazienti/${patientId}/ricetta`);
-  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('esempina');
+  // Dulaglutide: in DPC con nota AIFA 100 e piano terapeutico (elenco della Regione Piemonte).
+  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('dulaglutide');
   // Si aspetta il risultato della ricerca, non la terapia in corso (anche lei è un risultato).
-  const esempina = page.locator('.risultato').filter({ hasText: 'ESEMPINA' });
-  await esempina.waitFor();
-  await esempina.getByRole('button', { name: 'Aggiungi' }).click();
+  const withPlan = page.locator('.risultato').filter({ hasText: 'TRULICITY' });
+  await withPlan.waitFor();
+  await withPlan.getByRole('button', { name: 'Aggiungi' }).click();
   await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
   await page.getByText(/Regole di prescrizione, versione/).waitFor();
   // I controlli in alto nella schermata, con un po' di spazio sopra.
@@ -152,7 +153,7 @@ try {
   await shot(page, '09-esami');
 
   await page.goto(`${base}/banche-dati`);
-  await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('provalina');
+  await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('amlodipina');
   await page.locator('.risultato').first().waitFor();
   await page
     .locator('.risultato')
@@ -170,10 +171,11 @@ try {
     await restart.click();
     await page.goto(`${base}/pazienti/${patientId}/terapie/nuova`);
   }
-  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
-  const provalina = page.locator('.risultato').filter({ hasText: '28 compresse' });
-  await provalina.waitFor();
-  await provalina.getByRole('button', { name: 'Scegli' }).click();
+  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
+  // Un generico che nessun paziente dimostrativo ha già in terapia.
+  const chosen = page.locator('.risultato').filter({ hasText: 'AMLODIPINA EG' });
+  await chosen.waitFor();
+  await chosen.getByRole('button', { name: 'Scegli' }).click();
   await page.getByLabel('Dose', { exact: true }).fill('1');
   await page.getByLabel('Unità', { exact: true }).selectOption('compressa');
   await page.getByLabel('Frequenza').selectOption('1 volta al giorno');
@@ -266,12 +268,12 @@ try {
 
   await page.goto(`${base}/pazienti/${patientId}/piani`);
   await page.getByRole('heading', { level: 1, name: 'Piani terapeutici' }).waitFor();
-  await page.getByLabel('Farmaco', { exact: true }).fill('Farmaco dimostrativo con piano');
-  await page.getByLabel('Principio attivo').fill('principio dimostrativo');
+  await page.getByLabel('Farmaco', { exact: true }).fill('TRULICITY 1,5 mg, 4 penne');
+  await page.getByLabel('Principio attivo').fill('DULAGLUTIDE');
   await page.getByLabel('Rilasciato il').fill(studioDate(new Date(Date.now() - 60 * 86_400_000)));
   await page.getByLabel('Scade il').fill(studioDate(new Date(Date.now() + 20 * 86_400_000)));
   await page.getByLabel('Confezioni autorizzate').fill('6');
-  await page.getByLabel('Centro che l’ha rilasciato').fill('Centro dimostrativo');
+  await page.getByLabel('Centro che l’ha rilasciato').fill('Diabetologia, centro dimostrativo');
   await page.getByRole('button', { name: 'Registra il piano' }).click();
   await page.getByText('Piano registrato.').waitFor();
   await page.evaluate(() => window.scrollTo(0, 0));
