@@ -1,26 +1,51 @@
-import { PRODUCT_NAME } from '@mmg/brand';
-import { Logo } from './components/Logo';
-import { Signature } from './components/Signature';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { Loading } from './components/common';
+import { Shell } from './components/Shell';
+import { SessionProvider, useSession } from './lib/session';
+import { DataSearchPage } from './pages/DataSearchPage';
+import { ExamsPage } from './pages/ExamsPage';
+import { ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
+import { LockScreen, LoginPage } from './pages/LoginPage';
+import { PatientsPage } from './pages/PatientsPage';
+import { PrescriptionEditor } from './pages/PrescriptionEditor';
+import { RecordPage } from './pages/RecordPage';
+import { SignQueuePage } from './pages/SignQueuePage';
+import { TodayPage } from './pages/TodayPage';
+
+/** Le schermate dopo l'accesso. */
+function Screens() {
+  const { state } = useSession();
+  if (state.status === 'loading') return <Loading what="dati della sessione" />;
+  if (state.status === 'anonymous') return <LoginPage />;
+  if (state.status === 'locked') return <LockScreen />;
+  return (
+    <Shell>
+      <Routes>
+        <Route path="/" element={<TodayPage />} />
+        <Route path="/pazienti" element={<PatientsPage />} />
+        <Route path="/pazienti/:id" element={<RecordPage />} />
+        <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
+        <Route
+          path="/pazienti/:id/specialistica"
+          element={<PrescriptionEditor mode="specialistica" />}
+        />
+        <Route path="/pazienti/:id/esami" element={<ExamsPage />} />
+        <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
+        <Route path="/pazienti/:id/prestazioni" element={<ServiceHistoryPage />} />
+        <Route path="/ricette" element={<SignQueuePage />} />
+        <Route path="/banche-dati" element={<DataSearchPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Shell>
+  );
+}
 
 export function App() {
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <Logo />
-        <Signature />
-      </header>
-      <main className="app-main" id="contenuto">
-        <h1>Cartella clinica</h1>
-        <p>
-          Ambiente di sviluppo di {PRODUCT_NAME}: solo pazienti inventati. Le schermate arrivano con
-          le prossime tappe.
-        </p>
-      </main>
-      <footer className="app-footer">
-        <span>
-          {PRODUCT_NAME} <Signature />
-        </span>
-      </footer>
-    </div>
+    <BrowserRouter>
+      <SessionProvider>
+        <Screens />
+      </SessionProvider>
+    </BrowserRouter>
   );
 }

@@ -1,0 +1,426 @@
+import { useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
+import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { Icon } from '../components/Icon';
+import { api, ApiError, query } from '../lib/api';
+import { age, date, maskedFiscalCode, THERAPY_KIND, TIMELINE_KIND } from '../lib/format';
+import { useSession } from '../lib/session';
+import { useApi } from '../lib/useApi';
+
+export interface Patient {
+  id: string;
+  firstName: string;
+  lastName: string;
+  sex: 'M' | 'F';
+  birthDate: string;
+  birthPlaceName: string | null;
+  fiscalCode: string;
+  phone: string | null;
+  email: string | null;
+  asl: string | null;
+  status: string;
+}
+
+export interface Summary {
+  allergie: { sostanza: string; reazione: string | null }[];
+  problemiAttivi: { descrizione: string; codice: string | null; dal: string | null }[];
+  pianiTerapeutici: { farmaco: string; scadenza: string }[];
+  esenzioni: { codice: string; dal: string; al: string | null }[];
+  parametri: { data: string; parametro: string; valore: string; unita: string }[];
+}
+
+export interface TherapyRow {
+  id: string;
+  drugName: string;
+  drugAic: string | null;
+  activeIngredient: string | null;
+  kind: 'chronic' | 'as_needed' | 'cycle';
+  status: string;
+  dose: string | null;
+  doseUnit: string | null;
+  frequency: string | null;
+  timeOfDay: string | null;
+  aifaNote: string | null;
+  reserved: boolean;
+  important: boolean;
+}
+
+interface PrescriptionRow {
+  id: string;
+  kind: string;
+  status: string;
+  preparedAt: string;
+  righe: { serviceCode: string | null; serviceDescription: string | null; quantity: number }[];
+}
+
+const STATUS: Record<string, string> = {
+  active: 'in carico',
+  revoked: 'revocato',
+  deceased: 'deceduto',
+  temporary: 'temporaneo',
+};
+
+export const posology = (t: TherapyRow) =>
+  [t.dose && `${t.dose} ${t.doseUnit ?? ''}`.trim(), t.frequency, t.timeOfDay]
+    .filter(Boolean)
+    .join(', ');
+
+/** Testata della cartella: chi è il paziente, allergie ed esenzioni sempre in vista. */
+export function PatientBanner({
+  patient,
+  summary,
+}: {
+  patient: Patient;
+  summary?: Summary | null;
+}) {
+  const [showCf, setShowCf] = useState(false);
+  return (
+    <div className="testata-paziente">
+      <p className="testata-dati">
+        <span>{age(patient.birthDate)} anni</span>
+        <span>{patient.sex === 'F' ? 'donna' : 'uomo'}</span>
+        <span>
+          {patient.sex === 'F' ? 'Nata' : 'Nato'} il {date(patient.birthDate)}
+        </span>
+        <span className="codice">
+          {showCf ? patient.fiscalCode : maskedFiscalCode(patient.fiscalCode)}
+        </span>
+        <button
+          type="button"
+          className="pulsante pulsante-piatto"
+          onClick={() => setShowCf((v) => !v)}
+          aria-pressed={showCf}
+        >
+          {showCf ? 'Nascondi il codice fiscale' : 'Mostra il codice fiscale'}
+        </button>
+        {patient.status !== 'active' && (
+          <span className="etichetta">{STATUS[patient.status] ?? patient.status}</span>
+        )}
+      </p>
+      {summary && (
+        <ul className="testata-avvisi" aria-label="In evidenza">
+          {summary.allergie.map((a) => (
+            <li key={a.sostanza} className="pillola pillola-pericolo">
+              Allergia: {a.sostanza}
+            </li>
+          ))}
+          {summary.esenzioni.map((e) => (
+            <li key={e.codice} className="pillola">
+              Esenzione {e.codice}
+              {e.al ? ` fino al ${date(e.al)}` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function Forbidden({ error, what }: { error: ApiError | null; what: string }) {
+  if (error?.status === 403) return <p className="tenue">{what}: non visibile con il tuo ruolo.</p>;
+  return <ErrorMessage error={error} />;
+}
+
+const FILTERS = [
+  ['tutto', 'Tutto'],
+  ['visite', 'Visite'],
+  ['ricette', 'Ricette'],
+  ['esami', 'Esami'],
+] as const;
+
+export function RecordPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { isDoctor } = useSession();
+  const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
+  const therapies = useApi<{ terapie: TherapyRow[] }>(`/api/pazienti/${id}/terapie`);
+  const prescriptions = useApi<{ ricette: PrescriptionRow[] }>(`/api/pazienti/${id}/ricette`);
+  const [filter, setFilter] = useState<(typeof FILTERS)[number][0]>('tutto');
+  const timeline = useApi<{
+    cronologia: {
+      id: string;
+      data: string;
+      tipo: string;
+      titolo: string;
+      testo: string | null;
+      annullata: boolean;
+      autore: string | null;
+    }[];
+  }>(`/api/pazienti/${id}/cronologia${query({ tipo: filter })}`);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [repeatError, setRepeatError] = useState<ApiError | null>(null);
+  const [repeatDone, setRepeatDone] = useState<string | null>(null);
+
+  // Prestazioni già prescritte (D66): una voce per codice, o per descrizione se il codice manca.
+  const services = useMemo(() => {
+    const map = new Map<string, { codice: string | null; descrizione: string; volte: number }>();
+    for (const p of prescriptions.data?.ricette ?? []) {
+      if (p.kind !== 'specialist_ssn') continue;
+      for (const l of p.righe) {
+        const key = l.serviceCode ?? `desc:${(l.serviceDescription ?? '').toLowerCase()}`;
+        const v = map.get(key) ?? {
+          codice: l.serviceCode,
+          descrizione: l.serviceDescription ?? l.serviceCode ?? '',
+          volte: 0,
+        };
+        v.volte++;
+        map.set(key, v);
+      }
+    }
+    return [...map.values()].sort((a, b) => a.descrizione.localeCompare(b.descrizione));
+  }, [prescriptions.data]);
+
+  if (record.loading && !record.data) return <Loading what="dati della cartella" />;
+  if (!record.data) return <ErrorMessage error={record.error} />;
+  const { paziente: p, riepilogo } = record.data;
+  const active = (therapies.data?.terapie ?? []).filter((t) => t.status === 'active');
+
+  async function repeat() {
+    setRepeatError(null);
+    try {
+      const r = await api<{ ricette: unknown[] }>(`/api/pazienti/${id}/ricette/ripeti`, {
+        method: 'POST',
+        body: { terapie: [...selected] },
+      });
+      setSelected(new Set());
+      setRepeatDone(
+        isDoctor
+          ? `${r.ricette.length === 1 ? 'Preparata 1 ricetta' : `Preparate ${r.ricette.length} ricette`} in bozza.`
+          : `${r.ricette.length === 1 ? 'Preparata 1 ricetta' : `Preparate ${r.ricette.length} ricette`}: sono nella coda «da firmare» del medico.`,
+      );
+      prescriptions.reload();
+    } catch (e) {
+      setRepeatError(e instanceof ApiError ? e : null);
+    }
+  }
+
+  return (
+    <>
+      <PageHeader
+        title={`${p.firstName} ${p.lastName}`}
+        trail={
+          <>
+            <Link to="/pazienti">Pazienti</Link> <span aria-hidden="true">/</span>{' '}
+            <span>Cartella</span>
+          </>
+        }
+        actions={
+          <>
+            <Link className="pulsante pulsante-primario" to={`/pazienti/${id}/ricetta`}>
+              <Icon name="ricette" /> <span>Nuova ricetta</span>
+            </Link>
+            <Link className="pulsante" to={`/pazienti/${id}/specialistica`}>
+              <Icon name="specialistica" /> <span>Specialistica</span>
+            </Link>
+            <Link className="pulsante" to={`/pazienti/${id}/esami`}>
+              <Icon name="esami" /> <span>Esami</span>
+            </Link>
+          </>
+        }
+      />
+      <PatientBanner patient={p} summary={riepilogo} />
+
+      <div className="griglia-cartella">
+        {riepilogo ? (
+          <section className="riquadro" aria-labelledby="titolo-problemi">
+            <h2 id="titolo-problemi">Problemi attivi</h2>
+            {riepilogo.problemiAttivi.length === 0 ? (
+              <p className="tenue">Nessun problema attivo.</p>
+            ) : (
+              <ul className="elenco-semplice">
+                {riepilogo.problemiAttivi.map((x) => (
+                  <li key={`${x.descrizione}-${x.codice}`}>
+                    {x.descrizione}
+                    {x.codice && <span className="codice tenue"> {x.codice}</span>}
+                    {x.dal && <span className="tenue"> · dal {date(x.dal)}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h3>Scadenze</h3>
+            {riepilogo.pianiTerapeutici.length === 0 ? (
+              <p className="tenue">Nessun piano terapeutico.</p>
+            ) : (
+              <ul className="elenco-semplice">
+                {riepilogo.pianiTerapeutici.map((x) => (
+                  <li key={`${x.farmaco}-${x.scadenza}`}>
+                    Piano terapeutico {x.farmaco}: scade il {date(x.scadenza)}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h3>Parametri</h3>
+            {riepilogo.parametri.length === 0 ? (
+              <p className="tenue">Nessun parametro negli ultimi 12 mesi.</p>
+            ) : (
+              <dl className="parametri">
+                {riepilogo.parametri.map((x) => (
+                  <div key={x.parametro}>
+                    <dt>{x.parametro}</dt>
+                    <dd>
+                      {x.valore} {x.unita} <span className="tenue">· {date(x.data)}</span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </section>
+        ) : (
+          <section className="riquadro">
+            <h2>Riepilogo clinico</h2>
+            <p className="tenue">Non visibile con il tuo ruolo.</p>
+          </section>
+        )}
+
+        <section className="riquadro" aria-labelledby="titolo-terapia">
+          <h2 id="titolo-terapia">
+            <Icon name="terapia" /> Terapia in corso
+          </h2>
+          {therapies.loading && !therapies.data && <Loading what="terapie" />}
+          <Forbidden error={therapies.error} what="Terapie" />
+          {therapies.data && active.length === 0 && (
+            <p className="tenue">Nessuna terapia in corso.</p>
+          )}
+          {active.length > 0 && (
+            <fieldset className="terapie">
+              <legend className="visivamente-nascosto">Terapie da ripetere</legend>
+              <ul>
+                {active.map((t) => (
+                  <li key={t.id} className="terapia-riga">
+                    {t.kind === 'chronic' ? (
+                      // L'etichetta intorno alla casella porta il bersaglio a 44 px.
+                      <label className="bersaglio-casella">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(t.id)}
+                          onChange={(e) => {
+                            const next = new Set(selected);
+                            if (e.target.checked) next.add(t.id);
+                            else next.delete(t.id);
+                            setSelected(next);
+                          }}
+                          aria-label={`Seleziona ${t.drugName} da ripetere`}
+                        />
+                      </label>
+                    ) : (
+                      <span className="segnaposto-casella" aria-hidden="true" />
+                    )}
+                    <div className="terapia-testo">
+                      <Link to={`/pazienti/${id}/terapie/${t.id}`} className="terapia-nome">
+                        {t.drugName}
+                      </Link>
+                      <span className="tenue">{posology(t)}</span>
+                      <span>
+                        <span className="etichetta">{THERAPY_KIND[t.kind]}</span>
+                        {t.aifaNote && <span className="etichetta">Nota {t.aifaNote}</span>}
+                        {t.reserved && <span className="etichetta">Riservata</span>}
+                      </span>
+                    </div>
+                    <Link
+                      to={`/pazienti/${id}/terapie/${t.id}`}
+                      className="pulsante pulsante-piatto"
+                    >
+                      <Icon name="storico" /> <span>Scheda e storico</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <div className="azioni">
+                <button
+                  type="button"
+                  className="pulsante pulsante-primario"
+                  disabled={selected.size === 0}
+                  onClick={() => void repeat()}
+                >
+                  <Icon name="ripeti" />
+                  <span>
+                    Ripeti{' '}
+                    {selected.size === 0
+                      ? 'le terapie scelte'
+                      : selected.size === 1
+                        ? '1 terapia'
+                        : `${selected.size} terapie`}
+                  </span>
+                </button>
+                {isDoctor && (
+                  <button
+                    type="button"
+                    className="pulsante"
+                    onClick={() => void navigate('/ricette')}
+                  >
+                    <Icon name="firma" /> <span>Vai alle ricette da firmare</span>
+                  </button>
+                )}
+              </div>
+              <p className="aiuto">
+                Si ripetono solo le terapie croniche; il limite di confezioni lo decidono le regole.
+              </p>
+            </fieldset>
+          )}
+          <ErrorMessage error={repeatError} />
+          {repeatDone && <Notice kind="fatto">{repeatDone}</Notice>}
+
+          <h3>Prestazioni prescritte</h3>
+          {services.length === 0 ? (
+            <p className="tenue">Nessuna ricetta specialistica.</p>
+          ) : (
+            <ul className="elenco-semplice">
+              {services.map((x) => (
+                <li key={x.codice ?? x.descrizione}>
+                  <Link
+                    to={`/pazienti/${id}/prestazioni${query({ prestazione: x.codice, descrizione: x.codice ? null : x.descrizione })}`}
+                  >
+                    {x.descrizione}
+                  </Link>
+                  {x.codice && <span className="codice tenue"> {x.codice}</span>}
+                  <span className="tenue">
+                    {' '}
+                    · {x.volte === 1 ? '1 ricetta' : `${x.volte} ricette`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <section className="riquadro" aria-labelledby="titolo-cronologia">
+        <h2 id="titolo-cronologia">
+          <Icon name="storico" /> Cronologia
+        </h2>
+        <div className="schede" role="group" aria-label="Filtra la cronologia">
+          {FILTERS.map(([k, label]) => (
+            <button
+              key={k}
+              type="button"
+              className="scheda"
+              aria-pressed={filter === k}
+              onClick={() => setFilter(k)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <Forbidden error={timeline.error} what="Cronologia clinica" />
+        {timeline.loading && !timeline.data && <Loading what="voci" />}
+        {timeline.data && (
+          <ol className="cronologia" aria-live="polite">
+            {timeline.data.cronologia.length === 0 && <li className="tenue">Nessuna voce.</li>}
+            {timeline.data.cronologia.map((v) => (
+              <li key={`${v.tipo}-${v.id}`} className={v.annullata ? 'annullata' : undefined}>
+                <span className="cronologia-data">{date(v.data)}</span>
+                <span className="etichetta">{TIMELINE_KIND[v.tipo] ?? v.tipo}</span>
+                <span>
+                  <strong>{v.titolo}</strong>
+                  {v.testo && <span> · {v.testo}</span>}
+                  {v.annullata && <span> (annullata)</span>}
+                  {v.autore && <span className="tenue"> · {v.autore}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </>
+  );
+}
