@@ -4,9 +4,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 ## Dove siamo
 
-- `main` contiene le tappe 0–2 (pull request #1 unita il 18/11/2026 con il via di Simone).
-- Branch attivo: `tappe-3-4`, con le tappe 3 e 4 fatte e la pull request #2 per la **seconda fermata**.
-- Seconda fermata: risposte annotate qui sotto, da applicare; poi richiedere il via, unire la #2 e partire con le tappe 5–6 su `tappe-5-6`.
+- `main` contiene le tappe 0–4 (pull request #1 e #2 unite il 18/11/2026 con il via di Simone).
+- Branch attivo: `tappe-5-6`. Tappa 5 fatta; prossimo passo: tappa 6 (interfaccia), poi la pull request #3 e la fermata finale.
 
 ## Come provarlo
 
@@ -17,6 +16,7 @@ pnpm lint             # ESLint, Prettier, tipi
 pnpm dev              # migrazioni, servizio su :3001, interfaccia su :5173
 pnpm db:seed          # dati dimostrativi inventati; stampa una volta le password
 pnpm fixtures -- --seed 1 --count 5
+pnpm banche-dati:importa -- --esempio   # banche dati dimostrative: sync sul sito d'esempio, poi importazione
 ```
 
 Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente, password e postazione; la risposta dà il segreto da inserire in un'app di autenticazione; poi `POST /api/accesso/codice` con il codice. L'interfaccia di accesso arriva alla tappa 6.
@@ -137,6 +137,42 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 
 - Le regole con i dati veri della banca dati farmaci e dei cataloghi: arrivano alla tappa 5 (file d'esempio) e con la licenza Farmadati.
 - I controlli formali completi del Sistema TS (R10): manca il documento ufficiale dei controlli.
+
+### Tappa 5 – Banche dati pubbliche
+
+**Fatto** (dettagli in `docs/banche-dati.md`, decisioni D54–D64)
+
+- `packages/reference`: lettura dei CSV come `sync/` (codifica, separatore, virgolette), lettore XLSX minimo, intestazioni senza date come `sync/`, tipi di banca dati con i controlli dei valori, mappature come dati (`data/mappature.json`).
+- Importazione (`apps/api/src/reference`): legge `stato.json` e `correnti/` di `sync/`, controlla l'impronta, mappature, colonne e valori; i PDF entrano solo da trascrizioni controllate legate all'impronta del PDF (A8). Ogni importazione è una versione immutabile (migrazione 0006).
+- Consultazione alla data (A5): fatti per le regole (R5, R7, R8, R9, R17) collegati al controllo prima dell'invio; ricerche di farmaci (nome, principio attivo, AIC, ATC, equivalenti), prestazioni, esenzioni e comuni; versioni in uso con la loro data in ogni risposta (A6).
+- Comando `pnpm banche-dati:importa`, con `--esempio` per i dati dimostrativi.
+- Controllo della D12 sui comuni veri (lettera X).
+
+**Provato**
+
+- 18 prove di lettura e mappature, con il confronto cella per cella contro Python (`sync/`) su CSV veri d'esempio e casi difficili.
+- 20 prove sul database: `sync/` vero lanciato su un sito d'esempio in locale, importazione, idempotenza, catalogo che cambia il 30/10/2026, fatti dei farmaci, ricerche, versioni e vecchiaia, immutabilità, impronta manomessa, trascrizione superata dopo un PDF nuovo, righe non valide e scarti accettati, schede incomplete, lettera X; via HTTP le ricerche e le regole R5, R7, R9 e R17 alimentate dalle banche dati.
+- 9 sabotaggi (registro sotto).
+
+**Non fatto / da completare**
+
+- **Mappature AIFA da completare** (D55): dal cloud i file AIFA non si leggono. Al primo giro di `sync/` dal computer dello studio, l'importazione mostra le intestazioni vere da copiare in `packages/reference/data/mappature.json`.
+- Intestazioni ISTAT da confermare sul file vero (D56).
+- Soglie di vecchiaia (A6) da completare (D62).
+- Non importati: liste di trasparenza, farmaci carenti, registri e piani AIFA, ICD-9-CM e ICD-10-IM. A7 (aggiornamento che tocca un farmaco in terapia → «Da fare») non fatto: richiede la coda «Da fare» dell'interfaccia e le carenze.
+- Prescrivibilità dal medico di medicina generale, regime di fornitura, unità per confezione e antibiotici iniettabili restano non noti senza una fonte strutturata (D59).
+
+**Non provato**
+
+- File veri AIFA e ISTAT completi; XLSX scritto da Excel; tempi su file grandi (vedi `docs/banche-dati.md`).
+
+## Richieste di Simone tra le fermate (18/11/2026)
+
+Annotate come decisioni per la tappa 6:
+
+- **Storico delle prescrizioni di ogni farmaco** (D65): toccando un farmaco nella scheda delle terapie, tutte le sue ricette con data, confezioni, note, esenzione, autori, controlli.
+- **Lo stesso per le prestazioni** (D66), per esempio «visita chirurgica – primo accesso».
+- **Simboli nei menu** (D67): sì, accanto al nome e mai al suo posto.
 
 ## Risposte della seconda fermata (18/11/2026)
 
@@ -262,3 +298,12 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | A parità di data vale la versione più alta                | Ordine delle versioni senza numero                 | Rosso, poi verde                                                                                                                                                                   |
 | Ogni blocco porta la fonte della regola                   | Fonte non aggiunta dal motore                      | Rosso, poi verde                                                                                                                                                                   |
 | R15 spiega che cosa fare                                  | Rimedio tolto                                      | Rosso, poi verde                                                                                                                                                                   |
+| Date compatte tolte dalle intestazioni come in sync       | Date di 8 cifre lasciate                           | Rosso, poi verde                                                                                                                                                                   |
+| Virgolette raddoppiate nei CSV come Python                | Virgolette doppie ignorate                         | Rosso, poi verde                                                                                                                                                                   |
+| Mappatura incompleta non si usa                           | Nessun campo mancante mai                          | Rosso, poi verde                                                                                                                                                                   |
+| Impronta del file in uso uguale a stato.json              | Controllo dell'impronta saltato                    | Rosso, poi verde                                                                                                                                                                   |
+| Trascrizione superata se il PDF cambia                    | Controllo dell'impronta del PDF saltato            | Rosso, poi verde                                                                                                                                                                   |
+| A5: vale la versione più recente alla data                | Ordine per data invertito                          | Rosso, poi verde                                                                                                                                                                   |
+| Assenza dalla classe A non diventa «non a carico SSN»     | reimbursableSsn falso per assenza                  | Rosso, poi verde                                                                                                                                                                   |
+| D12: comuni veri con la lettera X segnalati               | Lettera cercata sbagliata                          | Rosso, poi verde                                                                                                                                                                   |
+| Banche dati importate immutabili                          | Trigger di ref_drug tolto dalla migrazione         | Rosso, poi verde                                                                                                                                                                   |

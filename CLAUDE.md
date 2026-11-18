@@ -63,18 +63,19 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Struttura
 
-| Percorso                | Contenuto                                                                           |
-| ----------------------- | ----------------------------------------------------------------------------------- |
-| `apps/web`              | Interfaccia per PC e tablet                                                         |
-| `apps/api`              | Servizio applicativo                                                                |
-| `packages/brand`        | Nome, marchi, colori e caratteri (unico posto con il nome del prodotto)             |
-| `packages/domain`       | Modello del dominio                                                                 |
-| `packages/rules`        | Regole di prescrizione: valori e fonti versionati come dati, mai scritti nel codice |
-| `packages/integrations` | Interfacce e simulatori (SAR/SIRPED, Sistema TS, AURA, INPS, FSE)                   |
-| `sync/`                 | Banche dati pubbliche (Python)                                                      |
-| `fixtures/`             | Pazienti inventati (generatore deterministico)                                      |
-| `docs/`                 | Requisiti, prototipi, decisioni, avanzamento, logo                                  |
-| `scripts/`              | `avvio-sessione.sh` (hook SessionStart) e utilità                                   |
+| Percorso                | Contenuto                                                                                     |
+| ----------------------- | --------------------------------------------------------------------------------------------- |
+| `apps/web`              | Interfaccia per PC e tablet                                                                   |
+| `apps/api`              | Servizio applicativo                                                                          |
+| `packages/brand`        | Nome, marchi, colori e caratteri (unico posto con il nome del prodotto)                       |
+| `packages/domain`       | Modello del dominio                                                                           |
+| `packages/rules`        | Regole di prescrizione: valori e fonti versionati come dati, mai scritti nel codice           |
+| `packages/integrations` | Interfacce e simulatori (SAR/SIRPED, Sistema TS, AURA, INPS, FSE)                             |
+| `packages/reference`    | Lettura dei file di `sync/` (CSV, XLSX), tipi di banca dati, mappature come dati              |
+| `sync/`                 | Banche dati pubbliche (Python)                                                                |
+| `fixtures/`             | Pazienti inventati (generatore deterministico); `banche-dati/`: sito e trascrizioni d'esempio |
+| `docs/`                 | Requisiti, prototipi, decisioni, avanzamento, logo                                            |
+| `scripts/`              | `avvio-sessione.sh` (hook SessionStart) e utilità                                             |
 
 ## Stack (provvisorio)
 
@@ -88,22 +89,24 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 
 ## Comandi
 
-| Comando                                                | Cosa fa                                                                         |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `pnpm install`                                         | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                            |
-| `pnpm dev`                                             | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)  |
-| `pnpm test`                                            | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python) |
-| `pnpm lint`                                            | ESLint, Prettier in controllo, tipi di ogni pacchetto                           |
-| `pnpm format`                                          | Prettier in scrittura                                                           |
-| `pnpm db:migrate`                                      | Applica le migrazioni a `DATABASE_URL`                                          |
-| `pnpm db:seed`                                         | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)  |
-| `pnpm --filter @mmg/domain docs:permessi`              | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                      |
-| `pnpm --filter @mmg/rules docs:regole`                 | Rigenera la tabella di `docs/regole.md` dai dati delle regole                   |
-| `pnpm --filter @mmg/api db:generate`                   | Genera una migrazione dallo schema Drizzle                                      |
-| `pnpm fixtures -- --seed 1 --count 20`                 | Pazienti inventati in JSON (stesso seme, stessi pazienti)                       |
-| `pnpm --filter @mmg/brand tokens:css`                  | Rigenera `tokens.css` da `tokens.ts`                                            |
-| `pnpm --filter @mmg/brand logo:proposte`               | Rigenera le proposte di logo e le tavole di `docs/logo.md`                      |
-| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'` | Prova un controllo: rosso col guasto, verde dopo il ripristino                  |
+| Comando                                                     | Cosa fa                                                                         |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `pnpm install`                                              | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                            |
+| `pnpm dev`                                                  | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)  |
+| `pnpm test`                                                 | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python) |
+| `pnpm lint`                                                 | ESLint, Prettier in controllo, tipi di ogni pacchetto                           |
+| `pnpm format`                                               | Prettier in scrittura                                                           |
+| `pnpm db:migrate`                                           | Applica le migrazioni a `DATABASE_URL`                                          |
+| `pnpm db:seed`                                              | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)  |
+| `pnpm banche-dati:importa -- --dati DIR --trascrizioni DIR` | Importa l'output di `sync/` e le trascrizioni dei PDF                           |
+| `pnpm banche-dati:importa -- --esempio`                     | Lancia `sync/` sul sito d'esempio e importa (banche dati dimostrative)          |
+| `pnpm --filter @mmg/domain docs:permessi`                   | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                      |
+| `pnpm --filter @mmg/rules docs:regole`                      | Rigenera la tabella di `docs/regole.md` dai dati delle regole                   |
+| `pnpm --filter @mmg/api db:generate`                        | Genera una migrazione dallo schema Drizzle                                      |
+| `pnpm fixtures -- --seed 1 --count 20`                      | Pazienti inventati in JSON (stesso seme, stessi pazienti)                       |
+| `pnpm --filter @mmg/brand tokens:css`                       | Rigenera `tokens.css` da `tokens.ts`                                            |
+| `pnpm --filter @mmg/brand logo:proposte`                    | Rigenera le proposte di logo e le tavole di `docs/logo.md`                      |
+| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'`      | Prova un controllo: rosso col guasto, verde dopo il ripristino                  |
 
 Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano). Il servizio vuole anche `APP_ENCRYPTION_KEY` (in cloud la imposta l'hook).
 
@@ -115,6 +118,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/ricetta.md`: ciclo della ricetta e integrazioni simulate.
 - `docs/regole.md`: regole di prescrizione, generate dai dati.
 - `docs/logo.md`: proposte di logo.
+- `docs/banche-dati.md`: importazione delle banche dati, mappature, trascrizioni, versioni.
 
 ## Le tappe
 

@@ -10,9 +10,12 @@ import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
+import { registerReferenceRoutes } from './http/reference-routes';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import { SimulatedGateway, type GatewaySystem, type PrescriptionGateway } from '@mmg/integrations';
+import { loadMappings } from '@mmg/reference';
+import { ReferenceData } from './reference/lookup';
 
 declare module 'fastify' {
   interface FastifyContextConfig {
@@ -108,14 +111,17 @@ export function buildApp({
 
   registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
   registerPatientRoutes(app, db);
+  // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
+  const reference = new ReferenceData(db, loadMappings());
+  registerReferenceRoutes(app, reference, now ?? (() => new Date()));
   registerPrescriptionRoutes(
     app,
     createPrescriptionService({
       db,
       gateways,
       now,
-      // Per difetto le regole di prescrizione vere (tappa 4).
-      preSendChecks: preSendChecks ?? createRulesCheck({ db, now }),
+      // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
+      preSendChecks: preSendChecks ?? createRulesCheck({ db, now, reference }),
     }),
   );
   return app;

@@ -1,0 +1,47 @@
+{
+  "versione": 1,
+  "legenda": "Le stesse fonti di sync/fonti.json, con gli stessi id, ma puntate al sito d'esempio servito in locale. __BASE__ diventa l'indirizzo del server di prova.",
+  "fonti": [
+    {
+      "id": "aifa_liste",
+      "ente": "AIFA (prova)",
+      "titolo": "Liste dei farmaci di prova",
+      "tipo": "pagina",
+      "url": "__BASE__/aifa/liste-dei-farmaci",
+      "filtro": "\\.csv(?:$|[/?#])",
+      "soglia_righe": 0.2
+    },
+    {
+      "id": "piemonte_dpc",
+      "ente": "Regione Piemonte (prova)",
+      "titolo": "Farmaci PHT in DPC di prova",
+      "tipo": "pagina",
+      "url": "__BASE__/piemonte/dpc",
+      "filtro": "/media/\\d+/download",
+      "chiave": "farmaci_pht_dpc.pdf"
+    },
+    {
+      "id": "piemonte_catalogo",
+      "ente": "Regione Piemonte (prova)",
+      "titolo": "Catalogo delle prestazioni di prova",
+      "tipo": "pagina",
+      "url": "__BASE__/piemonte/catalogo",
+      "filtro": "\\.pdf(?:$|[/?#])",
+      "max_file": 10
+    },
+    {
+      "id": "piemonte_esenzioni_prestazioni",
+      "ente": "Regione Piemonte (prova)",
+      "titolo": "Esenzioni e prestazioni associate di prova",
+      "tipo": "file",
+      "url": "__BASE__/piemonte/esenzioni_prestazioni_prova.pdf"
+    },
+    {
+      "id": "istat_comuni",
+      "ente": "ISTAT (prova)",
+      "titolo": "Elenco dei comuni d'esempio",
+      "tipo": "file",
+      "url": "__BASE__/istat/Elenco-comuni-italiani.xlsx"
+    }
+  ]
+}
