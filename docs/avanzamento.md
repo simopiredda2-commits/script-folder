@@ -4,8 +4,17 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 ## Dove siamo
 
-- `main` contiene le tappe 0–4 (pull request #1 e #2 unite il 18/11/2026 con il via di Simone).
-- Branch attivo: `tappe-5-6`. Tappe 5 e 6 fatte; pull request #3 per la **fermata finale**: domande con il pulsante, poi unione con il via di Simone e stop.
+- **Ciclo delle tappe 0–6 chiuso.** `main` contiene tutto: pull request #1, #2 e #3 unite il 18/11/2026 con il via di Simone.
+- Fermata finale fatta: risposte qui sotto (D76–D78). Prossimi passi in fondo a questa sezione.
+
+**Prossimi passi** (nessuno avviato):
+
+1. Primo giro di `sync/` dal computer dello studio; completare le mappature AIFA con le intestazioni vere e confermare quelle ISTAT (D55, D56).
+2. Specifiche e credenziali di collaudo di SAR, Sistema TS e AURA: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo della ricetta rossa e del promemoria.
+3. Terapie dall'interfaccia: nuova terapia, modifica, sospensione, schema orario (D72).
+4. Decisione su Ready! e sulla versione «Full» (D78).
+5. A7 e le altre liste AIFA (trasparenza, carenze, registri); soglie di vecchiaia (D62).
+6. Prove con lettori di schermo e tablet veri, e una giornata di lavoro con la Dr.ssa Rocca.
 
 ## Come provarlo
 
@@ -230,7 +239,16 @@ Simone ha risposto con il pulsante. **Applicate** sul branch `tappe-0-2` (decisi
 - **Registro degli accessi**: va bene così.
 - **Esportazione**: aggiungere anche il CSV (una tabella per file).
 
-## Domande per la fermata finale
+## Risposte della fermata finale (18/11/2026)
+
+Simone ha risposto con il pulsante. Applicate prima dell'unione della #3 (D76–D78).
+
+- **Colori**: giallo e avvisi in arancio, confermati.
+- **R15, R16**: blocco spiegato, confermato.
+- **Ready!**: Simone chiede se tutte le funzioni di Ready! possano entrare nel prodotto, in una versione «Full», e come gestire la palette. Proposta in D78 (integrazione, non riscrittura; palette con due pubblici e colori di stato comuni); decisione rimandata.
+- **Via libera**: unire la #3 e fermarsi.
+
+## Domande della fermata finale (chiuse)
 
 1. **R15, R16 (D52)**: «alert con motivazione» letto come avviso che spiega il blocco. Se invece si voleva poter procedere scrivendo un motivo, è in conflitto con i requisiti (le regole da norma non hanno deroghe): da decidere.
 2. **Appuntamenti da Ready!** (richiesta di Simone del 18/11/2026). I requisiti prevedono l'agenda dentro il prodotto («la segreteria prenota»); Simone propone di prendere gli appuntamenti da Ready!, il prodotto di prenotazione di SCRIPT. Dalla sessione «Ready! (prodotto)» (letta il 18/11/2026, solo come dati): installazione per studio su Aruba (per lo studio Rocca `prenota.studiomedicorocca.it`, prenotazioni dall'1/12/2026); l'elenco degli assistiti si importa dall'esportazione del gestionale con `src/Pazienti/ImportaCsv.php`, che riconosce le colonne per nome (codice fiscale, cognome, nome, email, cellulare) in CSV o Excel; il paziente si riconosce con codice fiscale e cognome; non ho visto un'esportazione o un'API degli appuntamenti. Proposta in due versi: (a) il prodotto esporta l'elenco degli assistiti nel formato di `ImportaCsv`, al posto di Next2; (b) Ready! espone gli appuntamenti (lavoro da fare in Ready!) e il prodotto li legge con un'interfaccia e un simulatore (regola 7), in copia con l'identificativo di Ready!, senza cambiare «Oggi». Da chiedere: conferma (cambia il perimetro dei requisiti), priorità di (a) e (b), nomi esatti delle colonne da verificare su `ImportaCsv.php`. Oggi non c'è nessuna agenda da rifare: «Oggi» legge la tabella degli appuntamenti e il seed ne mette alcuni dimostrativi.

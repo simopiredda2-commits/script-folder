@@ -169,3 +169,17 @@ Le scelte prese senza Simone, ognuna con il motivo e con che cosa toccare per ca
 **D74 · La prova dell'interfaccia gira nel browser vero.** Playwright con Chromium, axe-core per WCAG 2.2 A e AA, misura dei bersagli (almeno 44 px, caselle con la loro etichetta), tablet in verticale e in orizzontale senza scorrimento di lato. Sta nelle prove del servizio perché usa il database di prova, `sync/` e le banche dati d'esempio. In CI si installa Chromium.
 
 **D75 · «Oggi».** Il medico vede i suoi appuntamenti, la segreteria quelli dello studio; le code (da firmare, invii non riusciti, richieste aperte, piani in scadenza entro i giorni di R5) sono calcolate, non tabelle.
+
+## Fermata finale – risposte di Simone (18/11/2026)
+
+**D76 · Palette confermata.** Evidenziatore giallo e avvisi in arancio bruciato, come in D69.
+
+**D77 · R15 e R16: blocco spiegato, confermato.** La lettura di D52 resta: nessuna deroga, l'avviso spiega il perché e che cosa fare.
+
+**D78 · Ready! e una versione «Full»: proposta, da decidere.** Simone chiede se tutte le funzioni di Ready! possano entrare nel prodotto, in una versione «Full», e come gestire la palette. Proposta, senza lavori finché non decide:
+
+- **Si può.** Il modello del prodotto ha già appuntamenti e richieste dei pazienti, e i requisiti prevedono la prenotazione online dei pazienti in fase 2.
+- **«Full» come integrazione, non come riscrittura.** Il prodotto con Ready! dentro come modulo di prenotazione: un solo accesso per lo studio, l'elenco degli assistiti passato da solo, appuntamenti e richieste che arrivano in «Oggi». Ready! resta vendibile da solo agli studi con altri gestionali. Riscriverlo nel prodotto vorrebbe dire due codici per la stessa cosa (PHP e TypeScript) da tenere allineati, e toccare un prodotto che parte da Chiara l'1/12.
+- **Separazione anche nella «Full».** L'app dei pazienti resta un servizio esposto a parte, con i soli dati che le servono; dall'app la cartella non si raggiunge. Una richiesta di ripetizione delle terapie passa subito alla cartella e non resta nell'app.
+- **Palette con due pubblici.** Interfaccia dello studio: blu di SCRIPT, evidenziatore giallo e colori di stato (D69). App dei pazienti: lo stile e la palette che lo studio sceglie in Ready!, dalle combinazioni con i contrasti già misurati. In comune, i colori di stato con lo stesso significato ovunque (rosso errore e blocco, arancio attenzione, verde fatto, blu informazione) e i token in un solo posto (`packages/brand`). Il giallo resta un segnale per lo studio: ai pazienti non compare come avviso.
+- **Da decidere prima di lavorarci:** integrazione o riscrittura; quando (dopo il lancio di Ready! dall'1/12); prezzi, contratti art. 28 e informative per la versione «Full».

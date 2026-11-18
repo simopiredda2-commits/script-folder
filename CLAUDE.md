@@ -18,6 +18,7 @@ SCRIPT è lo studio di innovazione digitale di Simone Piredda: software house, c
 
 - Il marchio di SCRIPT si usa identico ai file ufficiali: non ridisegnarlo, non ricolorarlo, non descriverlo a parole nei testi.
 - Colori di SCRIPT, come token in `packages/brand`: luce `#4D6BFE`, ombra `#1B237A`, testo `#0E1435`; su fondo scuro `#8FA0FF`, `#3B4DE0` e bianco.
+- Palette dell'interfaccia (D69, confermata alla fermata finale): blu di SCRIPT per struttura e informazioni; evidenziatore giallo `#FFE45C` solo come sfondo con testo scuro (contatori, cartella attiva, selezioni); avvisi in arancio bruciato, errori in rosso, esiti in verde; ogni messaggio anche con simbolo e parola.
 - Caratteri: Special Gothic Expanded One (nome del prodotto e titoli), IBM Plex Sans (testo), IBM Plex Mono (codici ed etichette: codice fiscale, NRE, AIC). Licenza OFL 1.1, dai pacchetti npm `@fontsource/special-gothic-expanded-one`, `@fontsource/ibm-plex-sans`, `@fontsource/ibm-plex-mono`, serviti dal nostro dominio: mai da Google Fonts o da altre CDN.
 - Testi dell'interfaccia: italiano, registro professionale, tecnico ma chiaro; niente tono colloquiale.
 
