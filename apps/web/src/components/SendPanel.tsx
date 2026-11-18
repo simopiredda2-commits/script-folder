@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { api, ApiError } from '../lib/api';
+import { CREDENTIALS_PATH } from '../lib/credentials';
 import { useSession } from '../lib/session';
 import { ErrorMessage, IssueList, Notice, type RuleIssue } from './common';
 import { Icon } from './Icon';
@@ -11,7 +13,8 @@ interface CheckResult {
 }
 
 type SendOutcome =
-  { esito: 'accepted'; nre: string } | { esito: 'rejected' | 'unreachable' | 'timeout'; nre: null };
+  | { esito: 'accepted'; nre: string; messaggio: null }
+  | { esito: 'rejected' | 'unreachable' | 'timeout' | 'auth'; nre: null; messaggio: string };
 
 export interface SendPanelProps {
   prescriptionId: string;
@@ -192,6 +195,12 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
       )}
       {outcome?.esito === 'rejected' && (
         <Notice kind="errore">Ricetta respinta dal servizio regionale.</Notice>
+      )}
+      {outcome?.esito === 'auth' && (
+        <Notice kind="errore">
+          {outcome.messaggio} La ricetta non cambia: si rimanda così com’è.{' '}
+          <Link to={CREDENTIALS_PATH}>Apri «Credenziali dei servizi»</Link>
+        </Notice>
       )}
       {paper && <Notice kind="fatto">Ricetta rossa pronta per la stampa. {paper}.</Notice>}
       <div className="azioni">

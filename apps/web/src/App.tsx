@@ -6,12 +6,14 @@ import { SessionProvider, useSession } from './lib/session';
 import { DataSearchPage } from './pages/DataSearchPage';
 import { ExamsPage } from './pages/ExamsPage';
 import { ArchivePage } from './pages/ArchivePage';
+import { CertificatesPage } from './pages/CertificatesPage';
 import { ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
 import { LockScreen, LoginPage } from './pages/LoginPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { PrescriptionEditor } from './pages/PrescriptionEditor';
 import { RecordPage } from './pages/RecordPage';
 import { SchedulePage } from './pages/SchedulePage';
+import { ServiceCredentialsPage } from './pages/ServiceCredentialsPage';
 import { SignQueuePage } from './pages/SignQueuePage';
 import { TherapyForm } from './pages/TherapyForm';
 import { TodayPage } from './pages/TodayPage';
@@ -35,6 +37,7 @@ function Screens() {
             element={<PrescriptionEditor mode="specialistica" />}
           />
           <Route path="/pazienti/:id/esami" element={<ExamsPage />} />
+          <Route path="/pazienti/:id/certificati" element={<CertificatesPage />} />
           <Route path="/pazienti/:id/terapie/nuova" element={<TherapyForm />} />
           <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
           <Route path="/pazienti/:id/terapie/:therapyId/modifica" element={<TherapyForm />} />
@@ -43,6 +46,7 @@ function Screens() {
           <Route path="/ricette" element={<SignQueuePage />} />
           <Route path="/banche-dati" element={<DataSearchPage />} />
           <Route path="/archivio" element={<ArchivePage />} />
+          <Route path="/profilo/credenziali" element={<ServiceCredentialsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Shell>

@@ -1,7 +1,9 @@
 import { Link } from 'react-router';
-import { ErrorMessage, Loading, PageHeader } from '../components/common';
+import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
+import { credentialAlerts, CREDENTIALS_PATH, type CredentialsStatus } from '../lib/credentials';
 import { age, APPOINTMENT_KIND, date, longDate, plural, time } from '../lib/format';
+import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 
 interface Today {
@@ -41,6 +43,7 @@ export function TodayPage() {
     <>
       <PageHeader title="Oggi" />
       <p className="sottotitolo">{longDate(data.data)}</p>
+      <CredentialAlerts />
       <div className="griglia-oggi">
         <section aria-labelledby="titolo-agenda" className="riquadro">
           <h2 id="titolo-agenda">
@@ -120,5 +123,30 @@ export function TodayPage() {
         </section>
       </div>
     </>
+  );
+}
+
+/** Credenziali mancanti, password in scadenza, codice di sessione da attivare (D100–D102). */
+function CredentialAlerts() {
+  const { isDoctor } = useSession();
+  const st = useApi<CredentialsStatus>(isDoctor ? '/api/profilo/credenziali' : null);
+  // Una risposta inattesa non deve far cadere la pagina Oggi: niente avvisi.
+  const servizi = st.data?.servizi;
+  const alerts = Array.isArray(servizi) ? credentialAlerts(servizi) : [];
+  if (alerts.length === 0) return null;
+  return (
+    <section aria-labelledby="titolo-servizi" className="riquadro avvisi-servizi">
+      <h2 id="titolo-servizi">
+        <Icon name="lucchetto" /> Servizi
+      </h2>
+      {alerts.map((a) => (
+        <Notice key={a.text} kind={a.kind}>
+          {a.text}
+        </Notice>
+      ))}
+      <p>
+        <Link to={CREDENTIALS_PATH}>Apri «Credenziali dei servizi»</Link>
+      </p>
+    </section>
   );
 }

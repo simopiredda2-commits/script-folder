@@ -9,6 +9,7 @@ import {
   type DatasetVersion,
 } from '../components/common';
 import { Icon } from '../components/Icon';
+import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
 import { ACCESS_TYPE, date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
@@ -52,6 +53,9 @@ interface Line {
   byActiveIngredient?: boolean;
   notSubstitutable?: boolean;
   notSubstitutableReason?: string;
+  /** Ricetta bianca ripetibile, solo se diverso dalla regola del farmaco (D93). */
+  repeatCount?: string;
+  validityMonths?: string;
 }
 
 const SEARCH_DELAY_MS = 250;
@@ -150,6 +154,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const [accessType, setAccessType, resetAccess] = usePersistentState(k('accesso'), 'first');
   const [priority, setPriority, resetPriority] = usePersistentState(k('priorita'), 'P');
   const [question, setQuestion, resetQuestion] = usePersistentState(k('quesito'), '');
+  const [obscured, setObscured, resetObscured] = usePersistentState(k('oscurato'), false);
   const [text, setText] = useState('');
   const q = useDebounced(text);
   const search = useApi<{ farmaci?: Drug[]; prestazioni?: Service[]; versioni: DatasetVersion[] }>(
@@ -166,7 +171,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   } | null>(k('bozza'), null);
   const startOver = () => {
     for (const reset of [resetKind, resetLines, resetExemption, resetChannel, resetAccess]) reset();
-    for (const reset of [resetPriority, resetQuestion, resetDraft]) reset();
+    for (const reset of [resetPriority, resetQuestion, resetDraft, resetObscured]) reset();
   };
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -194,11 +199,27 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         ...(mode === 'specialistica'
           ? { accessType, priority, diagnosticQuestion: question || null }
           : {}),
-        lines: lines.map(({ key: _k, posologyText, notSubstitutableReason, ...l }) => ({
-          ...l,
-          posologyText: posologyText || null,
-          notSubstitutableReason: notSubstitutableReason || null,
-        })),
+        ...(kind !== 'white' && obscured ? { obscured: true } : {}),
+        lines: lines.map(
+          ({
+            key: _k,
+            posologyText,
+            notSubstitutableReason,
+            repeatCount,
+            validityMonths,
+            ...l
+          }) => ({
+            ...l,
+            posologyText: posologyText || null,
+            notSubstitutableReason: notSubstitutableReason || null,
+            ...(kind === 'white'
+              ? {
+                  repeatCount: repeatCount ? Number(repeatCount) : null,
+                  validityMonths: validityMonths ? Number(validityMonths) : null,
+                }
+              : {}),
+          }),
+        ),
       };
       const r = await api<{ id: string }>(`/api/pazienti/${id}/ricette`, { method: 'POST', body });
       const list = await api<{
@@ -483,6 +504,40 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                           />
                         </div>
                       )}
+                      {kind === 'white' && (
+                        <div className="campi-riga">
+                          <div className="campo campo-stretto">
+                            <label htmlFor={`rip-${l.key}`}>Ripetibile (volte)</label>
+                            <input
+                              id={`rip-${l.key}`}
+                              inputMode="numeric"
+                              value={l.repeatCount ?? ''}
+                              onChange={(e) =>
+                                update(l.key, { repeatCount: e.target.value.replace(/\D/g, '') })
+                              }
+                              aria-describedby={`rip-aiuto-${l.key}`}
+                            />
+                          </div>
+                          <div className="campo campo-stretto">
+                            <label htmlFor={`val-${l.key}`}>Validità (mesi)</label>
+                            <input
+                              id={`val-${l.key}`}
+                              inputMode="numeric"
+                              value={l.validityMonths ?? ''}
+                              onChange={(e) =>
+                                update(l.key, {
+                                  validityMonths: e.target.value.replace(/\D/g, ''),
+                                })
+                              }
+                              aria-describedby={`rip-aiuto-${l.key}`}
+                            />
+                          </div>
+                          <p className="aiuto" id={`rip-aiuto-${l.key}`}>
+                            Solo se diversi dalla regola del farmaco: altrimenti vale quella, e il
+                            SAC controlla le ripetizioni.
+                          </p>
+                        </div>
+                      )}
                     </>
                   )}
                   <button
@@ -558,6 +613,23 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 ))}
               </select>
             </div>
+            {kind !== 'white' && (
+              <div className="casella">
+                <input
+                  type="checkbox"
+                  id="oscurato"
+                  checked={obscured}
+                  onChange={(e) => setObscured(e.target.checked)}
+                />
+                <label htmlFor="oscurato">
+                  <strong>Oscura nome e indirizzo</strong>{' '}
+                  <span className="tenue">
+                    Lo chiede il paziente: non compaiono sul promemoria né all’erogatore; il codice
+                    fiscale resta.
+                  </span>
+                </label>
+              </div>
+            )}
             <div className="campo">
               <label htmlFor="canale">Promemoria al paziente</label>
               <select id="canale" value={channel} onChange={(e) => setChannel(e.target.value)}>
@@ -587,15 +659,18 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             </div>
           )}
           {draft && draft.status === 'sent' && (
-            <Notice kind="fatto">
-              Ricetta inviata.
-              {draft.nre && (
-                <>
-                  {' '}
-                  NRE <span className="codice">{draft.nre}</span>
-                </>
-              )}
-            </Notice>
+            <>
+              <Notice kind="fatto">
+                Ricetta inviata.
+                {draft.nre && (
+                  <>
+                    {' '}
+                    NRE <span className="codice">{draft.nre}</span>
+                  </>
+                )}
+              </Notice>
+              <ReminderPanel prescriptionId={draft.id} patientId={id!} kind={kind} />
+            </>
           )}
           {draft && draft.status === 'paper' && (
             <Notice kind="fatto">Ricetta rossa pronta per la stampa.</Notice>

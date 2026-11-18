@@ -87,7 +87,7 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 
 - `scripts/avvio-sessione.sh` è l'hook SessionStart (`.claude/settings.json`). Solo se `CLAUDE_CODE_REMOTE=true`: avvia Postgres 16, crea se mancano l'utente `mmg` (password locale `mmg`, con CREATEDB) e il database `mmg_dev`, scrive `DATABASE_URL` e `TZ=Europe/Rome` in `$CLAUDE_ENV_FILE`, installa le dipendenze solo se è cambiato un file che le decide (impronte in `node_modules/.avvio-sessione.sha256`).
 - `DATABASE_URL=postgres://mmg:mmg@localhost:5432/mmg_dev` (valore locale, non un segreto; vedi `.env.example`).
-- Dal cloud i siti istituzionali non si raggiungono.
+- La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e sette siti pubblici, solo per leggere specifiche e decreti (Sistema TS, Gazzetta Ufficiale, INPS, AIFA, Regione Piemonte, Ministero della Salute; D92). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7).
 
 ## Comandi
 
@@ -123,6 +123,8 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/logo.md`: proposte di logo.
 - `docs/banche-dati.md`: importazione delle banche dati, mappature, trascrizioni, versioni.
 - `docs/interfaccia.md`: schermate (in `docs/schermate/`), accessibilità, che cosa manca.
+- `docs/credenziali.md`: credenziali dei servizi (Sistema TS, RUPAR) e secondo fattore.
+- `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.
 
 ## Le tappe
 
@@ -137,9 +139,11 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 Secondo giro (D90), con lo stesso metodo: requisiti, specifiche pubbliche, simulatori, prove e sabotaggi, schermate.
 
 7. Promemoria e invio: promemoria sul modello ufficiale, per la ricetta SSN e per la ricetta bianca elettronica, completo o solo NRE; invio per email al paziente o al delegato registrato con un simulatore, secondo R15 e R16.
-8. Certificati INPS: inizio, continuazione o ricaduta; visita ambulatoriale o domiciliare; prognosi; diagnosi ICD-9-CM e testo; reperibilità; invio con il simulatore del Sistema TS e numero di protocollo; copia al lavoratore; al datore di lavoro solo il protocollo (D88); rettifica e annullamento nei casi ammessi. **Terza fermata.**
+8. Certificati INPS: inizio, continuazione o ricaduta; visita ambulatoriale o domiciliare; prognosi; diagnosi ICD-9-CM e testo; reperibilità; invio con il simulatore del Sistema TS e numero di protocollo; copia al lavoratore; al datore di lavoro protocollo con nome e cognome, mai la diagnosi (D88, D108); rettifica e annullamento nei casi ammessi. **Terza fermata.**
 9. Voci cliniche dall'interfaccia: problemi, allergie e reazioni, diario, parametri, anamnesi, stili di vita, esame obiettivo, privacy (consensi, deleghe, oscuramento), piani terapeutici.
 10. Presidi e assistenza integrativa; seguito delle prestazioni (esecuzione, struttura, esito, referto, sedute); voci nuove solo dopo la verifica sulla fonte (D91). **Fermata finale del secondo giro.**
+
+Dalla terza fermata: prima della tappa 9, secondo fattore con SPID o CIE dal programma (D109). Dopo la tappa 10, con il via della fermata finale (D110): 11. Profilo Sanitario Sintetico per il Fascicolo con un simulatore del Gateway; 12. condivisione tra i medici dell'AFT. Il documento sulle fonti (`docs/fse.md`) si prepara durante le tappe 9 e 10.
 
 ## Come si chiude
 

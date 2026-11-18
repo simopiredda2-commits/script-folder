@@ -7,3 +7,5 @@ export * from './agenda';
 export * from './audit';
 export * from './prescriptions';
 export * from './reference';
+export * from './credentials';
+export * from './certificates';

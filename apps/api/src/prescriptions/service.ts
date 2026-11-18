@@ -7,16 +7,20 @@ import {
   type PrescriptionKind,
   type PrescriptionStatus,
   type SendErrorKind,
+  type ServiceUse,
 } from '@mmg/domain';
 import type {
+  AuthProblem,
   GatewaySystem,
   PrescriptionGateway,
   PrescriptionMessage,
   SendResult,
+  ServiceAuth,
   StatusResult,
 } from '@mmg/integrations';
 import { systemFor } from '@mmg/integrations';
 import { basePackLimit } from '@mmg/rules';
+import { createHash } from 'node:crypto';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AccessAction } from '../audit/access-log';
@@ -29,12 +33,16 @@ import {
   prescriptionCheck,
   patient,
   prescription,
+  prescriptionDocument,
   prescriptionLine,
+  studio,
   therapy,
 } from '../db/schema';
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
+import { buildPromemoriaData } from '../reminders/promemoria';
+import type { createCredentialService } from '../credentials/service';
 import { studioDate } from './rules-check';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
 
@@ -51,6 +59,8 @@ export interface LineInput {
   notSubstitutable?: boolean;
   notSubstitutableReason?: string | null;
   posologyText?: string | null;
+  repeatCount?: number | null;
+  validityMonths?: number | null;
 }
 
 export interface DraftInput {
@@ -62,6 +72,7 @@ export interface DraftInput {
   requestId?: string | null;
   reminderChannel?: 'paper' | 'email' | 'pec' | 'sms' | 'messaging_app' | 'phone' | 'fse' | null;
   reminderContact?: string | null;
+  obscured?: boolean;
   lines: LineInput[];
 }
 
@@ -105,13 +116,38 @@ function parseSignInput(body: unknown): SignInput {
 export interface PrescriptionDeps {
   db: Database;
   gateways: Record<GatewaySystem, PrescriptionGateway>;
+  /**
+   * Credenziali e secondo fattore del medico che firma (D100–D102): si prendono prima di ogni
+   * chiamata e non entrano nei messaggi conservati.
+   */
+  credentials: Pick<ReturnType<typeof createCredentialService>, 'authFor' | 'authRefused'>;
   now?: () => Date;
   /**
    * Controlli prima dell'invio (regole di prescrizione, tappa 4): problemi trovati e versione
    * delle regole usata. Per difetto nessun controllo e nessuna versione.
    */
   preSendChecks?: (prescriptionId: string, actor: Actor, input: SignInput) => Promise<CheckOutcome>;
+  /**
+   * Tempo massimo di attesa della risposta all'invio, in millisecondi. Regione Piemonte (SIRPE,
+   * «Cartelle cliniche MMG e PLS», 4.4.7): la cartella clinica ha un parametro per il tempo tra la
+   * richiesta di stampa e la stampa, «al momento definiti in 6-8 secondi»; senza codice di
+   * autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto 8000 (D94).
+   */
+  sendTimeoutMs?: number;
 }
+
+/** Tempo massimo di attesa dell'invio per difetto: il limite alto dei 6–8 secondi del Piemonte. */
+export const DEFAULT_SEND_TIMEOUT_MS = 8000;
+
+/** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
+const useFor = (kind: PrescriptionMessage['kind']): ServiceUse =>
+  kind === 'white' ? 'ricetta_bianca' : 'ricetta_ssn';
+
+/** Messaggio per un rifiuto di accesso: la ricetta è giusta, l'accesso no. */
+const authMessage = (problem: AuthProblem, message: string) =>
+  problem === 'session'
+    ? `${message}. Chiedi un nuovo codice di sessione in «Credenziali dei servizi» e rimanda.`
+    : `${message}. Controlla utente, password e PIN in «Credenziali dei servizi» e rimanda.`;
 
 type PrescriptionRow = typeof prescription.$inferSelect;
 
@@ -183,6 +219,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           requestId: input.requestId ?? null,
           reminderChannel: input.reminderChannel ?? null,
           reminderContact: input.reminderContact ?? null,
+          obscured: input.obscured ?? false,
           preparedBy: actor.userId,
           preparedAt: now(),
           updatedAt: now(),
@@ -204,6 +241,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           notSubstitutable: l.notSubstitutable ?? false,
           notSubstitutableReason: l.notSubstitutableReason ?? null,
           posologyText: l.posologyText ?? null,
+          repeatCount: l.repeatCount ?? null,
+          validityMonths: l.validityMonths ?? null,
         })),
       );
       return p!.id;
@@ -370,6 +409,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       priority: p.priority,
       accessType: p.accessType,
       diagnosticQuestion: p.diagnosticQuestion,
+      obscured: p.obscured,
       lines: lines.map((l) => ({
         drugAic: l.drugAic,
         drugName: l.drugName,
@@ -380,8 +420,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         aifaNote: l.aifaNote,
         notSubstitutable: l.notSubstitutable,
         notSubstitutableReason: l.notSubstitutableReason,
+        repeatCount: l.repeatCount,
+        validityMonths: l.validityMonths,
       })),
-      compiledAt: now().toISOString().slice(0, 10),
+      compiledAt: studioDate(now()),
     };
   }
 
@@ -436,6 +478,11 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       );
     }
 
+    await ensurePromemoriaPossible(p, actor);
+    // Credenziali e codice di sessione di chi firma: se mancano ci si ferma qui, senza invio.
+    const use = useFor(p.kind);
+    const auth = await deps.credentials.authFor(actor.userId, use);
+
     // Passaggio atomico a «in invio»: se due richieste arrivano insieme, ne passa una sola.
     const claimed = await withActor(db, actor.userId, (tx) =>
       tx
@@ -451,19 +498,70 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const system = systemFor(p.kind);
     const gateway = deps.gateways[system];
     const started = Date.now();
+    const timeoutMs = deps.sendTimeoutMs ?? DEFAULT_SEND_TIMEOUT_MS;
     let result: SendResult;
+    let timer: NodeJS.Timeout | undefined;
     try {
-      result = await gateway.send(message);
+      result = await Promise.race([
+        gateway.send(message, auth),
+        new Promise<SendResult>((ok) => {
+          timer = setTimeout(
+            () =>
+              ok({
+                outcome: 'timeout',
+                message: `Nessuna risposta entro ${timeoutMs / 1000} secondi: non si sa se la ricetta è arrivata`,
+              }),
+            timeoutMs,
+          );
+        }),
+      ]);
     } catch (err) {
       // Un errore imprevisto dell'adattatore: non si sa se la ricetta è arrivata.
       result = { outcome: 'timeout', message: `Errore dell'adattatore: ${String(err)}` };
+    } finally {
+      clearTimeout(timer);
+    }
+    // Ricetta SSN accettata senza codice di autenticazione: non è valida e il promemoria non si dà
+    // (specifiche del Sistema TS, prescrizione, 5/12/2024). Si tratta come un rifiuto.
+    const ssn = p.kind === 'pharma_ssn' || p.kind === 'specialist_ssn';
+    if (result.outcome === 'accepted' && ssn && !result.authCode) {
+      result = {
+        outcome: 'rejected',
+        code: 'SENZA_CODICE_AUTENTICAZIONE',
+        message:
+          'Il sistema ha risposto senza codice di autenticazione: la ricetta non è valida e il promemoria non si può dare. Rimandala; se non arriva, usa la ricetta rossa.',
+        raw: result.raw,
+      };
+    }
+    const authProblem = result.outcome === 'rejected' ? (result.authProblem ?? null) : null;
+    if (result.outcome === 'rejected' && authProblem) {
+      await deps.credentials.authRefused(
+        actor,
+        use,
+        authProblem,
+        `${result.code}: ${result.message}`,
+      );
+      result = { ...result, message: authMessage(authProblem, result.message) };
     }
     const errorKind: SendErrorKind | null =
       result.outcome === 'accepted'
         ? null
-        : result.outcome === 'rejected'
-          ? 'rejected'
-          : result.outcome;
+        : authProblem
+          ? 'auth'
+          : result.outcome === 'rejected'
+            ? 'rejected'
+            : result.outcome;
+    // Dati del promemoria fissati ora, con il codice di autenticazione: ogni ristampa è identica.
+    const accepted = result.outcome === 'accepted' ? result : null;
+    const promemoria =
+      accepted && ssn
+        ? await buildPromemoriaData(db, p.id, {
+            nre: accepted.nre,
+            authCode: accepted.authCode!,
+            sacDoctorName: accepted.doctorName ?? null,
+            compiledAt: message.compiledAt,
+          })
+        : null;
 
     await withActor(db, actor.userId, async (tx) => {
       await tx.insert(externalSubmission).values({
@@ -486,6 +584,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
             ? {
                 status: 'sent',
                 nre: result.nre,
+                authCode: result.authCode ?? null,
+                sacDoctorName: result.doctorName ?? null,
+                pinNrbe: result.pinNrbe ?? null,
                 sentAt: now(),
                 lastErrorKind: null,
                 lastErrorCode: null,
@@ -502,8 +603,57 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
               },
         )
         .where(eq(prescription.id, p.id));
+      if (promemoria) {
+        const content = JSON.stringify(promemoria);
+        await tx.insert(prescriptionDocument).values({
+          prescriptionId: p.id,
+          kind: 'promemoria_dati',
+          mediaType: 'application/json',
+          content,
+          sha256: createHash('sha256').update(content).digest('hex'),
+        });
+      }
+      if (accepted?.reminderPdf) {
+        // Ricetta bianca: il PDF del SAC si conserva così com'è; è l'unico che si consegna.
+        await tx.insert(prescriptionDocument).values({
+          prescriptionId: p.id,
+          kind: 'promemoria_sac',
+          mediaType: 'application/pdf',
+          content: Buffer.from(accepted.reminderPdf).toString('base64'),
+          sha256: createHash('sha256').update(accepted.reminderPdf).digest('hex'),
+        });
+      }
     });
-    return { outcome: result.outcome, nre: result.outcome === 'accepted' ? result.nre : null };
+    return {
+      outcome: errorKind === 'auth' ? ('auth' as const) : result.outcome,
+      nre: result.outcome === 'accepted' ? result.nre : null,
+      messaggio: result.outcome === 'accepted' ? null : result.message,
+    };
+  }
+
+  /**
+   * Prima di inviare una ricetta SSN: il promemoria si deve poter fare (regione dello studio,
+   * codice fiscale del medico). Meglio fermarsi prima che avere una ricetta accettata senza
+   * promemoria.
+   */
+  async function ensurePromemoriaPossible(p: PrescriptionRow, actor: Actor) {
+    if (p.kind !== 'pharma_ssn' && p.kind !== 'specialist_ssn') return;
+    const [row] = await db
+      .select({ region: studio.regionName, fiscalCode: doctorProfile.fiscalCode })
+      .from(appUser)
+      .innerJoin(studio, eq(studio.id, appUser.studioId))
+      .leftJoin(doctorProfile, eq(doctorProfile.userId, appUser.id))
+      .where(eq(appUser.id, actor.userId));
+    if (!row?.region)
+      throw new HttpError(
+        409,
+        'Manca la regione dello studio: serve per l’intestazione del promemoria (DM 2/11/2011, campo 1). Nessun invio fatto.',
+      );
+    if (!row.fiscalCode)
+      throw new HttpError(
+        409,
+        'Manca il codice fiscale del medico nel profilo: va sul promemoria (DM 2/11/2011, campo 20). Nessun invio fatto.',
+      );
   }
 
   /**
@@ -514,6 +664,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     actor: Actor,
     p: PrescriptionRow,
     doctor: PrescriptionMessage['doctor'],
+    auth: ServiceAuth,
   ): Promise<StatusResult> {
     const system = systemFor(p.kind);
     const gateway = deps.gateways[system];
@@ -521,10 +672,17 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const started = Date.now();
     let result: StatusResult;
     try {
-      result = await gateway.status(request);
+      result = await gateway.status(request, auth);
     } catch (err) {
       result = { outcome: 'timeout', message: `Errore dell'adattatore: ${String(err)}` };
     }
+    if (result.outcome === 'rejected' && result.authProblem)
+      await deps.credentials.authRefused(
+        actor,
+        useFor(p.kind),
+        result.authProblem,
+        `${result.code}: ${result.message}`,
+      );
     await withActor(db, actor.userId, async (tx) => {
       await tx.insert(externalSubmission).values({
         system,
@@ -567,7 +725,22 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         controllataIl: null,
       };
     }
-    const result = await askDispensing(actor, p, await doctorInfo(actor.userId));
+    let auth: ServiceAuth;
+    try {
+      auth = await deps.credentials.authFor(actor.userId, useFor(p.kind));
+    } catch (err) {
+      // Senza credenziali o codice di sessione (per esempio la segreteria) lo stato non si chiede.
+      if (!(err instanceof HttpError)) throw err;
+      return {
+        inviata: true,
+        stato: null,
+        etichetta: null,
+        annullabile: null,
+        motivo: `Stato non disponibile: ${err.message}`,
+        controllataIl: null,
+      };
+    }
+    const result = await askDispensing(actor, p, await doctorInfo(actor.userId), auth);
     if (result.outcome !== 'ok') {
       // Lo stato non si sa: all'annullamento deciderà comunque l'ente.
       return {
@@ -614,15 +787,24 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const system = systemFor(p.kind);
     const gateway = deps.gateways[system];
     const doctor = await doctorInfo(actor.userId);
+    const use = useFor(p.kind);
+    const auth = await deps.credentials.authFor(actor.userId, use);
     // Prima lo stato: se l'ente ha già lavorato la ricetta non si chiede nemmeno l'annullamento.
-    const status = await askDispensing(actor, p, doctor);
+    const status = await askDispensing(actor, p, doctor, auth);
     if (status.outcome === 'ok') {
       const c = cancellableState(status.state);
       if (!c.ok) throw new HttpError(409, c.reason);
     }
     const request = { nre: p.nre!, reason, doctor };
     const started = Date.now();
-    const result = await gateway.cancel(request);
+    const result = await gateway.cancel(request, auth);
+    if (result.outcome === 'rejected' && result.authProblem)
+      await deps.credentials.authRefused(
+        actor,
+        use,
+        result.authProblem,
+        `${result.code}: ${result.message}`,
+      );
     await withActor(db, actor.userId, async (tx) => {
       await tx.insert(externalSubmission).values({
         system,
@@ -650,6 +832,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           .where(and(eq(prescription.id, p.id), eq(prescription.status, 'sent')));
       }
     });
+    if (result.outcome === 'rejected' && result.authProblem)
+      throw new HttpError(422, authMessage(result.authProblem, result.message), {
+        codice: result.authProblem === 'session' ? 'SESSIONE_SCADUTA' : 'CREDENZIALI_RIFIUTATE',
+      });
     if (result.outcome !== 'accepted') {
       throw new HttpError(result.outcome === 'rejected' ? 409 : 503, result.message);
     }

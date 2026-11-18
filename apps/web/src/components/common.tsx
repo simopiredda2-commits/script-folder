@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router';
 import type { ApiError } from '../lib/api';
+import { CREDENTIALS_PATH, isCredentialError } from '../lib/credentials';
 import { date, dateTime } from '../lib/format';
 import { Icon } from './Icon';
 
@@ -17,7 +19,15 @@ export function ErrorMessage({ error }: { error: ApiError | null }) {
   return (
     <div className="messaggio messaggio-errore" role="alert">
       <Icon name="avviso" />
-      <span>{error.message}</span>
+      <span>
+        {error.message}
+        {isCredentialError(error.details) && (
+          <>
+            {' '}
+            <Link to={CREDENTIALS_PATH}>Apri «Credenziali dei servizi»</Link>
+          </>
+        )}
+      </span>
     </div>
   );
 }

@@ -34,7 +34,21 @@ export type AccessAction =
   | 'ricetta_stato'
   | 'nuova_terapia'
   | 'modifica_terapia'
-  | 'sospensione_terapia';
+  | 'sospensione_terapia'
+  | 'stampa_promemoria'
+  | 'invio_promemoria'
+  | 'lettura_consegne_promemoria'
+  | 'lettura_recapiti_promemoria'
+  | 'lettura_certificati'
+  | 'certificato_bozza'
+  | 'certificato_modifica'
+  | 'certificato_controllo'
+  | 'certificato_invio'
+  | 'certificato_rettifica'
+  | 'certificato_annullamento'
+  | 'stampa_certificato'
+  | 'consegna_certificato'
+  | 'lettura_consegne_certificato';
 
 export interface AccessEntry {
   studioId?: string | null;

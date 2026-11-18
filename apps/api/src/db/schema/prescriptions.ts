@@ -30,7 +30,12 @@ export const prescriptionStatus = pgEnum('prescription_status', [
   'cancelled',
   'paper',
 ]);
-export const sendErrorKind = pgEnum('send_error_kind', ['rejected', 'unreachable', 'timeout']);
+export const sendErrorKind = pgEnum('send_error_kind', [
+  'rejected',
+  'unreachable',
+  'timeout',
+  'auth',
+]);
 export const priorityClass = pgEnum('priority_class', ['U', 'B', 'D', 'P']);
 export const accessType = pgEnum('access_type', ['first', 'subsequent']);
 
@@ -85,6 +90,18 @@ export const prescription = pgTable(
     /** Canale del promemoria al paziente e recapito usato (R15, R16; tappa 4). */
     reminderChannel: reminderChannel(),
     reminderContact: text(),
+    /**
+     * Codice di autenticazione restituito dal SAC, anche tramite il SAR: senza, la ricetta SSN non
+     * è valida e il promemoria non si dà; va stampato su ogni promemoria (specifiche del Sistema
+     * TS, prescrizione, 5/12/2024).
+     */
+    authCode: text(),
+    /** Cognome e nome del medico come li restituisce il SAC, per il promemoria (stesse specifiche). */
+    sacDoctorName: text(),
+    /** Ricetta bianca: numero breve per paziente e anno (Disciplinare tecnico, 1/12/2022). */
+    pinNrbe: text(),
+    /** Su richiesta del paziente: cognome, nome e indirizzo oscurati (oscuramDati). */
+    obscured: boolean().notNull().default(false),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.archiveId, t.status), index().on(t.patientId)],
@@ -112,6 +129,12 @@ export const prescriptionLine = pgTable(
     notSubstitutable: boolean().notNull().default(false),
     notSubstitutableReason: text(),
     posologyText: text(),
+    /**
+     * Ricetta bianca ripetibile: volte e mesi di validità, solo se diversi dalla regola del farmaco
+     * (Disciplinare tecnico della ricetta bianca, 1/12/2022: numRipetibilita, validitaFarm).
+     */
+    repeatCount: integer(),
+    validityMonths: integer(),
   },
   (t) => [index().on(t.prescriptionId)],
 );
@@ -170,6 +193,71 @@ export const prescriptionCheck = pgTable(
     issues: jsonb().notNull(),
     reasons: jsonb().notNull(),
     confirmedAifaNotes: jsonb().notNull(),
+  },
+  (t) => [index().on(t.prescriptionId)],
+);
+
+export const prescriptionDocumentKind = pgEnum('prescription_document_kind', [
+  'promemoria_dati',
+  'promemoria_sac',
+]);
+
+/**
+ * Documenti di una ricetta fissati al momento dell'invio: i dati del promemoria SSN, da cui ogni
+ * ristampa esce identica, e il PDF del promemoria della ricetta bianca prodotto dal SAC, l'unico
+ * che si può consegnare. Non si modificano e non si cancellano (migrazione 0008).
+ */
+export const prescriptionDocument = pgTable(
+  'prescription_document',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    prescriptionId: uuid()
+      .notNull()
+      .references(() => prescription.id),
+    kind: prescriptionDocumentKind().notNull(),
+    /** «application/json» per i dati, «application/pdf» per il PDF del SAC. */
+    mediaType: text().notNull(),
+    /** JSON in chiaro, oppure il PDF in base64: così l'esportazione resta testo. */
+    content: text().notNull(),
+    sha256: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index().on(t.prescriptionId)],
+);
+
+export const reminderDeliveryChannel = pgEnum('reminder_delivery_channel', [
+  'stampa_promemoria',
+  'stampa_nre',
+  'email',
+  'sms',
+]);
+
+/**
+ * Ogni consegna del promemoria: stampa, email o SMS, a chi, con quale esito. Il recapito è sempre
+ * del paziente o di un suo delegato registrato (R16). Non si modifica e non si cancella.
+ */
+export const reminderDelivery = pgTable(
+  'reminder_delivery',
+  {
+    id: bigint({ mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    prescriptionId: uuid()
+      .notNull()
+      .references(() => prescription.id),
+    userId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    channel: reminderDeliveryChannel().notNull(),
+    /** «paziente» o «delegato»; vuoto per le stampe. */
+    recipientKind: text(),
+    delegationId: uuid(),
+    recipient: text(),
+    /** «simulator», «test» o «production» per email e SMS. */
+    environment: text(),
+    /** «stampato», «consegnato», «rifiutato», «non_raggiungibile». */
+    outcome: text().notNull(),
+    messageId: text(),
+    errorMessage: text(),
   },
   (t) => [index().on(t.prescriptionId)],
 );

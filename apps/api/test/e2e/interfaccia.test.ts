@@ -55,6 +55,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   let work: string;
   let therapyId: string;
   let lastName: string;
+  let firstName: string;
   let newTherapyUrl: string;
 
   /** Codice a 6 cifre: ogni accesso usa l'intervallo di 30 secondi successivo. */
@@ -181,6 +182,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     s = await createScenario(t.db);
     const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
     lastName = rich!.lastName;
+    firstName = rich!.firstName;
     therapyId = (
       await t.db.select().from(therapy).where(eq(therapy.patientId, s.richPatient))
     ).find((x) => !x.reserved)!.id;
@@ -301,6 +303,40 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'ricetta con i controlli');
     await page.getByRole('button', { name: 'Firma e invia' }).click();
     await page.getByText('Ricetta inviata').waitFor();
+  });
+
+  it('promemoria dopo l’invio: PDF del modello, solo NRE, email al paziente (tappa 7)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
+    const panel = page.getByRole('region', { name: 'Promemoria della ricetta' });
+    await panel.waitFor();
+    const href = await panel.getByRole('link', { name: 'Promemoria (PDF)' }).getAttribute('href');
+    const pdf = await page.request.get(`${base}${href}`);
+    expect(pdf.status()).toBe(200);
+    expect(pdf.headers()['content-type']).toBe('application/pdf');
+    expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
+    expect((await page.request.get(`${base}${href}?formato=nre`)).status()).toBe(200);
+    await panel.getByRole('button', { name: 'Invia' }).click();
+    await panel.getByText(/Promemoria inviato per email a /).waitFor();
+    await panel.getByText(/Consegne \(\d+\)/).click();
+    await panel.getByText(/Email a .* · consegnato/).waitFor();
+    await check(page, 'promemoria dopo l’invio', true);
+  });
+
+  it('nell’editor: oscuramento per le SSN, ripetibilità per la ricetta bianca (tappa 7)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
+    await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
+    await page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ }).click();
+    await page.getByLabel(/Oscura nome e indirizzo/).waitFor();
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
+    const item = page.locator('.risultato').filter({ hasText: '28 compresse' });
+    await item.waitFor();
+    await item.getByRole('button', { name: 'Aggiungi' }).click();
+    await page.getByLabel('Bianca (a carico del paziente)').check();
+    await expect(page.getByLabel(/Oscura nome e indirizzo/).count()).resolves.toBe(0);
+    await page.getByLabel('Ripetibile (volte)').fill('2');
+    await page.getByLabel('Validità (mesi)').fill('6');
+    await check(page, 'ricetta bianca ripetibile', true);
+    await page.getByRole('button', { name: 'Ricomincia' }).click();
   });
 
   it('scheda della terapia con lo storico delle prescrizioni (D65)', async () => {
@@ -438,7 +474,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     );
     await check(page, 'cartelle aperte', true);
     // Dalla scheda si torna alla ricetta lasciata a metà, con la riga ancora lì.
-    await bar.getByRole('link', { name: new RegExp(lastName) }).click();
+    // Etichetta esatta: cognome e nome all'inizio. I nomi inventati cambiano a ogni giro e un
+    // altro paziente può avere lo stesso nome come cognome (o viceversa).
+    const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await bar
+      .getByRole('link', {
+        name: new RegExp(`^${escape(lastName)} ${escape(firstName)}(?![\\p{L}'])`, 'u'),
+      })
+      .click();
     await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
     await page.locator('.riga-ricetta').filter({ hasText: '14 compresse' }).waitFor();
     // Chiudere una scheda non tocca le altre.
@@ -588,6 +631,81 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     const res = await page.request.get(`${base}/api/esportazione?formato=json`);
     expect(res.status()).toBe(200);
     expect((await res.json()).formato).toBe('mmg-esportazione');
+  });
+
+  it('credenziali dei servizi: mai rilette; codice di sessione revocato, chiesto e attivato (D100–D102)', async () => {
+    await page.goto(base);
+    await page.locator('.utente').getByRole('link', { name: 'Credenziali' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Credenziali dei servizi' }).waitFor();
+    const rupar = page.getByRole('region', { name: 'RUPAR Piemonte' });
+    await rupar.getByText(/Impostate: utente/).waitFor();
+    // Le credenziali salvate non tornano nei campi.
+    await expect(rupar.getByLabel('Password', { exact: true }).inputValue()).resolves.toBe('');
+    await expect(rupar.getByLabel('PIN', { exact: true }).inputValue()).resolves.toBe('');
+    await check(page, 'credenziali dei servizi', true);
+    await rupar.getByRole('button', { name: 'Revoca il codice' }).click();
+    await rupar.getByText('Non attivo: serve per mandare le ricette.').waitFor();
+    // La pagina Oggi avvisa e porta alla pagina giusta.
+    await page
+      .getByRole('navigation', { name: 'Sezioni' })
+      .getByRole('link', { name: 'Oggi' })
+      .click();
+    await page
+      .getByText('Codice di sessione RUPAR Piemonte non attivo: serve per mandare le ricette.')
+      .waitFor();
+    await check(page, 'oggi con gli avvisi dei servizi');
+    await page.getByRole('link', { name: 'Apri «Credenziali dei servizi»' }).click();
+    await rupar.getByRole('button', { name: 'Chiedi il codice' }).click();
+    await rupar.getByText(/Ambiente di prova/).waitFor();
+    await rupar.getByRole('button', { name: 'Attiva' }).click();
+    await rupar.getByText(/^Attivo fino a/).waitFor();
+  });
+
+  it('certificato di malattia: compilato, controllato, inviato; copia in PDF e continuazione (tappa 8)', async () => {
+    // Lavoratore adulto con la residenza in anagrafica (dati inventati).
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .update(patient)
+        .set({
+          birthDate: '1980-05-05',
+          residenceStreet: 'Via di Prova',
+          residenceNumber: '',
+          residencePostalCode: '10121',
+          residenceTown: 'Torino',
+          residenceProvince: 'TO',
+        })
+        .where(eq(patient.id, s.richPatient)),
+    );
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page.getByRole('link', { name: 'Certificati' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
+    await page.getByRole('button', { name: 'Nuovo certificato' }).click();
+    const end = studioDate(new Date(s.clock.now().getTime() + 2 * 86_400_000));
+    await page.getByLabel('Prognosi a tutto il').fill(end);
+    await page.getByLabel('Codice ICD-9-CM').fill('487.1');
+    await page.getByLabel('Diagnosi', { exact: true }).fill('Sindrome influenzale di prova');
+    await expect(
+      page
+        .getByRole('group', { name: 'Residenza o domicilio abituale' })
+        .getByLabel('Via o piazza')
+        .inputValue(),
+    ).resolves.toBe('Via di Prova');
+    await page.getByRole('button', { name: 'Salva e controlla' }).click();
+    await page.getByText('Nessun problema nei controlli: si può inviare.').waitFor();
+    await check(page, 'modulo del certificato', true);
+    await page.getByRole('button', { name: 'Firma e invia all’INPS' }).click();
+    const card = page.locator('.scheda-certificato').filter({ hasText: 'Inviato' }).first();
+    await card.getByText(/protocollo SIM\d+/).waitFor();
+    const href = await card
+      .getByRole('link', { name: 'Copia per il lavoratore (PDF)' })
+      .getAttribute('href');
+    const res = await page.request.get(`${base}${href}`);
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toBe('application/pdf');
+    await card.getByRole('button', { name: 'Continuazione' }).click();
+    await page.getByText('Continuazione preparata: è tra le bozze.').waitFor();
+    await page.locator('.scheda-certificato').filter({ hasText: 'Bozza' }).first().waitFor();
+    await check(page, 'elenco dei certificati', true);
   });
 
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {

@@ -7,6 +7,8 @@ import type {
   SendResult,
   StatusResult,
 } from './prescription-gateway';
+import { authShapeProblem, type ServiceAuth, type SimulatedSecondFactor } from './service-auth';
+import { simulatedWhiteReminderPdf } from './simulated-documents';
 
 export type SimulatedOutcome = 'accepted' | 'rejected' | 'unreachable' | 'timeout';
 
@@ -20,6 +22,15 @@ export interface SimulatorOptions {
    * annullata se è stata annullata qui.
    */
   decideStatus?: (nre: string) => DispensingState | 'unreachable' | 'timeout';
+  /** Ricetta SSN accettata ma senza codice di autenticazione: per provare che il promemoria non esce. */
+  omitAuthCode?: (message: PrescriptionMessage) => boolean;
+  /** Attesa prima della risposta, per provare il tempo massimo di attesa. */
+  delayMs?: number;
+  /**
+   * Secondo fattore: se c'è, ogni chiamata deve portare un Id-Sessione valido per quel
+   * simulatore (D102). Senza, il simulatore controlla solo la forma delle credenziali.
+   */
+  sessions?: SimulatedSecondFactor;
 }
 
 /**
@@ -33,47 +44,106 @@ export class SimulatedGateway implements PrescriptionGateway {
   private readonly issued = new Map<string, { cancelled: boolean }>();
   /** Messaggi ricevuti, per le prove. */
   readonly received: PrescriptionMessage[] = [];
+  /** Con quali credenziali: solo l'utente e l'Id-Sessione, mai password e PIN. */
+  readonly receivedAuth: { username: string; sessionId: string | null }[] = [];
 
   constructor(
     readonly system: GatewaySystem,
     private readonly options: SimulatorOptions = {},
   ) {}
 
-  send(message: PrescriptionMessage): Promise<SendResult> {
+  /** Rifiuto per credenziali o secondo fattore, come farebbe il servizio vero. */
+  private authRefusal(auth: ServiceAuth) {
+    const shape = authShapeProblem(auth);
+    if (shape)
+      return {
+        outcome: 'rejected' as const,
+        ...shape,
+        authProblem: 'credentials' as const,
+        raw: { simulatore: this.system, esito: 'credenziali' },
+      };
+    if (this.options.sessions && !this.options.sessions.isValid(auth.sessionId))
+      return {
+        outcome: 'rejected' as const,
+        code: 'ID_SESSIONE',
+        message: 'Id-Sessione mancante, scaduto o revocato (simulato)',
+        authProblem: 'session' as const,
+        raw: { simulatore: this.system, esito: 'secondo fattore' },
+      };
+    return null;
+  }
+
+  async send(message: PrescriptionMessage, auth: ServiceAuth): Promise<SendResult> {
     this.received.push(message);
+    this.receivedAuth.push({ username: auth?.username ?? '', sessionId: auth?.sessionId ?? null });
+    if (this.options.delayMs) await new Promise((ok) => setTimeout(ok, this.options.delayMs));
+    const refused = this.authRefusal(auth);
+    if (refused) return refused;
     const outcome = this.options.decide?.(message) ?? 'accepted';
     switch (outcome) {
       case 'accepted': {
         this.counter += 1;
         const nre = `SIM${this.system === 'sar' ? 'R' : 'B'}${String(this.counter).padStart(12, '0')}`;
         this.issued.set(nre, { cancelled: false });
-        return Promise.resolve({ outcome, nre, raw: { simulatore: this.system, nre } });
+        if (this.system === 'sar') {
+          // Codice di autenticazione di fantasia, riconoscibile come i numeri del simulatore.
+          const authCode = this.options.omitAuthCode?.(message)
+            ? null
+            : `SIMAUT${String(this.counter).padStart(24, '0')}`;
+          return {
+            outcome,
+            nre,
+            authCode,
+            doctorName: message.doctor.name,
+            raw: { simulatore: this.system, nre, codAutenticazione: authCode },
+          };
+        }
+        const pinNrbe = `S${String(this.counter % 10000).padStart(4, '0')}`;
+        const reminderPdf = await simulatedWhiteReminderPdf({
+          nrbe: nre,
+          pinNrbe,
+          patientFiscalCode: message.patientFiscalCode,
+          compiledAt: message.compiledAt,
+          lines: message.lines,
+        });
+        return {
+          outcome,
+          nre,
+          pinNrbe,
+          reminderPdf,
+          // Il PDF non entra nel registro degli invii: lì basta sapere che c'era e quanto pesa.
+          raw: {
+            simulatore: this.system,
+            nre,
+            pinNrbe,
+            pdfPromemoria: { byte: reminderPdf.length },
+          },
+        };
       }
       case 'rejected':
-        return Promise.resolve({
+        return {
           outcome,
           code: 'SIM-001',
           message: 'Simulatore: ricetta rifiutata per prova',
           raw: { simulatore: this.system, esito: 'rifiutata' },
-        });
+        };
       case 'unreachable':
-        return Promise.resolve({
-          outcome,
-          message: `${this.label()} non raggiungibile (simulato)`,
-        });
+        return { outcome, message: `${this.label()} non raggiungibile (simulato)` };
       case 'timeout':
-        return Promise.resolve({
-          outcome,
-          message: `${this.label()}: nessuna risposta in tempo (simulato)`,
-        });
+        return { outcome, message: `${this.label()}: nessuna risposta in tempo (simulato)` };
     }
   }
 
-  cancel(input: {
-    nre: string;
-    reason: string;
-    doctor: PrescriptionMessage['doctor'];
-  }): Promise<CancelResult> {
+  cancel(
+    input: {
+      nre: string;
+      reason: string;
+      doctor: PrescriptionMessage['doctor'];
+    },
+    auth: ServiceAuth,
+  ): Promise<CancelResult> {
+    const refused = this.authRefusal(auth);
+    if (refused) return Promise.resolve(refused);
     const outcome = this.options.decideCancel?.(input.nre) ?? 'accepted';
     if (outcome === 'unreachable' || outcome === 'timeout') {
       return Promise.resolve({ outcome, message: `${this.label()} non raggiungibile (simulato)` });
@@ -94,7 +164,12 @@ export class SimulatedGateway implements PrescriptionGateway {
     });
   }
 
-  status(input: { nre: string; doctor: PrescriptionMessage['doctor'] }): Promise<StatusResult> {
+  status(
+    input: { nre: string; doctor: PrescriptionMessage['doctor'] },
+    auth: ServiceAuth,
+  ): Promise<StatusResult> {
+    const refused = this.authRefusal(auth);
+    if (refused) return Promise.resolve(refused);
     const known = this.issued.get(input.nre);
     const decided = this.options.decideStatus?.(input.nre);
     if (decided === 'unreachable' || decided === 'timeout') {

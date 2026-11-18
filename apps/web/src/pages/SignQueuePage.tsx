@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { dateTime, PRESCRIPTION_KIND } from '../lib/format';
 import { useSession } from '../lib/session';
@@ -89,7 +90,9 @@ function Queue({
 }) {
   const queue = useApi<{ pazienti: QueueGroup[] }>(path);
   // Le ricette inviate escono dalla coda: la conferma con l'NRE resta qui sopra.
-  const [sent, setSent] = useState<{ who: string; nre: string }[]>([]);
+  const [sent, setSent] = useState<
+    { who: string; nre: string; id: string; patientId: string; kind: string }[]
+  >([]);
   if (queue.loading && !queue.data) return <Loading what="ricette" />;
   if (!queue.data) return <ErrorMessage error={queue.error} />;
   const groups = queue.data.pazienti;
@@ -100,6 +103,7 @@ function Queue({
           <Notice kind="fatto">
             Ricetta inviata per {x.who}. NRE <span className="codice">{x.nre}</span>
           </Notice>
+          <ReminderPanel prescriptionId={x.id} patientId={x.patientId} kind={x.kind} />
         </li>
       ))}
     </ul>
@@ -133,7 +137,13 @@ function Queue({
                     if (newStatus === 'sent' && nre) {
                       setSent((xs) => [
                         ...xs,
-                        { who: `${g.paziente.nome} ${g.paziente.cognome}`, nre },
+                        {
+                          who: `${g.paziente.nome} ${g.paziente.cognome}`,
+                          nre,
+                          id: r.id,
+                          patientId: g.paziente.id,
+                          kind: r.tipo,
+                        },
                       ]);
                     }
                     queue.reload();

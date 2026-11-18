@@ -43,10 +43,14 @@ const ALLOWED: Record<string, PrescriptionStatus> = {
   'error|cancel|timeout': 'cancelled',
   'sent|cancel|': 'cancelled',
   'error|print_paper|unreachable': 'paper',
+  // Credenziali o secondo fattore rifiutati (D102): si rimanda o si corregge, niente ricetta rossa.
+  'error|edit|auth': 'draft',
+  'error|start_sending|auth': 'sending',
+  'error|cancel|auth': 'cancelled',
 };
 
 describe('ciclo della ricetta', () => {
-  const errorKinds: (SendErrorKind | '')[] = ['', 'rejected', 'unreachable', 'timeout'];
+  const errorKinds: (SendErrorKind | '')[] = ['', 'rejected', 'unreachable', 'timeout', 'auth'];
   const cases = PRESCRIPTION_STATUSES.flatMap((s) =>
     EVENTS.flatMap((e) => errorKinds.map((k) => [s, e, k] as const)),
   ).filter(([s, , k]) => k === '' || s === 'error');

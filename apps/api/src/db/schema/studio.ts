@@ -8,6 +8,11 @@ export const studio = pgTable('studio', {
   id: uuid().primaryKey().defaultRandom(),
   name: text().notNull(),
   address: text(),
+  /**
+   * Regione o provincia autonoma per l'intestazione del promemoria («SERVIZIO SANITARIO
+   * NAZIONALE – REGIONE …», DM 2 novembre 2011, allegato 2, campo 1), es. «PIEMONTE».
+   */
+  regionName: text(),
   kind: studioKind().notNull().default('single'),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   /**

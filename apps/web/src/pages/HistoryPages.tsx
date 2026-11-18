@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader, type RuleIssue } from '../components/common';
 import { Icon } from '../components/Icon';
+import { ReminderPanel } from '../components/ReminderPanel';
 import { api, ApiError, query } from '../lib/api';
 import { useSession } from '../lib/session';
 import {
@@ -180,14 +181,36 @@ function DispensingControl({
 const OUTCOME: Record<string, string> = { superato: 'superato', bloccato: 'bloccato' };
 
 /** Tabella dello storico: una riga per ogni ricetta che contiene il farmaco o la prestazione. */
+/** Il pannello del promemoria si apre a richiesta: aperto per ogni riga leggerebbe troppo. */
+function ReminderToggle({
+  prescriptionId,
+  patientId,
+  kind,
+}: {
+  prescriptionId: string;
+  patientId: string;
+  kind: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return open ? (
+    <ReminderPanel prescriptionId={prescriptionId} patientId={patientId} kind={kind} />
+  ) : (
+    <button type="button" className="pulsante" onClick={() => setOpen(true)}>
+      <Icon name="stampa" /> <span>Promemoria…</span>
+    </button>
+  );
+}
+
 function HistoryTable({
   history,
   kind,
   onChange,
+  patientId,
 }: {
   history: History;
   kind: 'farmaco' | 'prestazione';
   onChange: () => void;
+  patientId: string;
 }) {
   if (history.voci.length === 0) return <p className="tenue">Nessuna prescrizione finora.</p>;
   return (
@@ -237,7 +260,10 @@ function HistoryTable({
                   </div>
                 )}
                 {r.stato === 'sent' && (
-                  <DispensingControl prescriptionId={r.id} onChange={onChange} />
+                  <>
+                    <DispensingControl prescriptionId={r.id} onChange={onChange} />
+                    <ReminderToggle prescriptionId={r.id} patientId={patientId} kind={r.tipo} />
+                  </>
                 )}
                 {r.errore && <div>Errore: {r.errore}</div>}
               </td>
@@ -654,7 +680,12 @@ export function TherapyPage() {
                 <> · inviate e poi annullate: {history.data.annullateUltimi12Mesi}</>
               )}
             </p>
-            <HistoryTable history={history.data} kind="farmaco" onChange={history.reload} />
+            <HistoryTable
+              history={history.data}
+              kind="farmaco"
+              onChange={history.reload}
+              patientId={id!}
+            />
           </>
         )}
       </section>
@@ -704,7 +735,12 @@ export function ServiceHistoryPage() {
                 <> · inviata e poi annullata: {history.data.annullateUltimi12Mesi}</>
               )}
             </p>
-            <HistoryTable history={history.data} kind="prestazione" onChange={history.reload} />
+            <HistoryTable
+              history={history.data}
+              kind="prestazione"
+              onChange={history.reload}
+              patientId={id!}
+            />
           </>
         )}
       </section>

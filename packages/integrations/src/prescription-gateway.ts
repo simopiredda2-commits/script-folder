@@ -9,6 +9,7 @@
  */
 
 import type { DispensingState } from '@mmg/domain';
+import type { AuthProblem, ServiceAuth } from './service-auth';
 
 export type GatewaySystem = 'sar' | 'sistema_ts';
 
@@ -22,6 +23,12 @@ export interface PrescriptionLineMessage {
   aifaNote?: string | null;
   notSubstitutable?: boolean;
   notSubstitutableReason?: string | null;
+  /**
+   * Ricetta bianca ripetibile: quante volte e per quanti mesi, solo se diverso dalla regola del
+   * farmaco (Disciplinare tecnico della ricetta bianca, 1/12/2022: numRipetibilita, validitaFarm).
+   */
+  repeatCount?: number | null;
+  validityMonths?: number | null;
 }
 
 export interface PrescriptionMessage {
@@ -35,13 +42,43 @@ export interface PrescriptionMessage {
   priority?: 'U' | 'B' | 'D' | 'P' | null;
   accessType?: 'first' | 'subsequent' | null;
   diagnosticQuestion?: string | null;
+  /**
+   * Su richiesta del paziente, cognome, nome e indirizzo oscurati all'erogatore e sul promemoria
+   * (specifiche del Sistema TS, prescrizione, 5/12/2024: oscuramDati).
+   */
+  obscured?: boolean;
   lines: PrescriptionLineMessage[];
   compiledAt: string;
 }
 
+/**
+ * Ricetta accettata. Per la ricetta SSN il SAC, anche tramite il SAR, restituisce il codice di
+ * autenticazione: senza, la ricetta non è valida e il promemoria non si può dare (specifiche del
+ * Sistema TS, prescrizione, 5/12/2024). Per la ricetta bianca il SAC restituisce PIN-NRBE e il PDF
+ * del promemoria, l'unico che il medico può rilasciare (Disciplinare tecnico, 1/12/2022).
+ */
+export interface AcceptedSend {
+  outcome: 'accepted';
+  /** NRE (ricetta SSN) o NRBE (ricetta bianca). */
+  nre: string;
+  authCode?: string | null;
+  /** Cognome e nome del medico come li restituisce il SAC, da stampare sul promemoria. */
+  doctorName?: string | null;
+  pinNrbe?: string | null;
+  reminderPdf?: Uint8Array | null;
+  raw: unknown;
+}
+
 export type SendResult =
-  | { outcome: 'accepted'; nre: string; raw: unknown }
-  | { outcome: 'rejected'; code: string; message: string; raw: unknown }
+  | AcceptedSend
+  | {
+      outcome: 'rejected';
+      code: string;
+      message: string;
+      /** Rifiuto per credenziali o secondo fattore: la ricetta è giusta, l'accesso no. */
+      authProblem?: AuthProblem;
+      raw: unknown;
+    }
   /** Il sistema non risponde: la ricetta certamente non è arrivata. */
   | { outcome: 'unreachable'; message: string }
   /** Nessuna risposta entro il tempo: non si sa se è arrivata. */
@@ -49,7 +86,13 @@ export type SendResult =
 
 export type CancelResult =
   | { outcome: 'accepted'; raw: unknown }
-  | { outcome: 'rejected'; code: string; message: string; raw: unknown }
+  | {
+      outcome: 'rejected';
+      code: string;
+      message: string;
+      authProblem?: AuthProblem;
+      raw: unknown;
+    }
   | { outcome: 'unreachable'; message: string }
   | { outcome: 'timeout'; message: string };
 
@@ -59,7 +102,13 @@ export type CancelResult =
  */
 export type StatusResult =
   | { outcome: 'ok'; state: DispensingState; raw: unknown }
-  | { outcome: 'rejected'; code: string; message: string; raw: unknown }
+  | {
+      outcome: 'rejected';
+      code: string;
+      message: string;
+      authProblem?: AuthProblem;
+      raw: unknown;
+    }
   | { outcome: 'unreachable'; message: string }
   | { outcome: 'timeout'; message: string };
 
@@ -67,14 +116,21 @@ export interface PrescriptionGateway {
   readonly system: GatewaySystem;
   /** Ambiente: un adattatore vero dichiara «collaudo» o «produzione». */
   readonly environment: 'simulator' | 'test' | 'production';
-  send(message: PrescriptionMessage): Promise<SendResult>;
-  cancel(input: {
-    nre: string;
-    reason: string;
-    doctor: PrescriptionMessage['doctor'];
-  }): Promise<CancelResult>;
+  /** Le credenziali del medico che firma passano a parte: non entrano nel messaggio conservato. */
+  send(message: PrescriptionMessage, auth: ServiceAuth): Promise<SendResult>;
+  cancel(
+    input: {
+      nre: string;
+      reason: string;
+      doctor: PrescriptionMessage['doctor'];
+    },
+    auth: ServiceAuth,
+  ): Promise<CancelResult>;
   /** Che cosa ne è stato della ricetta: presa in carico, prenotata, erogata… */
-  status(input: { nre: string; doctor: PrescriptionMessage['doctor'] }): Promise<StatusResult>;
+  status(
+    input: { nre: string; doctor: PrescriptionMessage['doctor'] },
+    auth: ServiceAuth,
+  ): Promise<StatusResult>;
 }
 
 /** Il sistema a cui va ogni tipo di ricetta. */

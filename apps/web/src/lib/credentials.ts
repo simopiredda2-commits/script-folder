@@ -1,0 +1,68 @@
+/** Credenziali dei servizi del medico e codice di sessione (D100–D102). */
+
+export interface ServiceStatus {
+  servizio: 'sistema-ts' | 'rupar';
+  nome: string;
+  uso: string;
+  impostate: boolean;
+  /** Solo le ultime tre lettere dell'utente: le credenziali non si rileggono. */
+  utente: string | null;
+  passwordCambiataIl: string | null;
+  scadenzaPassword: string | null;
+  statoPassword: 'valida' | 'in_scadenza' | 'scaduta' | 'senza_scadenza' | null;
+  aggiornateIl: string | null;
+  secondoFattore: boolean;
+  sessione: { attiva: boolean; scadeIl: string | null };
+  ambiente: 'simulator' | 'test' | 'production';
+}
+
+export interface CredentialsStatus {
+  servizi: ServiceStatus[];
+}
+
+export const CREDENTIALS_PATH = '/profilo/credenziali';
+
+const CREDENTIAL_ERROR_CODES = new Set([
+  'CREDENZIALI_MANCANTI',
+  'CREDENZIALI_RIFIUTATE',
+  'SESSIONE_MANCANTE',
+  'SESSIONE_SCADUTA',
+]);
+
+/** L'errore si risolve nella pagina delle credenziali? */
+export function isCredentialError(details: unknown): boolean {
+  const code = (details as { codice?: unknown } | null | undefined)?.codice;
+  return typeof code === 'string' && CREDENTIAL_ERROR_CODES.has(code);
+}
+
+/** Che cosa manca, servizio per servizio: per la pagina Oggi. */
+export function credentialAlerts(
+  servizi: ServiceStatus[],
+): { kind: 'avviso' | 'errore'; text: string }[] {
+  const alerts: { kind: 'avviso' | 'errore'; text: string }[] = [];
+  for (const s of servizi) {
+    if (!s.impostate) {
+      alerts.push({
+        kind: 'avviso',
+        text: `Mancano le credenziali ${s.nome} (${s.uso.toLowerCase()}).`,
+      });
+      continue;
+    }
+    if (s.statoPassword === 'scaduta')
+      alerts.push({
+        kind: 'errore',
+        text: `La password ${s.nome} risulta scaduta: cambiala e inseriscila di nuovo.`,
+      });
+    else if (s.statoPassword === 'in_scadenza')
+      alerts.push({
+        kind: 'avviso',
+        text: `La password ${s.nome} scade a breve: cambiala per tempo.`,
+      });
+    if (s.secondoFattore && !s.sessione.attiva)
+      alerts.push({
+        kind: 'avviso',
+        text: `Codice di sessione ${s.nome} non attivo: serve per mandare le ricette.`,
+      });
+  }
+  return alerts;
+}

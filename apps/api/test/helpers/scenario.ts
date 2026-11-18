@@ -1,8 +1,11 @@
-import { randomBytes } from 'node:crypto';
-import type { Role } from '@mmg/domain';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { buildFiscalCode, type Role } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
+import { SimulatedSecondFactor } from '@mmg/integrations';
 import type { FastifyInstance } from 'fastify';
 import { buildApp, type AppDeps } from '../../src/app';
+import { storeCredentials, storeSession } from '../../src/credentials/service';
+import { studioDate } from '../../src/prescriptions/rules-check';
 import type { Database } from '../../src/db/client';
 import {
   allergyDetail,
@@ -15,6 +18,7 @@ import {
   exemption,
   patient,
   prescription,
+  sickLeaveCertificate,
   prescriptionLine,
   problemDetail,
   studio,
@@ -57,8 +61,14 @@ export interface Scenario {
   richPatient: string;
   /** Bozza di ricetta del paziente ricco. */
   draftPrescription: string;
+  /** Bozza di certificato di malattia del paziente ricco. */
+  draftCertificate: string;
   /** Codici TOTP: il segreto di ogni utente dopo l'attivazione. */
   secrets: Map<string, Buffer>;
+  /** Chiave dell'applicazione delle prove (credenziali cifrate). */
+  encryptionKey: Buffer;
+  /** Simulatori del secondo fattore (D102). */
+  secondFactor: NonNullable<AppDeps['secondFactor']>;
 }
 
 /**
@@ -68,12 +78,30 @@ export interface Scenario {
 export async function createScenario(
   db: Database,
   settings: Partial<typeof studio.$inferInsert> = {},
-  appOptions: Pick<AppDeps, 'gateways' | 'preSendChecks'> = {},
+  appOptions: Pick<
+    AppDeps,
+    | 'gateways'
+    | 'preSendChecks'
+    | 'reminderSender'
+    | 'sendTimeoutMs'
+    | 'secondFactor'
+    | 'sickLeaveGateway'
+  > = {},
 ): Promise<Scenario> {
   const clock = new Clock();
+  const encryptionKey = randomBytes(32);
+  const secondFactor = appOptions.secondFactor ?? {
+    sistema_ts: new SimulatedSecondFactor('sistema_ts', { now: clock.now }),
+    rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now: clock.now }),
+  };
   const [st] = await db
     .insert(studio)
-    .values({ name: 'Studio associato di prova', kind: 'group', ...settings })
+    .values({
+      name: 'Studio associato di prova',
+      kind: 'group',
+      regionName: 'PIEMONTE',
+      ...settings,
+    })
     .returning();
   const studioId = st!.id;
   const passwordHash = await hashPassword(PASSWORD);
@@ -94,10 +122,59 @@ export async function createScenario(
     sostituto: await mk('sostituto', 'Dott. Marco Fiore', ['substitute_doctor']),
     amministratore: await mk('amministratore', 'Andrea Conti', ['administrator']),
   };
+  // Codici fiscali inventati: luogo di nascita con la X, che nessun comune ha (D12).
+  const doctorCf = (surname: string, name: string, sex: 'M' | 'F') =>
+    buildFiscalCode({ surname, name, birthDate: '1970-01-01', sex, placeCode: 'X001' });
   await db.insert(doctorProfile).values([
-    { userId: users.titolare.id, regionalCode: 'MMG-PROVA-1', asl: 'ASL di prova' },
-    { userId: users.collega.id, regionalCode: 'MMG-PROVA-2', asl: 'ASL di prova' },
+    {
+      userId: users.titolare.id,
+      regionalCode: 'MMG-PROVA-1',
+      asl: 'ASL di prova',
+      fiscalCode: doctorCf('Marchi', 'Elena', 'F'),
+    },
+    {
+      userId: users.collega.id,
+      regionalCode: 'MMG-PROVA-2',
+      asl: 'ASL di prova',
+      fiscalCode: doctorCf('Serra', 'Paolo', 'M'),
+    },
+    {
+      userId: users.sostituto.id,
+      regionalCode: 'MMG-PROVA-3',
+      asl: 'ASL di prova',
+      fiscalCode: doctorCf('Fiore', 'Marco', 'M'),
+    },
   ]);
+  // Credenziali inventate e un codice di sessione lungo, per le prove che non riguardano le
+  // credenziali (D100–D102). Le prove delle credenziali partono da medici senza.
+  const sessionUntil = new Date(clock.now().getTime() + 365 * 86_400_000);
+  for (const [who, cf] of [
+    [users.titolare, doctorCf('Marchi', 'Elena', 'F')],
+    [users.collega, doctorCf('Serra', 'Paolo', 'M')],
+    [users.sostituto, doctorCf('Fiore', 'Marco', 'M')],
+  ] as const) {
+    for (const service of ['sistema_ts', 'rupar_piemonte'] as const) {
+      await storeCredentials(db, encryptionKey, {
+        userId: who.id,
+        service,
+        secret: {
+          username: `${service}-${who.username}`,
+          password: 'parola-di-prova',
+          pin: '0000',
+        },
+        passwordChangedOn: studioDate(clock.now()),
+      });
+      const token = randomUUID();
+      await storeSession(db, encryptionKey, {
+        userId: who.id,
+        service,
+        token,
+        validUntil: sessionUntil,
+      });
+      const gw = secondFactor[service];
+      if (gw instanceof SimulatedSecondFactor) gw.register(token, cf, sessionUntil);
+    }
+  }
 
   const [a1] = await db
     .insert(archive)
@@ -231,12 +308,35 @@ export async function createScenario(
     });
     return rows;
   });
+  const [certificate] = await withActor(db, users.titolare.id, (tx) =>
+    tx
+      .insert(sickLeaveCertificate)
+      .values({
+        patientId: rich,
+        archiveId: a1!.id,
+        preparedBy: users.titolare.id,
+        type: 'I',
+        visit: 'A',
+        releaseDate: studioDate(clock.now()),
+        startDate: studioDate(clock.now()),
+        endDate: studioDate(clock.now()),
+        residence: {
+          street: 'Via di Prova',
+          number: '1',
+          postalCode: '10100',
+          town: 'Torino',
+          province: 'TO',
+        },
+      })
+      .returning({ id: sickLeaveCertificate.id }),
+  );
 
   const app = buildApp({
     db,
-    config: { encryptionKey: randomBytes(32), sessionMaxHours: 12, cookieSecure: false },
+    config: { encryptionKey, sessionMaxHours: 12, cookieSecure: false },
     now: clock.now,
     ...appOptions,
+    secondFactor,
   });
   return {
     db,
@@ -248,7 +348,10 @@ export async function createScenario(
     patients: { titolare: p1, collega: p2 },
     richPatient: rich,
     draftPrescription: draft!.id,
+    draftCertificate: certificate!.id,
     secrets: new Map(),
+    encryptionKey,
+    secondFactor,
   };
 }
 

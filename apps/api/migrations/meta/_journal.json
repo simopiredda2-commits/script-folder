@@ -57,6 +57,27 @@
       "when": 1794994948070,
       "tag": "0007_stato_erogazione",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795000681515,
+      "tag": "0008_promemoria",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795003277939,
+      "tag": "0009_credenziali_dei_servizi",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795004502741,
+      "tag": "0010_certificati",
+      "breakpoints": true
     }
   ]
 }

@@ -8,10 +8,11 @@
  * si attiva al primo accesso.
  */
 import { randomBytes } from 'node:crypto';
-import type { Role } from '@mmg/domain';
+import { buildFiscalCode, type Role } from '@mmg/domain';
 import { generatePatients, Random } from '@mmg/fixtures';
 import { inArray } from 'drizzle-orm';
 import { loadConfig } from '../config';
+import { storeCredentials } from '../credentials/service';
 import { startOfStudioDay } from '../http/today-routes';
 import { studioDate } from '../prescriptions/rules-check';
 import { hashPassword } from '../security/password';
@@ -103,7 +104,7 @@ try {
 
   const [st] = await db
     .insert(studio)
-    .values({ name: 'Studio medico dimostrativo', kind: 'single' })
+    .values({ name: 'Studio medico dimostrativo', kind: 'single', regionName: 'PIEMONTE' })
     .returning();
   const passwords = new Map<string, string>();
   const users = new Map<string, string>();
@@ -117,9 +118,52 @@ try {
     users.set(u.username, row!.id);
   }
   const doctorId = users.get('medico')!;
-  await db
-    .insert(doctorProfile)
-    .values({ userId: doctorId, regionalCode: 'DEMO-0001', asl: 'ASL dimostrativa' });
+  await db.insert(doctorProfile).values({
+    userId: doctorId,
+    regionalCode: 'DEMO-0001',
+    asl: 'ASL dimostrativa',
+    // Inventato: luogo di nascita con la X, che nessun comune ha (D12).
+    fiscalCode: buildFiscalCode({
+      surname: 'Marchi',
+      name: 'Elena',
+      birthDate: '1970-01-01',
+      sex: 'F',
+      placeCode: 'X001',
+    }),
+  });
+  // Anche il sostituto firma a nome suo: gli serve il profilo con il codice fiscale (inventato).
+  await db.insert(doctorProfile).values({
+    userId: users.get('sostituto')!,
+    regionalCode: 'DEMO-0002',
+    asl: 'ASL dimostrativa',
+    fiscalCode: buildFiscalCode({
+      surname: 'Fiore',
+      name: 'Marco',
+      birthDate: '1970-01-01',
+      sex: 'M',
+      placeCode: 'X001',
+    }),
+  });
+  // Credenziali dei servizi inventate (D100): i simulatori ne controllano solo la forma. La
+  // password RUPAR del medico risulta cambiata 80 giorni fa, per mostrare l'avviso di scadenza.
+  const daysAgo = (n: number) => studioDate(new Date(Date.now() - n * 86_400_000));
+  for (const [username, ruparChangedOn] of [
+    ['medico', daysAgo(80)],
+    ['sostituto', daysAgo(0)],
+  ] as const) {
+    for (const service of ['sistema_ts', 'rupar_piemonte'] as const) {
+      await storeCredentials(db, config.encryptionKey, {
+        userId: users.get(username)!,
+        service,
+        secret: {
+          username: `${service === 'sistema_ts' ? 'TS' : 'RUPAR'}-DEMO-${username.toUpperCase()}`,
+          password: randomBytes(12).toString('base64url'),
+          pin: String(randomBytes(2).readUInt16BE() % 10_000).padStart(4, '0'),
+        },
+        passwordChangedOn: service === 'rupar_piemonte' ? ruparChangedOn : daysAgo(0),
+      });
+    }
+  }
   const [arc] = await db
     .insert(archive)
     .values({ studioId: st!.id, ownerUserId: doctorId, name: 'Archivio della Dott.ssa Marchi' })

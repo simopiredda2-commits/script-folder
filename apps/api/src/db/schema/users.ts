@@ -50,17 +50,20 @@ export const appUser = pgTable(
   (t) => [uniqueIndex('app_user_username_key').on(t.username)],
 );
 
-/** Profilo del medico: codice regionale, ASL, intestazioni, timbro, credenziali esterne cifrate. */
+/**
+ * Profilo del medico: codice regionale, ASL, intestazioni, timbro. Le credenziali dei servizi
+ * esterni stanno in `service_credential` (D100).
+ */
 export const doctorProfile = pgTable('doctor_profile', {
   userId: uuid()
     .primaryKey()
     .references(() => appUser.id),
   regionalCode: text(),
+  /** Codice fiscale del medico: va sul promemoria (DM 2 novembre 2011, allegato 2, campo 20). */
+  fiscalCode: text(),
   asl: text(),
   headerText: text(),
   stampText: text(),
-  /** Credenziali verso Sistema TS e Regione, cifrate. Mai in chiaro. */
-  externalCredentialsEnc: bytea(),
 });
 
 /** Archivio dei pazienti di un medico titolare. In medicina di gruppo ce n'è uno per titolare. */

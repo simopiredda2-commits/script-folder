@@ -35,7 +35,7 @@ Separatore **punto e virgola** e codifica **UTF-8 con BOM**, perché un foglio d
 
 ## Che cosa non c'è, apposta
 
-Password, segreti del secondo fattore e credenziali verso Sistema TS e Regione: sono dello studio, non dati dei pazienti, e una prova controlla che non escano. Gli allegati sono elencati con nome, tipo e impronta; i file stessi si aggiungeranno quando ci sarà l'archiviazione degli allegati. Le banche dati pubbliche (farmaci, cataloghi, comuni) non sono dati del medico: non entrano nell'esportazione e si riscaricano dalle fonti.
+Password, segreti del secondo fattore, credenziali verso Sistema TS e Regione e codici di sessione (`service_credential`, `service_session`, D100): sono dello studio e del medico, non dati dei pazienti, e una prova controlla che non escano. Gli allegati sono elencati con nome, tipo e impronta; i file stessi si aggiungeranno quando ci sarà l'archiviazione degli allegati. Le banche dati pubbliche (farmaci, cataloghi, comuni) non sono dati del medico: non entrano nell'esportazione e si riscaricano dalle fonti.
 
 ## Garanzie
 
