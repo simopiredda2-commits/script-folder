@@ -9,3 +9,4 @@ export * from './prescriptions';
 export * from './reference';
 export * from './credentials';
 export * from './certificates';
+export * from './followup';

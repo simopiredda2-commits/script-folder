@@ -1,4 +1,5 @@
 import type { ReminderSender } from '@mmg/integrations';
+import { delegationValidOn } from '@mmg/domain';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AccessAction } from '../audit/access-log';
@@ -157,8 +158,7 @@ export function createReminderService(deps: ReminderDeps) {
       .select()
       .from(delegation)
       .where(and(eq(delegation.id, delegationId!), eq(delegation.patientId, pt.id)));
-    const valid =
-      d && !d.revokedOn && d.validFrom <= today && (d.validTo === null || today <= d.validTo);
+    const valid = d && delegationValidOn(d, today);
     if (!valid) throw new HttpError(409, 'La delega non è registrata o non è valida oggi (R16)');
     const to = channel === 'email' ? d.delegateEmail : d.delegatePhone;
     if (!to)

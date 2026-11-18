@@ -328,3 +328,97 @@ Sostituisce la parte di D88 sul solo protocollo. Resta da confermare con il cons
 - tappa 12: condivisione tra i medici dell’AFT che usano il programma.
 
 Con gli altri programmi solo formati pubblici (D104).
+
+## Dopo la terza fermata (18/11/2026)
+
+**D111 · Come è fatto l’accesso con SPID o CIE (D109).**
+
+- **Dove sta la richiesta**: nel database, legata al medico che la avvia, con l’impronta dello state (mai lo state in chiaro) e il code_verifier cifrato. Vale 10 minuti ed è monouso; la Regione dà al codice «qualche minuto».
+- **Identità**: il codice fiscale nel token deve essere quello del medico collegato. Se non lo è, il token si revoca e l’accesso non vale, perché altrimenti si manderebbero ricette a nome di un altro.
+- **Profilo**: serve lo scope `prescrizione` concesso dalla Regione (configuratore regionale).
+- **Token**: senza rinnovo, come chiede la Regione. Nel simulatore vale 8 ore; la durata vera viene dalla risposta, da verificare in collaudo per l’ambiguità di `expires_in`.
+- **Parametri da completare con la Regione**: codice del gestionale (`client_id`) e indirizzo di ritorno registrato (D103). Il simulatore usa `SIMULATORE_000` e un ritorno interno.
+- **Pagina simulata**: servita dal programma solo in simulazione. Chi entra lo dice il programma (`login_hint`, solo per il simulatore); il servizio vero lo ricava da SPID o CIE.
+- **Codice per email**: resta come alternativa, con le credenziali RUPAR.
+
+## Tappa 9 – Voci cliniche dall'interfaccia (18/11/2026)
+
+**D112 · Chi scrive le voci cliniche e che cosa si modifica.** Problemi, allergie, diario, parametri, anamnesi, stili di vita ed esame obiettivo li scrive il medico (permesso «scrivere voci cliniche»: titolare, sostituto o collega con l'autorizzazione attiva); la segreteria no, come nei requisiti. Che cosa si modifica di una voce:
+
+- riservata, oscurata e promemoria;
+- per i problemi: stato attivo o risolto con la data, quesito aperto.
+
+Il testo non si corregge: si annulla la voce con un motivo e se ne scrive una nuova. Così ciò che è stato scritto resta leggibile, oltre che nello storico delle modifiche. I parametri della stessa visita si scrivono insieme, in una sola transazione: un valore sbagliato li ferma tutti.
+
+**D113 · Parametri: unità fisse, solo controlli formali.** Unità di ogni parametro: mmHg, kg, cm, kg/m², mg/dL, %. Si accettano la virgola e il punto, al più due decimali. Controlli: numero maggiore di zero, e la saturazione non oltre 100 (è una percentuale). Nessun intervallo «normale», nessun giudizio sul valore (regola 3, come D71 per gli esami). Il BMI si scrive come valore: calcolarlo dal peso e dall'altezza è un calcolo clinico, che R12 esclude dalla prima versione; è una domanda per la fermata finale. La glicemia solo in mg/dL; altre unità, se servono, con una serie a parte (il grafico non mescola le scale).
+
+**D114 · Codice dei problemi.** ICD-9-CM, facoltativo, nel formato dello schema del Sistema TS già usato per il certificato (D105): stessa regola, un solo controllo. Il programma non ha il catalogo ICD-9-CM, quindi non si cerca per descrizione. Da completare: la tabella ufficiale ICD-9-CM 2007 del Ministero della salute, da importare come le altre banche dati, se Simone e la Dr.ssa Rocca la vogliono.
+
+**D115 · Consensi del Fascicolo come nel DM 7 settembre 2023.** Letto sulla Gazzetta Ufficiale (GU n. 249 del 24/10/2023). Le modifiche dell'11/11/2025 (GU n. 286 del 10/12/2025) toccano gli art. 22 e 27-bis e l'allegato D, non gli art. 8 e 9. Quelle del 30/12/2024 non le ho lette nel testo: secondo il decreto del 2025 hanno inserito l'art. 27-bis. La consultazione da parte di terzi si consente separatamente:
+
+- per cura;
+- per prevenzione, da chi ha in cura il paziente e, a parte, da Regione e Ministero (art. 8, c. 1; art. 16, c. 1 e 2);
+- per profilassi internazionale.
+
+In cartella: un'espressione per riga (dato o negato, con la data e chi l'ha espresso se non è il paziente), revoca con la data, nuovo consenso come riga nuova; in vigore resta l'ultima. Altri consensi con la loro descrizione. Li registra chi gestisce l'anagrafica, segreteria compresa (requisiti, «Utenti e ruoli»). La Regione è titolare della raccolta dei consensi (art. 8, c. 13) e l'Anagrafe consensi e revoche si alimenta tramite INI (art. 8, c. 10): l'invio è un'interfaccia futura (tappa 11), da verificare sulle specifiche.
+
+**D116 · Oscuramento.** Una voce oscurata su richiesta del paziente resta in cartella e chi può leggerla la vede, segnata. Non va nel Fascicolo né ai colleghi dell'AFT (tappe 11 e 12). Il decreto vuole che l'oscuramento si possa chiedere al momento della prestazione o dopo, e revocare (art. 9). Chi alimenta il Fascicolo segnala anche i dati a maggiore tutela dell'anonimato (art. 6, art. 12, c. 4): si costruisce con la tappa 11. L'oscuramento di nome e indirizzo sulla ricetta SSN (tappa 7, `oscuramDati` delle specifiche del Sistema TS) è un'altra cosa e resta com'è.
+
+**D117 · Piani terapeutici dalla cartella.** Si registrano, si modificano (storico delle modifiche) e si annullano con un motivo; i piani non si cancellano. Un piano annullato non vale più per R5 e R6, né nel riepilogo né nella pagina Oggi. Un piano può essere riservato come le terapie: allora lo vede solo il medico, e la segreteria non lo trova nemmeno tra le scadenze. Le regole riconoscono il piano dal codice AIC o dal principio attivo, come prima; il collegamento esplicito dalla scheda della terapia non è nell'interfaccia (da fare se serve).
+
+**D118 · Grafico dei parametri.** Una scala per grafico, mai due assi: sistolica e diastolica insieme (stessa unità), ogni altro parametro nel suo grafico. Colori nei token del marchio, validati con il controllo dei colori dei grafici sul fondo bianco: luce di SCRIPT per la prima serie, magenta `#D55181` per la seconda. Contrasto almeno 3:1, distinti anche per chi confonde i colori; non sono colori di stato. In più la forma del punto (tondo, quadrato), la legenda e il valore in fondo alla linea. Sotto ogni grafico la tabella con gli stessi valori. Il cursore segue il puntatore e le frecce della tastiera. L'interfaccia non ha un tema scuro, quindi il grafico nemmeno.
+
+**D119 · Dettatura vocale del diario: per ora no.** I requisiti chiedono la «dettatura vocale del browser». In Chrome il riconoscimento vocale delle pagine web passa da un servizio in rete del produttore: l'audio viene mandato fuori per essere riconosciuto (documentazione MDN della Web Speech API). Sarebbe contro le regole 7 e 8, perché la voce del medico che detta dati clinici uscirebbe verso un servizio esterno, forse fuori dall'UE. Non è costruita. È una domanda per la fermata finale. Le alternative:
+
+- lasciarla fuori;
+- usare la dettatura del sistema operativo, fuori dal programma e sotto la responsabilità dello studio;
+- cercare un riconoscimento vocale che lavori solo nel browser.
+
+**D120 · Database delle prove che non si cancellano.** A volte, alla fine di un file di prova, Postgres è ancora collegato al database temporaneo per la sua manutenzione automatica, e l'utente delle prove non può interromperlo. La cancellazione allora riprova per qualche secondo, invece di far fallire una prova già passata. Una prova su tre falliva così.
+
+## Tappa 10 – Presidi e seguito delle prestazioni (18/11/2026)
+
+**D121 · Allegati nel database, e nell'esportazione.** I referti (PDF, JPEG o PNG, al più 5 MB) si salvano nel database, non in una cartella a parte: così stanno nei salvataggi e nell'esportazione come il resto. Il tipo si controlla dai primi byte del file, non solo dal nome. Il file si serve con `Content-Security-Policy: sandbox`, quindi niente script. Non si modifica e non si cancella; non ha lo storico delle modifiche (il file intero finirebbe nello storico). Nell'esportazione:
+
+- JSON: sezione `allegati` con il contenuto in base64 e l'impronta;
+- ZIP: i file nella cartella `allegati/`, con l'indice `allegati.csv` e le impronte nel manifesto.
+
+Il limite di 5 MB è una nostra scelta, da rivedere con la Dr.ssa Rocca se i referti scansionati sono più grandi.
+
+**D122 · Seguito delle prestazioni.** Vale per le prestazioni della ricetta specialistica inviata o stampata. Per ogni prestazione si registrano data di esecuzione, struttura, esito e referto. Per i cicli (quantità maggiore di 1) si registrano le sedute, numerate fino a quelle prescritte, una per numero. Lo scrive il medico e lo legge chi legge il diario: l'esito è un dato clinico. Il referto è anche una voce «referto» della cronologia. Si annulla con un motivo, e con l'esecuzione si annulla il suo referto. Controlli: la data non è nel futuro e non viene prima della prescrizione. L'acquisizione dei referti strutturati dal Fascicolo resta da verificare (requisiti, «Esami di laboratorio»).
+
+**D123 · Presidi e assistenza integrativa.** Fonti lette il 18/11/2026:
+
+- DPCM 12/1/2017 sui LEA, art. 10–14 (GU n. 65 del 18/3/2017, S.O. n. 15): dispositivi medici monouso (allegato 2), presidi per diabetici (allegato 3), prodotti dietetici. Le Regioni decidono modalità e quantità massime.
+- Vademecum per i malati cronici sul sito della Regione Piemonte (gennaio 2023, rivisto dalla Direzione Sanità), cap. 6.
+
+Che cosa si registra: categoria, prodotto, codice del nomenclatore (facoltativo), fabbisogno al mese con l'unità, mesi, dal–al; chi prescrive; la prima prescrizione dello specialista; l'indicazione. Il rinnovo riparte dal giorno dopo la fine della precedente, che si conclude; si annulla con un motivo; può essere riservato. Unico controllo di sostanza, dal vademecum: per le medicazioni avanzate la prima prescrizione è dello specialista, e il medico di famiglia le prescrive per al massimo 6 mesi. La fonte è una guida per i cittadini: la regola va verificata sull'atto regionale. I limiti numerici (fabbisogno fino a 9999, fino a 99 mesi) sono solo di formato, come in D93.
+
+Da completare:
+
+- il modulo da consegnare all'ASL: la guida dice che dipende dalle procedure di ciascuna ASL; il decreto parla del ricettario standardizzato del SSN per i monouso;
+- i codici del nomenclatore (allegati 2 e 3), da importare come banca dati;
+- i percorsi dematerializzati (alimenti senza glutine, dispositivi per diabetici con il piano di automonitoraggio glicemico): non ho trovato specifiche pubbliche.
+
+**D124 · Modifiche del 2026 ai LEA da verificare.** La ricerca ha riportato una nota del Ministero della salute: il DPCM 12/1/2017 sarebbe stato integrato e modificato dal DM 3 agosto 2026 e dal DPCM 7 agosto 2026. La pagina del Ministero non si legge in modo automatico (controllo anti-robot), quindi non l'ho verificato. Gli articoli usati (10–14) sono quelli del testo del 2017: prima dell'uso vero vanno confrontati con il testo vigente.
+
+## Risposte della fermata finale del secondo giro (18/11/2026)
+
+Simone ha risposto con il pulsante.
+
+**D125 · Via all'unione della pull request #5** (tappe 9 e 10, SPID o CIE, documento sul Fascicolo).
+
+**D126 · Dettatura vocale del diario: fuori per ora.** Conferma D119. Si riprende quando ci sarà un riconoscimento vocale che non manda l'audio fuori dallo studio.
+
+**D127 · BMI: resta scritto a mano.** Risposta: «Se diventa dispositivo medico no. Se ci sono gli estremi per poterlo fare allora ok. Altrimenti resta da compilare». Ho cercato la fonte: la linea guida europea MDCG 2019-11 (rev. 1 del 2025) e il manuale sui casi di confine. Dalla ricerca risulta che il manuale tratta il calcolo di un punteggio con una formula come un'azione sui dati che va oltre la semplice ricerca (passo 3 della linea guida); gli esempi sono CHA₂DS₂-VASc e Cockcroft-Gault. Non ho trovato un caso sul BMI e non ho letto i testi integrali. Gli estremi non ci sono: il BMI resta da compilare, come oggi. Da riesaminare con il consulente regolatorio sui testi integrali.
+
+**D128 · Via alle tappe 11 e 12.** Prima il Profilo Sanitario Sintetico con un simulatore del Gateway (tappa 11), poi la condivisione tra i medici dell'AFT (tappa 12), con lo stesso metodo: fonti, simulatori, prove e sabotaggi, schermate. Branch `tappe-11-12`, una fermata dopo la tappa 12. Si parte dalle fonti non ancora lette elencate in `docs/fse.md`.
+
+**Medicazioni avanzate (D123)**: resta il blocco oltre i 6 mesi per il medico di famiglia, come deciso; si cambia se Simone lo chiede o se l'atto regionale dice altro.
+
+## Dopo la fermata finale del secondo giro (18/11/2026)
+
+**D129 · Cartelle aperte con molte schede, e quello che si scrive resta per paziente.** Simone ha chiesto se la schermata con più cartelle aperte era provata. Nel browser era provata con due schede. Il limite di 20 era provato solo senza browser, e le pagine delle tappe 9 e 10 non erano provate dentro le schede. La prova nuova, con 21 pazienti inventati, ha trovato due difetti, ora corretti:
+
+- **Scheda attiva fuori vista**: con molte schede la barra scorre, e la scheda del paziente attivo poteva restare fuori dalla parte visibile, soprattutto su tablet. Ora la barra scorre da sola fino alla scheda attiva, anche quando cambia la larghezza dello schermo; la pagina non si sposta.
+- **Scritti persi cambiando paziente**: nelle pagine nuove, e nel certificato di malattia, quello che si stava scrivendo si perdeva passando a un altro paziente e tornando. Ora resta ricordato per paziente come la ricetta e la terapia (D68, D80), nella memoria della scheda del browser, che si svuota all'uscita. Vale per voci cliniche, parametri, piani terapeutici, presidi, consensi, deleghe, seguito delle prestazioni e certificato. Si cancella quando si registra; il file del referto no, perché il browser non lo conserva e va scelto di nuovo.

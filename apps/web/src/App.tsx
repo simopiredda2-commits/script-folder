@@ -5,16 +5,22 @@ import { OpenRecordsProvider } from './lib/openRecords';
 import { SessionProvider, useSession } from './lib/session';
 import { DataSearchPage } from './pages/DataSearchPage';
 import { ExamsPage } from './pages/ExamsPage';
+import { FollowUpPage } from './pages/FollowUpPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { CertificatesPage } from './pages/CertificatesPage';
+import { ClinicalEntriesPage } from './pages/ClinicalEntriesPage';
 import { ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
 import { LockScreen, LoginPage } from './pages/LoginPage';
+import { MeasurementsPage } from './pages/MeasurementsPage';
 import { PatientsPage } from './pages/PatientsPage';
+import { PlansPage } from './pages/PlansPage';
 import { PrescriptionEditor } from './pages/PrescriptionEditor';
+import { PrivacyPage } from './pages/PrivacyPage';
 import { RecordPage } from './pages/RecordPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { ServiceCredentialsPage } from './pages/ServiceCredentialsPage';
 import { SignQueuePage } from './pages/SignQueuePage';
+import { SuppliesPage } from './pages/SuppliesPage';
 import { TherapyForm } from './pages/TherapyForm';
 import { TodayPage } from './pages/TodayPage';
 
@@ -38,6 +44,12 @@ function Screens() {
           />
           <Route path="/pazienti/:id/esami" element={<ExamsPage />} />
           <Route path="/pazienti/:id/certificati" element={<CertificatesPage />} />
+          <Route path="/pazienti/:id/voci" element={<ClinicalEntriesPage />} />
+          <Route path="/pazienti/:id/parametri" element={<MeasurementsPage />} />
+          <Route path="/pazienti/:id/privacy" element={<PrivacyPage />} />
+          <Route path="/pazienti/:id/piani" element={<PlansPage />} />
+          <Route path="/pazienti/:id/seguito" element={<FollowUpPage />} />
+          <Route path="/pazienti/:id/presidi" element={<SuppliesPage />} />
           <Route path="/pazienti/:id/terapie/nuova" element={<TherapyForm />} />
           <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
           <Route path="/pazienti/:id/terapie/:therapyId/modifica" element={<TherapyForm />} />

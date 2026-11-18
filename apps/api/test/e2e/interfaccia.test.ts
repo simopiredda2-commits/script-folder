@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { generatePatients } from '@mmg/fixtures';
 import { loadMappings, overrideMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
@@ -643,22 +644,35 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await expect(rupar.getByLabel('Password', { exact: true }).inputValue()).resolves.toBe('');
     await expect(rupar.getByLabel('PIN', { exact: true }).inputValue()).resolves.toBe('');
     await check(page, 'credenziali dei servizi', true);
-    await rupar.getByRole('button', { name: 'Revoca il codice' }).click();
-    await rupar.getByText('Non attivo: serve per mandare le ricette.').waitFor();
+    const byEmail = rupar.getByRole('group', {
+      name: 'In alternativa: codice di sessione via email',
+    });
+    const regional = rupar.getByRole('group', { name: 'Accesso regionale con SPID o CIE' });
+    await byEmail.getByRole('button', { name: 'Revoca il codice' }).click();
+    await byEmail.getByText(/^Non attivo/).waitFor();
     // La pagina Oggi avvisa e porta alla pagina giusta.
     await page
       .getByRole('navigation', { name: 'Sezioni' })
       .getByRole('link', { name: 'Oggi' })
       .click();
     await page
-      .getByText('Codice di sessione RUPAR Piemonte non attivo: serve per mandare le ricette.')
+      .getByText('Accesso regionale per le ricette SSN non attivo: entra con SPID o CIE.')
       .waitFor();
     await check(page, 'oggi con gli avvisi dei servizi');
     await page.getByRole('link', { name: 'Apri «Credenziali dei servizi»' }).click();
-    await rupar.getByRole('button', { name: 'Chiedi il codice' }).click();
-    await rupar.getByText(/Ambiente di prova/).waitFor();
-    await rupar.getByRole('button', { name: 'Attiva' }).click();
-    await rupar.getByText(/^Attivo fino a/).waitFor();
+    // Codice via email: chiesto e attivato.
+    await byEmail.getByRole('button', { name: 'Chiedi il codice' }).click();
+    await byEmail.getByText(/Ambiente di prova/).waitFor();
+    await byEmail.getByRole('button', { name: 'Attiva' }).click();
+    await byEmail.getByText(/^Attivo fino a/).waitFor();
+    // Accesso regionale con SPID o CIE (D109): la pagina regionale simulata, poi il ritorno.
+    await regional.getByRole('button', { name: 'Entra con SPID o CIE' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Accesso regionale simulato' }).waitFor();
+    await check(page, 'pagina regionale simulata');
+    await page.getByRole('button', { name: 'Entra con SPID (simulato)' }).click();
+    await page.getByText('Accesso regionale attivo: puoi mandare le ricette SSN.').waitFor();
+    await regional.getByText(/^Attivo fino a/).waitFor();
+    expect(new URL(page.url()).search).toBe('');
   });
 
   it('certificato di malattia: compilato, controllato, inviato; copia in PDF e continuazione (tappa 8)', async () => {
@@ -708,7 +722,233 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'elenco dei certificati', true);
   });
 
-  it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {
+  it('voci cliniche, parametri con l’andamento, privacy e piani dalla cartella (tappa 9)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Voci cliniche' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    // Un problema nuovo, poi annullato con il motivo: resta in elenco, segnato.
+    await page.getByLabel('Descrizione').fill('Problema della prova nel browser');
+    await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Voce registrata.').waitFor();
+    const item = page.locator('.voce').filter({ hasText: 'Problema della prova nel browser' });
+    await item.waitFor();
+    await check(page, 'voci cliniche', true);
+    await item.getByRole('button', { name: /Annulla la voce/ }).click();
+    await item.getByLabel('Motivo dell’annullamento').fill('Inserita per prova');
+    await check(page, 'annullamento di una voce');
+    await item.getByRole('button', { name: 'Conferma l’annullamento' }).click();
+    await page
+      .locator('.voce-annullata')
+      .filter({ hasText: 'Motivo dell’annullamento: Inserita per prova' })
+      .waitFor();
+    // Una nota del diario per telefono.
+    await page.getByRole('button', { name: 'Diario clinico' }).click();
+    await page.getByLabel('Tipo di contatto').selectOption('telefono');
+    await page.getByLabel('Testo', { exact: true }).fill('Telefonata di prova.');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.locator('.voce').filter({ hasText: 'Al telefono: Telefonata di prova.' }).waitFor();
+
+    // Parametri della stessa visita, poi l'andamento in grafico e in tabella.
+    await page.getByRole('link', { name: 'Parametri' }).first().click();
+    await page.getByRole('heading', { level: 1, name: 'Parametri' }).waitFor();
+    await page.getByLabel(/Pressione sistolica/).fill('135');
+    await page.getByLabel(/Pressione diastolica/).fill('85');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Registrati 2 parametri.').waitFor();
+    await page.getByRole('table', { name: /Pressione arteriosa: valori/ }).waitFor();
+    await page.getByRole('group', { name: /Pressione arteriosa: grafico/ }).focus();
+    await page.locator('.grafico-suggerimento').getByText('135 mmHg').waitFor();
+    await check(page, 'parametri', true);
+
+    // Privacy: un consenso del Fascicolo, con la fonte.
+    await page.goto(`${base}/pazienti/${s.richPatient}/privacy`);
+    await page.getByRole('heading', { level: 1, name: 'Privacy' }).waitFor();
+    await page.getByLabel('Consenso', { exact: true }).selectOption('fse_cura');
+    await page.getByRole('button', { name: 'Registra il consenso' }).click();
+    await page.getByText('Consenso registrato.').waitFor();
+    await page.getByRole('row', { name: /finalità di cura Dato/ }).waitFor();
+    await check(page, 'privacy', true);
+
+    // Piani terapeutici: un piano valido, con i giorni alla scadenza.
+    await page.goto(`${base}/pazienti/${s.richPatient}/piani`);
+    await page.getByRole('heading', { level: 1, name: 'Piani terapeutici' }).waitFor();
+    await page.getByLabel('Farmaco', { exact: true }).fill('Piano di prova nel browser');
+    await page
+      .getByLabel('Scade il')
+      .fill(studioDate(new Date(s.clock.now().getTime() + 90 * 86_400_000)));
+    await page.getByRole('button', { name: 'Registra il piano' }).click();
+    await page.getByText('Piano registrato.').waitFor();
+    await page
+      .locator('.voce')
+      .filter({ hasText: 'Piano di prova nel browser' })
+      .getByText('Valido', { exact: true })
+      .waitFor();
+    await check(page, 'piani terapeutici', true);
+  });
+
+  it('seguito delle prestazioni con il referto in PDF, e presidi (tappa 10)', async () => {
+    // La ricetta specialistica inviata da una prova precedente (D66) è nel seguito.
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Seguito delle prestazioni' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Seguito delle prestazioni' }).waitFor();
+    await page
+      .getByRole('button', { name: /Registra (l’esecuzione|una seduta)/ })
+      .first()
+      .click();
+    await page.getByLabel('Struttura').fill('Struttura di prova');
+    await page.getByLabel('Esito').fill('Esito di prova, paziente inventato.');
+    await page.getByLabel(/Referto \(PDF o immagine/).setInputFiles({
+      name: 'referto-di-prova.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n% referto di prova\n%%EOF\n', 'latin1'),
+    });
+    await check(page, 'esecuzione da registrare');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Esecuzione registrata.').waitFor();
+    const link = page.getByRole('link', { name: /Referto/ }).first();
+    const res = await page.request.get(`${base}${await link.getAttribute('href')}`);
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toBe('application/pdf');
+    await check(page, 'seguito delle prestazioni', true);
+
+    await page.goto(`${base}/pazienti/${s.richPatient}/presidi`);
+    await page
+      .getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' })
+      .waitFor();
+    await page.getByLabel('Categoria').selectOption('diabetici');
+    await page.getByText(/Fonte: DPCM 12\/1\/2017 \(LEA\), art\. 13/).waitFor();
+    await page.getByLabel('Prodotto').fill('Strisce reattive di prova');
+    await page.getByLabel('Fabbisogno al mese').fill('50');
+    await page.getByLabel('Unità').fill('strisce');
+    await page.getByRole('button', { name: 'Registra la prescrizione' }).click();
+    await page.getByText('Prescrizione registrata.').waitFor();
+    await page
+      .locator('.voce')
+      .filter({ hasText: 'Strisce reattive di prova' })
+      .getByText('In corso')
+      .waitFor();
+    await check(page, 'presidi', true);
+  });
+
+  it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {
+    // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20.
+    const extra = generatePatients({ seed: `molte-cartelle-${s.studioId}`, count: 18 });
+    const added = await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .insert(patient)
+        .values(
+          extra.map((p) => ({
+            studioId: s.studioId,
+            archiveId: s.archives.titolare,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            sex: p.sex,
+            birthDate: p.birthDate,
+            birthPlaceCode: p.birthPlace.code,
+            birthPlaceName: p.birthPlace.name,
+            fiscalCode: p.fiscalCode,
+            status: p.status,
+          })),
+        )
+        .returning({ id: patient.id }),
+    );
+    const ids = [...s.patients.titolare, ...added.map((r) => r.id)];
+    const names = new Map(
+      (await t.db.select().from(patient)).map((p) => [p.id, `${p.lastName} ${p.firstName}`]),
+    );
+    const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const bar = page.getByRole('navigation', { name: 'Cartelle aperte' });
+    const tab = (id: string) =>
+      bar.getByRole('link', {
+        name: new RegExp(`^${escape(names.get(id)!)}(?![\\p{L}'])`, 'u'),
+      });
+    /** La scheda attiva si vede tutta nella barra, anche quando la barra scorre. */
+    const activeVisible = () =>
+      page.evaluate(() => {
+        const nav = document.querySelector('nav.schede-aperte');
+        const li = nav?.querySelector('a[aria-current="page"]')?.closest('li');
+        if (!nav || !li) return false;
+        const n = nav.getBoundingClientRect();
+        const r = li.getBoundingClientRect();
+        return r.left >= n.left - 1 && r.right <= n.right + 1;
+      });
+
+    await page.goto(`${base}/pazienti`);
+    await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
+    const closeAll = page.getByRole('button', { name: 'Chiudi tutte' });
+    if (await closeAll.count()) await closeAll.click();
+    for (const id of ids.slice(0, 20)) {
+      await page.goto(`${base}/pazienti/${id}`);
+      await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    }
+    await expect(bar.getByRole('link').count()).resolves.toBe(20);
+    await expect(activeVisible()).resolves.toBe(true);
+    await check(page, 'venti cartelle aperte', true);
+
+    // La ventunesima: si chiude quella usata meno di recente, con l'avviso.
+    await page.goto(`${base}/pazienti/${ids[20]}`);
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    await page.getByText(`chiusa quella di ${names.get(ids[0]!)}, usata meno di recente`).waitFor();
+    await expect(bar.getByRole('link').count()).resolves.toBe(20);
+    await expect(tab(ids[0]!).count()).resolves.toBe(0);
+    await expect(activeVisible()).resolves.toBe(true);
+    for (const v of TABLETS) {
+      await page.setViewportSize(v);
+      // Il riposizionamento segue l'evento di ridimensionamento: si aspetta un attimo.
+      await expect
+        .poll(() => activeVisible(), { timeout: 2000, message: `tablet ${v.width}×${v.height}` })
+        .toBe(true);
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    // Pagine nuove nelle schede: si torna alla pagina lasciata, con quello che si stava scrivendo.
+    const [a, b] = [ids[20]!, ids[19]!];
+    await page.goto(`${base}/pazienti/${a}/voci?tipo=diario`);
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await page.getByLabel('Testo', { exact: true }).fill('Nota lasciata a metà.');
+    await tab(b).click();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    // Ciascuno il suo: mentre la nota del primo è in sospeso, la cartella dell'altro non la mostra.
+    await page.goto(`${base}/pazienti/${b}/voci?tipo=diario`);
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
+    await page.goto(`${base}/pazienti/${b}`);
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Parametri' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Parametri' }).waitFor();
+    await page.getByRole('textbox', { name: /^Peso/ }).fill('70');
+    await tab(a).click();
+    await page.waitForURL(`**/pazienti/${a}/voci?tipo=diario`);
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe(
+      'Nota lasciata a metà.',
+    );
+    await expect(activeVisible()).resolves.toBe(true);
+    // Registrata, la bozza non resta: tornando, il modulo è vuoto.
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Voce registrata.').waitFor();
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
+    await tab(b).click();
+    await page.waitForURL(`**/pazienti/${b}/parametri`);
+    await expect(page.getByRole('textbox', { name: /^Peso/ }).inputValue()).resolves.toBe('70');
+    await tab(a).click();
+    await page.waitForURL(`**/pazienti/${a}/voci?tipo=diario`);
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
+  });
+
+  it('dopo l’inattività la sessione si blocca e si sblocca con il codice; le cartelle aperte restano', async () => {
+    const bar = page.getByRole('navigation', { name: 'Cartelle aperte' });
+    const before = await bar.getByRole('link').count();
+    expect(before).toBeGreaterThan(1);
     s.clock.advance(6 * 60_000);
     await page.goto(`${base}/pazienti`);
     await page.getByRole('heading', { name: 'Sessione bloccata' }).waitFor();
@@ -718,5 +958,6 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Codice a 6 cifre').fill(totp(secret, s.clock.now().getTime()));
     await page.getByRole('button', { name: 'Sblocca' }).click();
     await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
+    await expect(bar.getByRole('link').count()).resolves.toBe(before);
   });
 });

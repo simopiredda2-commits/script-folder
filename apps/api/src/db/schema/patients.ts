@@ -126,17 +126,27 @@ export const exemption = pgTable('exemption', {
 
 export const consentStatus = pgEnum('consent_status', ['given', 'refused', 'revoked']);
 
-/** Consensi, compreso quello al Fascicolo Sanitario Elettronico. */
+/**
+ * Consensi, compresi quelli alla consultazione del Fascicolo Sanitario Elettronico (DM 7
+ * settembre 2023, art. 8): un'espressione per riga; la revoca chiude la riga, un consenso nuovo
+ * è una riga nuova.
+ */
 export const consent = pgTable('consent', {
   id: uuid().primaryKey().defaultRandom(),
   patientId: uuid()
     .notNull()
     .references(() => patient.id),
   kind: text().notNull(),
+  /** Per i consensi fuori elenco: che cosa si consente. */
+  description: text(),
   status: consentStatus().notNull(),
   givenOn: date(),
   revokedOn: date(),
+  /** Chi l'ha espresso, se non il paziente (genitore, tutore, delegato: art. 8, c. 2, 3, 5). */
+  expressedBy: text(),
   notes: text(),
+  recordedBy: uuid().references(() => appUser.id),
+  recordedAt: timestamp({ withTimezone: true }).defaultNow(),
 });
 
 /** Delega: chi può ricevere ricette e promemoria per il paziente (R16). */

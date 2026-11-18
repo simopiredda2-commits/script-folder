@@ -18,6 +18,7 @@ JSON (RFC 8259), un solo documento:
 | `tabelle`                      | Un elenco di righe per ogni tabella: `patient`, `family`, `patient_choice`, `exemption`, `consent`, `delegation`, `clinical_entry` con tutti i dettagli (`problem_detail`, `diary_detail`, …, `attachment`), `therapy`, `therapeutic_plan`, `appointment`, `patient_request` |
 | `storico_modifiche`            | Ogni modifica delle righe esportate, con prima, dopo e utente                                                                                                                                                                                                                |
 | `registro_accessi`             | Gli accessi ai pazienti dell'archivio e le azioni del titolare, in ordine, con le impronte della catena                                                                                                                                                                      |
+| `allegati`                     | I file degli allegati (referti in PDF o immagine): `id`, `nome`, `tipo`, `sha256` e `contenuto_base64`, il file così com'è arrivato (D121)                                                                                                                                   |
 | `conteggi`                     | Quante righe per sezione                                                                                                                                                                                                                                                     |
 | `impronte`                     | SHA-256 di ogni sezione, per controllare che il file sia integro                                                                                                                                                                                                             |
 
@@ -28,6 +29,7 @@ Le righe sono quelle del database, con i nomi delle colonne (in inglese, `snake_
 Chiesto da Simone alla prima fermata. Un archivio `esportazione-AAAA-MM-GG-csv.zip` con:
 
 - un file `.csv` per ogni sezione del JSON (`patient.csv`, `therapy.csv`, …, `storico_modifiche.csv`, `registro_accessi.csv`), con la riga di intestazione anche quando la tabella è vuota;
+- i file degli allegati nella cartella `allegati/`, così come sono arrivati, con l'indice `allegati.csv` (id, nome, tipo, impronta, file);
 - `manifest.json`: formato, data, studio, archivio, medico, e per ogni file il numero di righe e l'impronta SHA-256;
 - `LEGGIMI.txt`: come leggere i file.
 
@@ -35,7 +37,7 @@ Separatore **punto e virgola** e codifica **UTF-8 con BOM**, perché un foglio d
 
 ## Che cosa non c'è, apposta
 
-Password, segreti del secondo fattore, credenziali verso Sistema TS e Regione e codici di sessione (`service_credential`, `service_session`, D100): sono dello studio e del medico, non dati dei pazienti, e una prova controlla che non escano. Gli allegati sono elencati con nome, tipo e impronta; i file stessi si aggiungeranno quando ci sarà l'archiviazione degli allegati. Le banche dati pubbliche (farmaci, cataloghi, comuni) non sono dati del medico: non entrano nell'esportazione e si riscaricano dalle fonti.
+Password, segreti del secondo fattore, credenziali verso Sistema TS e Regione e codici di sessione (`service_credential`, `service_session`, D100): sono dello studio e del medico, non dati dei pazienti, e una prova controlla che non escano. Gli allegati ci sono, con il loro contenuto (dalla tappa 10, D121). Le banche dati pubbliche (farmaci, cataloghi, comuni) non sono dati del medico: non entrano nell'esportazione e si riscaricano dalle fonti.
 
 ## Garanzie
 

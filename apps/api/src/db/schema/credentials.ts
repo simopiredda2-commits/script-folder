@@ -6,6 +6,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { appUser, bytea } from './users';
@@ -35,7 +36,13 @@ export const serviceCredential = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.service] })],
 );
 
-/** Id-Sessione del secondo fattore (D102): cifrato, con la scadenza data dal servizio. */
+/** Come si è ottenuto il codice di sessione: per email (D102) o con SPID o CIE (D109). */
+export const sessionMode = pgEnum('session_mode', ['email', 'spid_cie']);
+
+/**
+ * Id-Sessione del secondo fattore (D102) o token dell'accesso regionale con SPID o CIE (D109):
+ * cifrato, con la scadenza data dal servizio.
+ */
 export const serviceSession = pgTable(
   'service_session',
   {
@@ -46,8 +53,32 @@ export const serviceSession = pgTable(
     tokenEnc: bytea().notNull(),
     validUntil: timestamp({ withTimezone: true }).notNull(),
     activatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    mode: sessionMode().notNull().default('email'),
+    /** Codice fiscale di chi è entrato con SPID o CIE (sub del token), per verifica e revoca. */
+    subject: text(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.service] })],
+);
+
+/**
+ * Richieste di accesso regionale in corso (D109): impronta dello state e code_verifier cifrato.
+ * Brevi e monouso: il ritorno dalla Regione deve portare lo state di una richiesta di quel medico.
+ */
+export const regionalAuthorizationRequest = pgTable(
+  'regional_authorization_request',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    stateHash: text().notNull(),
+    verifierEnc: bytea().notNull(),
+    redirectUri: text().notNull(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    usedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [uniqueIndex().on(t.stateHash)],
 );
 
 /**

@@ -220,6 +220,7 @@ describe('credenziali dei servizi e secondo fattore (D100–D102)', () => {
     expect(sar.receivedAuth.at(-1)).toEqual({
       username: 'RUPAR-PROVA-ABC',
       sessionId: codiceDiProva,
+      bearer: false,
     });
   });
 

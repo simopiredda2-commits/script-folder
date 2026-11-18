@@ -57,7 +57,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Come si procede
 
-- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`.
+- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`.
 - Dopo ogni tappa: test e lint verdi, commit e push (la macchina in cloud può essere riciclata), poi aggiornare `docs/avanzamento.md` con fatto, non fatto, non provato e prossimo passo.
 - **Fermate**: dopo la tappa 2 e dopo la tappa 4. Domande con il pulsante a Simone; spiegare in parole semplici cosa devono verificare lui e la Dr.ssa Rocca (dopo la 2: struttura, modello dei dati, ruoli e permessi; dopo la 4: ciclo della ricetta e regole di prescrizione con le loro fonti) e chiedere il via. Alla prima fermata chiedere anche quale proposta di logo preferisce, con il collegamento a `docs/logo.md` su GitHub, indicando quella consigliata. Se chiede modifiche: farle, aggiornare la PR, richiedere il via. Con il via: unire la PR e continuare. Simone non interviene su GitHub: le PR le unisce Claude.
 - Dopo la tappa 6: stesso giro per l'ultima PR (fatto).
@@ -125,6 +125,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/interfaccia.md`: schermate (in `docs/schermate/`), accessibilità, che cosa manca.
 - `docs/credenziali.md`: credenziali dei servizi (Sistema TS, RUPAR) e secondo fattore.
 - `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.
+- `docs/fse.md`: Fascicolo Sanitario Elettronico 2.0 e Profilo Sanitario Sintetico, con le fonti (D110).
 
 ## Le tappe
 
@@ -143,7 +144,12 @@ Secondo giro (D90), con lo stesso metodo: requisiti, specifiche pubbliche, simul
 9. Voci cliniche dall'interfaccia: problemi, allergie e reazioni, diario, parametri, anamnesi, stili di vita, esame obiettivo, privacy (consensi, deleghe, oscuramento), piani terapeutici.
 10. Presidi e assistenza integrativa; seguito delle prestazioni (esecuzione, struttura, esito, referto, sedute); voci nuove solo dopo la verifica sulla fonte (D91). **Fermata finale del secondo giro.**
 
-Dalla terza fermata: prima della tappa 9, secondo fattore con SPID o CIE dal programma (D109). Dopo la tappa 10, con il via della fermata finale (D110): 11. Profilo Sanitario Sintetico per il Fascicolo con un simulatore del Gateway; 12. condivisione tra i medici dell'AFT. Il documento sulle fonti (`docs/fse.md`) si prepara durante le tappe 9 e 10.
+Dalla terza fermata: prima della tappa 9, secondo fattore con SPID o CIE dal programma (D109). Secondo giro chiuso con la fermata finale del 18/11/2026 (D125–D128).
+
+Terzo giro (via del 18/11/2026, D128), branch `tappe-11-12`, stesso metodo:
+
+11. Profilo Sanitario Sintetico per il Fascicolo con un simulatore del Gateway, dalle fonti di `docs/fse.md` (prima quelle ancora da leggere).
+12. Condivisione tra i medici dell'AFT che usano il programma. **Fermata dopo la tappa 12**, con lo stesso giro (domande con il pulsante, via, unione), poi fermarsi.
 
 ## Come si chiude
 

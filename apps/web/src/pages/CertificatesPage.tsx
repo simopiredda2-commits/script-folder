@@ -13,6 +13,7 @@ import {
 } from '../lib/certificates';
 import { date, dateTime, studioToday } from '../lib/format';
 import { useSession } from '../lib/session';
+import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 
 const EMPTY_ADDRESS: CertAddress = { via: '', civico: '', cap: '', comune: '', provincia: '' };
@@ -128,7 +129,8 @@ export function CertificatesPage() {
     `/api/pazienti/${id}`,
   );
   const list = useApi<CertificateList>(isDoctor ? `/api/pazienti/${id}/certificati` : null);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  // Il certificato che si sta scrivendo resta ricordato per paziente, come la ricetta (D68, D129).
+  const [draft, setDraft] = usePersistentState<Draft | null>(`bozza-certificato-${id}`, null);
 
   const name = record.data
     ? `${record.data.paziente.firstName} ${record.data.paziente.lastName}`
@@ -244,7 +246,15 @@ function CertificateForm({
   initial: Draft;
   onDone: () => void;
 }) {
-  const [d, setD] = useState<Draft>(initial);
+  const [d, setD, resetD] = usePersistentState<Draft>(
+    `bozza-certificato-${patientId}-${initial.id ?? 'nuovo'}`,
+    initial,
+  );
+  /** Chiuso o inviato: la bozza ricordata nel browser non serve più. */
+  const finish = () => {
+    resetD();
+    onDone();
+  };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [checked, setChecked] = useState<string | null>(null);
@@ -296,7 +306,7 @@ function CertificateForm({
         { method: 'POST' },
       );
       if (r.esito !== 'accepted') throw new ApiError(502, r.messaggio ?? 'Invio non riuscito');
-      onDone();
+      finish();
     });
   };
 
@@ -477,7 +487,7 @@ function CertificateForm({
         <button type="submit" className="pulsante pulsante-primario" disabled={busy}>
           <Icon name="firma" /> <span>Firma e invia all’INPS</span>
         </button>
-        <button type="button" className="pulsante" disabled={busy} onClick={onDone}>
+        <button type="button" className="pulsante" disabled={busy} onClick={finish}>
           <Icon name="annulla" /> <span>Chiudi</span>
         </button>
       </div>

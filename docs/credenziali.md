@@ -25,6 +25,29 @@ Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id
 
 - **Certificati INPS**: nelle fonti lette il secondo fattore non c'è. È da verificare in collaudo.
 
+## Accesso regionale con SPID o CIE (D109)
+
+È la modalità scelta alla terza fermata per le ricette SSN in Piemonte. Fonte: SIRPED, autenticazione forte, versione 4.0 del 2/3/2026, 3.2 e 4.3.
+
+1. Il medico preme «Entra con SPID o CIE». Il programma crea uno `state` casuale (ne conserva l'impronta) e un `code_verifier` PKCE (cifrato), poi apre la pagina di autorizzazione regionale (`/oauth2/authorize` con `client_id`, `redirect_uri`, scope `prescrizione`, `state`, `code_challenge` S256).
+2. Il medico entra con SPID o CIE e autorizza. La Regione rimanda il browser al programma con `code` e `state`, oppure con un errore.
+3. Il programma fa questi controlli:
+   - lo `state` è di una richiesta di **questo** medico, non usata e non più vecchia di 10 minuti;
+   - scambia il codice con il `code_verifier` (`/oauth2/token`);
+   - chi è entrato con SPID o CIE (`sub` del token) è il medico collegato; altrimenti revoca il token;
+   - la Regione ha concesso il profilo di prescrizione.
+4. Il token si conserva cifrato, con la scadenza indicata dalla Regione. Non si rinnova: alla scadenza si rientra.
+5. Le ricette SSN, i loro annullamenti e lo stato di erogazione usano il token come `Authorization: Bearer`. Utente, password e PIN RUPAR non servono.
+6. «Esci dall’accesso regionale» revoca il token (`/sessionid/revoke`).
+
+Errori come annullamento, identità diversa, richiesta scaduta o accesso al programma scaduto nel frattempo tornano come messaggio chiaro nella pagina delle credenziali, mai come errore tecnico. Il codice per email resta come alternativa.
+
+In prova la pagina regionale è simulata dal programma stesso:
+
+- esiste solo con il simulatore;
+- accetta solo indirizzi di ritorno interni;
+- non imita il sito della Regione.
+
 ## Come funziona nel programma
 
 - **Pagina «Credenziali dei servizi»**, dal collegamento «Credenziali» nell'intestazione, solo per i medici.
@@ -76,7 +99,10 @@ Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id
   - codici d'errore veri per credenziali e sessione (oggi l'esito è segnalato dal simulatore);
   - intestazione `Authorization2F`.
 - **Durata del codice SIRPED** («tempo predefinito»): valore da completare. Nel simulatore vale 8 ore, come quella del Sistema TS.
-- **Modalità OAuth2 con SPID o CIE**: non costruita, è una domanda della terza fermata.
+- **Accesso con SPID o CIE, con il servizio vero**:
+  - codice del gestionale (`client_id`) e indirizzo di ritorno da registrare presso la Regione (D103);
+  - verifica della firma del token con la chiave pubblica (JWKS);
+  - durata vera del token. La specifica descrive `expires_in` in modo ambiguo («durata… in formato Unix time»), con un esempio di 7199 secondi: da chiarire in collaudo. Nel simulatore il token vale 8 ore.
 - **Registrazione del programma presso la Regione** (codice del gestionale, autocertificazione) e censimento dei medici nel configuratore regionale: pratiche da avviare (D103).
 - **Secondo codice del Sistema TS**: il Sistema TS ammette un secondo codice «in attesa» accanto a quello attivo; non è simulato.
 - **Scadenza della password del Sistema TS**: da verificare.

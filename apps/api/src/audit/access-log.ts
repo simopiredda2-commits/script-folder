@@ -48,7 +48,30 @@ export type AccessAction =
   | 'certificato_annullamento'
   | 'stampa_certificato'
   | 'consegna_certificato'
-  | 'lettura_consegne_certificato';
+  | 'lettura_consegne_certificato'
+  | 'lettura_voci'
+  | 'nuova_voce'
+  | 'modifica_voce'
+  | 'annullamento_voce'
+  | 'nuovi_parametri'
+  | 'lettura_parametri'
+  | 'lettura_privacy'
+  | 'nuovo_consenso'
+  | 'revoca_consenso'
+  | 'nuova_delega'
+  | 'revoca_delega'
+  | 'lettura_piani'
+  | 'nuovo_piano'
+  | 'modifica_piano'
+  | 'annullamento_piano'
+  | 'lettura_seguito'
+  | 'nuova_esecuzione'
+  | 'annullamento_esecuzione'
+  | 'lettura_allegato'
+  | 'lettura_presidi'
+  | 'nuovo_presidio'
+  | 'rinnovo_presidio'
+  | 'annullamento_presidio';
 
 export interface AccessEntry {
   studioId?: string | null;

@@ -86,6 +86,7 @@ export async function createScenario(
     | 'sendTimeoutMs'
     | 'secondFactor'
     | 'sickLeaveGateway'
+    | 'regional'
   > = {},
 ): Promise<Scenario> {
   const clock = new Clock();

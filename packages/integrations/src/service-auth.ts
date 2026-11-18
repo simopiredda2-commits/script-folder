@@ -19,11 +19,16 @@ import { randomUUID } from 'node:crypto';
 import type { CredentialService } from '@mmg/domain';
 
 export interface ServiceAuth {
-  username: string;
-  password: string;
-  pin: string;
+  username?: string;
+  password?: string;
+  pin?: string;
   /** Id-Sessione del secondo fattore, per i servizi che lo chiedono. */
   sessionId?: string | null;
+  /**
+   * Token dell'accesso regionale con SPID o CIE (OAuth2, D109): per il SAR sostituisce utente,
+   * password e PIN (SIRPED, autenticazione forte, 4).
+   */
+  bearer?: string | null;
 }
 
 /**
@@ -76,6 +81,7 @@ export interface SecondFactorGateway {
 export function authShapeProblem(
   auth: ServiceAuth | undefined,
 ): { code: string; message: string } | null {
+  if (auth?.bearer) return null;
   if (!auth?.username?.trim() || !auth.password)
     return { code: 'CREDENZIALI', message: 'Credenziali invalide (from client)' };
   if (!auth.pin) return { code: 'EA01', message: 'Inserire il PinCode' };
