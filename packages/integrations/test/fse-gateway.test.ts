@@ -105,6 +105,31 @@ describe('Gateway del Fascicolo: cliente e simulatore', () => {
     ).toBe('/msg/simulatore-conflitto');
   });
 
+  it('l’invio a INI può arrivare dopo la presa in carico: lo stato lo dice quando arriva', async () => {
+    let mode: 'ok' | 'ini-pending' = 'ini-pending';
+    const now = () => new Date('2026-11-18T10:00:00Z');
+    const sim = new SimulatedFseGateway({ now, decide: () => mode });
+    const client = new FseGatewayClient(sim, sim.issueCredentials('Programma di prova'), now);
+    const input = sampleInput();
+    const pdf = await pdfOf(input);
+    const v = await client.validate(caller, PATIENT, pdf);
+    if (v.outcome !== 'ok') throw new Error(JSON.stringify(v));
+    const p = await client.publish(
+      caller,
+      PATIENT,
+      await sign(pdf),
+      metadata(input, v.workflowInstanceId!),
+    );
+    expect(p).toMatchObject({ outcome: 'ok', status: 202 });
+    const events = async () => {
+      const st = await client.status(caller, PATIENT, v.workflowInstanceId!);
+      return st.outcome === 'ok' ? st.events.map((e) => e.eventType) : st.outcome;
+    };
+    expect(await events()).toEqual(['VALIDATION', 'PUBLICATION']);
+    mode = 'ok';
+    expect(await events()).toEqual(['VALIDATION', 'PUBLICATION', 'SEND_TO_INI']);
+  });
+
   it('una versione nuova sostituisce la precedente', async () => {
     const { sim, client } = setup();
     const v1 = sampleInput();

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
@@ -39,7 +39,14 @@ export function ServiceCredentialsPage() {
   if (!st.data) return <ErrorMessage error={st.error} />;
   return (
     <>
-      <PageHeader title="Credenziali dei servizi" />
+      <PageHeader
+        title="Credenziali dei servizi"
+        actions={
+          <Link className="pulsante" to="/profilo/recapiti">
+            <Icon name="pazienti" /> <span>Recapiti di studio</span>
+          </Link>
+        }
+      />
       <p className="sottotitolo">
         Servono a mandare ricette e certificati a tuo nome. Sono salvate cifrate e, una volta
         salvate, non si rileggono: né qui né altrove. Le vedi e le cambi solo tu.

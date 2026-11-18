@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
@@ -43,6 +43,7 @@ interface Pss {
   ultimoProblema: Problem | null;
   validatoIl: string | null;
   firmatoIl: string | null;
+  inviatoIl: string | null;
   pubblicatoIl: string | null;
   sostituitoIl: string | null;
 }
@@ -88,6 +89,12 @@ const ABSENCES: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
+/** Che cosa dire dopo la firma o il controllo dello stato: pubblicato, o solo preso in carico. */
+const outcome = (p: Pss) =>
+  p.stato === 'published'
+    ? 'Profilo firmato e pubblicato nel Fascicolo.'
+    : 'Profilo firmato e preso in carico dal Gateway: è pubblicato quando i dati arrivano all’indice nazionale (INI).';
+
 const failure = (e: unknown) =>
   e instanceof ApiError ? e : new ApiError(0, 'Servizio non raggiungibile');
 
@@ -104,6 +111,14 @@ export function HealthProfilePage() {
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
+  // La casella cambia subito; con la risposta del servizio vale quello che ha salvato, quindi se
+  // ha rifiutato torna com'era (come nell'archivio, D84).
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+  const [pickedAbsence, setPickedAbsence] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setPicked({});
+    setPickedAbsence({});
+  }, [overview.data]);
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
@@ -111,13 +126,13 @@ export function HealthProfilePage() {
   const o = overview.data;
   const open = o?.inLavorazione ?? null;
 
-  async function run(fn: () => Promise<unknown>, message: string) {
+  async function run<T>(fn: () => Promise<T>, message: string | ((result: T) => string)) {
     setBusy(true);
     setError(null);
     setDone(null);
     try {
-      await fn();
-      setDone(message);
+      const result = await fn();
+      setDone(typeof message === 'string' ? message : message(result));
       setConfirmed(false);
     } catch (e) {
       setError(failure(e));
@@ -153,6 +168,17 @@ export function HealthProfilePage() {
               <li key={m}>{m}</li>
             ))}
           </ul>
+          {o.mancano.some((m) => m.startsWith('Medico:')) && o.puoFirmare && (
+            <p>
+              <Link to="/profilo/recapiti">Apri «Recapiti di studio»</Link>
+            </p>
+          )}
+          {o.mancano.some((m) => m.startsWith('Impostazioni del Fascicolo')) && (
+            <p>
+              Le impostazioni del Fascicolo le inserisce l’amministratore dello studio, in
+              «Strumenti».
+            </p>
+          )}
         </Notice>
       )}
       {done && <Notice kind="fatto">{done}</Notice>}
@@ -202,15 +228,24 @@ export function HealthProfilePage() {
             <Section
               key={s.key}
               section={s}
-              items={open.contenuto!.sezioni[s.key]}
+              items={open.contenuto!.sezioni[s.key].map((i) =>
+                i.id in picked ? { ...i, incluso: picked[i.id]! } : i,
+              )}
               absence={
-                s.mandatory ? open.contenuto!.assenze[s.key as keyof Content['assenze']] : undefined
+                s.mandatory
+                  ? (pickedAbsence[s.key] ??
+                    open.contenuto!.assenze[s.key as keyof Content['assenze']])
+                  : undefined
               }
               editable={open.stato === 'draft' && o!.puoFirmare && !busy}
-              onToggle={(itemId, included) =>
-                void choose({ scelte: { [s.key]: { [itemId]: included } } })
-              }
-              onAbsence={(value) => void choose({ assenze: { [s.key]: value } })}
+              onToggle={(itemId, included) => {
+                setPicked((x) => ({ ...x, [itemId]: included }));
+                void choose({ scelte: { [s.key]: { [itemId]: included } } });
+              }}
+              onAbsence={(value) => {
+                setPickedAbsence((x) => ({ ...x, [s.key]: value }));
+                void choose({ assenze: { [s.key]: value } });
+              }}
             />
           ))}
           {open.stato === 'draft' && o!.puoFirmare && (
@@ -219,6 +254,8 @@ export function HealthProfilePage() {
                 <input
                   id="conferma-profilo"
                   type="checkbox"
+                  // Ferma mentre si salva una scelta: la conferma vale per il contenuto salvato.
+                  disabled={busy}
                   checked={confirmed}
                   onChange={(e) => setConfirmed(e.target.checked)}
                 />
@@ -271,6 +308,29 @@ export function HealthProfilePage() {
               </button>
             </div>
           )}
+          {open.stato === 'submitted' && (
+            <div className="azioni-profilo">
+              <p>
+                Preso in carico dal Gateway il {dateTime(open.inviatoIl)}: è pubblicato quando i
+                dati risultano arrivati all’indice nazionale (INI).
+              </p>
+              {o!.puoFirmare && (
+                <button
+                  type="button"
+                  className="pulsante"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () => api<Pss>(`${base}/${open.id}/stato`, { method: 'POST' }),
+                      outcome,
+                    )
+                  }
+                >
+                  <Icon name="ripeti" /> <span>Controlla lo stato</span>
+                </button>
+              )}
+            </div>
+          )}
           {(open.stato === 'validated' || open.stato === 'signed') && o!.puoFirmare && (
             <div className="azioni-profilo">
               <p>
@@ -292,8 +352,8 @@ export function HealthProfilePage() {
                 disabled={busy}
                 onClick={() =>
                   void run(
-                    () => api(`${base}/${open.id}/firma-e-pubblica`, { method: 'POST' }),
-                    'Profilo firmato e pubblicato nel Fascicolo.',
+                    () => api<Pss>(`${base}/${open.id}/firma-e-pubblica`, { method: 'POST' }),
+                    outcome,
                   )
                 }
               >

@@ -1660,3 +1660,60 @@ textarea[aria-invalid='true'] {
 .tabella .pulsante {
   white-space: nowrap;
 }
+
+/* Profilo sanitario sintetico (tappa 11) --------------------------------------------------- */
+
+.sezione-profilo {
+  border-top: 1px solid var(--color-divider);
+  padding-top: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.sezione-profilo > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.sezione-profilo > legend + * {
+  clear: left;
+}
+
+.manca-voce {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem 2.25rem;
+  color: var(--color-warning);
+}
+
+.azioni-profilo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  border-top: 1px solid var(--color-divider);
+  padding-top: 1rem;
+}
+
+.azioni-profilo > p {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+/* Dati fissi delle impostazioni dello studio: etichetta sopra, valore sotto. */
+.dati-fissi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 0 0 1rem;
+}
+
+.dati-fissi dt {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.dati-fissi dd {
+  margin: 0;
+}

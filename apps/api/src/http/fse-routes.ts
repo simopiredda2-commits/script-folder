@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { FSE_ADMINISTRATIVE_REQUESTS, FSE_CLINICAL_ACTIVITIES } from '@mmg/integrations';
 import { z } from 'zod';
 import type { Database } from '../db/client';
 import { fseSetting } from '../db/schema';
@@ -18,6 +19,12 @@ const ids = (params: unknown) => ({
     return typeof v === 'string' ? v : '';
   })(),
 });
+
+/** Le chiavi di una tabella dei valori, come elenco per zod. */
+const keysOf = <T extends Record<string, string>>(t: T) =>
+  Object.keys(t) as [keyof T & string, ...(keyof T & string)[]];
+const options = (t: Record<string, string>) =>
+  Object.entries(t).map(([codice, nome]) => ({ codice, nome }));
 
 const oidText = z
   .string()
@@ -49,8 +56,8 @@ const settingsBody = z
         /^[^^]+\^\^\^\^\^&[0-9.]+&ISO\^\^\^\^[^^]+$/,
         'Struttura nel formato XON: NOME^^^^^&OID&ISO^^^^CODICE',
       ),
-    attivitaClinica: z.enum(['PHR', 'CON', 'DIS', 'ERP', 'Sistema_TS', 'INI', 'PN_DGC', 'OBS']),
-    regime: z.enum(['SSN', 'INPATIENT', 'NOSSN', 'SSR', 'DONOR', 'AUTO']),
+    attivitaClinica: z.enum(keysOf(FSE_CLINICAL_ACTIVITIES)),
+    regime: z.enum(keysOf(FSE_ADMINISTRATIVE_REQUESTS)),
   })
   .strict();
 
@@ -84,6 +91,10 @@ export function registerFseRoutes(
   app.post(`${base}/:documentoId/firma-e-pubblica`, scoped, async (req) => {
     const p = ids(req.params);
     return service.signAndPublish(req.actor!, p.id, p.documentoId);
+  });
+  app.post(`${base}/:documentoId/stato`, scoped, async (req) => {
+    const p = ids(req.params);
+    return service.refreshStatus(req.actor!, p.id, p.documentoId);
   });
   app.post(`${base}/:documentoId/scarta`, scoped, async (req) => {
     const p = ids(req.params);
@@ -134,6 +145,12 @@ export function registerFseRoutes(
           }
         : null,
       daCompletare: settingsIssues(s),
+      /** Valori ammessi, con i nomi delle tabelle 57 e 63 della specifica del Gateway. */
+      valori: {
+        attivitaClinica: options(FSE_CLINICAL_ACTIVITIES),
+        regime: options(FSE_ADMINISTRATIVE_REQUESTS),
+      },
+      puoModificare: req.actor!.roles.includes('administrator'),
     };
   });
 

@@ -214,4 +214,66 @@ describe('dati della cartella per il Profilo Sanitario Sintetico', () => {
       ).statusCode,
     ).toBe(403);
   });
+
+  it('impostazioni del Fascicolo: le legge chi lavora nello studio, le cambia l’amministratore', async () => {
+    const at = (cookie: string, method: 'GET' | 'PUT', payload?: object) =>
+      s.app.inject({
+        method,
+        url: '/api/studio/fascicolo',
+        headers: { cookie },
+        ...(payload ? { payload } : {}),
+      });
+    interface Settings {
+      impostazioni: { attivitaClinica: string | null; regime: string | null } | null;
+      daCompletare: string[];
+      valori: { attivitaClinica: { codice: string; nome: string }[]; regime: unknown[] };
+      puoModificare: boolean;
+    }
+    const seen = (await at(doctor, 'GET')).json<Settings>();
+    expect(seen).toMatchObject({ daCompletare: [], puoModificare: false });
+    expect(seen.impostazioni).toMatchObject({ attivitaClinica: 'OBS', regime: 'SSN' });
+    // Codici e nomi delle tabelle 57 e 63 della specifica del Gateway.
+    expect(seen.valori.attivitaClinica).toContainEqual({
+      codice: 'OBS',
+      nome: 'Documento stato di salute',
+    });
+    expect(seen.valori.regime).toContainEqual({ codice: 'SSN', nome: 'Regime SSN' });
+    const body = {
+      radiceDocumenti: '2.999.10.1',
+      repository: '2.999.10.2',
+      radiceInvii: '2.999.10.3',
+      custode: {
+        radice: '2.999.10.4',
+        codice: 'CUSTODE-PROVA',
+        nome: 'Custode di prova',
+        via: 'Via del Custode 1',
+        comune: 'Comune di prova',
+        istat: '999999',
+        provincia: 'XX',
+      },
+      struttura: 'STUDIO DI PROVA^^^^^&2.999.10.5&ISO^^^^000001',
+      attivitaClinica: 'OBS',
+      regime: 'NOSSN',
+    };
+    const denied = await at(doctor, 'PUT', body);
+    expect(denied.statusCode).toBe(403);
+    expect(denied.json<{ errore: string }>().errore).toBe(
+      'Le impostazioni del Fascicolo le cambia l’amministratore dello studio',
+    );
+    const admin = await login(s, 'amministratore');
+    expect((await at(admin, 'GET')).json<Settings>().puoModificare).toBe(true);
+    for (const wrong of [
+      { ...body, radiceDocumenti: '2.999.x' },
+      { ...body, struttura: 'STUDIO DI PROVA' },
+      { ...body, attivitaClinica: 'XYZ' },
+      { ...body, custode: { ...body.custode, istat: '12345' } },
+    ])
+      expect((await at(admin, 'PUT', wrong)).statusCode).toBe(400);
+    const saved = await at(admin, 'PUT', body);
+    expect(saved.statusCode, saved.body).toBe(200);
+    expect((await at(doctor, 'GET')).json<Settings>().impostazioni).toMatchObject({
+      regime: 'NOSSN',
+    });
+    expect((await at(admin, 'PUT', { ...body, regime: 'SSN' })).statusCode).toBe(200);
+  });
 });

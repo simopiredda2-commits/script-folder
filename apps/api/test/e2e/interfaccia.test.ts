@@ -65,7 +65,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     return totp(base32Decode(secret.replace(/\s/g, '')), s.clock.now().getTime());
   };
 
-  async function loginInBrowser(p: Page, who: 'titolare' | 'segreteria') {
+  async function loginInBrowser(p: Page, who: 'titolare' | 'segreteria' | 'amministratore') {
     await p.goto(base);
     await p.getByLabel('Nome utente').fill(s.users[who].username);
     await p.getByLabel('Password').fill(PASSWORD);
@@ -835,6 +835,139 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByText('In corso')
       .waitFor();
     await check(page, 'presidi', true);
+  });
+
+  it('Profilo sanitario sintetico: dalla cartella, scelto e confermato dal medico, validato, firmato e pubblicato (tappa 11)', async () => {
+    // Le voci con i dati che il Profilo vuole: patologia cronica, organo mancante, allergia.
+    await page.goto(`${base}/pazienti/${s.richPatient}/voci`);
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await page.getByLabel('Descrizione').fill('Ipertensione della prova nel browser');
+    await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+    await page.getByLabel(/Patologia cronica/).check();
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Voce registrata.').waitFor();
+    await page
+      .locator('.voce')
+      .filter({ hasText: 'Ipertensione della prova nel browser' })
+      .locator('.etichetta', { hasText: 'Cronico' })
+      .waitFor();
+    await page.getByLabel('Che cosa').selectOption('organo_mancante');
+    // Il codice solo dall'elenco ufficiale; la descrizione si riempie con il nome dell'organo.
+    await expect(page.getByLabel('Codice ICD-9-CM').count()).resolves.toBe(0);
+    await page.getByLabel('Organo mancante').selectOption({ index: 1 });
+    expect(await page.getByLabel('Descrizione').inputValue()).not.toBe('');
+    await check(page, 'voce di un organo mancante', true);
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Voce registrata.').waitFor();
+    await page
+      .locator('.voce')
+      .filter({ hasText: /^.*Organo mancante:/ })
+      .first()
+      .waitFor();
+    await page.getByRole('button', { name: 'Allergie e reazioni' }).click();
+    await page.getByLabel('Sostanza o farmaco').fill('Pollini della prova nel browser');
+    await page.getByLabel('Agente', { exact: true }).selectOption('ambiente');
+    await page.getByLabel('Allergene').selectOption({ index: 1 });
+    await page.getByLabel('Criticità').selectOption('moderata');
+    await check(page, 'allergia con agente e criticità', true);
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Voce registrata.').waitFor();
+    await page
+      .locator('.voce')
+      .filter({ hasText: 'Pollini della prova nel browser' })
+      .getByText('Criticità moderata')
+      .waitFor();
+
+    // Il Profilo dalla cartella: il programma propone, il medico controlla e conferma.
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Profilo sanitario sintetico' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Profilo sanitario sintetico' }).waitFor();
+    await check(page, 'Profilo sanitario sintetico, prima della bozza');
+    await page.getByRole('button', { name: 'Prepara il Profilo dalla cartella' }).click();
+    await page.getByText('Bozza preparata dalla cartella.').waitFor();
+    const problems = page.getByRole('group', {
+      name: 'Patologie croniche, organi mancanti, trapianti, malformazioni',
+    });
+    await expect(
+      problems.getByLabel(/Ipertensione della prova nel browser/).isChecked(),
+    ).resolves.toBe(true);
+    await expect(
+      page
+        .getByRole('group', { name: 'Allergie e intolleranze' })
+        .getByLabel(/Pollini della prova/)
+        .isChecked(),
+    ).resolves.toBe(true);
+    await check(page, 'Profilo sanitario sintetico, bozza', true);
+    // Si toglie una voce: la scelta resta.
+    await problems.getByLabel(/Ipertensione della prova nel browser/).uncheck();
+    await page.getByText('Scelta salvata.').waitFor();
+    await expect(
+      problems.getByLabel(/Ipertensione della prova nel browser/).isChecked(),
+    ).resolves.toBe(false);
+    await problems.getByLabel(/Ipertensione della prova nel browser/).check();
+    await page.getByText('Scelta salvata.').waitFor();
+    // Senza la conferma del medico non si valida.
+    const validate = page.getByRole('button', { name: 'Valida con il Gateway' });
+    await expect(validate.isDisabled()).resolves.toBe(true);
+    await page.getByLabel('Ho controllato il contenuto del Profilo, voce per voce').check();
+    await validate.click();
+    await page.getByText('Validato dal Gateway. Ora puoi firmarlo e pubblicarlo.').waitFor();
+    await check(page, 'Profilo validato');
+    const draftPdf = page.getByRole('link', { name: 'Apri il PDF' });
+    const preview = await page.request.get(`${base}${await draftPdf.getAttribute('href')}`);
+    expect(preview.headers()['content-type']).toBe('application/pdf');
+    await page.getByRole('button', { name: 'Firma e pubblica' }).click();
+    await page.getByText('Profilo firmato e pubblicato nel Fascicolo.').waitFor();
+    await page.getByRole('heading', { name: 'Versioni nel Fascicolo' }).waitFor();
+    const signed = page.getByRole('link', { name: 'PDF firmato della versione 1' });
+    const res = await page.request.get(`${base}${await signed.getAttribute('href')}`);
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toBe('application/pdf');
+    expect((await res.body()).includes(Buffer.from('/ETSI.CAdES.detached'))).toBe(true);
+    await check(page, 'Profilo pubblicato', true);
+  });
+
+  it('recapiti di studio del medico e impostazioni del Fascicolo dell’amministratore (tappa 11)', async () => {
+    await page.goto(`${base}/profilo/credenziali`);
+    await page.getByRole('link', { name: 'Recapiti di studio' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Recapiti di studio' }).waitFor();
+    await page.getByText('Ci sono i dati che il Profilo sanitario sintetico richiede.').waitFor();
+    await page.getByLabel('Telefono dello studio').fill('011 000 0000');
+    await page.getByRole('button', { name: 'Salva i recapiti' }).click();
+    await page.getByText('Recapiti salvati.').waitFor();
+    await check(page, 'recapiti di studio', true);
+    // Il medico non ha «Strumenti» nel menu.
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Sezioni' })
+        .getByRole('link', { name: 'Strumenti' })
+        .count(),
+    ).resolves.toBe(0);
+
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    const admin = await ctx.newPage();
+    try {
+      await loginInBrowser(admin, 'amministratore');
+      await admin
+        .getByRole('navigation', { name: 'Sezioni' })
+        .getByRole('link', { name: 'Strumenti' })
+        .click();
+      await admin.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
+      await admin.getByText('Impostazioni complete.').waitFor();
+      expect(await admin.getByLabel('Tipo di attività clinica').inputValue()).toBe('OBS');
+      await admin.getByLabel('Regime').selectOption('SSN');
+      await admin.getByRole('button', { name: 'Salva le impostazioni' }).click();
+      await admin.getByText('Impostazioni salvate.').waitFor();
+      await check(admin, 'strumenti dello studio', true);
+    } finally {
+      await ctx.close();
+    }
   });
 
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {

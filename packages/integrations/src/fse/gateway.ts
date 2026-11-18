@@ -16,6 +16,33 @@ export const fiscalCodeClaim = (cf: string) => `${cf}^^^&2.16.840.1.113883.2.9.4
 /** Tipo di documento del PSS nei token (resource_hl7_type, 16.1): LOINC 60591-5. */
 export const PSS_RESOURCE_TYPE = "('60591-5^^2.16.840.1.113883.6.1')";
 
+/**
+ * Attività clinica (metadato tipoAttivitaClinica): codice e nome della tabella 57 della specifica
+ * del Gateway 2.26, che la prende dall'Affinity Domain Italia 2.5.
+ */
+export const FSE_CLINICAL_ACTIVITIES = {
+  PHR: 'Personal Health Record Update',
+  CON: 'Consulto',
+  DIS: 'Discharge',
+  ERP: 'Erogazione Prestazione Prenotata',
+  Sistema_TS: 'Documenti sistema TS',
+  INI: 'Documenti INI',
+  PN_DGC: 'Documenti PN-DGC',
+  OBS: 'Documento stato di salute',
+} as const;
+export type FseClinicalActivity = keyof typeof FSE_CLINICAL_ACTIVITIES;
+
+/** Regime di erogazione (metadato administrativeRequest): tabella 63 della stessa specifica. */
+export const FSE_ADMINISTRATIVE_REQUESTS = {
+  SSN: 'Regime SSN',
+  INPATIENT: 'Regime di ricovero',
+  NOSSN: 'Regime privato',
+  SSR: 'Regime SSR',
+  DONOR: 'Regime donatori',
+  AUTO: 'Autoprodotto',
+} as const;
+export type FseAdministrativeRequest = keyof typeof FSE_ADMINISTRATIVE_REQUESTS;
+
 export interface FseCertificate {
   der: Buffer;
   /** Chiave privata in PEM: nel programma vero viene dalle credenziali cifrate. */

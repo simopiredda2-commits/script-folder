@@ -19,6 +19,7 @@ import {
   ROUTES,
   TIMES_OF_DAY,
 } from '../lib/therapy';
+import { useCatalog } from '../lib/clinical';
 import { useApi } from '../lib/useApi';
 import { drugFacts, useDebounced, type Drug } from './PrescriptionEditor';
 import { PatientBanner, type Patient, type Summary, type TherapyFull } from './RecordPage';
@@ -410,6 +411,8 @@ export function TherapyForm() {
   const { id, therapyId } = useParams<{ id: string; therapyId?: string }>();
   const navigate = useNavigate();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
+  // Le vie con il codice del dizionario ufficiale vengono dal dominio (tappa 11).
+  const routes = useCatalog().data?.vieSomministrazione ?? ROUTES;
   const therapies = useApi<{ terapie: TherapyFull[] }>(
     therapyId ? `/api/pazienti/${id}/terapie` : null,
   );
@@ -652,7 +655,7 @@ export function TherapyForm() {
                     onChange={(e) => update({ route: e.target.value })}
                   >
                     <option value="">Non indicata</option>
-                    {choices(ROUTES, d.route).map((v) => (
+                    {choices(routes, d.route).map((v) => (
                       <option key={v}>{v}</option>
                     ))}
                   </select>

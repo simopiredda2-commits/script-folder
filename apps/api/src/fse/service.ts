@@ -204,6 +204,33 @@ export function createPssService(deps: PssDeps) {
     });
   }
 
+  /**
+   * Lo stato della transazione: il Profilo è pubblicato quando i metadati sono andati a INI;
+   * con la versione nuova la precedente risulta sostituita. Altrimenti resta preso in carico.
+   */
+  async function checkIni(actor: Actor, patientCf: string, who: FseCaller, r: Row) {
+    const st = await deps.gateway.status(who, patientCf, r.workflowInstanceId!);
+    await logCall(r.id, actor, 'status', st.outcome === 'ok' ? { outcome: 'ok' } : st);
+    if (
+      st.outcome === 'ok' &&
+      st.events.some((e) => e.eventType === 'SEND_TO_INI' && e.eventStatus === 'SUCCESS')
+    ) {
+      const at = now();
+      await withActor(db, actor.userId, async (tx) => {
+        await tx
+          .update(pssDocument)
+          .set({ status: 'published', publishedAt: at })
+          .where(eq(pssDocument.id, r.id));
+        if (r.replacesId)
+          await tx
+            .update(pssDocument)
+            .set({ status: 'replaced', replacedAt: at })
+            .where(eq(pssDocument.id, r.replacesId));
+      });
+    }
+    return st;
+  }
+
   /** Il documento CDA2 dalle voci incluse, con le assenze per le sezioni obbligatorie vuote. */
   function cdaInput(
     r: Row,
@@ -553,31 +580,38 @@ export function createPssService(deps: PssDeps) {
           );
         throw gatewayError(res);
       }
-      const at = now();
       await withActor(db, actor.userId, (tx) =>
         tx
           .update(pssDocument)
-          .set({ status: 'submitted', submittedAt: at, lastProblem: null })
+          .set({ status: 'submitted', submittedAt: now(), lastProblem: null })
           .where(eq(pssDocument.id, r.id)),
       );
-      // Lo stato della transazione: pubblicato quando i metadati sono andati a INI.
-      const st = await deps.gateway.status(who, patient.fiscalCode, r.workflowInstanceId!);
-      await logCall(r.id, actor, 'status', st.outcome === 'ok' ? { outcome: 'ok' } : st);
-      if (
-        st.outcome === 'ok' &&
-        st.events.some((e) => e.eventType === 'SEND_TO_INI' && e.eventStatus === 'SUCCESS')
-      )
-        await withActor(db, actor.userId, async (tx) => {
-          await tx
-            .update(pssDocument)
-            .set({ status: 'published', publishedAt: at })
-            .where(eq(pssDocument.id, r.id));
-          if (replaces)
-            await tx
-              .update(pssDocument)
-              .set({ status: 'replaced', replacedAt: at })
-              .where(eq(pssDocument.id, replaces.id));
-        });
+      await checkIni(actor, patient.fiscalCode, who, await load(patientId, r.id));
+      return view(await load(patientId, r.id));
+    },
+
+    /**
+     * Preso in carico, ma i metadati non risultavano ancora a INI: si chiede di nuovo lo stato
+     * della transazione al Gateway. Pubblicato solo quando l'invio a INI è riuscito.
+     */
+    async refreshStatus(actor: Actor, patientId: string, docId: string) {
+      const { patient } = await guardPatient(
+        db,
+        actor,
+        patientId,
+        'fse.publish',
+        'stato_profilo_sanitario',
+      );
+      const r = await load(patientId, docId);
+      if (r.status !== 'submitted')
+        throw new HttpError(
+          409,
+          'Lo stato si controlla per il Profilo preso in carico dal Gateway',
+        );
+      const s = (await settingsOf(actor.studioId))!;
+      const d = (await doctorOf(actor.userId))!;
+      const st = await checkIni(actor, patient.fiscalCode, caller(s, d.fiscalCode!), r);
+      if (st.outcome !== 'ok' && st.outcome !== 'problem') throw gatewayError(st);
       return view(await load(patientId, r.id));
     },
 

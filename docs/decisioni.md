@@ -439,3 +439,46 @@ Non si raggiungono da qui la guida HL7 Italia e il portale del Fascicolo; al lor
 **D131 · Copie dei file ufficiali nel repository.** Lo schematron del PSS, sedici dizionari e un estratto LOINC sono in `packages/integrations/fse-ufficiale/`. Ogni file ha la sua provenienza (repository e commit del Ministero) e l'impronta SHA-256, e una prova controlla che nessuno li cambi a mano. Motivo: le prove e il simulatore devono girare senza rete, e il documento del programma va controllato con le regole vere. Il repository del Ministero non indica una licenza: è una domanda per la fermata. Per LOINC c'è l'avviso di licenza.
 
 **D132 · Il simulatore del Gateway applica lo schematron ufficiale.** Come il Gateway vero, la validazione del simulatore controlla il documento con lo schematron e risponde con gli stessi tipi di errore (RFC 7807). Lo schematron usa XPath 1.0 più una funzione di XPath 2 (`matches`). Lo esegue un piccolo motore nostro su due librerie con licenza MIT, `@xmldom/xmldom` e `xpath`. Non provato: i controlli sui dizionari (errore «vocabolario») che il Gateway fa oltre allo schematron. Il simulatore controlla solo i codici dei dizionari copiati.
+
+**D133 · Impostazioni del Fascicolo dello studio.** Servono i valori che lo studio riceve con l'accreditamento: radice OID dei documenti, identificativo del repository, radice OID degli invii, custode del documento, struttura del medico nel formato XON. Restano «da completare» finché la Regione non li assegna. Tre valori sono fissi:
+
+- organizzazione 010, Regione Piemonte, che usa il Gateway nazionale (D130);
+- tipologia della struttura «Territorio»: la tabella 58 la indica per i documenti di «uno specialista territoriale (ad es. MMG, PLS)»;
+- assetto organizzativo AD_PSC130, «Medicina di Base».
+
+Tipo di attività clinica e regime si scelgono tra i valori delle tabelle 57 e 63 della specifica del Gateway; codici e nomi stanno in un solo posto (`FSE_CLINICAL_ACTIVITIES`, `FSE_ADMINISTRATIVE_REQUESTS`), usato dal simulatore, dal servizio e dall'interfaccia. Nelle prove e nei dati dimostrativi si usano OBS («Documento stato di salute») e SSN («Regime SSN»): sono una proposta da confermare alla fermata. Le impostazioni le cambia l'amministratore nella pagina «Strumenti dello studio», che compare solo nel suo menu; chi lavora nello studio le legge.
+
+**D134 · Il programma propone, il medico sceglie e conferma.** Dalla cartella si propongono:
+
+- le patologie croniche, gli organi mancanti, i trapianti e le malformazioni;
+- le allergie attive;
+- le terapie in corso, se hanno l'AIC o l'ATC e la via;
+- l'anamnesi familiare, se ha il parente e il codice della patologia;
+- gli ultimi parametri, gli stili di vita e la capacità motoria.
+
+Le voci oscurate non entrano mai (art. 4, c. 3). Le riservate non si propongono: la pagina dice quante sono, e per farle entrare si toglie la riservatezza nella cartella. Una voce a cui manca un dato non si può spuntare, e la pagina dice che cosa manca.
+
+Una sezione obbligatoria senza voci dice l'assenza con i codici ufficiali: per difetto «nessuna informazione»; «nessuna allergia nota» e simili solo se li sceglie il medico. Prima della validazione il medico conferma di aver controllato il contenuto voce per voce. Se cambia una scelta, la conferma si ripete. Motivo: il programma prepara, ma il documento è del medico che lo firma (regola 3: nessuna scelta clinica automatica).
+
+**D135 · Campi nuovi nelle voci cliniche, dai dizionari ufficiali.**
+
+- Problema: «patologia cronica»; categoria (diagnosi, organo mancante, trapianto, malformazione). L'organo mancante ha solo il codice del dizionario ICD-10 «Organi mancanti».
+- Allergia: allergia o intolleranza; l'agente; il codice, cioè AIC o ATC per i farmaci, oppure l'elenco «Allergeni (No Farmaci)»; la criticità; «non più attiva».
+- Anamnesi familiare: parente, patologia in ICD-9-CM, età all'esordio.
+- Capacità motoria: un tipo di voce nuovo.
+
+La scheda della terapia offre le dodici vie con il codice HL7. Le prende dal dominio attraverso il catalogo, così una terapia nuova ha sempre una via che il Profilo sa codificare.
+
+**D136 · Validare, firmare, pubblicare, controllare lo stato.** Il medico valida: prima lo schematron nel programma, poi la validazione del Gateway. Poi firma (PAdES) e pubblica, oppure sostituisce la versione precedente. Infine il programma chiede lo stato della transazione.
+
+Il Profilo è «pubblicato» solo quando lo stato dice che i dati sono arrivati a INI (SEND_TO_INI riuscito). Prima è «preso in carico», e la pagina ha «Controlla lo stato»; il simulatore può rispondere in due tempi per provarlo. Il servizio che valida e crea con una sola chiamata non si usa: il medico firma solo quello che il Gateway ha già validato. La specifica fa rifiutare i documenti più vecchi di 5 giorni (errore `max-day-limit-exceed`): la pagina lo ricorda dopo la validazione.
+
+**D137 · Firma del Profilo simulata.** Il PDF si firma PAdES con un certificato di prova per ogni medico (`SimulatedDocumentSigner`). La firma digitale vera ha bisogno di un fornitore di firma qualificata (remota o con dispositivo) da scegliere: è una domanda per la fermata. L'interfaccia `DocumentSigner` è già quella che il fornitore vero dovrà rispettare.
+
+**D138 · Certificati del Gateway.** Il Gateway vuole due certificati che Sogei rilascia con l'accreditamento: uno per il collegamento e uno per firmare i token. Il simulatore ne rilascia di prova e rifiuta quelli che non ha rilasciato. Quelli veri non entrano nel repository (regola 7): andranno tra i segreti del servizio.
+
+**D139 · Versioni del Profilo.** Ogni versione nuova tiene lo stesso `setId`, ha il numero successivo e dichiara che sostituisce la precedente (RPLC). Il Gateway la riceve come sostituzione. La precedente resta consultabile con il suo PDF firmato e resta «pubblicata» finché INI non conferma la nuova. Il codice P81 («Versioni precedenti Profilo Sanitario Sintetico») non si usa ancora: il suo uso va chiarito con la Regione (`docs/fse.md`).
+
+**D140 · Recapiti di studio del medico.** Il Profilo vuole nome e cognome del medico separati e almeno un recapito (schematron, ERRORE-38 ed ERRORE-40). Si inseriscono nella pagina «Recapiti di studio», raggiungibile da «Credenziali dei servizi» e dall'avviso del Profilo quando manca qualcosa. Li cambia solo il medico stesso. Il codice fiscale del medico resta quello del profilo creato con l'account: qui non si cambia.
+
+**D141 · Indirizzo del paziente fuori dal Profilo.** Lo schematron non lo chiede. Se c'è, però, deve avere anche il codice ISTAT del comune (ERRORE-11), che l'anagrafica non ha. Per ora non entra; il programma lo scrive solo se è completo. Da rivedere quando l'anagrafica avrà il codice ISTAT del comune di residenza.

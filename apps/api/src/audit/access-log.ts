@@ -76,6 +76,7 @@ export type AccessAction =
   | 'bozza_profilo_sanitario'
   | 'validazione_profilo_sanitario'
   | 'pubblicazione_profilo_sanitario'
+  | 'stato_profilo_sanitario'
   | 'scarto_profilo_sanitario'
   | 'pdf_profilo_sanitario';
 

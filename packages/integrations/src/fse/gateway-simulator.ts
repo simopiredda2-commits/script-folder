@@ -20,7 +20,12 @@ import type {
   FseHttpResponse,
   FseTransport,
 } from './gateway';
-import { PSS_RESOURCE_TYPE, textOf } from './gateway';
+import {
+  FSE_ADMINISTRATIVE_REQUESTS,
+  FSE_CLINICAL_ACTIVITIES,
+  PSS_RESOURCE_TYPE,
+  textOf,
+} from './gateway';
 import { readJwt } from './jwt';
 import { extractCda, readPades } from './pdf';
 import { pssSchematron } from './schematron';
@@ -29,7 +34,12 @@ import { certificateFingerprint, createTestCertificate } from './x509';
 /** Destinatario dei token per il simulatore (nel servizio vero è l'indirizzo di base). */
 export const SIMULATED_FSE_AUDIENCE = 'simulatore-gateway-fse/v1';
 
-export type SimulatedFseOutcome = 'ok' | 'unreachable' | 'timeout' | 'internal-error';
+/**
+ * Esito deciso dalla prova. «ini-pending»: la pubblicazione è presa in carico (202) ma l'invio
+ * dei metadati a INI arriva dopo; finché lo stato è chiesto con «ini-pending» resta in attesa.
+ */
+export type SimulatedFseOutcome =
+  'ok' | 'unreachable' | 'timeout' | 'internal-error' | 'ini-pending';
 type Operation = 'validation' | 'publication' | 'replacement' | 'status';
 
 /** Tabelle dei valori delle specifiche (16.3) usate nei controlli dei metadati. */
@@ -62,8 +72,8 @@ const CLASS_CODES = [
   'PRO',
   'COL',
 ];
-const CLINICAL_ACTIVITIES = ['PHR', 'CON', 'DIS', 'ERP', 'Sistema_TS', 'INI', 'PN_DGC', 'OBS'];
-const ADMINISTRATIVE_REQUESTS = ['SSN', 'INPATIENT', 'NOSSN', 'SSR', 'DONOR', 'AUTO'];
+const CLINICAL_ACTIVITIES: string[] = Object.keys(FSE_CLINICAL_ACTIVITIES);
+const ADMINISTRATIVE_REQUESTS: string[] = Object.keys(FSE_ADMINISTRATIVE_REQUESTS);
 const ROLES = [
   'AAS',
   'APR',
@@ -121,6 +131,8 @@ interface Workflow {
   documentId: string;
   activity: 'VALIDATION' | 'VERIFICA';
   events: FseEvent[];
+  /** Pubblicato, ma i metadati non sono ancora andati a INI. */
+  iniPending?: boolean;
 }
 interface Published {
   workflowInstanceId: string;
@@ -229,7 +241,7 @@ export class SimulatedFseGateway implements FseTransport {
             'Errore generico.',
             'Simulatore: errore interno, per prova',
           )
-        : await this.handle(op, req);
+        : await this.handle(op, req, outcome);
     this.log.push({
       operation: op,
       status: 'status' in res ? res.status : 0,
@@ -444,7 +456,11 @@ export class SimulatedFseGateway implements FseTransport {
     return null;
   }
 
-  private async handle(op: Operation, req: FseHttpRequest): Promise<Reply> {
+  private async handle(
+    op: Operation,
+    req: FseHttpRequest,
+    outcome: SimulatedFseOutcome,
+  ): Promise<Reply> {
     const tokens = this.checkTokens(req, op, req.file);
     if ('status' in tokens) return tokens;
     if (op === 'status') {
@@ -457,6 +473,14 @@ export class SimulatedFseGateway implements FseTransport {
           'Record non trovato.',
           'Transazione non trovata',
         );
+      if (w.iniPending && outcome !== 'ini-pending') {
+        w.events.push({
+          eventType: 'SEND_TO_INI',
+          eventStatus: 'SUCCESS',
+          eventDate: this.now().toISOString(),
+        });
+        w.iniPending = false;
+      }
       const trace = hex(8);
       return { status: 200, body: { traceID: trace, spanID: trace, transactionData: w.events } };
     }
@@ -621,10 +645,18 @@ export class SimulatedFseGateway implements FseTransport {
       old.replacedBy = d.documentId;
     }
     this.documents.set(d.documentId, { workflowInstanceId: wii, patientCf: d.patientCf });
-    w.events.push(
-      { eventType: 'PUBLICATION', eventStatus: 'SUCCESS', eventDate: at.toISOString() },
-      { eventType: 'SEND_TO_INI', eventStatus: 'SUCCESS', eventDate: at.toISOString() },
-    );
+    w.events.push({
+      eventType: 'PUBLICATION',
+      eventStatus: 'SUCCESS',
+      eventDate: at.toISOString(),
+    });
+    if (outcome === 'ini-pending') w.iniPending = true;
+    else
+      w.events.push({
+        eventType: 'SEND_TO_INI',
+        eventStatus: 'SUCCESS',
+        eventDate: at.toISOString(),
+      });
     const trace = hex(8);
     return { status: 202, body: { traceID: trace, spanID: trace, workflowInstanceId: wii } };
   }

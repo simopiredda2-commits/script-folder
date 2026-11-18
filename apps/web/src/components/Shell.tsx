@@ -127,6 +127,9 @@ export function Shell({ children }: { children: ReactNode }) {
             ...(me?.archivio
               ? [{ to: '/archivio', label: 'Archivio', icon: 'archivio' as const, end: false }]
               : []),
+            ...(me?.ruoli.some((r) => r.codice === 'administrator')
+              ? [{ to: '/strumenti', label: 'Strumenti', icon: 'strumenti' as const, end: false }]
+              : []),
           ].map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className="menu-voce">
               <Icon name={n.icon} />

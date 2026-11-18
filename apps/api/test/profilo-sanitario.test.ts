@@ -259,6 +259,42 @@ describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
     expect((await ok<Pss>('POST', `${base()}/${draft.id}/scarta`)).stato).toBe('discarded');
   });
 
+  it('preso in carico ma non ancora a INI: resta in lavorazione finché lo stato non lo conferma', async () => {
+    const v3 = await ok<Pss>('POST', `${base()}/bozza`);
+    await ok('POST', `${base()}/${v3.id}/valida`, { confermo: true });
+    mode = 'ini-pending';
+    expect((await ok<Pss>('POST', `${base()}/${v3.id}/firma-e-pubblica`)).stato).toBe('submitted');
+    const waiting = await ok<{ versioni: Pss[]; inLavorazione: Pss }>('GET', base());
+    expect(waiting.inLavorazione).toMatchObject({ id: v3.id, stato: 'submitted' });
+    // La versione precedente resta quella pubblicata finché INI non ha la nuova.
+    expect(waiting.versioni.map((v) => [v.versione, v.stato])).toEqual([
+      [2, 'published'],
+      [1, 'replaced'],
+    ]);
+    expect((await ok<Pss>('POST', `${base()}/${v3.id}/stato`)).stato).toBe('submitted');
+    mode = 'ok';
+    expect((await ok<Pss>('POST', `${base()}/${v3.id}/stato`)).stato).toBe('published');
+    const after = await ok<{ versioni: Pss[]; inLavorazione: Pss | null }>('GET', base());
+    expect(after.inLavorazione).toBeNull();
+    expect(after.versioni.map((v) => [v.versione, v.stato])).toEqual([
+      [3, 'published'],
+      [2, 'replaced'],
+      [1, 'replaced'],
+    ]);
+    expect((await req('POST', `${base()}/${v3.id}/stato`)).statusCode).toBe(409);
+    const calls = await t.db
+      .select()
+      .from(fseTransmission)
+      .where(eq(fseTransmission.documentId, v3.id));
+    expect(calls.map((c) => c.operation).sort()).toEqual([
+      'replacement',
+      'status',
+      'status',
+      'status',
+      'validation',
+    ]);
+  });
+
   it('chi può: il collega di gruppo e la segreteria no; il contenuto validato non cambia nel database', async () => {
     // Il collega della medicina di gruppo, autorizzato: legge la cartella, non firma il Profilo.
     const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));

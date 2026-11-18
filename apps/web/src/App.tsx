@@ -4,6 +4,7 @@ import { Shell } from './components/Shell';
 import { OpenRecordsProvider } from './lib/openRecords';
 import { SessionProvider, useSession } from './lib/session';
 import { DataSearchPage } from './pages/DataSearchPage';
+import { DoctorContactsPage } from './pages/DoctorContactsPage';
 import { ExamsPage } from './pages/ExamsPage';
 import { FollowUpPage } from './pages/FollowUpPage';
 import { ArchivePage } from './pages/ArchivePage';
@@ -19,6 +20,7 @@ import { PrivacyPage } from './pages/PrivacyPage';
 import { RecordPage } from './pages/RecordPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { ServiceCredentialsPage } from './pages/ServiceCredentialsPage';
+import { StudioToolsPage } from './pages/StudioToolsPage';
 import { SignQueuePage } from './pages/SignQueuePage';
 import { SuppliesPage } from './pages/SuppliesPage';
 import { HealthProfilePage } from './pages/HealthProfilePage';
@@ -61,6 +63,8 @@ function Screens() {
           <Route path="/banche-dati" element={<DataSearchPage />} />
           <Route path="/archivio" element={<ArchivePage />} />
           <Route path="/profilo/credenziali" element={<ServiceCredentialsPage />} />
+          <Route path="/profilo/recapiti" element={<DoctorContactsPage />} />
+          <Route path="/strumenti" element={<StudioToolsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Shell>

@@ -15,7 +15,24 @@ export const FREQUENCIES = [
 
 export const TIMES_OF_DAY = ['al mattino', 'a pranzo', 'la sera', 'indifferente'] as const;
 
-export const ROUTES = ['per bocca', 'sottocute', 'inalatoria', 'cutanea', 'oculare'] as const;
+/**
+ * Vie di somministrazione mentre il catalogo non è ancora arrivato: le stesse del dominio
+ * (THERAPY_ROUTES), che le associa ai codici del dizionario ufficiale per il Profilo.
+ */
+export const ROUTES = [
+  'per bocca',
+  'sublinguale',
+  'sottocute',
+  'intramuscolare',
+  'endovenosa',
+  'inalatoria',
+  'cutanea',
+  'transdermica',
+  'oculare',
+  'nasale',
+  'rettale',
+  'vaginale',
+] as const;
 
 /** Quante volte al giorno, per ogni frequenza dell'elenco. */
 const TIMES_PER_DAY: Record<string, number> = {
