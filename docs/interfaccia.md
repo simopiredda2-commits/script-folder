@@ -30,6 +30,8 @@ All'accesso si sceglie un utente del seed (`medico`, `segreteria`, `sostituto`);
 | ![](schermate/14-schema-orario.png)            | Schema orario da stampare: momento della giornata, come si prende, fino a quando (D83)                             |
 | ![](schermate/15-recapiti.png)                 | Anagrafica e recapiti modificabili dalla cartella (D86)                                                            |
 | ![](schermate/16-archivio.png)                 | Archivio del titolare: che cosa vede la segreteria ed esportazione completa (D84)                                  |
+| ![](schermate/17-promemoria.png)               | Promemoria dopo l’invio: PDF, solo NRE, email o SMS al paziente o a un delegato (tappa 7)                          |
+| ![](schermate/18-promemoria-pdf.png)           | Il promemoria della ricetta SSN dal modello del DM 2/11/2011, con codice di autenticazione e riga piemontese (D93) |
 
 Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al file), su un database appena preparato con il seed.
 
@@ -41,6 +43,7 @@ Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al f
 - **Ricette**: la segreteria prepara e manda alla firma; il medico controlla, conferma le note, scrive i motivi e firma. Se l'ente non risponde, la ricetta rossa; se l'esito è incerto, niente ricetta rossa finché non è chiaro.
 - **Storico** di ogni farmaco e prestazione: confezioni degli ultimi 12 mesi, autori, controlli, passaggi con l'ente; annullamento solo se l'ente non ha ancora lavorato la ricetta, e le annullate restano (D70).
 - **Terapia**: nuova, modifica, sospensione con motivo (la reazione avversa va tra le allergie), ripresa, schema orario da stampare (D80–D83). I controlli formali si vedono prima di salvare, vicino al campo, e il servizio li ripete.
+- **Promemoria** (tappa 7): dopo l’invio, nell’editor, nella coda delle ricette e nello storico. La ricetta bianca consegna solo il PDF del SAC (D93).
 - **Accesso**: password e secondo fattore; dopo 5 minuti senza attività la sessione si blocca e si sblocca con il codice. All'uscita il browser non conserva dati dei pazienti.
 
 ## Accessibilità (WCAG 2.2 AA)

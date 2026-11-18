@@ -6,6 +6,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 - **Primo giro (tappe 0–6) chiuso.** Pull request #1, #2 e #3 su `main`, l'ultima con la terapia completa e i collegamenti pronti (D79–D88), unita con il via di Simone del 18/11/2026.
 - **Secondo giro (tappe 7–10) avviato** con il via di Simone: «fai tutto, nell'ordine che ritieni giusto» (D90). Ordine: promemoria e invio, certificati INPS (terza fermata), voci cliniche, presidi e seguito delle prestazioni (fermata finale). Branch `tappe-7-8`, poi `tappe-9-10`.
+- **Tappa 7 fatta** (promemoria e invio, D92–D99); si prosegue con la tappa 8 sullo stesso branch.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -236,6 +237,39 @@ Scelta di Simone con il pulsante: «Terapia + collegamenti pronti». Decisioni D
 
 - Stampa su una stampante vera; lettori di schermo veri; la scheda con la Dr.ssa Rocca.
 
+### Tappa 7 – Promemoria e invio
+
+Fonti ufficiali lette il 18/11/2026 (sessione nell'ambiente «Folder», D92): DM 2/11/2011 allegato 2; specifiche del Sistema TS, prescrizione, 5/12/2024; Regione Piemonte, SIRPE «Cartelle cliniche MMG e PLS»; disciplinare tecnico della ricetta bianca, 1/12/2022; DM 30/12/2020. Dettagli in `docs/ricetta.md`, «Promemoria e invio».
+
+**Fatto**
+
+- **Promemoria della ricetta SSN** dal modello del decreto. Contiene il codice a barre 3-of-9 alle misure del decreto, il codice di autenticazione del SAC e la riga piemontese «codice regionale – nominativo». I dati si fissano all'invio, così ogni ristampa è identica. C'è anche il foglio «solo NRE».
+- **Codice di autenticazione.** Senza, la ricetta va in errore e il promemoria non esce (D96). Prima dell'invio servono la regione dello studio e il codice fiscale del medico (D95).
+- **Ricetta bianca.** Si consegna solo il PDF del SAC, conservato byte per byte. Nell'editor si indicano ripetibilità e validità (D93).
+- **Oscuramento di nome e indirizzo** su richiesta del paziente, per le ricette SSN.
+- **Invio per email** (promemoria allegato) **e SMS** (solo il numero), al paziente o a un delegato con delega valida oggi. Il servizio è simulato e ogni consegna è registrata in una tabella che non si modifica (D98).
+- **Tempo massimo di attesa dell'invio**: 8 secondi, come indica la Regione (D94).
+- **Interfaccia.** Pannello «Promemoria» dopo l'invio, nella coda delle ricette e nello storico. Schermate 17 e 18.
+- **Migrazione 0008.** Campi `auth_code`, `sac_doctor_name`, `pin_nrbe`, `obscured`, ripetibilità delle righe, `studio.region_name`, `doctor_profile.fiscal_code`. Tabelle `prescription_document` e `reminder_delivery`, nell'esportazione.
+
+**Provato**
+
+- **Servizio**: 17 prove nuove (`apps/api/test/promemoria.test.ts`), che leggono il testo vero dei PDF con pdfjs-dist. Coprono campi del modello, riga del medico, codice di autenticazione, solo NRE, oscuramento, ristampa identica dopo un cambio di anagrafica, rifiuto senza codice, specialistica, ricetta bianca byte per byte, ripetibilità solo sulla bianca, email e SMS, deleghe valide e revocate e di un altro paziente, servizio di invio irraggiungibile, segreteria, prerequisiti prima dell'invio, tempo massimo.
+- **Code 39**: ogni carattere disegna le stesse barre di bwip-js, che è un'implementazione indipendente (D99).
+- **Browser**: 2 prove nuove, 21 in tutto, con axe, bersagli di 44 px e tablet.
+- **Prove complete**: 598 TypeScript e 5 di `sync/`, verdi.
+- **Sabotaggi**: 10 nuovi, tutti rossi e poi verdi (registro sotto).
+
+**Non fatto**
+
+- Posizioni di stampa, suddivisione dell'NRE nei codici a barre e dicitura delle specifiche di stampa del 1/3/2016: il documento non è sul portale. Carattere OCR-A per l'NRE in chiaro (D97).
+- Fornitore vero di email e SMS; frase regionale nell'ultima riga del promemoria.
+
+**Non provato**
+
+- Lettura del codice a barre con un lettore vero; stampa su carta.
+- Il promemoria con la Dr.ssa Rocca e con una farmacia.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:
@@ -458,3 +492,13 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D83: su carta solo il foglio                              | Regola di stampa tolta                             | Rosso, poi verde                                                                                                                                                                   |
 | Barra delle cartelle corta sulle pagine corte             | Righe della griglia come prima                     | Rosso, poi verde                                                                                                                                                                   |
 | Prova del menu senza dipendere dai tempi                  | Ricerca in tutta la pagina                         | Rosso, poi verde                                                                                                                                                                   |
+| Senza codice di autenticazione la ricetta non vale        | Controllo tolto                                    | Rosso, poi verde                                                                                                                                                                   |
+| Ricetta bianca: solo il PDF del SAC                       | Ramo della bianca tolto                            | Rosso, poi verde                                                                                                                                                                   |
+| Oscuramento di nome e indirizzo                           | Oscuramento ignorato                               | Rosso, poi verde                                                                                                                                                                   |
+| Delega revocata non vale                                  | Revoca ignorata                                    | Rosso, poi verde                                                                                                                                                                   |
+| Ristampa dai dati fissati all'invio                       | Dati ricostruiti dall'anagrafica di oggi           | Rosso, poi verde                                                                                                                                                                   |
+| Tempo massimo di attesa dell'invio                        | Attesa mille volte più lunga                       | Rosso, poi verde                                                                                                                                                                   |
+| Prima dell'invio il promemoria si deve poter fare         | Controllo tolto                                    | Rosso, poi verde                                                                                                                                                                   |
+| Documenti del promemoria immutabili                       | Trigger solo sulla cancellazione                   | Rosso, poi verde                                                                                                                                                                   |
+| Code 39: largo 2,5 volte lo stretto                       | Rapporto 3                                         | Rosso, poi verde                                                                                                                                                                   |
+| Pannello del promemoria dopo l'invio (browser)            | Pannello tolto dall'editor                         | Rosso, poi verde                                                                                                                                                                   |

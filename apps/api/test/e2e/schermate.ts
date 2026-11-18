@@ -7,7 +7,8 @@
  * Vuole DATABASE_URL e APP_ENCRYPTION_KEY, e un medico che non ha ancora attivato il secondo
  * fattore (il primo accesso dopo il seed). Solo pazienti inventati; nessun sito esterno.
  */
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -82,6 +83,19 @@ try {
   await reminder.getByRole('button', { name: 'Invia' }).waitFor();
   await reminder.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await shot(page, '17-promemoria');
+  // Il PDF del promemoria come lo riceve il paziente, in immagine (serve pdftoppm, di poppler).
+  const href = await reminder.getByRole('link', { name: 'Promemoria (PDF)' }).getAttribute('href');
+  const pdfPath = join(work, 'promemoria.pdf');
+  writeFileSync(pdfPath, await (await page.request.get(`${base}${href}`)).body());
+  execFileSync('pdftoppm', [
+    '-png',
+    '-r',
+    '96',
+    '-singlefile',
+    pdfPath,
+    join(OUT, '18-promemoria-pdf'),
+  ]);
+  console.log('  18-promemoria-pdf.png');
 
   // Il paziente della ricetta appena inviata: cartella, scheda della terapia con lo storico.
   const sent = await db.execute<{ patient_id: string; therapy_id: string }>(sql`
