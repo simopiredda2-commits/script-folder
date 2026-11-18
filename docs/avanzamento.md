@@ -4,9 +4,9 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 ## Dove siamo
 
-- Branch attivo: `tappe-0-2`, con la pull request verso `main` aperta per la prima fermata.
-- Tappe fatte: 0, 1, 2.
-- **Prima fermata fatta**: risposte applicate su `tappe-0-2` (vedi sotto e D29–D34); si unisce la pull request #1 e si parte con la tappa 3 su `tappe-3-4`. Seconda fermata dopo la tappa 4.
+- `main` contiene le tappe 0–2 (pull request #1 unita il 18/11/2026 con il via di Simone).
+- Branch attivo: `tappe-3-4`. Tappa 3 fatta; in corso la tappa 4 (regole di prescrizione), poi la **seconda fermata** con la pull request del blocco 3–4.
+- Prossimo passo: motore delle regole in `packages/rules`, valori e fonti come dati.
 
 ## Come provarlo
 
@@ -99,6 +99,27 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 - Il servizio collegato al database con un utente che non possiede le tabelle (vedi «Cose irreversibili non fatte»).
 - Interfaccia di accesso e blocco schermo: arrivano alla tappa 6.
 
+### Tappa 3 – Ciclo della ricetta
+
+**Fatto**
+
+- Stati e transizioni in `packages/domain/src/prescription.ts`: bozza, da firmare, in invio, inviata, errore (rifiutata, non raggiungibile, esito incerto), annullata, stampata su ricetta rossa. Descritti in `docs/ricetta.md`.
+- `packages/integrations`: interfaccia di invio per SAR e Sistema TS e simulatore con i quattro esiti.
+- Migrazione 0004: ricette, righe, invii esterni (immutabili); storico e divieto di cancellazione per ricette e righe.
+- Servizio e rotte: bozza del medico, ripetizione della segreteria (nella coda «da firmare»), firma e invio con presa in carico atomica, annullamento locale o tramite SAR, ripiego sulla ricetta rossa, code «da firmare» e «invii non riusciti», elenco delle ricette del paziente (senza quelle di terapie riservate per chi non le vede).
+- Aggancio per i controlli prima dell'invio (`preSendChecks`): blocca l'invio e registra la versione delle regole. Lo riempie la tappa 4.
+- Esportazione estesa a ricette, righe e invii esterni.
+
+**Provato**
+
+- Prova esaustiva delle transizioni (ogni stato per ogni evento e tipo di errore).
+- Percorsi completi attraverso il servizio con il simulatore: invio riuscito, rifiuto e correzione, rete assente e ricetta rossa, esito incerto e nuovo invio, guasto dell'adattatore, annullamento con SAR non raggiungibile e poi riuscito, annullamento di una bozza, ricetta bianca al Sistema TS, due firme contemporanee con un solo invio, sostituto che firma a nome suo, segreteria che non firma e non ripete terapie riservate o al bisogno.
+
+**Non provato**
+
+- Adattatori veri per SAR e Sistema TS: non esistono ancora (servono specifiche e credenziali di collaudo).
+- Stampa della ricetta rossa e del promemoria: c'è solo il contenuto da stampare.
+
 ## Risposte della prima fermata (18/11/2026)
 
 Simone ha risposto con il pulsante. **Applicate** sul branch `tappe-0-2` (decisioni D29–D34); poi si prosegue con le tappe 3–4 senza fermarsi di nuovo (via già dato).
@@ -177,3 +198,13 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | CSV con le virgolette giuste                              | Punto e virgola non più tra virgolette             | Rosso, poi verde                                                                                                                                                                   |
 | Logo scelto nell'interfaccia                              | Geometria diversa nel segno del prodotto           | Rosso, poi verde                                                                                                                                                                   |
 | Favicon dal logo scelto                                   | Colore cambiato nella favicon                      | Rosso, poi verde                                                                                                                                                                   |
+| Ricetta rossa solo se il sistema non risponde             | Ricetta rossa ammessa anche con esito incerto      | Rosso, poi verde                                                                                                                                                                   |
+| Un solo invio per ricetta                                 | Presa in carico senza controllo dello stato        | **Rimasto verde la prima volta**: le due richieste non erano davvero contemporanee. Prova riscritta con una barriera; poi rosso, poi verde                                         |
+| Ogni invio esterno registrato                             | Registrazione dell'invio tolta                     | Rosso, poi verde                                                                                                                                                                   |
+| Ripetizione della segreteria nella coda «da firmare»      | Ripetizione lasciata in bozza                      | Rosso, poi verde                                                                                                                                                                   |
+| Ricetta a nome di chi firma                               | Messaggio a nome di chi l'ha preparata             | Rosso, poi verde                                                                                                                                                                   |
+| Ricetta bianca al Sistema TS                              | Tutto al SAR                                       | Rosso, poi verde                                                                                                                                                                   |
+| Firma solo con il permesso di firma                       | Guardia con il permesso di lettura                 | Rosso, poi verde                                                                                                                                                                   |
+| Controlli bloccanti prima dell'invio                      | Blocchi ignorati                                   | Rosso, poi verde                                                                                                                                                                   |
+| Guasto dell'adattatore come esito incerto                 | Guasto trattato come rete assente                  | Rosso, poi verde                                                                                                                                                                   |
+| Nessun indirizzo di rete nelle integrazioni               | Indirizzo aggiunto al simulatore                   | Rosso, poi verde                                                                                                                                                                   |
