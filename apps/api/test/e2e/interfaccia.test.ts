@@ -915,6 +915,12 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Testo', { exact: true }).fill('Nota lasciata a metà.');
     await tab(b).click();
     await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    // Ciascuno il suo: mentre la nota del primo è in sospeso, la cartella dell'altro non la mostra.
+    await page.goto(`${base}/pazienti/${b}/voci?tipo=diario`);
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
+    await page.goto(`${base}/pazienti/${b}`);
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
     await page
       .getByRole('navigation', { name: 'Sezioni della cartella' })
       .getByRole('link', { name: 'Parametri' })
@@ -936,12 +942,6 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await expect(page.getByRole('textbox', { name: /^Peso/ }).inputValue()).resolves.toBe('70');
     await tab(a).click();
     await page.waitForURL(`**/pazienti/${a}/voci?tipo=diario`);
-    await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
-    await tab(b).click();
-    await page.waitForURL(`**/pazienti/${b}/parametri`);
-    // Ciascuno il suo: la nota di un paziente non compare nella cartella dell'altro.
-    await page.goto(`${base}/pazienti/${b}/voci?tipo=diario`);
-    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
     await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
   });
 
