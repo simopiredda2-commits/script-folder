@@ -26,6 +26,24 @@ Da verificare con la Dr.ssa Rocca alla seconda fermata. Fonte: «Prescrizioni e 
   - **sistema non raggiungibile**: la ricetta certamente non è arrivata. Si può riprovare oppure stampare la **ricetta rossa**, come dicono i requisiti («se SAR o Sistema TS non rispondono ma il programma sì, si stampa la ricetta rossa; senza rete resta il ricettario a mano»).
   - **esito incerto**: nessuna risposta in tempo, non si sa se la ricetta è arrivata. Niente ricetta rossa (si rischierebbe un doppione); si riprova l'invio. Come gestire questo caso va verificato sulle specifiche del SAR: i requisiti lo segnano «da verificare».
 - **Annullata**: prima dell'invio l'annullamento è solo nostro; dopo l'invio passa dal SAR, nei casi ammessi dalle specifiche. Se il SAR non risponde, la ricetta resta inviata. Serve sempre il motivo.
+
+## Annullamento e stato di erogazione (D70)
+
+Una ricetta inviata si annulla solo se l'ente non l'ha ancora lavorata. Prima di chiedere l'annullamento il prodotto chiede all'ente lo stato di erogazione:
+
+| Stato presso l'ente         | Si annulla?                                |
+| --------------------------- | ------------------------------------------ |
+| Non ancora presa in carico  | Sì, con il motivo                          |
+| Presa in carico o prenotata | No: rifiuto immediato, con la spiegazione  |
+| Erogata in parte o erogata  | No                                         |
+| Già annullata               | No                                         |
+| Non disponibile             | Decide l'ente all'annullamento, come prima |
+
+- Ogni verifica dello stato va nel registro degli invii (`external_submission`, operazione `stato`); nella ricetta restano l'ultimo stato noto e quando è stato verificato.
+- Nessuna ricetta si cancella: annullata, resta nello storico con chi, quando e perché, e si conta a parte («inviate e poi annullate»).
+- Nello storico di un farmaco o di una prestazione, «Verifica lo stato presso l'ente» e, solo se si può, «Annulla la ricetta».
+- Nella ricetta specialistica, aggiungere una prestazione già prescritta fa comparire subito un avviso con data, NRE e stato presso l'ente: è il caso del paziente che dice di non averla prenotata.
+- I nomi dei cinque stati sono del prodotto. **Da verificare sulle specifiche del SAR e del Sistema TS**: che il servizio di stato esista e quali codici restituisce, da mappare sui cinque stati.
 - **Stampata su ricetta rossa**: chiusa, non si invia più.
 
 ## Chi fa che cosa

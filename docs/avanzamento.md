@@ -5,7 +5,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 ## Dove siamo
 
 - `main` contiene le tappe 0–4 (pull request #1 e #2 unite il 18/11/2026 con il via di Simone).
-- Branch attivo: `tappe-5-6`. Tappa 5 fatta; prossimo passo: tappa 6 (interfaccia), poi la pull request #3 e la fermata finale.
+- Branch attivo: `tappe-5-6`. Tappe 5 e 6 fatte; pull request #3 per la **fermata finale**: domande con il pulsante, poi unione con il via di Simone e stop.
 
 ## Come provarlo
 
@@ -166,6 +166,32 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 
 - File veri AIFA e ISTAT completi; XLSX scritto da Excel; tempi su file grandi (vedi `docs/banche-dati.md`).
 
+### Tappa 6 – Interfaccia per PC e tablet
+
+**Fatto** (dettagli in `docs/interfaccia.md`, schermate in `docs/schermate/`, decisioni D65–D75)
+
+- Accesso con password e secondo fattore, sblocco con il codice a 6 cifre, uscita che svuota il browser.
+- Oggi, Pazienti con ricerca, Cartella (testata, riepilogo, terapia con «Ripeti», prestazioni prescritte, cronologia filtrabile), Scheda della terapia con lo storico delle prescrizioni (D65), storico di ogni prestazione (D66), Esami senza giudizio (D71), Ricerca farmaci e prestazioni con equivalenti e data della banca dati (A6), Ricetta farmaceutica e specialistica con controlli, conferme, motivi, firma e invio, Ricette da firmare e invii non riusciti con ricetta rossa.
+- Richieste di Simone durante la tappa: simboli accanto ai nomi (D67), fino a 20 cartelle aperte insieme con la ricetta in corso ricordata (D68), evidenziatore giallo con avvisi in arancio (D69), annullamento solo se l'ente non ha lavorato la ricetta, con lo storico che conserva tutto e l'avviso di prestazione già prescritta (D70).
+- Rotte nuove: storico delle prescrizioni, cronologia, esami, oggi, stato di erogazione (migrazione 0007).
+- Dati dimostrativi più ricchi e script delle schermate.
+
+**Provato**
+
+- 13 prove nel browser (Chromium): accesso con attivazione del secondo fattore, ogni schermata con axe-core (WCAG 2.2 A e AA), bersagli di almeno 44 px, tablet in verticale e in orizzontale, ricetta dalla banca dati fino all'NRE, segreteria che prepara e medico che firma, cartelle aperte e ricetta ricordata, verifica dello stato e annullamento, avviso di prestazione già prescritta, blocco e sblocco.
+- Prove del servizio per storico, cronologia, esami, oggi e annullamento (D70); prove dell'interfaccia (jsdom) per accesso, blocco, menu, cartelle aperte e uscita.
+- 13 sabotaggi (registro sotto): due non hanno fatto diventare rossa la prova al primo colpo e sono stati sistemati (prova rafforzata per D65; sabotaggio degli esami rifatto perché il primo non si era applicato davvero).
+
+**Non fatto**
+
+- Nuova terapia e modifiche (D72), agenda (in attesa della decisione su Ready!), riepiloghi, certificati, nuove voci cliniche, anagrafica e impostazioni dall'interfaccia, stampe conformi, tema scuro.
+- A7 (aggiornamento delle banche dati che tocca un farmaco in terapia) e le altre liste AIFA (tappa 5).
+
+**Non provato**
+
+- Lettori di schermo veri, tablet veri, una giornata di lavoro con la Dr.ssa Rocca.
+- Il servizio di stato di erogazione vero: esiste solo nel simulatore, finché non arrivano le specifiche.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:
@@ -173,6 +199,10 @@ Annotate come decisioni per la tappa 6:
 - **Storico delle prescrizioni di ogni farmaco** (D65): toccando un farmaco nella scheda delle terapie, tutte le sue ricette con data, confezioni, note, esenzione, autori, controlli.
 - **Lo stesso per le prestazioni** (D66), per esempio «visita chirurgica – primo accesso».
 - **Simboli nei menu** (D67): sì, accanto al nome e mai al suo posto.
+- **Più cartelle aperte insieme, fino a 20** (D68).
+- **Palette dei prototipi con il giallo** (D69): applicata in prova, da confermare.
+- **Annullamento solo se la prestazione non è ancora lavorata dall'ente, e storico che conserva tutto** (D70).
+- **Ready!**: prodotti nati separati, da rendere complementari (domanda 2 qui sotto).
 
 ## Risposte della seconda fermata (18/11/2026)
 
@@ -205,6 +235,9 @@ Simone ha risposto con il pulsante. **Applicate** sul branch `tappe-0-2` (decisi
 1. **R15, R16 (D52)**: «alert con motivazione» letto come avviso che spiega il blocco. Se invece si voleva poter procedere scrivendo un motivo, è in conflitto con i requisiti (le regole da norma non hanno deroghe): da decidere.
 2. **Appuntamenti da Ready!** (richiesta di Simone del 18/11/2026). I requisiti prevedono l'agenda dentro il prodotto («la segreteria prenota»); Simone propone di prendere gli appuntamenti da Ready!, il prodotto di prenotazione di SCRIPT. Dalla sessione «Ready! (prodotto)» (letta il 18/11/2026, solo come dati): installazione per studio su Aruba (per lo studio Rocca `prenota.studiomedicorocca.it`, prenotazioni dall'1/12/2026); l'elenco degli assistiti si importa dall'esportazione del gestionale con `src/Pazienti/ImportaCsv.php`, che riconosce le colonne per nome (codice fiscale, cognome, nome, email, cellulare) in CSV o Excel; il paziente si riconosce con codice fiscale e cognome; non ho visto un'esportazione o un'API degli appuntamenti. Proposta in due versi: (a) il prodotto esporta l'elenco degli assistiti nel formato di `ImportaCsv`, al posto di Next2; (b) Ready! espone gli appuntamenti (lavoro da fare in Ready!) e il prodotto li legge con un'interfaccia e un simulatore (regola 7), in copia con l'identificativo di Ready!, senza cambiare «Oggi». Da chiedere: conferma (cambia il perimetro dei requisiti), priorità di (a) e (b), nomi esatti delle colonne da verificare su `ImportaCsv.php`. Oggi non c'è nessuna agenda da rifare: «Oggi» legge la tabella degli appuntamenti e il seed ne mette alcuni dimostrativi.
    Ready! e il prodotto sono nati come prodotti separati (Simone, 18/11/2026): la separazione è data, resta da decidere come renderli **complementari**. Parere dato: buona idea, a tre condizioni. (1) Un solo proprietario per dato: pazienti e dati clinici al prodotto, appuntamenti e regole dell'agenda a Ready!, copie solo in un verso. (2) Collegamenti aperti e versionati, ognuno dei due usabile da solo. (3) Ready! senza dati clinici: una richiesta di ripetizione delle terapie fatta in Ready! va passata al prodotto senza conservarla in Ready!. Vantaggi: superficie esposta ai pazienti separata dalla cartella, mercati e tempi indipendenti (Ready! dall'1/12), fine della sovrapposizione con la «prenotazione online in fase 2» dei requisiti. Costo: doppia manutenzione, due informative e due contratti art. 28.
+
+3. **Palette (D69)**: evidenziatore giallo dei prototipi per contatori, cartella attiva e selezioni, avvisi in arancio bruciato. Alternative: menta, pesca, azzurro. Da confermare con le schermate in `docs/schermate/`.
+4. **Stato di erogazione (D70)**: i cinque stati sono del prodotto; vanno verificati sulle specifiche del SAR e del Sistema TS. Da chiedere solo come promemoria: chi può procurare le specifiche e le credenziali di collaudo.
 
 ## Cose irreversibili non fatte
 
@@ -309,3 +342,13 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Assenza dalla classe A non diventa «non a carico SSN»     | reimbursableSsn falso per assenza                  | Rosso, poi verde                                                                                                                                                                   |
 | D12: comuni veri con la lettera X segnalati               | Lettera cercata sbagliata                          | Rosso, poi verde                                                                                                                                                                   |
 | Banche dati importate immutabili                          | Trigger di ref_drug tolto dalla migrazione         | Rosso, poi verde                                                                                                                                                                   |
+| D70: ricetta già lavorata non annullabile                 | Rifiuto tolto                                      | Rosso, poi verde                                                                                                                                                                   |
+| D70: presa in carico non annullabile                      | Presa in carico ammessa                            | Rosso, poi verde                                                                                                                                                                   |
+| D70: le annullate restano nello storico                   | Annullate filtrate                                 | Rosso, poi verde                                                                                                                                                                   |
+| D65: nello storico solo la terapia scelta                 | Righe di ogni terapia                              | **Non rilevato la prima volta** (nello scenario nessuna altra terapia aveva ricette): prova rafforzata con un secondo farmaco; poi rosso, poi verde                                |
+| Esami senza giudizio (D71)                                | Campo «sopra» aggiunto                             | **Non applicato la prima volta** (il comando non aveva inserito il campo); rifatto con un controllo che il campo ci sia: rosso, poi verde                                          |
+| D67: simboli decorativi                                   | aria-hidden tolto                                  | Rosso, poi verde                                                                                                                                                                   |
+| D68: al massimo 20 cartelle                               | Limite 21                                          | Rosso, poi verde                                                                                                                                                                   |
+| Uscita che svuota il browser                              | Pulizia tolta                                      | Rosso, poi verde                                                                                                                                                                   |
+| Bersagli di almeno 44 px                                  | Pulsanti alti 30 px                                | Rosso, poi verde                                                                                                                                                                   |
+| Tablet senza scorrimento di lato                          | Griglia della pagina senza limite                  | Rosso, poi verde                                                                                                                                                                   |

@@ -100,6 +100,7 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 | `pnpm db:seed`                                              | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)  |
 | `pnpm banche-dati:importa -- --dati DIR --trascrizioni DIR` | Importa l'output di `sync/` e le trascrizioni dei PDF                           |
 | `pnpm banche-dati:importa -- --esempio`                     | Lancia `sync/` sul sito d'esempio e importa (banche dati dimostrative)          |
+| `pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts`     | Fotografa le schermate per `docs/interfaccia.md` (istruzioni nel file)          |
 | `pnpm --filter @mmg/domain docs:permessi`                   | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                      |
 | `pnpm --filter @mmg/rules docs:regole`                      | Rigenera la tabella di `docs/regole.md` dai dati delle regole                   |
 | `pnpm --filter @mmg/api db:generate`                        | Genera una migrazione dallo schema Drizzle                                      |
@@ -119,6 +120,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/regole.md`: regole di prescrizione, generate dai dati.
 - `docs/logo.md`: proposte di logo.
 - `docs/banche-dati.md`: importazione delle banche dati, mappature, trascrizioni, versioni.
+- `docs/interfaccia.md`: schermate (in `docs/schermate/`), accessibilità, che cosa manca.
 
 ## Le tappe
 

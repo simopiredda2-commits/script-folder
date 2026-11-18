@@ -46,7 +46,7 @@ function OpenRecordsBar() {
               <li key={r.id} className={active ? 'scheda-aperta attiva' : 'scheda-aperta'}>
                 <Link to={r.lastPath} aria-current={active ? 'page' : undefined}>
                   <span>{label}</span>
-                  <span className="tenue"> · {age(r.birthDate)} anni</span>
+                  <span className="tenue">· {age(r.birthDate)} anni</span>
                 </Link>
                 <button
                   type="button"

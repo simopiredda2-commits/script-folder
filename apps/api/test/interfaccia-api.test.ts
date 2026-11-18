@@ -78,6 +78,31 @@ describe('rotte per l’interfaccia: storico, cronologia, esami, oggi', () => {
         kind: 'pharma_ssn',
         lines: [{ drugName: 'Altro', activeIngredient: 'altro principio', quantity: 1 }],
       });
+      // Un'altra terapia dello stesso paziente, con la sua ricetta: non entra nello storico della prima.
+      const [other] = await withActor(t.db, s.users.titolare.id, (tx) =>
+        tx
+          .insert(therapy)
+          .values({
+            patientId: s.richPatient,
+            drugName: 'Secondo farmaco di prova',
+            activeIngredient: 'secondo principio',
+            kind: 'chronic',
+            startOn: '2026-01-01',
+            createdBy: s.users.titolare.id,
+          })
+          .returning(),
+      );
+      await draft({
+        kind: 'pharma_ssn',
+        lines: [
+          {
+            therapyId: other!.id,
+            drugName: 'Secondo farmaco di prova',
+            activeIngredient: 'secondo principio',
+            quantity: 1,
+          },
+        ],
+      });
 
       const res = await history(`terapia=${therapyId}`);
       expect(res.statusCode, res.body).toBe(200);
