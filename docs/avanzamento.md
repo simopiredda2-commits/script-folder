@@ -6,7 +6,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 - `main` contiene le tappe 0–2 (pull request #1 unita il 18/11/2026 con il via di Simone).
 - Branch attivo: `tappe-3-4`, con le tappe 3 e 4 fatte e la pull request #2 per la **seconda fermata**.
-- Prossimo passo: con il via di Simone, unire la #2 e partire con le tappe 5–6 su `tappe-5-6`.
+- Seconda fermata: risposte annotate qui sotto, da applicare; poi richiedere il via, unire la #2 e partire con le tappe 5–6 su `tappe-5-6`.
 
 ## Come provarlo
 
@@ -137,6 +137,15 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 
 - Le regole con i dati veri della banca dati farmaci e dei cataloghi: arrivano alla tappa 5 (file d'esempio) e con la licenza Farmadati.
 - I controlli formali completi del Sistema TS (R10): manca il documento ufficiale dei controlli.
+
+## Risposte della seconda fermata (18/11/2026)
+
+Simone ha risposto con il pulsante. Da applicare su `tappe-3-4`, poi aggiornare la pull request #2 e **richiedere il via** prima di unire.
+
+- **Ciclo della ricetta**: ripetizioni raggruppate: la segreteria mette più terapie croniche nella stessa ricetta, entro il limite di confezioni.
+- **Confezioni (R1–R4)**: va bene così.
+- **Piani, note, classe ed esenzioni (R5–R9, R17)**: va bene così.
+- **Contatore (R11)**: solo informativo, senza motivo obbligatorio.
 
 ## Risposte della prima fermata (18/11/2026)
 
