@@ -4,9 +4,9 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 ## Dove siamo
 
-- Branch attivo: `tappe-0-2`, con la pull request verso `main` aperta per la prima fermata.
-- Tappe fatte: 0, 1, 2.
-- **Prima fermata fatta**: risposte applicate su `tappe-0-2` (vedi sotto e D29–D34); si unisce la pull request #1 e si parte con la tappa 3 su `tappe-3-4`. Seconda fermata dopo la tappa 4.
+- `main` contiene le tappe 0–2 (pull request #1 unita il 18/11/2026 con il via di Simone).
+- Branch attivo: `tappe-3-4`, con le tappe 3 e 4 fatte e la pull request #2 per la **seconda fermata**.
+- Seconda fermata: risposte annotate qui sotto, da applicare; poi richiedere il via, unire la #2 e partire con le tappe 5–6 su `tappe-5-6`.
 
 ## Come provarlo
 
@@ -99,6 +99,57 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 - Il servizio collegato al database con un utente che non possiede le tabelle (vedi «Cose irreversibili non fatte»).
 - Interfaccia di accesso e blocco schermo: arrivano alla tappa 6.
 
+### Tappa 3 – Ciclo della ricetta
+
+**Fatto**
+
+- Stati e transizioni in `packages/domain/src/prescription.ts`: bozza, da firmare, in invio, inviata, errore (rifiutata, non raggiungibile, esito incerto), annullata, stampata su ricetta rossa. Descritti in `docs/ricetta.md`.
+- `packages/integrations`: interfaccia di invio per SAR e Sistema TS e simulatore con i quattro esiti.
+- Migrazione 0004: ricette, righe, invii esterni (immutabili); storico e divieto di cancellazione per ricette e righe.
+- Servizio e rotte: bozza del medico, ripetizione della segreteria (nella coda «da firmare»), firma e invio con presa in carico atomica, annullamento locale o tramite SAR, ripiego sulla ricetta rossa, code «da firmare» e «invii non riusciti», elenco delle ricette del paziente (senza quelle di terapie riservate per chi non le vede).
+- Aggancio per i controlli prima dell'invio (`preSendChecks`): blocca l'invio e registra la versione delle regole. Lo riempie la tappa 4.
+- Esportazione estesa a ricette, righe e invii esterni.
+
+**Provato**
+
+- Prova esaustiva delle transizioni (ogni stato per ogni evento e tipo di errore).
+- Percorsi completi attraverso il servizio con il simulatore: invio riuscito, rifiuto e correzione, rete assente e ricetta rossa, esito incerto e nuovo invio, guasto dell'adattatore, annullamento con SAR non raggiungibile e poi riuscito, annullamento di una bozza, ricetta bianca al Sistema TS, due firme contemporanee con un solo invio, sostituto che firma a nome suo, segreteria che non firma e non ripete terapie riservate o al bisogno.
+
+**Non provato**
+
+- Adattatori veri per SAR e Sistema TS: non esistono ancora (servono specifiche e credenziali di collaudo).
+- Stampa della ricetta rossa e del promemoria: c'è solo il contenuto da stampare.
+
+### Tappa 4 – Regole di prescrizione
+
+**Fatto**
+
+- `packages/rules`: regole R1–R17 come dati versionati (`data/regole-2026-11-18.json`) con fonti, valori e cose da completare; motore che sceglie la versione in vigore alla data della ricetta; R12 fuori perimetro. Tabella generata in `docs/regole.md`.
+- Integrazione nel servizio: controllo prima di ogni invio (blocco per le norme, motivo per R11, conferma per le note AIFA), registrato in `prescription_check` (migrazione 0005, immutabile); la ricetta inviata porta la versione delle regole; controllo di anteprima `POST /api/ricette/:id/controlla`.
+- Canale e recapito del promemoria nella bozza (R15, R16).
+
+**Provato**
+
+- 46 prove delle regole, con i casi limite dei requisiti: 2 e 3 confezioni, piano che scade oggi, nota non confermata; l'esempio del contatore (21/10, 28 compresse, copre fino al 17/11 compreso; avviso al giorno 22, non al 23).
+- 6 prove attraverso il servizio: blocco con dettagli e controllo registrato, nota AIFA confermata, specialistica senza quesito con anteprima, esenzione non registrata, canale e recapito, contatore con motivo.
+
+**Non provato**
+
+- Le regole con i dati veri della banca dati farmaci e dei cataloghi: arrivano alla tappa 5 (file d'esempio) e con la licenza Farmadati.
+- I controlli formali completi del Sistema TS (R10): manca il documento ufficiale dei controlli.
+
+## Risposte della seconda fermata (18/11/2026)
+
+Simone ha risposto con il pulsante. **Applicate** su `tappe-3-4` (D49–D53) e via dato: la pull request #2 si unisce.
+
+- **Ciclo della ricetta**: ripetizioni raggruppate: la segreteria mette più terapie croniche nella stessa ricetta, entro il limite di confezioni.
+- **Confezioni (R1–R4)**: va bene così.
+- **Piani, note, classe ed esenzioni (R5–R9, R17)**: va bene così.
+- **Contatore (R11)**: solo informativo, senza motivo obbligatorio.
+- **R13, R14**: va bene così.
+- **R15, R16**: va bene, «prevedi comunque un alert con motivazione nel caso bloccasse». Applicato come avviso che spiega perché e che cosa fare (D52).
+- **Via libera**: unire la #2 e proseguire con le tappe 5–6.
+
 ## Risposte della prima fermata (18/11/2026)
 
 Simone ha risposto con il pulsante. **Applicate** sul branch `tappe-0-2` (decisioni D29–D34); poi si prosegue con le tappe 3–4 senza fermarsi di nuovo (via già dato).
@@ -112,6 +163,10 @@ Simone ha risposto con il pulsante. **Applicate** sul branch `tappe-0-2` (decisi
 - **Dati clinici e storico**: va bene così.
 - **Registro degli accessi**: va bene così.
 - **Esportazione**: aggiungere anche il CSV (una tabella per file).
+
+## Domande per la fermata finale
+
+1. **R15, R16 (D52)**: «alert con motivazione» letto come avviso che spiega il blocco. Se invece si voleva poter procedere scrivendo un motivo, è in conflitto con i requisiti (le regole da norma non hanno deroghe): da decidere.
 
 ## Cose irreversibili non fatte
 
@@ -177,3 +232,33 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | CSV con le virgolette giuste                              | Punto e virgola non più tra virgolette             | Rosso, poi verde                                                                                                                                                                   |
 | Logo scelto nell'interfaccia                              | Geometria diversa nel segno del prodotto           | Rosso, poi verde                                                                                                                                                                   |
 | Favicon dal logo scelto                                   | Colore cambiato nella favicon                      | Rosso, poi verde                                                                                                                                                                   |
+| Ricetta rossa solo se il sistema non risponde             | Ricetta rossa ammessa anche con esito incerto      | Rosso, poi verde                                                                                                                                                                   |
+| Un solo invio per ricetta                                 | Presa in carico senza controllo dello stato        | **Rimasto verde la prima volta**: le due richieste non erano davvero contemporanee. Prova riscritta con una barriera; poi rosso, poi verde                                         |
+| Ogni invio esterno registrato                             | Registrazione dell'invio tolta                     | Rosso, poi verde                                                                                                                                                                   |
+| Ripetizione della segreteria nella coda «da firmare»      | Ripetizione lasciata in bozza                      | Rosso, poi verde                                                                                                                                                                   |
+| Ricetta a nome di chi firma                               | Messaggio a nome di chi l'ha preparata             | Rosso, poi verde                                                                                                                                                                   |
+| Ricetta bianca al Sistema TS                              | Tutto al SAR                                       | Rosso, poi verde                                                                                                                                                                   |
+| Firma solo con il permesso di firma                       | Guardia con il permesso di lettura                 | Rosso, poi verde                                                                                                                                                                   |
+| Controlli bloccanti prima dell'invio                      | Blocchi ignorati                                   | Rosso, poi verde                                                                                                                                                                   |
+| Guasto dell'adattatore come esito incerto                 | Guasto trattato come rete assente                  | Rosso, poi verde                                                                                                                                                                   |
+| Nessun indirizzo di rete nelle integrazioni               | Indirizzo aggiunto al simulatore                   | Rosso, poi verde                                                                                                                                                                   |
+| Valori presi dai dati                                     | maxPacks di R2 cambiato nel file                   | Rosso, poi verde                                                                                                                                                                   |
+| Nessun numero nel codice delle regole                     | Limite scritto a mano                              | Rosso (lint), poi verde                                                                                                                                                            |
+| R4: trattamento da almeno 6 mesi                          | Condizione tolta                                   | Rosso, poi verde                                                                                                                                                                   |
+| R5: piano che scade oggi                                  | Scadenza esclusa                                   | Rosso, poi verde                                                                                                                                                                   |
+| R7: conferma della nota                                   | Conferma ignorata                                  | Rosso, poi verde                                                                                                                                                                   |
+| R11: soglia dell'80%                                      | Soglia ignorata                                    | Rosso, poi verde                                                                                                                                                                   |
+| R13: motivazione della non sostituibilità                 | Motivazione vuota accettata                        | Rosso, poi verde                                                                                                                                                                   |
+| R14: priorità per il primo accesso                        | Priorità ignorata                                  | Rosso, poi verde                                                                                                                                                                   |
+| R16: delega revocata                                      | Revoca ignorata                                    | Rosso, poi verde                                                                                                                                                                   |
+| R17: prestazioni dell'esenzione                           | Controllo tolto                                    | Rosso, poi verde                                                                                                                                                                   |
+| Versione delle regole alla data                           | Versione scelta senza guardare la data             | Rosso, poi verde                                                                                                                                                                   |
+| Controllo registrato                                      | Registrazione tolta                                | Rosso, poi verde                                                                                                                                                                   |
+| Avviso senza motivo blocca                                | Solo i blocchi fermano l'invio                     | Rosso, poi verde                                                                                                                                                                   |
+| Tabella di docs/regole.md allineata                       | Testo di una regola cambiato nei dati              | Rosso, poi verde                                                                                                                                                                   |
+| Ripetizioni entro il limite di confezioni                 | Limite ignorato nel raggruppamento                 | Rosso, poi verde                                                                                                                                                                   |
+| Ripetizioni con la stessa esenzione                       | Esenzione ignorata nel raggruppamento              | Rosso, poi verde                                                                                                                                                                   |
+| R11 informativo nella versione .2                         | R11 di nuovo «avvisa» nella .2                     | Rosso, poi verde                                                                                                                                                                   |
+| A parità di data vale la versione più alta                | Ordine delle versioni senza numero                 | Rosso, poi verde                                                                                                                                                                   |
+| Ogni blocco porta la fonte della regola                   | Fonte non aggiunta dal motore                      | Rosso, poi verde                                                                                                                                                                   |
+| R15 spiega che cosa fare                                  | Rimedio tolto                                      | Rosso, poi verde                                                                                                                                                                   |

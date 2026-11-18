@@ -1,0 +1,233 @@
+{
+  "version": "2026-11-18.1",
+  "effectiveFrom": "2026-11-18",
+  "valuesSource": "docs/requisiti.md, sezione «Regole di prescrizione», revisione 45 del 18/11/2026",
+  "validated": false,
+  "validationNote": "Prima dell'uso con pazienti reali la Dr.ssa Rocca valida ogni regola e un consulente verifica i riferimenti normativi (requisiti, «Come garantiamo il rigore»).",
+  "rules": [
+    {
+      "id": "R1",
+      "text": "La ricetta SSN vale 30 giorni",
+      "behavior": "inform",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Tabella AIFA di classificazione dei medicinali",
+          "url": "https://www.aifa.gov.it/documents/20142/0/tabella_classificazione_medicinali.pdf"
+        }
+      ],
+      "values": { "validityDays": 30 },
+      "toComplete": []
+    },
+    {
+      "id": "R2",
+      "text": "Di regola al massimo 2 confezioni per ricetta",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Tabella AIFA di classificazione dei medicinali",
+          "url": "https://www.aifa.gov.it/documents/20142/0/tabella_classificazione_medicinali.pdf"
+        }
+      ],
+      "values": { "maxPacks": 2 },
+      "toComplete": []
+    },
+    {
+      "id": "R3",
+      "text": "Fino a 6 confezioni per antibiotici iniettabili e soluzioni per infusione",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Tabella AIFA di classificazione dei medicinali",
+          "url": "https://www.aifa.gov.it/documents/20142/0/tabella_classificazione_medicinali.pdf"
+        }
+      ],
+      "values": { "maxPacks": 6 },
+      "toComplete": [
+        "Forma farmaceutica dalla banca dati farmaci: finché manca, il limite resta quello di R2"
+      ]
+    },
+    {
+      "id": "R4",
+      "text": "Fino a 6 confezioni per patologie croniche in trattamento da almeno 6 mesi, per non più di 180 giorni di terapia",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Tabella AIFA di classificazione dei medicinali",
+          "url": "https://www.aifa.gov.it/documents/20142/0/tabella_classificazione_medicinali.pdf"
+        }
+      ],
+      "values": { "maxPacks": 6, "minTreatmentMonths": 6, "maxTherapyDays": 180 },
+      "toComplete": [
+        "Condizioni esatte da verificare sul testo di legge e sulle regole del Piemonte (requisiti)",
+        "Unità per confezione dalla banca dati farmaci: finché manca, i giorni di terapia non si calcolano e il limite resta quello di R2"
+      ]
+    },
+    {
+      "id": "R5",
+      "text": "Farmaco con piano terapeutico obbligatorio",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        { "title": "Determina AIFA del farmaco" },
+        { "title": "Note AIFA", "url": "https://www.aifa.gov.it/it/note-aifa" },
+        {
+          "title": "Regione Piemonte, farmaci PHT in DPC (piani ancora cartacei, es. Nota 85)",
+          "url": "https://www.regione.piemonte.it/web/node/964"
+        }
+      ],
+      "values": { "expiryWarningDays": 30 },
+      "toComplete": [
+        "Obbligo di piano per farmaco dalla banca dati farmaci: finché manca, la regola si applica solo ai farmaci con un piano registrato in cartella"
+      ]
+    },
+    {
+      "id": "R6",
+      "text": "Quantità entro quanto indicato nel piano terapeutico",
+      "behavior": "block",
+      "status": "active",
+      "sources": [{ "title": "Piano terapeutico dello specialista" }],
+      "values": {},
+      "toComplete": [
+        "Posologia e durata del piano: oggi si controllano solo le confezioni autorizzate"
+      ]
+    },
+    {
+      "id": "R7",
+      "text": "Nota AIFA: il numero della nota in ricetta dichiara che ricorrono le condizioni di rimborsabilità",
+      "behavior": "block",
+      "status": "active",
+      "sources": [{ "title": "Note AIFA", "url": "https://www.aifa.gov.it/it/note-aifa" }],
+      "values": {},
+      "toComplete": [
+        "Nota collegata al farmaco dalla banca dati farmaci: finché manca, vale la nota scritta nella riga della ricetta"
+      ]
+    },
+    {
+      "id": "R8",
+      "text": "Classe e regime di fornitura",
+      "behavior": "block",
+      "status": "active",
+      "sources": [{ "title": "Classificazione AIFA, dalla banca dati" }],
+      "values": {},
+      "toComplete": [
+        "Classe e regime di fornitura dalla banca dati farmaci: finché mancano, la regola segnala che non è verificabile"
+      ]
+    },
+    {
+      "id": "R9",
+      "text": "Esenzione valida",
+      "behavior": "block",
+      "status": "active",
+      "sources": [{ "title": "Anagrafe regionale AURA e catalogo esenzioni" }],
+      "values": {},
+      "toComplete": [
+        "Catalogo delle esenzioni (tappa 5): finché manca, si controlla solo l'esenzione registrata in cartella e la sua validità"
+      ]
+    },
+    {
+      "id": "R10",
+      "text": "Controlli formali del Sistema TS, ripetuti in locale prima dell'invio",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Sistema TS, Specifiche tecniche ricetta dematerializzata, prescrizione (5/12/2024)",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/81804/20241205_Specifiche%20tecniche%20ricetta%20dematerializzata%20-%20prescrizione/7cfbbd34-e929-d051-d5b2-629232f3d79e"
+        },
+        { "title": "Documento dei controlli del Sistema TS sulla prescrizione" }
+      ],
+      "values": {},
+      "toComplete": [
+        "Elenco completo dei controlli dal documento ufficiale del Sistema TS: oggi ci sono solo codice fiscale, righe e quantità"
+      ]
+    },
+    {
+      "id": "R11",
+      "text": "Contatore delle confezioni: avviso se la nuova ricetta arriva troppo presto rispetto alla copertura delle precedenti",
+      "behavior": "warn",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Buona pratica, da validare con la Dr.ssa Rocca e con il consulente regolatorio (MDR)"
+        }
+      ],
+      "values": { "coverageThreshold": 0.8 },
+      "toComplete": [
+        "Soglia dell'80%: proposta dei requisiti, da decidere con la Dr.ssa Rocca",
+        "Unità per confezione dalla banca dati farmaci: finché mancano, il contatore non si calcola"
+      ]
+    },
+    {
+      "id": "R12",
+      "text": "Dose rispetto all'RCP, interazioni, linee guida cliniche",
+      "behavior": "out_of_scope",
+      "status": "out_of_scope",
+      "sources": [
+        {
+          "title": "Dati clinici con licenza e percorso di dispositivo medico (requisiti, Vincoli legali)"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R13",
+      "text": "In ricetta il principio attivo; il marchio vincola il farmacista solo con la clausola di non sostituibilità e una sintetica motivazione",
+      "behavior": "block",
+      "status": "active",
+      "sources": [{ "title": "DL 95/2012, art. 15, comma 11-bis" }],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R14",
+      "text": "Ricetta specialistica: tipo di accesso sempre; classe di priorità per il primo accesso; quesito diagnostico",
+      "behavior": "block",
+      "status": "active",
+      "sources": [{ "title": "PNGLA e indicazioni regionali" }],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R15",
+      "text": "Promemoria cartaceo oppure, su richiesta del paziente, canale alternativo con recapito e scelta registrata",
+      "behavior": "block",
+      "status": "active",
+      "sources": [{ "title": "DM MEF 25/03/2020 e norme successive" }],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R16",
+      "text": "Ricetta o NRE a una persona diversa dal paziente solo se è un delegato registrato",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        { "title": "Privacy (GDPR) e deleghe in cartella; da validare con il consulente privacy" }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R17",
+      "text": "Esenzione per patologia su ricetta specialistica: ogni prestazione deve essere tra quelle associate a quell'esenzione",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        { "title": "DPCM LEA, allegato 8-bis, e atti regionali" },
+        {
+          "title": "Regione Piemonte, D.D. 1167/2022 (controllo bloccante del SAR dal 28/06/2022)",
+          "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/2022/28/attach/dda1410001167_10100.pdf"
+        }
+      ],
+      "values": {},
+      "toComplete": [
+        "Elenco regionale esenzioni–prestazioni (tappa 5): finché manca, la regola segnala che non è verificabile"
+      ]
+    }
+  ]
+}

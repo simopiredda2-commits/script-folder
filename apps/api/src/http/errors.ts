@@ -1,8 +1,9 @@
-/** Errore con codice HTTP e messaggio in chiaro per l'interfaccia. */
+/** Errore con codice HTTP e messaggio in chiaro per l'interfaccia, con dettagli facoltativi. */
 export class HttpError extends Error {
   constructor(
     readonly statusCode: number,
     message: string,
+    readonly details?: unknown,
   ) {
     super(message);
   }

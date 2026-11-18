@@ -40,7 +40,9 @@ describe('registro degli accessi', () => {
 
   it('ogni rotta sui dati di un paziente è marcata e passa dalla guardia', () => {
     const scoped = new Set(s.app.patientScopedRoutes.map((r) => `${r.method} ${r.url}`));
-    const patientRoutes = s.app.allRoutes.filter((r) => r.url.startsWith('/api/pazienti/:id'));
+    const patientRoutes = s.app.allRoutes.filter(
+      (r) => r.url.startsWith('/api/pazienti/:id') || r.url.startsWith('/api/ricette/:id'),
+    );
     expect(patientRoutes.length).toBeGreaterThanOrEqual(5);
     for (const r of patientRoutes)
       expect(scoped, `${r.method} ${r.url}`).toContain(`${r.method} ${r.url}`);
@@ -53,9 +55,17 @@ describe('registro degli accessi', () => {
         const before = await logCount(id);
         await s.app.inject({
           method: route.method as 'GET',
-          url: route.url.replace(':id', id),
+          url: route.url.replace(
+            ':id',
+            route.url.startsWith('/api/ricette/') ? s.draftPrescription : id,
+          ),
           headers: { cookie },
-          payload: route.method === 'PATCH' ? { phone: '+39 000 0000000' } : undefined,
+          payload:
+            route.method === 'PATCH'
+              ? { phone: '+39 000 0000000' }
+              : route.method === 'POST'
+                ? {}
+                : undefined,
         });
         expect(await logCount(id), `${route.method} ${route.url}`).toBe(before + 1);
       }
@@ -197,8 +207,8 @@ describe('storico delle modifiche e dati mai cancellati', () => {
   it('ogni tabella con dati dei pazienti ha storico e divieto di cancellazione', async () => {
     const res = await s.db.execute<{ table_name: string }>(sql`
       select distinct table_name from information_schema.columns
-      where table_schema = 'public' and column_name in ('patient_id', 'entry_id')
-        and table_name not in ('access_log')`);
+      where table_schema = 'public' and column_name in ('patient_id', 'entry_id', 'prescription_id')
+        and table_name not in ('access_log', 'external_submission', 'prescription_check')`);
     const triggers = await s.db.execute<{ name: string }>(
       sql`select tgname as name from pg_trigger where not tgisinternal`,
     );
@@ -206,6 +216,11 @@ describe('storico delle modifiche e dati mai cancellati', () => {
     for (const { table_name } of res.rows) {
       expect(names, table_name).toContain(`${table_name}_history`);
       expect(names, table_name).toContain(`${table_name}_no_delete`);
+    }
+    // Tabelle di sola aggiunta: non si modificano affatto.
+    for (const t of ['access_log', 'external_submission', 'prescription_check']) {
+      expect(names, t).toContain(`${t}_immutable`);
+      expect(names, t).toContain(`${t}_no_truncate`);
     }
     expect(names).toContain('patient_history');
     expect(names).toContain('patient_no_delete');

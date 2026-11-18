@@ -6,6 +6,7 @@ import {
   ENTRY_TABLES,
   HANDLED_SEPARATELY,
   PATIENT_TABLES,
+  PRESCRIPTION_TABLES,
   type ExportDocument,
 } from '../src/export/export';
 import { createScenario, login, type Scenario } from './helpers/scenario';
@@ -63,14 +64,21 @@ describe('esportazione completa dei dati del medico', () => {
   it('ogni tabella del database con dati dei pazienti è esportata', async () => {
     const res = await s.db.execute<{ table_name: string }>(sql`
       select distinct table_name from information_schema.columns
-      where table_schema = 'public' and column_name in ('patient_id', 'entry_id')`);
+      where table_schema = 'public' and column_name in ('patient_id', 'entry_id', 'prescription_id')`);
     const known = new Set<string>([
       ...PATIENT_TABLES,
       ...ENTRY_TABLES,
+      ...PRESCRIPTION_TABLES,
       ...Object.keys(HANDLED_SEPARATELY),
     ]);
     for (const { table_name } of res.rows) expect(known, table_name).toContain(table_name);
-    for (const tname of [...PATIENT_TABLES, ...ENTRY_TABLES, 'patient', 'family']) {
+    for (const tname of [
+      ...PATIENT_TABLES,
+      ...ENTRY_TABLES,
+      ...PRESCRIPTION_TABLES,
+      'patient',
+      'family',
+    ]) {
       expect(doc.tabelle, tname).toHaveProperty(tname);
     }
   });

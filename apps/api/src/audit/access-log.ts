@@ -18,6 +18,15 @@ export type AccessAction =
   | 'modifica_anagrafica'
   | 'esportazione'
   | 'impostazioni_archivio'
+  | 'ricetta_bozza'
+  | 'ricetta_ripetizione'
+  | 'ricetta_da_firmare'
+  | 'ricetta_modifica'
+  | 'ricetta_firma_invio'
+  | 'ricetta_annullamento'
+  | 'ricetta_cartacea'
+  | 'lettura_ricette'
+  | 'ricetta_controllo'
   | 'lettura_registro';
 
 export interface AccessEntry {
