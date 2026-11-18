@@ -8,3 +8,8 @@ export * from './regional-authorization';
 export * from './fse/dictionaries';
 export * from './fse/cda';
 export * from './fse/schematron';
+export * from './fse/gateway';
+export * from './fse/gateway-simulator';
+export * from './fse/pdf';
+export * from './fse/x509';
+export * from './fse/jwt';
