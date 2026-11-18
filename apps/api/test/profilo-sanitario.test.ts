@@ -1,0 +1,299 @@
+import {
+  FseGatewayClient,
+  SIMULATED_FSE_AUDIENCE,
+  SimulatedDocumentSigner,
+  SimulatedFseGateway,
+  extractCda,
+  pssSchematron,
+  readPades,
+  type SimulatedFseOutcome,
+} from '@mmg/integrations';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { fseTransmission, pssDocument, therapy } from '../src/db/schema';
+import { withActor } from '../src/db/tx';
+import { studioDate } from '../src/prescriptions/rules-check';
+import { createScenario, login, type Scenario } from './helpers/scenario';
+import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+
+interface Item {
+  id: string;
+  etichetta: string;
+  incluso: boolean;
+  manca: string[];
+}
+interface Pss {
+  id: string;
+  stato: string;
+  versione: number;
+  documento: string;
+  sostituisce: string | null;
+  contenuto: {
+    sezioni: Record<string, Item[]>;
+    esclusi: { oscurate: number; riservate: number };
+    nonInseribili: { etichetta: string; motivo: string }[];
+    assenze: Record<string, string>;
+  };
+}
+
+describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
+  let t: TestDatabase;
+  let s: Scenario;
+  let doctor: string;
+  let mode: SimulatedFseOutcome = 'ok';
+
+  beforeAll(async () => {
+    t = await createTestDatabase();
+    // L'orologio dello scenario c'è solo dopo la sua creazione: fino ad allora quello vero.
+    let clock = () => new Date();
+    const now = () => clock();
+    const simulator = new SimulatedFseGateway({ now, decide: () => mode });
+    s = await createScenario(
+      t.db,
+      {},
+      {
+        fse: {
+          gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Prova'), now),
+          audience: SIMULATED_FSE_AUDIENCE,
+          signer: new SimulatedDocumentSigner({ now }),
+        },
+      },
+    );
+    clock = () => s.clock.now();
+    doctor = await login(s, 'titolare');
+  });
+  afterAll(async () => {
+    await s?.app.close();
+    await t?.drop();
+  });
+
+  const base = () => `/api/pazienti/${s.richPatient}/profilo-sanitario`;
+  const req = (method: 'GET' | 'POST' | 'PATCH', url: string, payload?: object, cookie = doctor) =>
+    s.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+  const ok = async <T>(method: 'GET' | 'POST' | 'PATCH', url: string, payload?: object) => {
+    const res = await req(method, url, payload);
+    expect(res.statusCode, res.body).toBeLessThan(300);
+    return res.json<T>();
+  };
+  const entry = (body: object) =>
+    ok('POST', `/api/pazienti/${s.richPatient}/voci`, { data: studioDate(s.clock.now()), ...body });
+  const item = (p: Pss, section: string, label: RegExp) =>
+    p.contenuto.sezioni[section]!.find((i) => label.test(i.etichetta))!;
+
+  it('compone dalla cartella: obbligatori proposti, oscurate fuori, riservate non proposte', async () => {
+    await entry({
+      tipo: 'problema',
+      descrizione: 'Diabete di prova',
+      codice: '250.00',
+      cronico: true,
+    });
+    await entry({
+      tipo: 'problema',
+      descrizione: 'Problema oscurato',
+      codice: '300.0',
+      cronico: true,
+      oscurata: true,
+    });
+    await entry({
+      tipo: 'anamnesi',
+      sezione: 'familiare',
+      testo: 'Infarto del padre',
+      parente: 'padre',
+      codice: '410.9',
+      etaEsordio: 55,
+    });
+    await entry({ tipo: 'anamnesi', sezione: 'familiare', testo: 'Testo libero senza codice' });
+    await entry({ tipo: 'misura', parametro: 'peso', valore: '70' });
+    await entry({ tipo: 'stile_di_vita', fattore: 'Fumo', valore: 'Ex fumatrice' });
+    await entry({ tipo: 'stile_di_vita', fattore: 'Dieta', valore: 'Mediterranea' });
+    await entry({ tipo: 'capacita_motoria', capacita: 'autonomo' });
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx.insert(therapy).values({
+        patientId: s.richPatient,
+        drugAic: '000000001',
+        atc: 'C09AA02',
+        drugName: 'Farmaco con codice 20 mg',
+        activeIngredient: 'Enalapril',
+        dose: '1',
+        doseUnit: 'compressa',
+        route: 'per bocca',
+        kind: 'chronic',
+        startOn: '2026-01-01',
+        createdBy: s.users.titolare.id,
+      }),
+    );
+    const before = await ok<{ inLavorazione: null; versioni: unknown[]; mancano: string[] }>(
+      'GET',
+      base(),
+    );
+    expect(before).toMatchObject({ inLavorazione: null, versioni: [], mancano: [] });
+    const p = await ok<Pss>('POST', `${base()}/bozza`);
+    expect(p).toMatchObject({ stato: 'draft', versione: 1, sostituisce: null });
+    const c = p.contenuto;
+    expect(item(p, 'problemi', /Diabete/)).toMatchObject({ incluso: true, manca: [] });
+    expect(item(p, 'problemi', /^Problema di prova/)).toMatchObject({ incluso: false });
+    expect(c.sezioni.problemi!.some((i) => /oscurato/.test(i.etichetta))).toBe(false);
+    expect(item(p, 'allergie', /Sostanza di prova/)).toMatchObject({ incluso: true });
+    expect(item(p, 'terapie', /Farmaco con codice/)).toMatchObject({ incluso: true, manca: [] });
+    expect(item(p, 'terapie', /Farmaco di prova/)).toMatchObject({
+      incluso: false,
+      manca: [
+        'Manca il codice AIC o ATC del farmaco',
+        'Scegli la via di somministrazione nella scheda della terapia',
+      ],
+    });
+    expect(c.sezioni.terapie!.some((i) => /riservato/.test(i.etichetta))).toBe(false);
+    expect(item(p, 'anamnesiFamiliare', /Padre/)).toMatchObject({ incluso: true });
+    expect(item(p, 'parametri', /Peso/)).toMatchObject({ incluso: true });
+    expect(item(p, 'stiliDiVita', /Fumo/)).toMatchObject({ incluso: true });
+    expect(item(p, 'capacitaMotoria', /Autonomo/)).toMatchObject({ incluso: true });
+    expect(c.esclusi).toEqual({ oscurate: 1, riservate: 2 });
+    expect(c.nonInseribili.map((n) => n.motivo)).toEqual(
+      expect.arrayContaining([
+        'Indica il parente e il codice ICD-9-CM della patologia',
+        'Il Profilo ha i codici solo per fumo, alcol e attività fisica',
+      ]),
+    );
+    expect(c.assenze).toMatchObject({ allergie: 'no-allergy-info' });
+  });
+
+  it('il medico sceglie; una voce a cui manca qualcosa non entra', async () => {
+    const draft = (await ok<{ inLavorazione: Pss }>('GET', base())).inLavorazione;
+    const smoke = item(draft, 'stiliDiVita', /Fumo/);
+    const blocked = item(draft, 'terapie', /Farmaco di prova/);
+    const res = await req('PATCH', `${base()}/${draft.id}`, {
+      scelte: { terapie: { [blocked.id]: true } },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json<{ errore: string }>().errore).toMatch(/Manca il codice AIC o ATC/);
+    const p = await ok<Pss>('PATCH', `${base()}/${draft.id}`, {
+      scelte: { stiliDiVita: { [smoke.id]: false } },
+      assenze: { allergie: 'no-known-allergies' },
+    });
+    expect(item(p, 'stiliDiVita', /Fumo/).incluso).toBe(false);
+    expect(p.contenuto.assenze.allergie).toBe('no-known-allergies');
+    // Ricomporre tiene le scelte fatte.
+    const again = await ok<Pss>('POST', `${base()}/bozza`);
+    expect(again.id).toBe(draft.id);
+    expect(item(again, 'stiliDiVita', /Fumo/).incluso).toBe(false);
+  });
+
+  it('valida dopo la conferma del medico; il PDF ha dentro il CDA, che rispetta lo schematron', async () => {
+    const draft = (await ok<{ inLavorazione: Pss }>('GET', base())).inLavorazione;
+    expect((await req('POST', `${base()}/${draft.id}/valida`, {})).statusCode).toBe(400);
+    const p = await ok<Pss>('POST', `${base()}/${draft.id}/valida`, { confermo: true });
+    expect(p.stato).toBe('validated');
+    const pdf = await req('GET', `${base()}/${draft.id}/pdf`);
+    expect(pdf.headers['content-type']).toBe('application/pdf');
+    const xml = (await extractCda(new Uint8Array(pdf.rawPayload)))!;
+    expect(xml).toContain('Diabete di prova');
+    expect(xml).not.toContain('Problema oscurato');
+    expect(xml).not.toContain('Farmaco riservato');
+    expect(pssSchematron().validate(xml).errors).toEqual([]);
+    // Validato, non si sceglie più.
+    expect((await req('PATCH', `${base()}/${draft.id}`, { assenze: {} })).statusCode).toBe(409);
+  });
+
+  it('firma e pubblica: preso in carico, poi pubblicato; ogni chiamata nel registro degli invii', async () => {
+    const open = (await ok<{ inLavorazione: Pss }>('GET', base())).inLavorazione;
+    const p = await ok<Pss>('POST', `${base()}/${open.id}/firma-e-pubblica`);
+    expect(p.stato).toBe('published');
+    const pdf = await req('GET', `${base()}/${open.id}/pdf`);
+    expect(readPades(new Uint8Array(pdf.rawPayload))?.subFilter).toBe('ETSI.CAdES.detached');
+    const calls = await t.db
+      .select()
+      .from(fseTransmission)
+      .where(eq(fseTransmission.documentId, open.id));
+    expect(calls.map((c) => `${c.operation} ${c.outcome}`).sort()).toEqual([
+      'publication ok',
+      'status ok',
+      'validation ok',
+    ]);
+    const overview = await ok<{ versioni: Pss[]; inLavorazione: Pss | null }>('GET', base());
+    expect(overview.inLavorazione).toBeNull();
+    expect(overview.versioni.map((v) => [v.versione, v.stato])).toEqual([[1, 'published']]);
+  });
+
+  it('una versione nuova sostituisce la precedente, che resta consultabile', async () => {
+    await entry({
+      tipo: 'allergia',
+      sostanza: 'Amoxicillina',
+      agente: 'farmaco',
+      codiceAgente: 'J01CA04',
+    });
+    const v2 = await ok<Pss>('POST', `${base()}/bozza`);
+    expect(v2).toMatchObject({ versione: 2 });
+    expect(v2.sostituisce).not.toBeNull();
+    await ok('POST', `${base()}/${v2.id}/valida`, { confermo: true });
+    expect((await ok<Pss>('POST', `${base()}/${v2.id}/firma-e-pubblica`)).stato).toBe('published');
+    const overview = await ok<{ versioni: Pss[] }>('GET', base());
+    expect(overview.versioni.map((v) => [v.versione, v.stato])).toEqual([
+      [2, 'published'],
+      [1, 'replaced'],
+    ]);
+    const rows = await t.db
+      .select()
+      .from(pssDocument)
+      .where(eq(pssDocument.patientId, s.richPatient));
+    const set = new Set(rows.map((r) => `${r.setRoot}^${r.setExtension}`));
+    expect(set.size).toBe(1);
+  });
+
+  it('la rete che manca non cambia il Profilo e resta nel registro; si riprova', async () => {
+    const draft = await ok<Pss>('POST', `${base()}/bozza`);
+    mode = 'unreachable';
+    const res = await req('POST', `${base()}/${draft.id}/valida`, { confermo: true });
+    expect(res.statusCode).toBe(503);
+    expect(res.json<{ errore: string }>().errore).toBe('Gateway non raggiungibile');
+    mode = 'ok';
+    const after = await ok<{ inLavorazione: Pss }>('GET', base());
+    expect(after.inLavorazione.stato).toBe('draft');
+    const calls = await t.db
+      .select()
+      .from(fseTransmission)
+      .where(eq(fseTransmission.documentId, draft.id));
+    expect(calls.map((c) => c.outcome)).toEqual(['unreachable']);
+    expect((await ok<Pss>('POST', `${base()}/${draft.id}/valida`, { confermo: true })).stato).toBe(
+      'validated',
+    );
+    expect((await ok<Pss>('POST', `${base()}/${draft.id}/scarta`)).stato).toBe('discarded');
+  });
+
+  it('chi può: il collega di gruppo e la segreteria no; il contenuto validato non cambia nel database', async () => {
+    const colleague = await login(s, 'collega');
+    expect((await req('POST', `${base()}/bozza`, undefined, colleague)).statusCode).toBe(403);
+    const secretary = await login(s, 'segreteria');
+    expect((await req('GET', base(), undefined, secretary)).statusCode).toBe(403);
+    const [published] = await t.db
+      .select()
+      .from(pssDocument)
+      .where(eq(pssDocument.status, 'published'));
+    /** Il messaggio del database, dentro l'errore della libreria. */
+    const dbError = async (p: Promise<unknown>) => {
+      try {
+        await p;
+        return 'nessun errore';
+      } catch (e) {
+        const err = e as { cause?: { message?: string }; message: string };
+        return err.cause?.message ?? err.message;
+      }
+    };
+    expect(
+      await dbError(
+        withActor(t.db, s.users.titolare.id, (tx) =>
+          tx
+            .update(pssDocument)
+            .set({ cdaXml: '<cambiato/>' })
+            .where(eq(pssDocument.id, published!.id)),
+        ),
+      ),
+    ).toMatch(/non si modifica/);
+    expect(
+      await dbError(
+        withActor(t.db, s.users.titolare.id, (tx) =>
+          tx.update(pssDocument).set({ status: 'draft' }).where(eq(pssDocument.id, published!.id)),
+        ),
+      ),
+    ).toMatch(/passaggio non ammesso/);
+  });
+});

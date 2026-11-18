@@ -71,7 +71,13 @@ export type AccessAction =
   | 'lettura_presidi'
   | 'nuovo_presidio'
   | 'rinnovo_presidio'
-  | 'annullamento_presidio';
+  | 'annullamento_presidio'
+  | 'lettura_profilo_sanitario'
+  | 'bozza_profilo_sanitario'
+  | 'validazione_profilo_sanitario'
+  | 'pubblicazione_profilo_sanitario'
+  | 'scarto_profilo_sanitario'
+  | 'pdf_profilo_sanitario';
 
 export interface AccessEntry {
   studioId?: string | null;

@@ -33,6 +33,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Preparare la bozza di una ricetta ripetuta | Sì | Solo terapie croniche non riservate | Sì | Sì | No | No |
 | Firmare e inviare le ricette | Sì | No | Sì | Sì | No | No |
 | Firmare e inviare i certificati | Sì | No | Sì | Sì | No | No |
+| Firmare e pubblicare il Profilo Sanitario Sintetico nel Fascicolo | Sì | No | Sì | No | No | No |
 | Stampare i promemoria | Sì | Sì | Sì | Sì | No | No |
 | Leggere il registro degli accessi | Sì | No | No | No | No | No |
 | Esportare tutti i dati dell’archivio | Sì | No | No | No | No | No |

@@ -12,6 +12,8 @@ import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
 import { registerFollowUpRoutes } from './http/followup-routes';
+import { registerFseRoutes } from './http/fse-routes';
+import { createPssService } from './fse/service';
 import { registerPrivacyRoutes } from './http/privacy-routes';
 import { registerCredentialRoutes } from './http/credentials-routes';
 import { registerDoctorProfileRoutes } from './http/doctor-profile-routes';
@@ -27,11 +29,16 @@ import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import type { CredentialService } from '@mmg/domain';
 import {
+  FseGatewayClient,
+  SIMULATED_FSE_AUDIENCE,
+  SimulatedDocumentSigner,
+  SimulatedFseGateway,
   SimulatedGateway,
   SimulatedReminderSender,
   SimulatedRegionalAuthorization,
   SimulatedSecondFactor,
   SimulatedSickLeaveGateway,
+  type DocumentSigner,
   type GatewaySystem,
   type PrescriptionGateway,
   type ReminderSender,
@@ -88,6 +95,11 @@ export interface AppDeps {
   reminderSender?: ReminderSender;
   /** Tempo massimo di attesa dell'invio delle ricette, in millisecondi (D94). */
   sendTimeoutMs?: number;
+  /**
+   * Gateway del Fascicolo e firma PAdES del medico (tappa 11). Per difetto i simulatori: il
+   * simulatore rilascia i certificati del programma all'avvio, solo in memoria (regola 7).
+   */
+  fse?: { gateway: FseGatewayClient; audience: string; signer: DocumentSigner };
 }
 
 export function buildApp({
@@ -109,6 +121,7 @@ export function buildApp({
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
   sendTimeoutMs,
+  fse = defaultFse(now),
 }: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
   const auth = createAuthService({
@@ -221,7 +234,29 @@ export function buildApp({
       now,
     }),
   );
+  registerFseRoutes(
+    app,
+    db,
+    createPssService({
+      db,
+      gateway: fse.gateway,
+      gatewayAudience: fse.audience,
+      signer: fse.signer,
+      reference,
+      now,
+    }),
+  );
   return app;
+}
+
+/** Simulatori del Gateway del Fascicolo e della firma, con i certificati di prova in memoria. */
+function defaultFse(now?: () => Date): NonNullable<AppDeps['fse']> {
+  const simulator = new SimulatedFseGateway({ now });
+  return {
+    gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Programma'), now),
+    audience: SIMULATED_FSE_AUDIENCE,
+    signer: new SimulatedDocumentSigner({ now }),
+  };
 }
 
 /** Simulatori del SAR e del Sistema TS che vogliono l'Id-Sessione dei rispettivi simulatori. */

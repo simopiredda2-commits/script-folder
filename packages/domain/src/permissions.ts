@@ -42,6 +42,8 @@ export const ACTIONS = [
   'prescription.draft_repeat',
   'prescription.sign_send',
   'certificate.sign_send',
+  /** Profilo Sanitario Sintetico: validarlo, firmarlo e pubblicarlo nel Fascicolo (tappa 11). */
+  'fse.publish',
   'reminder.print',
   /** Registro degli accessi dell'archivio. */
   'access_log.read',
@@ -72,6 +74,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'prescription.draft_repeat': 'Preparare la bozza di una ricetta ripetuta',
   'prescription.sign_send': 'Firmare e inviare le ricette',
   'certificate.sign_send': 'Firmare e inviare i certificati',
+  'fse.publish': 'Firmare e pubblicare il Profilo Sanitario Sintetico nel Fascicolo',
   'reminder.print': 'Stampare i promemoria',
   'access_log.read': 'Leggere il registro degli accessi',
   'data.export': 'Esportare tutti i dati dell’archivio',
@@ -97,6 +100,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'prescription.draft_repeat',
   'prescription.sign_send',
   'certificate.sign_send',
+  'fse.publish',
   'reminder.print',
   'access_log.read',
   'data.export',
@@ -212,11 +216,18 @@ export function can(actor: Actor, action: Action, ctx: AccessContext = {}): Deci
       const grant = activeGrant(actor, ctx);
       if (grant) {
         const label = grant.kind === 'substitution' ? 'Sostituzione' : 'Medicina di gruppo';
-        candidates.push(
-          DOCTOR_ON_GRANTED_ARCHIVE.includes(action)
-            ? allow(`${label} attiva su questo archivio`)
-            : deny(`${label}: azione riservata al titolare`),
-        );
+        // Il Profilo Sanitario Sintetico lo scrive il medico di famiglia del paziente (DM 7/9/2023,
+        // art. 4): il titolare, o il sostituto durante la sostituzione; non il collega di gruppo.
+        if (action === 'fse.publish' && grant.kind !== 'substitution')
+          candidates.push(
+            deny('Il Profilo lo firma il medico di famiglia del paziente o il suo sostituto'),
+          );
+        else
+          candidates.push(
+            DOCTOR_ON_GRANTED_ARCHIVE.includes(action)
+              ? allow(`${label} attiva su questo archivio`)
+              : deny(`${label}: azione riservata al titolare`),
+          );
       } else {
         candidates.push(deny('Nessuna autorizzazione attiva su questo archivio'));
       }

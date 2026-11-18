@@ -13,3 +13,4 @@ export * from './fse/gateway-simulator';
 export * from './fse/pdf';
 export * from './fse/x509';
 export * from './fse/jwt';
+export * from './fse/signer';

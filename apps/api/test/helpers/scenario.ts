@@ -16,6 +16,7 @@ import {
   diaryDetail,
   doctorProfile,
   exemption,
+  fseSetting,
   patient,
   prescription,
   sickLeaveCertificate,
@@ -87,6 +88,7 @@ export async function createScenario(
     | 'secondFactor'
     | 'sickLeaveGateway'
     | 'regional'
+    | 'fse'
   > = {},
 ): Promise<Scenario> {
   const clock = new Clock();
@@ -105,6 +107,23 @@ export async function createScenario(
     })
     .returning();
   const studioId = st!.id;
+  // Impostazioni del Fascicolo di prova: OID dell'arco 2.999, riservato agli esempi (tappa 11).
+  await db.insert(fseSetting).values({
+    studioId,
+    documentIdRoot: '2.999.10.1',
+    repositoryId: '2.999.10.2',
+    submissionIdRoot: '2.999.10.3',
+    custodianIdRoot: '2.999.10.4',
+    custodianIdExtension: 'CUSTODE-PROVA',
+    custodianName: 'Custode di prova',
+    custodianStreet: 'Via del Custode 1',
+    custodianCity: 'Comune di prova',
+    custodianIstatCode: '999999',
+    custodianProvince: 'XX',
+    locality: 'STUDIO DI PROVA^^^^^&2.999.10.5&ISO^^^^000001',
+    clinicalActivity: 'OBS',
+    administrativeRequest: 'SSN',
+  });
   const passwordHash = await hashPassword(PASSWORD);
   const suffix = randomBytes(3).toString('hex');
 

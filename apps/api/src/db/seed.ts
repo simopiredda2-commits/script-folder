@@ -27,6 +27,7 @@ import {
   clinicalEntry,
   diaryDetail,
   doctorProfile,
+  fseSetting,
   exemption,
   labResultDetail,
   measurementDetail,
@@ -118,6 +119,27 @@ try {
     users.set(u.username, row!.id);
   }
   const doctorId = users.get('medico')!;
+  // Impostazioni del Fascicolo dimostrative: OID dell'arco 2.999, riservato agli esempi; i
+  // valori veri li danno la Regione e l'accreditamento (D133).
+  await db
+    .insert(fseSetting)
+    .values({
+      studioId: st!.id,
+      documentIdRoot: '2.999.10.1',
+      repositoryId: '2.999.10.2',
+      submissionIdRoot: '2.999.10.3',
+      custodianIdRoot: '2.999.10.4',
+      custodianIdExtension: 'CUSTODE-DEMO',
+      custodianName: 'Custode dimostrativo',
+      custodianStreet: 'Via del Custode 1',
+      custodianCity: 'Comune dimostrativo',
+      custodianIstatCode: '999999',
+      custodianProvince: 'XX',
+      locality: 'STUDIO DIMOSTRATIVO^^^^^&2.999.10.5&ISO^^^^000001',
+      clinicalActivity: 'OBS',
+      administrativeRequest: 'SSN',
+    })
+    .onConflictDoNothing();
   await db.insert(doctorProfile).values({
     userId: doctorId,
     regionalCode: 'DEMO-0001',
