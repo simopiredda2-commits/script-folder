@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Folder – Esami di laboratorio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@75..125,200..900&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#EEF0F2}
+a{color:#1F3A9E}a:hover{color:#152A75}
+:focus-visible{outline:3px solid #1F3A9E;outline-offset:2px}
+input::placeholder{color:#5A6270}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #EEF0F2; color: #121519; font-family: 'Mona Sans', 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #D9DDE2">
+<div style="max-width: 1440px; margin: 0 auto; padding: 10px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 28px; box-sizing: border-box">
+<a href="Main.dc.html" aria-label="Folder, vai a Oggi" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #121519; min-height: 44px">
+<svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><polyline points="2,16 9,16 12,7 16,23 19,16 28,16" fill="none" stroke="{{accent}}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+<span style="font-size: 23px; font-weight: 800; font-stretch: expanded; letter-spacing: -0.5px">folder</span>
+</a>
+<nav aria-label="Sezioni" style="display: flex; flex-wrap: wrap; gap: 2px">
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #3A414C; text-decoration: none">Oggi</a>
+<a href="Cartella.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 650; color: {{accent}}; text-decoration: none; box-shadow: inset 0 -3px 0 {{accent}}">Pazienti</a>
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #3A414C; text-decoration: none">Agenda</a>
+<a href="Firma.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #3A414C; text-decoration: none">Ricette <span style="min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px; background: {{mark}}; color: #121519; font-size: 12px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center">7</span></a>
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #3A414C; text-decoration: none">Riepiloghi</a>
+</nav>
+<div role="search" style="flex: 1 1 300px; min-width: 0">
+<label for="cerca" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap">Cerca un paziente o un'azione</label>
+<div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 8px 0 14px; border: 1px solid #C9CFD6; border-radius: 10px; background: #F6F7F8; color: #5A6270">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg>
+<input id="cerca" type="search" placeholder="Cerca un paziente o scrivi un'azione, es. «ricetta Leone»" style="flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 15px; color: #121519">
+<kbd style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 12px; padding: 2px 7px; border: 1px solid #C9CFD6; border-radius: 6px; background: #FFFFFF; color: #3A414C">/</kbd>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; margin-left: auto">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #1B6B3A"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #1B6B3A"></span>Sistema TS collegato</span>
+<button type="button" aria-label="Profilo di Dr.ssa Chiara Rocca" style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px 0 6px; border: 1px solid #D9DDE2; border-radius: 999px; background: #FFFFFF; font: inherit; cursor: pointer">
+<span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 50%; background: #121519; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700">CR</span>
+<span style="font-size: 14px; font-weight: 600; color: #121519">Dr.ssa Rocca</span>
+</button>
+</div>
+</div>
+</header>
+
+<main style="max-width: 1440px; margin: 0 auto; padding: 24px 32px 56px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+
+<nav aria-label="Percorso">
+<ol style="list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px; color: #5A6270">
+<li><a href="Main.dc.html" style="text-decoration: none; font-weight: 600">Oggi</a></li>
+<li aria-hidden="true">/</li>
+<li><a href="Cartella.dc.html" style="text-decoration: none; font-weight: 600">Sara Leone</a></li>
+<li aria-hidden="true">/</li>
+<li aria-current="page" style="color: #121519; font-weight: 600">Esami di laboratorio</li>
+</ol>
+</nav>
+
+<section aria-labelledby="titolo-esami" style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 32px">
+<div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+<h1 id="titolo-esami" style="margin: 0; font-size: 46px; line-height: 1.02; font-weight: 780; font-stretch: expanded; letter-spacing: -1px">Esami di laboratorio</h1>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 15px; color: #3A414C">
+<span><strong style="font-weight: 700; color: #121519">Sara Leone</strong> · 67 anni</span>
+<span style="display: inline-flex; align-items: center; padding: 5px 11px; border-radius: 999px; background: #F3F4F6; color: #3A414C; border: 1px solid #E1E4E8; font-size: 13px; font-weight: 600">Diabete mellito tipo 2 · ICD-9-CM 250.00</span>
+<span style="display: inline-flex; align-items: center; padding: 5px 11px; border-radius: 999px; background: #F3F4F6; color: #3A414C; border: 1px solid #E1E4E8; font-size: 13px; font-weight: 600">Esenzione 013</span>
+</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px">
+<button type="button" style="display: inline-flex; align-items: center; min-height: 48px; padding: 0 16px; border-radius: 10px; border: 1px solid #C9CFD6; background: #FFFFFF; color: #121519; font: inherit; font-size: 15px; font-weight: 650; cursor: pointer">Inserisci un referto</button>
+<a href="Specialistica.dc.html" style="display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px; border-radius: 10px; background: {{accent}}; color: #FFFFFF; font-size: 15px; font-weight: 650; text-decoration: none">Richiedi di nuovo gli stessi esami</a>
+</div>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+<section aria-labelledby="h-risultati" style="flex: 2 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 22px 24px; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 16px">
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px">
+<div style="min-width: 0">
+<h2 id="h-risultati" style="margin: 0; font-size: 19px; font-weight: 720; font-stretch: semi-expanded">Risultati</h2>
+<span style="font-size: 13px; color: #5A6270">Ultimi tre referti · l'ultimo è del 12/11/2026</span>
+</div>
+<div role="group" aria-label="Filtra gli esami" style="display: flex; flex-wrap: wrap; gap: 6px">
+<button type="button" aria-pressed="true" style="min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid #121519; background: #121519; color: #FFFFFF; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer">Tutti</button>
+<button type="button" aria-pressed="false" style="min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid #C9CFD6; background: #FFFFFF; color: #121519; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Diabete</button>
+<button type="button" aria-pressed="false" style="min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid #C9CFD6; background: #FFFFFF; color: #121519; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Lipidi</button>
+<button type="button" aria-pressed="false" style="min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid #C9CFD6; background: #FFFFFF; color: #121519; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Rene</button>
+</div>
+</div>
+
+<div style="overflow-x: auto; border: 1px solid #E1E4E8; border-radius: 12px">
+<table style="width: 100%; min-width: 640px; border-collapse: collapse; font-size: 15px">
+<caption style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap">Risultati degli esami di Sara Leone negli ultimi tre referti</caption>
+<thead>
+<tr style="background: #F6F7F8; text-align: left">
+<th scope="col" style="padding: 12px 14px; font-size: 13px; font-weight: 650; color: #3A414C; border-bottom: 1px solid #E1E4E8">Esame</th>
+<th scope="col" style="padding: 12px 14px; font-size: 13px; font-weight: 650; color: #121519; border-bottom: 1px solid #E1E4E8; white-space: nowrap">12/11/2026</th>
+<th scope="col" style="padding: 12px 14px; font-size: 13px; font-weight: 650; color: #3A414C; border-bottom: 1px solid #E1E4E8; white-space: nowrap">06/08/2026</th>
+<th scope="col" style="padding: 12px 14px; font-size: 13px; font-weight: 650; color: #3A414C; border-bottom: 1px solid #E1E4E8; white-space: nowrap">10/05/2026</th>
+<th scope="col" style="padding: 12px 14px; font-size: 13px; font-weight: 650; color: #3A414C; border-bottom: 1px solid #E1E4E8">Intervallo del laboratorio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650; border-bottom: 1px solid #EEF0F2">Emoglobina glicata (HbA1c)</th>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; font-weight: 700">57 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">54 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">52 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; color: #3A414C; white-space: nowrap">20–42 mmol/mol</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650; border-bottom: 1px solid #EEF0F2">Glucosio</th>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; font-weight: 700">141 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">132 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">128 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; color: #3A414C; white-space: nowrap">70–99 mg/dL</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650; border-bottom: 1px solid #EEF0F2">Colesterolo LDL</th>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; font-weight: 700">96</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">104</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">131 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; color: #3A414C; white-space: nowrap">meno di 115 mg/dL</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650; border-bottom: 1px solid #EEF0F2">Colesterolo HDL</th>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; font-weight: 700">52</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">50</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">49</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; color: #3A414C; white-space: nowrap">più di 45 mg/dL</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650; border-bottom: 1px solid #EEF0F2">Trigliceridi</th>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; font-weight: 700">148</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">160 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">171 <span style="margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #FFF4DB; border: 1px solid #F0D49A; color: #5C3800; font-size: 12px; font-weight: 650">sopra</span></td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; color: #3A414C; white-space: nowrap">meno di 150 mg/dL</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650; border-bottom: 1px solid #EEF0F2">Creatinina</th>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; font-weight: 700">0,86</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">0,84</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">0,88</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; color: #3A414C; white-space: nowrap">0,50–0,95 mg/dL</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650; border-bottom: 1px solid #EEF0F2">Potassio</th>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; font-weight: 700">4,4</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">4,6</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">4,3</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; color: #3A414C; white-space: nowrap">3,5–5,1 mmol/L</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650; border-bottom: 1px solid #EEF0F2">Albumina/creatinina nelle urine</th>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap; font-weight: 700">24</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">19</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; white-space: nowrap">21</td>
+<td style="padding: 12px 14px; border-bottom: 1px solid #EEF0F2; color: #3A414C; white-space: nowrap">meno di 30 mg/g</td>
+</tr>
+<tr>
+<th scope="row" style="padding: 12px 14px; text-align: left; font-weight: 650">Emoglobina</th>
+<td style="padding: 12px 14px; white-space: nowrap; font-weight: 700">13,1</td>
+<td style="padding: 12px 14px; white-space: nowrap">13,4</td>
+<td style="padding: 12px 14px; white-space: nowrap">13,0</td>
+<td style="padding: 12px 14px; color: #3A414C; white-space: nowrap">12,0–15,5 g/dL</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p style="margin: 0; font-size: 13px; color: #5A6270">«Sopra» e «sotto» confrontano il valore con l'intervallo stampato sul referto, senza giudizio clinico. Funzione da validare con il consulente regolatorio. Valori inventati.</p>
+</section>
+
+<div style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 20px">
+
+<section aria-labelledby="h-andamento" style="display: flex; flex-direction: column; gap: 10px; padding: 22px 24px; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 16px">
+<div style="min-width: 0">
+<h2 id="h-andamento" style="margin: 0; font-size: 19px; font-weight: 720; font-stretch: semi-expanded">Emoglobina glicata nel tempo</h2>
+<span style="font-size: 13px; color: #5A6270">4 referti nel 2026 · mmol/mol</span>
+</div>
+<svg viewBox="0 0 520 230" width="100%" role="img" aria-label="Emoglobina glicata nel 2026: 55 a febbraio, 52 a maggio, 54 ad agosto, 57 a novembre, in mmol/mol. Limite del laboratorio 42." style="display: block">
+<line x1="50" y1="20" x2="500" y2="20" stroke="#EEF0F2" stroke-width="1"></line>
+<line x1="50" y1="73" x2="500" y2="73" stroke="#EEF0F2" stroke-width="1"></line>
+<line x1="50" y1="127" x2="500" y2="127" stroke="#EEF0F2" stroke-width="1"></line>
+<line x1="50" y1="180" x2="500" y2="180" stroke="#C9CFD6" stroke-width="1"></line>
+<text x="40" y="24" text-anchor="end" font-size="12" fill="#5A6270">70</text>
+<text x="40" y="77" text-anchor="end" font-size="12" fill="#5A6270">60</text>
+<text x="40" y="131" text-anchor="end" font-size="12" fill="#5A6270">50</text>
+<text x="40" y="184" text-anchor="end" font-size="12" fill="#5A6270">40</text>
+<line x1="50" y1="169" x2="500" y2="169" stroke="#8A5300" stroke-width="1.5" stroke-dasharray="5 4"></line>
+<text x="500" y="163" text-anchor="end" font-size="12" fill="#8A5300">limite del laboratorio 42</text>
+<polyline points="70,100 210,116 350,105 490,89" fill="none" stroke="{{accent}}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>
+<circle cx="70" cy="100" r="6" fill="#FFFFFF" stroke="{{accent}}" stroke-width="3"></circle>
+<circle cx="210" cy="116" r="6" fill="#FFFFFF" stroke="{{accent}}" stroke-width="3"></circle>
+<circle cx="350" cy="105" r="6" fill="#FFFFFF" stroke="{{accent}}" stroke-width="3"></circle>
+<circle cx="490" cy="89" r="7" fill="{{accent}}" stroke="{{accent}}" stroke-width="3"></circle>
+<text x="70" y="86" text-anchor="middle" font-size="13" font-weight="650" fill="#121519">55</text>
+<text x="210" y="102" text-anchor="middle" font-size="13" font-weight="650" fill="#121519">52</text>
+<text x="350" y="91" text-anchor="middle" font-size="13" font-weight="650" fill="#121519">54</text>
+<text x="490" y="74" text-anchor="middle" font-size="13" font-weight="750" fill="#121519">57</text>
+<text x="70" y="206" text-anchor="middle" font-size="12" fill="#3A414C">03/02</text>
+<text x="210" y="206" text-anchor="middle" font-size="12" fill="#3A414C">10/05</text>
+<text x="350" y="206" text-anchor="middle" font-size="12" fill="#3A414C">06/08</text>
+<text x="490" y="206" text-anchor="middle" font-size="12" fill="#3A414C">12/11</text>
+</svg>
+</section>
+
+<section aria-labelledby="h-richiami" style="display: flex; flex-direction: column; gap: 10px; padding: 22px 24px; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 16px">
+<h2 id="h-richiami" style="margin: 0; font-size: 19px; font-weight: 720; font-stretch: semi-expanded">Richiami</h2>
+<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+<li style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding: 10px 0; border-top: 1px solid #EEF0F2">
+<span style="font-size: 15px; font-weight: 650">Controllo del diabete</span>
+<span style="font-size: 14px; color: #3A414C">ogni 3 mesi · dal 12/02/2027</span>
+</li>
+<li style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding: 10px 0; border-top: 1px solid #EEF0F2">
+<span style="font-size: 15px; font-weight: 650">Profilo lipidico</span>
+<span style="font-size: 14px; color: #3A414C">ogni 6 mesi · dal 06/02/2027</span>
+</li>
+</ul>
+<p style="margin: 0; font-size: 13px; color: #5A6270">Richiami impostati dalla Dr.ssa Rocca: Folder ricorda, non decide.</p>
+</section>
+
+<section aria-labelledby="h-origine" style="display: flex; flex-direction: column; gap: 8px; padding: 22px 24px; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 16px">
+<h2 id="h-origine" style="margin: 0; font-size: 19px; font-weight: 720; font-stretch: semi-expanded">Da dove arrivano i dati</h2>
+<p style="margin: 0; font-size: 14px; color: #3A414C">Referto del 12/11/2026: PDF allegato, valori inseriti a mano. <a href="Esami.dc.html" style="font-weight: 650; text-decoration: none">Apri il PDF</a></p>
+<p style="margin: 0; font-size: 14px; color: #3A414C">Acquisizione dei referti strutturati dal Fascicolo: accesso e formato da verificare.</p>
+<p style="margin: 0; font-size: 13px; color: #5A6270">Nessun calcolo clinico automatico nella prima versione (R12).</p>
+</section>
+
+</div>
+</div>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1F3A9E","options":["#1F3A9E","#0F5B5C","#121519","#7A2E1F"],"section":"Colori"},"mark":{"editor":"color","default":"#FFE45C","options":["#FFE45C","#B8F0C8","#FFD2BF","#CDE3FF"],"section":"Colori"},"$preview":{"width":1440,"height":1400}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      accent: this.props.accent ?? '#1F3A9E',
+      mark: this.props.mark ?? '#FFE45C'
+    };
+  }
+}
+</script>
+</body>
+</html>

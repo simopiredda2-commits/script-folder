@@ -1,0 +1,34 @@
+# Dipendenze e prodotti di compilazione
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+.turbo/
+
+# Ambiente locale: mai segreti nel repository
+.env
+.env.*
+!.env.example
+
+# Python (sync/)
+__pycache__/
+*.pyc
+.venv/
+
+# Dati scaricati da sync/ e archivi: non entrano nel repository
+dati-pubblici/
+*.zip
+
+# Esportazioni e prove locali
+esportazioni/
+test-results/
+playwright-report/
+
+# Sistema ed editor
+.DS_Store
+*.log
+.idea/
+.vscode/
+.claude/settings.local.json

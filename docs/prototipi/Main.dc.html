@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Folder – Oggi</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mona+Sans:wdth,wght@75..125,200..900&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0;background:#EEF0F2}
+a{color:#1F3A9E}a:hover{color:#152A75}
+:focus-visible{outline:3px solid #1F3A9E;outline-offset:2px}
+input::placeholder{color:#5A6270}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #EEF0F2; color: #121519; font-family: 'Mona Sans', 'Segoe UI', system-ui, -apple-system, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #D9DDE2">
+<div style="max-width: 1440px; margin: 0 auto; padding: 10px 32px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 28px; box-sizing: border-box">
+<a href="Main.dc.html" aria-label="Folder, vai a Oggi" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #121519; min-height: 44px">
+<svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><polyline points="2,16 9,16 12,7 16,23 19,16 28,16" fill="none" stroke="{{accent}}" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+<span style="font-size: 23px; font-weight: 800; font-stretch: expanded; letter-spacing: -0.5px">folder</span>
+</a>
+<nav aria-label="Sezioni" style="display: flex; flex-wrap: wrap; gap: 2px">
+<a href="Main.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 650; color: {{accent}}; text-decoration: none; box-shadow: inset 0 -3px 0 {{accent}}">Oggi</a>
+<a href="Cartella.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #3A414C; text-decoration: none">Pazienti</a>
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #3A414C; text-decoration: none">Agenda</a>
+<a href="Firma.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #3A414C; text-decoration: none">Ricette <span style="min-width: 22px; height: 22px; padding: 0 7px; box-sizing: border-box; border-radius: 11px; background: {{mark}}; color: #121519; font-size: 12px; font-weight: 750; display: inline-flex; align-items: center; justify-content: center">7</span></a>
+<a href="Main.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #3A414C; text-decoration: none">Riepiloghi</a>
+</nav>
+<div role="search" style="flex: 1 1 300px; min-width: 0">
+<label for="cerca" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap">Cerca un paziente o un'azione</label>
+<div style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 8px 0 14px; border: 1px solid #C9CFD6; border-radius: 10px; background: #F6F7F8; color: #5A6270">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg>
+<input id="cerca" type="search" placeholder="Cerca un paziente o scrivi un'azione, es. «ricetta Leone»" style="flex: 1; min-width: 0; border: 0; background: transparent; font: inherit; font-size: 15px; color: #121519">
+<kbd style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 12px; padding: 2px 7px; border: 1px solid #C9CFD6; border-radius: 6px; background: #FFFFFF; color: #3A414C">/</kbd>
+</div>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; margin-left: auto">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #1B6B3A"><span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 50%; background: #1B6B3A"></span>Sistema TS collegato</span>
+<button type="button" aria-label="Profilo di Dr.ssa Chiara Rocca" style="display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px 0 6px; border: 1px solid #D9DDE2; border-radius: 999px; background: #FFFFFF; font: inherit; cursor: pointer">
+<span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 50%; background: #121519; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700">CR</span>
+<span style="font-size: 14px; font-weight: 600; color: #121519">Dr.ssa Rocca</span>
+</button>
+</div>
+</div>
+</header>
+
+<main style="max-width: 1440px; margin: 0 auto; padding: 36px 32px 56px; box-sizing: border-box; display: flex; flex-direction: column; gap: 28px">
+
+<section aria-labelledby="titolo-oggi" style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px">
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<p style="margin: 0; font-size: 13px; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: #5A6270; font-stretch: semi-expanded">Oggi</p>
+<h1 id="titolo-oggi" style="margin: 0; font-size: 52px; line-height: 1.02; font-weight: 780; font-stretch: expanded; letter-spacing: -1.2px; text-wrap: balance">Martedì 17 novembre</h1>
+<p style="margin: 0; font-size: 16px; color: #3A414C">Studio aperto 8:30–12:30 e 15:00–18:00</p>
+</div>
+<dl style="display: flex; flex-wrap: wrap; gap: 12px; margin: 0">
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 14px 20px; min-width: 140px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 12px">
+<dt style="font-size: 13px; font-weight: 600; color: #5A6270">Appuntamenti</dt>
+<dd style="margin: 0; font-size: 34px; line-height: 1.1; font-weight: 760; font-stretch: expanded; font-variant-numeric: tabular-nums">15</dd>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 14px 20px; min-width: 140px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 12px">
+<dt style="font-size: 13px; font-weight: 600; color: #5A6270">Domicili</dt>
+<dd style="margin: 0; font-size: 34px; line-height: 1.1; font-weight: 760; font-stretch: expanded; font-variant-numeric: tabular-nums">2</dd>
+</div>
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 14px 20px; min-width: 140px; box-sizing: border-box; background: {{mark}}; border: 1px solid #121519; border-radius: 12px">
+<dt style="font-size: 13px; font-weight: 650; color: #121519">Da firmare</dt>
+<dd style="margin: 0; font-size: 34px; line-height: 1.1; font-weight: 760; font-stretch: expanded; font-variant-numeric: tabular-nums">7</dd>
+</div>
+</dl>
+</section>
+
+<div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+<section aria-labelledby="titolo-agenda" style="flex: 1 1 400px; min-width: 0; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 16px; overflow: hidden">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 20px 22px 14px">
+<h2 id="titolo-agenda" style="margin: 0; font-size: 20px; font-weight: 720; font-stretch: semi-expanded">Mattina</h2>
+<span style="font-size: 14px; color: #5A6270">9 appuntamenti</span>
+</div>
+<ol style="list-style: none; margin: 0; padding: 0">
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #5A6270">08:30</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 16px; font-weight: 600; color: #5A6270; text-decoration: none">Sara Leone</a><span style="font-size: 14px; color: #5A6270"> · 67</span><div style="font-size: 14px; color: #5A6270; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Controllo pressione e glicemie</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #1B6B3A"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>Visitata</span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #5A6270">08:45</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 16px; font-weight: 600; color: #5A6270; text-decoration: none">Fabio Greco</a><span style="font-size: 14px; color: #5A6270"> · 45</span><div style="font-size: 14px; color: #5A6270; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Continuazione certificato di malattia</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #1B6B3A"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>Visitato</span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #5A6270">09:00</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 16px; font-weight: 600; color: #5A6270; text-decoration: none">Dora Testa</a><span style="font-size: 14px; color: #5A6270"> · 52</span><div style="font-size: 14px; color: #5A6270; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Dolore lombare</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #1B6B3A"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>Visitata</span>
+</li>
+
+<li aria-label="Adesso sono le 9:12" style="display: flex; align-items: center; gap: 10px; padding: 0 22px; height: 30px; border-top: 1px solid #EEF0F2">
+<span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 5px; background: {{mark}}; color: #121519">9:12</span>
+<svg width="34" height="14" viewBox="0 0 34 14" aria-hidden="true"><polyline points="0,7 10,7 13,2 17,12 20,7 34,7" fill="none" stroke="#121519" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline></svg>
+<span aria-hidden="true" style="flex: 1; height: 2px; background: #121519"></span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 14px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; color: #121519">09:15</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 17px; font-weight: 700; color: #121519; text-decoration: none">Lina Rota</a><span style="font-size: 14px; color: #5A6270"> · 58</span><div style="font-size: 14px; color: #3A414C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Controllo diabete trimestrale</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #3A414C; background: #F3F4F6; border: 1px solid #E1E4E8"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5"></rect><circle cx="15" cy="12" r="1"></circle></svg>Studio</span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #121519">09:30</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 16px; font-weight: 650; color: #121519; text-decoration: none">Ettore Riva</a><span style="font-size: 14px; color: #5A6270"> · 72</span><div style="font-size: 14px; color: #3A414C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Rivalutazione della terapia</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #3A414C; background: #F3F4F6; border: 1px solid #E1E4E8"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"></rect><path d="m16 10 5-3v10l-5-3"></path></svg>Televisita</span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #5A6270">09:45</time>
+<span style="font-size: 15px; color: #5A6270">Libero</span>
+<span></span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #121519">10:00</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 16px; font-weight: 650; color: #121519; text-decoration: none">Noemi Valle</a><span style="font-size: 14px; color: #5A6270"> · 34</span><div style="font-size: 14px; color: #3A414C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Prima visita</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #3A414C; background: #F3F4F6; border: 1px solid #E1E4E8"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5"></rect><circle cx="15" cy="12" r="1"></circle></svg>Studio</span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #121519">10:15</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 16px; font-weight: 650; color: #121519; text-decoration: none">Ugo Ferri</a><span style="font-size: 14px; color: #5A6270"> · 61</span><div style="font-size: 14px; color: #3A414C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Certificato per attività sportiva</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #3A414C; background: #F3F4F6; border: 1px solid #E1E4E8"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5"></rect><circle cx="15" cy="12" r="1"></circle></svg>Studio</span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #121519">11:30</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 16px; font-weight: 650; color: #121519; text-decoration: none">Ilaria Conte</a><span style="font-size: 14px; color: #5A6270"> · 81</span><div style="font-size: 14px; color: #3A414C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Visita domiciliare</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #3A414C; background: #F3F4F6; border: 1px solid #E1E4E8"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10v10h13V10"></path></svg>Domicilio</span>
+</li>
+
+<li style="display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 22px; border-top: 1px solid #EEF0F2">
+<time style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 15px; font-weight: 500; color: #121519">12:00</time>
+<div style="min-width: 0"><a href="Cartella.dc.html" style="font-size: 16px; font-weight: 650; color: #121519; text-decoration: none">Bruno Sala</a><span style="font-size: 14px; color: #5A6270"> · 77</span><div style="font-size: 14px; color: #3A414C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Visita domiciliare</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #3A414C; background: #F3F4F6; border: 1px solid #E1E4E8"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5.5 10v10h13V10"></path></svg>Domicilio</span>
+</li>
+
+</ol>
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 22px; border-top: 1px solid #EEF0F2; background: #F8F9FA">
+<span style="font-size: 14px; color: #3A414C">Pomeriggio: 6 appuntamenti dalle 15:00</span>
+<a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 14px; font-weight: 650; text-decoration: none">Apri l'agenda<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+</div>
+</section>
+
+<section aria-labelledby="titolo-dafare" style="flex: 1.35 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+<h2 id="titolo-dafare" style="margin: 0; font-size: 13px; font-weight: 650; letter-spacing: 0.09em; text-transform: uppercase; color: #5A6270; font-stretch: semi-expanded">Da fare</h2>
+
+<article style="display: flex; flex-direction: column; gap: 16px; padding: 22px 24px; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 16px">
+<div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 16px">
+<h3 style="margin: 0; font-size: 22px; font-weight: 720; font-stretch: semi-expanded">Ricette da firmare <span style="padding: 0 4px; box-shadow: inset 0 -0.55em 0 {{mark}}">7</span></h3>
+<span style="font-size: 14px; color: #5A6270">Preparate dalla segreteria tra le 8:12 e le 9:05</span>
+</div>
+<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column">
+<li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; padding: 12px 0; border-top: 1px solid #EEF0F2">
+<div style="min-width: 0"><span style="font-size: 16px; font-weight: 650">Lina Rota</span><div style="font-size: 14px; color: #3A414C">Metformina 1000 mg · Insulina glargine 100 U/ml</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 650; color: #8A5300; background: #FFF4DB; border: 1px solid #F0D49A"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>Metformina in anticipo</span>
+</li>
+<li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; padding: 12px 0; border-top: 1px solid #EEF0F2">
+<div style="min-width: 0"><span style="font-size: 16px; font-weight: 650">Bruno Sala</span><div style="font-size: 14px; color: #3A414C">Ramipril 5 mg · Atorvastatina 20 mg</div></div>
+<span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 650; color: #8A5300; background: #FFF4DB; border: 1px solid #F0D49A"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 2.5 20h19L12 3.5Z"></path><line x1="12" y1="10" x2="12" y2="14"></line><line x1="12" y1="17" x2="12" y2="17.01"></line></svg>Nota 13 da confermare</span>
+</li>
+<li style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; padding: 12px 0; border-top: 1px solid #EEF0F2">
+<div style="min-width: 0"><span style="font-size: 16px; font-weight: 650">Ornella Pace</span><div style="font-size: 14px; color: #3A414C">Levotiroxina 75 µg</div></div>
+<span style="font-size: 13px; font-weight: 600; color: #1B6B3A">1 ricetta pronta</span>
+</li>
+<li style="padding: 12px 0 0; border-top: 1px solid #EEF0F2; font-size: 14px; color: #5A6270">E altre 2: Ettore Riva, pronta, e Bianca Serra, bloccata per piano terapeutico scaduto</li>
+</ul>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+<a href="Firma.dc.html" style="display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 22px; border-radius: 10px; background: {{accent}}; color: #FFFFFF; font-size: 16px; font-weight: 650; text-decoration: none"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4Z"></path><path d="m13.5 6.5 4 4"></path></svg>Rivedi e firma</a>
+<span style="font-size: 13px; color: #5A6270">oppure premi <kbd style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace; font-size: 12px; padding: 2px 7px; border: 1px solid #C9CFD6; border-radius: 6px; background: #FFFFFF; color: #3A414C">F</kbd></span>
+</div>
+</article>
+
+<article style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 20px; padding: 18px 24px; background: #FFFFFF; border: 1px solid #E8A99F; border-radius: 16px">
+<div style="display: flex; gap: 14px; align-items: flex-start; min-width: 0; flex: 1 1 320px">
+<span aria-hidden="true" style="flex: none; width: 40px; height: 40px; border-radius: 10px; background: #FDECEA; color: #B42318; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 2.5 20h19L12 3.5Z"></path><line x1="12" y1="10" x2="12" y2="14"></line><line x1="12" y1="17" x2="12" y2="17.01"></line></svg></span>
+<div style="min-width: 0">
+<h3 style="margin: 0; font-size: 17px; font-weight: 700; color: #8F1D14">Invio non riuscito</h3>
+<p style="margin: 2px 0 0; font-size: 15px; color: #3A414C">Certificato INPS di Fabio Greco, ore 8:51. Rifiutato: manca l'indirizzo di reperibilità.</p>
+</div>
+</div>
+<button type="button" style="min-height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid #C9CFD6; background: #FFFFFF; color: #121519; font: inherit; font-size: 15px; font-weight: 650; cursor: pointer">Correggi e reinvia</button>
+</article>
+
+<article style="display: flex; flex-direction: column; gap: 4px; padding: 20px 24px; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 16px">
+<h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700">Richieste dei pazienti <span style="font-size: 15px; font-weight: 600; color: #5A6270">· 3</span></h3>
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 0; border-top: 1px solid #EEF0F2">
+<p style="margin: 0; min-width: 0; flex: 1 1 300px; font-size: 15px"><strong style="font-weight: 650">Aldo Neri</strong> chiede Omeprazolo 20 mg, che non è nella sua terapia abituale</p>
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #C9CFD6; background: #FFFFFF; color: #121519; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer">Valuta</button>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 0; border-top: 1px solid #EEF0F2">
+<p style="margin: 0; min-width: 0; flex: 1 1 300px; font-size: 15px"><strong style="font-weight: 650">Dora Testa</strong> chiede la continuazione del certificato di malattia</p>
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #C9CFD6; background: #FFFFFF; color: #121519; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer">Apri certificato</button>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 10px 0; border-top: 1px solid #EEF0F2">
+<p style="margin: 0; min-width: 0; flex: 1 1 300px; font-size: 15px"><strong style="font-weight: 650">Renzo Gatti</strong> ha inviato il referto di un'ecografia dell'addome</p>
+<button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #C9CFD6; background: #FFFFFF; color: #121519; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer">Leggi referto</button>
+</div>
+</article>
+
+<article style="display: flex; flex-direction: column; gap: 4px; padding: 20px 24px; background: #FFFFFF; border: 1px solid #D9DDE2; border-radius: 16px">
+<h3 style="margin: 0 0 8px; font-size: 18px; font-weight: 700">In scadenza</h3>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 0; border-top: 1px solid #EEF0F2">
+<span aria-hidden="true" style="color: #8A5300; display: flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg></span>
+<p style="margin: 0; min-width: 0; flex: 1 1 300px; font-size: 15px">Piano terapeutico di <strong style="font-weight: 650">Ilaria Conte</strong>: scade il 2 dicembre</p>
+<span style="font-size: 13px; font-weight: 650; color: #8A5300">tra 15 giorni</span>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 0; border-top: 1px solid #EEF0F2">
+<span aria-hidden="true" style="color: #3A414C; display: flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 20 4"></path><path d="m14 4 6 6"></path><path d="M9 9l6 6"></path></svg></span>
+<p style="margin: 0; min-width: 0; flex: 1 1 300px; font-size: 15px">Campagna antinfluenzale: <strong style="font-weight: 650">23 assistiti over 65</strong> non ancora vaccinati</p>
+<a href="Main.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 650; text-decoration: none">Vedi elenco</a>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 0; border-top: 1px solid #EEF0F2">
+<span aria-hidden="true" style="color: #3A414C; display: flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11Z"></path></svg></span>
+<p style="margin: 0; min-width: 0; flex: 1 1 300px; font-size: 15px">Diabete: <strong style="font-weight: 650">5 pazienti</strong> senza emoglobina glicata da oltre 6 mesi</p>
+<a href="Main.dc.html" style="display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 650; text-decoration: none">Vedi elenco</a>
+</div>
+</article>
+
+</section>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1F3A9E","options":["#1F3A9E","#0F5B5C","#121519","#7A2E1F"],"section":"Colori"},"mark":{"editor":"color","default":"#FFE45C","options":["#FFE45C","#B8F0C8","#FFD2BF","#CDE3FF"],"section":"Colori"},"$preview":{"width":1440,"height":1440}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      accent: this.props.accent ?? '#1F3A9E',
+      mark: this.props.mark ?? '#FFE45C'
+    };
+  }
+}
+</script>
+</body>
+</html>
