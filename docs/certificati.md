@@ -76,12 +76,12 @@ Ogni chiamata all'INPS, riuscita o no, resta in `certificate_submission` con ric
 
 ## Consegne
 
-| Canale                    | Che cosa                                                                                                       | Fonte                               |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
-| Stampa                    | Copia e attestato, da consegnare al lavoratore                                                                 | DM, art. 3.2; disciplinare, 6       |
-| Email al lavoratore       | Copia e attestato in PDF; nel testo nessun dato clinico                                                        | Disciplinare, 4.2                   |
-| SMS al lavoratore         | Protocollo, data di rilascio, durata della prognosi, nome e cognome del lavoratore e del medico                | Disciplinare, 4.2                   |
-| Email al datore di lavoro | Solo il numero di protocollo, se il lavoratore lo chiede; nessun dato clinico e nemmeno il nome del lavoratore | D88; l'attestato lo dà l'INPS (3.5) |
+| Canale                    | Che cosa                                                                                                        | Fonte                                                 |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Stampa                    | Copia e attestato, da consegnare al lavoratore                                                                  | DM, art. 3.2; disciplinare, 6                         |
+| Email al lavoratore       | Copia e attestato in PDF; nel testo nessun dato clinico                                                         | Disciplinare, 4.2                                     |
+| SMS al lavoratore         | Protocollo, data di rilascio, durata della prognosi, nome e cognome del lavoratore e del medico                 | Disciplinare, 4.2                                     |
+| Email al datore di lavoro | Protocollo con nome e cognome del lavoratore, come nell'attestato, se il lavoratore lo chiede; mai dati clinici | D88, D108; allegato B; l'attestato lo dà l'INPS (3.5) |
 
 Ogni stampa e consegna resta in `certificate_delivery`, che non si modifica. Email e SMS passano dal simulatore (regola 7).
 
@@ -112,5 +112,5 @@ Ogni stampa e consegna resta in `certificate_delivery`, che non si modifica. Ema
 - **Esito incerto**: non si sa ancora se l'INPS rifiuta un certificato doppio. Il servizio di ricerca (RicercaMalattia) è da usare con l'adattatore vero (D107).
 - **ICD-10-IM dal 1/1/2027**: da quando lo accetta l'INPS (domanda già nei requisiti).
 - **Certificato cartaceo quando il sistema non risponde**: il decreto letto non lo prevede; da verificare nelle circolari INPS.
-- **Testo dell'email al datore di lavoro**: solo il protocollo. Se serva anche il nome del lavoratore è una domanda della fermata.
+- **Email al datore di lavoro con nome e cognome** (D108): da confermare con il consulente privacy.
 - **Prove dal vero**: stampa su carta e consegna reale di email e SMS non provate.

@@ -307,3 +307,24 @@ I requisiti mettono la medicina di gruppo con più archivi in fase 2, quindi è 
 - niente per il pronto soccorso.
 
 **D107 · Esito incerto dei certificati.** Come per le ricette, dopo un tempo scaduto si può riprovare l’invio o annullare il certificato nel programma. Se l’INPS rifiuti un certificato doppio va verificato con l’adattatore vero e con il servizio di ricerca delle specifiche (RicercaMalattia), che oggi non si usa.
+
+## Risposte della terza fermata (18/11/2026)
+
+Simone ha risposto con il pulsante: via alla pull request #4.
+
+**D108 · Al datore di lavoro protocollo con nome e cognome.** Risposta: «se indicare nome e cognome non viola la privacy, ok anche per nome e cognome». Verificato sulla fonte: l’attestato per il datore di lavoro (allegato B del DM 26/2/2010) contiene già cognome, nome e codice fiscale del lavoratore, e l’INPS lo mette a disposizione del datore (3.5). Quindi l’email non gli dice nulla di più di quello che riceve comunque.
+
+- Il testo contiene protocollo, nome e cognome del lavoratore come all’invio; il nome sta solo nel testo, non nell’oggetto.
+- Mai la diagnosi né altri dati clinici.
+- Si manda sempre e solo se il lavoratore lo chiede.
+
+Sostituisce la parte di D88 sul solo protocollo. Resta da confermare con il consulente privacy.
+
+**D109 · Secondo fattore per le ricette in Piemonte: SPID o CIE dal programma.** Si costruisce la modalità OAuth2 del SIRPED: il medico entra con SPID o CIE dalla pagina di autorizzazione regionale e il programma riceve il codice da solo; per il SAR non servono più password e PIN RUPAR. Si fa con un simulatore, nel branch `tappe-9-10`, prima della tappa 9. La modalità con il codice per email resta come alternativa.
+
+**D110 · Fascicolo Sanitario Elettronico e rete AFT dopo la tappa 10.** Durante le tappe 9 e 10 si prepara `docs/fse.md` dalle fonti ufficiali (Profilo Sanitario Sintetico: contenuto, aggiornamento, firma, invio, accreditamento). Lo si presenta alla fermata finale del secondo giro, poi si fanno con il via:
+
+- tappa 11: Profilo Sanitario Sintetico con un simulatore del Gateway;
+- tappa 12: condivisione tra i medici dell’AFT che usano il programma.
+
+Con gli altri programmi solo formati pubblici (D104).

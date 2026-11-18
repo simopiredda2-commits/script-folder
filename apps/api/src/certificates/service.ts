@@ -815,8 +815,8 @@ export function createCertificateService(deps: CertificateDeps) {
 
   /**
    * Consegna (DM 26/2/2010, 4.2): al lavoratore copia e attestato per email, oppure un SMS con i
-   * dati essenziali dell'attestato; al datore di lavoro solo il protocollo, se il lavoratore lo
-   * chiede (D88).
+   * dati essenziali dell'attestato; al datore di lavoro protocollo e nome del lavoratore, se il
+   * lavoratore lo chiede (D88, D108).
    */
   async function deliver(actor: Actor, id: string, body: unknown) {
     const c = await load(id, actor.studioId);
@@ -840,7 +840,9 @@ export function createCertificateService(deps: CertificateDeps) {
       result = await deps.sender.sendEmail({
         to,
         subject: `Certificato di malattia telematico: protocollo ${c.protocol}`,
-        text: `Numero di protocollo del certificato di malattia telematico: ${c.protocol}.\nIl lavoratore ha chiesto di comunicarlo; l’attestato di malattia è a disposizione presso l’INPS.`,
+        // Protocollo e nome del lavoratore, come nell'attestato che il datore riceve dall'INPS
+        // (allegato B); mai la diagnosi (D108). Il nome solo nel testo, non nell'oggetto.
+        text: `Certificato di malattia telematico di ${worker}: protocollo ${c.protocol}.\nIl lavoratore ha chiesto di comunicarlo; l’attestato di malattia è a disposizione presso l’INPS.`,
         attachments: [],
       });
     } else if (b.canale === 'email') {

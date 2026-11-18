@@ -385,12 +385,15 @@ describe('certificati di malattia INPS (tappa 8)', () => {
     const toEmployer = sender.emails.at(-1)!;
     expect(toEmployer.attachments).toEqual([]);
     expect(toEmployer.text).toContain(cert.protocollo!);
+    // Protocollo e nome del lavoratore come all'invio, come nell'attestato (D108); mai la diagnosi.
     expect(toEmployer.text).not.toMatch(/487|influenzale|diagnosi|Marchi/i);
-    // Nemmeno il nome del lavoratore: solo il protocollo (D88).
-    const [w] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
-    expect(toEmployer.text).not.toContain(w!.lastName);
-    expect(toEmployer.text).not.toContain(w!.firstName);
-    expect(toEmployer.subject).not.toContain(w!.lastName);
+    const [row] = await t.db
+      .select()
+      .from(sickLeaveCertificate)
+      .where(eq(sickLeaveCertificate.id, cert.id));
+    const worker = (row!.snapshot as { worker: { firstName: string; lastName: string } }).worker;
+    expect(toEmployer.text).toContain(`${worker.firstName} ${worker.lastName}`);
+    expect(toEmployer.subject).not.toContain(worker.lastName);
     const list = (await req('GET', `/api/certificati/${cert.id}/consegne`)).json<{
       consegne: { canale: string }[];
     }>();

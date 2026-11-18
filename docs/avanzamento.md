@@ -7,7 +7,12 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Primo giro (tappe 0–6) chiuso.** Pull request #1, #2 e #3 su `main`, l'ultima con la terapia completa e i collegamenti pronti (D79–D88), unita con il via di Simone del 18/11/2026.
 - **Secondo giro (tappe 7–10) avviato** con il via di Simone: «fai tutto, nell'ordine che ritieni giusto» (D90). Ordine: promemoria e invio, certificati INPS (terza fermata), voci cliniche, presidi e seguito delle prestazioni (fermata finale). Branch `tappe-7-8`, poi `tappe-9-10`.
 - **Tappa 7 fatta** (promemoria e invio, D92–D99).
-- **Tappa 8 fatta** (certificati INPS, D105–D107), con le credenziali dei servizi e il secondo fattore (D100–D103) chiesti dalla Dr.ssa Rocca. Prossimo passo: pull request `tappe-7-8` e terza fermata.
+- **Tappa 8 fatta** (certificati INPS, D105–D107), con le credenziali dei servizi e il secondo fattore (D100–D103) chiesti dalla Dr.ssa Rocca.
+- **Terza fermata fatta**: via di Simone, pull request #4 unita (D108–D110). Prossimo passo, nel branch `tappe-9-10`:
+  1. secondo fattore con SPID o CIE dal programma (D109);
+  2. tappa 9 (voci cliniche) e tappa 10 (presidi e seguito delle prestazioni);
+  3. intanto `docs/fse.md` (D110);
+  4. poi la fermata finale.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -366,7 +371,16 @@ Durante la tappa 8:
 
 - **Net Medica Italia** (domanda della Dr.ssa Rocca): far comunicare medici con programmi diversi senza comprare quel servizio. Raccolte le informazioni pubbliche, fatta una proposta (D104). È una domanda della terza fermata; non è costruito nulla.
 
-## Domande per la terza fermata (da fare, dopo la tappa 8)
+## Risposte della terza fermata (18/11/2026)
+
+Simone ha risposto con il pulsante:
+
+- **Via**: unire la pull request #4 e continuare con le tappe 9 e 10.
+- **Secondo fattore in Piemonte**: SPID o CIE dal programma (D109).
+- **FSE e rete AFT**: dopo la tappa 10, prima il documento sulle fonti (D110).
+- **Email al datore di lavoro**: «se indicare nome e cognome non viola la privacy, ok anche per nome e cognome». Verificato sull'allegato B del DM 26/2/2010, che contiene già nome e cognome; applicato prima dell'unione (D108).
+
+## Domande della terza fermata (chiuse)
 
 1. **Via per promemoria e certificati**: modelli e fonti (come da `CLAUDE.md`).
 2. **Secondo fattore per le ricette in Piemonte** (D102). Le opzioni:
@@ -606,3 +620,5 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Invii all'INPS immutabili                                 | Trigger solo sulla cancellazione                   | Rosso, poi verde                                                                                                                                                                   |
 | Certificati raggiungibili dalla cartella (browser)        | Collegamento rinominato                            | Rosso, poi verde                                                                                                                                                                   |
 | Pagina Oggi robusta a una risposta inattesa               | Elenco dei servizi letto senza controllo           | Rosso, poi verde. Trovato dal giro completo delle prove: la prova dell'uscita cadeva solo sotto carico, quando la risposta arrivava prima del clic                                 |
+| Al datore di lavoro mai la diagnosi (D108)                | Diagnosi nel testo dell'email                      | Rosso, poi verde                                                                                                                                                                   |
+| Al datore di lavoro nome e cognome (D108)                 | Nome tolto dal testo                               | Rosso, poi verde                                                                                                                                                                   |

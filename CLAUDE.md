@@ -139,9 +139,11 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 Secondo giro (D90), con lo stesso metodo: requisiti, specifiche pubbliche, simulatori, prove e sabotaggi, schermate.
 
 7. Promemoria e invio: promemoria sul modello ufficiale, per la ricetta SSN e per la ricetta bianca elettronica, completo o solo NRE; invio per email al paziente o al delegato registrato con un simulatore, secondo R15 e R16.
-8. Certificati INPS: inizio, continuazione o ricaduta; visita ambulatoriale o domiciliare; prognosi; diagnosi ICD-9-CM e testo; reperibilità; invio con il simulatore del Sistema TS e numero di protocollo; copia al lavoratore; al datore di lavoro solo il protocollo (D88); rettifica e annullamento nei casi ammessi. **Terza fermata.**
+8. Certificati INPS: inizio, continuazione o ricaduta; visita ambulatoriale o domiciliare; prognosi; diagnosi ICD-9-CM e testo; reperibilità; invio con il simulatore del Sistema TS e numero di protocollo; copia al lavoratore; al datore di lavoro protocollo con nome e cognome, mai la diagnosi (D88, D108); rettifica e annullamento nei casi ammessi. **Terza fermata.**
 9. Voci cliniche dall'interfaccia: problemi, allergie e reazioni, diario, parametri, anamnesi, stili di vita, esame obiettivo, privacy (consensi, deleghe, oscuramento), piani terapeutici.
 10. Presidi e assistenza integrativa; seguito delle prestazioni (esecuzione, struttura, esito, referto, sedute); voci nuove solo dopo la verifica sulla fonte (D91). **Fermata finale del secondo giro.**
+
+Dalla terza fermata: prima della tappa 9, secondo fattore con SPID o CIE dal programma (D109). Dopo la tappa 10, con il via della fermata finale (D110): 11. Profilo Sanitario Sintetico per il Fascicolo con un simulatore del Gateway; 12. condivisione tra i medici dell'AFT. Il documento sulle fonti (`docs/fse.md`) si prepara durante le tappe 9 e 10.
 
 ## Come si chiude
 
