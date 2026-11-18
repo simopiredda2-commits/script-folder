@@ -1385,3 +1385,69 @@ textarea[aria-invalid='true'] {
 .avvisi-servizi {
   margin-bottom: 1rem;
 }
+
+/* Certificati di malattia (tappa 8) ------------------------------------------------------- */
+
+.campi-in-riga {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+}
+
+.campi-in-riga .campo {
+  flex: 1 1 14rem;
+}
+
+.campi-in-riga .campo-stretto {
+  flex: 0 1 9rem;
+}
+
+.elenco-certificati {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.scheda-certificato {
+  padding: 1rem 0;
+  border-top: 1px solid var(--color-divider);
+}
+
+.scheda-certificato:first-child {
+  border-top: none;
+}
+
+.scheda-certificato h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.0625rem;
+}
+
+.scheda-certificato fieldset {
+  margin-top: 0.75rem;
+}
+
+/* Stato del certificato: parola sempre scritta; il colore accompagna, non sostituisce (D69). */
+.stato {
+  display: inline-block;
+  padding: 0 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+}
+
+.stato-sent {
+  background: var(--color-success-surface);
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.stato-error {
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.stato-draft {
+  background: var(--color-mark);
+  color: var(--color-on-mark);
+}

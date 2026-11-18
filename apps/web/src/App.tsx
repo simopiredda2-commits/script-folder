@@ -6,6 +6,7 @@ import { SessionProvider, useSession } from './lib/session';
 import { DataSearchPage } from './pages/DataSearchPage';
 import { ExamsPage } from './pages/ExamsPage';
 import { ArchivePage } from './pages/ArchivePage';
+import { CertificatesPage } from './pages/CertificatesPage';
 import { ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
 import { LockScreen, LoginPage } from './pages/LoginPage';
 import { PatientsPage } from './pages/PatientsPage';
@@ -36,6 +37,7 @@ function Screens() {
             element={<PrescriptionEditor mode="specialistica" />}
           />
           <Route path="/pazienti/:id/esami" element={<ExamsPage />} />
+          <Route path="/pazienti/:id/certificati" element={<CertificatesPage />} />
           <Route path="/pazienti/:id/terapie/nuova" element={<TherapyForm />} />
           <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
           <Route path="/pazienti/:id/terapie/:therapyId/modifica" element={<TherapyForm />} />

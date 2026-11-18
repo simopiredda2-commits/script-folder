@@ -652,6 +652,53 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await rupar.getByText(/^Attivo fino a/).waitFor();
   });
 
+  it('certificato di malattia: compilato, controllato, inviato; copia in PDF e continuazione (tappa 8)', async () => {
+    // Lavoratore adulto con la residenza in anagrafica (dati inventati).
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .update(patient)
+        .set({
+          birthDate: '1980-05-05',
+          residenceStreet: 'Via di Prova',
+          residenceNumber: '',
+          residencePostalCode: '10121',
+          residenceTown: 'Torino',
+          residenceProvince: 'TO',
+        })
+        .where(eq(patient.id, s.richPatient)),
+    );
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page.getByRole('link', { name: 'Certificati' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
+    await page.getByRole('button', { name: 'Nuovo certificato' }).click();
+    const end = studioDate(new Date(s.clock.now().getTime() + 2 * 86_400_000));
+    await page.getByLabel('Prognosi a tutto il').fill(end);
+    await page.getByLabel('Codice ICD-9-CM').fill('487.1');
+    await page.getByLabel('Diagnosi', { exact: true }).fill('Sindrome influenzale di prova');
+    await expect(
+      page
+        .getByRole('group', { name: 'Residenza o domicilio abituale' })
+        .getByLabel('Via o piazza')
+        .inputValue(),
+    ).resolves.toBe('Via di Prova');
+    await page.getByRole('button', { name: 'Salva e controlla' }).click();
+    await page.getByText('Nessun problema nei controlli: si può inviare.').waitFor();
+    await check(page, 'modulo del certificato', true);
+    await page.getByRole('button', { name: 'Firma e invia all’INPS' }).click();
+    const card = page.locator('.scheda-certificato').filter({ hasText: 'Inviato' }).first();
+    await card.getByText(/protocollo SIM\d+/).waitFor();
+    const href = await card
+      .getByRole('link', { name: 'Copia per il lavoratore (PDF)' })
+      .getAttribute('href');
+    const res = await page.request.get(`${base}${href}`);
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toBe('application/pdf');
+    await card.getByRole('button', { name: 'Continuazione' }).click();
+    await page.getByText('Continuazione preparata: è tra le bozze.').waitFor();
+    await page.locator('.scheda-certificato').filter({ hasText: 'Bozza' }).first().waitFor();
+    await check(page, 'elenco dei certificati', true);
+  });
+
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {
     s.clock.advance(6 * 60_000);
     await page.goto(`${base}/pazienti`);

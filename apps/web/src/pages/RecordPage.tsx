@@ -262,6 +262,11 @@ export function RecordPage() {
             <Link className="pulsante" to={`/pazienti/${id}/esami`}>
               <Icon name="esami" /> <span>Esami</span>
             </Link>
+            {isDoctor && (
+              <Link className="pulsante" to={`/pazienti/${id}/certificati`}>
+                <Icon name="firma" /> <span>Certificati</span>
+              </Link>
+            )}
           </>
         }
       />
