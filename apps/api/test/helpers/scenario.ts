@@ -194,6 +194,7 @@ export async function createScenario(
       {
         patientId: rich,
         drugName: 'Farmaco di prova 5 mg',
+        activeIngredient: 'principio di prova',
         kind: 'chronic',
         startOn: '2026-01-01',
         indicationEntryId: problemId,
@@ -225,6 +226,7 @@ export async function createScenario(
       prescriptionId: rows[0]!.id,
       position: 1,
       drugName: 'Farmaco di prova 5 mg',
+      activeIngredient: 'principio di prova',
       quantity: 1,
     });
     return rows;

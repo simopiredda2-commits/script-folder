@@ -14,6 +14,7 @@ import type {
 } from '@mmg/integrations';
 import { systemFor } from '@mmg/integrations';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import type { AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
@@ -21,6 +22,7 @@ import {
   appUser,
   doctorProfile,
   externalSubmission,
+  prescriptionCheck,
   patient,
   prescription,
   prescriptionLine,
@@ -53,14 +55,44 @@ export interface DraftInput {
   diagnosticQuestion?: string | null;
   exemptionCode?: string | null;
   requestId?: string | null;
+  reminderChannel?: 'paper' | 'email' | 'pec' | 'sms' | 'messaging_app' | 'phone' | 'fse' | null;
+  reminderContact?: string | null;
   lines: LineInput[];
 }
 
 /** Problema trovato dai controlli prima dell'invio (le regole di prescrizione, tappa 4). */
 export interface PreSendIssue {
   ruleId: string;
-  severity: 'block' | 'warn';
+  /** block: ferma l'invio; warn: lo ferma finché non c'è un motivo; info: solo informazione. */
+  severity: 'block' | 'warn' | 'info';
   message: string;
+  lineId?: string;
+  needs?: 'reason' | 'aifa_confirmation';
+}
+
+/** Ciò che il medico aggiunge al momento della firma: motivi per gli avvisi, note confermate. */
+export interface SignInput {
+  reasons: Record<string, string>;
+  confirmedAifaNotes: string[];
+}
+
+export interface CheckOutcome {
+  rulesVersion: string | null;
+  issues: PreSendIssue[];
+  reasonsUsed?: Record<string, string>;
+  confirmedAifaNotes?: string[];
+}
+
+const signSchema = z
+  .object({
+    motivi: z.record(z.string(), z.string().trim().max(500)).optional(),
+    confermeNote: z.array(z.uuid()).optional(),
+  })
+  .strict();
+
+function parseSignInput(body: unknown): SignInput {
+  const parsed = signSchema.parse(body ?? {});
+  return { reasons: parsed.motivi ?? {}, confirmedAifaNotes: parsed.confermeNote ?? [] };
 }
 
 export interface PrescriptionDeps {
@@ -71,10 +103,7 @@ export interface PrescriptionDeps {
    * Controlli prima dell'invio (regole di prescrizione, tappa 4): problemi trovati e versione
    * delle regole usata. Per difetto nessun controllo e nessuna versione.
    */
-  preSendChecks?: (
-    prescriptionId: string,
-    actor: Actor,
-  ) => Promise<{ issues: PreSendIssue[]; rulesVersion: string | null }>;
+  preSendChecks?: (prescriptionId: string, actor: Actor, input: SignInput) => Promise<CheckOutcome>;
 }
 
 type PrescriptionRow = typeof prescription.$inferSelect;
@@ -145,6 +174,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           diagnosticQuestion: input.diagnosticQuestion ?? null,
           exemptionCode: input.exemptionCode ?? null,
           requestId: input.requestId ?? null,
+          reminderChannel: input.reminderChannel ?? null,
+          reminderContact: input.reminderContact ?? null,
           preparedBy: actor.userId,
           preparedAt: now(),
           updatedAt: now(),
@@ -329,19 +360,49 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     };
   }
 
+  async function runChecks(p: PrescriptionRow, actor: Actor, input: SignInput) {
+    const outcome = (await deps.preSendChecks?.(p.id, actor, input)) ?? {
+      rulesVersion: null,
+      issues: [],
+    };
+    const blocking = outcome.issues.filter((i) => i.severity === 'block' || i.severity === 'warn');
+    return { ...outcome, blocking };
+  }
+
+  /** Controllo senza invio: i problemi si vedono prima, non dopo un rifiuto. */
+  async function checkOnly(actor: Actor, id: string, body: unknown) {
+    const p = await load(id, actor.studioId);
+    await guardPrepare(actor, p, 'ricetta_controllo');
+    const r = await runChecks(p, actor, parseSignInput(body));
+    return { versioneRegole: r.rulesVersion, problemi: r.issues, bloccanti: r.blocking.length };
+  }
+
   /** Il medico firma e invia: al SAR (SSN) o al Sistema TS (bianca). */
-  async function signAndSend(actor: Actor, id: string) {
+  async function signAndSend(actor: Actor, id: string, body?: unknown) {
     const p = await load(id, actor.studioId);
     await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'ricetta_firma_invio');
+    const input = parseSignInput(body);
     check(p, 'start_sending');
 
-    const { issues, rulesVersion } = (await deps.preSendChecks?.(p.id, actor)) ?? {
-      issues: [],
-      rulesVersion: null,
-    };
-    const blocking = issues.filter((i) => i.severity === 'block');
+    const checked = await runChecks(p, actor, input);
+    const { rulesVersion, issues, blocking } = checked;
+    if (rulesVersion !== null) {
+      // Ogni controllo prima di un invio resta registrato, superato o no.
+      await db.insert(prescriptionCheck).values({
+        prescriptionId: p.id,
+        userId: actor.userId,
+        rulesVersion,
+        outcome: blocking.length > 0 ? 'bloccato' : 'superato',
+        issues,
+        reasons: checked.reasonsUsed ?? {},
+        confirmedAifaNotes: checked.confirmedAifaNotes ?? [],
+      });
+    }
     if (blocking.length > 0) {
-      throw new HttpError(422, blocking.map((i) => `${i.ruleId}: ${i.message}`).join('\n'));
+      throw new HttpError(422, blocking.map((i) => `${i.ruleId}: ${i.message}`).join('\n'), {
+        versioneRegole: rulesVersion,
+        problemi: issues,
+      });
     }
 
     // Passaggio atomico a «in invio»: se due richieste arrivano insieme, ne passa una sola.
@@ -595,6 +656,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     submitForSigning,
     backToDraft,
     signAndSend,
+    checkOnly,
     cancel,
     printPaper,
     toSignQueue,

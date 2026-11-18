@@ -140,3 +140,30 @@ export const externalSubmission = pgTable(
   },
   (t) => [index().on(t.prescriptionId)],
 );
+
+/**
+ * Controllo di una ricetta con le regole di prescrizione: versione delle regole, problemi
+ * trovati, motivi dati dal medico agli avvisi, note AIFA confermate. Ogni controllo prima di un
+ * invio resta registrato e non si modifica (migrazione 0005): la ricetta resta verificabile
+ * anche dopo un cambio di norma.
+ */
+export const prescriptionCheck = pgTable(
+  'prescription_check',
+  {
+    id: bigint({ mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    at: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    prescriptionId: uuid()
+      .notNull()
+      .references(() => prescription.id),
+    userId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    rulesVersion: text().notNull(),
+    /** «superato» o «bloccato». */
+    outcome: text().notNull(),
+    issues: jsonb().notNull(),
+    reasons: jsonb().notNull(),
+    confirmedAifaNotes: jsonb().notNull(),
+  },
+  (t) => [index().on(t.prescriptionId)],
+);

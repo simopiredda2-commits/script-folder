@@ -208,7 +208,7 @@ describe('storico delle modifiche e dati mai cancellati', () => {
     const res = await s.db.execute<{ table_name: string }>(sql`
       select distinct table_name from information_schema.columns
       where table_schema = 'public' and column_name in ('patient_id', 'entry_id', 'prescription_id')
-        and table_name not in ('access_log', 'external_submission')`);
+        and table_name not in ('access_log', 'external_submission', 'prescription_check')`);
     const triggers = await s.db.execute<{ name: string }>(
       sql`select tgname as name from pg_trigger where not tgisinternal`,
     );
@@ -216,6 +216,11 @@ describe('storico delle modifiche e dati mai cancellati', () => {
     for (const { table_name } of res.rows) {
       expect(names, table_name).toContain(`${table_name}_history`);
       expect(names, table_name).toContain(`${table_name}_no_delete`);
+    }
+    // Tabelle di sola aggiunta: non si modificano affatto.
+    for (const t of ['access_log', 'external_submission', 'prescription_check']) {
+      expect(names, t).toContain(`${t}_immutable`);
+      expect(names, t).toContain(`${t}_no_truncate`);
     }
     expect(names).toContain('patient_history');
     expect(names).toContain('patient_no_delete');

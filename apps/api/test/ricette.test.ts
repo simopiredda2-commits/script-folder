@@ -52,7 +52,9 @@ describe('ciclo della ricetta', () => {
   const newDraft = async (who = 'titolare', kind = 'pharma_ssn') => {
     const res = await post(who, `/api/pazienti/${s.richPatient}/ricette`, {
       kind,
-      lines: [{ drugName: 'Farmaco di prova 5 mg', quantity: 1 }],
+      lines: [
+        { drugName: 'Farmaco di prova 5 mg', activeIngredient: 'principio di prova', quantity: 1 },
+      ],
     });
     expect(res.statusCode, res.body).toBe(201);
     return res.json<{ id: string }>().id;

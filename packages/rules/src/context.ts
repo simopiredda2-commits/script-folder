@@ -1,0 +1,106 @@
+/**
+ * Tutto ciò che le regole guardano. Il servizio applicativo lo costruisce dal database; le prove
+ * lo scrivono a mano. Le date sono AAAA-MM-GG.
+ */
+
+/** Fatti del farmaco dalla banca dati (tappa 5). Assenti = non noti: la regola lo dice. */
+export interface DrugFacts {
+  /** Il farmaco richiede un piano terapeutico (R5). */
+  requiresPlan?: boolean;
+  /** Nota AIFA collegata al farmaco (R7). */
+  aifaNote?: string | null;
+  /** A carico del SSN (classe A o H dispensabile) (R8). */
+  reimbursableSsn?: boolean;
+  /** Prescrivibile dal medico di medicina generale (R8). */
+  mmgPrescribable?: boolean;
+  /** Antibiotico iniettabile o soluzione per infusione (R3). */
+  injectableAntibioticOrInfusion?: boolean;
+  /** Unità posologiche per confezione (R4, R11). */
+  unitsPerPack?: number;
+}
+
+export interface TherapyContext {
+  id: string;
+  kind: 'chronic' | 'as_needed' | 'cycle';
+  startOn: string;
+  /** Unità al giorno della posologia, se scritte come numero. */
+  unitsPerDay: number | null;
+  /** Opzione «Multiprescrizione» della scheda della terapia. */
+  multiPrescription: boolean;
+  therapeuticPlanId: string | null;
+}
+
+export interface LineContext {
+  id: string;
+  drugAic: string | null;
+  drugName: string | null;
+  activeIngredient: string | null;
+  serviceCode: string | null;
+  quantity: number;
+  aifaNote: string | null;
+  notSubstitutable: boolean;
+  notSubstitutableReason: string | null;
+  therapy: TherapyContext | null;
+}
+
+export interface PlanContext {
+  id: string;
+  drugAic: string | null;
+  activeIngredient: string | null;
+  grantedOn: string;
+  expiresOn: string;
+  packsAuthorized: number | null;
+}
+
+/** Riga di una ricetta già inviata, per il contatore (R11) e i piani (R6). */
+export interface SentLineContext {
+  therapyId: string | null;
+  drugAic: string | null;
+  activeIngredient: string | null;
+  quantity: number;
+  sentOn: string;
+}
+
+export interface RuleContext {
+  /** Data di compilazione della ricetta. */
+  date: string;
+  prescription: {
+    id: string;
+    kind: 'pharma_ssn' | 'specialist_ssn' | 'white' | 'devices';
+    exemptionCode: string | null;
+    priority: string | null;
+    accessType: 'first' | 'subsequent' | null;
+    diagnosticQuestion: string | null;
+    reminderChannel: string | null;
+    reminderContact: string | null;
+    lines: LineContext[];
+  };
+  patient: {
+    fiscalCode: string;
+    email: string | null;
+    phone: string | null;
+    reminderChannel: string | null;
+    reminderContact: string | null;
+    reminderChannelChosenOn: string | null;
+  };
+  exemptions: { code: string; validFrom: string; validTo: string | null }[];
+  delegations: {
+    email: string | null;
+    phone: string | null;
+    validFrom: string;
+    validTo: string | null;
+    revokedOn: string | null;
+  }[];
+  plans: PlanContext[];
+  sentLines: SentLineContext[];
+  /** Banca dati farmaci; restituisce undefined se il farmaco non è noto. */
+  drugFacts: (aic: string | null) => DrugFacts | undefined;
+  /** Catalogo delle esenzioni (tappa 5); undefined se il catalogo non c'è. */
+  exemptionExists?: (code: string) => boolean | undefined;
+  /** Elenco regionale esenzione → prestazioni (R17); undefined se non noto. */
+  exemptionServices?: (code: string) => ReadonlySet<string> | undefined;
+  /** Righe per cui il medico conferma che il paziente rientra nella nota AIFA (R7). */
+  confirmedAifaNotes: ReadonlySet<string>;
+  /** Motivi dati dal medico per procedere nonostante un avviso, per regola. */
+  reasons: Readonly<Record<string, string>>;
+}

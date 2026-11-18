@@ -28,6 +28,14 @@ export default defineConfig(
     },
   },
   {
+    // Regole di prescrizione: i valori stanno nei dati (packages/rules/data), mai nel codice.
+    files: ['packages/rules/src/**/*.ts'],
+    ignores: ['packages/rules/src/dates.ts'],
+    rules: {
+      'no-magic-numbers': ['error', { ignore: [0, 1, -1], ignoreArrayIndexes: true }],
+    },
+  },
+  {
     // Nelle prove le risposte HTTP sono JSON non tipizzato: i controlli `no-unsafe-*` non aiutano.
     files: ['**/test/**/*.ts', '**/test/**/*.tsx'],
     rules: {

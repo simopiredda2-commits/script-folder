@@ -5,8 +5,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 ## Dove siamo
 
 - `main` contiene le tappe 0–2 (pull request #1 unita il 18/11/2026 con il via di Simone).
-- Branch attivo: `tappe-3-4`. Tappa 3 fatta; in corso la tappa 4 (regole di prescrizione), poi la **seconda fermata** con la pull request del blocco 3–4.
-- Prossimo passo: motore delle regole in `packages/rules`, valori e fonti come dati.
+- Branch attivo: `tappe-3-4`, con le tappe 3 e 4 fatte e la pull request #2 per la **seconda fermata**.
+- Prossimo passo: con il via di Simone, unire la #2 e partire con le tappe 5–6 su `tappe-5-6`.
 
 ## Come provarlo
 
@@ -120,6 +120,24 @@ Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente
 - Adattatori veri per SAR e Sistema TS: non esistono ancora (servono specifiche e credenziali di collaudo).
 - Stampa della ricetta rossa e del promemoria: c'è solo il contenuto da stampare.
 
+### Tappa 4 – Regole di prescrizione
+
+**Fatto**
+
+- `packages/rules`: regole R1–R17 come dati versionati (`data/regole-2026-11-18.json`) con fonti, valori e cose da completare; motore che sceglie la versione in vigore alla data della ricetta; R12 fuori perimetro. Tabella generata in `docs/regole.md`.
+- Integrazione nel servizio: controllo prima di ogni invio (blocco per le norme, motivo per R11, conferma per le note AIFA), registrato in `prescription_check` (migrazione 0005, immutabile); la ricetta inviata porta la versione delle regole; controllo di anteprima `POST /api/ricette/:id/controlla`.
+- Canale e recapito del promemoria nella bozza (R15, R16).
+
+**Provato**
+
+- 46 prove delle regole, con i casi limite dei requisiti: 2 e 3 confezioni, piano che scade oggi, nota non confermata; l'esempio del contatore (21/10, 28 compresse, copre fino al 17/11 compreso; avviso al giorno 22, non al 23).
+- 6 prove attraverso il servizio: blocco con dettagli e controllo registrato, nota AIFA confermata, specialistica senza quesito con anteprima, esenzione non registrata, canale e recapito, contatore con motivo.
+
+**Non provato**
+
+- Le regole con i dati veri della banca dati farmaci e dei cataloghi: arrivano alla tappa 5 (file d'esempio) e con la licenza Farmadati.
+- I controlli formali completi del Sistema TS (R10): manca il documento ufficiale dei controlli.
+
 ## Risposte della prima fermata (18/11/2026)
 
 Simone ha risposto con il pulsante. **Applicate** sul branch `tappe-0-2` (decisioni D29–D34); poi si prosegue con le tappe 3–4 senza fermarsi di nuovo (via già dato).
@@ -208,3 +226,17 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Controlli bloccanti prima dell'invio                      | Blocchi ignorati                                   | Rosso, poi verde                                                                                                                                                                   |
 | Guasto dell'adattatore come esito incerto                 | Guasto trattato come rete assente                  | Rosso, poi verde                                                                                                                                                                   |
 | Nessun indirizzo di rete nelle integrazioni               | Indirizzo aggiunto al simulatore                   | Rosso, poi verde                                                                                                                                                                   |
+| Valori presi dai dati                                     | maxPacks di R2 cambiato nel file                   | Rosso, poi verde                                                                                                                                                                   |
+| Nessun numero nel codice delle regole                     | Limite scritto a mano                              | Rosso (lint), poi verde                                                                                                                                                            |
+| R4: trattamento da almeno 6 mesi                          | Condizione tolta                                   | Rosso, poi verde                                                                                                                                                                   |
+| R5: piano che scade oggi                                  | Scadenza esclusa                                   | Rosso, poi verde                                                                                                                                                                   |
+| R7: conferma della nota                                   | Conferma ignorata                                  | Rosso, poi verde                                                                                                                                                                   |
+| R11: soglia dell'80%                                      | Soglia ignorata                                    | Rosso, poi verde                                                                                                                                                                   |
+| R13: motivazione della non sostituibilità                 | Motivazione vuota accettata                        | Rosso, poi verde                                                                                                                                                                   |
+| R14: priorità per il primo accesso                        | Priorità ignorata                                  | Rosso, poi verde                                                                                                                                                                   |
+| R16: delega revocata                                      | Revoca ignorata                                    | Rosso, poi verde                                                                                                                                                                   |
+| R17: prestazioni dell'esenzione                           | Controllo tolto                                    | Rosso, poi verde                                                                                                                                                                   |
+| Versione delle regole alla data                           | Versione scelta senza guardare la data             | Rosso, poi verde                                                                                                                                                                   |
+| Controllo registrato                                      | Registrazione tolta                                | Rosso, poi verde                                                                                                                                                                   |
+| Avviso senza motivo blocca                                | Solo i blocchi fermano l'invio                     | Rosso, poi verde                                                                                                                                                                   |
+| Tabella di docs/regole.md allineata                       | Testo di una regola cambiato nei dati              | Rosso, poi verde                                                                                                                                                                   |

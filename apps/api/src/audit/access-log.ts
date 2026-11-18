@@ -26,6 +26,7 @@ export type AccessAction =
   | 'ricetta_annullamento'
   | 'ricetta_cartacea'
   | 'lettura_ricette'
+  | 'ricetta_controllo'
   | 'lettura_registro';
 
 export interface AccessEntry {

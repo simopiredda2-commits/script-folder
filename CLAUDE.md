@@ -98,6 +98,7 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 | `pnpm db:migrate`                                      | Applica le migrazioni a `DATABASE_URL`                                          |
 | `pnpm db:seed`                                         | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)  |
 | `pnpm --filter @mmg/domain docs:permessi`              | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                      |
+| `pnpm --filter @mmg/rules docs:regole`                 | Rigenera la tabella di `docs/regole.md` dai dati delle regole                   |
 | `pnpm --filter @mmg/api db:generate`                   | Genera una migrazione dallo schema Drizzle                                      |
 | `pnpm fixtures -- --seed 1 --count 20`                 | Pazienti inventati in JSON (stesso seme, stessi pazienti)                       |
 | `pnpm --filter @mmg/brand tokens:css`                  | Rigenera `tokens.css` da `tokens.ts`                                            |
@@ -111,6 +112,8 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/modello-dati.md`: entità, stato e scelte.
 - `docs/ruoli-permessi.md`: ruoli, matrice generata dal codice, accesso.
 - `docs/esportazione.md`: formato dell'esportazione.
+- `docs/ricetta.md`: ciclo della ricetta e integrazioni simulate.
+- `docs/regole.md`: regole di prescrizione, generate dai dati.
 - `docs/logo.md`: proposte di logo.
 
 ## Le tappe

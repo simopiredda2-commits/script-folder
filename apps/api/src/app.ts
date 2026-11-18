@@ -10,6 +10,7 @@ import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
+import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import { SimulatedGateway, type GatewaySystem, type PrescriptionGateway } from '@mmg/integrations';
 
@@ -71,7 +72,15 @@ export function buildApp({
   void app.register(cookie);
 
   app.setErrorHandler((err, req, reply) => {
-    if (err instanceof HttpError) return reply.status(err.statusCode).send({ errore: err.message });
+    if (err instanceof HttpError) {
+      return reply
+        .status(err.statusCode)
+        .send(
+          err.details === undefined
+            ? { errore: err.message }
+            : { errore: err.message, dettagli: err.details },
+        );
+    }
     if (err instanceof ZodError) {
       return reply.status(400).send({ errore: 'Dati non validi', dettagli: err.issues });
     }
@@ -99,6 +108,15 @@ export function buildApp({
 
   registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
   registerPatientRoutes(app, db);
-  registerPrescriptionRoutes(app, createPrescriptionService({ db, gateways, now, preSendChecks }));
+  registerPrescriptionRoutes(
+    app,
+    createPrescriptionService({
+      db,
+      gateways,
+      now,
+      // Per difetto le regole di prescrizione vere (tappa 4).
+      preSendChecks: preSendChecks ?? createRulesCheck({ db, now }),
+    }),
+  );
   return app;
 }

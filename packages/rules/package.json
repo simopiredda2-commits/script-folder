@@ -1,0 +1,17 @@
+{
+  "name": "@mmg/rules",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "docs:regole": "tsx scripts/docs-regole.ts"
+  },
+  "dependencies": {
+    "@mmg/domain": "workspace:*",
+    "zod": "^4.6.7"
+  }
+}

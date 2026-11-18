@@ -30,6 +30,12 @@ export const draftSchema = z
     diagnosticQuestion: z.string().max(1000).nullable().optional(),
     exemptionCode: z.string().max(20).nullable().optional(),
     requestId: z.uuid().nullable().optional(),
+    /** Canale del promemoria e recapito (R15, R16); vuoto = promemoria cartaceo. */
+    reminderChannel: z
+      .enum(['paper', 'email', 'pec', 'sms', 'messaging_app', 'phone', 'fse'])
+      .nullable()
+      .optional(),
+    reminderContact: z.string().trim().max(200).nullable().optional(),
     lines: z.array(lineSchema).min(1).max(10),
   })
   .strict();

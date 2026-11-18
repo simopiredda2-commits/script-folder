@@ -38,8 +38,12 @@ export function registerPrescriptionRoutes(app: FastifyInstance, service: Prescr
     return { stato: 'draft' };
   });
 
+  app.post('/api/ricette/:id/controlla', scoped, async (req) => {
+    return service.checkOnly(req.actor!, idParams.parse(req.params).id, req.body);
+  });
+
   app.post('/api/ricette/:id/firma-e-invia', scoped, async (req) => {
-    const r = await service.signAndSend(req.actor!, idParams.parse(req.params).id);
+    const r = await service.signAndSend(req.actor!, idParams.parse(req.params).id, req.body);
     return { esito: r.outcome, nre: r.nre };
   });
 

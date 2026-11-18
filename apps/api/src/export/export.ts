@@ -40,7 +40,11 @@ export const ENTRY_TABLES = [
 ] as const;
 
 /** Tabelle collegate per ricetta: righe e invii esterni (richiesta, risposta, esito). */
-export const PRESCRIPTION_TABLES = ['prescription_line', 'external_submission'] as const;
+export const PRESCRIPTION_TABLES = [
+  'prescription_line',
+  'external_submission',
+  'prescription_check',
+] as const;
 
 /**
  * Tabelle con una colonna `patient_id` o `entry_id` che non stanno nelle liste sopra, con il
