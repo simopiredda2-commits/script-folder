@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { Role } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
 import type { FastifyInstance } from 'fastify';
-import { buildApp } from '../../src/app';
+import { buildApp, type AppDeps } from '../../src/app';
 import type { Database } from '../../src/db/client';
 import {
   allergyDetail,
@@ -14,6 +14,8 @@ import {
   doctorProfile,
   exemption,
   patient,
+  prescription,
+  prescriptionLine,
   problemDetail,
   studio,
   therapy,
@@ -53,6 +55,8 @@ export interface Scenario {
   patients: { titolare: string[]; collega: string[] };
   /** Paziente del titolare con diario, allergia, problema, terapia normale e riservata. */
   richPatient: string;
+  /** Bozza di ricetta del paziente ricco. */
+  draftPrescription: string;
   /** Codici TOTP: il segreto di ogni utente dopo l'attivazione. */
   secrets: Map<string, Buffer>;
 }
@@ -64,6 +68,7 @@ export interface Scenario {
 export async function createScenario(
   db: Database,
   settings: Partial<typeof studio.$inferInsert> = {},
+  appOptions: Pick<AppDeps, 'gateways' | 'preSendChecks'> = {},
 ): Promise<Scenario> {
   const clock = new Clock();
   const [st] = await db
@@ -205,10 +210,31 @@ export async function createScenario(
     ]);
   });
 
+  // Una bozza di ricetta del titolare, per le rotte /api/ricette/:id.
+  const [draft] = await withActor(db, users.titolare.id, async (tx) => {
+    const rows = await tx
+      .insert(prescription)
+      .values({
+        patientId: rich,
+        archiveId: a1!.id,
+        kind: 'pharma_ssn',
+        preparedBy: users.titolare.id,
+      })
+      .returning({ id: prescription.id });
+    await tx.insert(prescriptionLine).values({
+      prescriptionId: rows[0]!.id,
+      position: 1,
+      drugName: 'Farmaco di prova 5 mg',
+      quantity: 1,
+    });
+    return rows;
+  });
+
   const app = buildApp({
     db,
     config: { encryptionKey: randomBytes(32), sessionMaxHours: 12, cookieSecure: false },
     now: clock.now,
+    ...appOptions,
   });
   return {
     db,
@@ -219,6 +245,7 @@ export async function createScenario(
     archives: { titolare: a1!.id, collega: a2!.id },
     patients: { titolare: p1, collega: p2 },
     richPatient: rich,
+    draftPrescription: draft!.id,
     secrets: new Map(),
   };
 }

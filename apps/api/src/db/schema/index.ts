@@ -5,3 +5,4 @@ export * from './clinical';
 export * from './therapy';
 export * from './agenda';
 export * from './audit';
+export * from './prescriptions';

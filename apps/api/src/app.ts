@@ -9,6 +9,9 @@ import type { Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
+import { registerPrescriptionRoutes } from './http/prescription-routes';
+import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
+import { SimulatedGateway, type GatewaySystem, type PrescriptionGateway } from '@mmg/integrations';
 
 declare module 'fastify' {
   interface FastifyContextConfig {
@@ -31,9 +34,20 @@ export interface AppDeps {
   config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'>;
   now?: () => Date;
   logger?: boolean;
+  /** SAR e Sistema TS. Per difetto i simulatori: nessuna chiamata a servizi reali (regola 7). */
+  gateways?: Record<GatewaySystem, PrescriptionGateway>;
+  /** Controlli prima dell'invio delle ricette (regole di prescrizione). */
+  preSendChecks?: PrescriptionDeps['preSendChecks'];
 }
 
-export function buildApp({ db, config, now, logger = false }: AppDeps): FastifyInstance {
+export function buildApp({
+  db,
+  config,
+  now,
+  logger = false,
+  gateways = { sar: new SimulatedGateway('sar'), sistema_ts: new SimulatedGateway('sistema_ts') },
+  preSendChecks,
+}: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
   const auth = createAuthService({
     db,
@@ -85,5 +99,6 @@ export function buildApp({ db, config, now, logger = false }: AppDeps): FastifyI
 
   registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
   registerPatientRoutes(app, db);
+  registerPrescriptionRoutes(app, createPrescriptionService({ db, gateways, now, preSendChecks }));
   return app;
 }

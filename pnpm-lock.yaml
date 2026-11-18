@@ -50,6 +50,9 @@ importers:
       '@mmg/fixtures':
         specifier: workspace:*
         version: link:../../fixtures
+      '@mmg/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       drizzle-orm:
         specifier: ^0.45.4
         version: 0.45.4(@types/pg@8.23.1)(pg@8.23.1)
@@ -136,6 +139,8 @@ importers:
         version: 2.0.0
 
   packages/domain: {}
+
+  packages/integrations: {}
 
 packages:
 
