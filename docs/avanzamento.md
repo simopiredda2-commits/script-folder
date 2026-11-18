@@ -11,7 +11,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
 1. Primo giro di `sync/` dal computer dello studio; completare le mappature AIFA con le intestazioni vere e confermare quelle ISTAT (D55, D56).
-2. Specifiche e credenziali di collaudo di SAR, Sistema TS e AURA: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo della ricetta rossa e del promemoria.
+2. Specifiche e credenziali di collaudo di SAR, Sistema TS e AURA: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo della ricetta rossa e del promemoria. Insieme: registrazione del programma presso la Regione (codice del gestionale, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103).
 3. Decisione su Ready! e sulla versione «Full» (D78).
 4. Riepiloghi, agenda (dopo la decisione su Ready!), AURA e FSE, importazione dei dati dal software attuale (serve il formato dell'esportazione di Next² con un file d'esempio senza dati veri).
 5. A7 e le altre liste AIFA (trasparenza, carenze, registri); soglie di vecchiaia (D62).
@@ -303,6 +303,29 @@ Dopo la fermata finale:
 | Portale paziente                                | Fase 2                                                                                                          | Fuori dalla prima versione                        |
 | Prontuario                                      | Banca dati farmaci                                                                                              | Fatto: «Farmaci e prestazioni»                    |
 | Strumenti                                       | Amministratore: utenti, stampanti, intestazioni, modelli                                                        | Archivio fatto; il resto no                       |
+
+Durante la tappa 8:
+
+- **Credenziali del Sistema TS e RUPAR** (domanda della Dr.ssa Rocca). Nei requisiti c'erano, ma non erano costruite. Le fonti ufficiali aggiungono:
+  - la scadenza trimestrale della password RUPAR;
+  - il secondo fattore (Id-Sessione) per le ricette;
+  - la registrazione del programma presso la Regione.
+
+  Si costruiscono nella tappa 8, con i simulatori (D100–D103).
+
+- **Net Medica Italia** (domanda della Dr.ssa Rocca): far comunicare medici con programmi diversi senza comprare quel servizio. Raccolte le informazioni pubbliche, fatta una proposta (D104). È una domanda della terza fermata; non è costruito nulla.
+
+## Domande per la terza fermata (da fare, dopo la tappa 8)
+
+1. **Via per promemoria e certificati**: modelli e fonti (come da `CLAUDE.md`).
+2. **Secondo fattore per le ricette in Piemonte** (D102). Le opzioni:
+   - accesso con SPID o CIE dal programma (OAuth2), consigliato: non servono più password e PIN RUPAR per il SAR, e non c'è niente da copiare;
+   - codice via email da copiare nel programma, già costruito nel simulatore.
+3. **Rete tra medici dell'AFT** (D104). Le opzioni:
+   - anticipare dalla fase 2 la condivisione tra chi usa il nostro programma, più l'importazione e l'esportazione del Profilo Sanitario Sintetico;
+   - lasciarla in fase 2.
+
+   Se serve leggere per intero le pagine di Net Medica Italia, va aggiunto all'ambiente il sito `www.netmedicaitalia.it`.
 
 ## Risposte della seconda fermata (18/11/2026)
 

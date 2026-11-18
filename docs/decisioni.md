@@ -240,3 +240,60 @@ Branch `tappe-7-8` e `tappe-9-10`, con una pull request ciascuno. Restano dopo: 
 **D98 · Email e SMS: il minimo, e solo a chi ha diritto.** L’email porta il promemoria allegato e un testo senza dati clinici; l’SMS porta solo il numero di ricetta (e il PIN per la bianca). Destinatari: il recapito del paziente in anagrafica o quello di un delegato con delega valida oggi (stesso criterio di R16). Ogni consegna, riuscita o no, resta in `reminder_delivery`. Fornitore vero da scegliere con le garanzie sul trattamento dei dati.
 
 **D99 · Codice a barre: tabella da una fonte scritta, verificata con un’altra implementazione.** La tabella del Code 39 viene dal file `barcode.ps` di Barcode Writer in Pure PostScript (pacchetto bwip-js 4.11.4, licenza MIT); il disegno usa il rapporto 2,5 del decreto. Una prova confronta le barre di ogni carattere con quelle disegnate da bwip-js (rapporto 3, normalizzato). Le prove leggono il testo dei PDF con pdfjs-dist 6.4.299 (Apache 2.0), solo per le prove.
+
+## Tappa 8 – Certificati INPS (18/11/2026)
+
+Domanda della Dr.ssa Rocca, tramite Simone: in Next² ha configurato, oltre all’accesso al programma, le credenziali del Sistema TS (certificati di malattia) e le credenziali RUPAR. Verificato sulle fonti ufficiali:
+
+- Regione Piemonte, SIRPED: specifiche del SAR per i prescrittori (`servizi.regione.piemonte.it/media/1019`), piano dei test per le cartelle cliniche, V02 (`media/1036`), autenticazione forte, versione 4.0 del 2/3/2026 (`media/3354`).
+- Sistema TS: specifiche per i certificati di malattia, versione 3.2; disciplinare tecnico della ricetta bianca, 1/12/2022; autenticazione forte per la ricetta SSN, versione 1.1 del 3/6/2025; autenticazione forte per i web service, versione 1.1 del 12/1/2026.
+
+**D100 · Credenziali dei servizi nel profilo del medico.** Ogni medico, titolare o sostituto, conserva le proprie credenziali per due servizi:
+
+- **Sistema TS**: utente, password e PIN, per i certificati INPS e la ricetta bianca. Fonti: specifiche INPS 4.1 (basic authentication o CNS) e disciplinare della ricetta bianca 2.3 («credenziali di autenticazione rilasciate dal Sistema TS»).
+- **RUPAR Piemonte**: utente, password e PIN, per le ricette SSN al SAR. Fonte: specifiche del SAR 3.1.1 («le credenziali Rupar Piemonte (user, password e pin)»).
+
+Le regole:
+
+- Le inserisce e le cambia solo il medico a cui appartengono; la segreteria e l’amministratore no (regola 5). Il sostituto usa le proprie (requisiti, «Medico sostituto»).
+- Sono cifrate con una chiave derivata da `APP_ENCRYPTION_KEY` solo per questo uso, e legate al medico e al servizio.
+- L’interfaccia non le rilegge mai: mostra solo se ci sono, le ultime tre lettere dell’utente e la data del cambio della password.
+- Non entrano nell’esportazione né nello storico delle modifiche, perché nessun segreto vecchio deve restare conservato. Il medico può cancellarle.
+- Il campo segnaposto `doctor_profile.external_credentials_enc`, mai usato, lascia il posto alla tabella `service_credential`.
+
+**D101 · Password RUPAR: scadenza trimestrale e avviso.** Il piano dei test SIRPED dice che la password RUPAR «ha scadenza trimestrale, come richiesto dal provvedimento del Garante»: si cambia sul portale SistemaPiemonte e subito dopo nel gestionale.
+
+- Il medico indica la data del cambio. Il programma calcola la scadenza con tre mesi solari (la funzione `addMonths` del certificato).
+- L’avviso parte 14 giorni prima. È un parametro dell’interfaccia, non una regola.
+- Decide la risposta del SAR («Password scaduta»): il programma non blocca l’invio per la data calcolata.
+
+**D102 · Secondo fattore: l’Id-Sessione.** I decreti dell’8/6/2023 (ricetta bianca) e del 27/2/2025 (ricetta SSN) aggiungono a utente, password e PIN un codice di sessione.
+
+- **Sistema TS**: l’«ID-SESSIONE» va nell’intestazione `Authorization2F: Bearer` e vale «per almeno 8 ore» per la ricetta SSN (3/6/2025, 5). Si ottiene dal portale con SPID, CIE o CNS, oppure con un web service che lo manda all’email certificata (12/1/2026, 5). La tessera TS-CNS ne è esente (3/6/2025, 3).
+- **Piemonte**: il SIRPED ha due modalità (V04, 3 e 4):
+  - un codice per email certificata, chiesto con le credenziali RUPAR;
+  - OAuth2 con SPID, CIE, TS-CNS o CNS tramite GASP-RP Salute, che per il SAR sostituisce utente, password e PIN.
+- **Nel prodotto**:
+  - Ogni medico ha una sessione per servizio, con la sua scadenza.
+  - Se un invio la richiede e manca o è scaduta, si ferma prima di contattare il servizio, come per D95.
+  - È costruita la modalità con il codice per email, che vale per tutti e due i servizi. Nel simulatore il codice compare a video, come fa l’ambiente di prova del SIRPED (4.2.1).
+- **Da completare o verificare**:
+  - La durata della sessione SIRPED è indicata come «tempo predefinito»: valore da completare. Nel simulatore vale 8 ore, come quella del Sistema TS.
+  - Per i certificati INPS il secondo fattore non compare nelle fonti lette: da verificare in collaudo.
+  - La modalità da usare in Piemonte (email o SPID/CIE) è una domanda della terza fermata.
+
+**D103 · Registrazione del programma presso la Regione.** Per i due fattori la Regione assegna al programma un codice del gestionale all’avvio dell’autocertificazione (SIRPED, autenticazione forte, 4.2.1, campo `infoAggiuntive` «APP»). Il medico deve essere censito nel configuratore regionale con i suoi profili. È una pratica esterna: è annotata tra quelle da avviare con i collaudi, e il codice resta un parametro vuoto, da completare.
+
+**D104 · Net Medica Italia: che cosa si sa, che cosa si propone.** Lo ha chiesto la Dr.ssa Rocca. Il sito non è raggiungibile da questa sessione, quindi le informazioni vengono solo dai risultati di ricerca:
+
+- È la società di innovazione tecnologica della FIMMG.
+- Un programma sul PC dello studio, NetDesk, manda i dati della cartella a un cloud con un database unico «standardizzato». I colleghi dell’AFT lo consultano anche se usano programmi diversi.
+- Dichiara la compatibilità con molti programmi di cartella (Millewin, Medico 2000, Next, Profim, Perseo, Effepieffe, Iatros e altri), tramite NetDesk o integrazioni dirette con i produttori.
+- Ha un canone annuale e credenziali proprie.
+
+Proposta, nel rispetto della regola 2:
+
+- tra chi usa il nostro programma, la condivisione della medicina di gruppo (D18), da estendere all’AFT;
+- con chi usa altri programmi, solo formati pubblici (il Profilo Sanitario Sintetico dell’FSE 2.0) o accordi con i produttori.
+
+I requisiti mettono la medicina di gruppo con più archivi in fase 2, quindi è una domanda della terza fermata. Non è stato costruito nulla.
