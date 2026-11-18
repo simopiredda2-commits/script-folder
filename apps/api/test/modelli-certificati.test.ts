@@ -211,7 +211,13 @@ describe('modelli dei certificati (tappa 13)', () => {
     expect(text).toContain('testo scritto dal medico.');
     expect(text).toContain('Timbro di prova');
     expect(await fontsOf(bytes)).toEqual(['Times-Bold', 'Times-Roman']);
-    // Lo stesso certificato dà lo stesso file.
+    // La data del file è quella del rilascio conservata: così lo stesso certificato dà lo stesso file.
+    const [row] = await t.db
+      .select()
+      .from(templateCertificate)
+      .where(eq(templateCertificate.id, c.id));
+    const created = (await PDFDocument.load(bytes)).getCreationDate()!;
+    expect(created.getTime()).toBe(Math.floor(row!.issuedAt.getTime() / 1000) * 1000);
     expect(Buffer.from((await req('GET', `${base()}/${c.id}/pdf`)).rawPayload)).toEqual(
       Buffer.from(bytes),
     );

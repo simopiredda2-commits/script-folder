@@ -75,7 +75,43 @@ function licenseAllowed(expression: string): boolean {
   return parts.length > 0 && parts.every((p) => ALLOWED_LICENSES.has(p));
 }
 
+/**
+ * Il programma di cartella che lo studio usa oggi (regola 2): il suo nome e il suo indirizzo non
+ * compaiono mai nel codice. L'espressione è scritta in modo che questo file non li contenga.
+ */
+const OTHER_SOFTWARE = /evo[l]us|next\s*(?:²|2)(?!\d)|next[m]mg/i;
+const CODE_ROOTS = ['apps/', 'packages/', 'sync/', 'fixtures/', 'scripts/', '.github/'];
+
+/** Righe del codice che nominano l'altro programma. */
+function otherSoftwareMentions(files: string[]): string[] {
+  const out: string[] = [];
+  for (const f of files) {
+    let text: string;
+    try {
+      text = readFileSync(join(repoRoot, f), 'utf8');
+    } catch {
+      continue; // file tracciato ma cancellato nella copia di lavoro
+    }
+    text.split('\n').forEach((line, i) => {
+      if (OTHER_SOFTWARE.test(line)) out.push(`${f}:${i + 1}`);
+    });
+  }
+  return out;
+}
+
 describe('provenienza dei file (regola 2)', () => {
+  it('nel codice nessun riferimento al programma di cartella usato oggi dallo studio', () => {
+    const code = repositoryFiles().filter(
+      (f) => CODE_ROOTS.some((r) => f.startsWith(r)) && !MEDIA.test(f),
+    );
+    expect(code.length).toBeGreaterThan(100);
+    expect(otherSoftwareMentions(code)).toEqual([]);
+    // La ricerca funziona: trova il nome scritto in qualunque modo.
+    expect(OTHER_SOFTWARE.test(['Evo', 'lus Next', '\u00b2'].join(''))).toBe(true);
+    expect(OTHER_SOFTWARE.test(['ne', 'xt2'].join(''))).toBe(true);
+    expect(OTHER_SOFTWARE.test('const next = 3;')).toBe(false);
+  });
+
   it('immagini, documenti e archivi: solo con una provenienza dichiarata', () => {
     const shots = screenshotNames();
     const examples = exampleFiles();

@@ -527,3 +527,11 @@ Se il modello fissa una validità in mesi, «valido fino al» è il giorno prima
 C'è la prova di stampa prima di salvare. Vale per i certificati dai modelli; il testo dei modelli non cambia. Un certificato già rilasciato tiene l'impaginazione che aveva.
 
 **D146 · «Strumenti» anche per i medici.** La pagina degli strumenti ha tre schede: modelli dei certificati, impaginazione (solo per i medici) e Fascicolo sanitario. La vedono i medici e l'amministratore, la segreteria no. Le impostazioni del Fascicolo le cambia solo l'amministratore.
+
+**D147 · Il programma usato oggi dallo studio non si nomina nel codice.** Domanda di Simone: «confermi con assoluta certezza che nel codice non c'è traccia né alcun riferimento» a quel programma? Verificato il 18/11/2026:
+
+- **Codice:** nessun riferimento in `apps/`, `packages/`, `sync/`, `fixtures/`, `scripts/` e `.github/`, né oggi né in tutta la storia (66 commit), né nei nomi dei file.
+- **Immagini e documenti:** nella storia sono entrati solo le nostre schermate e i file inventati delle prove.
+- **Testi:** il nome compare solo nei documenti che fissano la regola e ne tengono traccia (requisiti, `CLAUDE.md`, decisioni D87, D89 e D104, avanzamento, `docs/provenienze.md`), in un messaggio di commit e nella descrizione della pull request #3. Restano, perché sono la traccia del processo pulito: dicono che cosa non si è preso e perché.
+
+Da ora una prova su tutto il codice (`packages/brand/test/provenienza.test.ts`) diventa rossa se il nome o l'indirizzo del programma compaiono nel codice. L'espressione è scritta in modo che il file della prova non li contenga.
