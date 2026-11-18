@@ -162,6 +162,19 @@ describe('amministratore: «utenti, stampanti, intestazioni, modelli; nessun acc
   });
 });
 
+describe('autorizzazioni date per errore a chi non è medico', () => {
+  it('un’autorizzazione su un archivio non dà accesso clinico all’amministratore', () => {
+    const errata: ArchiveGrant = { ...sostituzione, granteeUserId: amministratore.userId };
+    const c = ctx({ grants: [errata] });
+    expect(ok(amministratore, 'clinical.summary.read', c)).toBe(false);
+    expect(ok(amministratore, 'prescription.sign_send', c)).toBe(false);
+  });
+  it('né alla segreteria oltre ai suoi permessi', () => {
+    const errata: ArchiveGrant = { ...sostituzione, granteeUserId: segreteria.userId };
+    expect(ok(segreteria, 'prescription.sign_send', ctx({ grants: [errata] }))).toBe(false);
+  });
+});
+
 describe('regole generali', () => {
   it('nessuno accede a un archivio di un altro studio', () => {
     const altro = { id: 'x', studioId: 'studio-2', ownerUserId: 'u-titolare' };

@@ -14,7 +14,8 @@
     "lint": "eslint . && prettier --check . && pnpm typecheck",
     "typecheck": "pnpm -r --no-bail typecheck",
     "format": "prettier --write .",
-    "fixtures": "pnpm --filter @mmg/fixtures generate"
+    "fixtures": "pnpm --filter @mmg/fixtures generate",
+    "db:seed": "pnpm --filter @mmg/api db:seed"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

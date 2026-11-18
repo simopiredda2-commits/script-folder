@@ -22,6 +22,7 @@ declare module 'fastify' {
   }
   interface FastifyInstance {
     patientScopedRoutes: { method: string; url: string }[];
+    allRoutes: { method: string; url: string }[];
   }
 }
 
@@ -43,10 +44,13 @@ export function buildApp({ db, config, now, logger = false }: AppDeps): FastifyI
   });
 
   app.decorate('patientScopedRoutes', [] as { method: string; url: string }[]);
+  app.decorate('allRoutes', [] as { method: string; url: string }[]);
   app.addHook('onRoute', (route) => {
-    if (route.config?.patientScoped) {
-      const methods = Array.isArray(route.method) ? route.method : [route.method];
-      for (const m of methods) app.patientScopedRoutes.push({ method: m, url: route.url });
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    for (const m of methods) {
+      if (m === 'HEAD') continue;
+      app.allRoutes.push({ method: m, url: route.url });
+      if (route.config?.patientScoped) app.patientScopedRoutes.push({ method: m, url: route.url });
     }
   });
 

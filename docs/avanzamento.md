@@ -4,9 +4,9 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 ## Dove siamo
 
-- Branch attivo: `tappe-0-2` (pull request verso `main` da aprire a fine tappa 2).
-- Tappe fatte: 0, 1.
-- Prossimo passo: tappa 2, modello, ruoli e accesso; poi la prima fermata.
+- Branch attivo: `tappe-0-2`, con la pull request verso `main` aperta per la prima fermata.
+- Tappe fatte: 0, 1, 2.
+- **Prima fermata**: in attesa delle risposte di Simone (domande qui sotto). Con il via si unisce la pull request e si parte con la tappa 3 su un branch nuovo, `tappe-3-4`.
 
 ## Come provarlo
 
@@ -15,8 +15,11 @@ pnpm install          # in cloud lo fa l'hook di avvio
 pnpm test             # prove TypeScript e prove di sync/
 pnpm lint             # ESLint, Prettier, tipi
 pnpm dev              # migrazioni, servizio su :3001, interfaccia su :5173
+pnpm db:seed          # dati dimostrativi inventati; stampa una volta le password
 pnpm fixtures -- --seed 1 --count 5
 ```
+
+Per provare l'accesso a mano: `pnpm db:seed`, poi `POST /api/accesso` con utente, password e postazione; la risposta dà il segreto da inserire in un'app di autenticazione; poi `POST /api/accesso/codice` con il codice. L'interfaccia di accesso arriva alla tappa 6.
 
 ## Tappe
 
@@ -69,13 +72,48 @@ pnpm fixtures -- --seed 1 --count 5
 - `sync/` con Python 3.12 (la versione della CI): provato in locale con la 3.13.
 - La verifica della lettera X sul file ISTAT dei comuni: alla tappa 5, e comunque con un file d'esempio; il file vero si scarica solo da un computer dello studio.
 
+### Tappa 2 – Modello, ruoli e accesso
+
+**Fatto**
+
+- Modello dei dati completo per la cartella (30 tabelle nuove): studio, utenti con più ruoli, profilo medico, archivi, autorizzazioni (sostituzione e medicina di gruppo), sessioni, pazienti, famiglie, scelte, esenzioni, consensi, deleghe, voci cliniche con un dettaglio per tipo e allegati, terapie con tutte le opzioni della scheda, piani terapeutici, appuntamenti, richieste. Descritto in `docs/modello-dati.md`.
+- Migrazione scritta a mano (`0002_registro_e_storico.sql`): registro degli accessi non modificabile con catena di impronte, storico delle modifiche con l'utente, divieto di cancellare i dati dei pazienti.
+- Ruoli e permessi come regole in `packages/domain/src/permissions.ts`; matrice generata in `docs/ruoli-permessi.md`.
+- Accesso: password (scrypt) e secondo fattore TOTP obbligatorio per tutti, attivato al primo accesso; segreti cifrati con AES-256-GCM; blocco per inattività e per tentativi falliti con soglie da completare; sblocco con password; uscita.
+- Guardia unica sui dati dei pazienti: decide e registra prima di restituire dati, anche quando nega.
+- Esportazione completa dell'archivio in JSON (`docs/esportazione.md`).
+- Dati dimostrativi (`pnpm db:seed`) e chiave di cifratura di sviluppo creata dall'hook.
+
+**Provato**
+
+- 301 prove TypeScript verdi (17 file) e 5 Python; lint verde.
+- Vettori ufficiali: TOTP dalla RFC 6238 (appendice B), Base32 dalla RFC 4648 (sezione 10).
+- Ogni riga della tabella dei ruoli dei requisiti ha la sua prova, sia sulle regole sia attraverso il servizio.
+- Ogni rotta `/api/pazienti/:id…` scrive il registro, anche quando l'accesso è negato.
+- Alterazioni del registro fatte spegnendo i trigger: la catena le trova (riga modificata, riga tolta).
+- `pnpm dev` con i dati dimostrativi: servizio vivo, rotte protette chiuse senza sessione, tentativo fallito nel registro, catena integra.
+
+**Non provato**
+
+- L'accesso con un'app di autenticazione vera su un telefono: provato solo calcolando i codici nelle prove.
+- Il servizio collegato al database con un utente che non possiede le tabelle (vedi «Cose irreversibili non fatte»).
+- Interfaccia di accesso e blocco schermo: arrivano alla tappa 6.
+
 ## Domande per la prossima fermata
 
-1. **Logo**: quale proposta (A, B, C) o nessuna; consigliata la B. Pagina: `docs/logo.md`.
+Prima fermata, dopo la tappa 2:
+
+1. **Via libera** su struttura, modello dei dati, ruoli e permessi (`docs/modello-dati.md`, `docs/ruoli-permessi.md`).
+2. **Logo**: A, B (consigliata), C o nessuna (`docs/logo.md`).
+3. **Soglie di sicurezza** (D20): minuti di inattività prima del blocco, tentativi falliti e durata del blocco.
+4. **Medicina di gruppo** (D18): a quali condizioni un collega vede i pazienti di un altro titolare.
+
+Annotate per dopo, da chiedere a Chiara quando servirà: che cosa deve vedere la segreteria oltre alle terapie (D22).
 
 ## Cose irreversibili non fatte
 
-Nessuna per ora.
+- Nessuna azione irreversibile è stata fatta.
+- Da fare in produzione, non qui: utente del database per il servizio che non possiede le tabelle (così non può spegnere i trigger del registro); chiave di cifratura in un archivio di segreti.
 
 ## Registro dei sabotaggi
 
@@ -107,3 +145,22 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | Logo nei colori ammessi                   | Colore rosso                                       | Rosso, poi verde                                                                                                                                                                   |
 | Logo con estremi arrotondati              | `stroke-linecap="butt"`                            | Rosso, poi verde                                                                                                                                                                   |
 | Simbolo di SCRIPT fuori dal logo          | Poligono aggiunto                                  | Rosso, poi verde                                                                                                                                                                   |
+| Segreteria che firma                      | Permesso di firma aggiunto alla segreteria         | Rosso, poi verde                                                                                                                                                                   |
+| Periodo del sostituto                     | Fine del periodo ignorata                          | Rosso, poi verde                                                                                                                                                                   |
+| Amministratore senza accesso clinico      | Amministratore trattato come medico                | **Rimasto verde la prima volta**: mancava il caso di un'autorizzazione data per errore a un amministratore. Aggiunta la prova; poi rosso, poi verde                                |
+| Diario alla segreteria                    | Impostazione dello studio ignorata                 | Rosso, poi verde                                                                                                                                                                   |
+| Guardia che registra                      | Scrittura del registro tolta dalla guardia         | Rosso, poi verde                                                                                                                                                                   |
+| Rotte sui pazienti marcate                | Marca tolta alla rotta del diario                  | Rosso, poi verde (prova rafforzata prima: ora controlla tutte le rotte, non solo quelle marcate)                                                                                   |
+| Registro non modificabile                 | Trigger tolto dalla migrazione                     | Rosso, poi verde                                                                                                                                                                   |
+| Catena delle impronte                     | Esito tolto dall'impronta                          | Rosso, poi verde                                                                                                                                                                   |
+| Voci cliniche non cancellabili            | `clinical_entry` tolta dall'elenco protetto        | Rosso, poi verde                                                                                                                                                                   |
+| Storico con l'utente                      | Utente non dichiarato nella transazione            | Rosso, poi verde                                                                                                                                                                   |
+| Codice TOTP usato una volta               | Ultimo intervallo ignorato                         | Rosso, poi verde                                                                                                                                                                   |
+| Codice sbagliato rifiutato                | Verifica del codice saltata                        | Rosso, poi verde                                                                                                                                                                   |
+| Blocco per inattività                     | Blocco mai applicato                               | Rosso, poi verde                                                                                                                                                                   |
+| Blocco per tentativi falliti              | Blocco mai applicato                               | **Sabotaggio non applicato la prima volta** (il testo cercato era su più righe); rifatto: rosso, poi verde. Lo script ora segnala i sabotaggi non applicati                        |
+| Stesso messaggio per utente sconosciuto   | Messaggio diverso                                  | Rosso, poi verde                                                                                                                                                                   |
+| Esportazione completa                     | `therapy` tolta dalle tabelle esportate            | Rosso, poi verde                                                                                                                                                                   |
+| Niente segreti nell'esportazione          | Impronta della password aggiunta                   | Rosso, poi verde                                                                                                                                                                   |
+| Solo l'archivio del titolare              | Pazienti di tutto lo studio                        | Rosso, poi verde                                                                                                                                                                   |
+| Matrice dei permessi allineata            | Riepilogo clinico dato alla segreteria nel codice  | Rosso, poi verde                                                                                                                                                                   |

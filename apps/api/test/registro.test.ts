@@ -38,12 +38,12 @@ describe('registro degli accessi', () => {
       await s.db.select({ n: count() }).from(accessLog).where(eq(accessLog.patientId, patientId))
     )[0]!.n;
 
-  it('ci sono rotte sui dati dei pazienti e sono tutte marcate', () => {
-    expect(s.app.patientScopedRoutes.length).toBeGreaterThanOrEqual(5);
-    // Ogni rotta con :id in /api/pazienti/ deve essere marcata come rotta su un paziente.
-    const marked = new Set(s.app.patientScopedRoutes.map((r) => `${r.method} ${r.url}`));
-    for (const r of s.app.patientScopedRoutes) expect(r.url).toContain(':id');
-    expect(marked.size).toBe(s.app.patientScopedRoutes.length);
+  it('ogni rotta sui dati di un paziente è marcata e passa dalla guardia', () => {
+    const scoped = new Set(s.app.patientScopedRoutes.map((r) => `${r.method} ${r.url}`));
+    const patientRoutes = s.app.allRoutes.filter((r) => r.url.startsWith('/api/pazienti/:id'));
+    expect(patientRoutes.length).toBeGreaterThanOrEqual(5);
+    for (const r of patientRoutes)
+      expect(scoped, `${r.method} ${r.url}`).toContain(`${r.method} ${r.url}`);
   });
 
   it('ogni rotta su un paziente scrive il registro, anche quando l’accesso è negato', async () => {

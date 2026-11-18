@@ -54,6 +54,31 @@ export const ACTIONS = [
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
+/** Nome delle azioni nell'interfaccia e nella documentazione. */
+export const ACTION_LABELS: Record<Action, string> = {
+  'registry.read': 'Leggere anagrafica, dati SSN, esenzioni, consensi e deleghe',
+  'registry.write': 'Modificare anagrafica, recapiti, esenzioni, consensi e deleghe',
+  'agenda.manage': 'Gestire l’agenda',
+  'patient_request.manage': 'Gestire le richieste dei pazienti',
+  'clinical.summary.read': 'Leggere il riepilogo clinico (allergie, problemi, scadenze)',
+  'clinical.diary.read': 'Leggere il diario clinico',
+  'clinical.write': 'Scrivere voci cliniche',
+  'therapy.read': 'Leggere le terapie non riservate',
+  'reserved.read': 'Leggere terapie e voci riservate',
+  'therapy.write': 'Modificare le terapie',
+  'prescription.draft': 'Preparare una ricetta nuova',
+  'prescription.draft_repeat': 'Preparare la bozza di una ricetta ripetuta',
+  'prescription.sign_send': 'Firmare e inviare le ricette',
+  'certificate.sign_send': 'Firmare e inviare i certificati',
+  'reminder.print': 'Stampare i promemoria',
+  'access_log.read': 'Leggere il registro degli accessi',
+  'data.export': 'Esportare tutti i dati dell’archivio',
+  'admin.users': 'Gestire gli utenti dello studio',
+  'admin.printers': 'Gestire le stampanti',
+  'admin.headers': 'Gestire le intestazioni',
+  'admin.templates': 'Gestire i modelli',
+};
+
 const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'registry.read',
   'registry.write',

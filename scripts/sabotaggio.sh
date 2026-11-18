@@ -46,6 +46,22 @@ for i in "${!files[@]}"; do
 done
 
 bash -c "$sabotage"
+changed=0
+for i in "${!files[@]}"; do
+  f="${files[$i]}"
+  if [ -e "$backup/$i" ]; then
+    cmp -s "$backup/$i" "$f" || changed=1
+  elif [ -e "$f" ]; then
+    changed=1
+  fi
+done
+# Il guasto non è stato fatto ai file indicati (per esempio un sed che non trova il testo):
+# lo si dice, invece di riferire un falso «non rilevato». Per sabotaggi senza file (variabili
+# d'ambiente) indicare comunque un file e toccarlo nel comando.
+if [ "$changed" -eq 0 ]; then
+  echo "SABOTAGGIO NON APPLICATO: nessuno dei file indicati è cambiato" >&2
+  exit 2
+fi
 if bash -c "$check" >/tmp/sabotaggio.$$.log 2>&1; then
   echo "SABOTAGGIO NON RILEVATO: la prova è rimasta verde" >&2
   tail -20 /tmp/sabotaggio.$$.log >&2

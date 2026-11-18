@@ -4,7 +4,8 @@
 # Solo se CLAUDE_CODE_REMOTE=true:
 #   1. avvia Postgres 16 (già installato nell'immagine) se è fermo;
 #   2. crea, se mancano, l'utente mmg e il database mmg_dev;
-#   3. scrive DATABASE_URL e TZ=Europe/Rome in $CLAUDE_ENV_FILE, senza duplicati;
+#   3. scrive DATABASE_URL, TZ=Europe/Rome e la chiave di cifratura di sviluppo in
+#      $CLAUDE_ENV_FILE, senza duplicati (la chiave sta fuori dal repository, in ~/.config/mmg);
 #   4. installa le dipendenze pnpm solo se è cambiato un file che le decide.
 #
 # È idempotente: lanciato due volte di seguito, la seconda volta non fa nulla
@@ -60,10 +61,17 @@ else
   log "Postgres non installato: salto la parte database"
 fi
 
-# 3. Variabili della sessione
+# 3. Variabili della sessione. La chiave di cifratura di sviluppo si crea una volta per macchina,
+#    fuori dal repository; non protegge dati reali (in sviluppo ci sono solo pazienti inventati).
+CHIAVE="${HOME}/.config/mmg/chiave-cifratura-sviluppo"
+if [ ! -s "$CHIAVE" ]; then
+  mkdir -p "$(dirname "$CHIAVE")"
+  (umask 077 && openssl rand -base64 32 >"$CHIAVE")
+fi
 if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
   touch "$CLAUDE_ENV_FILE"
-  for riga in "export DATABASE_URL=${DATABASE_URL}" "export TZ=Europe/Rome"; do
+  for riga in "export DATABASE_URL=${DATABASE_URL}" "export TZ=Europe/Rome" \
+    "export APP_ENCRYPTION_KEY=$(cat "$CHIAVE")" "export COOKIE_SECURE=false"; do
     grep -qxF "$riga" "$CLAUDE_ENV_FILE" || printf '%s\n' "$riga" >>"$CLAUDE_ENV_FILE"
   done
 fi

@@ -96,13 +96,22 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 | `pnpm lint`                                            | ESLint, Prettier in controllo, tipi di ogni pacchetto                           |
 | `pnpm format`                                          | Prettier in scrittura                                                           |
 | `pnpm db:migrate`                                      | Applica le migrazioni a `DATABASE_URL`                                          |
+| `pnpm db:seed`                                         | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)  |
+| `pnpm --filter @mmg/domain docs:permessi`              | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                      |
 | `pnpm --filter @mmg/api db:generate`                   | Genera una migrazione dallo schema Drizzle                                      |
 | `pnpm fixtures -- --seed 1 --count 20`                 | Pazienti inventati in JSON (stesso seme, stessi pazienti)                       |
 | `pnpm --filter @mmg/brand tokens:css`                  | Rigenera `tokens.css` da `tokens.ts`                                            |
 | `pnpm --filter @mmg/brand logo:proposte`               | Rigenera le proposte di logo e le tavole di `docs/logo.md`                      |
 | `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'` | Prova un controllo: rosso col guasto, verde dopo il ripristino                  |
 
-Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano).
+Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano). Il servizio vuole anche `APP_ENCRYPTION_KEY` (in cloud la imposta l'hook).
+
+## Documenti per la revisione
+
+- `docs/modello-dati.md`: entità, stato e scelte.
+- `docs/ruoli-permessi.md`: ruoli, matrice generata dal codice, accesso.
+- `docs/esportazione.md`: formato dell'esportazione.
+- `docs/logo.md`: proposte di logo.
 
 ## Le tappe
 

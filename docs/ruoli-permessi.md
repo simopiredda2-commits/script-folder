@@ -1,0 +1,58 @@
+# Ruoli e permessi
+
+Da verificare con la Dr.ssa Rocca alla prima fermata. Fonte: la tabella «Utenti e ruoli» di `docs/requisiti.md`. Il principio: **la segreteria prepara, il medico firma e invia; ogni accesso a una cartella viene registrato.**
+
+## I ruoli
+
+- **Medico titolare.** Ha un archivio, cioè i pazienti che lo hanno scelto. Sul proprio archivio può tutto: firma e invia ricette e certificati, legge il registro degli accessi, esporta i dati.
+- **Segreteria.** È condivisa dallo studio e lavora su tutti gli archivi: anagrafiche, agenda, richieste dei pazienti, bozze di ricette ripetute, stampa dei promemoria. Non firma, non invia, non legge il diario clinico. Lo studio può consentirle la lettura del diario: per difetto è spenta.
+- **Medico sostituto.** Lavora sull'archivio del titolare solo nel periodo autorizzato, con le proprie credenziali. Ricette e certificati restano a nome suo. Non esporta i dati e non legge il registro: i dati sono del titolare.
+- **Medicina di gruppo.** Non è un ruolo dell'utente ma un modo di organizzare lo studio: più titolari, ognuno con il suo archivio, e una segreteria condivisa. Un collega vede i pazienti di un altro titolare solo con un'**autorizzazione** che il titolare gli dà, con periodo e motivo. Le condizioni vere sono «da definire» nei requisiti: è una domanda della fermata.
+- **Amministratore dello studio.** Gestisce utenti, stampanti, intestazioni e modelli. Non ha accesso clinico, a meno che non sia anche medico: un utente può avere più ruoli, per esempio titolare e amministratore.
+- **Paziente.** Fase 2, non c'è ancora.
+
+## Matrice
+
+Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le stesse regole che usa il servizio; una prova controlla che questa tabella sia allineata. Per aggiornarla: `pnpm --filter @mmg/domain docs:permessi`.
+
+<!-- matrice:inizio -->
+
+| Azione | Titolare (proprio archivio) | Segreteria | Sostituto (nel periodo) | Collega di gruppo (autorizzato) | Collega di gruppo (senza autorizzazione) | Amministratore |
+| --- | --- | --- | --- | --- | --- | --- |
+| Leggere anagrafica, dati SSN, esenzioni, consensi e deleghe | Sì | Sì | Sì | Sì | No | No |
+| Modificare anagrafica, recapiti, esenzioni, consensi e deleghe | Sì | Sì | Sì | Sì | No | No |
+| Gestire l’agenda | Sì | Sì | Sì | Sì | No | No |
+| Gestire le richieste dei pazienti | Sì | Sì | Sì | Sì | No | No |
+| Leggere il riepilogo clinico (allergie, problemi, scadenze) | Sì | No | Sì | Sì | No | No |
+| Leggere il diario clinico | Sì | Se lo studio lo consente | Sì | Sì | No | No |
+| Scrivere voci cliniche | Sì | No | Sì | Sì | No | No |
+| Leggere le terapie non riservate | Sì | Solo non riservate | Sì | Sì | No | No |
+| Leggere terapie e voci riservate | Sì | No | Sì | Sì | No | No |
+| Modificare le terapie | Sì | No | Sì | Sì | No | No |
+| Preparare una ricetta nuova | Sì | No | Sì | Sì | No | No |
+| Preparare la bozza di una ricetta ripetuta | Sì | Solo terapie croniche non riservate | Sì | Sì | No | No |
+| Firmare e inviare le ricette | Sì | No | Sì | Sì | No | No |
+| Firmare e inviare i certificati | Sì | No | Sì | Sì | No | No |
+| Stampare i promemoria | Sì | Sì | Sì | Sì | No | No |
+| Leggere il registro degli accessi | Sì | No | No | No | No | No |
+| Esportare tutti i dati dell’archivio | Sì | No | No | No | No | No |
+| Gestire gli utenti dello studio | No | No | No | No | No | Sì |
+| Gestire le stampanti | No | No | No | No | No | Sì |
+| Gestire le intestazioni | No | No | No | No | No | Sì |
+| Gestire i modelli | No | No | No | No | No | Sì |
+
+<!-- matrice:fine -->
+
+## Regole che valgono sempre
+
+- Ogni studio vede solo i propri dati.
+- Un'autorizzazione vale solo nel suo periodo e finché non è revocata; vale solo per chi è medico (data per errore a un amministratore o alla segreteria, non apre nulla in più).
+- Ogni apertura di una cartella, consentita o negata, entra nel registro degli accessi con utente, paziente, azione, data e postazione, e il motivo della decisione.
+- I dati dei pazienti non si cancellano: si annullano con un motivo. Ogni modifica entra nello storico con l'utente che l'ha fatta.
+
+## Accesso
+
+- Nome utente e password, poi il **secondo fattore obbligatorio per tutti** (codice a 6 cifre da un'app di autenticazione, standard TOTP). Al primo accesso il secondo fattore si attiva. SPID e CIE arriveranno più avanti.
+- Messaggio uguale per utente sconosciuto e password sbagliata, per non rivelare quali utenti esistono.
+- Lo stesso codice non vale due volte; il passaggio fra password e codice scade dopo 5 minuti; una sessione dura al massimo 12 ore.
+- **Da completare**, sono impostazioni dello studio senza valore: dopo quanti minuti di inattività la sessione si blocca (i requisiti dicono «pochi minuti»), dopo quanti tentativi falliti l'utente si blocca e per quanto tempo. I meccanismi ci sono e sono provati; finché i valori sono vuoti, i blocchi non scattano.

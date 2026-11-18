@@ -48,6 +48,3 @@ export async function verifyPassword(password: string, stored: string): Promise<
   );
   return key.length === expected.length && timingSafeEqual(key, expected);
 }
-
-/** Requisito minimo della password: lunghezza. Le regole fini sono una scelta dello studio. */
-export const MIN_PASSWORD_LENGTH = 12;
