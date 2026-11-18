@@ -340,3 +340,38 @@ Con gli altri programmi solo formati pubblici (D104).
 - **Parametri da completare con la Regione**: codice del gestionale (`client_id`) e indirizzo di ritorno registrato (D103). Il simulatore usa `SIMULATORE_000` e un ritorno interno.
 - **Pagina simulata**: servita dal programma solo in simulazione. Chi entra lo dice il programma (`login_hint`, solo per il simulatore); il servizio vero lo ricava da SPID o CIE.
 - **Codice per email**: resta come alternativa, con le credenziali RUPAR.
+
+## Tappa 9 – Voci cliniche dall'interfaccia (18/11/2026)
+
+**D112 · Chi scrive le voci cliniche e che cosa si modifica.** Problemi, allergie, diario, parametri, anamnesi, stili di vita ed esame obiettivo li scrive il medico (permesso «scrivere voci cliniche»: titolare, sostituto o collega con l'autorizzazione attiva); la segreteria no, come nei requisiti. Che cosa si modifica di una voce:
+
+- riservata, oscurata e promemoria;
+- per i problemi: stato attivo o risolto con la data, quesito aperto.
+
+Il testo non si corregge: si annulla la voce con un motivo e se ne scrive una nuova. Così ciò che è stato scritto resta leggibile, oltre che nello storico delle modifiche. I parametri della stessa visita si scrivono insieme, in una sola transazione: un valore sbagliato li ferma tutti.
+
+**D113 · Parametri: unità fisse, solo controlli formali.** Unità di ogni parametro: mmHg, kg, cm, kg/m², mg/dL, %. Si accettano la virgola e il punto, al più due decimali. Controlli: numero maggiore di zero, e la saturazione non oltre 100 (è una percentuale). Nessun intervallo «normale», nessun giudizio sul valore (regola 3, come D71 per gli esami). Il BMI si scrive come valore: calcolarlo dal peso e dall'altezza è un calcolo clinico, che R12 esclude dalla prima versione; è una domanda per la fermata finale. La glicemia solo in mg/dL; altre unità, se servono, con una serie a parte (il grafico non mescola le scale).
+
+**D114 · Codice dei problemi.** ICD-9-CM, facoltativo, nel formato dello schema del Sistema TS già usato per il certificato (D105): stessa regola, un solo controllo. Il programma non ha il catalogo ICD-9-CM, quindi non si cerca per descrizione. Da completare: la tabella ufficiale ICD-9-CM 2007 del Ministero della salute, da importare come le altre banche dati, se Simone e la Dr.ssa Rocca la vogliono.
+
+**D115 · Consensi del Fascicolo come nel DM 7 settembre 2023.** Letto sulla Gazzetta Ufficiale (GU n. 249 del 24/10/2023). Le modifiche dell'11/11/2025 (GU n. 286 del 10/12/2025) toccano gli art. 22 e 27-bis e l'allegato D, non gli art. 8 e 9. Quelle del 30/12/2024 non le ho lette nel testo: secondo il decreto del 2025 hanno inserito l'art. 27-bis. La consultazione da parte di terzi si consente separatamente:
+
+- per cura;
+- per prevenzione, da chi ha in cura il paziente e, a parte, da Regione e Ministero (art. 8, c. 1; art. 16, c. 1 e 2);
+- per profilassi internazionale.
+
+In cartella: un'espressione per riga (dato o negato, con la data e chi l'ha espresso se non è il paziente), revoca con la data, nuovo consenso come riga nuova; in vigore resta l'ultima. Altri consensi con la loro descrizione. Li registra chi gestisce l'anagrafica, segreteria compresa (requisiti, «Utenti e ruoli»). La Regione è titolare della raccolta dei consensi (art. 8, c. 13) e l'Anagrafe consensi e revoche si alimenta tramite INI (art. 8, c. 10): l'invio è un'interfaccia futura (tappa 11), da verificare sulle specifiche.
+
+**D116 · Oscuramento.** Una voce oscurata su richiesta del paziente resta in cartella e chi può leggerla la vede, segnata. Non va nel Fascicolo né ai colleghi dell'AFT (tappe 11 e 12). Il decreto vuole che l'oscuramento si possa chiedere al momento della prestazione o dopo, e revocare (art. 9). Chi alimenta il Fascicolo segnala anche i dati a maggiore tutela dell'anonimato (art. 6, art. 12, c. 4): si costruisce con la tappa 11. L'oscuramento di nome e indirizzo sulla ricetta SSN (tappa 7, `oscuramDati` delle specifiche del Sistema TS) è un'altra cosa e resta com'è.
+
+**D117 · Piani terapeutici dalla cartella.** Si registrano, si modificano (storico delle modifiche) e si annullano con un motivo; i piani non si cancellano. Un piano annullato non vale più per R5 e R6, né nel riepilogo né nella pagina Oggi. Un piano può essere riservato come le terapie: allora lo vede solo il medico, e la segreteria non lo trova nemmeno tra le scadenze. Le regole riconoscono il piano dal codice AIC o dal principio attivo, come prima; il collegamento esplicito dalla scheda della terapia non è nell'interfaccia (da fare se serve).
+
+**D118 · Grafico dei parametri.** Una scala per grafico, mai due assi: sistolica e diastolica insieme (stessa unità), ogni altro parametro nel suo grafico. Colori nei token del marchio, validati con il controllo dei colori dei grafici sul fondo bianco: luce di SCRIPT per la prima serie, magenta `#D55181` per la seconda. Contrasto almeno 3:1, distinti anche per chi confonde i colori; non sono colori di stato. In più la forma del punto (tondo, quadrato), la legenda e il valore in fondo alla linea. Sotto ogni grafico la tabella con gli stessi valori. Il cursore segue il puntatore e le frecce della tastiera. L'interfaccia non ha un tema scuro, quindi il grafico nemmeno.
+
+**D119 · Dettatura vocale del diario: per ora no.** I requisiti chiedono la «dettatura vocale del browser». In Chrome il riconoscimento vocale delle pagine web passa da un servizio in rete del produttore: l'audio viene mandato fuori per essere riconosciuto (documentazione MDN della Web Speech API). Sarebbe contro le regole 7 e 8, perché la voce del medico che detta dati clinici uscirebbe verso un servizio esterno, forse fuori dall'UE. Non è costruita. È una domanda per la fermata finale. Le alternative:
+
+- lasciarla fuori;
+- usare la dettatura del sistema operativo, fuori dal programma e sotto la responsabilità dello studio;
+- cercare un riconoscimento vocale che lavori solo nel browser.
+
+**D120 · Database delle prove che non si cancellano.** A volte, alla fine di un file di prova, Postgres è ancora collegato al database temporaneo per la sua manutenzione automatica, e l'utente delle prove non può interromperlo. La cancellazione allora riprova per qualche secondo, invece di far fallire una prova già passata. Una prova su tre falliva così.

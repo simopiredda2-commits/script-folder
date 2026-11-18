@@ -12,31 +12,35 @@ All'accesso si sceglie un utente del seed (`medico`, `segreteria`, `sostituto`);
 
 ## Schermate
 
-| Schermata                                      | Che cosa guardare                                                                                                                                    |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ![](schermate/01-accesso.png)                  | Accesso: nome del prodotto in evidenza, «by SCRIPT» piccolo; poi il codice a 6 cifre                                                                 |
-| ![](schermate/02-oggi.png)                     | Oggi: avvisi dei servizi (credenziali, codice di sessione), appuntamenti del giorno, cose da fare (ricette da firmare, piani in scadenza secondo R5) |
-| ![](schermate/03-pazienti.png)                 | Pazienti: ricerca per cognome, nome, codice fiscale, anno di nascita o telefono                                                                      |
-| ![](schermate/04-ricette-da-firmare.png)       | Ricette da firmare: le ripetizioni preparate dalla segreteria, con i controlli prima della firma                                                     |
-| ![](schermate/05-cartella.png)                 | Cartella: testata, problemi, scadenze, parametri, terapia con «Ripeti», prestazioni prescritte, cronologia                                           |
-| ![](schermate/06-scheda-terapia-e-storico.png) | Scheda della terapia in tre parti e storico delle prescrizioni (D65)                                                                                 |
-| ![](schermate/07-ricetta-con-controlli.png)    | Ricetta: banche dati con la data della versione (A6), controlli con fonte e rimedio                                                                  |
-| ![](schermate/08-ricetta-specialistica.png)    | Ricetta specialistica dal catalogo regionale                                                                                                         |
-| ![](schermate/09-esami.png)                    | Esami: valore e intervallo del referto, senza giudizio (D71)                                                                                         |
-| ![](schermate/10-farmaci-ed-equivalenti.png)   | Ricerca farmaci con filtri ed equivalenti                                                                                                            |
-| ![](schermate/11-cartella-tablet.png)          | La cartella su un tablet in verticale                                                                                                                |
-| ![](schermate/12-nuova-terapia.png)            | Nuova terapia: farmaco dalla banca dati, come si prende, come la legge il paziente, unità al giorno (D80)                                            |
-| ![](schermate/13-sospensione.png)              | Sospensione con motivo; la reazione avversa va tra le allergie (D81)                                                                                 |
-| ![](schermate/14-schema-orario.png)            | Schema orario da stampare: momento della giornata, come si prende, fino a quando (D83)                                                               |
-| ![](schermate/15-recapiti.png)                 | Anagrafica e recapiti modificabili dalla cartella (D86)                                                                                              |
-| ![](schermate/16-archivio.png)                 | Archivio del titolare: che cosa vede la segreteria ed esportazione completa (D84)                                                                    |
-| ![](schermate/17-promemoria.png)               | Promemoria dopo l’invio: PDF, solo NRE, email o SMS al paziente o a un delegato (tappa 7)                                                            |
-| ![](schermate/18-promemoria-pdf.png)           | Il promemoria della ricetta SSN dal modello del DM 2/11/2011, con codice di autenticazione e riga piemontese (D93)                                   |
-| ![](schermate/19-credenziali.png)              | Credenziali dei servizi: Sistema TS e RUPAR, mai rilette; avviso di scadenza della password RUPAR (tappa 8, D100–D102)                               |
-| ![](schermate/20-certificato.png)              | Certificato di malattia: dati del modello, residenza dall’anagrafica, controlli dell’INPS prima dell’invio (tappa 8)                                 |
-| ![](schermate/21-certificati.png)              | Certificato inviato: protocollo, copia e attestato, email e SMS, continuazione, rettifica, annullamento                                              |
-| ![](schermate/22-certificato-copia.png)        | Copia per il lavoratore dal fac-simile (allegato A del DM 26/2/2010), con DataRicezione e IdCertificato                                              |
-| ![](schermate/23-certificato-attestato.png)    | Attestato per il datore di lavoro (allegato B): senza diagnosi e senza tipo di visita                                                                |
+| Schermata                                      | Che cosa guardare                                                                                                                                                                                                                  |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![](schermate/01-accesso.png)                  | Accesso: nome del prodotto in evidenza, «by SCRIPT» piccolo; poi il codice a 6 cifre                                                                                                                                               |
+| ![](schermate/02-oggi.png)                     | Oggi: avvisi dei servizi (credenziali, codice di sessione), appuntamenti del giorno, cose da fare (ricette da firmare, piani in scadenza secondo R5)                                                                               |
+| ![](schermate/03-pazienti.png)                 | Pazienti: ricerca per cognome, nome, codice fiscale, anno di nascita o telefono                                                                                                                                                    |
+| ![](schermate/04-ricette-da-firmare.png)       | Ricette da firmare: le ripetizioni preparate dalla segreteria, con i controlli prima della firma                                                                                                                                   |
+| ![](schermate/05-cartella.png)                 | Cartella: testata, problemi, scadenze, parametri, terapia con «Ripeti», prestazioni prescritte, cronologia                                                                                                                         |
+| ![](schermate/06-scheda-terapia-e-storico.png) | Scheda della terapia in tre parti e storico delle prescrizioni (D65)                                                                                                                                                               |
+| ![](schermate/07-ricetta-con-controlli.png)    | Ricetta: banche dati con la data della versione (A6), controlli con fonte e rimedio                                                                                                                                                |
+| ![](schermate/08-ricetta-specialistica.png)    | Ricetta specialistica dal catalogo regionale                                                                                                                                                                                       |
+| ![](schermate/09-esami.png)                    | Esami: valore e intervallo del referto, senza giudizio (D71)                                                                                                                                                                       |
+| ![](schermate/10-farmaci-ed-equivalenti.png)   | Ricerca farmaci con filtri ed equivalenti                                                                                                                                                                                          |
+| ![](schermate/11-cartella-tablet.png)          | La cartella su un tablet in verticale                                                                                                                                                                                              |
+| ![](schermate/12-nuova-terapia.png)            | Nuova terapia: farmaco dalla banca dati, come si prende, come la legge il paziente, unità al giorno (D80)                                                                                                                          |
+| ![](schermate/13-sospensione.png)              | Sospensione con motivo; la reazione avversa va tra le allergie (D81)                                                                                                                                                               |
+| ![](schermate/14-schema-orario.png)            | Schema orario da stampare: momento della giornata, come si prende, fino a quando (D83)                                                                                                                                             |
+| ![](schermate/15-recapiti.png)                 | Anagrafica e recapiti modificabili dalla cartella (D86)                                                                                                                                                                            |
+| ![](schermate/16-archivio.png)                 | Archivio del titolare: che cosa vede la segreteria ed esportazione completa (D84)                                                                                                                                                  |
+| ![](schermate/17-promemoria.png)               | Promemoria dopo l’invio: PDF, solo NRE, email o SMS al paziente o a un delegato (tappa 7)                                                                                                                                          |
+| ![](schermate/18-promemoria-pdf.png)           | Il promemoria della ricetta SSN dal modello del DM 2/11/2011, con codice di autenticazione e riga piemontese (D93)                                                                                                                 |
+| ![](schermate/19-credenziali.png)              | Credenziali dei servizi: Sistema TS e RUPAR, mai rilette; avviso di scadenza della password RUPAR (tappa 8, D100–D102)                                                                                                             |
+| ![](schermate/20-certificato.png)              | Certificato di malattia: dati del modello, residenza dall’anagrafica, controlli dell’INPS prima dell’invio (tappa 8)                                                                                                               |
+| ![](schermate/21-certificati.png)              | Certificato inviato: protocollo, copia e attestato, email e SMS, continuazione, rettifica, annullamento                                                                                                                            |
+| ![](schermate/22-certificato-copia.png)        | Copia per il lavoratore dal fac-simile (allegato A del DM 26/2/2010), con DataRicezione e IdCertificato                                                                                                                            |
+| ![](schermate/23-certificato-attestato.png)    | Attestato per il datore di lavoro (allegato B): senza diagnosi e senza tipo di visita                                                                                                                                              |
+| ![](schermate/24-voci-cliniche.png)            | Voci cliniche (tappa 9): un tipo per scheda; problema con codice ICD-9-CM, stato, inizio, quesito aperto; riservata, oscurata, promemoria; elenco con «Segna come risolto», «Riservata», «Oscurata», «Annulla la voce» (D112–D116) |
+| ![](schermate/25-parametri.png)                | Parametri della stessa visita scritti insieme; andamento nel tempo: pressione in un solo grafico (sistolica e diastolica), un grafico per gli altri; il cursore con le frecce; la tabella con gli stessi valori (D113, D118)       |
+| ![](schermate/26-privacy.png)                  | Privacy: consensi alla consultazione del Fascicolo per finalità, con la fonte (DM 7 settembre 2023, art. 8 e 16), revoca; deleghe (R16); voci oscurate (D115, D116)                                                                |
+| ![](schermate/27-piani-terapeutici.png)        | Piani terapeutici: rilascio, scadenza, confezioni autorizzate, centro; validità alla data e giorni alla scadenza; modifica e annullamento con motivo (D117)                                                                        |
 
 Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al file), su un database appena preparato con il seed.
 
@@ -49,6 +53,8 @@ Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al f
 - **Storico** di ogni farmaco e prestazione: confezioni degli ultimi 12 mesi, autori, controlli, passaggi con l'ente; annullamento solo se l'ente non ha ancora lavorato la ricetta, e le annullate restano (D70).
 - **Terapia**: nuova, modifica, sospensione con motivo (la reazione avversa va tra le allergie), ripresa, schema orario da stampare (D80–D83). I controlli formali si vedono prima di salvare, vicino al campo, e il servizio li ripete.
 - **Promemoria** (tappa 7): dopo l’invio, nell’editor, nella coda delle ricette e nello storico. La ricetta bianca consegna solo il PDF del SAC (D93).
+- **Voci cliniche** (tappa 9): dalla cartella, sotto la testata, «Voci cliniche», «Parametri», «Piani terapeutici», «Privacy». Le voci le scrive il medico; non si cancellano, si annullano con un motivo e restano in elenco, barrate. Nessun giudizio sui valori e nessun calcolo (regola 3, R12).
+- **Grafico dei parametri**: una scala per grafico; colori validati per il contrasto e per chi confonde i colori, forma del punto come seconda codifica, valore in fondo alla linea; il cursore si muove anche con le frecce (il grafico si raggiunge con il tasto Tab) e annuncia i valori; la tabella sotto ha gli stessi numeri (D118).
 - **Accesso**: password e secondo fattore; dopo 5 minuti senza attività la sessione si blocca e si sblocca con il codice. All'uscita il browser non conserva dati dei pazienti.
 
 ## Accessibilità (WCAG 2.2 AA)
@@ -64,7 +70,10 @@ Le pagine hanno il salto al contenuto, titoli in ordine, etichette per ogni camp
 
 ## Che cosa non c'è ancora
 
-- Agenda e prenotazione (proposta: da Ready!), riepiloghi, certificati INPS, diario e voci cliniche nuove (allergie, problemi, piani terapeutici dall'interfaccia), presidi, seguito delle prestazioni (esecuzione, struttura, esito, referto).
+- Agenda e prenotazione (proposta: da Ready!), riepiloghi, presidi, seguito delle prestazioni (esecuzione, struttura, esito, referto).
+- Dettatura vocale del diario: non c'è, per le regole 7 e 8 (D119, domanda per la fermata finale).
+- Ricerca dei codici ICD-9-CM per descrizione: manca il catalogo (D114).
+- Vaccinazioni, schede UVG regionali, percorsi (diabete, BPCO, scompenso): nel modello dei dati, non nell'interfaccia.
 - Collegamento alla segnalazione di farmacovigilanza: da completare (D82).
 - Stampa del promemoria e della ricetta rossa nel modulo conforme: da completare con le specifiche.
 - Tema scuro.

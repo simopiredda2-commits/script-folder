@@ -721,6 +721,74 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'elenco dei certificati', true);
   });
 
+  it('voci cliniche, parametri con l’andamento, privacy e piani dalla cartella (tappa 9)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Voci cliniche' })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    // Un problema nuovo, poi annullato con il motivo: resta in elenco, segnato.
+    await page.getByLabel('Descrizione').fill('Problema della prova nel browser');
+    await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Voce registrata.').waitFor();
+    const item = page.locator('.voce').filter({ hasText: 'Problema della prova nel browser' });
+    await item.waitFor();
+    await check(page, 'voci cliniche', true);
+    await item.getByRole('button', { name: /Annulla la voce/ }).click();
+    await item.getByLabel('Motivo dell’annullamento').fill('Inserita per prova');
+    await check(page, 'annullamento di una voce');
+    await item.getByRole('button', { name: 'Conferma l’annullamento' }).click();
+    await page
+      .locator('.voce-annullata')
+      .filter({ hasText: 'Motivo dell’annullamento: Inserita per prova' })
+      .waitFor();
+    // Una nota del diario per telefono.
+    await page.getByRole('button', { name: 'Diario clinico' }).click();
+    await page.getByLabel('Tipo di contatto').selectOption('telefono');
+    await page.getByLabel('Testo', { exact: true }).fill('Telefonata di prova.');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.locator('.voce').filter({ hasText: 'Al telefono: Telefonata di prova.' }).waitFor();
+
+    // Parametri della stessa visita, poi l'andamento in grafico e in tabella.
+    await page.getByRole('link', { name: 'Parametri' }).first().click();
+    await page.getByRole('heading', { level: 1, name: 'Parametri' }).waitFor();
+    await page.getByLabel(/Pressione sistolica/).fill('135');
+    await page.getByLabel(/Pressione diastolica/).fill('85');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Registrati 2 parametri.').waitFor();
+    await page.getByRole('table', { name: /Pressione arteriosa: valori/ }).waitFor();
+    await page.getByRole('group', { name: /Pressione arteriosa: grafico/ }).focus();
+    await page.locator('.grafico-suggerimento').getByText('135 mmHg').waitFor();
+    await check(page, 'parametri', true);
+
+    // Privacy: un consenso del Fascicolo, con la fonte.
+    await page.goto(`${base}/pazienti/${s.richPatient}/privacy`);
+    await page.getByRole('heading', { level: 1, name: 'Privacy' }).waitFor();
+    await page.getByLabel('Consenso', { exact: true }).selectOption('fse_cura');
+    await page.getByRole('button', { name: 'Registra il consenso' }).click();
+    await page.getByText('Consenso registrato.').waitFor();
+    await page.getByRole('row', { name: /finalità di cura Dato/ }).waitFor();
+    await check(page, 'privacy', true);
+
+    // Piani terapeutici: un piano valido, con i giorni alla scadenza.
+    await page.goto(`${base}/pazienti/${s.richPatient}/piani`);
+    await page.getByRole('heading', { level: 1, name: 'Piani terapeutici' }).waitFor();
+    await page.getByLabel('Farmaco', { exact: true }).fill('Piano di prova nel browser');
+    await page
+      .getByLabel('Scade il')
+      .fill(studioDate(new Date(s.clock.now().getTime() + 90 * 86_400_000)));
+    await page.getByRole('button', { name: 'Registra il piano' }).click();
+    await page.getByText('Piano registrato.').waitFor();
+    await page
+      .locator('.voce')
+      .filter({ hasText: 'Piano di prova nel browser' })
+      .getByText('Valido', { exact: true })
+      .waitFor();
+    await check(page, 'piani terapeutici', true);
+  });
+
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice', async () => {
     s.clock.advance(6 * 60_000);
     await page.goto(`${base}/pazienti`);

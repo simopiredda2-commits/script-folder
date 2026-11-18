@@ -34,9 +34,9 @@ const app = buildApp({ db, config: { ...config, cookieSecure: false } });
 const work = mkdtempSync(join(tmpdir(), 'mmg-schermate-'));
 mkdirSync(OUT, { recursive: true });
 
-async function shot(page: Page, name: string) {
+async function shot(page: Page, name: string, fullPage = false) {
   await page.waitForLoadState('networkidle');
-  await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: false });
+  await page.screenshot({ path: join(OUT, `${name}.png`), fullPage });
   console.log(`  ${name}.png`);
 }
 
@@ -206,6 +206,75 @@ try {
     .evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await page.evaluate(() => window.scrollBy(0, -120));
   await shot(page, '15-recapiti');
+
+  // Tappa 9: voci cliniche, parametri con l'andamento, privacy, piani terapeutici (dati inventati).
+  await page.goto(`${base}/pazienti/${patientId}/voci?tipo=problema`);
+  await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+  await page.getByLabel('Descrizione').fill('Ipertensione essenziale');
+  await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+  await page
+    .getByLabel('Inizio', { exact: true })
+    .fill(studioDate(new Date(Date.now() - 400 * 86_400_000)));
+  await page.getByRole('button', { name: 'Registra', exact: true }).click();
+  await page.getByText('Voce registrata.').waitFor();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  // Pagina intera: modulo ed elenco insieme.
+  await shot(page, '24-voci-cliniche', true);
+
+  await page.goto(`${base}/pazienti/${patientId}/parametri`);
+  await page.getByRole('heading', { level: 1, name: 'Parametri' }).waitFor();
+  for (const [days, pas, pad, weight] of [
+    [270, '152', '96', '81,5'],
+    [180, '146', '92', '80'],
+    [90, '138', '88', '78,4'],
+    [7, '132', '84', '77'],
+  ] as const) {
+    await page
+      .getByLabel('Data', { exact: true })
+      .fill(studioDate(new Date(Date.now() - days * 86_400_000)));
+    await page.getByRole('textbox', { name: /Pressione sistolica/ }).fill(pas);
+    await page.getByRole('textbox', { name: /Pressione diastolica/ }).fill(pad);
+    await page.getByRole('textbox', { name: /^Peso/ }).fill(weight);
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.getByText('Registrati 3 parametri.').waitFor();
+  }
+  const chart = page.getByRole('group', { name: /Pressione arteriosa: grafico/ });
+  await chart.focus();
+  await page.keyboard.press('ArrowLeft');
+  await page
+    .getByRole('heading', { name: 'Andamento nel tempo' })
+    .evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await page.evaluate(() => window.scrollBy(0, -16));
+  await shot(page, '25-parametri');
+
+  await page.goto(`${base}/pazienti/${patientId}/privacy`);
+  await page.getByRole('heading', { level: 1, name: 'Privacy' }).waitFor();
+  await page.getByLabel('Consenso', { exact: true }).selectOption('fse_cura');
+  await page.getByRole('button', { name: 'Registra il consenso' }).click();
+  await page.getByText('Consenso registrato.').waitFor();
+  await page.getByLabel('Consenso', { exact: true }).selectOption('fse_prevenzione_enti');
+  await page.getByLabel('Nega il consenso').check();
+  await page.getByRole('button', { name: 'Registra il consenso' }).click();
+  await page.getByText('Consenso registrato.').waitFor();
+  await page.getByLabel('Cognome e nome del delegato').fill('Delegato Dimostrativo');
+  await page.getByLabel('Per che cosa vale').fill('Ritiro di ricette e promemoria');
+  await page.getByRole('button', { name: 'Registra la delega' }).click();
+  await page.getByText('Delega registrata.').waitFor();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '26-privacy');
+
+  await page.goto(`${base}/pazienti/${patientId}/piani`);
+  await page.getByRole('heading', { level: 1, name: 'Piani terapeutici' }).waitFor();
+  await page.getByLabel('Farmaco', { exact: true }).fill('Farmaco dimostrativo con piano');
+  await page.getByLabel('Principio attivo').fill('principio dimostrativo');
+  await page.getByLabel('Rilasciato il').fill(studioDate(new Date(Date.now() - 60 * 86_400_000)));
+  await page.getByLabel('Scade il').fill(studioDate(new Date(Date.now() + 20 * 86_400_000)));
+  await page.getByLabel('Confezioni autorizzate').fill('6');
+  await page.getByLabel('Centro che l’ha rilasciato').fill('Centro dimostrativo');
+  await page.getByRole('button', { name: 'Registra il piano' }).click();
+  await page.getByText('Piano registrato.').waitFor();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '27-piani-terapeutici', true);
 
   // Tappa 8: certificato di malattia di un lavoratore adulto con la residenza in anagrafica.
   const adult = await db.execute<{ id: string }>(sql`

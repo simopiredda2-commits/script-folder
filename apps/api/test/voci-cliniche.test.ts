@@ -155,6 +155,26 @@ describe('voci cliniche dalla cartella (tappa 9)', () => {
     for (const id of Object.values(ids)) expect(timeline.map((x) => x.id)).toContain(id);
   });
 
+  it('il catalogo dà tipi, parametri con l’unità e consensi con la fonte, dal dominio', async () => {
+    const res = await req('GET', '/api/voci-cliniche/catalogo', secretary);
+    expect(res.statusCode, res.body).toBe(200);
+    const c = res.json<{
+      tipi: { chiave: string }[];
+      parametri: { chiave: string; unita: string; massimo: number | null }[];
+      consensi: { chiave: string; fonte: string | null }[];
+    }>();
+    expect(c.tipi.map((x) => x.chiave)).toContain('esame_obiettivo');
+    expect(c.parametri.find((x) => x.chiave === 'saturazione')).toMatchObject({
+      unita: '%',
+      massimo: 100,
+    });
+    expect(c.consensi.find((x) => x.chiave === 'fse_cura')!.fonte).toMatch(/art\. 8/);
+    // Senza sessione no.
+    expect(
+      (await s.app.inject({ method: 'GET', url: '/api/voci-cliniche/catalogo' })).statusCode,
+    ).toBe(401);
+  });
+
   it('filtri dell’elenco: per tipo e senza le voci annullate', async () => {
     const diaries = (await list('?tipo=diario')).voci;
     expect(diaries.length).toBeGreaterThan(0);

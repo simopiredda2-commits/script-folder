@@ -59,6 +59,13 @@ export const uiColors = {
   successSurface: '#E5F4EA',
   info: scriptColors.light.ombra,
   infoSurface: '#E8ECFF',
+  /**
+   * Serie dei grafici (andamento dei parametri, tappa 9): la prima è la luce di SCRIPT, la
+   * seconda un magenta. Validate con il controllo dei colori dei grafici: contrasto ≥ 3:1 sulla
+   * scheda, distinte anche per chi confonde i colori; mai colori di stato.
+   */
+  chartSeries1: scriptColors.light.luce,
+  chartSeries2: '#D55181',
 } as const;
 
 export type UiColor = keyof typeof uiColors;

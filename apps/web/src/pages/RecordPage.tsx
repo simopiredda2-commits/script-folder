@@ -271,11 +271,28 @@ export function RecordPage() {
         }
       />
       <PatientBanner patient={p} summary={riepilogo} />
+      <nav className="collegamenti-cartella" aria-label="Sezioni della cartella">
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/voci`}>
+          <Icon name="storico" /> <span>Voci cliniche</span>
+        </Link>
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/parametri`}>
+          <Icon name="esami" /> <span>Parametri</span>
+        </Link>
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/piani`}>
+          <Icon name="terapia" /> <span>Piani terapeutici</span>
+        </Link>
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/privacy`}>
+          <Icon name="lucchetto" /> <span>Privacy</span>
+        </Link>
+      </nav>
 
       <div className="griglia-cartella">
         {riepilogo ? (
           <section className="riquadro" aria-labelledby="titolo-problemi">
             <h2 id="titolo-problemi">Problemi attivi</h2>
+            <p>
+              <Link to={`/pazienti/${id}/voci?tipo=problema`}>Problemi e diagnosi</Link>
+            </p>
             {riepilogo.problemiAttivi.length === 0 ? (
               <p className="tenue">Nessun problema attivo.</p>
             ) : (
@@ -302,6 +319,9 @@ export function RecordPage() {
               </ul>
             )}
             <h3>Parametri</h3>
+            <p>
+              <Link to={`/pazienti/${id}/parametri`}>Andamento dei parametri</Link>
+            </p>
             {riepilogo.parametri.length === 0 ? (
               <p className="tenue">Nessun parametro negli ultimi 12 mesi.</p>
             ) : (

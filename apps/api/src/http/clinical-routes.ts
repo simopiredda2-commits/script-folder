@@ -1,4 +1,15 @@
-import { can } from '@mmg/domain';
+import {
+  ANAMNESIS_LABELS,
+  ANAMNESIS_SECTIONS,
+  CONSENT_KINDS,
+  CONTACT_LABELS,
+  CONTACT_TYPES,
+  ENTRY_TYPE_LABELS,
+  ENTRY_TYPES,
+  LIFESTYLE_FACTORS,
+  MEASURES,
+  can,
+} from '@mmg/domain';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import {
@@ -30,6 +41,21 @@ const entryParams = z.object({ id: z.uuid(), voceId: z.uuid() });
  */
 export function registerClinicalRoutes(app: FastifyInstance, db: Database, now: () => Date) {
   const scoped = { config: { patientScoped: true } };
+
+  /** Tipi, parametri e consensi con i loro nomi: un'unica fonte, il dominio. */
+  app.get('/api/voci-cliniche/catalogo', () => ({
+    tipi: ENTRY_TYPES.map((k) => ({ chiave: k, nome: ENTRY_TYPE_LABELS[k] })),
+    contatti: CONTACT_TYPES.map((k) => ({ chiave: k, nome: CONTACT_LABELS[k] })),
+    sezioniAnamnesi: ANAMNESIS_SECTIONS.map((k) => ({ chiave: k, nome: ANAMNESIS_LABELS[k] })),
+    parametri: MEASURES.map((m) => ({
+      chiave: m.key,
+      nome: m.label,
+      unita: m.unit,
+      massimo: 'max' in m ? m.max : null,
+    })),
+    fattori: [...LIFESTYLE_FACTORS],
+    consensi: CONSENT_KINDS.map((k) => ({ chiave: k.key, nome: k.label, fonte: k.source })),
+  }));
 
   app.get('/api/pazienti/:id/voci', scoped, async (req) => {
     const actor = req.actor!;
@@ -91,8 +117,11 @@ export function registerClinicalRoutes(app: FastifyInstance, db: Database, now: 
       'clinical.diary.read',
       'lettura_parametri',
     );
-    const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
-    return { parametri: await measurementSeries(db, id, reservedAllowed) };
+    const at = { ...context, now: now() };
+    return {
+      parametri: await measurementSeries(db, id, can(actor, 'reserved.read', at).allowed),
+      puoScrivere: can(actor, 'clinical.write', at).allowed,
+    };
   });
 
   app.patch('/api/pazienti/:id/voci/:voceId', scoped, async (req) => {

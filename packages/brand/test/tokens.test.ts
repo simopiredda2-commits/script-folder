@@ -56,6 +56,8 @@ describe('contrasti WCAG 2.2 AA dell’interfaccia', () => {
     ['border', 'background', 'bordo su pagina'],
     ['focus', 'surface', 'anello di messa a fuoco'],
     ['focus', 'background', 'anello di messa a fuoco su pagina'],
+    ['chartSeries1', 'surface', 'prima serie dei grafici'],
+    ['chartSeries2', 'surface', 'seconda serie dei grafici'],
   ];
   it.each(graphics)('%s su %s (%s) ≥ 3:1', (fg, bg) => {
     const ratio = contrastRatio(

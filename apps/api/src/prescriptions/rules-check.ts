@@ -151,9 +151,7 @@ export async function buildRuleContext(
         packsAuthorized: therapeuticPlan.packsAuthorized,
       })
       .from(therapeuticPlan)
-      .where(
-        and(eq(therapeuticPlan.patientId, p.patientId), eq(therapeuticPlan.status, 'active')),
-      ),
+      .where(and(eq(therapeuticPlan.patientId, p.patientId), eq(therapeuticPlan.status, 'active'))),
     sentLines: sent
       .filter((s) => s.sentAt)
       .map((s) => ({
