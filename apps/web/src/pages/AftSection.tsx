@@ -125,7 +125,7 @@ export function AftSection() {
           </Notice>
         ))}
         {o.aft ? (
-          <Membership o={o} busy={busy} run={run} />
+          <Membership o={o} busy={busy} run={run} onChanged={overview.reload} />
         ) : o.puoCreare ? (
           <CreateAft busy={busy} run={run} />
         ) : (
@@ -188,10 +188,12 @@ function Membership({
   o,
   busy,
   run,
+  onChanged,
 }: {
   o: Overview;
   busy: boolean;
   run: (path: string, body?: unknown) => Promise<boolean>;
+  onChanged: () => void;
 }) {
   const a = o.aft!;
   const [code, setCode] = useState('');
@@ -212,6 +214,7 @@ function Membership({
         {a.asl ? ` · ${a.asl}` : ''}
         {a.codice ? ` · codice ${a.codice}` : ''}. Sei membro dal {date(a.dal)}.
       </p>
+      <EditAft a={a} onSaved={onChanged} />
       <table className="tabella">
         <caption>Medici dell’AFT nel programma</caption>
         <thead>
@@ -282,6 +285,109 @@ function Membership({
           Esci dall’AFT
         </button>
       </p>
+    </>
+  );
+}
+
+/**
+ * Nome, ASL e codice dell'AFT (tappa 14): li cambia un medico titolare che ne fa parte. ASL e
+ * codice vuoti si tolgono; ogni modifica va nel registro delle azioni di amministrazione.
+ */
+function EditAft({ a, onSaved }: { a: NonNullable<Overview['aft']>; onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(a.nome);
+  const [asl, setAsl] = useState(a.asl ?? '');
+  const [code, setCode] = useState(a.codice ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  const toggle = () => {
+    // Si apre con i dati di adesso: un collega può averli cambiati nel frattempo.
+    if (!open) {
+      setName(a.nome);
+      setAsl(a.asl ?? '');
+      setCode(a.codice ?? '');
+      setError(null);
+    }
+    setSaved(false);
+    setOpen(!open);
+  };
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/api/aft/${a.id}`, {
+        method: 'PATCH',
+        body: { nome: name, asl, codice: code },
+      });
+      setSaved(true);
+      setOpen(false);
+      onSaved();
+    } catch (err) {
+      setError(failure(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <p>
+        <button
+          type="button"
+          className="pulsante pulsante-piatto"
+          aria-expanded={open}
+          aria-controls="aft-modifica"
+          onClick={toggle}
+        >
+          <Icon name="strumenti" /> <span>Modifica nome, ASL e codice dell’AFT</span>
+        </button>
+      </p>
+      {saved && <Notice kind="fatto">Dati dell’AFT salvati.</Notice>}
+      {open && (
+        <form id="aft-modifica" onSubmit={(e) => void submit(e)} className="modulo">
+          <fieldset disabled={busy}>
+            <legend>Dati dell’AFT</legend>
+            <div className="campo">
+              <label htmlFor="aft-modifica-nome">Nome dell’AFT</label>
+              <input
+                id="aft-modifica-nome"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                minLength={3}
+                maxLength={120}
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor="aft-modifica-asl">Azienda sanitaria (facoltativo)</label>
+              <input
+                id="aft-modifica-asl"
+                value={asl}
+                onChange={(e) => setAsl(e.target.value)}
+                maxLength={120}
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor="aft-modifica-codice">Codice dell’AFT (facoltativo)</label>
+              <input
+                id="aft-modifica-codice"
+                className="codice"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                maxLength={40}
+              />
+            </div>
+          </fieldset>
+          <ErrorMessage error={error} />
+          <div className="azioni">
+            <button type="submit" className="pulsante pulsante-primario" disabled={busy}>
+              <Icon name="fatto" /> <span>Salva i dati dell’AFT</span>
+            </button>
+          </div>
+        </form>
+      )}
     </>
   );
 }

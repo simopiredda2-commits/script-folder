@@ -7,6 +7,7 @@ import {
   createBody,
   inviteBody,
   sharingBody,
+  updateBody,
 } from '../aft/service';
 
 const aftParams = z.object({ id: z.uuid() });
@@ -21,6 +22,12 @@ export function registerAftRoutes(app: FastifyInstance, service: AftService) {
   app.post('/api/aft', async (req, reply) => {
     const id = await service.create(req.actor!, createBody.parse(req.body));
     return reply.status(201).send({ id });
+  });
+
+  // Nome, ASL e codice dell'AFT: li cambia un medico titolare che ne fa parte (tappa 14).
+  app.patch('/api/aft/:id', async (req) => {
+    const { id } = aftParams.parse(req.params);
+    return { aft: await service.update(req.actor!, id, updateBody.parse(req.body)) };
   });
 
   app.post('/api/aft/:id/inviti', async (req, reply) => {
