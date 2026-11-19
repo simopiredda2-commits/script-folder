@@ -101,11 +101,13 @@ Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al f
 La prova nel browser (`apps/api/test/e2e/interfaccia.test.ts`) apre ogni schermata e controlla:
 
 - nessuna violazione WCAG 2.2 A e AA trovata da axe-core;
-- ogni pulsante, collegamento e campo misura almeno 44×44 px; le caselle con la loro etichetta;
+- ogni pulsante, collegamento e campo misura almeno 44×44 px; le caselle con la loro etichetta. Fanno eccezione, come in WCAG, i collegamenti dentro una frase (`<p>`);
 - su tablet, in verticale (768×1024) e in orizzontale (1024×768), la pagina non scorre di lato;
 - contrasti dei colori calcolati da una prova del marchio (testo almeno 4,5:1, elementi grafici almeno 3:1).
 
 Le pagine hanno il salto al contenuto, titoli in ordine, etichette per ogni campo, annunci per i risultati che cambiano e il fuoco sempre visibile.
+
+Negli avvisi il collegamento sta in una frase: lo controlla `apps/web/test/avvisi.test.ts` su tutti i sorgenti, anche per gli avvisi che la prova nel browser non apre. La simulazione del paziente deceduto ha trovato l'avviso di Oggi «AURA segnala il decesso di …» con il nome del paziente scritto fuori da una frase: un bersaglio a sé alto 22 px. Corretto lì e negli altri cinque avvisi scritti allo stesso modo.
 
 ## Che cosa non c'è ancora
 

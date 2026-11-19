@@ -370,11 +370,13 @@ export function AuraChangesToday() {
           <h3>Da confermare</h3>
           {deaths.map((p) => (
             <Notice key={`decesso-${p.paziente.id}`} kind="avviso">
-              AURA segnala il decesso di{' '}
-              <Link to={toPanel(p.paziente)}>
-                {p.paziente.nome} {p.paziente.cognome}
-              </Link>{' '}
-              il {date(p.decesso)}: da confermare nei dati amministrativi.
+              <p>
+                AURA segnala il decesso di{' '}
+                <Link to={toPanel(p.paziente)}>
+                  {p.paziente.nome} {p.paziente.cognome}
+                </Link>{' '}
+                il {date(p.decesso)}: da confermare nei dati amministrativi.
+              </p>
             </Notice>
           ))}
           {registry.length > 0 && (
@@ -536,13 +538,15 @@ export function AuraNewPatientsToday() {
       )}
       {done && (
         <Notice kind="fatto">
-          {done.text}
-          {done.patientId && (
-            <>
-              {' '}
-              <Link to={`/pazienti/${done.patientId}`}>Apri la cartella</Link>
-            </>
-          )}
+          <p>
+            {done.text}
+            {done.patientId && (
+              <>
+                {' '}
+                <Link to={`/pazienti/${done.patientId}`}>Apri la cartella</Link>
+              </>
+            )}
+          </p>
         </Notice>
       )}
       <ErrorMessage error={error} />
