@@ -1434,6 +1434,76 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await promemoria.getByText('Promemoria cartaceo').first().waitFor();
   });
 
+  it('importazione a passi: file, destinazione proposta, colonne, anteprima, prova, importazione (tappa 15)', async () => {
+    // Pazienti inventati (D12): in prova si importano solo codici fiscali con la X.
+    const nuovi = generatePatients({ seed: `importazione-e2e-${s.studioId}`, count: 3 });
+    const csv = [
+      'Codice fiscale;Cognome;Nome;Sesso;Data di nascita',
+      ...nuovi.map((p) => [p.fiscalCode, p.lastName, p.firstName, p.sex, p.birthDate].join(';')),
+    ].join('\r\n');
+    await page.goto(`${base}/strumenti?sezione=importazione`);
+    await page
+      .getByRole('heading', { level: 2, name: 'Importazione da altri programmi' })
+      .waitFor();
+    await check(page, 'importazione: scegli il file', true);
+    await page.getByLabel('File da importare').setInputFiles({
+      name: 'pazienti-inventati.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(csv, 'utf-8'),
+    });
+    await page.getByRole('button', { name: 'Carica e leggi il file' }).click();
+    await page.getByRole('heading', { level: 4, name: 'File letto' }).waitFor();
+    await page.getByRole('definition').filter({ hasText: 'Punto e virgola (;)' }).waitFor();
+
+    // La destinazione è proposta dai nomi delle colonne: è solo un suggerimento.
+    await page.getByRole('button', { name: 'Avanti: dove vanno i dati' }).click();
+    await page.getByRole('heading', { level: 3, name: '2. Dove vanno i dati' }).waitFor();
+    expect(await page.getByLabel('Dove vanno le righe').inputValue()).toBe('pazienti');
+    await check(page, 'importazione: dove vanno i dati', true);
+
+    await page.getByRole('button', { name: 'Avanti: colonne e campi' }).click();
+    await page.getByRole('heading', { level: 3, name: '3. Colonne e campi' }).waitFor();
+    await check(page, 'importazione: colonne e campi', true);
+
+    await page.getByRole('button', { name: 'Mostra l’anteprima' }).click();
+    await page.getByRole('heading', { level: 3, name: '4. Anteprima' }).waitFor();
+    await page.getByText(nuovi[0]!.lastName).first().waitFor();
+    await check(page, 'importazione: anteprima', true);
+
+    await page.getByRole('button', { name: 'Avanti: prova senza scrivere' }).click();
+    await page.getByRole('heading', { level: 3, name: '5. Prova senza scrivere' }).waitFor();
+    await page.getByRole('button', { name: 'Fai la prova (non scrive nulla)' }).click();
+    await page.getByText('Prova finita: nessun dato è stato scritto.').waitFor();
+    await check(page, 'importazione: prova senza scrivere', true);
+    // La prova non ha scritto nulla.
+    const codici = nuovi.map((p) => p.fiscalCode);
+    const scritti = async () =>
+      (await t.db.select({ cf: patient.fiscalCode }).from(patient)).filter((r) =>
+        codici.includes(r.cf),
+      ).length;
+    expect(await scritti()).toBe(0);
+
+    await page.getByRole('button', { name: 'Avanti: importa' }).click();
+    await page.getByRole('heading', { level: 3, name: '6. Importa' }).waitFor();
+    const importa = page.getByRole('button', { name: 'Importa', exact: true });
+    await expect(importa.isDisabled()).resolves.toBe(true);
+    await page.getByLabel('Ho controllato la prova: importa i dati nel mio archivio').check();
+    await check(page, 'importazione: conferma', true);
+    await importa.click();
+    await page.getByRole('heading', { level: 3, name: '7. Esito' }).waitFor();
+    await page.getByText('Importazione finita.').waitFor();
+    await check(page, 'importazione: esito', true);
+    expect(await scritti()).toBe(3);
+
+    // Il paziente importato si trova nell'elenco, come uno scritto a mano.
+    await page.goto(`${base}/pazienti`);
+    await page.getByLabel('Cerca un paziente').fill(nuovi[0]!.lastName);
+    await page
+      .locator('.paziente-riga', { hasText: new RegExp(nuovi[0]!.lastName, 'i') })
+      .first()
+      .waitFor();
+  });
+
   it('pagina della password: regole lette dal servizio, accessibile (tappa 14)', async () => {
     await page.goto(`${base}/profilo/password`);
     await page.getByRole('heading', { level: 1, name: 'Cambia la password' }).waitFor();
