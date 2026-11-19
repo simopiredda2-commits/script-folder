@@ -16,11 +16,13 @@ import {
   type StudioListKind,
 } from '@mmg/domain';
 import { ageAt, generatePatients, Random } from '@mmg/fixtures';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { grantPeriod } from '../admin/archive-service';
+import { insertEntry } from '../clinical/entries';
 import { loadConfig } from '../config';
 import { storeCredentials } from '../credentials/service';
 import { startOfStudioDay } from '../http/today-routes';
+import { insertHistorical } from '../prescriptions/historical';
 import { studioDate } from '../prescriptions/rules-check';
 import { hashPassword } from '../security/password';
 import { createDatabase, createPool } from './client';
@@ -32,6 +34,7 @@ import {
   archive,
   archiveGrant,
   clinicalEntry,
+  historicalPrescription,
   diaryDetail,
   doctorProfile,
   fseSetting,
@@ -482,6 +485,71 @@ try {
       .update(patient)
       .set({ familyId: fam!.id })
       .where(inArray(patient.id, pids.slice(2, 4)));
+    // Voci nuove della tappa 15 (D176) per i pazienti delle ricette da firmare, quelli delle
+    // schermate: una vaccinazione, un referto di laboratorio, ricette fatte con un altro programma
+    // (una annullata), una terapia conclusa. Valori inventati; nessuna estrazione casuale in più,
+    // così gli altri pazienti dimostrativi restano gli stessi.
+    for (const r of toSign) {
+      await insertEntry(tx, r.patientId, doctorId, {
+        tipo: 'vaccinazione',
+        data: '2026-10-20',
+        vaccino: 'Vaccino antinfluenzale dimostrativo',
+        lotto: 'LOTTO-DEMO-1',
+        dose: 1,
+        campagna: 'Campagna antinfluenzale 2026/2027',
+      });
+      for (const exam of [
+        { esame: 'Glicemia', valore: '92', unita: 'mg/dl', minimo: '70', massimo: '99' },
+        { esame: 'Emoglobina glicata', valore: '5,6', unita: '%', intervallo: '4,0–6,0' },
+        { esame: 'Esame dimostrativo', valore: 'negativo', intervallo: 'negativo' },
+      ])
+        await insertEntry(tx, r.patientId, doctorId, {
+          tipo: 'esame_laboratorio',
+          data: '2026-11-10',
+          ...exam,
+        });
+      const owner = { patientId: r.patientId, archiveId: arc!.id, recordedBy: doctorId };
+      const past = {
+        prescrittore: 'Medico precedente (dimostrativo)',
+        programma: 'Programma precedente',
+      };
+      for (const data of ['2025-09-18', '2025-11-20'])
+        await insertHistorical(tx, owner, {
+          tipo: 'farmaco',
+          data,
+          farmaco: r.drug.drugName,
+          principioAttivo: r.drug.activeIngredient ?? undefined,
+          quantita: 2,
+          ...past,
+        });
+      await insertHistorical(tx, owner, {
+        tipo: 'prestazione',
+        data: '2025-10-02',
+        descrizione: 'VISITA DIMOSTRATIVA',
+        ...past,
+      });
+      const twice = await insertHistorical(tx, owner, {
+        tipo: 'farmaco',
+        data: '2025-11-20',
+        farmaco: r.drug.drugName,
+        quantita: 2,
+        ...past,
+      });
+      await tx
+        .update(historicalPrescription)
+        .set({ annulledAt: new Date(), annulReason: 'Registrata due volte' })
+        .where(eq(historicalPrescription.id, twice));
+      await tx.insert(therapy).values({
+        patientId: r.patientId,
+        drugName: 'Paracetamolo dimostrativo 500 mg',
+        activeIngredient: 'PARACETAMOLO',
+        kind: 'as_needed',
+        startOn: '2026-09-01',
+        endOn: '2026-10-15',
+        status: 'ended',
+        createdBy: doctorId,
+      });
+    }
   });
 
   // Ripetizioni preparate dalla segreteria, in attesa della firma del medico.

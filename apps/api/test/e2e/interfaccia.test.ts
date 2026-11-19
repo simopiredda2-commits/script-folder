@@ -607,13 +607,24 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await check(sec, 'cartella vista dalla segreteria');
       // La segreteria non scrive le terapie e non ha un archivio suo.
       await expect(sec.getByRole('link', { name: 'Nuova terapia' }).count()).resolves.toBe(0);
-      // Né gli strumenti dello studio (modelli, impaginazione, Fascicolo).
+      // Degli strumenti dello studio solo gli elenchi, in sola lettura (D175): niente modelli,
+      // impaginazione né Fascicolo.
+      await sec
+        .getByRole('navigation', { name: 'Sezioni' })
+        .getByRole('link', { name: 'Strumenti' })
+        .click();
+      await sec.getByRole('heading', { level: 2, name: 'Elenchi dello studio' }).waitFor();
       await expect(
         sec
-          .getByRole('navigation', { name: 'Sezioni' })
-          .getByRole('link', { name: 'Strumenti' })
-          .count(),
-      ).resolves.toBe(0);
+          .getByRole('group', { name: 'Sezione degli strumenti' })
+          .getByRole('button')
+          .allInnerTexts(),
+      ).resolves.toEqual(['Elenchi dello studio']);
+      await sec.getByText('qui si consultano', { exact: false }).waitFor();
+      await expect(sec.getByRole('button', { name: 'Aggiungi all’elenco' }).count()).resolves.toBe(
+        0,
+      );
+      await check(sec, 'elenchi dello studio, segreteria');
       await expect(
         sec
           .getByRole('navigation', { name: 'Sezioni' })
@@ -1502,6 +1513,123 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .locator('.paziente-riga', { hasText: new RegExp(nuovi[0]!.lastName, 'i') })
       .first()
       .waitFor();
+  });
+
+  it('elenchi dello studio: il medico aggiunge un contatto utile (tappa 14, D175)', async () => {
+    await page.goto(`${base}/strumenti?sezione=elenchi&elenco=contatto`);
+    await page.getByRole('heading', { level: 2, name: 'Elenchi dello studio' }).waitFor();
+    await page.getByLabel('Nome', { exact: true }).fill('Laboratorio di prova e2e');
+    await page.getByLabel('Tipo', { exact: true }).selectOption({ label: 'Laboratorio' });
+    await page.getByLabel('Telefono (facoltativo)').fill('000 0000099');
+    await page.getByRole('button', { name: 'Aggiungi all’elenco' }).click();
+    await page.getByText(/«Laboratorio di prova e2e» aggiunto/).waitFor();
+    await page
+      .getByRole('table', { name: /Contatti utili in uso/ })
+      .getByText('Laboratorio di prova e2e')
+      .waitFor();
+    await check(page, 'elenchi dello studio', true);
+  });
+
+  it('archivio: autorizzazione al sostituto e sua revoca, avvisi da completare; registro di amministrazione (tappa 14, D177)', async () => {
+    await page.goto(`${base}/archivio`);
+    await page.getByRole('heading', { level: 2, name: 'Autorizzazioni sull’archivio' }).waitFor();
+    await page.getByLabel('Medico', { exact: true }).selectOption({ index: 1 });
+    await page.getByLabel('Dal', { exact: true }).fill(studioDate(new Date()));
+    await page.getByLabel('Al (compreso)').fill(studioDayFrom(new Date(), 3));
+    await page.getByLabel('Motivo', { exact: true }).fill('Ferie di prova nel browser');
+    await page.getByRole('button', { name: 'Autorizza', exact: true }).click();
+    const row = page.getByRole('row').filter({ hasText: 'Ferie di prova nel browser' });
+    await row.getByText('Attiva').waitFor();
+    await check(page, 'archivio: autorizzazioni', true);
+    // La revoca chiede conferma e chiude subito.
+    page.once('dialog', (d) => void d.accept());
+    await row.getByRole('button', { name: /^Revoca/ }).click();
+    await row.getByText('Revocata').waitFor();
+    // Avvisi: con le soglie vuote la pagina dice che cosa completare, con la fonte.
+    await page.getByRole('heading', { level: 2, name: 'Avvisi sugli accessi anomali' }).waitFor();
+    await page.getByText('Soglie da completare.').waitFor();
+    await check(page, 'archivio: avvisi sugli accessi anomali');
+
+    await page.goto(`${base}/strumenti?sezione=registro`);
+    await page
+      .getByRole('heading', { level: 2, name: 'Registro delle azioni di amministrazione' })
+      .waitFor();
+    await page
+      .getByRole('cell', { name: /Autorizzazione revocata/ })
+      .first()
+      .waitFor();
+    await check(page, 'registro di amministrazione', true);
+  });
+
+  it('referto di laboratorio con due esami e vaccinazione, scritti a mano (tappa 15, D176)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/esami`);
+    await page.getByRole('heading', { level: 2, name: 'Nuovo referto di laboratorio' }).waitFor();
+    await page.getByLabel('Data del referto').fill(studioDate(new Date()));
+    const first = page.getByRole('group', { name: 'Esame 1' });
+    await first.getByLabel('Esame', { exact: true }).fill('Esame di prova nel browser');
+    await first.getByLabel('Valore', { exact: true }).fill('13,5');
+    await first.getByLabel('Unità di misura').fill('g/dl');
+    await first.getByLabel('Minimo', { exact: true }).fill('12');
+    await first.getByLabel('Massimo', { exact: true }).fill('16');
+    await page.getByRole('button', { name: 'Aggiungi un esame' }).click();
+    const second = page.getByRole('group', { name: 'Esame 2' });
+    await second.getByLabel('Esame', { exact: true }).fill('Altro esame di prova nel browser');
+    await second.getByLabel('Valore', { exact: true }).fill('negativo');
+    await check(page, 'nuovo referto di laboratorio', true);
+    await page.getByRole('button', { name: 'Registra il referto' }).click();
+    await page.getByText('Altro esame di prova nel browser').last().waitFor();
+    await page.getByText('Esame di prova nel browser', { exact: true }).last().waitFor();
+
+    await page.goto(`${base}/pazienti/${s.richPatient}/voci`);
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await page.getByRole('button', { name: 'Vaccinazioni' }).click();
+    await page.getByLabel('Vaccino', { exact: true }).fill('Vaccino di prova nel browser');
+    await page.getByLabel('Campagna vaccinale').fill('Campagna di prova');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.locator('.voce').filter({ hasText: 'Vaccino di prova nel browser' }).waitFor();
+    await check(page, 'voci cliniche: vaccinazioni', true);
+  });
+
+  it('ricetta fatta con un altro programma nei farmaci prescritti; terapia conclusa (tappa 15, D176)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/farmaci`);
+    await page
+      .getByRole('heading', { level: 2, name: /Farmaci prescritti con un altro programma/ })
+      .waitFor();
+    await page
+      .getByRole('button', { name: 'Registra una ricetta fatta con un altro programma' })
+      .click();
+    await page.getByLabel('Data della ricetta').fill('2026-01-15');
+    await page.getByLabel('Nome del farmaco').fill('Farmaco di un altro programma');
+    await page.getByLabel('Programma con cui è stata fatta').fill('Programma di prova');
+    await check(page, 'ricetta fatta con un altro programma', true);
+    await page.getByRole('button', { name: 'Registra la ricetta' }).click();
+    await page
+      .getByText(/Con un altro programma/)
+      .first()
+      .waitFor();
+    await page.getByText('Farmaco di un altro programma').first().waitFor();
+
+    // Una terapia in corso, conclusa dalla sua pagina: non si sospende e non si ripete più.
+    const [t1] = await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .insert(therapy)
+        .values({
+          patientId: s.richPatient,
+          drugName: 'Farmaco da concludere nel browser',
+          kind: 'chronic',
+          startOn: '2026-01-01',
+          createdBy: s.users.titolare.id,
+        })
+        .returning({ id: therapy.id }),
+    );
+    await page.goto(`${base}/pazienti/${s.richPatient}/terapie/${t1!.id}`);
+    await page.getByRole('button', { name: 'Concludi…' }).click();
+    await page.getByRole('heading', { level: 2, name: 'Concludi la terapia' }).waitFor();
+    await page.getByLabel('Conclusa il').fill(studioDate(new Date()));
+    await check(page, 'conclusione della terapia', true);
+    await page.getByRole('button', { name: 'Concludi la terapia' }).click();
+    await page.getByText(/Terapia conclusa il/).waitFor();
+    await expect(page.getByRole('button', { name: 'Sospendi…' }).count()).resolves.toBe(0);
   });
 
   it('pagina della password: regole lette dal servizio, accessibile (tappa 14)', async () => {
