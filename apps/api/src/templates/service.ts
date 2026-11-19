@@ -15,6 +15,7 @@ import {
 } from '@mmg/domain';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
+import { studioHeaderLines } from '../admin/studio-service';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import { appUser, doctorProfile, studioTemplate, templateCertificate } from '../db/schema';
@@ -155,6 +156,16 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
   async function profileOf(userId: string) {
     const [p] = await db.select().from(doctorProfile).where(eq(doctorProfile.userId, userId));
     return p;
+  }
+
+  /**
+   * L'impaginazione con cui si stampa: quella del medico e, se il medico non ha un'intestazione,
+   * quella dello studio, impostata dall'amministratore (D145). Il resto resta del medico.
+   */
+  async function printedLayout(actor: Actor, layout: PrintLayout): Promise<PrintLayout> {
+    if (layout.header.length) return layout;
+    const header = await studioHeaderLines(db, actor.studioId);
+    return header.length ? { ...layout, header } : layout;
   }
 
   async function studioTemplates(studioId: string) {
@@ -362,7 +373,7 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
     /** Prova di stampa con un'impaginazione (anche non ancora salvata). */
     async layoutPreview(actor: Actor, body: unknown) {
       if (!isDoctor(actor)) throw new HttpError(403, 'L’impaginazione è del medico');
-      const layout = parseLayout(body);
+      const layout = await printedLayout(actor, parseLayout(body));
       return renderTemplatePdf({
         title: 'Prova di impaginazione',
         paragraphs: [
@@ -409,7 +420,7 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
         title: filled.title,
         paragraphs: filled.paragraphs,
         signature: template.signature,
-        layout: layoutOf(await profileOf(actor.userId)),
+        layout: await printedLayout(actor, layoutOf(await profileOf(actor.userId))),
         createdAt: now(),
         parts: partsOf(filled),
       });
@@ -422,7 +433,9 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
         body,
         'rilascio',
       );
-      const layout = layoutOf(await profileOf(actor.userId));
+      // Si conserva l'impaginazione stampata, intestazione dello studio compresa: il certificato
+      // rilasciato non cambia se poi cambia l'intestazione.
+      const layout = await printedLayout(actor, layoutOf(await profileOf(actor.userId)));
       const [row] = await withActor(db, actor.userId, (tx) =>
         tx
           .insert(templateCertificate)

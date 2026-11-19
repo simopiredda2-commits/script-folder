@@ -23,6 +23,7 @@ import { basePackLimit } from '@mmg/rules';
 import { createHash } from 'node:crypto';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { secondsText, studioSendTimeoutMs } from '../admin/studio-service';
 import type { AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
@@ -132,7 +133,9 @@ export interface PrescriptionDeps {
    * Tempo massimo di attesa della risposta all'invio, in millisecondi. Regione Piemonte (SIRPE,
    * «Cartelle cliniche MMG e PLS», 4.4.7): la cartella clinica ha un parametro per il tempo tra la
    * richiesta di stampa e la stampa, «al momento definiti in 6-8 secondi»; senza codice di
-   * autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto 8000 (D94).
+   * autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto vale l'impostazione
+   * dello studio, letta a ogni invio (`studio.sendTimeoutSeconds`, 8 secondi per difetto, D94); un
+   * valore dato qui (lo usano le prove) vale sopra quello dello studio.
    */
   sendTimeoutMs?: number;
   /**
@@ -143,9 +146,6 @@ export interface PrescriptionDeps {
     date: string,
   ) => Promise<((code: string) => { nationalCode: string | null } | null) | undefined>;
 }
-
-/** Tempo massimo di attesa dell'invio per difetto: il limite alto dei 6–8 secondi del Piemonte. */
-export const DEFAULT_SEND_TIMEOUT_MS = 8000;
 
 /** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
 const useFor = (kind: PrescriptionMessage['kind']): ServiceUse =>
@@ -525,8 +525,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const message = await buildMessage(p, actor);
     const system = systemFor(p.kind);
     const gateway = deps.gateways[system];
+    // Il tempo di attesa dello studio, com'è adesso: l'amministratore può averlo appena cambiato.
+    const timeoutMs = deps.sendTimeoutMs ?? (await studioSendTimeoutMs(db, actor.studioId));
     const started = Date.now();
-    const timeoutMs = deps.sendTimeoutMs ?? DEFAULT_SEND_TIMEOUT_MS;
     let result: SendResult;
     let timer: NodeJS.Timeout | undefined;
     try {
@@ -537,7 +538,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
             () =>
               ok({
                 outcome: 'timeout',
-                message: `Nessuna risposta entro ${timeoutMs / 1000} secondi: non si sa se la ricetta è arrivata`,
+                message: `Nessuna risposta entro ${secondsText(timeoutMs)}: non si sa se la ricetta è arrivata`,
               }),
             timeoutMs,
           );
