@@ -43,5 +43,3 @@ Password, segreti del secondo fattore, credenziali verso Sistema TS e Regione e 
 ## Garanzie
 
 Una prova controlla che **ogni** tabella del database con dati dei pazienti sia esportata: una tabella nuova dimenticata fa fallire le prove. Altre controllano che non escano pazienti di altri archivi, che il CSV abbia le stesse righe del JSON e che le impronte del manifesto siano giuste.
-EOF
-echo ok
