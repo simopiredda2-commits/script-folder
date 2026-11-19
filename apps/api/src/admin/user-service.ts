@@ -111,6 +111,12 @@ export const OWNER_ROLE_REMOVAL_REFUSAL = `${OWNER_HAS_PATIENTS}: senza il ruolo
 export const OWNER_ROLE_ADD_REFUSAL = `${OWNER_HAS_PATIENTS}: con un altro ruolo con i dati dei pazienti resterebbe in attesa di conferma, fuori dal suo archivio e senza poter esportare i suoi dati`;
 /** Un titolare con pazienti sospeso (dal server) si riattiva solo dal server. */
 export const OWNER_REACTIVATE_REFUSAL = `${OWNER_HAS_PATIENTS}: sospeso, lo riattiva solo chi gestisce il servizio, sul server`;
+/**
+ * Un titolare in attesa con pazienti nell'archivio (possibile solo se entrati prima della richiesta):
+ * il rifiuto lo sospenderebbe con i pazienti, e dal programma non si riattiverebbe più. Decide chi
+ * gestisce il servizio, sul server (--mostra, poi --conferma o --rifiuta).
+ */
+export const OWNER_REFUSE_REFUSAL = `${OWNER_HAS_PATIENTS}: il rifiuto lo sospenderebbe con i suoi pazienti. Decide chi gestisce il servizio, sul server`;
 
 /**
  * Chi è sospeso da chi gestisce il servizio, sul server, si riattiva solo dal server, qualunque
@@ -1417,6 +1423,12 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       'rifiuto',
       async () => {
         const closed = await withActor(db, actor.userId, async (tx) => {
+          // Come nella sospensione: gli archivi di un titolare si bloccano prima degli utenti dello
+          // studio, così un paziente che sta entrando nel suo archivio finisce prima (e si conta) o
+          // aspetta il rifiuto e poi non entra (archive-owner.ts).
+          const pre = await targetOf(tx, actor, id);
+          const archivesLocked = pre.roles.includes('owner_doctor');
+          if (archivesLocked) await lockOwnerArchives(tx, actor.studioId, id, pre.username);
           const users = await lockStudioUsers(tx, actor.studioId);
           const target = users.find((u) => u.id === id);
           if (!target) throw new HttpError(404, 'Utente non trovato');
@@ -1430,6 +1442,12 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           if (!target.awaitingConfirmation) throw new Refusal(409, NOT_AWAITING, target.username);
           if (target.status !== 'active')
             throw new Refusal(409, 'L’utente è già sospeso', target.username);
+          if (target.roles.includes('owner_doctor')) {
+            // Diventato titolare dopo la prima lettura: gli archivi non sono bloccati.
+            if (!archivesLocked) throw new Refusal(409, CHANGED_MEANWHILE, target.username);
+            if (await ownerHasPatients(tx, actor.studioId, id))
+              throw new Refusal(409, OWNER_REFUSE_REFUSAL, target.username);
+          }
           const t = now();
           // Il rifiuto di un titolare dal programma lo può annullare l'amministratore, riattivando
           // l'utente con una richiesta nuova: non è una sospensione del server.

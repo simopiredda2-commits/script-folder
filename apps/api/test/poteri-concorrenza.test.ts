@@ -10,6 +10,7 @@ import { buildApp } from '../src/app';
 import {
   ARCHIVE_BUSY_REFUSAL,
   CHANGED_MEANWHILE,
+  OWNER_REFUSE_REFUSAL,
   OWNER_SUSPEND_REFUSAL,
 } from '../src/admin/user-service';
 import {
@@ -36,6 +37,7 @@ import {
 import { withActor } from '../src/db/tx';
 import { restoreUser } from '../src/db/user-restore';
 import {
+  OWNER_AWAITING_NO_NEW_PATIENTS,
   OWNER_GONE_NO_NEW_PATIENTS,
   OWNER_SUSPENDED_NO_NEW_PATIENTS,
 } from '../src/patients/archive-owner';
@@ -1001,6 +1003,101 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
       identita: person(5),
     });
     expect(ok.statusCode, ok.body).toBe(201);
+  });
+
+  /** Un titolare creato dall'amministratore e non ancora confermato: in attesa, con il suo archivio. */
+  async function awaitingOwner(tag: string, surname: string) {
+    const created = await h.req(c.amministratore, 'POST', '/api/studio/utenti', {
+      nomeUtente: `${tag}.${sfx}`,
+      nome: `Dott. ${surname}`,
+      ruoli: ['owner_doctor'],
+      medico: { codiceFiscale: cf(surname, 'Carlo', 'M'), nome: 'Carlo', cognome: surname },
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const id = created.json().utente.id as string;
+    const [own] = await t.db.select().from(archive).where(eq(archive.ownerUserId, id));
+    return { id, archiveId: own!.id };
+  }
+
+  it('nell’archivio di un titolare in attesa non entrano pazienti: non si propone, non si sceglie come medico di famiglia; dopo la conferma sì (terza revisione)', async () => {
+    const owner = await awaitingOwner('gara.attesa', 'Attesi');
+    const r = await h.req(c.segreteria, 'POST', '/api/pazienti', {
+      archivioId: owner.archiveId,
+      identita: person(7),
+    });
+    expect(r.statusCode, r.body).toBe(409);
+    expect(r.json().errore).toBe(OWNER_AWAITING_NO_NEW_PATIENTS);
+    expect(await patientsIn(owner.archiveId)).toBe(0);
+    // Il modulo del nuovo paziente non propone il suo archivio.
+    const form = (await h.req(c.segreteria, 'GET', '/api/pazienti/nuovo')).json<{
+      archivi: { id: string }[];
+    }>();
+    expect(form.archivi.map((a) => a.id)).not.toContain(owner.archiveId);
+    expect(form.archivi.map((a) => a.id)).toContain(s.archives.titolare);
+    // Fra i medici di famiglia possibili non c'è.
+    const view = (
+      await h.req(c.segreteria, 'GET', `/api/pazienti/${s.patients.titolare[0]}/amministrazione`)
+    ).json<{ medici: { id: string }[] }>();
+    expect(view.medici.map((m) => m.id)).not.toContain(owner.id);
+    expect(view.medici.map((m) => m.id)).toContain(s.users.titolare.id);
+    // Confermato dalla titolare, il suo archivio riceve pazienti.
+    const pending = (await h.req(c.titolare, 'GET', '/api/studio/utenti/da-confermare'))
+      .json()
+      .utenti.find((x: { id: string }) => x.id === owner.id);
+    const ok = await h.req(c.titolare, 'POST', `/api/studio/utenti/${owner.id}/conferma`, {
+      richiestaIl: pending.richiesta.il,
+    });
+    expect(ok.statusCode, ok.body).toBe(200);
+    const later = await h.req(c.segreteria, 'POST', '/api/pazienti', {
+      archivioId: owner.archiveId,
+      identita: person(8),
+    });
+    expect(later.statusCode, later.body).toBe(201);
+  });
+
+  it('il rifiuto di un titolare in attesa blocca il suo archivio: con l’archivio occupato, 409 entro pochi secondi (terza revisione)', async () => {
+    const owner = await awaitingOwner('gara.rifiuto', 'Rifiuti');
+    // Un'altra transazione tiene la riga dell'archivio, come un paziente che sta entrando.
+    const holder = await t.pool.connect();
+    try {
+      await holder.query('begin');
+      await holder.query('select id from archive where id = $1 for key share', [owner.archiveId]);
+      const started = Date.now();
+      const r = await h.req(c.titolare, 'POST', `/api/studio/utenti/${owner.id}/rifiuta`);
+      expect(r.statusCode, r.body).toBe(409);
+      expect(r.json().errore).toBe(ARCHIVE_BUSY_REFUSAL);
+      expect(Date.now() - started).toBeLessThan(10_000);
+    } finally {
+      await holder.query('rollback').catch(() => undefined);
+      holder.release();
+    }
+    const [still] = await t.db.select().from(appUser).where(eq(appUser.id, owner.id));
+    expect(still!.status).toBe('active');
+    // Libero l'archivio, il rifiuto passa.
+    const r2 = await h.req(c.titolare, 'POST', `/api/studio/utenti/${owner.id}/rifiuta`);
+    expect(r2.statusCode, r2.body).toBe(200);
+  });
+
+  it('un titolare in attesa con pazienti già nell’archivio non si rifiuta dal programma: lo sospenderebbe con i pazienti (terza revisione)', async () => {
+    const owner = await newOwner('gara.rifiuto2', 'Scartini');
+    const p = await h.req(c.segreteria, 'POST', '/api/pazienti', {
+      archivioId: owner.archiveId,
+      identita: person(9),
+    });
+    expect(p.statusCode, p.body).toBe(201);
+    // Uno stato che il programma non crea (un titolare con pazienti non va in attesa): come se i
+    // pazienti fossero entrati prima della richiesta.
+    await withActor(t.db, s.users.amministratore.id, (tx) =>
+      tx
+        .update(appUser)
+        .set({ awaitingConfirmation: true, confirmationRequestedAt: s.clock.now() })
+        .where(eq(appUser.id, owner.id)),
+    );
+    const r = await h.req(c.titolare, 'POST', `/api/studio/utenti/${owner.id}/rifiuta`);
+    expect(r.statusCode, r.body).toBe(409);
+    expect(r.json().errore).toBe(OWNER_REFUSE_REFUSAL);
+    const [u] = await t.db.select().from(appUser).where(eq(appUser.id, owner.id));
+    expect(u!.status).toBe('active');
   });
 
   it('il comando del server: --sospendi blocca anche lui l’archivio, e il paziente che arriva durante non entra', async () => {

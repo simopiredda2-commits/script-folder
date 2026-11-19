@@ -199,7 +199,11 @@ export interface WritableArchive {
   proprio: boolean;
 }
 
-/** Archivi dello studio in cui chi agisce può registrare e modificare pazienti (registry.write). */
+/**
+ * Archivi dello studio in cui chi agisce può registrare pazienti nuovi (registry.write), per il
+ * modulo del nuovo paziente. Solo gli archivi aperti a pazienti nuovi: titolare attivo, ancora
+ * titolare e confermato (archive-owner.ts, che lo ricontrolla sotto blocco al salvataggio, D179).
+ */
 export async function writableArchives(
   db: Database,
   actor: Actor,
@@ -214,7 +218,14 @@ export async function writableArchives(
     })
     .from(archive)
     .innerJoin(appUser, eq(appUser.id, archive.ownerUserId))
-    .where(eq(archive.studioId, actor.studioId))
+    .where(
+      and(
+        eq(archive.studioId, actor.studioId),
+        eq(appUser.status, 'active'),
+        eq(appUser.awaitingConfirmation, false),
+        sql`'owner_doctor' = any(${appUser.roles})`,
+      ),
+    )
     .orderBy(archive.name);
   const out: WritableArchive[] = [];
   for (const a of rows) {
@@ -235,7 +246,10 @@ export function proposedArchive(list: readonly WritableArchive[]): string | null
   return list.find((a) => a.proprio)?.id ?? (list.length === 1 ? list[0]!.id : null);
 }
 
-/** Medici titolari dello studio, attivi: tra loro il paziente sceglie il medico di famiglia. */
+/**
+ * Medici titolari dello studio, attivi e confermati: tra loro il paziente sceglie il medico di
+ * famiglia. Un titolare in attesa di conferma non si propone (D179).
+ */
 async function studioDoctors(db: Db, studioId: string) {
   return db
     .select({ id: appUser.id, nome: appUser.displayName })
@@ -244,6 +258,7 @@ async function studioDoctors(db: Db, studioId: string) {
       and(
         eq(appUser.studioId, studioId),
         eq(appUser.status, 'active'),
+        eq(appUser.awaitingConfirmation, false),
         sql`'owner_doctor' = any(${appUser.roles})`,
       ),
     )
@@ -322,7 +337,7 @@ export const newPatientSchema = z
 
 const archiveOnly = z.object({ archivioId: z.uuid().optional() }).loose();
 
-/** L'archivio non accetta pazienti nuovi: il titolare è sospeso o non è più titolare. */
+/** L'archivio non accetta pazienti nuovi: il titolare è sospeso, non è più titolare o aspetta la conferma. */
 class ArchiveClosed extends Error {}
 
 /**
