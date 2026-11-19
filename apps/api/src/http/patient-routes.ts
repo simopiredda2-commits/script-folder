@@ -8,6 +8,7 @@ import type { Database } from '../db/client';
 import {
   accessLog,
   allergyDetail,
+  appUser,
   archive,
   clinicalEntry,
   diaryDetail,
@@ -50,12 +51,20 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       .select({ id: archive.id, nome: archive.name })
       .from(archive)
       .where(and(eq(archive.studioId, actor.studioId), eq(archive.ownerUserId, actor.userId)));
+    // Il nome utente serve al modulo del cambio della password (gestori di password).
+    const [me] = await db
+      .select({ username: appUser.username })
+      .from(appUser)
+      .where(eq(appUser.id, actor.userId));
     return {
       id: actor.userId,
       nome: actor.displayName,
+      nomeUtente: me?.username ?? null,
       ruoli: actor.roles.map((r) => ({ codice: r, nome: ROLE_LABELS[r] })),
       postazione: actor.workstation,
       archivio: own ?? null,
+      // Password temporanea: l'interfaccia mostra solo il cambio della password (tappa 14).
+      devoCambiarePassword: actor.mustChangePassword,
     };
   });
 

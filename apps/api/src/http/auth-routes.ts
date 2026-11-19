@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
-import type { AuthService } from '../auth/service';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, type AuthService } from '../auth/service';
 import { HttpError } from './errors';
 
 export const SESSION_COOKIE = 'sessione';
@@ -12,6 +12,13 @@ const loginBody = z.object({
 });
 const codeBody = z.object({ passaggio: z.string().min(1), codice: z.string().min(1) });
 const unlockBody = z.object({ codice: z.string().min(1) });
+/** Le password non si accorciano né si toccano: le lunghezze le controlla il servizio. */
+const passwordBody = z
+  .object({
+    passwordAttuale: z.string().min(1).max(1024),
+    nuovaPassword: z.string().max(1024),
+  })
+  .strict();
 
 export function registerAuthRoutes(
   app: FastifyInstance,
@@ -67,5 +74,23 @@ export function registerAuthRoutes(
     if (token) await auth.logout(token);
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { stato: 'ok' };
+  });
+
+  // Cambio della propria password (tappa 14): per tutti, anche con la password temporanea.
+  app.get('/api/profilo/password', (req) => ({
+    lunghezzaMinima: PASSWORD_MIN_LENGTH,
+    lunghezzaMassima: PASSWORD_MAX_LENGTH,
+    obbligato: req.actor!.mustChangePassword,
+  }));
+
+  app.post('/api/profilo/password', async (req) => {
+    const body = passwordBody.parse(req.body);
+    const r = await auth.changePassword(req.actor!, {
+      current: body.passwordAttuale,
+      next: body.nuovaPassword,
+    });
+    // Mai 401: per l'interfaccia vorrebbe dire «sessione finita».
+    if (!r.ok) throw new HttpError(r.status, r.message);
+    return { stato: 'ok', altreSessioniChiuse: r.otherSessionsClosed };
   });
 }

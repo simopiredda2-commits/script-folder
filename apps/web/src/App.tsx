@@ -14,6 +14,7 @@ import { DrugHistoryPage, ServiceHistoryPage, TherapyPage } from './pages/Histor
 import { PrescribedDrugsPage, PrescribedServicesPage } from './pages/PrescribedPages';
 import { LockScreen, LoginPage } from './pages/LoginPage';
 import { MeasurementsPage } from './pages/MeasurementsPage';
+import { PasswordPage } from './pages/PasswordPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { PlansPage } from './pages/PlansPage';
 import { PrescriptionEditor } from './pages/PrescriptionEditor';
@@ -37,6 +38,8 @@ function Screens() {
   if (state.status === 'loading') return <Loading what="dati della sessione" />;
   if (state.status === 'anonymous') return <LoginPage />;
   if (state.status === 'locked') return <LockScreen />;
+  // Password temporanea (tappa 14): prima di ogni altra schermata, la password nuova.
+  if (state.me.devoCambiarePassword) return <PasswordPage forced />;
   return (
     <OpenRecordsProvider>
       <Shell>
@@ -74,6 +77,7 @@ function Screens() {
           <Route path="/archivio" element={<ArchivePage />} />
           <Route path="/profilo/credenziali" element={<ServiceCredentialsPage />} />
           <Route path="/profilo/recapiti" element={<DoctorContactsPage />} />
+          <Route path="/profilo/password" element={<PasswordPage />} />
           <Route path="/strumenti" element={<StudioToolsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
