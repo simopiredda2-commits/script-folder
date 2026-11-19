@@ -13,3 +13,4 @@ export * from './followup';
 export * from './fse';
 export * from './templates';
 export * from './aft';
+export * from './aft-activity';

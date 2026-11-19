@@ -1303,10 +1303,12 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'AFT del titolare', true);
     // Il consenso del paziente, come lo registra lo studio nella sua cartella.
     const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
-    const given = await page.request.post(`${base}/api/pazienti/${s.richPatient}/consensi`, {
-      data: { tipo: 'aft_condivisione', stato: 'dato', data: '2026-11-18' },
-    });
-    expect(given.status()).toBe(201);
+    for (const tipo of ['aft_condivisione', 'aft_condivisione_pregressi']) {
+      const given = await page.request.post(`${base}/api/pazienti/${s.richPatient}/consensi`, {
+        data: { tipo, stato: 'dato', data: '2026-11-18' },
+      });
+      expect(given.status(), tipo).toBe(201);
+    }
 
     const ctx = await browser.newContext({
       viewport: { width: 1280, height: 900 },
@@ -1330,13 +1332,30 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .waitFor();
       await colleague.getByText('Sostanza di prova', { exact: false }).first().waitFor();
       await expect(colleague.getByText('Farmaco riservato di prova').count()).resolves.toBe(0);
+      // Si dice che il riepilogo può non essere completo (Garante, par. 5.1).
+      await colleague.getByText('Il riepilogo può non essere completo', { exact: false }).waitFor();
       await check(colleague, 'AFT del collega, riepilogo', true);
+      // L'attività svolta va nel registro di AFT e nella cronologia del medico curante.
+      await colleague.getByLabel('Tipologia').selectOption('ambulatorio');
+      await colleague.getByLabel('Esito', { exact: true }).fill('Controllo pressorio di prova');
+      await colleague.getByRole('button', { name: 'Registra l’attività' }).click();
+      await colleague
+        .getByText('Attività registrata: il medico curante la vede nella cronologia.')
+        .waitFor();
     } finally {
       await ctx.close();
     }
-    // Il titolare vede chi ha consultato e perché.
+    // Il titolare vede chi ha consultato e perché, e che cosa ha fatto il collega.
     await page.reload();
-    await page.getByRole('cell', { name: 'Visita nell’ambulatorio serale dell’AFT' }).waitFor();
+    await page
+      .getByRole('table', { name: 'Consultazioni dei colleghi sui miei pazienti' })
+      .getByRole('cell', { name: 'Visita nell’ambulatorio serale dell’AFT' })
+      .waitFor();
+    await page
+      .getByRole('table', { name: 'Attività dei colleghi sui miei pazienti' })
+      .getByRole('cell', { name: 'Controllo pressorio di prova' })
+      .waitFor();
+    await check(page, 'AFT del titolare, consultazioni e attività', true);
   });
 
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {

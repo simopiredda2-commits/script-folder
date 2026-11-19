@@ -1,9 +1,10 @@
-import { can } from '@mmg/domain';
+import { AFT_ACTIVITY_KINDS, can } from '@mmg/domain';
 import { and, desc, eq, gte, inArray, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import {
+  aftActivity,
   allergyDetail,
   anamnesisDetail,
   appUser,
@@ -176,6 +177,26 @@ export async function timeline(db: Database, actor: Actor, patientId: string, ra
           autore: null,
         });
       }
+    }
+  }
+  // Attività dei colleghi dell'AFT per questo paziente (registro di AFT, D161).
+  if (tipo === 'tutto' || tipo === 'visite') {
+    const rows = await db
+      .select({ a: aftActivity, doctor: appUser.displayName })
+      .from(aftActivity)
+      .innerJoin(appUser, eq(appUser.id, aftActivity.doctorUserId))
+      .where(eq(aftActivity.patientId, patientId));
+    for (const { a, doctor } of rows) {
+      const kind = AFT_ACTIVITY_KINDS.find((k) => k.key === a.kind)?.label ?? a.kind;
+      items.push({
+        id: a.id,
+        data: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(a.performedAt),
+        tipo: 'aft_activity',
+        titolo: `Collega dell’AFT: ${kind}`,
+        testo: [a.outcome, a.notes].filter(Boolean).join('. '),
+        annullata: false,
+        autore: doctor,
+      });
     }
   }
   items.sort((a, b) => b.data.localeCompare(a.data));

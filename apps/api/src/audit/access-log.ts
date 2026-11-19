@@ -87,7 +87,8 @@ export type AccessAction =
   | 'scarto_profilo_sanitario'
   | 'pdf_profilo_sanitario'
   | 'impostazioni_aft'
-  | 'consultazione_aft';
+  | 'consultazione_aft'
+  | 'attivita_aft';
 
 export interface AccessEntry {
   studioId?: string | null;

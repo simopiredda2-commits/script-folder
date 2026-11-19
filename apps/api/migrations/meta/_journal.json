@@ -148,6 +148,13 @@
       "when": 1795044710445,
       "tag": "0020_aft",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795048284424,
+      "tag": "0021_registro_aft",
+      "breakpoints": true
     }
   ]
 }

@@ -1,9 +1,20 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { accessLog, allergyDetail, clinicalEntry, doctorProfile, patient } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+
+async function rejectsWith(promise: Promise<unknown>, pattern: RegExp): Promise<void> {
+  try {
+    await promise;
+  } catch (err) {
+    const e = err as { message: string; cause?: { message: string } };
+    expect(e.cause?.message ?? e.message).toMatch(pattern);
+    return;
+  }
+  throw new Error(`Doveva fallire con ${pattern}`);
+}
 
 /**
  * Condivisione tra i medici dell'AFT (tappa 12, D161): due studi diversi, ognuno con i suoi
@@ -181,6 +192,22 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
     expect(given.statusCode, given.body).toBe(201);
     // Il motivo dell'accesso serve.
     expect((await consult('visita')).statusCode).toBe(400);
+    // Senza il consenso per il pregresso, solo le voci dal giorno del consenso (Garante, par. 3):
+    // le voci del paziente di prova sono tutte precedenti.
+    const onlyNew = await consult();
+    expect(onlyNew.statusCode, onlyNew.body).toBe(200);
+    expect(onlyNew.json<{ soloDal: string; riepilogo: Record<string, string[]> }>()).toMatchObject({
+      soloDal: '2026-11-18',
+      riepilogo: { allergie: [], problemi: [], terapie: [], parametri: [] },
+    });
+    const previous = await req(
+      a,
+      cookies.aSegreteria!,
+      'POST',
+      `/api/pazienti/${a.richPatient}/consensi`,
+      { tipo: 'aft_condivisione_pregressi', stato: 'dato', data: '2026-11-18' },
+    );
+    expect(previous.statusCode, previous.body).toBe(201);
     const res = await consult();
     expect(res.statusCode, res.body).toBe(200);
     const body = res.json<{
@@ -207,7 +234,79 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
       studio: 'Studio B di prova',
       motivo: 'Visita nell’ambulatorio serale dell’AFT',
     });
-    expect(seen.consultazioni.map((c) => c.esito)).toEqual(['consentito', 'negato', 'negato']);
+    expect(seen.consultazioni.map((c) => c.esito)).toEqual([
+      'consentito',
+      'consentito',
+      'negato',
+      'negato',
+    ]);
+  });
+
+  it('il collega registra l’attività svolta: registro di AFT e cronologia del medico curante', async () => {
+    const activity = (body: object) =>
+      req(b, cookies.bTitolare!, 'POST', '/api/aft/attivita', { codiceFiscale: cf, ...body });
+    // Non nel futuro.
+    expect(
+      (
+        await activity({
+          tipologia: 'ambulatorio',
+          esito: 'Visita di prova',
+          quando: '2099-01-01T10:00:00+01:00',
+        })
+      ).statusCode,
+    ).toBe(400);
+    const done = await activity({
+      tipologia: 'ambulatorio',
+      esito: 'Controllo pressorio di prova nella norma',
+      note: 'Nota di prova per il medico curante',
+    });
+    expect(done.statusCode, done.body).toBe(201);
+    // Il medico curante la vede tra le attività dei colleghi e nella cronologia della cartella.
+    const list = (await req(a, cookies.aTitolare!, 'GET', '/api/aft/attivita')).json<{
+      attivita: { tipologia: string; esito: string; medico: string }[];
+    }>();
+    expect(list.attivita[0]).toMatchObject({
+      tipologia: 'Visita in ambulatorio',
+      esito: 'Controllo pressorio di prova nella norma',
+    });
+    const timeline = (
+      await req(a, cookies.aTitolare!, 'GET', `/api/pazienti/${a.richPatient}/cronologia`)
+    ).json<{ cronologia: { tipo: string; titolo: string; testo: string }[] }>();
+    expect(timeline.cronologia.find((x) => x.tipo === 'aft_activity')).toMatchObject({
+      titolo: 'Collega dell’AFT: Visita in ambulatorio',
+      testo: 'Controllo pressorio di prova nella norma. Nota di prova per il medico curante',
+    });
+    // Il registro di AFT non si modifica.
+    await rejectsWith(
+      t.db.execute(sql`update aft_activity set outcome = 'altro'`),
+      /registro di AFT non si modifica/,
+    );
+    await rejectsWith(
+      t.db.execute(sql`delete from aft_activity`),
+      /registro di AFT non si modifica/,
+    );
+    // Chi ha visto o annotato i dati del paziente: per rispondere alla sua richiesta.
+    const own = await req(
+      a,
+      cookies.aTitolare!,
+      'GET',
+      `/api/pazienti/${a.richPatient}/consultazioni-aft`,
+    );
+    expect(own.statusCode, own.body).toBe(200);
+    expect(
+      own.json<{ consultazioni: { azione: string; studio: string }[] }>().consultazioni[0],
+    ).toMatchObject({ azione: 'Attività registrata', studio: 'Studio B di prova' });
+    // La segreteria no: il registro lo legge il titolare.
+    expect(
+      (
+        await req(
+          a,
+          cookies.aSegreteria!,
+          'GET',
+          `/api/pazienti/${a.richPatient}/consultazioni-aft`,
+        )
+      ).statusCode,
+    ).toBe(403);
   });
 
   it('chi non è nell’AFT, la revoca del consenso e l’uscita chiudono l’accesso', async () => {
@@ -236,6 +335,16 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
     expect((await lastLog())!.details).toMatchObject({
       regola: 'Il paziente ha revocato il consenso alla condivisione nell’AFT',
     });
+    // Senza consenso non si registra nemmeno l'attività svolta.
+    expect(
+      (
+        await req(b, cookies.bTitolare!, 'POST', '/api/aft/attivita', {
+          codiceFiscale: cf,
+          tipologia: 'telefono',
+          esito: 'Contatto telefonico di prova',
+        })
+      ).statusCode,
+    ).toBe(404);
     await req(a, cookies.aTitolare!, 'POST', `/api/pazienti/${a.richPatient}/consensi`, {
       tipo: 'aft_condivisione',
       stato: 'dato',

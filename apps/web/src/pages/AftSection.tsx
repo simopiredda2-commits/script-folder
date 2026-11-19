@@ -25,11 +25,15 @@ interface Overview {
   } | null;
   inviti: { id: string; aft: string; asl: string | null; invitatoIl: string }[];
   puoCreare: boolean;
+  tipologieAttivita: { codice: string; nome: string }[];
+  motiviComuni: string[];
 }
 interface Summary {
   paziente: { cognome: string; nome: string; codiceFiscale: string; nascita: string };
   medicoCurante: string | null;
   consultatoIl: string;
+  /** Solo i dati da questa data: il paziente non ha consentito di condividere quelli precedenti. */
+  soloDal: string | null;
   riepilogo: { allergie: string[]; problemi: string[]; terapie: string[]; parametri: string[] };
 }
 interface Consultation {
@@ -128,8 +132,9 @@ export function AftSection() {
           <Notice kind="info">L’AFT riguarda i medici titolari dello studio.</Notice>
         )}
       </section>
-      {o.aft && <ConsultForm />}
+      {o.aft && <ConsultForm kinds={o.tipologieAttivita} reasons={o.motiviComuni} />}
       {o.aft && <Consultations />}
+      {o.aft && <Activities />}
     </>
   );
 }
@@ -281,7 +286,13 @@ function Membership({
   );
 }
 
-function ConsultForm() {
+function ConsultForm({
+  kinds,
+  reasons,
+}: {
+  kinds: Overview['tipologieAttivita'];
+  reasons: string[];
+}) {
   const [cf, setCf] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -334,7 +345,13 @@ function ConsultForm() {
             minLength={10}
             maxLength={300}
             placeholder="Per esempio: visita nell’ambulatorio serale dell’AFT"
+            list="aft-motivi-comuni"
           />
+          <datalist id="aft-motivi-comuni">
+            {reasons.map((r) => (
+              <option key={r} value={r} />
+            ))}
+          </datalist>
         </div>
         <button type="submit" className="pulsante" disabled={busy}>
           Mostra il riepilogo
@@ -351,8 +368,22 @@ function ConsultForm() {
             {date(summary.paziente.nascita)} · medico curante {summary.medicoCurante ?? '—'}
           </p>
           <Notice kind="info">
-            Riepilogo condiviso con il consenso del paziente. La consultazione del{' '}
-            {dateTime(summary.consultatoIl)} è nel registro del medico curante, con il motivo.
+            <p>
+              Riepilogo condiviso con il consenso del paziente. La consultazione del{' '}
+              {dateTime(summary.consultatoIl)} è nel registro del medico curante, con il motivo; il
+              paziente può sapere chi ha consultato i suoi dati, quando e da quale studio.
+            </p>
+            <p>
+              Il riepilogo può non essere completo: il paziente può aver chiesto di non condividere
+              alcune informazioni, e contiene solo quanto il medico curante ha registrato nel
+              programma. Non certifica lo stato di salute.
+            </p>
+            {summary.soloDal && (
+              <p>
+                Contiene solo i dati dal {date(summary.soloDal)}: il paziente non ha consentito di
+                condividere quelli precedenti.
+              </p>
+            )}
           </Notice>
           {SECTION_LABELS.map(([key, label]) => {
             const items = summary.riepilogo[key];
@@ -371,7 +402,156 @@ function ConsultForm() {
               </section>
             );
           })}
+          <ActivityForm fiscalCode={summary.paziente.codiceFiscale} kinds={kinds} />
         </article>
+      )}
+    </section>
+  );
+}
+
+/**
+ * L'attività svolta per il paziente del collega, con orario, tipologia ed esito: va nel registro di
+ * AFT e nella cronologia della cartella del medico curante (DGR Piemonte 31-8647/2024, art. 22).
+ */
+function ActivityForm({
+  fiscalCode,
+  kinds,
+}: {
+  fiscalCode: string;
+  kinds: Overview['tipologieAttivita'];
+}) {
+  const [kind, setKind] = useState(kinds[0]?.codice ?? '');
+  const [outcome, setOutcome] = useState('');
+  const [notes, setNotes] = useState('');
+  const [when, setWhen] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [done, setDone] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api('/api/aft/attivita', {
+        method: 'POST',
+        body: {
+          codiceFiscale: fiscalCode,
+          tipologia: kind,
+          esito: outcome,
+          note: notes || undefined,
+          quando: when ? new Date(when).toISOString() : undefined,
+        },
+      });
+      setDone(true);
+      setOutcome('');
+      setNotes('');
+    } catch (err) {
+      setError(failure(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form onSubmit={(e) => void submit(e)} className="modulo" aria-labelledby="titolo-attivita-aft">
+      <h4 id="titolo-attivita-aft">Registra l’attività svolta</h4>
+      <p className="tenue">
+        Va nel registro di AFT e nella cartella del medico curante, che così ne è informato.
+      </p>
+      {error && <ErrorMessage error={error} />}
+      {done && (
+        <Notice kind="fatto">
+          Attività registrata: il medico curante la vede nella cronologia.
+        </Notice>
+      )}
+      <div className="campo">
+        <label htmlFor="aft-tipologia">Tipologia</label>
+        <select id="aft-tipologia" value={kind} onChange={(e) => setKind(e.target.value)}>
+          {kinds.map((k) => (
+            <option key={k.codice} value={k.codice}>
+              {k.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="campo">
+        <label htmlFor="aft-esito">Esito</label>
+        <input
+          id="aft-esito"
+          value={outcome}
+          onChange={(e) => setOutcome(e.target.value)}
+          required
+          minLength={3}
+          maxLength={500}
+        />
+      </div>
+      <div className="campo">
+        <label htmlFor="aft-note">Note per il medico curante (facoltative)</label>
+        <textarea id="aft-note" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+      </div>
+      <div className="campo">
+        <label htmlFor="aft-quando">Data e ora (se non è adesso)</label>
+        <input
+          id="aft-quando"
+          type="datetime-local"
+          value={when}
+          onChange={(e) => setWhen(e.target.value)}
+        />
+      </div>
+      <button type="submit" className="pulsante" disabled={busy}>
+        Registra l’attività
+      </button>
+    </form>
+  );
+}
+
+interface Activity {
+  quando: string;
+  paziente: string;
+  medico: string;
+  tipologia: string;
+  esito: string;
+  note: string | null;
+}
+
+/** Le attività dei colleghi dell'AFT sui pazienti del medico curante. */
+function Activities() {
+  const list = useApi<{ attivita: Activity[] }>('/api/aft/attivita');
+  if (list.loading && !list.data) return <Loading what="attività dei colleghi" />;
+  if (!list.data) return <ErrorMessage error={list.error} />;
+  const rows = list.data.attivita;
+  return (
+    <section className="riquadro" aria-labelledby="titolo-attivita-colleghi">
+      <h2 id="titolo-attivita-colleghi">
+        <Icon name="storico" /> Attività dei colleghi sui miei pazienti
+      </h2>
+      {rows.length === 0 ? (
+        <p className="tenue">Nessuna attività.</p>
+      ) : (
+        <table className="tabella" aria-labelledby="titolo-attivita-colleghi">
+          <thead>
+            <tr>
+              <th scope="col">Quando</th>
+              <th scope="col">Paziente</th>
+              <th scope="col">Medico</th>
+              <th scope="col">Tipologia</th>
+              <th scope="col">Esito e note</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td>{dateTime(r.quando)}</td>
+                <td>{r.paziente}</td>
+                <td>{r.medico}</td>
+                <td>{r.tipologia}</td>
+                <td>
+                  {r.esito}
+                  {r.note ? `. ${r.note}` : ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </section>
   );
@@ -390,7 +570,7 @@ function Consultations() {
       {rows.length === 0 ? (
         <p className="tenue">Nessuna consultazione.</p>
       ) : (
-        <table className="tabella">
+        <table className="tabella" aria-labelledby="titolo-consultazioni-aft">
           <thead>
             <tr>
               <th scope="col">Quando</th>

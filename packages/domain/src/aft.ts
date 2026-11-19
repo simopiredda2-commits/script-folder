@@ -29,6 +29,39 @@ export type AftConsentState = 'given' | 'refused' | 'revoked' | null;
 /** Chiave del consenso del paziente alla condivisione nell'AFT (vedi `CONSENT_KINDS`). */
 export const AFT_CONSENT_KEY = 'aft_condivisione';
 
+/**
+ * Consenso a condividere anche i dati precedenti al consenso: separato, come vuole il Garante
+ * (Linee guida sul dossier sanitario del 4/6/2015, par. 3, «consenso per il pregresso»). Senza,
+ * il riepilogo contiene solo le voci dalla data del consenso alla condivisione.
+ */
+export const AFT_PREVIOUS_CONSENT_KEY = 'aft_condivisione_pregressi';
+
+/**
+ * Tipologie dell'attività che un collega dell'AFT registra per un paziente di un altro medico
+ * (DGR Piemonte 27/5/2024, n. 31-8647, accordo integrativo, art. 22, c. 2, 3 e 5: annotazione
+ * dell'attività, con orario, tipologia ed esito, nel registro di AFT).
+ */
+export const AFT_ACTIVITY_KINDS = [
+  { key: 'ambulatorio', label: 'Visita in ambulatorio' },
+  { key: 'domicilio', label: 'Visita a domicilio' },
+  { key: 'telefono', label: 'Contatto telefonico' },
+  { key: 'televisita', label: 'Televisita' },
+  { key: 'altro', label: 'Altra attività' },
+] as const;
+export type AftActivityKind = (typeof AFT_ACTIVITY_KINDS)[number]['key'];
+export const AFT_ACTIVITY_KEYS = AFT_ACTIVITY_KINDS.map((k) => k.key) as [
+  AftActivityKind,
+  ...AftActivityKind[],
+];
+
+/** Motivi d'accesso più comuni, proposti nell'interfaccia; si può sempre scrivere un altro motivo. */
+export const AFT_COMMON_REASONS = [
+  'Visita nell’ambulatorio dell’AFT',
+  'Continuità dell’assistenza in attività oraria',
+  'Visita a domicilio per conto del medico curante',
+  'Richiesta di chiarimenti sulla terapia da parte del paziente',
+] as const;
+
 /** Lunghezza minima del motivo dell'accesso: una frase, non una sigla. */
 export const AFT_REASON_MIN = 10;
 

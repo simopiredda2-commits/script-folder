@@ -1,7 +1,11 @@
 import {
+  AFT_ACTIVITY_KEYS,
+  AFT_ACTIVITY_KINDS,
+  AFT_COMMON_REASONS,
   AFT_CONSENT_KEY,
+  AFT_PREVIOUS_CONSENT_KEY,
+  AFT_REASON_MIN,
   aftAccess,
-  type AftConsentState,
   type AftMembership,
   currentConsents,
 } from '@mmg/domain';
@@ -13,9 +17,11 @@ import type { Database } from '../db/client';
 import {
   accessLog,
   aft,
+  aftActivity,
   aftMember,
   appUser,
   archive,
+  clinicalEntry,
   consent,
   doctorProfile,
   patient,
@@ -24,6 +30,7 @@ import {
 import { withActor } from '../db/tx';
 import { composePss } from '../fse/compose';
 import { HttpError } from '../http/errors';
+import { guardPatient } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
 
 /**
@@ -41,6 +48,20 @@ export const createBody = z
   .strict();
 export const inviteBody = z.object({ codiceRegionale: z.string().trim().min(1).max(40) }).strict();
 export const sharingBody = z.object({ condivide: z.boolean() }).strict();
+export const activityBody = z
+  .object({
+    codiceFiscale: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9]{16}$/, 'Codice fiscale di 16 caratteri'),
+    tipologia: z.enum(AFT_ACTIVITY_KEYS),
+    esito: z.string().trim().min(3).max(500),
+    note: z.string().trim().max(2000).optional(),
+    /** Data e ora dell'attività; per difetto adesso. */
+    quando: z.iso.datetime({ offset: true }).optional(),
+  })
+  .strict();
 export const consultBody = z
   .object({
     codiceFiscale: z
@@ -110,7 +131,12 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
       const a = invitationAfts.find((x) => x.a.id === i.aftId)!;
       return { id: i.id, aft: a.a.name, asl: a.a.asl, invitatoIl: i.invitedAt };
     });
-    if (!member) return { aft: null, inviti, puoCreare: isOwnerDoctor(actor) };
+    // Tipologie dell'attività e motivi comuni, per i moduli dell'interfaccia.
+    const lists = {
+      tipologieAttivita: AFT_ACTIVITY_KINDS.map((k) => ({ codice: k.key, nome: k.label })),
+      motiviComuni: [...AFT_COMMON_REASONS],
+    };
+    if (!member) return { aft: null, inviti, puoCreare: isOwnerDoctor(actor), ...lists };
     const [a] = await db.select().from(aft).where(eq(aft.id, member.aftId));
     const rows = await db
       .select({
@@ -150,6 +176,7 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
       },
       inviti,
       puoCreare: false,
+      ...lists,
     };
   }
 
@@ -258,30 +285,53 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
     );
   }
 
-  /** Stato del consenso del paziente alla condivisione nell'AFT: l'ultima espressione. */
-  async function consentState(patientId: string): Promise<AftConsentState> {
+  /**
+   * Consensi del paziente alla condivisione nell'AFT: l'ultima espressione di ciascuno, con la
+   * data del consenso alla condivisione (per i dati precedenti, vedi `AFT_PREVIOUS_CONSENT_KEY`).
+   */
+  async function consentInfo(patientId: string) {
     const rows = await db
       .select()
       .from(consent)
-      .where(and(eq(consent.patientId, patientId), eq(consent.kind, AFT_CONSENT_KEY)));
-    return currentConsents(rows).get(AFT_CONSENT_KEY)?.status ?? null;
+      .where(
+        and(
+          eq(consent.patientId, patientId),
+          inArray(consent.kind, [AFT_CONSENT_KEY, AFT_PREVIOUS_CONSENT_KEY]),
+        ),
+      );
+    const current = currentConsents(rows);
+    const main = current.get(AFT_CONSENT_KEY);
+    return {
+      state: main?.status ?? null,
+      givenOn: main?.status === 'given' ? main.givenOn : null,
+      previous: current.get(AFT_PREVIOUS_CONSENT_KEY)?.status ?? null,
+    };
   }
 
+  const NOT_SHARED =
+    'Nessun riepilogo condiviso con questo codice fiscale: il paziente non è di un collega dell’AFT che condivide, oppure non ha dato il consenso.';
+
   /**
-   * Consultazione del riepilogo di un paziente di un collega. Chi consulta non sa se il paziente
-   * c'è finché l'accesso non è consentito: la risposta negativa è la stessa per tutti i casi,
-   * il motivo preciso va nel registro del medico curante.
+   * Trova il paziente di un collega con il codice fiscale e decide l'accesso. Chi consulta non sa
+   * se il paziente c'è finché l'accesso non è consentito: la risposta negativa è la stessa per
+   * tutti i casi, il motivo preciso va nel registro del medico curante. Ogni tentativo, consentito
+   * o negato, va nel registro.
    */
-  async function consult(actor: Actor, body: z.infer<typeof consultBody>) {
+  async function locate(
+    actor: Actor,
+    fiscalCode: string,
+    reason: string,
+    action: 'consultazione_aft' | 'attivita_aft',
+  ) {
     const at = now();
-    const NOT_SHARED =
-      'Nessun riepilogo condiviso con questo codice fiscale: il paziente non è di un collega dell’AFT che condivide, oppure non ha dato il consenso.';
     const mine = membershipsOf(await openRowsOf(db, actor.userId)).filter((m) => !m.until);
     const aftIds = mine.map((m) => m.aftId);
-    const reasonShort = body.motivo.length < 10;
     if (!aftIds.length) throw new HttpError(403, 'Non sei in un’AFT');
-    if (reasonShort)
-      throw new HttpError(400, 'Scrivi il motivo dell’accesso (almeno 10 caratteri)');
+    if (reason.trim().length < AFT_REASON_MIN)
+      throw new HttpError(
+        400,
+        `Scrivi il motivo dell’accesso (almeno ${AFT_REASON_MIN} caratteri)`,
+      );
     const colleagues = await db
       .select()
       .from(aftMember)
@@ -295,90 +345,201 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
           .from(patient)
           .innerJoin(archive, eq(archive.id, patient.archiveId))
           .where(
-            and(
-              eq(patient.fiscalCode, body.codiceFiscale),
-              inArray(archive.ownerUserId, colleagueIds),
-            ),
+            and(eq(patient.fiscalCode, fiscalCode), inArray(archive.ownerUserId, colleagueIds)),
           )
       : [];
     if (!found.length) {
       await logAccess(db, {
         studioId: actor.studioId,
         userId: actor.userId,
-        action: 'consultazione_aft',
+        action,
         outcome: 'negato',
         workstation: actor.workstation,
         details: { motivo: 'nessun paziente di un collega dell’AFT con questo codice fiscale' },
       });
       throw new HttpError(404, NOT_SHARED);
     }
+    const [actorStudio] = await db
+      .select({ name: studio.name })
+      .from(studio)
+      .where(eq(studio.id, actor.studioId));
     for (const { p, ownerUserId } of found) {
+      const consents = await consentInfo(p.id);
       const decision = aftAccess({
         actor: { userId: actor.userId, ownerDoctor: isOwnerDoctor(actor) },
         ownerUserId,
         memberships: membershipsOf(colleagues).concat(mine),
-        consent: await consentState(p.id),
-        reason: body.motivo,
+        consent: consents.state,
+        reason,
         now: at,
       });
-      const [actorStudio] = await db
-        .select({ name: studio.name })
-        .from(studio)
-        .where(eq(studio.id, actor.studioId));
       // Nel registro del medico curante: chi, da quale studio, perché, con quale esito.
       await logAccess(db, {
         studioId: p.studioId,
         userId: actor.userId,
         patientId: p.id,
-        action: 'consultazione_aft',
+        action,
         outcome: decision.allowed ? 'consentito' : 'negato',
         workstation: actor.workstation,
         details: {
           aft: decision.aftId ?? null,
           medico: actor.displayName,
           studio: actorStudio?.name ?? null,
-          motivoDellAccesso: body.motivo,
+          motivoDellAccesso: reason,
           regola: decision.reason,
         },
       });
-      if (!decision.allowed) continue;
-      const [owner] = await db
-        .select({ name: appUser.displayName })
-        .from(appUser)
-        .where(eq(appUser.id, ownerUserId));
-      // Le voci vengono dalla composizione del Profilo sanitario, che lascia fuori le oscurate e
-      // le riservate; qui con il loro stato clinico, non con la scelta per il Profilo.
-      const composed = await composePss(db, p.id, studioDate(at));
-      const s = composed.sezioni;
-      const itDate = (iso: string) => iso.split('-').reverse().join('/');
-      return {
-        paziente: {
-          cognome: p.lastName,
-          nome: p.firstName,
-          codiceFiscale: p.fiscalCode,
-          nascita: p.birthDate,
-        },
-        medicoCurante: owner?.name ?? null,
-        consultatoIl: at,
-        riepilogo: {
-          allergie: s.allergie.map(
-            (i) => `${i.etichetta}${i.dati.status === 'active' ? '' : ' (non più attiva)'}`,
-          ),
-          problemi: s.problemi.map(
+      if (decision.allowed) return { p, ownerUserId, aftId: decision.aftId!, consents, at };
+    }
+    throw new HttpError(404, NOT_SHARED);
+  }
+
+  /** Consultazione del riepilogo di un paziente di un collega (D161). */
+  async function consult(actor: Actor, body: z.infer<typeof consultBody>) {
+    const { p, ownerUserId, consents, at } = await locate(
+      actor,
+      body.codiceFiscale,
+      body.motivo,
+      'consultazione_aft',
+    );
+    const [owner] = await db
+      .select({ name: appUser.displayName })
+      .from(appUser)
+      .where(eq(appUser.id, ownerUserId));
+    // Le voci vengono dalla composizione del Profilo sanitario, che lascia fuori le oscurate e
+    // le riservate; qui con il loro stato clinico, non con la scelta per il Profilo.
+    const composed = await composePss(db, p.id, studioDate(at));
+    const s = composed.sezioni;
+    // Senza il consenso per il pregresso, solo le voci dalla data del consenso (Garante, par. 3).
+    const since = consents.previous === 'given' ? null : consents.givenOn;
+    const entryDates = new Map<string, string>();
+    if (since) {
+      const ids = [...s.allergie, ...s.problemi].map((i) => i.id);
+      if (ids.length)
+        for (const e of await db
+          .select({ id: clinicalEntry.id, on: clinicalEntry.occurredOn })
+          .from(clinicalEntry)
+          .where(inArray(clinicalEntry.id, ids)))
+          entryDates.set(e.id, e.on);
+    }
+    const recent = (date: string | null | undefined) => !since || (!!date && date >= since);
+    const itDate = (iso: string) => iso.split('-').reverse().join('/');
+    return {
+      paziente: {
+        cognome: p.lastName,
+        nome: p.firstName,
+        codiceFiscale: p.fiscalCode,
+        nascita: p.birthDate,
+      },
+      medicoCurante: owner?.name ?? null,
+      consultatoIl: at,
+      // Solo i dati dal giorno del consenso: si dice, perché chi consulta lo sappia.
+      soloDal: since,
+      riepilogo: {
+        allergie: s.allergie
+          .filter((i) => recent(entryDates.get(i.id)))
+          .map((i) => `${i.etichetta}${i.dati.status === 'active' ? '' : ' (non più attiva)'}`),
+        problemi: s.problemi
+          .filter((i) => recent(entryDates.get(i.id)))
+          .map(
             (i) =>
               `${i.etichetta}${i.dati.chronic ? ', cronico' : ''}${i.dati.state === 'active' ? '' : ' (non attivo)'}`,
           ),
-          terapie: s.terapie.map(
+        terapie: s.terapie
+          .filter((i) => recent(i.dati.startOn))
+          .map(
             (i) =>
               `${i.etichetta}${i.dati.dosage ? `: ${i.dati.dosage}` : ''}, dal ${itDate(i.dati.startOn)}`,
           ),
-          parametri: s.parametri.map((i) => i.etichetta),
-        },
-        // Niente conteggi delle voci escluse: chi consulta non deve sapere che il paziente ha
-        // oscurato qualcosa (D161).
+        parametri: s.parametri.filter((i) => recent(i.dati.measuredOn)).map((i) => i.etichetta),
+      },
+      // Niente conteggi delle voci escluse: chi consulta non deve sapere che il paziente ha
+      // oscurato qualcosa (D161; Garante, par. 5.1, «oscuramento dell'oscuramento»).
+    };
+  }
+
+  /**
+   * Attività svolta da un collega dell'AFT per un paziente di un altro medico, nel registro di
+   * AFT e nella cronologia della cartella del medico curante (DGR Piemonte 31-8647/2024, art. 22).
+   * Valgono le stesse condizioni della consultazione.
+   */
+  async function recordActivity(actor: Actor, body: z.infer<typeof activityBody>) {
+    const label = AFT_ACTIVITY_KINDS.find((k) => k.key === body.tipologia)!.label;
+    const { p, ownerUserId, aftId, at } = await locate(
+      actor,
+      body.codiceFiscale,
+      `${label}: ${body.esito}`,
+      'attivita_aft',
+    );
+    const performedAt = body.quando ? new Date(body.quando) : at;
+    if (performedAt.getTime() > at.getTime())
+      throw new HttpError(400, 'L’attività non può essere nel futuro');
+    const [row] = await withActor(db, actor.userId, (tx) =>
+      tx
+        .insert(aftActivity)
+        .values({
+          aftId,
+          patientId: p.id,
+          ownerUserId,
+          doctorUserId: actor.userId,
+          performedAt,
+          kind: body.tipologia,
+          outcome: body.esito,
+          notes: body.note || null,
+        })
+        .returning(),
+    );
+    return { id: row!.id };
+  }
+
+  /** Le attività dei colleghi dell'AFT sui miei pazienti. */
+  async function activitiesOf(actor: Actor) {
+    requireOwnerDoctor(actor);
+    const rows = await db
+      .select({ a: aftActivity, p: patient, doctor: appUser.displayName })
+      .from(aftActivity)
+      .innerJoin(patient, eq(patient.id, aftActivity.patientId))
+      .innerJoin(appUser, eq(appUser.id, aftActivity.doctorUserId))
+      .where(eq(aftActivity.ownerUserId, actor.userId))
+      .orderBy(desc(aftActivity.performedAt))
+      .limit(200);
+    return rows.map(({ a, p, doctor }) => ({
+      quando: a.performedAt,
+      paziente: `${p.lastName} ${p.firstName}`,
+      medico: doctor,
+      tipologia: AFT_ACTIVITY_KINDS.find((k) => k.key === a.kind)?.label ?? a.kind,
+      esito: a.outcome,
+      note: a.notes,
+    }));
+  }
+
+  /**
+   * Le consultazioni dei colleghi su un paziente: per rispondere alla sua richiesta di sapere chi
+   * ha visto i suoi dati, quando e da quale studio (Garante, par. 5.2). Le legge il titolare.
+   */
+  async function patientConsultations(actor: Actor, patientId: string) {
+    await guardPatient(db, actor, patientId, 'access_log.read', 'lettura_registro');
+    const rows = await db
+      .select()
+      .from(accessLog)
+      .where(
+        and(
+          eq(accessLog.patientId, patientId),
+          inArray(accessLog.action, ['consultazione_aft', 'attivita_aft']),
+        ),
+      )
+      .orderBy(desc(accessLog.seq));
+    return rows.map((log) => {
+      const d = log.details as Record<string, string | null>;
+      return {
+        quando: log.at,
+        azione: log.action === 'attivita_aft' ? 'Attività registrata' : 'Consultazione',
+        esito: log.outcome,
+        medico: d.medico ?? null,
+        studio: d.studio ?? null,
+        motivo: d.motivoDellAccesso ?? null,
       };
-    }
-    throw new HttpError(404, NOT_SHARED);
+    });
   }
 
   /** Le consultazioni dei colleghi dell'AFT sui miei pazienti: dal mio registro degli accessi. */
@@ -406,7 +567,19 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
     });
   }
 
-  return { overview, create, invite, respond, setSharing, leave, consult, consultationsOf };
+  return {
+    overview,
+    create,
+    invite,
+    respond,
+    setSharing,
+    leave,
+    consult,
+    consultationsOf,
+    recordActivity,
+    activitiesOf,
+    patientConsultations,
+  };
 }
 
 export type AftService = ReturnType<typeof createAftService>;

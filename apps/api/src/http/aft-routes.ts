@@ -1,6 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { type AftService, consultBody, createBody, inviteBody, sharingBody } from '../aft/service';
+import {
+  activityBody,
+  type AftService,
+  consultBody,
+  createBody,
+  inviteBody,
+  sharingBody,
+} from '../aft/service';
 
 const aftParams = z.object({ id: z.uuid() });
 
@@ -53,4 +60,23 @@ export function registerAftRoutes(app: FastifyInstance, service: AftService) {
   app.get('/api/aft/consultazioni', async (req) => ({
     consultazioni: await service.consultationsOf(req.actor!),
   }));
+
+  // Attività svolta per un paziente di un collega: registro di AFT e cronologia del curante.
+  app.post('/api/aft/attivita', async (req, reply) =>
+    reply.status(201).send(await service.recordActivity(req.actor!, activityBody.parse(req.body))),
+  );
+
+  app.get('/api/aft/attivita', async (req) => ({
+    attivita: await service.activitiesOf(req.actor!),
+  }));
+
+  // Chi ha consultato i dati di un paziente: per rispondere alla sua richiesta (Garante, 5.2).
+  app.get(
+    '/api/pazienti/:id/consultazioni-aft',
+    { config: { patientScoped: true } },
+    async (req) => {
+      const { id } = aftParams.parse(req.params);
+      return { consultazioni: await service.patientConsultations(req.actor!, id) };
+    },
+  );
 }

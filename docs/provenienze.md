@@ -84,6 +84,10 @@ Moduli dell'anamnestico per la patente mandati da Simone il 18/11/2026, usati so
 | `ANAMNESTICO_web.pdf` (solo immagini)          | 3      | 226.831 | `d559c4ef5031c99cd929768499c845a199634ddfd7d2977d289248790c056cf3` |
 | `anamnestico-MMG.pdf`                          | 1      | 14.646  | `d3a6cdd70003b63d15a9beaa3678f4e488890fd8ae0eb70f828379a785e72e61` |
 
+### Condivisione nell'AFT (D161)
+
+Le regole della condivisione vengono da atti ufficiali, letti il 19/11/2026 sui testi pubblicati: D.Lgs. 502/1992, art. 8, e D.L. 158/2012, art. 1 (Normattiva); ACN della medicina generale 2022-2024, G.U. n. 24 del 30/1/2026, s.o. n. 5; Garante, linee guida sul dossier sanitario, provv. n. 331 del 4/6/2015, G.U. n. 164 del 17/7/2015; Regione Piemonte, D.G.R. 27/5/2024, n. 31-8647, B.U. n. 22 del 30/5/2024. Nel repository ci sono solo brevi citazioni, in `docs/aft.md` e nei commenti del codice, con la fonte accanto: sono testi di atti ufficiali (art. 5 della legge 633/1941). I PDF restano fuori dal repository.
+
 ## Fuori dal repository
 
 Le banche dati pubbliche non sono nel repository. Le scarica `sync/` nello studio e le importa il programma: AIFA, ISTAT, Regione Piemonte, DPCM LEA. Fonti e versioni sono in `sync/fonti.json` e in `docs/banche-dati.md`. Le condizioni d'uso di ciascuna fonte sono da verificare e scrivere qui prima del lancio.
