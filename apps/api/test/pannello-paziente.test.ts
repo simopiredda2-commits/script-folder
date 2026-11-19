@@ -212,6 +212,64 @@ describe('pannello amministrativo del paziente (tappa 15)', () => {
       expect(history).toMatchObject({ operation: 'INSERT', userId: s.users.titolare.id });
     });
 
+    it('paziente temporaneo (D199): stato e scelta del titolare con la scadenza, in un passo solo', async () => {
+      const { id } = await createOk('segreteria', {
+        archivioId: s.archives.collega,
+        identita: person(11),
+        dati: { stato: 'temporaneo' },
+        sceltaTemporanea: { dal: day(0), scadenza: day(90) },
+      });
+      const [row] = await s.db.select().from(patient).where(eq(patient.id, id));
+      expect(row!.status).toBe('temporary');
+      // La scelta è del titolare dell'archivio, a mano, fino alla scadenza.
+      const choices = await s.db
+        .select()
+        .from(patientChoice)
+        .where(eq(patientChoice.patientId, id));
+      expect(choices).toHaveLength(1);
+      expect(choices[0]).toMatchObject({
+        doctorUserId: s.users.collega.id,
+        chosenOn: day(0),
+        expiresOn: day(90),
+        endedOn: null,
+        source: 'manual',
+      });
+      const v = await view(id, 'segreteria');
+      expect(v.scelte.map((c) => [c.medicoId, c.stato])).toEqual([
+        [s.users.collega.id, 'in_corso'],
+      ]);
+      expect((await lastLog(id, 'nuovo_paziente'))!.details).toMatchObject({
+        sceltaTemporanea: { dal: day(0), scadenza: day(90) },
+      });
+    });
+
+    it('temporaneo senza scadenza, scadenza prima della scelta, scelta senza temporaneo: rifiutati, nessun paziente', async () => {
+      const who = person(12);
+      const noExpiry = await create('titolare', { identita: who, dati: { stato: 'temporaneo' } });
+      expect(noExpiry.statusCode, noExpiry.body).toBe(400);
+      expect(problems(noExpiry.body)).toEqual([
+        'Per il paziente temporaneo serve la scadenza della scelta',
+      ]);
+      const backwards = await create('titolare', {
+        identita: who,
+        dati: { stato: 'temporaneo' },
+        sceltaTemporanea: { dal: day(0), scadenza: day(-1) },
+      });
+      expect(backwards.statusCode, backwards.body).toBe(400);
+      expect(backwards.body).toMatch(/La scadenza viene dopo la scelta/);
+      const notTemporary = await create('titolare', {
+        identita: who,
+        sceltaTemporanea: { dal: day(0), scadenza: day(30) },
+      });
+      expect(notTemporary.statusCode, notTemporary.body).toBe(400);
+      expect(problems(notTemporary.body)).toEqual([
+        'La scelta con la scadenza si registra qui solo per il paziente temporaneo',
+      ]);
+      expect(
+        await s.db.select().from(patient).where(eq(patient.fiscalCode, who.codiceFiscale)),
+      ).toEqual([]);
+    });
+
     it('la segreteria sceglie l’archivio: senza scelta lo chiede', async () => {
       const missing = await create('segreteria', { identita: person(2) });
       expect(missing.statusCode, missing.body).toBe(400);

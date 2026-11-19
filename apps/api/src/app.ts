@@ -333,7 +333,6 @@ export function buildApp({
     stopAuraListener();
     await auraScheduler?.stop();
   });
-  registerAuraRoutes(app, { db, aura: auraService, now: now ?? (() => new Date()) });
   // Ricetta con esenzione: prima dei controlli, esenzioni rilette da AURA se non sono di adesso.
   const withAuraRefresh =
     (check: NonNullable<PrescriptionDeps['preSendChecks']>): PrescriptionDeps['preSendChecks'] =>
@@ -375,6 +374,8 @@ export function buildApp({
     expectedSince: (at) => referenceUpdates.expectedSince(at),
   });
   registerReferenceRoutes(app, reference, now ?? (() => new Date()));
+  // AURA (D197–D199): con le banche dati, per il nome del luogo di nascita dei nuovi assistiti.
+  registerAuraRoutes(app, { db, aura: auraService, now: now ?? (() => new Date()), reference });
   registerReferenceUpdateRoutes(app, db, referenceUpdates);
   // Alla chiusura si ferma l'orologio e il download in corso (il giro resta «interrotto»).
   app.addHook('onClose', async () => referenceUpdates.stop());

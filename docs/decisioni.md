@@ -985,3 +985,28 @@ Prove (servizio, interfaccia, browser con accessibilità) e diciannove sabotaggi
 - **Fuori, per ora**: l'identità (cognome, nome, nascita), che si corregge con un motivo e non da AURA; la scadenza di una scelta a tempo determinato, da verificare con le specifiche (oggi conta solo la cessazione); i nuovi assistiti, cioè chi sceglie il medico e non è ancora nell'archivio (domanda per la fermata).
 
 Prove (servizio, interfaccia, browser con accessibilità) e sabotaggi.
+
+**D199 · Nuovi assistiti da AURA, paziente temporaneo in un passo, stato del paziente alla ricetta.** Alla fermata dopo l'unione della #12 Simone ha dato il via alla #13 e, per i nuovi assistiti, ha scelto «Elenco in Oggi, un clic». Poi ha chiesto: «il medico deve poter inserire un paziente in incarico temporaneo e dunque poter prescrivere esami o farmaci. già previsto?». In parte: c'erano lo stato «temporaneo», la scelta con la scadenza e le ricette, ma lo stato si sceglieva solo dopo la registrazione e alla ricetta il programma non guardava lo stato di nessun paziente. Alla proposta ha risposto «ok, procedi così». Scelte:
+
+- **Nuovi assistiti da AURA.**
+  - **Quando.** Alla notifica di una scelta, e a ogni notifica di chi è già fra i nuovi, il programma legge il profilo in AURA. Conta la scelta che vale oggi o più avanti (non cessata, non scaduta) con un medico titolare di uno studio del servizio, riconosciuto dal codice fiscale, con il suo archivio. Se nello studio il paziente c'è già (stesso codice fiscale), si collega e si allinea; altrimenti entra fra i nuovi assistiti dell'archivio di quel medico. Un controllo alla volta per assistito, come in D198.
+  - **Chi lo vede.** Chi può registrare pazienti in quell'archivio, cioè scrivere l'anagrafica: il titolare, il sostituto autorizzato, la segreteria. Si vede nella pagina Oggi, con il codice fiscale mascherato come nell'elenco dei pazienti; la lettura resta nel registro.
+  - **«Registra».** Un clic: i dati di AURA con i controlli di «Nuovo paziente».
+    - Sesso e luogo di nascita dal codice fiscale (omocodia compresa); il nome del luogo dal catalogo dei comuni, se c'è.
+    - Residenza, domicilio, ASL e distretto di AURA, solo i valori che passano i controlli del pannello: gli altri si vedono dopo come differenze da confermare (D198).
+    - Stato «temporaneo» se la scelta ha una scadenza.
+    - Poi il collegamento con AURA porta esenzioni e scelte, con la fonte «AURA».
+    - Due clic insieme fanno un paziente solo: il primo prende il blocco dell'assistito, il secondo non lo aspetta (terrebbe occupata una connessione al database) e riceve «Registrazione già in corso». Un paziente registrato a mano nel frattempo si dice, con il collegamento alla sua cartella, e l'assistito esce dall'elenco.
+  - **«Non registrare».** Esce dall'elenco, e la scelta resta nel registro. Non si ripropone finché AURA non manda una scelta nuova (altro medico o altra data).
+  - **Esce dall'elenco da solo** quando la scelta non vale più, o AURA dice il decesso.
+  - **Dati.** Tabella `aura_new_patient` (migrazione 0035), con lo storico di ogni modifica e il divieto di cancellazione, nell'esportazione dell'archivio (regola 4).
+  - **Fuori, per ora.** Il giro di notte non trova i nuovi assistiti di cui la notifica non è arrivata: servirebbe l'elenco degli assistiti di un medico, se le specifiche AURA--SER-01 lo danno (da completare). Un paziente che c'è già in un altro archivio dello studio si allinea soltanto: non cambia archivio.
+- **Il giro di ogni notte comprende anche i temporanei**, che hanno scelte a tempo, anche da AURA.
+- **Paziente temporaneo in un passo solo.** In «Nuovo paziente» lo stato si sceglie: in carico o temporaneo. Per il temporaneo servono le date della scelta, dal giorno (per difetto oggi) fino alla scadenza. La scelta è del titolare dell'archivio, inserita a mano, e si registra nella stessa transazione del paziente. Si rifiutano il temporaneo senza scadenza, la scadenza prima della scelta e la scelta senza il temporaneo.
+- **Stato del paziente alla ricetta**: due regole nuove nei dati (versione 2026-11-19.2), come R18 (D154). Non sono nei requisiti: la fonte scritta nei dati è questa scelta di Simone, da validare con la Dr.ssa Rocca come le altre (validata: no).
+  - **R19, paziente deceduto: blocca.** La bozza e la ripetizione delle terapie si rifiutano subito (409), e la pagina della ricetta lo dice con il rimedio (correggere lo stato nei dati amministrativi, se è sbagliato). Una bozza fatta prima si ferma ai controlli prima dell'invio, e un motivo non basta.
+  - **R20, paziente revocato, o temporaneo senza una scelta in corso** (scaduta, cessata, futura o mancante): avviso con un motivo per procedere, come gli altri avvisi (tappa 4), e il motivo resta nel controllo. Il temporaneo con la scelta che vale non dà avvisi, fino al giorno della scadenza compreso. Contano le scelte non annullate, a mano o da AURA.
+  - La testata della cartella dice «deceduto il …» con la data.
+- **Prove.** Lo scenario delle prove tiene in carico il paziente con la cartella piena: da R19 e R20 lo stato conta alla ricetta, e uno stato dato a caso dal generatore renderebbe instabili le prove delle ricette.
+
+Prove (servizio, interfaccia, browser con accessibilità) e sabotaggi.

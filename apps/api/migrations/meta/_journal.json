@@ -246,6 +246,13 @@
       "when": 1795111217368,
       "tag": "0034_aura_anagrafica",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1795115180048,
+      "tag": "0035_aura_nuovi_assistiti",
+      "breakpoints": true
     }
   ]
 }

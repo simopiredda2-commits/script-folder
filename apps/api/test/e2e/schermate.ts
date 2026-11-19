@@ -24,6 +24,7 @@ import { buildApp } from '../../src/app';
 import { loadConfig } from '../../src/config';
 import { referenceUpdatesFromConfig } from '../../src/reference/updates-service';
 import { createDatabase, createPool } from '../../src/db/client';
+import { DEMO_REFERENCE_DATE } from '../../src/db/demo';
 import { studioDate } from '../../src/prescriptions/rules-check';
 import { base32Decode } from '../../src/security/base32';
 import { totp } from '../../src/security/totp';
@@ -794,6 +795,90 @@ try {
     .getByText(/AURA segnala il decesso/)
     .waitFor();
   await shot(page, '61-variazioni-da-aura-in-oggi', true);
+
+  // D199: due assistiti inventati scelgono il medico dimostrativo in AURA, uno con una scelta
+  // temporanea; la notifica li porta fra i nuovi assistiti nella pagina Oggi.
+  const doctorCf = (
+    await db.execute<{ cf: string }>(sql`
+      select fiscal_code as cf from doctor_profile where regional_code = 'DEMO-0001'`)
+  ).rows[0]!.cf;
+  const today = studioDate(new Date());
+  const newOnes = generatePatients({
+    seed: 'schermate-nuovi-assistiti',
+    count: 2,
+    minAge: 18,
+    referenceDate: DEMO_REFERENCE_DATE,
+  });
+  for (const [i, n] of newOnes.entries()) {
+    const id = aura.register({
+      fiscalCode: n.fiscalCode,
+      lastName: n.lastName.toUpperCase(),
+      firstName: n.firstName.toUpperCase(),
+      birthDate: n.birthDate,
+      exemptions: [],
+      choices: [],
+      registry: {
+        ...EMPTY_AURA_REGISTRY,
+        residenceTown: 'COMUNE DIMOSTRATIVO',
+        asl: 'ASL DIMOSTRATIVA',
+      },
+    });
+    aura.setChoice(id, {
+      doctorFiscalCode: doctorCf,
+      chosenOn: today,
+      expiresOn: i === 1 ? studioDate(new Date(Date.now() + 120 * 86_400_000)) : null,
+      endedOn: null,
+      endReason: null,
+    });
+  }
+  const signalled = async () =>
+    Number(
+      (
+        await db.execute<{ n: string }>(
+          sql`select count(*)::text as n from aura_new_patient where status = 'da_registrare'`,
+        )
+      ).rows[0]!.n,
+    );
+  for (let i = 0; i < 100 && (await signalled()) < 2; i++)
+    await new Promise((r) => setTimeout(r, 50));
+  await page.goto(base);
+  const newRegion = page.getByRole('region', { name: 'Nuovi assistiti in AURA' });
+  await newRegion.getByRole('table', { name: 'Nuovi assistiti da registrare' }).waitFor();
+  await newRegion.scrollIntoViewIfNeeded();
+  await shot(page, '63-nuovi-assistiti-in-oggi');
+
+  // D199: il paziente temporaneo si registra in un passo solo, con la scadenza della scelta.
+  const [temporary] = generatePatients({
+    seed: 'schermate-temporaneo',
+    count: 1,
+    minAge: 18,
+    referenceDate: DEMO_REFERENCE_DATE,
+  });
+  await page.goto(`${base}/pazienti/nuovo`);
+  await page.getByRole('heading', { level: 1, name: 'Nuovo paziente' }).waitFor();
+  await page.getByLabel('Cognome').fill(temporary!.lastName);
+  await page.getByLabel('Nome', { exact: true }).fill(temporary!.firstName);
+  await page.getByLabel(temporary!.sex === 'M' ? 'Maschile' : 'Femminile').check();
+  await page.getByLabel('Data di nascita').fill(temporary!.birthDate);
+  await page.getByLabel('Codice catastale del luogo di nascita').fill(temporary!.birthPlace.code);
+  await page.getByLabel('Codice fiscale').fill(temporary!.fiscalCode);
+  await page.getByLabel('Temporaneo, con la scadenza della scelta').check();
+  await page
+    .getByLabel('Scadenza della scelta', { exact: true })
+    .fill(studioDate(new Date(Date.now() + 180 * 86_400_000)));
+  await page.getByRole('group', { name: 'Stato' }).scrollIntoViewIfNeeded();
+  await shot(page, '64-nuovo-paziente-temporaneo');
+
+  // D199: confermato il decesso segnalato da AURA, la ricetta non si fa (R19).
+  await page.goto(`${base}/pazienti/${other.id}/amministrazione#aura`);
+  await auraSection.getByRole('button', { name: 'Conferma il decesso' }).click();
+  await auraSection
+    .getByText(/decesso/i)
+    .first()
+    .waitFor();
+  await page.goto(`${base}/pazienti/${other.id}/ricetta`);
+  await page.getByText(/la ricetta non si fa/).waitFor();
+  await shot(page, '65-ricetta-paziente-deceduto');
 
   await browser.close();
   await new Promise((ok) => web.close(ok));

@@ -154,17 +154,9 @@ describe('AURA: esenzioni e scelte dall’anagrafe regionale (D197)', () => {
         },
       ],
     });
-    // Nello scenario il paziente può essere «revocato»: con una scelta in corso del titolare in
-    // AURA torna in carico da solo (D198), e anche questo è una variazione.
-    const [{ status: before }] = (await t.db
-      .select({ status: patient.status })
-      .from(patient)
-      .where(eq(patient.id, s.richPatient))) as [{ status: string }];
+    // Nello scenario il paziente principale è in carico (D199): due esenzioni e una scelta.
     const res = await sync();
-    expect(res.json()).toMatchObject({
-      esito: 'aggiornato',
-      variazioni: before === 'revoked' ? 4 : 3,
-    });
+    expect(res.json()).toMatchObject({ esito: 'aggiornato', variazioni: 3 });
     expect(res.json().stato).toMatchObject({ idAura: auraId, esito: 'aggiornato' });
     expect((await fromAura()).map((e) => [e.code, e.validTo])).toEqual([
       ['013', null],
@@ -385,6 +377,9 @@ describe('AURA: esenzioni e scelte dall’anagrafe regionale (D197)', () => {
             and(eq(accessLog.patientId, s.richPatient), eq(accessLog.action, 'aggiornamento_aura')),
           )
       ).length;
+    // Un paziente dell'archivio temporaneo apposta: il giro lo deve contare (D199).
+    const temporary = s.patients.titolare[2]!;
+    await t.db.update(patient).set({ status: 'temporary' }).where(eq(patient.id, temporary));
     const [h0, l0] = [await history(), await logged()];
     expect(h0).toBeGreaterThan(1);
     const run = await service.syncAll('notte');
@@ -393,8 +388,8 @@ describe('AURA: esenzioni e scelte dall’anagrafe regionale (D197)', () => {
       t.db.execute(sql`delete from aura_link where patient_id = ${s.richPatient}`),
       /non si cancellano/,
     );
-    // In carico, e i revocati già collegati ad AURA (D198): qui il paziente di prima, revocato
-    // quando AURA ha detto cessata la scelta del titolare.
+    // In carico, temporanei (D199) e revocati già collegati ad AURA (D198): qui il paziente di
+    // prima, revocato quando AURA ha detto cessata la scelta del titolare.
     const active = await t.db
       .select({ id: patient.id })
       .from(patient)
@@ -404,11 +399,12 @@ describe('AURA: esenzioni e scelte dall’anagrafe regionale (D197)', () => {
           eq(patient.studioId, s.studioId),
           or(
             eq(patient.status, 'active'),
+            eq(patient.status, 'temporary'),
             and(eq(patient.status, 'revoked'), isNotNull(auraLink.auraId)),
           ),
         ),
       );
-    expect(active.map((a) => a.id)).toContain(s.richPatient);
+    expect(active.map((a) => a.id)).toEqual(expect.arrayContaining([s.richPatient, temporary]));
     expect(run.patients).toBe(active.length);
     expect(run.failed).toBe(0);
     const [stored] = await t.db.select().from(auraSyncRun).where(eq(auraSyncRun.id, run.id));

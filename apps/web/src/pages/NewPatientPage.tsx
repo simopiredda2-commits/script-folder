@@ -343,7 +343,21 @@ const LABELS: Record<string, string> = {
   ...IDENTITY_LABELS,
   ...Object.fromEntries(CONTACTS.map((c) => [c.key, c.label])),
   archivioId: 'Archivio',
+  dal: 'Scelta dal',
+  scadenza: 'Scadenza della scelta',
 };
+
+/** Stato del paziente nuovo (D199): in carico, o temporaneo con le date della scelta. */
+interface NewPatientState {
+  stato: 'attivo' | 'temporaneo';
+  dal: string;
+  scadenza: string;
+}
+const EMPTY_STATE: NewPatientState = { stato: 'attivo', dal: '', scadenza: '' };
+const STATES: [NewPatientState['stato'], string][] = [
+  ['attivo', 'In carico'],
+  ['temporaneo', 'Temporaneo, con la scadenza della scelta'],
+];
 
 /**
  * Nuovo paziente (tappa 15): identità con il controllo del codice fiscale, archivio se c'è da
@@ -365,6 +379,11 @@ export function NewPatientPage() {
     'bozza-nuovo-paziente-archivio',
     '',
   );
+  const [state, setState, resetState] = usePersistentState<NewPatientState>(
+    'bozza-nuovo-paziente-stato',
+    EMPTY_STATE,
+  );
+  const today = studioToday();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
@@ -402,6 +421,8 @@ export function NewPatientPage() {
       const v = contacts[c.key].trim();
       if (v) dati[c.key] = c.key === 'residenzaProvincia' ? v.toUpperCase() : v;
     }
+    const temporary = state.stato === 'temporaneo';
+    if (temporary) dati['stato'] = 'temporaneo';
     try {
       const created = await api<{ id: string }>('/api/pazienti', {
         method: 'POST',
@@ -409,11 +430,16 @@ export function NewPatientPage() {
           ...(chosen ? { archivioId: chosen } : {}),
           identita: identityBody(identity),
           dati,
+          // Senza la scadenza il servizio dice che serve: il controllo è uno solo, lì.
+          ...(temporary && state.scadenza
+            ? { sceltaTemporanea: { dal: state.dal || today, scadenza: state.scadenza } }
+            : {}),
         },
       });
       resetIdentity();
       resetContacts();
       resetArchive();
+      resetState();
       void navigate(`/pazienti/${created.id}`);
     } catch (err) {
       setError(failure(err));
@@ -459,6 +485,57 @@ export function NewPatientPage() {
           </p>
         )}
         <fieldset disabled={busy} className="riquadro">
+          <legend>Stato</legend>
+          <div className="scelta">
+            {STATES.map(([v, label]) => (
+              <div key={v} className="casella">
+                <input
+                  type="radio"
+                  id={`nuovo-stato-${v}`}
+                  name="nuovo-stato"
+                  value={v}
+                  checked={state.stato === v}
+                  onChange={() => setState({ ...state, stato: v })}
+                />
+                <label htmlFor={`nuovo-stato-${v}`}>{label}</label>
+              </div>
+            ))}
+          </div>
+          {state.stato === 'temporaneo' && (
+            <>
+              <div className="campi-in-riga">
+                <div className="campo campo-stretto">
+                  <label htmlFor="nuovo-scelta-dal">{LABELS.dal}</label>
+                  <input
+                    id="nuovo-scelta-dal"
+                    type="date"
+                    required
+                    value={state.dal || today}
+                    onChange={(e) => setState({ ...state, dal: e.target.value })}
+                  />
+                </div>
+                <div className="campo campo-stretto">
+                  <label htmlFor="nuovo-scelta-scadenza">{LABELS.scadenza}</label>
+                  <input
+                    id="nuovo-scelta-scadenza"
+                    type="date"
+                    required
+                    min={state.dal || today}
+                    aria-describedby="nuovo-scelta-aiuto"
+                    value={state.scadenza}
+                    onChange={(e) => setState({ ...state, scadenza: e.target.value })}
+                  />
+                </div>
+              </div>
+              <p className="aiuto" id="nuovo-scelta-aiuto">
+                La scelta è del titolare dell’archivio e vale fino alla scadenza compresa. Finché
+                vale, le ricette si fanno come per gli altri pazienti; dopo, alla ricetta il
+                programma avvisa e chiede un motivo (R20).
+              </p>
+            </>
+          )}
+        </fieldset>
+        <fieldset disabled={busy} className="riquadro">
           <legend>Residenza e recapiti</legend>
           <div className="campi-in-riga">
             {CONTACTS.map((c) => (
@@ -477,8 +554,8 @@ export function NewPatientPage() {
             ))}
           </div>
           <p className="aiuto">
-            Dati SSN, stato, esenzioni, scelta del medico, canale del promemoria e nucleo familiare
-            si completano dopo, nei «Dati amministrativi» della cartella.
+            Dati SSN, esenzioni, scelta del medico per chi è in carico, canale del promemoria e
+            nucleo familiare si completano dopo, nei «Dati amministrativi» della cartella.
           </p>
         </fieldset>
         <FormError error={error} labels={LABELS}>
@@ -502,6 +579,7 @@ export function NewPatientPage() {
               resetIdentity();
               resetContacts();
               resetArchive();
+              resetState();
               setError(null);
             }}
           >

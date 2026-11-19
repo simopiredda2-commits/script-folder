@@ -7,6 +7,7 @@ import {
   exemption,
   historicalPrescription,
   patient,
+  patientChoice,
   prescription,
   prescriptionLine,
   therapeuticPlan,
@@ -145,7 +146,18 @@ export async function buildRuleContext(
       reminderChannel: pt!.reminderChannel,
       reminderContact: pt!.reminderContact,
       reminderChannelChosenOn: pt!.reminderChannelChosenOn,
+      // Stato nella cartella e scelte del medico (R19, R20; D199).
+      status: pt!.status,
+      deceasedOn: pt!.deceasedOn,
     },
+    choices: await db
+      .select({
+        chosenOn: patientChoice.chosenOn,
+        expiresOn: patientChoice.expiresOn,
+        endedOn: patientChoice.endedOn,
+      })
+      .from(patientChoice)
+      .where(and(eq(patientChoice.patientId, p.patientId), isNull(patientChoice.annulledAt))),
     ...(serviceCatalog ? { serviceCatalog } : {}),
     exemptions: await db
       .select({ code: exemption.code, validFrom: exemption.validFrom, validTo: exemption.validTo })

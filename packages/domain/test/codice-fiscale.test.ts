@@ -4,6 +4,7 @@ import {
   buildFiscalCode,
   checkCharacter,
   checkFiscalCode,
+  fiscalCodeFacts,
   nameCode,
   ODD_VALUES,
   surnameCode,
@@ -103,5 +104,31 @@ describe('codice fiscale (DM 23/12/1976)', () => {
     // Ultima cifra del luogo (2) sostituita con N, poi carattere di controllo ricalcolato.
     const omo15 = base.slice(0, 14) + 'N';
     expect(checkFiscalCode(omo15 + checkCharacter(omo15))).toEqual({ valid: true });
+  });
+
+  it('sesso e luogo di nascita dal codice fiscale, anche con l’omocodia (D199)', () => {
+    const woman = buildFiscalCode({
+      surname: 'Riva',
+      name: 'Anna',
+      birthDate: '1975-10-02',
+      sex: 'F',
+      placeCode: 'X202',
+    });
+    expect(fiscalCodeFacts(woman)).toEqual({ sex: 'F', placeCode: 'X202' });
+    const man = buildFiscalCode({
+      surname: 'Riva',
+      name: 'Ettore',
+      birthDate: '1975-10-31',
+      sex: 'M',
+      placeCode: 'X202',
+    });
+    expect(fiscalCodeFacts(man.toLowerCase())).toEqual({ sex: 'M', placeCode: 'X202' });
+    // Giorno 42 con la seconda cifra al posto di lettera (2 → N) e luogo 2 → N: si leggono le cifre.
+    const omo15 = woman.slice(0, 10) + 'N' + woman.slice(11, 14) + 'N';
+    expect(fiscalCodeFacts(omo15 + checkCharacter(omo15))).toEqual({
+      sex: 'F',
+      placeCode: 'X202',
+    });
+    expect(fiscalCodeFacts('NONVALIDO')).toBeNull();
   });
 });

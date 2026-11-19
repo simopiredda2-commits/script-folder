@@ -23,6 +23,8 @@ export interface Patient {
   email: string | null;
   asl: string | null;
   status: string;
+  /** Data del decesso, per un paziente deceduto. */
+  deceasedOn?: string | null;
 }
 
 export interface Summary {
@@ -132,7 +134,12 @@ export function PatientBanner({
           {showCf ? 'Nascondi il codice fiscale' : 'Mostra il codice fiscale'}
         </button>
         {patient.status !== 'active' && (
-          <span className="etichetta">{STATUS[patient.status] ?? patient.status}</span>
+          <span className="etichetta">
+            {STATUS[patient.status] ?? patient.status}
+            {patient.status === 'deceased' && patient.deceasedOn
+              ? ` il ${date(patient.deceasedOn)}`
+              : ''}
+          </span>
         )}
       </p>
       {summary && (

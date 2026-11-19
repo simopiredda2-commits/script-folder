@@ -91,7 +91,16 @@ export interface RuleContext {
     reminderChannel: string | null;
     reminderContact: string | null;
     reminderChannelChosenOn: string | null;
+    /** Stato nella cartella (R19, R20; D199). Assente nelle prove che non lo guardano. */
+    status?: 'active' | 'revoked' | 'deceased' | 'temporary';
+    /** Data del decesso, se il paziente risulta deceduto. */
+    deceasedOn?: string | null;
   };
+  /**
+   * Scelte del medico del paziente, non annullate, a mano o da AURA (R20; D199): conta se ce n'è una
+   * in corso alla data della ricetta.
+   */
+  choices?: { chosenOn: string; expiresOn: string | null; endedOn: string | null }[];
   exemptions: { code: string; validFrom: string; validTo: string | null }[];
   delegations: {
     email: string | null;

@@ -1,11 +1,19 @@
+import { can, fiscalCodeFacts } from '@mmg/domain';
+import { and, eq, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { newPatientBody } from '../aura/new-patients';
 import { adminBodyFor, REGISTRY_FIELD_KEYS } from '../aura/registry';
 import type { AuraService } from '../aura/service';
-import { logAccess, logAccessForPatients } from '../audit/access-log';
+import type { Actor } from '../auth/service';
+import { logAccess, logAccessForPatients, type AccessAction } from '../audit/access-log';
 import type { Database } from '../db/client';
-import { guardPatient, visibleArchives } from '../patients/access';
-import { updateAdmin } from '../patients/admin';
+import { auraNewPatient } from '../db/schema';
+import { withActor } from '../db/tx';
+import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
+import { createPatient, updateAdmin } from '../patients/admin';
+import { studioDate } from '../prescriptions/rules-check';
+import type { ReferenceData } from '../reference/lookup';
 import { HttpError } from './errors';
 
 const idParams = z.object({ id: z.uuid() });
@@ -35,10 +43,164 @@ const choicesBody = z
  */
 export function registerAuraRoutes(
   app: FastifyInstance,
-  deps: { db: Database; aura: AuraService; now: () => Date },
+  deps: { db: Database; aura: AuraService; now: () => Date; reference?: ReferenceData },
 ): void {
-  const { db, aura, now } = deps;
+  const { db, aura, now, reference } = deps;
   const scoped = { config: { patientScoped: true } };
+
+  /** Un nuovo assistito dello studio di chi chiede (D199); 404 se non c'è. */
+  async function candidate(actor: Actor, id: string) {
+    const [c] = await db
+      .select()
+      .from(auraNewPatient)
+      .where(and(eq(auraNewPatient.id, id), eq(auraNewPatient.studioId, actor.studioId)));
+    if (!c) throw new HttpError(404, 'Nuovo assistito non trovato');
+    return c;
+  }
+
+  /** Prima il permesso: scrivere l'anagrafica nell'archivio del medico scelto. Un no si registra. */
+  async function guardCandidate(
+    actor: Actor,
+    c: typeof auraNewPatient.$inferSelect,
+    action: AccessAction,
+  ) {
+    const decision = can(actor, 'registry.write', {
+      ...(await loadArchiveContext(db, c.archiveId)),
+      now: now(),
+    });
+    if (decision.allowed) return;
+    await logAccess(db, {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      action,
+      outcome: 'negato',
+      workstation: actor.workstation,
+      details: { permesso: 'registry.write', nuovoAssistito: c.id, motivo: decision.reason },
+    });
+    throw new HttpError(403, decision.reason);
+  }
+
+  /**
+   * Nuovi assistiti segnalati da AURA (D199): chi ha scelto un medico dello studio e non è ancora
+   * nel suo archivio, negli archivi dove chi legge può registrare pazienti. La lettura si registra.
+   */
+  app.get('/api/aura/nuovi', async (req) => {
+    const actor = req.actor!;
+    const archives = await visibleArchives(db, actor, 'registry.write');
+    const rows = await aura.newPatientsFor(actor.studioId, archives);
+    if (rows.length)
+      await logAccess(db, {
+        studioId: actor.studioId,
+        userId: actor.userId,
+        action: 'lettura_nuovi_assistiti_aura',
+        outcome: 'consentito',
+        workstation: actor.workstation,
+        details: { nuoviAssistiti: rows.map((r) => r.c.id) },
+      });
+    return {
+      disponibile: aura.available(),
+      nuovi: rows.map(({ c, doctor }) => ({
+        id: c.id,
+        cognome: c.lastName,
+        nome: c.firstName,
+        nascita: c.birthDate,
+        codiceFiscale: c.fiscalCode,
+        medico: doctor,
+        sceltaDal: c.chosenOn,
+        scadenza: c.expiresOn,
+        segnalatoIl: c.notifiedAt.toISOString(),
+      })),
+    };
+  });
+
+  /**
+   * «Registra» (D199): il paziente entra nell'archivio del medico con i dati di AURA e i controlli
+   * di «Nuovo paziente», poi si collega ad AURA, che porta esenzioni e scelte. Un assistito alla
+   * volta, insieme alle notifiche: due clic non registrano due volte. Chi arriva mentre un altro
+   * registra non aspetta il blocco (terrebbe occupata una connessione al database): lo si dice.
+   */
+  app.post('/api/aura/nuovi/:id/registra', async (req, reply) => {
+    const actor = req.actor!;
+    const { id } = idParams.parse(req.params);
+    const first = await candidate(actor, id);
+    await guardCandidate(actor, first, 'nuovo_paziente');
+    const at = now();
+    let created: { id: string; avvisi: string[] };
+    try {
+      created = await withActor(db, actor.userId, async (tx) => {
+        const lock = await tx.execute<{ preso: boolean }>(
+          sql`select pg_try_advisory_xact_lock(hashtextextended(${`aura-nuovo:${first.auraId}`}, 0)) as preso`,
+        );
+        if (!lock.rows[0]?.preso)
+          throw new HttpError(409, 'Registrazione già in corso: ricarica la pagina tra poco');
+        const [c] = await tx.select().from(auraNewPatient).where(eq(auraNewPatient.id, id));
+        if (c!.status !== 'da_registrare')
+          throw new HttpError(
+            409,
+            c!.status === 'registrato'
+              ? 'Già registrato'
+              : 'Non è più fra i nuovi assistiti: ricarica la pagina',
+            c!.patientId ? { paziente: { id: c!.patientId } } : undefined,
+          );
+        const facts = fiscalCodeFacts(c!.fiscalCode);
+        const place = facts ? await reference?.municipality(facts.placeCode, studioDate(at)) : null;
+        const p = await createPatient(db, actor, newPatientBody(c!, place?.name ?? null), at, {
+          details: { fonte: 'AURA', nuovoAssistito: c!.id },
+          choiceFromAura: true,
+        });
+        await tx
+          .update(auraNewPatient)
+          .set({ status: 'registrato', patientId: p.id, decidedBy: actor.userId, decidedAt: at })
+          .where(eq(auraNewPatient.id, id));
+        return p;
+      });
+    } catch (err) {
+      // Il codice fiscale c'è già nello studio: l'assistito esce dall'elenco, e lo si dice.
+      const details = err instanceof HttpError ? (err.details as { paziente?: unknown }) : null;
+      if (err instanceof HttpError && err.statusCode === 409 && details && 'paziente' in details)
+        await withActor(db, actor.userId, (tx) =>
+          tx
+            .update(auraNewPatient)
+            .set({ status: 'superato' })
+            .where(and(eq(auraNewPatient.id, id), eq(auraNewPatient.status, 'da_registrare'))),
+        );
+      throw err;
+    }
+    const sync = await aura.syncPatient(created.id, 'manuale', actor.userId);
+    void reply.code(201);
+    return {
+      id: created.id,
+      avvisi: created.avvisi,
+      aura: { esito: sync.outcome, messaggio: sync.message, variazioni: sync.changes },
+    };
+  });
+
+  /** «Non registrare» (D199): esce dall'elenco e non si ripropone finché AURA non manda una scelta nuova. */
+  app.post('/api/aura/nuovi/:id/non-registrare', async (req) => {
+    const actor = req.actor!;
+    const { id } = idParams.parse(req.params);
+    const c = await candidate(actor, id);
+    await guardCandidate(actor, c, 'nuovo_assistito_non_registrato');
+    const at = now();
+    const done = await withActor(db, actor.userId, (tx) =>
+      tx
+        .update(auraNewPatient)
+        .set({ status: 'non_registrato', decidedBy: actor.userId, decidedAt: at })
+        .where(and(eq(auraNewPatient.id, id), eq(auraNewPatient.status, 'da_registrare')))
+        .returning({ id: auraNewPatient.id }),
+    );
+    if (done.length === 0)
+      throw new HttpError(409, 'Non è più fra i nuovi assistiti: ricarica la pagina');
+    await logAccess(db, {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      action: 'nuovo_assistito_non_registrato',
+      outcome: 'riuscito',
+      workstation: actor.workstation,
+      details: { nuovoAssistito: id, archivio: c.archiveId },
+    });
+    return { id, stato: 'non_registrato' };
+  });
 
   app.get('/api/pazienti/:id/aura', scoped, async (req) => {
     const { id } = idParams.parse(req.params);

@@ -118,6 +118,18 @@ function decodeOmocodia(code: string): string {
   return chars.join('');
 }
 
+/**
+ * Sesso e codice del luogo di nascita scritti nel codice fiscale, con le cifre al posto delle
+ * lettere dell'omocodia (DM 23/12/1976): per le donne il giorno aumenta di 40. Null se il codice
+ * non è formalmente corretto. Serve a registrare un assistito arrivato da AURA (D199).
+ */
+export function fiscalCodeFacts(raw: string): { sex: Sex; placeCode: string } | null {
+  const code = raw.trim().toUpperCase();
+  if (!checkFiscalCode(code).valid) return null;
+  const plain = decodeOmocodia(code);
+  return { sex: Number(plain.slice(9, 11)) > 40 ? 'F' : 'M', placeCode: plain.slice(11, 15) };
+}
+
 export type FiscalCodeProblem = 'lunghezza' | 'struttura' | 'giorno' | 'controllo';
 
 /** Controllo formale: struttura, giorno di nascita ammesso, carattere di controllo. */

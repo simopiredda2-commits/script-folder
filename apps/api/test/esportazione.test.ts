@@ -128,6 +128,8 @@ describe('esportazione completa dei dati del medico', () => {
       ...PSS_TABLES,
       'patient',
       'family',
+      // Esportata per archivio, non per paziente (D199).
+      'aura_new_patient',
     ]) {
       expect(doc.tabelle, tname).toHaveProperty(tname);
     }

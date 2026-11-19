@@ -83,19 +83,23 @@ const blocks = (c: RuleContext, id: string) =>
 describe('dati delle regole', () => {
   const [ruleset] = loadRulesets();
 
-  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3', () => {
+  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2', () => {
     const all = loadRulesets();
     expect(all.map((r) => r.version)).toEqual([
       '2026-11-18.1',
       '2026-11-18.2',
       '2026-11-18.3',
       '2026-11-19.1',
+      '2026-11-19.2',
     ]);
-    const upTo17 = RULE_IDS.filter((id) => id !== 'R18');
+    const upTo17 = RULE_IDS.filter((id) => !['R18', 'R19', 'R20'].includes(id));
     for (const rs of all.slice(0, 2)) {
       expect(rs.rules.map((r) => r.id).sort()).toEqual([...upTo17].sort());
     }
-    for (const rs of all.slice(2)) {
+    for (const rs of all.slice(2, 4)) {
+      expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...upTo17, 'R18'].sort());
+    }
+    for (const rs of all.slice(4)) {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...RULE_IDS].sort());
     }
   });
@@ -115,7 +119,28 @@ describe('dati delle regole', () => {
         expect(r, r.id).toEqual(before);
       }
     }
-    expect(rulesetAt('2026-11-19').version).toBe('2026-11-19.1');
+    expect(
+      rulesetAt(
+        '2026-11-19',
+        all.filter((r) => r.version !== '2026-11-19.2'),
+      ).version,
+    ).toBe('2026-11-19.1');
+  });
+
+  it('dalla 2026-11-19.2 R19 blocca e R20 avvisa (D199); il resto come la 2026-11-19.1', () => {
+    const all = loadRulesets();
+    const v4 = all.find((r) => r.version === '2026-11-19.1')!;
+    const v5 = all.find((r) => r.version === '2026-11-19.2')!;
+    expect(v5.effectiveFrom).toBe('2026-11-19');
+    expect(rulesetAt('2026-11-19').version).toBe('2026-11-19.2');
+    for (const r of v5.rules) {
+      if (r.id === 'R19' || r.id === 'R20') {
+        expect(r.behavior, r.id).toBe(r.id === 'R19' ? 'block' : 'warn');
+        expect(r.sources[0]!.title, r.id).toMatch(/D199/);
+      } else {
+        expect(r, r.id).toEqual(v4.rules.find((x) => x.id === r.id));
+      }
+    }
   });
 
   it('la versione .2 rende R11 solo informativo (seconda fermata); la .1 resta com’era', () => {
@@ -339,7 +364,8 @@ describe('R5, R6 · piano terapeutico', () => {
       sentLines: sent,
       prescription: { lines: [line({ quantity: 2 })] },
     });
-    expect(run(c).rulesVersion).toBe('2026-11-19.1');
+    // In vigore il 25/11/2026: la 2026-11-19.2, con R6 come nella 2026-11-19.1 (D181).
+    expect(run(c).rulesVersion).toBe('2026-11-19.2');
     expect(blocks(c, 'R6')).toBe(true);
     expect(of(c, 'R6')[0]!.message).toBe(
       'Farmaco di prova 5 mg: il piano autorizza 4 confezioni, già prescritte 3, di cui 2 con un altro programma; residuo 1',
@@ -778,5 +804,106 @@ describe('R17 · esenzione e prestazioni', () => {
     expect(i).toHaveLength(1);
     expect(i[0]!.lineId).toBe('b');
     expect(i[0]!.message).toMatch(/Spostala/);
+  });
+});
+
+describe('R19 e R20 · stato del paziente alla ricetta (D199)', () => {
+  const withStatus = (
+    status: 'active' | 'revoked' | 'deceased' | 'temporary',
+    over: Partial<Omit<RuleContext, 'prescription' | 'patient'>> & {
+      deceasedOn?: string | null;
+    } = {},
+  ) => {
+    const { deceasedOn = null, ...rest } = over;
+    const base = ctx({ date: '2026-11-20', ...rest });
+    return { ...base, patient: { ...base.patient, status, deceasedOn } };
+  };
+  const choice = (chosenOn: string, expiresOn: string | null, endedOn: string | null = null) => ({
+    chosenOn,
+    expiresOn,
+    endedOn,
+  });
+
+  it('in carico: nessun problema, con o senza scelte', () => {
+    expect(of(withStatus('active'), 'R19')).toEqual([]);
+    expect(of(withStatus('active'), 'R20')).toEqual([]);
+    expect(
+      of(withStatus('active', { choices: [choice('2020-01-01', '2021-01-01')] }), 'R20'),
+    ).toEqual([]);
+  });
+
+  it('R19: deceduto, la ricetta non si fa, per ogni tipo di ricetta, con la data e il rimedio', () => {
+    const dead = withStatus('deceased', { deceasedOn: '2026-11-17' });
+    expect(blocks(dead, 'R19')).toBe(true);
+    expect(of(dead, 'R19')[0]).toMatchObject({
+      severity: 'block',
+      message: 'Il paziente risulta deceduto il 17/11/2026: la ricetta non si fa',
+    });
+    expect(of(dead, 'R19')[0]!.remedy).toMatch(/Dati amministrativi/);
+    expect(of(dead, 'R19')[0]!.source).toMatch(/D199/);
+    for (const kind of ['specialist_ssn', 'white', 'devices'] as const) {
+      const other = withStatus('deceased', { prescription: { kind, lines: [line()] } } as never);
+      expect(blocks({ ...other, prescription: { ...other.prescription, kind } }, 'R19'), kind).toBe(
+        true,
+      );
+    }
+    // Un motivo non lo supera: è un blocco.
+    expect(blocks(withStatus('deceased', { reasons: { R19: 'Prova' } }), 'R19')).toBe(true);
+    expect(of(withStatus('deceased'), 'R19')[0]!.message).toBe(
+      'Il paziente risulta deceduto: la ricetta non si fa',
+    );
+  });
+
+  it('R20: revocato, serve un motivo; con il motivo si procede e il motivo resta', () => {
+    const revoked = withStatus('revoked', {
+      choices: [choice('2020-01-01', null, '2026-11-10'), choice('2026-12-01', null)],
+    });
+    expect(of(revoked, 'R20')[0]).toMatchObject({
+      severity: 'warn',
+      needs: 'reason',
+      message:
+        'Paziente revocato: la scelta del medico è cessata il 10/11/2026. Serve un motivo per procedere',
+    });
+    expect(blocks(revoked, 'R20')).toBe(true);
+    const ok = { ...revoked, reasons: { R20: 'Visita occasionale' } };
+    expect(blocks(ok, 'R20')).toBe(false);
+    expect(of(ok, 'R20')[0]!.message).toMatch(/motivo registrato: Visita occasionale$/);
+    expect(run(ok).reasonsUsed).toEqual({ R20: 'Visita occasionale' });
+    expect(of(withStatus('revoked'), 'R20')[0]!.message).toMatch(
+      /^Paziente revocato: non è più in carico\./,
+    );
+  });
+
+  it('R20: temporaneo con la scelta che vale, nessun avviso; fino al giorno della scadenza compreso', () => {
+    const valid = withStatus('temporary', { choices: [choice('2026-11-01', '2027-05-01')] });
+    expect(of(valid, 'R20')).toEqual([]);
+    const lastDay = withStatus('temporary', {
+      date: '2027-05-01',
+      choices: [choice('2026-11-01', '2027-05-01')],
+    });
+    expect(of(lastDay, 'R20')).toEqual([]);
+  });
+
+  it('R20: temporaneo con la scelta scaduta, cessata, futura o mancante: avviso con il perché', () => {
+    const expired = withStatus('temporary', { choices: [choice('2026-05-01', '2026-11-19')] });
+    expect(of(expired, 'R20')[0]!.message).toBe(
+      'Paziente temporaneo: la scelta è scaduta il 19/11/2026. Serve un motivo per procedere',
+    );
+    expect(blocks(expired, 'R20')).toBe(true);
+    const ended = withStatus('temporary', {
+      choices: [choice('2026-05-01', '2027-05-01', '2026-11-15')],
+    });
+    expect(of(ended, 'R20')[0]!.message).toMatch(/^Paziente temporaneo senza una scelta in corso/);
+    const future = withStatus('temporary', { choices: [choice('2026-12-01', '2027-06-01')] });
+    expect(blocks(future, 'R20')).toBe(true);
+    expect(of(withStatus('temporary'), 'R20')[0]!.message).toBe(
+      'Paziente temporaneo senza una scelta in corso. Serve un motivo per procedere',
+    );
+  });
+
+  it('le ricette controllate con la versione precedente restano com’erano', () => {
+    const before = loadRulesets().filter((r) => r.version !== '2026-11-19.2');
+    const dead = withStatus('deceased');
+    expect(checkPrescription(dead, before).issues.some((i) => i.ruleId === 'R19')).toBe(false);
   });
 });
