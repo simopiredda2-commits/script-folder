@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { ErrorMessage, Loading, Notice } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, type ApiError } from '../lib/api';
-import { date, dateTime, plural } from '../lib/format';
+import { date, dateTime, maskedFiscalCode, plural } from '../lib/format';
 import { useApi } from '../lib/useApi';
 import { failure } from './NewPatientPage';
 
@@ -410,6 +410,146 @@ export function AuraChangesToday() {
             ))}
           </ul>
         </>
+      )}
+    </section>
+  );
+}
+
+/** Un nuovo assistito segnalato da AURA (D199). */
+export interface NewPatient {
+  id: string;
+  cognome: string;
+  nome: string;
+  nascita: string;
+  codiceFiscale: string;
+  medico: string;
+  sceltaDal: string;
+  scadenza: string | null;
+  segnalatoIl: string;
+}
+
+/**
+ * Nuovi assistiti in AURA (D199), nella pagina Oggi: chi ha scelto un medico dello studio e non è
+ * ancora nel suo archivio. Medico o segreteria lo registrano con un clic dai dati di AURA, o
+ * scelgono di non registrarlo. Lo vede solo chi può registrare pazienti in quell'archivio.
+ */
+export function AuraNewPatientsToday() {
+  const r = useApi<{ disponibile: boolean; nuovi: NewPatient[] }>('/api/aura/nuovi');
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<{ patientId?: string; text: string } | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  // Una risposta inattesa non deve far cadere la pagina Oggi.
+  const list = Array.isArray(r.data?.nuovi) ? r.data.nuovi : [];
+  if (list.length === 0 && !done && !error) return null;
+  const existing = (error?.details as { paziente?: { id: string } | null } | undefined)?.paziente;
+
+  async function act(n: NewPatient, register: boolean) {
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    const name = `${n.nome} ${n.cognome}`;
+    try {
+      if (register) {
+        const res = await api<{ id: string }>(`/api/aura/nuovi/${n.id}/registra`, {
+          method: 'POST',
+        });
+        setDone({ patientId: res.id, text: `${name}: registrato con i dati di AURA.` });
+      } else {
+        await api(`/api/aura/nuovi/${n.id}/non-registrare`, { method: 'POST' });
+        setDone({
+          text: `${name}: non registrato. Non si ripropone finché AURA non manda una scelta nuova.`,
+        });
+      }
+    } catch (e) {
+      setError(failure(e));
+    } finally {
+      setBusy(false);
+      r.reload();
+    }
+  }
+
+  return (
+    <section aria-labelledby="titolo-nuovi-aura" className="riquadro">
+      <h2 id="titolo-nuovi-aura">
+        <Icon name="aggiungi" /> Nuovi assistiti in AURA
+      </h2>
+      <p className="tenue">
+        Hanno scelto un medico dello studio e non sono ancora nel suo archivio. «Registra» li porta
+        nell’archivio con i dati di AURA; esenzioni e scelta arrivano subito dopo.
+      </p>
+      {list.length > 0 && (
+        <div className="tabella-scorrevole">
+          <table className="tabella">
+            <caption>Nuovi assistiti da registrare</caption>
+            <thead>
+              <tr>
+                <th scope="col">Assistito</th>
+                <th scope="col">Nascita</th>
+                <th scope="col">Codice fiscale</th>
+                <th scope="col">Scelta</th>
+                <th scope="col">Azioni</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((n) => {
+                const name = `${n.nome} ${n.cognome}`;
+                return (
+                  <tr key={n.id}>
+                    <th scope="row">{name}</th>
+                    <td>{date(n.nascita)}</td>
+                    <td>
+                      <span className="codice">{maskedFiscalCode(n.codiceFiscale)}</span>
+                    </td>
+                    <td>
+                      {n.medico}, dal {date(n.sceltaDal)}
+                      {n.scadenza ? `; temporanea fino al ${date(n.scadenza)}` : ''}
+                    </td>
+                    <td>
+                      <div className="azioni">
+                        <button
+                          type="button"
+                          className="pulsante pulsante-primario"
+                          disabled={busy}
+                          // Il nome comincia con il testo visibile, e dice di chi si tratta.
+                          aria-label={`Registra ${name}`}
+                          onClick={() => void act(n, true)}
+                        >
+                          <Icon name="aggiungi" /> <span>Registra</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="pulsante pulsante-piatto"
+                          disabled={busy}
+                          aria-label={`Non registrare ${name}`}
+                          onClick={() => void act(n, false)}
+                        >
+                          <Icon name="annulla" /> <span>Non registrare</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {done && (
+        <Notice kind="fatto">
+          {done.text}
+          {done.patientId && (
+            <>
+              {' '}
+              <Link to={`/pazienti/${done.patientId}`}>Apri la cartella</Link>
+            </>
+          )}
+        </Notice>
+      )}
+      <ErrorMessage error={error} />
+      {existing && (
+        <p>
+          <Link to={`/pazienti/${existing.id}`}>Apri la cartella del paziente già registrato</Link>
+        </p>
       )}
     </section>
   );

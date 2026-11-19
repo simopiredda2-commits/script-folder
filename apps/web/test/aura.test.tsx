@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AuraChangesToday, AuraSection } from '../src/pages/AuraSection';
+import { AuraChangesToday, AuraNewPatientsToday, AuraSection } from '../src/pages/AuraSection';
 import { ServiceSection } from '../src/pages/admin/ServiceSection';
 
 /** Risposte finte del servizio: per ogni percorso, un corpo (o una funzione per i POST). */
@@ -224,6 +224,100 @@ describe('AURA nell’interfaccia (D197)', () => {
     const second = render(
       <MemoryRouter>
         <AuraChangesToday />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+    expect(second.container.textContent).toBe('');
+  });
+
+  it('nuovi assistiti in Oggi (D199): chi, scelta e scadenza; «Registra» con un clic porta alla cartella', async () => {
+    const one = {
+      id: 'n1',
+      cognome: 'INVENTATO',
+      nome: 'PAZIENTE',
+      nascita: '1970-05-04',
+      codiceFiscale: 'NVNPZN70E04X001A',
+      medico: 'Medico Titolare',
+      sceltaDal: '2026-11-19',
+      scadenza: '2027-02-17',
+      segnalatoIl: '2026-11-19T08:00:00Z',
+    };
+    const fetchMock = stub({
+      'GET /api/aura/nuovi': { disponibile: true, nuovi: [one] },
+      'POST /api/aura/nuovi/n1/registra': { id: 'p9', avvisi: [], aura: { esito: 'aggiornato' } },
+    });
+    render(
+      <MemoryRouter>
+        <AuraNewPatientsToday />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByRole('heading', { name: /Nuovi assistiti in AURA/ })).toBeTruthy();
+    const row = screen.getByRole('row', { name: /PAZIENTE INVENTATO/ });
+    expect(row.textContent).toMatch(/04\/05\/1970/);
+    expect(row.textContent).toMatch(
+      /Medico Titolare, dal 19\/11\/2026; temporanea fino al 17\/02\/2027/,
+    );
+    // Il codice fiscale si vede mascherato, come nell'elenco dei pazienti.
+    expect(row.textContent).not.toContain('NVNPZN70E04X001A');
+    fireEvent.click(screen.getByRole('button', { name: 'Registra PAZIENTE INVENTATO' }));
+    expect(await screen.findByText(/registrato con i dati di AURA/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Apri la cartella' }).getAttribute('href')).toBe(
+      '/pazienti/p9',
+    );
+    // L'elenco si ricarica dopo il clic.
+    expect(fetchMock.mock.calls.filter(([u]) => u === '/api/aura/nuovi').length).toBe(2);
+    expect(screen.getByRole('button', { name: 'Non registrare PAZIENTE INVENTATO' })).toBeTruthy();
+  });
+
+  it('nuovi assistiti: già registrato a mano, il collegamento al paziente; senza nuovi, niente', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        const conflict = init?.method === 'POST';
+        const body = conflict
+          ? { errore: 'Il codice fiscale è già registrato', dettagli: { paziente: { id: 'p7' } } }
+          : {
+              disponibile: true,
+              nuovi: [
+                {
+                  id: 'n2',
+                  cognome: 'ALTRO',
+                  nome: 'ASSISTITO',
+                  nascita: '1980-01-01',
+                  codiceFiscale: 'LTRSST80A01X002B',
+                  medico: 'Medico Titolare',
+                  sceltaDal: '2026-11-19',
+                  scadenza: null,
+                  segnalatoIl: '2026-11-19T08:00:00Z',
+                },
+              ],
+            };
+        return Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: conflict ? 409 : 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      }),
+    );
+    const first = render(
+      <MemoryRouter>
+        <AuraNewPatientsToday />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Registra ASSISTITO ALTRO' }));
+    expect(await screen.findByText('Il codice fiscale è già registrato')).toBeTruthy();
+    expect(
+      screen
+        .getByRole('link', { name: 'Apri la cartella del paziente già registrato' })
+        .getAttribute('href'),
+    ).toBe('/pazienti/p7');
+    first.unmount();
+    vi.unstubAllGlobals();
+    stub({ 'GET /api/aura/nuovi': { disponibile: true, nuovi: [] } });
+    const second = render(
+      <MemoryRouter>
+        <AuraNewPatientsToday />
       </MemoryRouter>,
     );
     await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());

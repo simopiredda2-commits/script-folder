@@ -1608,7 +1608,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Codice catastale del luogo di nascita').fill(nuovo!.birthPlace.code);
     await page.getByLabel('Codice fiscale').fill(nuovo!.fiscalCode);
     await page.getByLabel('Temporaneo, con la scadenza della scelta').check();
-    await page.getByLabel('Scadenza della scelta').fill(scadenza);
+    await page.getByLabel('Scadenza della scelta', { exact: true }).fill(scadenza);
     await check(page, 'nuovo paziente temporaneo', true);
     await page.getByRole('button', { name: 'Registra il paziente' }).click();
     await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
@@ -2020,6 +2020,51 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await section.getByText('ASL di assistenza: ora c’è il dato di AURA.').waitFor();
     const [after] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
     expect(after!.asl).toBe('ASL DIMOSTRATIVA NUOVA');
+  });
+
+  it('nuovi assistiti da AURA (D199): in Oggi, registrati con un clic, con la cartella pronta', async () => {
+    const [owner] = await t.db
+      .select({ cf: doctorProfile.fiscalCode })
+      .from(doctorProfile)
+      .where(eq(doctorProfile.userId, s.users.titolare.id));
+    // Un assistito inventato (D12) che sceglie il titolare in AURA: la notifica lo porta in Oggi.
+    const [nuovo] = generatePatients({
+      seed: `nuovo-aura-e2e-${s.studioId}`,
+      count: 1,
+      minAge: 18,
+    });
+    const auraId = aura.register({
+      fiscalCode: nuovo!.fiscalCode,
+      lastName: nuovo!.lastName,
+      firstName: nuovo!.firstName,
+      birthDate: nuovo!.birthDate,
+      exemptions: [{ code: '013', prescriptionCode: null, validFrom: '2026-01-01', validTo: null }],
+      choices: [],
+    });
+    aura.setChoice(auraId, {
+      doctorFiscalCode: owner!.cf!,
+      chosenOn: studioDate(new Date()),
+      expiresOn: null,
+      endedOn: null,
+      endReason: null,
+    });
+    await page.goto(`${base}/`);
+    const region = page.getByRole('region', { name: 'Nuovi assistiti in AURA' });
+    const name = `${nuovo!.firstName} ${nuovo!.lastName}`;
+    // La notifica arriva senza aspettare: se la pagina è stata più veloce, si ricarica.
+    for (let i = 0; i < 20 && !(await region.isVisible()); i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      await page.reload();
+    }
+    await region.getByRole('rowheader', { name }).waitFor();
+    await check(page, 'nuovi assistiti in Oggi', true);
+    await region.getByRole('button', { name: `Registra ${name}` }).click();
+    await region.getByText(`${name}: registrato con i dati di AURA.`).waitFor();
+    await region.getByRole('link', { name: 'Apri la cartella' }).click();
+    await page.getByRole('heading', { level: 1, name }).waitFor();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    // Esenzione e scelta sono arrivate da AURA.
+    await page.locator('.testata-avvisi').getByText('Esenzione 013').waitFor();
   });
 
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice; le cartelle aperte restano', async () => {

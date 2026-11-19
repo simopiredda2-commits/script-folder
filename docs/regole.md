@@ -10,6 +10,7 @@ Da verificare con la Dr.ssa Rocca e con un consulente alla seconda fermata. Font
   - Le regole che vengono da una **norma bloccano** l'invio.
   - Il contatore delle confezioni (R11) **informa** soltanto: scelta di Simone alla seconda fermata, nella versione 2026-11-18.2 delle regole. Un motivo scritto dal medico resta comunque registrato.
   - Dalla versione 2026-11-19.1 (scelta di Simone alla fermata dopo la tappa 15, D181) R6 e R11 contano anche le **ricette fatte con altri programmi** e importate (D176), e il messaggio lo dice. Non sono collegate a una terapia: si riconoscono dal farmaco, per AIC o principio attivo. Se una non dice quante confezioni, non si conta e un'informazione lo dice. Con le versioni di prima non contano.
+  - Dalla versione 2026-11-19.2 (scelta di Simone del 19/11/2026, D199) conta lo **stato del paziente**: per un deceduto la ricetta non si fa (R19 blocca, e già la bozza si rifiuta); per un revocato, o un temporaneo senza una scelta in corso, serve un motivo (R20). Il temporaneo con la scelta che vale non dà avvisi.
   - Le **note AIFA** vanno confermate dal medico.
 - Ogni problema porta la **fonte** della sua regola e, quando blocca, il **rimedio**: che cosa fare per procedere. Per R15 e R16 l'avviso spiega perché il canale o il recapito non sono ammessi e come sbloccare (scelta della seconda fermata).
 - Ogni controllo fatto prima di un invio resta registrato e non si modifica: versione delle regole, problemi trovati, motivi dati, note confermate. La ricetta inviata porta la versione delle regole.
@@ -146,3 +147,4 @@ Tabella generata dai dati: `pnpm --filter @mmg/rules docs:regole`. Una prova con
 - **R13**: blocca la non sostituibilità senza motivazione e una riga senza principio attivo (la ricetta «riporta sempre il principio attivo»).
 - **R16**: il recapito si confronta senza maiuscole e spazi; vale un delegato con delega attiva alla data.
 - **R12** resta fuori, come dicono i requisiti: nessun giudizio su dosi, interazioni, allergie.
+- **R19 e R20** non sono nei requisiti: sono controlli formali sullo stato del paziente nella cartella, chiesti da Simone (D199). Per R20 contano le scelte non annullate, a mano o da AURA; la scelta vale fino al giorno della scadenza compreso. Da confermare con la Dr.ssa Rocca, come le altre.
