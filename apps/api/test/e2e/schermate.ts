@@ -53,6 +53,8 @@ const app = buildApp({
   config: { ...config, cookieSecure: false },
   referenceUpdates,
   aura: { gateway: aura },
+  // SCHERMATE_REGISTRO=1: il servizio scrive le sue richieste e i suoi errori.
+  logger: process.env.SCHERMATE_REGISTRO === '1',
 });
 mkdirSync(OUT, { recursive: true });
 
@@ -742,15 +744,18 @@ try {
     residenceNumber: '12',
     asl: 'ASL dimostrativa nuova',
   });
-  const arrived = async (id: string) =>
+  // La notifica di AURA basta di solito; la segreteria può anche premere «Aggiorna da AURA».
+  const arrived = async () =>
     (
       await db.execute<{ ok: boolean }>(
-        sql`select registry is not null as ok from aura_link where patient_id = ${id}`,
+        sql`select registry is not null as ok from aura_link where patient_id = ${diabetic.id}`,
       )
     ).rows[0]?.ok === true;
-  for (let i = 0; i < 100 && !(await arrived(diabetic.id)); i++)
-    await new Promise((r) => setTimeout(r, 50));
+  for (let i = 0; i < 100 && !(await arrived()); i++) await new Promise((r) => setTimeout(r, 50));
+  console.log(`  notifica di AURA ${(await arrived()) ? 'arrivata' : 'non arrivata'}`);
   await page.goto(`${base}/pazienti/${diabetic.id}/amministrazione#aura`);
+  await auraSection.getByRole('button', { name: 'Aggiorna da AURA' }).click();
+  await auraSection.getByText(/^Aggiornato da AURA/).waitFor();
   const pending = auraSection.getByRole('heading', {
     name: 'Anagrafica diversa in AURA, da confermare',
   });

@@ -140,7 +140,7 @@ export function registryText(diffs: readonly RegistryDifference[]): string {
     .map((d) =>
       d.campo === 'decesso'
         ? `decesso il ${itDate(d.inAura)}`
-        : `${d.etichetta.toLowerCase()} «${d.inAura}»`,
+        : `${d.etichetta} «${d.inAura}»`,
     )
     .join('; ')}`;
 }
