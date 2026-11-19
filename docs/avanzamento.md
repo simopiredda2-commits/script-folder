@@ -726,7 +726,7 @@ Durante la tappa 11 (terzo giro):
 
 - **Elenchi, moduli e banche dati aggiornati di continuo** (Simone: «o con un comando o in automatico secondo una cadenza appropriata e/o prevista»; i codici regionali «ogni giorno»). Fatto (D156):
   - **ogni notte** all'ora scelta (`BANCHE_DATI_AGGIORNAMENTO`, proposta 03:30) tutte le fonti, come chiede A1; un giro perso perché il servizio era spento parte appena il servizio riparte;
-  - **un comando**, `pnpm banche-dati:aggiorna`, e il pulsante **«Aggiorna adesso»** per l'amministratore dello studio, in Strumenti › Banche dati;
+  - **un comando**, `pnpm banche-dati:aggiorna`, e il pulsante **«Aggiorna adesso»** per l'amministratore dello studio, in Strumenti › Banche dati (il pulsante è stato tolto il 19/11/2026: le banche dati le aggiorna chi gestisce il servizio, D192);
   - ogni giro resta nel registro, con l'esito, le cose da controllare a mano (per esempio un PDF nuovo del catalogo da trascrivere) e gli ultimi dieci giri;
   - accanto alla data di ogni banca dati: quando è stata controllata la fonte e, se è **più vecchia del previsto**, il perché (controllo fallito, giro di stanotte mancato, versione più nuova in attesa, soglia d'età della fonte). La soglia d'età non è più «da completare»: c'è dove la fonte dichiara una cadenza (ISTAT, 185 giorni), e altrove vale il controllo di ogni notte;
   - `sync/` scrive anche un rapporto JSON e l'ora di ogni controllo riuscito.

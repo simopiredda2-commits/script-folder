@@ -16,15 +16,22 @@ import { ERRORS, importReferenceData, NEEDS_ATTENTION, type ImportLine } from '.
  * Aggiornamento delle banche dati (D156): sync scarica dalle fonti solo ciò che è cambiato (A1),
  * poi l'importazione controlla e mette in uso le versioni nuove (A3, A5). Ogni giro resta nel
  * registro con l'esito, e alla fine dice per ogni serie in uso se la sua fonte è stata controllata
- * e se una versione più nuova aspetta qualcuno (A6, A8). Lo stesso giro per il comando, per
- * l'avvio di ogni notte e per il pulsante degli strumenti.
+ * e se una versione più nuova aspetta qualcuno (A6, A8). Lo stesso giro per il comando sul server e
+ * per l'avvio di ogni notte: le banche dati le aggiorna chi gestisce il servizio (D192).
  */
 
 const ROOT = resolve(import.meta.dirname, '..', '..', '..', '..');
 const SYNC_SCRIPT = join(ROOT, 'sync', 'banche_dati.py');
 
+/**
+ * Come è partito un giro. «pulsante» sono i giri avviati dagli strumenti dello studio prima di D192:
+ * restano nel registro con il loro nome, ma un giro nuovo parte solo dal comando sul server o
+ * dall'orologio di ogni notte.
+ */
 export const UPDATE_TRIGGERS = ['comando', 'automatico', 'pulsante'] as const;
 export type UpdateTrigger = (typeof UPDATE_TRIGGERS)[number];
+/** Come può partire un giro nuovo (D192). */
+export type StartTrigger = Exclude<UpdateTrigger, 'pulsante'>;
 export type UpdateOutcome = 'ok' | 'da_verificare' | 'errore' | 'interrotto';
 
 export interface SyncResult {
@@ -284,7 +291,7 @@ async function closeAbandoned(db: Database, now: Date) {
 }
 
 export interface BeginOptions {
-  trigger: UpdateTrigger;
+  trigger: StartTrigger;
   requestedBy: string;
   now: () => Date;
   signal?: AbortSignal;

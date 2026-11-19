@@ -185,13 +185,14 @@ Le forme dei codici: AIC di 9 cifre (tutti i 160.101 dell'anagrafica AIFA letta 
 
 ## Aggiornamento continuo (D156)
 
-Banche dati e tabelle di codici si aggiornano da sole ogni notte, e quando serve anche subito. Un solo giro fa tutto: `sync/` scarica dalle fonti solo ciò che è cambiato (A1), l'importazione controlla e mette in uso le versioni nuove (A3, A5), il giro resta nel registro (`reference_update_run`).
+Banche dati e tabelle di codici si aggiornano da sole ogni notte, e quando serve anche subito. Sono le stesse per tutti gli studi del servizio: le aggiorna chi gestisce il servizio, una volta per tutti, e gli studi non devono fare nulla (D191, D192). Un solo giro fa tutto: `sync/` scarica dalle fonti solo ciò che è cambiato (A1), l'importazione controlla e mette in uso le versioni nuove (A3, A5), il giro resta nel registro (`reference_update_run`).
 
-Il giro si avvia in tre modi:
+Il giro si avvia in due modi, tutti e due di chi gestisce il servizio:
 
 - **ogni notte**, all'ora di `BANCHE_DATI_AGGIORNAMENTO` (per esempio `03:30`, ora dello studio). L'orologio tiene conto del cambio dell'ora. Se il servizio era spento all'ora prevista, il giro perso parte un minuto dopo l'avvio;
-- **con il comando** `pnpm banche-dati:aggiorna`, anche da un'attività pianificata del server;
-- **con il pulsante «Aggiorna adesso»**, solo per l'amministratore dello studio (`admin.reference_data`), in Strumenti › Banche dati.
+- **con il comando** `pnpm banche-dati:aggiorna` sul server, anche da un'attività pianificata.
+
+Fino al 19/11/2026 c'era anche il pulsante «Aggiorna adesso» per l'amministratore dello studio: un giro avviato da uno studio cambiava i dati di tutti, e il pulsante non c'è più (D192). I giri avviati così restano nel registro con il loro nome. In Strumenti › Banche dati tutti gli utenti vedono quando parte il prossimo giro, com'è andato l'ultimo e che cosa aspetta un controllo.
 
 Le regole del giro:
 

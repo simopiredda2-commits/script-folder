@@ -1,13 +1,9 @@
-import { can } from '@mmg/domain';
 import type { SyncReport } from '@mmg/reference';
-import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { Database } from '../db/client';
-import { appUser } from '../db/schema';
 import type { ImportLine } from '../reference/importer';
-import { issuesOf, recentRuns, UpdateInProgressError, type UpdateRun } from '../reference/update';
+import { issuesOf, recentRuns, type UpdateRun } from '../reference/update';
 import type { ReferenceUpdates } from '../reference/updates-service';
-import { HttpError } from './errors';
 
 const iso = (d: Date | null) => d?.toISOString() ?? null;
 
@@ -39,14 +35,15 @@ function summary(run: UpdateRun) {
 
 /**
  * Aggiornamento delle banche dati (D156): tutti vedono com'è andato l'ultimo giro e quando parte il
- * prossimo; l'amministratore dello studio può avviarne uno subito.
+ * prossimo. Le banche dati sono comuni a tutti gli studi del servizio: le aggiorna chi gestisce il
+ * servizio, ogni notte e con il comando sul server, mai un utente di uno studio (D192).
  */
 export function registerReferenceUpdateRoutes(
   app: FastifyInstance,
   db: Database,
   updates: ReferenceUpdates,
 ) {
-  app.get('/api/banche-dati/aggiornamenti', async (req) => {
+  app.get('/api/banche-dati/aggiornamenti', async () => {
     const runs = await recentRuns(db, 10);
     const last = runs.find((r) => r.finishedAt);
     const running = runs.find((r) => r.running);
@@ -54,41 +51,10 @@ export function registerReferenceUpdateRoutes(
     return {
       configurato: updates.configured,
       automatico: updates.time ? { ora: updates.time, prossimo: iso(next) } : null,
-      puoAvviare: updates.configured && can(req.actor!, 'admin.reference_data').allowed,
       nomiFonti: updates.sourceNames,
       inCorso: running ? summary(running) : null,
       ultimo: last ? { ...summary(last), daControllare: issuesOf(last) } : null,
       giri: runs.map(summary),
     };
-  });
-
-  app.post('/api/banche-dati/aggiornamenti', async (req, reply) => {
-    const actor = req.actor!;
-    const decision = can(actor, 'admin.reference_data');
-    if (!decision.allowed) throw new HttpError(403, decision.reason);
-    if (!updates.configured) {
-      throw new HttpError(
-        409,
-        'In questa installazione le banche dati non si aggiornano dal programma: manca la cartella dei dati (BANCHE_DATI_DIR)',
-      );
-    }
-    const [user] = await db
-      .select({ name: appUser.displayName })
-      .from(appUser)
-      .where(eq(appUser.id, actor.userId));
-    try {
-      const { id } = await updates.start('pulsante', user?.name ?? actor.userId);
-      return reply.status(202).send({ id });
-    } catch (err) {
-      if (err instanceof UpdateInProgressError) {
-        const since = new Intl.DateTimeFormat('it-IT', {
-          timeZone: 'Europe/Rome',
-          dateStyle: 'short',
-          timeStyle: 'short',
-        }).format(err.runningSince);
-        throw new HttpError(409, `Un aggiornamento è già in corso, dal ${since}`);
-      }
-      throw err;
-    }
   });
 }

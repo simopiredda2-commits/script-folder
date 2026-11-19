@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { ErrorMessage, Loading, Notice } from '../components/common';
 import { Icon } from '../components/Icon';
-import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
 import { useApi } from '../lib/useApi';
 
@@ -36,7 +35,6 @@ interface Issue {
 interface UpdatesStatus {
   configurato: boolean;
   automatico: { ora: string; prossimo: string | null } | null;
-  puoAvviare: boolean;
   nomiFonti: Record<string, string>;
   inCorso: RunSummary | null;
   ultimo: (RunSummary & { daControllare: Issue[] }) | null;
@@ -88,12 +86,11 @@ function counts(r: RunSummary) {
 
 /**
  * Aggiornamento delle banche dati (D156): quando parte, com'è andato l'ultimo, che cosa va
- * controllato a mano. L'amministratore dello studio può avviarne uno subito.
+ * controllato a mano. Le banche dati sono comuni a tutti gli studi del servizio: le aggiorna chi
+ * gestisce il servizio, ogni notte e con il comando sul server; lo studio vede lo stato (D192).
  */
 export function DataUpdatesSection() {
   const status = useApi<UpdatesStatus>('/api/banche-dati/aggiornamenti');
-  const [startError, setStartError] = useState<ApiError | null>(null);
-  const [starting, setStarting] = useState(false);
   const running = status.data?.inCorso ?? null;
   const { reload } = status;
 
@@ -109,19 +106,6 @@ export function DataUpdatesSection() {
   const s = status.data;
   const sourceName = (id: string) => s.nomiFonti[id] ?? id;
 
-  const start = async () => {
-    setStarting(true);
-    setStartError(null);
-    try {
-      await api('/api/banche-dati/aggiornamenti', { method: 'POST', body: {} });
-      reload();
-    } catch (e) {
-      setStartError(e instanceof ApiError ? e : new ApiError(0, 'Servizio non raggiungibile'));
-    } finally {
-      setStarting(false);
-    }
-  };
-
   return (
     <section aria-labelledby="titolo-aggiornamenti">
       <h2 id="titolo-aggiornamenti">Aggiornamento delle banche dati</h2>
@@ -131,6 +115,10 @@ export function DataUpdatesSection() {
         fonti e scarica solo ciò che è cambiato. Una versione nuova entra in uso solo se supera i
         controlli; altrimenti resta in uso la precedente. I documenti in PDF si scaricano e si
         segnalano: i loro dati entrano solo dopo una trascrizione controllata.
+      </p>
+      <p>
+        Le banche dati sono le stesse per tutti gli studi del servizio: le aggiorna chi gestisce il
+        servizio, e lo studio non deve fare nulla.
       </p>
       {!s.configurato ? (
         <Notice kind="info">
@@ -144,8 +132,8 @@ export function DataUpdatesSection() {
         </p>
       ) : (
         <p>
-          <strong>Aggiornamento automatico non attivo</strong>: le banche dati si aggiornano con il
-          comando sul server o con il pulsante.
+          <strong>Aggiornamento automatico non attivo</strong>: le banche dati le aggiorna chi
+          gestisce il servizio, con il comando sul server.
         </p>
       )}
       {running && (
@@ -154,20 +142,6 @@ export function DataUpdatesSection() {
           pagina si aggiorna da sola.
         </Notice>
       )}
-      {s.puoAvviare && (
-        <div className="azioni">
-          <button
-            type="button"
-            className="pulsante"
-            onClick={() => void start()}
-            disabled={starting || !!running}
-          >
-            <Icon name="ripeti" /> Aggiorna adesso
-          </button>
-          <p className="tenue">Controlla subito tutte le fonti, senza aspettare la notte.</p>
-        </div>
-      )}
-      <ErrorMessage error={startError} />
 
       <h3>Ultimo aggiornamento</h3>
       {!s.ultimo ? (
@@ -184,6 +158,7 @@ export function DataUpdatesSection() {
           {s.ultimo.daControllare.length > 0 && (
             <>
               <h4>Da controllare</h4>
+              <p className="tenue">Questi controlli li segue chi gestisce il servizio.</p>
               <ul className="da-controllare">
                 {s.ultimo.daControllare.map((i, n) => (
                   <li key={n}>

@@ -12,7 +12,7 @@ import {
   publicSourcesSync,
   type UpdateRun,
   type UpdateSetup,
-  type UpdateTrigger,
+  type StartTrigger,
 } from './update';
 
 export interface UpdatesOptions {
@@ -70,7 +70,7 @@ export class ReferenceUpdates {
   }
 
   /** Avvia un giro; restituisce subito, con la promessa del giro finito. */
-  async start(trigger: UpdateTrigger, requestedBy: string) {
+  async start(trigger: StartTrigger, requestedBy: string) {
     if (!this.setup) throw new Error('Aggiornamento delle banche dati non configurato');
     const controller = new AbortController();
     const begun = await beginReferenceUpdate(this.db, this.setup, {

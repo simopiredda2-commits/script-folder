@@ -204,7 +204,10 @@ export const referenceUpdateRun = pgTable(
   'reference_update_run',
   {
     id: uuid().primaryKey().defaultRandom(),
-    /** «comando» (riga di comando), «automatico» (ogni notte) o «pulsante» (dagli strumenti). */
+    /**
+     * «comando» (riga di comando sul server), «automatico» (ogni notte) o «pulsante» (dagli
+     * strumenti dello studio, solo i giri di prima di D192).
+     */
     trigger: text().notNull(),
     requestedBy: text().notNull(),
     startedAt: timestamp({ withTimezone: true }).notNull(),
