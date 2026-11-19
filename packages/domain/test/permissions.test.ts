@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTIONS,
   can,
+  opensPatientData,
+  PATIENT_DATA_ROLES,
   type AccessContext,
   type Action,
   type Actor,
@@ -198,6 +200,24 @@ describe('azioni sullo studio di più ruoli (tappa 14)', () => {
     for (const a of [titolare, collega, amministratore])
       expect(ok(a, 'studio.admin_log', {})).toBe(true);
     for (const a of [sostituto, segreteria]) expect(ok(a, 'studio.admin_log', {})).toBe(false);
+  });
+  it('gli utenti creati o cambiati dall’amministratore li conferma solo un titolare', () => {
+    for (const a of [titolare, collega, titolareAmministratore])
+      expect(ok(a, 'studio.confirm_users', {})).toBe(true);
+    for (const a of [amministratore, segreteria, sostituto])
+      expect(ok(a, 'studio.confirm_users', {})).toBe(false);
+    expect(ok(titolare, 'studio.confirm_users', ctx())).toBe(false);
+  });
+  it('i ruoli che aprono dati dei pazienti: titolare, sostituto, segreteria; non l’amministratore', () => {
+    expect(PATIENT_DATA_ROLES).toEqual(['owner_doctor', 'secretary', 'substitute_doctor']);
+    for (const a of [titolare, segreteria, sostituto, titolareAmministratore])
+      expect(opensPatientData(a.roles)).toBe(true);
+    expect(opensPatientData(amministratore.roles)).toBe(false);
+    expect(opensPatientData([])).toBe(false);
+    // Coerente con le decisioni: chi apre dati dei pazienti legge l'anagrafica di un archivio,
+    // con un'autorizzazione se non è suo; l'amministratore no.
+    for (const a of [titolare, segreteria, sostituto])
+      expect(ok(a, 'registry.read'), a.userId).toBe(true);
   });
   it('non riguardano un archivio', () => {
     expect(ok(titolare, 'studio.lists', ctx())).toBe(false);

@@ -169,6 +169,13 @@
       "when": 1795050701658,
       "tag": "0023_importazione",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795055580284,
+      "tag": "0024_conferma_utenti",
+      "breakpoints": true
     }
   ]
 }

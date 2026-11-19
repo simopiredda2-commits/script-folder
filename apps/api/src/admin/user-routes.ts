@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AdminDeps } from './deps';
 import {
+  confirmBody,
   createUserAdminService,
   createUserBody,
   updateUserBody,
@@ -13,14 +14,20 @@ const idParams = z.object({ id: z.uuid() });
 /**
  * Utenti e ruoli dello studio (tappa 14): creazione, ruoli, dati del medico, sospensione, password temporanea, azzeramento del secondo fattore, sblocco; cambio della propria password.
  *
- * Tutte per l'amministratore dello studio (`admin.users`): il controllo viene prima dei dati, e ogni
- * rifiuto va nel registro. Il cambio della propria password, per tutti, sta con l'accesso
- * (`POST /api/profilo/password`, http/auth-routes.ts).
+ * Le rotte di gestione sono dell'amministratore dello studio (`admin.users`); quelle della
+ * conferma degli utenti in attesa dei medici titolari (`studio.confirm_users`). In tutte il
+ * controllo viene prima dei dati, e ogni rifiuto va nel registro. Il cambio della propria password,
+ * per tutti, sta con l'accesso (`POST /api/profilo/password`, http/auth-routes.ts). Password e
+ * secondo fattore di medici e segreteria li ripristina chi gestisce il servizio, sul server
+ * (`pnpm utente:ripristina`, db/user-restore-cli.ts).
  */
 export function registerUserAdminRoutes(app: FastifyInstance, deps: AdminDeps): void {
   const users = createUserAdminService({ db: deps.db, now: deps.now });
   const admin = (azione: UserAction) => ({
     preHandler: async (req: FastifyRequest) => users.requireAdmin(req.actor!, azione),
+  });
+  const confirmer = (azione: UserAction) => ({
+    preHandler: async (req: FastifyRequest) => users.requireConfirmer(req.actor!, azione),
   });
   const idOf = (req: FastifyRequest) => idParams.parse(req.params).id;
 
@@ -56,5 +63,19 @@ export function registerUserAdminRoutes(app: FastifyInstance, deps: AdminDeps): 
 
   app.post('/api/studio/utenti/:id/sblocca', admin('sblocco'), async (req) =>
     users.unlock(req.actor!, idOf(req)),
+  );
+
+  // Conferma dei medici titolari: utenti con i dati dei pazienti creati o cambiati
+  // dall'amministratore.
+  app.get('/api/studio/utenti/da-confermare', confirmer('elenco_da_confermare'), async (req) =>
+    users.pending(req.actor!),
+  );
+
+  app.post('/api/studio/utenti/:id/conferma', confirmer('conferma'), async (req) =>
+    users.confirm(req.actor!, idOf(req), confirmBody.parse(req.body ?? {})),
+  );
+
+  app.post('/api/studio/utenti/:id/rifiuta', confirmer('rifiuto'), async (req) =>
+    users.refuse(req.actor!, idOf(req)),
   );
 }

@@ -27,6 +27,14 @@ export const CHALLENGE_MINUTES = 5;
 
 export const GENERIC_LOGIN_ERROR = 'Nome utente o password non validi';
 
+/**
+ * Utente con un ruolo che apre dati dei pazienti, creato o cambiato dall'amministratore, non
+ * ancora confermato da un medico titolare (tappa 14). Si dice solo dopo la password giusta: con
+ * quella sbagliata il messaggio resta quello generico.
+ */
+export const AWAITING_CONFIRMATION_ERROR =
+  'In attesa della conferma di un medico titolare dello studio';
+
 export interface Actor {
   userId: string;
   studioId: string;
@@ -188,6 +196,11 @@ export function createAuthService(deps: AuthDeps) {
       await registerFailure(user, st);
       return fail('password errata', user);
     }
+    // Password giusta, ma nessun passaggio successivo finché un titolare non conferma (tappa 14).
+    if (user.awaitingConfirmation) {
+      await fail('in attesa della conferma di un medico titolare', user);
+      return { ok: false, message: AWAITING_CONFIRMATION_ERROR };
+    }
 
     if (user.totpSecretEnc && user.totpEnabledAt) {
       const challengeToken = await createChallenge(
@@ -235,6 +248,9 @@ export function createAuthService(deps: AuthDeps) {
     const row = rows[0];
     if (!row) return { ok: false, message: 'Passaggio scaduto: ripeti l’accesso' };
     const { challenge, user, studio: st } = row;
+    // Sospeso o messo in attesa di conferma a metà accesso: il passaggio non vale più (tappa 14).
+    if (user.status !== 'active' || user.awaitingConfirmation)
+      return { ok: false, message: 'Passaggio scaduto: ripeti l’accesso' };
 
     const secretEnc =
       challenge.purpose === 'enroll' ? challenge.pendingSecretEnc : user.totpSecretEnc;
@@ -323,7 +339,8 @@ export function createAuthService(deps: AuthDeps) {
     if (!row) return { status: 'invalid' };
     const { session: s, user, studio: st } = row;
     const t = now();
-    if (s.revokedAt || s.expiresAt <= t || user.status !== 'active') return { status: 'invalid' };
+    if (s.revokedAt || s.expiresAt <= t || user.status !== 'active' || user.awaitingConfirmation)
+      return { status: 'invalid' };
     const actor: Actor = {
       userId: user.id,
       studioId: user.studioId,
@@ -360,6 +377,7 @@ export function createAuthService(deps: AuthDeps) {
     const row = await loadSession(sessionToken);
     if (!row || row.session.revokedAt || row.session.expiresAt <= now()) return false;
     const { user, studio: st } = row;
+    if (user.status !== 'active' || user.awaitingConfirmation) return false;
     if (user.lockedUntil && user.lockedUntil > now()) return false;
     const step =
       user.totpSecretEnc && user.totpEnabledAt
