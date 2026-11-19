@@ -18,7 +18,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { generatePatients } from '@mmg/fixtures';
-import { SimulatedAura } from '@mmg/integrations';
+import { EMPTY_AURA_REGISTRY, SimulatedAura } from '@mmg/integrations';
 import { chromium, type Browser, type Page } from 'playwright';
 import { buildApp } from '../../src/app';
 import { loadConfig } from '../../src/config';
@@ -721,7 +721,7 @@ try {
       limit 1`)
   ).rows[0];
   if (!diabetic) throw new Error('Serve un paziente dimostrativo con il diabete');
-  aura.register({
+  const diabeticAura = aura.register({
     fiscalCode: diabetic.cf,
     lastName: diabetic.ln,
     firstName: diabetic.fn,
@@ -735,8 +735,59 @@ try {
   await auraSection.getByText('Aggiornato da AURA: 1 variazione.').waitFor();
   await auraSection.scrollIntoViewIfNeeded();
   await shot(page, '60-aura-nei-dati-amministrativi');
+
+  // D198: AURA manda un'anagrafica diversa (dati inventati): differenze da confermare.
+  aura.setRegistry(diabeticAura, {
+    residenceStreet: 'Via dei Dati Inventati',
+    residenceNumber: '12',
+    asl: 'ASL dimostrativa nuova',
+  });
+  const arrived = async (id: string) =>
+    (
+      await db.execute<{ ok: boolean }>(
+        sql`select registry is not null as ok from aura_link where patient_id = ${id}`,
+      )
+    ).rows[0]?.ok === true;
+  for (let i = 0; i < 100 && !(await arrived(diabetic.id)); i++)
+    await new Promise((r) => setTimeout(r, 50));
+  await page.goto(`${base}/pazienti/${diabetic.id}/amministrazione#aura`);
+  const pending = auraSection.getByRole('heading', {
+    name: 'Anagrafica diversa in AURA, da confermare',
+  });
+  await pending.waitFor();
+  await pending.scrollIntoViewIfNeeded();
+  await shot(page, '62-anagrafica-da-aura-da-confermare');
+
+  // Un altro paziente dimostrativo: AURA segnala il decesso, da confermare (in evidenza in Oggi).
+  const other = (
+    await db.execute<{ id: string; cf: string; ln: string; fn: string; bd: string }>(sql`
+      select id, fiscal_code as cf, last_name as ln, first_name as fn, birth_date::text as bd
+      from patient
+      where id <> ${diabetic.id} and status = 'active'
+      order by birth_date, last_name
+      limit 1`)
+  ).rows[0];
+  if (!other) throw new Error('Serve un secondo paziente dimostrativo in carico');
+  aura.register({
+    fiscalCode: other.cf,
+    lastName: other.ln,
+    firstName: other.fn,
+    birthDate: other.bd,
+    exemptions: [],
+    choices: [],
+    registry: {
+      ...EMPTY_AURA_REGISTRY,
+      deceasedOn: studioDate(new Date(Date.now() - 2 * 86_400_000)),
+    },
+  });
+  await page.goto(`${base}/pazienti/${other.id}/amministrazione#aura`);
+  await auraSection.getByRole('button', { name: 'Aggiorna da AURA' }).click();
+  await auraSection.getByText('Aggiornato da AURA: 1 variazione.').waitFor();
   await page.goto(base);
-  await page.getByRole('region', { name: 'Variazioni da AURA' }).waitFor();
+  await page
+    .getByRole('region', { name: 'Variazioni da AURA' })
+    .getByText(/AURA segnala il decesso/)
+    .waitFor();
   await shot(page, '61-variazioni-da-aura-in-oggi', true);
 
   await browser.close();
