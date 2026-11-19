@@ -76,6 +76,8 @@ function cell(col: Column, action: Action): string {
     archive: own,
     grants: col.grants,
     settings: { secretaryCanReadDiary: false, secretaryCanReadSummary: false },
+    // La segreteria della colonna è confermata dal titolare per questo archivio (D181).
+    secretaries: ['segreteria'],
     now: at,
   };
   if (!can(col.actor, action, base).allowed) {

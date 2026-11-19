@@ -78,6 +78,18 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 - **Tempo di attesa degli invii:** 8 secondi per difetto; la Regione indica 6–8 (D94). Si legge a ogni invio di ricette e certificati.
 - **Soglie degli avvisi sugli accessi anomali** (Garante, linee guida sul dossier sanitario, par. 7, lett. c): vuote, quindi avvisi spenti, finché qualcuno non dà i valori (da completare).
 
+## Segreteria per archivio (D181, D185)
+
+In medicina di gruppo ogni titolare conferma la segreteria per il suo archivio: finché non lo fa, la segreteria non vede i suoi pazienti, nemmeno l'anagrafica.
+
+- Il titolare che conferma la segreteria come utente la conferma anche per il suo archivio. Gli altri titolari la trovano in **Strumenti › Utenti da confermare**, sotto «Segreteria sul tuo archivio»: «Conferma per il mio archivio» o «Non sul mio archivio». Lì vedono anche la segreteria che lavora già sul loro archivio, con «Togli dal mio archivio».
+- Un archivio nuovo, di un titolare nuovo, parte senza segreteria: la conferma il nuovo titolare.
+- Se l'amministratore toglie o ridà il ruolo di segreteria, le conferme di prima non valgono più: ogni titolare decide di nuovo.
+- La conferma dal server (quando nessun titolare può confermare) non dà nessun archivio: lo dà ogni titolare per il suo.
+- In **Utenti e ruoli** l'amministratore vede, per ogni segreteria, archivio per archivio: confermata dal titolare, non ci lavora, da confermare.
+- Ogni decisione si aggiunge e non si cambia; vale l'ultima. Conferme e tolte vanno nel registro delle azioni di amministrazione e nell'esportazione completa dell'archivio.
+- Le segreterie confermate prima di questa regola restano su tutti gli archivi dello studio, come lavoravano (migrazione 0028): ogni titolare le può togliere dal suo.
+
 ## Elenchi dello studio (D175)
 
 Quattro elenchi comuni dello studio, in **Strumenti › Elenchi dello studio**: li scrivono i titolari, l'amministratore e il sostituto mentre ha un'autorizzazione attiva su un archivio dello studio (D181); li leggono tutti, segreteria compresa. Non contengono dati dei pazienti. Una voce non si cancella: si archivia, perché una terapia o una ricetta può averla usata.
@@ -135,7 +147,7 @@ Risposte di Simone alla fermata dopo la tappa 15 in D181: quelle sui poteri dell
 - **Formato del promemoria:** oggi A4; le «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non sono state trovate (D97).
 - **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?
 - **Poteri dell'amministratore** (D179, dalle revisioni avversarie):
-  - in medicina di gruppo una segreteria confermata da un solo titolare legge gli archivi di tutti: consigliata la conferma per archivio, cioè ogni titolare per il suo (problema 3);
+  - in medicina di gruppo una segreteria confermata da un solo titolare leggeva gli archivi di tutti: risposta di Simone, la conferma per archivio; fatto nella tappa 16 (D185, problema 3);
   - chi conosce il nome utente di un medico lo tiene fuori un'ora alla volta, ripetendo i tentativi sbagliati: consigliati ritardi crescenti per indirizzo e postazione, con il blocco del conto solo oltre una soglia alta, e un avviso di ogni blocco al medico e ai titolari (problema 4, la parte rimasta);
   - codice fiscale del medico corretto dall'amministratore: risposta di Simone, la correzione resta in sospeso finché il medico non la conferma; fatto nella tappa 16 (D184, problema 12);
   - conferma dal server: come chi gestisce il servizio riconosce il medico. Consigliato di persona, con un documento e il codice regionale, annotato fuori dal programma; l'alternativa è il primo accesso con SPID o CIE, dove c'è l'accesso regionale;

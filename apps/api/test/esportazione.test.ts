@@ -94,6 +94,13 @@ describe('esportazione completa dei dati del medico', () => {
     for (const g of grants) expect(g.archive_id).toBe(s.archives.titolare);
   });
 
+  it('contiene le decisioni del titolare sulla segreteria, solo di questo archivio (D181)', () => {
+    const rows = doc.tabelle.archive_secretary!;
+    expect(rows.map((r) => [r.archive_id, r.user_id, r.decision])).toEqual([
+      [s.archives.titolare, s.users.segreteria.id, 'confermata'],
+    ]);
+  });
+
   it('contiene gli elenchi dello studio (tappa 14)', () => {
     expect(doc.tabelle.studio_list_item).toHaveLength(1);
     expect(JSON.stringify(doc.tabelle.studio_list_item)).toContain('Laboratorio di prova');

@@ -45,6 +45,8 @@ const ctx = (extra: Partial<AccessContext> = {}): AccessContext => ({
   archive: archiveRocca,
   grants: [sostituzione, gruppo],
   settings: { secretaryCanReadDiary: false },
+  // La segreteria confermata dalla titolare per il suo archivio (D181).
+  secretaries: [segreteria.userId],
   now,
   ...extra,
 });
@@ -305,5 +307,28 @@ describe('Profilo Sanitario Sintetico: lo firma il medico di famiglia del pazien
     expect(ok(sostituto, 'fse.publish', ctx({ now: new Date('2026-11-25T10:00:00+01:00') }))).toBe(
       false,
     );
+  });
+});
+
+describe('segreteria confermata per archivio (D181)', () => {
+  it('senza la conferma del titolare di quell’archivio non fa nulla, nemmeno l’anagrafica', () => {
+    for (const a of ['registry.read', 'agenda.manage', 'prescription.draft_repeat'] as const) {
+      expect(ok(segreteria, a, ctx({ secretaries: [] })), a).toBe(false);
+      expect(ok(segreteria, a, ctx({ secretaries: undefined })), a).toBe(false);
+    }
+    expect(can(segreteria, 'registry.read', ctx({ secretaries: [] })).reason).toBe(
+      'La segreteria lavora su questo archivio dopo la conferma del suo titolare',
+    );
+    // Confermata per l'archivio della titolare, non per quello del collega.
+    expect(ok(segreteria, 'registry.read')).toBe(true);
+    expect(ok(segreteria, 'registry.read', ctx({ archive: archiveCollega, secretaries: [] }))).toBe(
+      false,
+    );
+    // Un'altra segreteria confermata non conta per lei.
+    expect(ok(segreteria, 'registry.read', ctx({ secretaries: ['u-altra'] }))).toBe(false);
+  });
+  it('per i medici la conferma della segreteria non cambia nulla', () => {
+    expect(ok(titolare, 'clinical.write', ctx({ secretaries: [] }))).toBe(true);
+    expect(ok(sostituto, 'registry.read', ctx({ secretaries: [] }))).toBe(true);
   });
 });

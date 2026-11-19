@@ -29,6 +29,7 @@ import {
   accessLog,
   appUser,
   archive,
+  archiveSecretary,
   authChallenge,
   patient,
   serviceSession,
@@ -899,6 +900,14 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
       `la password del dottor ${surname}`,
     );
     const [own] = await t.db.select().from(archive).where(eq(archive.ownerUserId, id));
+    // Il titolare nuovo conferma la segreteria per il suo archivio (D181): qui si provano gli
+    // stati del titolare, non la conferma della segreteria.
+    const sec = await h.req(
+      cookie,
+      'POST',
+      `/api/studio/utenti/${s.users.segreteria.id}/archivio/conferma`,
+    );
+    expect(sec.statusCode, sec.body).toBe(200);
     return { id, cookie, archiveId: own!.id };
   }
 
@@ -1066,6 +1075,15 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
     expect(created.statusCode, created.body).toBe(201);
     const id = created.json().utente.id as string;
     const [own] = await t.db.select().from(archive).where(eq(archive.ownerUserId, id));
+    // Come se la segreteria fosse già confermata per quell'archivio (D181): qui si prova che
+    // l'archivio di un titolare in attesa resta chiuso ai pazienti nuovi anche per lei.
+    await t.db.insert(archiveSecretary).values({
+      archiveId: own!.id,
+      userId: s.users.segreteria.id,
+      decision: 'confermata',
+      decidedBy: null,
+      decidedAt: new Date(),
+    });
     return { id, archiveId: own!.id };
   }
 
@@ -1301,26 +1319,29 @@ describe('sessione dei servizi durante la correzione del codice fiscale (seconda
       payload: { codice: asked.json().codiceDiProva as string },
     });
     await entered;
-    // L'amministratore corregge il codice fiscale mentre il servizio verifica il codice.
+    // L'amministratore corregge il codice fiscale mentre il servizio verifica il codice, e il
+    // medico conferma la correzione (D181): il codice cambia durante la verifica.
+    const corrected = buildFiscalCode({
+      surname: 'Marchi',
+      name: 'Elena',
+      birthDate: '1971-02-02',
+      sex: 'F',
+      placeCode: 'X001',
+    });
     const fix = await s.app.inject({
       method: 'PATCH',
       url: `/api/studio/utenti/${s.users.titolare.id}`,
       headers: { cookie: admin },
-      payload: {
-        medico: {
-          codiceFiscale: buildFiscalCode({
-            surname: 'Marchi',
-            name: 'Elena',
-            birthDate: '1971-02-02',
-            sex: 'F',
-            placeCode: 'X001',
-          }),
-          nome: 'Elena',
-          cognome: 'Marchi',
-        },
-      },
+      payload: { medico: { codiceFiscale: corrected, nome: 'Elena', cognome: 'Marchi' } },
     });
     expect(fix.statusCode, fix.body).toBe(200);
+    const accepted = await s.app.inject({
+      method: 'POST',
+      url: '/api/profilo/codice-fiscale/conferma',
+      headers: { cookie: doctor },
+      payload: { proposto: corrected },
+    });
+    expect(accepted.statusCode, accepted.body).toBe(200);
     gated.gate = null;
     release();
     expect((await confirming).statusCode).toBe(200);

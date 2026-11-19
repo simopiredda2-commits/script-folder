@@ -300,6 +300,8 @@ export const ACTION_LABELS: Record<string, string> = {
   ritiro_codice_fiscale: 'Ritiro della correzione del codice fiscale',
   conferma_codice_fiscale: 'Conferma del codice fiscale corretto',
   rifiuto_codice_fiscale: 'Rifiuto del codice fiscale corretto',
+  conferma_archivio: 'Segreteria confermata per l’archivio',
+  rifiuto_archivio: 'Segreteria tolta dall’archivio',
 };
 
 /** Da dove viene l'azione, quando non dal programma (`details.tramite`): solo valori noti. */

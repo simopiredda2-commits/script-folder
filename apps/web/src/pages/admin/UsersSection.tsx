@@ -34,6 +34,15 @@ interface User {
   creatoIl: string;
   medico: Doctor | null;
   archivio: { id: string; nome: string } | null;
+  /** Per la segreteria: archivio per archivio, la decisione del suo titolare (D181). */
+  archiviSegreteria?:
+    | {
+        archivio: { id: string; nome: string };
+        stato: 'confermata' | 'rifiutata' | 'da_confermare';
+        da: string | null;
+        il: string | null;
+      }[]
+    | null;
   io: boolean;
   /** Ruolo con i dati dei pazienti dato dall'amministratore: non entra finché un titolare non conferma. */
   inAttesaDiConferma: boolean;
@@ -387,7 +396,24 @@ export function UsersSection() {
                       '—'
                     )}
                   </td>
-                  <td>{u.archivio?.nome ?? '—'}</td>
+                  <td>
+                    {u.archiviSegreteria ? (
+                      <ul className="opzioni">
+                        {u.archiviSegreteria.map((a) => (
+                          <li key={a.archivio.id}>
+                            {a.archivio.nome}:{' '}
+                            {a.stato === 'confermata'
+                              ? 'confermata dal titolare'
+                              : a.stato === 'rifiutata'
+                                ? 'non ci lavora'
+                                : 'da confermare dal titolare'}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      (u.archivio?.nome ?? '—')
+                    )}
+                  </td>
                   <td>
                     <ul className="elenco-azioni">
                       <li>

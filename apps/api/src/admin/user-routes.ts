@@ -85,4 +85,16 @@ export function registerUserAdminRoutes(app: FastifyInstance, deps: AdminDeps): 
   app.post('/api/studio/utenti/:id/rifiuta', confirmer('rifiuto'), async (req) =>
     users.refuse(req.actor!, idOf(req)),
   );
+
+  // In medicina di gruppo ogni titolare conferma la segreteria per il suo archivio, o la toglie
+  // (D181).
+  app.post(
+    '/api/studio/utenti/:id/archivio/conferma',
+    confirmer('conferma_archivio'),
+    async (req) => users.decideForArchive(req.actor!, idOf(req), true),
+  );
+
+  app.post('/api/studio/utenti/:id/archivio/rifiuta', confirmer('rifiuto_archivio'), async (req) =>
+    users.decideForArchive(req.actor!, idOf(req), false),
+  );
 }

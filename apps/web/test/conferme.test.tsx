@@ -161,6 +161,71 @@ describe('Strumenti › Utenti da confermare (tappa 14)', () => {
     ]);
   });
 
+  it('segreteria sul mio archivio: la confermo per il mio, poi la posso togliere (D181)', async () => {
+    let decision: 'da' | 'sul' | 'no' = 'da';
+    const sec = {
+      id: 's1',
+      nomeUtente: 'lucia.bassi',
+      nome: 'Lucia Bassi',
+      ruoli: [{ codice: 'secretary', nome: 'Segreteria' }],
+      archivio: { id: 'arc2', nome: 'Archivio Serra' },
+    };
+    const calls = fakeService({
+      '/api/studio/utenti/da-confermare': () => ({
+        status: 200,
+        body: {
+          utenti: [],
+          perArchivio: decision === 'da' ? [sec] : [],
+          sulMioArchivio: decision === 'sul' ? [sec] : [],
+        },
+      }),
+      '/api/studio/utenti/s1/archivio/conferma': () => {
+        decision = 'sul';
+        return {
+          status: 200,
+          body: { avvisi: ['Confermata per il tuo archivio: da adesso la segreteria lo vede.'] },
+        };
+      },
+      '/api/studio/utenti/s1/archivio/rifiuta': () => {
+        decision = 'no';
+        return {
+          status: 200,
+          body: {
+            avvisi: [
+              'Tolta dal tuo archivio: da adesso la segreteria non lo vede. Gli altri archivi non cambiano.',
+            ],
+          },
+        };
+      },
+    });
+    const confirm = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirm);
+    const user = userEvent.setup();
+    render(<ConfirmUsersSection />);
+    expect(await screen.findByText('Nessun utente da confermare.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Segreteria sul tuo archivio' })).toBeTruthy();
+    await user.click(
+      screen.getByRole('button', { name: 'Conferma per il mio archivio Lucia Bassi' }),
+    );
+    expect(String((confirm.mock.calls[0] as unknown[])[0])).toMatch(
+      /per il tuo archivio «Archivio Serra»\? Vedrà i tuoi pazienti come segreteria/,
+    );
+    await screen.findByText('Confermata per il tuo archivio: da adesso la segreteria lo vede.');
+    const remove = await screen.findByRole('button', {
+      name: 'Togli dal mio archivio Lucia Bassi',
+    });
+    expect(screen.getByText(/lavora sul tuo archivio/)).toBeTruthy();
+    await user.click(remove);
+    await screen.findByText(/^Tolta dal tuo archivio/);
+    expect(calls.filter((c) => c.method === 'POST').map((c) => c.path)).toEqual([
+      '/api/studio/utenti/s1/archivio/conferma',
+      '/api/studio/utenti/s1/archivio/rifiuta',
+    ]);
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Segreteria sul tuo archivio' })).toBeNull(),
+    );
+  });
+
   it('nessuno in attesa: lo dice, senza tabella', async () => {
     fakeService({
       '/api/studio/utenti/da-confermare': () => ({ status: 200, body: { utenti: [] } }),

@@ -1,5 +1,6 @@
 import {
   bigint,
+  bigserial,
   boolean,
   customType,
   index,
@@ -164,6 +165,36 @@ export const archiveGrant = pgTable('archive_grant', {
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   revokedAt: timestamp({ withTimezone: true }),
 });
+
+export const secretaryArchiveDecision = pgEnum('secretary_archive_decision', [
+  'confermata',
+  'rifiutata',
+  'da_confermare',
+]);
+
+/**
+ * Segreteria e archivio (D181): in medicina di gruppo ogni titolare conferma la segreteria per il
+ * suo archivio. Ogni riga è una decisione e non si cambia: vale l'ultima. Senza righe, o con
+ * l'ultima «da confermare» (per esempio quando il ruolo di segreteria torna), la segreteria non
+ * vede l'archivio finché il titolare non la conferma. `decidedBy` è vuoto per le decisioni prese
+ * fuori dal programma (la migrazione che ha introdotto la regola).
+ */
+export const archiveSecretary = pgTable(
+  'archive_secretary',
+  {
+    seq: bigserial({ mode: 'number' }).primaryKey(),
+    archiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
+    userId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    decision: secretaryArchiveDecision().notNull(),
+    decidedBy: uuid().references(() => appUser.id),
+    decidedAt: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [index().on(t.archiveId, t.userId, t.seq)],
+);
 
 /** Sessione di lavoro su una postazione. Il token è conservato solo come impronta. */
 export const session = pgTable(

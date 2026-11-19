@@ -12,6 +12,7 @@ import {
   appUser,
   archive,
   archiveGrant,
+  archiveSecretary,
   clinicalEntry,
   diaryDetail,
   doctorProfile,
@@ -215,6 +216,23 @@ export async function createScenario(
     .insert(archive)
     .values({ studioId, ownerUserId: users.collega.id, name: 'Archivio Serra' })
     .returning();
+  // La segreteria lavora sui due archivi: ognuno dei titolari l'ha confermata per il suo (D181).
+  await db.insert(archiveSecretary).values([
+    {
+      archiveId: a1!.id,
+      userId: users.segreteria.id,
+      decision: 'confermata',
+      decidedBy: users.titolare.id,
+      decidedAt: new Date(),
+    },
+    {
+      archiveId: a2!.id,
+      userId: users.segreteria.id,
+      decision: 'confermata',
+      decidedBy: users.collega.id,
+      decidedAt: new Date(),
+    },
+  ]);
   const day = 86_400_000;
   await db.insert(archiveGrant).values({
     archiveId: a1!.id,

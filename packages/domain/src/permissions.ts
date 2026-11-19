@@ -235,6 +235,11 @@ export interface AccessContext {
   grants?: readonly ArchiveGrant[];
   /** Impostazioni dell'archivio decise dal titolare (D30). Assenti = spente. */
   settings?: { secretaryCanReadDiary: boolean; secretaryCanReadSummary?: boolean };
+  /**
+   * Segreterie confermate dal titolare per questo archivio (D181): in medicina di gruppo ogni
+   * titolare conferma la segreteria per il suo. Assenti = nessuna.
+   */
+  secretaries?: readonly string[];
   /** Risorsa toccata, quando conta. */
   resource?: { reserved?: boolean; therapyKind?: 'chronic' | 'as_needed' | 'cycle' };
   now?: Date;
@@ -327,7 +332,11 @@ export function can(actor: Actor, action: Action, ctx: AccessContext = {}): Deci
   }
 
   if (actor.roles.includes('secretary')) {
-    if (action === 'clinical.diary.read') {
+    if (!ctx.secretaries?.includes(actor.userId)) {
+      candidates.push(
+        deny('La segreteria lavora su questo archivio dopo la conferma del suo titolare'),
+      );
+    } else if (action === 'clinical.diary.read') {
       candidates.push(
         ctx.settings?.secretaryCanReadDiary
           ? allow('Il titolare consente alla segreteria di leggere il diario')

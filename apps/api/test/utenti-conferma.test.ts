@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import {
   FISCAL_CODE_PENDING_NOTICE,
+  SECRETARY_OWN_ARCHIVE_NOTICE,
   CLINICAL_CREDENTIALS_REFUSAL,
   CLINICAL_UNLOCK_REFUSAL,
   createUserAdminService,
@@ -374,8 +375,49 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       'attiva-secondo-fattore',
     );
     const cookie = await firstAccess('nuova.segreteria', password, 'la segreteria nuova lavora');
-    // Segreteria condivisa: l'anagrafica di tutti gli archivi dello studio.
-    expect((await req(cookie, 'GET', '/api/pazienti')).json().pazienti).toHaveLength(8);
+    // In medicina di gruppo (D181): l'archivio della titolare che l'ha confermata, non ancora
+    // quello del collega.
+    expect(ok.json().avvisi[1]).toBe(SECRETARY_OWN_ARCHIVE_NOTICE);
+    const seen = async () =>
+      (await req(cookie, 'GET', '/api/pazienti')).json().pazienti as unknown[];
+    expect(await seen()).toHaveLength(5);
+    const theirs = async () =>
+      (await req(cookies.collega, 'GET', '/api/studio/utenti/da-confermare')).json() as {
+        perArchivio: { id: string; archivio: { nome: string } }[];
+        sulMioArchivio: { id: string }[];
+      };
+    expect((await theirs()).perArchivio.find((x) => x.id === id)?.archivio.nome).toBe(
+      'Archivio Serra',
+    );
+    // Il collega la conferma per il suo: da adesso vede anche i suoi pazienti.
+    const mine = await req(cookies.collega, 'POST', `/api/studio/utenti/${id}/archivio/conferma`);
+    expect(mine.statusCode, mine.body).toBe(200);
+    expect(await seen()).toHaveLength(8);
+    expect((await theirs()).sulMioArchivio.map((x) => x.id)).toContain(id);
+    expect((await adminLog()).at(-1)).toMatchObject({
+      userId: s.users.collega.id,
+      azione: 'conferma_archivio',
+      utente: 'nuova.segreteria',
+      archivio: s.archives.collega,
+    });
+    // Due volte no; e la tolgo: torna a vedere solo l'archivio della titolare.
+    expect(
+      (await req(cookies.collega, 'POST', `/api/studio/utenti/${id}/archivio/conferma`)).statusCode,
+    ).toBe(409);
+    const off = await req(cookies.collega, 'POST', `/api/studio/utenti/${id}/archivio/rifiuta`);
+    expect(off.statusCode, off.body).toBe(200);
+    expect(await seen()).toHaveLength(5);
+    // La segreteria non decide per sé, e l'amministratore non decide per i titolari.
+    expect(
+      (await req(cookie, 'POST', `/api/studio/utenti/${id}/archivio/conferma`)).statusCode,
+    ).toBe(403);
+    expect(
+      (await req(cookies.amministratore, 'POST', `/api/studio/utenti/${id}/archivio/conferma`))
+        .statusCode,
+    ).toBe(403);
+    const back = await req(cookies.collega, 'POST', `/api/studio/utenti/${id}/archivio/conferma`);
+    expect(back.statusCode, back.body).toBe(200);
+    expect(await seen()).toHaveLength(8);
 
     // Confermata: non è più nell'elenco, e una seconda conferma non serve.
     expect((await pendingOf(cookies.titolare)).map((x) => x.id)).not.toContain(id);

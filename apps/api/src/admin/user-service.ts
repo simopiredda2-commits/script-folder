@@ -12,11 +12,18 @@ import {
   type FiscalCodeProblem,
   type Role,
 } from '@mmg/domain';
-import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import { closeServiceSessions } from '../credentials/service';
+import {
+  decisionOf,
+  latestSecretaryDecisions,
+  recordSecretaryDecision,
+  resetSecretaryDecisions,
+  type DecisionRow,
+} from './secretary-archives';
 import type { Database } from '../db/client';
 import { isLockTimeout, withLockTimeout } from '../db/locks';
 import {
@@ -81,6 +88,9 @@ export const USER_ACTIONS = [
   'rifiuto',
   /** Ritiro di una correzione del codice fiscale di un medico, prima che lui la confermi (D181). */
   'ritiro_codice_fiscale',
+  /** Il titolare conferma la segreteria per il suo archivio, o la toglie (D181). */
+  'conferma_archivio',
+  'rifiuto_archivio',
 ] as const;
 export type UserAction = (typeof USER_ACTIONS)[number];
 
@@ -389,6 +399,9 @@ interface ViewContext {
   withPatients: Set<string>;
   /** Titolari attivi e confermati dello studio: quelli che possono confermare. */
   confirmers: Set<string>;
+  /** Archivi dello studio e decisioni dei titolari sulla segreteria (D181). */
+  archives: ArchiveRow[];
+  secretaryDecisions: Map<string, DecisionRow>;
 }
 
 function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewContext) {
@@ -451,6 +464,21 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
     confermaDalServizio: u.awaitingConfirmation && c.confirmers.size === 0,
     /** Sospeso da chi gestisce il servizio, sul server: dal programma non si riattiva. */
     sospesoDalServizio: u.status === 'suspended' && u.suspendedByService,
+    /**
+     * Per la segreteria, archivio per archivio: confermata dal titolare, tolta, o da confermare
+     * (D181). In medicina di gruppo ogni titolare decide per il suo.
+     */
+    archiviSegreteria: u.roles.includes('secretary')
+      ? c.archives.map((a) => {
+          const d = c.secretaryDecisions.get(`${a.id}:${u.id}`);
+          return {
+            archivio: { id: a.id, nome: a.name },
+            stato: decisionOf(c.secretaryDecisions, a.id, u.id),
+            da: d ? who(d.decidedBy) : null,
+            il: d?.decidedAt.toISOString() ?? null,
+          };
+        })
+      : null,
   };
 }
 
@@ -626,10 +654,18 @@ interface DoneDetails {
   sessioniServiziChiuse?: CredentialService[];
   /** Il codice fiscale corretto aspetta la conferma del medico (D181). */
   codiceFiscaleInAttesaDelMedico?: boolean;
+  /** L'archivio su cui il titolare ha deciso per la segreteria (D181). */
+  archivio?: string;
   /** Per conferme e rifiuti: chi aveva chiesto la conferma, e quando. */
   richiestaDa?: string | null;
   richiestaIl?: string | null;
 }
+
+/** Segreteria e archivi in medicina di gruppo (D181). */
+export const SECRETARY_OWN_ARCHIVE_NOTICE =
+  'La segreteria lavora sul tuo archivio. Sugli archivi degli altri titolari dello studio dopo la loro conferma.';
+export const SECRETARY_ARCHIVES_RESET_NOTICE =
+  'Ruolo di segreteria cambiato: le conferme dei titolari per i loro archivi non valgono più, ognuno la conferma di nuovo per il suo.';
 
 /** Correzione del codice fiscale di un medico fatta dall'amministratore (D181). */
 export const FISCAL_CODE_PENDING_NOTICE =
@@ -744,12 +780,22 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
 
   async function one(actor: Actor, id: string): Promise<UserView> {
     const u = await targetOf(db, actor, id);
+    const archives = await db
+      .select(archiveColumns)
+      .from(archive)
+      .where(eq(archive.studioId, actor.studioId))
+      .orderBy(asc(archive.name));
     return view(u, await profileOf(db, id), await ownArchive(db, actor, id), {
       actorId: actor.userId,
       t: now(),
       names: await studioNames(db, actor.studioId),
       withPatients: await ownersWithPatients(db, actor.studioId, [id]),
       confirmers: await confirmersOf(db, actor.studioId),
+      archives,
+      secretaryDecisions: await latestSecretaryDecisions(db, {
+        archiveIds: archives.map((a) => a.id),
+        userIds: [id],
+      }),
     });
   }
 
@@ -819,6 +865,11 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       names: new Map(users.map((u) => [u.id, u.displayName])),
       withPatients: await ownersWithPatients(db, actor.studioId),
       confirmers: new Set(users.filter(isActiveConfirmedOwner).map((u) => u.id)),
+      archives,
+      secretaryDecisions: await latestSecretaryDecisions(db, {
+        archiveIds: archives.map((a) => a.id),
+        userIds: users.filter((u) => u.roles.includes('secretary')).map((u) => u.id),
+      }),
     };
     return {
       utenti: users.map((u) =>
@@ -1140,6 +1191,18 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
             );
         }
 
+        // Il ruolo di segreteria tolto o ridato: le conferme dei titolari per i loro archivi non
+        // valgono più, ognuno decide di nuovo (D181).
+        if (before.includes('secretary') !== after.includes('secretary')) {
+          const reset = await resetSecretaryDecisions(tx, {
+            studioId: actor.studioId,
+            userId: id,
+            by: actor.userId,
+            at: t,
+          });
+          if (reset > 0 && after.includes('secretary')) out.push(SECRETARY_ARCHIVES_RESET_NOTICE);
+        }
+
         // Chi va in attesa non lavora più finché non è confermato.
         const sessionsClosed = startsWaiting ? await closeSessions(tx, id, t) : 0;
         const noConfirmer = awaiting && otherActiveOwners(users, id).length === 0;
@@ -1415,7 +1478,127 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       utenti: rows.map((u) =>
         pendingView(u, profiles.find((p) => p.userId === u.id) ?? null, names),
       ),
+      ...(await secretariesOfMyArchive(actor)),
     };
+  }
+
+  /**
+   * Le segreterie dello studio, già confermate come utenti, che il titolare non ha ancora
+   * confermato per il suo archivio (D181): finché non lo fa, non lo vedono.
+   */
+  async function secretariesOfMyArchive(actor: Actor) {
+    const mine = await ownArchive(db, actor, actor.userId);
+    if (!mine) return { perArchivio: [], sulMioArchivio: [] };
+    const secretaries = (
+      await db
+        .select(userColumns)
+        .from(appUser)
+        .where(
+          and(
+            eq(appUser.studioId, actor.studioId),
+            eq(appUser.status, 'active'),
+            eq(appUser.awaitingConfirmation, false),
+            sql`'secretary' = any(${appUser.roles})`,
+          ),
+        )
+        .orderBy(asc(appUser.displayName), asc(appUser.username))
+    ).filter((u) => u.id !== actor.userId);
+    const decisions = await latestSecretaryDecisions(db, {
+      archiveIds: [mine.id],
+      userIds: secretaries.map((u) => u.id),
+    });
+    const item = (u: UserRow) => ({
+      id: u.id,
+      nomeUtente: u.username,
+      nome: u.displayName,
+      ruoli: roleList(u.roles),
+      archivio: { id: mine.id, nome: mine.name },
+    });
+    return {
+      // Da confermare per il mio archivio: senza la mia conferma non lo vedono.
+      perArchivio: secretaries
+        .filter((u) => decisionOf(decisions, mine.id, u.id) === 'da_confermare')
+        .map(item),
+      // Lavorano sul mio archivio: le posso togliere.
+      sulMioArchivio: secretaries
+        .filter((u) => decisionOf(decisions, mine.id, u.id) === 'confermata')
+        .map(item),
+    };
+  }
+
+  /**
+   * Il titolare conferma la segreteria per il suo archivio, o la toglie (D181). Vale per una
+   * segreteria attiva e già confermata come utente; chi è in attesa si conferma prima come utente.
+   */
+  async function decideForArchive(actor: Actor, id: string, confirmed: boolean) {
+    const azione: UserAction = confirmed ? 'conferma_archivio' : 'rifiuto_archivio';
+    return guarded(
+      actor,
+      azione,
+      async () => {
+        await withActor(db, actor.userId, async (tx) => {
+          const users = await lockStudioUsers(tx, actor.studioId);
+          const target = users.find((u) => u.id === id);
+          if (!target) throw new HttpError(404, 'Utente non trovato');
+          ensureActiveOwner(users, actor, target);
+          const mine = await ownArchive(tx, actor, actor.userId);
+          if (!mine)
+            throw new Refusal(409, 'Non hai un archivio tuo nello studio', target.username);
+          if (!target.roles.includes('secretary'))
+            throw new Refusal(
+              409,
+              'Solo la segreteria si conferma per un archivio',
+              target.username,
+            );
+          if (target.awaitingConfirmation)
+            throw new Refusal(
+              409,
+              'È in attesa di conferma come utente: prima la si conferma, nell’elenco qui sopra',
+              target.username,
+            );
+          if (confirmed && target.status !== 'active')
+            throw new Refusal(409, SUSPENDED_CONFIRM, target.username);
+          const decisions = await latestSecretaryDecisions(tx, {
+            archiveIds: [mine.id],
+            userIds: [id],
+          });
+          const current = decisionOf(decisions, mine.id, id);
+          if (confirmed ? current === 'confermata' : current === 'rifiutata')
+            throw new HttpError(
+              409,
+              confirmed
+                ? 'È già confermata per il tuo archivio'
+                : 'Non lavora già sul tuo archivio',
+            );
+          const t = now();
+          await recordSecretaryDecision(tx, {
+            archiveId: mine.id,
+            userId: id,
+            decision: confirmed ? 'confermata' : 'rifiutata',
+            by: actor.userId,
+            at: t,
+          });
+          await logDone(tx, actor, {
+            azione,
+            utente: target.username,
+            utenteId: id,
+            ruoliPrima: target.roles,
+            ruoliDopo: target.roles,
+            campi: ['archivio'],
+            archivio: mine.id,
+          });
+        });
+        return {
+          utente: await one(actor, id).catch(() => null),
+          avvisi: [
+            confirmed
+              ? 'Confermata per il tuo archivio: da adesso la segreteria lo vede.'
+              : 'Tolta dal tuo archivio: da adesso la segreteria non lo vede. Gli altri archivi non cambiano.',
+          ],
+        };
+      },
+      requireConfirmer,
+    );
   }
 
   /**
@@ -1477,6 +1660,27 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
             })
             .where(eq(appUser.id, id));
           const n = issues ? await closeSessions(tx, id, t) : 0;
+          // La segreteria lavora sull'archivio del titolare che la conferma; sugli altri archivi
+          // dopo la conferma dei loro titolari (D181).
+          const mine = target.roles.includes('secretary')
+            ? await ownArchive(tx, actor, actor.userId)
+            : null;
+          const alreadyMine =
+            !!mine &&
+            decisionOf(
+              await latestSecretaryDecisions(tx, { archiveIds: [mine.id], userIds: [id] }),
+              mine.id,
+              id,
+            ) === 'confermata';
+          const onMyArchive = !!mine && !alreadyMine;
+          if (onMyArchive)
+            await recordSecretaryDecision(tx, {
+              archiveId: mine.id,
+              userId: id,
+              decision: 'confermata',
+              by: actor.userId,
+              at: t,
+            });
           await logDone(tx, actor, {
             azione: 'conferma',
             utente: target.username,
@@ -1488,15 +1692,16 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
             richiestaIl: target.confirmationRequestedAt?.toISOString() ?? null,
             ...(issues ? { sessioniChiuse: n } : {}),
           });
-          return issues;
+          return { issues, onMyArchive };
         });
         return {
           utente: await pendingOne(actor, id),
-          ...(fresh ? { passwordTemporanea: password } : {}),
+          ...(fresh.issues ? { passwordTemporanea: password } : {}),
           avvisi: [
-            fresh
+            fresh.issues
               ? 'Utente confermato. Consegna di persona la password temporanea: al primo accesso l’utente attiva il secondo fattore e sceglie la sua password.'
               : 'Utente confermato: entra con la sua password e il suo secondo fattore.',
+            ...(fresh.onMyArchive ? [SECRETARY_OWN_ARCHIVE_NOTICE] : []),
           ],
         };
       },
@@ -1607,6 +1812,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
     requireConfirmer,
     list,
     withdrawFiscalCode,
+    decideForArchive,
     create,
     update,
     setStatus,

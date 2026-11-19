@@ -4,12 +4,15 @@ import { logAccess, type AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import { archive, archiveGrant, patient, studio } from '../db/schema';
+import { confirmedSecretaries } from '../admin/secretary-archives';
 import { HttpError } from '../http/errors';
 
 export interface ArchiveContext {
   archive: { id: string; studioId: string; ownerUserId: string };
   grants: ArchiveGrant[];
   settings: { secretaryCanReadDiary: boolean; secretaryCanReadSummary: boolean };
+  /** Segreterie confermate dal titolare per questo archivio (D181). */
+  secretaries: string[];
 }
 
 export async function loadArchiveContext(db: Database, archiveId: string): Promise<ArchiveContext> {
@@ -34,6 +37,7 @@ export async function loadArchiveContext(db: Database, archiveId: string): Promi
       secretaryCanReadDiary: a.archive.secretaryCanReadDiary,
       secretaryCanReadSummary: a.archive.secretaryCanReadSummary,
     },
+    secretaries: await confirmedSecretaries(db, archiveId),
   };
 }
 

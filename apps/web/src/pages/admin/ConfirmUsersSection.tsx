@@ -24,8 +24,19 @@ interface PendingUser {
   passwordAllaConferma: boolean;
   medico: { nome: string | null; cognome: string | null; codiceFiscale: string | null } | null;
 }
+/** Segreteria già confermata come utente, sull'archivio del titolare (D181). */
+interface ArchiveSecretary {
+  id: string;
+  nomeUtente: string;
+  nome: string;
+  archivio: { id: string; nome: string };
+}
 interface Pending {
   utenti: PendingUser[];
+  /** Da confermare per il mio archivio: finché non lo faccio, non lo vede. */
+  perArchivio?: ArchiveSecretary[];
+  /** Lavora sul mio archivio: la posso togliere. */
+  sulMioArchivio?: ArchiveSecretary[];
 }
 interface Result {
   utente: PendingUser;
@@ -66,6 +77,32 @@ export function ConfirmUsersSection() {
   if (pending.loading && !pending.data) return <Loading what="utenti da confermare" />;
   if (!pending.data) return <ErrorMessage error={pending.error} />;
   const users = pending.data.utenti;
+  const toConfirm = pending.data.perArchivio ?? [];
+  const onMine = pending.data.sulMioArchivio ?? [];
+
+  /** La segreteria sul mio archivio: la confermo o la tolgo (D181). */
+  async function decideArchive(u: ArchiveSecretary, confirm: boolean) {
+    const question = confirm
+      ? `Confermare ${u.nome} (${u.nomeUtente}) per il tuo archivio «${u.archivio.nome}»? Vedrà i tuoi pazienti come segreteria, con le impostazioni del tuo archivio.`
+      : `Togliere ${u.nome} (${u.nomeUtente}) dal tuo archivio «${u.archivio.nome}»? Non vedrà più i tuoi pazienti; gli archivi degli altri titolari non cambiano.`;
+    if (!window.confirm(question)) return;
+    setBusy(true);
+    setError(null);
+    setOutcome(null);
+    setShown(null);
+    try {
+      const r = await api<{ avvisi?: string[] }>(
+        `/api/studio/utenti/${u.id}/archivio/${confirm ? 'conferma' : 'rifiuta'}`,
+        { method: 'POST', body: {} },
+      );
+      setOutcome(r.avvisi ?? []);
+    } catch (e) {
+      setError(e instanceof ApiError ? e : new ApiError(0, 'Servizio non raggiungibile'));
+    } finally {
+      setBusy(false);
+      pending.reload();
+    }
+  }
 
   async function act(u: PendingUser, kind: Kind) {
     if (!window.confirm(QUESTIONS[kind](u))) return;
@@ -194,6 +231,62 @@ export function ConfirmUsersSection() {
             </tbody>
           </table>
         </div>
+      )}
+      {(toConfirm.length > 0 || onMine.length > 0) && (
+        <>
+          <h3>Segreteria sul tuo archivio</h3>
+          <p>
+            In medicina di gruppo ogni titolare conferma la segreteria per il suo archivio: finché
+            non la confermi, non vede i tuoi pazienti. La puoi anche togliere; gli archivi degli
+            altri titolari non cambiano.
+          </p>
+          <ul className="elenco-azioni">
+            {toConfirm.map((u) => (
+              <li key={`da-${u.id}`}>
+                <span>
+                  {u.nome} <span className="codice">{u.nomeUtente}</span>:{' '}
+                  <strong>
+                    <Icon name="avviso" /> da confermare
+                  </strong>
+                </span>{' '}
+                <button
+                  type="button"
+                  className="pulsante pulsante-primario"
+                  disabled={busy}
+                  onClick={() => void decideArchive(u, true)}
+                >
+                  <Icon name="fatto" /> <span>Conferma per il mio archivio</span>{' '}
+                  <span className="visivamente-nascosto">{u.nome}</span>
+                </button>{' '}
+                <button
+                  type="button"
+                  className="pulsante pulsante-piatto"
+                  disabled={busy}
+                  onClick={() => void decideArchive(u, false)}
+                >
+                  <Icon name="annulla" /> <span>Non sul mio archivio</span>{' '}
+                  <span className="visivamente-nascosto">{u.nome}</span>
+                </button>
+              </li>
+            ))}
+            {onMine.map((u) => (
+              <li key={`sul-${u.id}`}>
+                <span>
+                  {u.nome} <span className="codice">{u.nomeUtente}</span>: lavora sul tuo archivio
+                </span>{' '}
+                <button
+                  type="button"
+                  className="pulsante pulsante-piatto"
+                  disabled={busy}
+                  onClick={() => void decideArchive(u, false)}
+                >
+                  <Icon name="annulla" /> <span>Togli dal mio archivio</span>{' '}
+                  <span className="visivamente-nascosto">{u.nome}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </section>
   );
