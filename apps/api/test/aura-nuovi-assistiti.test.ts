@@ -1,6 +1,6 @@
 import { generatePatients } from '@mmg/fixtures';
 import { EMPTY_AURA_REGISTRY, SimulatedAura, type AuraChoice } from '@mmg/integrations';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   accessLog,
@@ -208,6 +208,25 @@ describe('AURA: nuovi assistiti (D199)', () => {
       .where(and(eq(accessLog.patientId, id), eq(accessLog.action, 'nuovo_paziente')));
     expect(log).toMatchObject({ outcome: 'consentito', userId: s.users.segreteria.id });
     expect(log!.details).toMatchObject({ fonte: 'AURA', nuovoAssistito: candidateId });
+    // Lo storico ha ogni cambio dell'assistito, e la riga non si cancella.
+    const history = await t.db.execute<{ operation: string; status: string }>(sql`
+      select operation, new_row ->> 'status' as status from change_history
+      where table_name = 'aura_new_patient' and row_id = ${candidateId} order by id`);
+    expect(history.rows.map((h) => [h.operation, h.status])).toEqual([
+      ['INSERT', 'da_registrare'],
+      ['UPDATE', 'registrato'],
+    ]);
+    await expect(
+      t.db.delete(auraNewPatient).where(eq(auraNewPatient.id, candidateId)),
+    ).rejects.toThrow();
+    await expect(t.db.execute(sql`truncate aura_new_patient`)).rejects.toThrow();
+    // «Registrato» vuol dire con il paziente: il database non accetta l'uno senza l'altro.
+    await expect(
+      t.db
+        .update(auraNewPatient)
+        .set({ patientId: null })
+        .where(eq(auraNewPatient.id, candidateId)),
+    ).rejects.toThrow();
     // Esce dall'elenco; un secondo clic lo dice.
     expect((await list('segreteria')).map((x) => x.id)).not.toContain(candidateId);
     const again = await post(`/api/aura/nuovi/${candidateId}/registra`, 'segreteria');
@@ -359,6 +378,11 @@ describe('AURA: nuovi assistiti (D199)', () => {
     expect(both.map((r) => r.statusCode).sort()).toEqual([201, 409]);
     const rows = await t.db.select().from(patient).where(eq(patient.fiscalCode, p.fiscalCode));
     expect(rows).toHaveLength(1);
+    // Chi arriva secondo non passa dalla registrazione: il blocco lo ferma prima.
+    const loser = both.find((r) => r.statusCode === 409)!;
+    expect(['Già registrato', 'Registrazione già in corso: ricarica la pagina tra poco']).toContain(
+      loser.json().errore,
+    );
   });
 
   it('registrato a mano nel frattempo: «Registra» lo dice con il paziente, e l’assistito esce dall’elenco', async () => {

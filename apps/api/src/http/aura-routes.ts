@@ -116,7 +116,8 @@ export function registerAuraRoutes(
   /**
    * «Registra» (D199): il paziente entra nell'archivio del medico con i dati di AURA e i controlli
    * di «Nuovo paziente», poi si collega ad AURA, che porta esenzioni e scelte. Un assistito alla
-   * volta, insieme alle notifiche: due clic non registrano due volte.
+   * volta, insieme alle notifiche: due clic non registrano due volte. Chi arriva mentre un altro
+   * registra non aspetta il blocco (terrebbe occupata una connessione al database): lo si dice.
    */
   app.post('/api/aura/nuovi/:id/registra', async (req, reply) => {
     const actor = req.actor!;
@@ -127,9 +128,11 @@ export function registerAuraRoutes(
     let created: { id: string; avvisi: string[] };
     try {
       created = await withActor(db, actor.userId, async (tx) => {
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`aura-nuovo:${first.auraId}`}, 0))`,
+        const lock = await tx.execute<{ preso: boolean }>(
+          sql`select pg_try_advisory_xact_lock(hashtextextended(${`aura-nuovo:${first.auraId}`}, 0)) as preso`,
         );
+        if (!lock.rows[0]?.preso)
+          throw new HttpError(409, 'Registrazione già in corso: ricarica la pagina tra poco');
         const [c] = await tx.select().from(auraNewPatient).where(eq(auraNewPatient.id, id));
         if (c!.status !== 'da_registrare')
           throw new HttpError(
