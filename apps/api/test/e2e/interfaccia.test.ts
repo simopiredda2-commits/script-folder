@@ -2283,4 +2283,27 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     const [after] = await t.db.select().from(patient).where(eq(patient.id, movingId));
     expect(after).toMatchObject({ archiveId: s.archives.collega, status: 'active' });
   });
+
+  it('riepiloghi per periodo (D201): dall’Archivio, accessibili anche su tablet, con il CSV', async () => {
+    await page.goto(`${base}/archivio`);
+    await page.getByRole('link', { name: 'Apri i riepiloghi' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Riepiloghi' }).waitFor();
+    await page
+      .getByRole('status')
+      .getByText(/^Riepilogo dal /)
+      .waitFor();
+    await page.getByRole('table', { name: 'Ricette fatte nell’archivio, per tipo' }).waitFor();
+    await check(page, 'riepiloghi per periodo', true);
+    // Il CSV dello stesso periodo, con la sessione di chi guarda.
+    const href = await page.getByRole('link', { name: 'Scarica in CSV' }).getAttribute('href');
+    expect(href).toMatch(
+      /^\/api\/archivi\/[0-9a-f-]+\/riepiloghi\/esportazione\?dal=\d{4}-\d{2}-01&al=/,
+    );
+    const csv = await page.request.get(`${base}${href}`);
+    expect(csv.status()).toBe(200);
+    expect(csv.headers()['content-type']).toMatch(/^text\/csv/);
+    expect((await csv.text()).split('\r\n')[0]).toBe(
+      '\uFEFFSezione;Data;Tipo;Cognome;Nome;Codice fiscale;Dettaglio;Medico',
+    );
+  });
 });

@@ -261,6 +261,19 @@ describe('azioni sullo studio di più ruoli (tappa 14)', () => {
     expect(ok(collega, 'archive.grants')).toBe(false);
     expect(ok(amministratore, 'archive.grants')).toBe(false);
   });
+  it('i riepiloghi dell’archivio li legge ed esporta solo il titolare (D201)', () => {
+    expect(ok(titolare, 'reports.read')).toBe(true);
+    const grants = ctx({
+      grants: [
+        sostituzione,
+        { ...sostituzione, granteeUserId: collega.userId, kind: 'group_colleague' },
+      ],
+    });
+    expect(ok(sostituto, 'reports.read', grants)).toBe(false);
+    expect(ok(collega, 'reports.read', grants)).toBe(false);
+    expect(ok(segreteria, 'reports.read', ctx({ secretaries: [segreteria.userId] }))).toBe(false);
+    expect(ok(amministratore, 'reports.read')).toBe(false);
+  });
   it('lo spostamento nell’archivio del medico scelto in AURA lo decide solo il titolare (D200)', () => {
     expect(ok(titolare, 'archive.transfer')).toBe(true);
     // Né il sostituto né il collega di gruppo, anche con l'autorizzazione attiva.

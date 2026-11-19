@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
@@ -178,6 +178,16 @@ export function ArchivePage() {
             Ogni esportazione è registrata nel registro degli accessi. Ogni sezione del file ha la
             sua impronta SHA-256, per controllare che sia integro.
           </p>
+        </section>
+
+        <section className="riquadro" aria-labelledby="titolo-riepiloghi">
+          <h2 id="titolo-riepiloghi">
+            <Icon name="storico" /> Riepiloghi
+          </h2>
+          <p>Visite e contatti, ricette e vaccinazioni per periodo, con l’esportazione in CSV.</p>
+          <Link className="pulsante" to="/archivio/riepiloghi">
+            <Icon name="storico" /> <span>Apri i riepiloghi</span>
+          </Link>
         </section>
       </div>
       <GrantsSection archiveId={own.id} />

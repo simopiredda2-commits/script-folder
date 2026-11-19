@@ -20,6 +20,7 @@ import { isPoolTimeout, type Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerIdentityRoutes } from './http/identity-routes';
 import { registerAuraRoutes } from './http/aura-routes';
+import { registerReportRoutes } from './http/report-routes';
 import { createAuraService } from './aura/service';
 import { ReferenceUpdateScheduler } from './reference/scheduler';
 import { registerIdentitySimulatorRoutes } from './http/identity-simulator-routes';
@@ -363,6 +364,7 @@ export function buildApp({
   registerUserAdminRoutes(app, adminDeps);
   registerPrintRoutes(app, adminDeps);
   registerArchiveAdminRoutes(app, adminDeps);
+  registerReportRoutes(app, { db, now: now ?? (() => new Date()) });
   registerStudioListRoutes(app, adminDeps);
   // Pannello amministrativo del paziente e importazione da altri programmi (tappa 15).
   registerPatientAdminRoutes(app, adminDeps);

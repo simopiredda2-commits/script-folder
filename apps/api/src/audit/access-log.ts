@@ -125,7 +125,9 @@ export type AccessAction =
   | 'nuovo_assistito_non_registrato'
   | 'lettura_cambi_medico'
   | 'spostamento_archivio'
-  | 'cambio_medico_non_spostato';
+  | 'cambio_medico_non_spostato'
+  | 'lettura_riepiloghi'
+  | 'esportazione_riepiloghi';
 
 export interface AccessEntry {
   studioId?: string | null;
