@@ -1,5 +1,9 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { RECOVERY_MINUTES, type IdentityService } from '../auth/identity-service';
+import {
+  RECOVERY_MINUTES,
+  type IdentityService,
+  type ReturnFailure,
+} from '../auth/identity-service';
 import type { Actor } from '../auth/service';
 
 /** Cookie del ripristino: il passaggio per la password nuova, solo per le rotte del ripristino. */
@@ -9,7 +13,8 @@ const RECOVERY_PATH = '/api/ripristino';
 /**
  * Ripristino delle credenziali con SPID o CIE (D189), pubblico: avvio, ritorno dal gestore
  * dell'identità, stato, password nuova. Collegamento dell'identità della segreteria, a sessione
- * aperta. I ritorni sono navigazioni del browser: gli errori diventano pagine dell'interfaccia.
+ * aperta. I ritorni sono navigazioni del browser: gli errori diventano pagine dell'interfaccia, con
+ * un codice nell'indirizzo e mai un testo (D193).
  */
 export function registerIdentityRoutes(
   app: FastifyInstance,
@@ -62,17 +67,11 @@ export function registerIdentityRoutes(
 
   app.delete('/api/profilo/identita', async (req) => identity.unlink(req.actor!));
 
-  const back = (q: Record<string, string>) =>
+  const back = (q: { collegamento: 'ok' } | { collegamento: 'errore'; motivo: ReturnFailure }) =>
     `/profilo/identita?${new URLSearchParams(q).toString()}`;
   app.get('/api/profilo/identita/ritorno', pub, async (req, reply) => {
     const actor = await opts.actorOf(req.cookies[opts.sessionCookie]);
-    if (!actor)
-      return reply.redirect(
-        back({
-          collegamento: 'errore',
-          motivo: 'Accesso al programma scaduto o bloccato: entra di nuovo e ricomincia',
-        }),
-      );
+    if (!actor) return reply.redirect(back({ collegamento: 'errore', motivo: 'sessione' }));
     const r = await identity.completeLink(actor, req.query);
     return reply.redirect(
       r.esito === 'ok'

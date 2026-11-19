@@ -1,7 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { Actor } from '../auth/service';
 import { z } from 'zod';
-import { SERVICE_SLUGS, type createCredentialService } from '../credentials/service';
+import {
+  SERVICE_SLUGS,
+  type createCredentialService,
+  type RegionalFailure,
+} from '../credentials/service';
 
 const params = z.object({
   servizio: z.enum(Object.keys(SERVICE_SLUGS) as ['sistema-ts', 'rupar']),
@@ -45,7 +49,8 @@ export function registerCredentialRoutes(
     service.startRegionalAccess(req.actor!),
   );
 
-  const back = (q: Record<string, string>) =>
+  // Nell'indirizzo del ritorno solo un codice, mai un testo (D193).
+  const back = (q: { accesso: 'ok' } | { accesso: 'errore'; motivo: RegionalFailure }) =>
     `/profilo/credenziali?${new URLSearchParams(q).toString()}`;
   app.get(
     '/api/profilo/credenziali/rupar/accesso-regionale/ritorno',
@@ -53,14 +58,7 @@ export function registerCredentialRoutes(
     async (req, reply) => {
       // Il ritorno è una navigazione del browser: errori come pagina, non come risposta tecnica.
       const actor = await opts.actorOf(req.cookies[opts.sessionCookie]);
-      if (!actor)
-        return reply.redirect(
-          back({
-            accesso: 'errore',
-            motivo:
-              'Accesso al programma scaduto o bloccato: entra di nuovo e ripeti l’accesso regionale',
-          }),
-        );
+      if (!actor) return reply.redirect(back({ accesso: 'errore', motivo: 'sessione' }));
       const r = await service.completeRegionalAccess(actor, req.query);
       return reply.redirect(
         r.esito === 'ok' ? back({ accesso: 'ok' }) : back({ accesso: 'errore', motivo: r.motivo }),

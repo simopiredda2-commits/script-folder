@@ -60,6 +60,7 @@ All'installazione, se davanti al servizio c'è un proxy inverso, il suo indirizz
 - Dalla pagina di accesso, «Ripristina con SPID o CIE»: nome utente e postazione, poi SPID o CIE. Se la persona riconosciuta ha il codice fiscale dell'utente, sceglie una password nuova e, se ha perso l'app, azzera il secondo fattore. Il conto si sblocca e tutte le sessioni si chiudono.
 - Vale per medici e segreteria attivi, confermati e non sospesi dal server. Per il medico conta il codice fiscale del suo profilo; la segreteria collega prima la sua identità dal suo profilo («Cambia la password» › «SPID o CIE per il ripristino»), con il codice a 6 cifre di adesso. Gli amministratori no.
 - Nel registro di amministrazione: «Ripristino delle credenziali, dall'utente stesso, con SPID o CIE», e i collegamenti dell'identità.
+- Se il ripristino non riesce, la pagina dice che cosa fare con un testo del programma: nell'indirizzo del ritorno c'è solo un codice, mai un testo che altri potrebbero scrivere (D193). Il motivo vero è nel registro degli accessi.
 - Oggi SPID e CIE sono simulati: in produzione il ripristino resta spento finché il programma non è accreditato come fornitore di servizi (da completare).
 
 ### Tentativi sbagliati e blocchi (D188)

@@ -921,3 +921,12 @@ Restano annotati: nome e impronta del PDF del manuale ICD-9-CM, l'accreditamento
 - **Non fatto:** una pagina per chi gestisce il servizio. Il comando sul server basta per oggi, come per il ripristino delle credenziali (D179).
 
 Prove e sabotaggi.
+
+**D193 · I ritorni da SPID o CIE e dalla pagina regionale portano un codice, non un testo.** Da una rilettura del codice dopo la fermata. Il ritorno da SPID o CIE (ripristino e collegamento, D189) e quello dalla pagina regionale (D109) mettevano nell'indirizzo il testo del motivo (`?motivo=…`), e la pagina lo mostrava così com'era. Chiunque poteva mandare a uno studio un collegamento al dominio vero con un messaggio falso, per esempio «conto sospeso: chiama questo numero». Scelte:
+
+- **Un codice fra pochi noti.** Il servizio mette nell'indirizzo solo il codice (`non-possibile`, `non-riconosciuta`, `annullato` e gli altri); il testo lo scrive l'interfaccia (`apps/web/src/lib/return-reasons.ts`). Un codice sconosciuto, anche il nome di una proprietà come `toString`, dà un testo generico. Il motivo vero resta nel registro.
+- **Le risposte dei gestori non si mostrano più.** I codici d'errore del gestore dell'identità o della Regione entravano nel testo; ora vanno solo nel registro, e chi accede legge che cosa fare.
+- **I simulatori rimandano solo ai ritorni registrati.** Accettavano qualunque indirizzo che cominciava con «/», anche «//altro-sito», che il browser legge come un altro sito. Come un gestore vero, ora accettano solo gli indirizzi di ritorno del programma.
+- **Non cambia:** lo storico di una prestazione o di un farmaco, quando non trova nulla, ha per titolo la parola cercata. È la ricerca stessa, dentro la cartella e a sessione aperta.
+
+Prove (servizio, simulatori, interfaccia) e sette sabotaggi.

@@ -42,7 +42,7 @@ Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id
 5. Le ricette SSN, i loro annullamenti e lo stato di erogazione usano il token come `Authorization: Bearer`. Utente, password e PIN RUPAR non servono.
 6. «Esci dall’accesso regionale» revoca il token (`/sessionid/revoke`).
 
-Errori come annullamento, identità diversa, richiesta scaduta o accesso al programma scaduto nel frattempo tornano come messaggio chiaro nella pagina delle credenziali, mai come errore tecnico. Il codice per email resta come alternativa.
+Errori come annullamento, identità diversa, richiesta scaduta o accesso al programma scaduto nel frattempo tornano come messaggio chiaro nella pagina delle credenziali, mai come errore tecnico. Nell'indirizzo del ritorno c'è solo un codice, e il testo lo scrive il programma: un testo nell'indirizzo lo potrebbe scrivere chiunque (D193). Il codice per email resta come alternativa.
 
 In prova la pagina regionale è simulata dal programma stesso:
 

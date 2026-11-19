@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
+import { identityReturnText } from '../lib/return-reasons';
 import { useApi } from '../lib/useApi';
 
 interface IdentityState {
@@ -64,7 +65,9 @@ export function IdentityPage() {
       <PageHeader title="SPID o CIE per il ripristino" />
       {outcome === 'ok' && <Notice kind="fatto">Identità collegata.</Notice>}
       {outcome === 'errore' && (
-        <Notice kind="errore">{params.get('motivo') ?? 'Collegamento non riuscito'}</Notice>
+        <Notice kind="errore">
+          {identityReturnText(params.get('motivo'), 'Collegamento non riuscito')}
+        </Notice>
       )}
       <ErrorMessage error={error ?? current.error} />
       {d && !d.disponibile && (

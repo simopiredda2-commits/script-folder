@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import type { CredentialsStatus, ServiceStatus } from '../lib/credentials';
 import { date, dateTime, studioToday } from '../lib/format';
+import { regionalReturnText } from '../lib/return-reasons';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 
@@ -15,11 +16,12 @@ import { useApi } from '../lib/useApi';
 export function ServiceCredentialsPage() {
   const { isDoctor } = useSession();
   const st = useApi<CredentialsStatus>(isDoctor ? '/api/profilo/credenziali' : null);
-  // Ritorno dalla pagina regionale (D109): esito nell'indirizzo, letto una volta e poi tolto.
+  // Ritorno dalla pagina regionale (D109): esito nell'indirizzo, letto una volta e poi tolto. Del
+  // motivo c'è solo il codice; il testo è del programma (D193).
   const [params, setParams] = useSearchParams();
   const [regionalOutcome] = useState(() =>
     params.get('accesso')
-      ? { ok: params.get('accesso') === 'ok', why: params.get('motivo') }
+      ? { ok: params.get('accesso') === 'ok', why: regionalReturnText(params.get('motivo')) }
       : null,
   );
   useEffect(() => {
@@ -55,9 +57,7 @@ export function ServiceCredentialsPage() {
         (regionalOutcome.ok ? (
           <Notice kind="fatto">Accesso regionale attivo: puoi mandare le ricette SSN.</Notice>
         ) : (
-          <Notice kind="errore">
-            Accesso regionale non riuscito: {regionalOutcome.why ?? 'motivo non indicato'}.
-          </Notice>
+          <Notice kind="errore">Accesso regionale non riuscito: {regionalOutcome.why}.</Notice>
         ))}
       <div className="griglia-credenziali">
         {st.data.servizi.map((s) => (

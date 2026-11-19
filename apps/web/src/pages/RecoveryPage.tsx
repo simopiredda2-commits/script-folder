@@ -3,6 +3,7 @@ import { ErrorMessage, Notice } from '../components/common';
 import { Logo } from '../components/Logo';
 import { Signature } from '../components/Signature';
 import { api, ApiError } from '../lib/api';
+import { identityReturnText } from '../lib/return-reasons';
 import { rememberedWorkstation } from '../lib/storage';
 
 /** Il ripristino aperto dopo SPID o CIE, come lo dice il servizio. */
@@ -30,7 +31,9 @@ const field = (f: FormData, name: string): string => {
  */
 export function RecoveryPage() {
   const params = new URLSearchParams(window.location.search);
-  const returnedError = params.get('esito') === 'errore' ? params.get('motivo') : null;
+  // Nell'indirizzo c'è solo il codice del motivo; il testo è del programma (D193).
+  const returnedError =
+    params.get('esito') === 'errore' ? identityReturnText(params.get('motivo')) : null;
   const [open, setOpen] = useState<Recovery | null>(null);
   const [checked, setChecked] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
