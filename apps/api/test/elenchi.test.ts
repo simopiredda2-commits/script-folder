@@ -3,6 +3,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   accessLog,
+  archiveGrant,
   changeHistory,
   refService,
   referenceDataset,
@@ -245,6 +246,79 @@ describe('elenchi dello studio (tappa 14)', () => {
     expect(
       (await req(cookies.titolare!, 'GET', '/api/studio/elenchi?tipo=farmaco')).statusCode,
     ).toBe(400);
+  });
+
+  it('il sostituto scrive solo con un’autorizzazione attiva su un archivio dello studio (D181)', async () => {
+    // Lo scenario gli dà una sostituzione da ieri a domani: adesso può.
+    expect((await list('', cookies.sostituto)).puoModificare).toBe(true);
+    const [grant] = await t.db
+      .select()
+      .from(archiveGrant)
+      .where(eq(archiveGrant.granteeUserId, a.users.sostituto.id));
+    expect(grant).toBeDefined();
+    const elsewhere = await t.db
+      .insert(archiveGrant)
+      .values({
+        archiveId: b.archives.titolare,
+        granteeUserId: a.users.sostituto.id,
+        kind: 'substitution',
+        validFrom: grant!.validFrom,
+        validTo: grant!.validTo,
+        reason: 'Sostituzione di prova in un altro studio',
+        grantedBy: b.users.titolare.id,
+      })
+      .returning();
+    const deniedNow = async (what: string) => {
+      const seen = await list('', cookies.sostituto);
+      expect(seen.puoModificare, what).toBe(false);
+      expect(seen.voci.length, what).toBeGreaterThan(0);
+      const denied = await create(
+        'posologia',
+        { testo: '2 compresse al mattino' },
+        cookies.sostituto,
+      );
+      expect(denied.statusCode, what).toBe(403);
+      expect(denied.json<{ errore: string }>().errore).toBe(
+        'Il sostituto modifica gli elenchi dello studio solo mentre ha un’autorizzazione attiva su un archivio dello studio',
+      );
+      const last = (await adminLog()).at(-1)!;
+      expect(last).toMatchObject({ outcome: 'negato', userId: a.users.sostituto.id });
+      expect(last.details).toMatchObject({
+        area: 'elenchi',
+        azione: 'creazione',
+        permesso: 'studio.lists',
+        motivo: 'Serve un’autorizzazione attiva su un archivio dello studio',
+      });
+      expect(
+        (await patch(ids.posologia!, { momento: 'al mattino' }, cookies.sostituto)).statusCode,
+      ).toBe(403);
+      expect((await archive(ids.posologia!, cookies.sostituto)).statusCode).toBe(403);
+    };
+    try {
+      // Revocata: legge, non scrive. L'autorizzazione nell'altro studio non conta.
+      await t.db
+        .update(archiveGrant)
+        .set({ revokedAt: a.clock.now() })
+        .where(eq(archiveGrant.id, grant!.id));
+      await deniedNow('sostituzione revocata');
+      // Finita ieri: lo stesso.
+      await t.db
+        .update(archiveGrant)
+        .set({ revokedAt: null, validTo: new Date(a.clock.now().getTime() - 86_400_000) })
+        .where(eq(archiveGrant.id, grant!.id));
+      await deniedNow('sostituzione finita');
+    } finally {
+      await t.db
+        .update(archiveGrant)
+        .set({ revokedAt: null, validTo: grant!.validTo })
+        .where(eq(archiveGrant.id, grant!.id));
+      // Le autorizzazioni non si cancellano: si revocano.
+      await t.db
+        .update(archiveGrant)
+        .set({ revokedAt: a.clock.now() })
+        .where(eq(archiveGrant.id, elsewhere[0]!.id));
+    }
+    expect((await list('', cookies.sostituto)).puoModificare).toBe(true);
   });
 
   it('un pacchetto si compone dal catalogo: senza catalogo non si crea, con almeno una prestazione', async () => {

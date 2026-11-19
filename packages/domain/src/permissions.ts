@@ -202,6 +202,15 @@ export const STUDIO_ACTION_ROLES: Partial<Record<Action, readonly Role[]>> = {
   'studio.confirm_users': ['owner_doctor'],
 };
 
+/**
+ * Ruoli che per un'azione sullo studio vogliono anche un'autorizzazione attiva su un archivio
+ * dello studio (D181): il sostituto scrive gli elenchi dello studio solo mentre sostituisce un
+ * titolare. Le autorizzazioni da guardare le passa chi chiama, tutte e solo dello studio.
+ */
+export const STUDIO_ACTION_GRANT_ROLES: Partial<Record<Action, readonly Role[]>> = {
+  'studio.lists': ['substitute_doctor'],
+};
+
 export type GrantKind = 'substitution' | 'group_colleague';
 
 /** Autorizzazione di un medico su un archivio non suo. */
@@ -260,9 +269,19 @@ export function can(actor: Actor, action: Action, ctx: AccessContext = {}): Deci
   const studioRoles = STUDIO_ACTION_ROLES[action];
   if (studioRoles) {
     if (ctx.archive) return deny('Azione sullo studio, non su un archivio');
-    return actor.roles.some((r) => studioRoles.includes(r))
-      ? allow('Ruolo previsto per questa azione dello studio')
-      : deny('Azione non prevista per il tuo ruolo');
+    const roles = actor.roles.filter((r) => studioRoles.includes(r));
+    if (roles.length === 0) return deny('Azione non prevista per il tuo ruolo');
+    const grantRoles = STUDIO_ACTION_GRANT_ROLES[action] ?? [];
+    if (roles.some((r) => !grantRoles.includes(r)))
+      return allow('Ruolo previsto per questa azione dello studio');
+    const now = ctx.now ?? new Date();
+    const active = ctx.grants?.some(
+      (g) =>
+        g.granteeUserId === actor.userId && !g.revokedAt && g.validFrom <= now && now <= g.validTo,
+    );
+    return active
+      ? allow('Autorizzazione attiva su un archivio dello studio')
+      : deny('Serve un’autorizzazione attiva su un archivio dello studio');
   }
   if (ADMINISTRATOR.includes(action)) {
     if (ctx.archive) return deny('Le azioni di amministrazione non riguardano un archivio');

@@ -191,10 +191,41 @@ describe('amministratore: «utenti, stampanti, intestazioni, modelli; nessun acc
 });
 
 describe('azioni sullo studio di più ruoli (tappa 14)', () => {
-  it('gli elenchi dello studio li curano i medici e l’amministratore, non la segreteria', () => {
-    for (const a of [titolare, sostituto, amministratore])
+  it('gli elenchi dello studio li curano i titolari e l’amministratore, non la segreteria', () => {
+    for (const a of [titolare, collega, amministratore])
       expect(ok(a, 'studio.lists', {})).toBe(true);
     expect(ok(segreteria, 'studio.lists', {})).toBe(false);
+    expect(ok(segreteria, 'studio.lists', { grants: [sostituzione], now })).toBe(false);
+  });
+  it('il sostituto li scrive solo con un’autorizzazione attiva su un archivio dello studio (D181)', () => {
+    expect(ok(sostituto, 'studio.lists', {})).toBe(false);
+    expect(can(sostituto, 'studio.lists', {}).reason).toBe(
+      'Serve un’autorizzazione attiva su un archivio dello studio',
+    );
+    expect(ok(sostituto, 'studio.lists', { grants: [sostituzione], now })).toBe(true);
+    // Scaduta, non ancora cominciata, revocata, o di un altro medico: no.
+    expect(
+      ok(sostituto, 'studio.lists', {
+        grants: [sostituzione],
+        now: new Date('2026-11-21T10:00:00+01:00'),
+      }),
+    ).toBe(false);
+    expect(
+      ok(sostituto, 'studio.lists', {
+        grants: [sostituzione],
+        now: new Date('2026-11-15T10:00:00+01:00'),
+      }),
+    ).toBe(false);
+    expect(
+      ok(sostituto, 'studio.lists', { grants: [{ ...sostituzione, revokedAt: now }], now }),
+    ).toBe(false);
+    expect(ok(sostituto, 'studio.lists', { grants: [gruppo], now })).toBe(false);
+    // Con un altro ruolo che basta da solo, l'autorizzazione non serve.
+    const sostitutoAmministratore: Actor = {
+      ...sostituto,
+      roles: ['substitute_doctor', 'administrator'],
+    };
+    expect(ok(sostitutoAmministratore, 'studio.lists', {})).toBe(true);
   });
   it('il registro di amministrazione lo leggono l’amministratore e i titolari', () => {
     for (const a of [titolare, collega, amministratore])

@@ -6,21 +6,21 @@ Tutto sta in **Strumenti**, una scheda per area. Ognuno vede le schede del suo r
 
 ## Chi vede che cosa
 
-| Scheda                      | Amministratore    | Titolare          | Sostituto         | Segreteria |
-| --------------------------- | ----------------- | ----------------- | ----------------- | ---------- |
-| Dati dello studio           | Modifica          | Legge             | Legge             | —          |
-| Utenti e ruoli              | Modifica          | —                 | —                 | —          |
-| Utenti da confermare        | —                 | Conferma          | —                 | —          |
-| Postazioni e stampa         | Modifica          | La sua postazione | La sua postazione | —          |
-| Elenchi dello studio        | Modifica          | Modifica          | Modifica          | Legge      |
-| Modelli dei certificati     | Modifica          | Modifica          | Modifica          | —          |
-| Impaginazione               | —                 | La sua            | La sua            | —          |
-| Fascicolo sanitario         | Modifica          | Legge             | Legge             | —          |
-| Banche dati                 | «Aggiorna adesso» | Legge             | Legge             | —          |
-| AFT                         | —                 | La sua            | —                 | —          |
-| Importazione                | —                 | Nel suo archivio  | —                 | —          |
-| Registro di amministrazione | Legge             | Legge             | —                 | —          |
-| Stato del servizio          | Legge             | —                 | —                 | —          |
+| Scheda                      | Amministratore    | Titolare          | Sostituto                    | Segreteria |
+| --------------------------- | ----------------- | ----------------- | ---------------------------- | ---------- |
+| Dati dello studio           | Modifica          | Legge             | Legge                        | —          |
+| Utenti e ruoli              | Modifica          | —                 | —                            | —          |
+| Utenti da confermare        | —                 | Conferma          | —                            | —          |
+| Postazioni e stampa         | Modifica          | La sua postazione | La sua postazione            | —          |
+| Elenchi dello studio        | Modifica          | Modifica          | Modifica, mentre sostituisce | Legge      |
+| Modelli dei certificati     | Modifica          | Modifica          | Modifica                     | —          |
+| Impaginazione               | —                 | La sua            | La sua                       | —          |
+| Fascicolo sanitario         | Modifica          | Legge             | Legge                        | —          |
+| Banche dati                 | «Aggiorna adesso» | Legge             | Legge                        | —          |
+| AFT                         | —                 | La sua            | —                            | —          |
+| Importazione                | —                 | Nel suo archivio  | —                            | —          |
+| Registro di amministrazione | Legge             | Legge             | —                            | —          |
+| Stato del servizio          | Legge             | —                 | —                            | —          |
 
 La segreteria vede in Strumenti solo gli elenchi dello studio, in sola lettura: le servono per preparare (D175, che aggiorna D146). La pagina della password è per tutti, dal menu dell'utente.
 
@@ -80,7 +80,7 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 
 ## Elenchi dello studio (D175)
 
-Quattro elenchi comuni dello studio, in **Strumenti › Elenchi dello studio**: li scrivono titolare, sostituto e amministratore, li leggono tutti, segreteria compresa. Non contengono dati dei pazienti. Una voce non si cancella: si archivia, perché una terapia o una ricetta può averla usata.
+Quattro elenchi comuni dello studio, in **Strumenti › Elenchi dello studio**: li scrivono i titolari, l'amministratore e il sostituto mentre ha un'autorizzazione attiva su un archivio dello studio (D181); li leggono tutti, segreteria compresa. Non contengono dati dei pazienti. Una voce non si cancella: si archivia, perché una terapia o una ricetta può averla usata.
 
 | Elenco                   | Campi                                                                                        | Dove si usa                                                                         |
 | ------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -130,7 +130,7 @@ Regole di prescrizione (si cambiano con una versione nuova e la sua fonte: D41, 
 
 Risposte di Simone alla fermata dopo la tappa 15 in D181: quelle sui poteri dell'amministratore, sul blocco, sul codice fiscale del medico e sugli elenchi cambiano il programma e si costruiscono in un blocco nuovo; le altre restano con la scelta di oggi.
 
-- **Elenchi dello studio** (dalla revisione del piano): posologie e pacchetti sono contenuto clinico. Consigliata: li scrivono solo i medici, il sostituto solo con un'autorizzazione attiva; suggeritori e contatti anche l'amministratore. Oggi li scrivono titolare, sostituto e amministratore.
+- **Elenchi dello studio** (dalla revisione del piano): posologie e pacchetti sono contenuto clinico. Risposta di Simone (D181): «solo i medici e l'amministratore». Fatto nella tappa 16: li scrivono i titolari, l'amministratore e il sostituto solo con un'autorizzazione attiva su un archivio dello studio; senza, li legge e il tentativo di scrivere resta nel registro.
 - **Stampa diretta**, senza la finestra di stampa (requisiti, «stampa diretta in studio»): consigliata un'impostazione del browser sulla postazione (modalità chiosco), da provare su un computer dello studio; l'alternativa è un programma da installare, contro «nessuna installazione».
 - **Formato del promemoria:** oggi A4; le «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non sono state trovate (D97).
 - **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?

@@ -38,6 +38,27 @@ export async function loadArchiveContext(db: Database, archiveId: string): Promi
 }
 
 /**
+ * Le autorizzazioni di un medico sugli archivi del suo studio, per le azioni sullo studio che le
+ * vogliono (D181: il sostituto scrive gli elenchi dello studio solo mentre sostituisce). Tutte,
+ * anche scadute o revocate: quali valgono adesso lo decide `can()`.
+ */
+export async function studioGrantsOf(db: Database, actor: Actor): Promise<ArchiveGrant[]> {
+  const rows = await db
+    .select({ g: archiveGrant })
+    .from(archiveGrant)
+    .innerJoin(archive, eq(archive.id, archiveGrant.archiveId))
+    .where(and(eq(archiveGrant.granteeUserId, actor.userId), eq(archive.studioId, actor.studioId)));
+  return rows.map(({ g }) => ({
+    archiveId: g.archiveId,
+    granteeUserId: g.granteeUserId,
+    kind: g.kind,
+    validFrom: g.validFrom,
+    validTo: g.validTo,
+    revokedAt: g.revokedAt,
+  }));
+}
+
+/**
  * Unico passaggio per accedere ai dati di un paziente: decide con le regole dei permessi e
  * registra l'accesso, consentito o negato, prima di restituire qualsiasi dato.
  */
