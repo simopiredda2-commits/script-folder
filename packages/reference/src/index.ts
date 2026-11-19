@@ -5,6 +5,7 @@ import { type MappingSet, parseMappings } from './mapping';
 export * from './changes';
 export * from './csv';
 export * from './diagnoses';
+export * from './exemptions';
 export * from './files';
 export * from './kinds';
 export * from './mapping';

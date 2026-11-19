@@ -3,6 +3,7 @@ import {
   diagnosisByCode,
   type DiagnosisHit,
   type DiagnosisIndex,
+  exemptionFamily,
   indexDiagnoses,
   indexServices,
   KINDS,
@@ -541,6 +542,8 @@ export class ReferenceData {
    * sincrone per le regole. Senza la banca dati le funzioni restituiscono undefined (= non noto).
    */
   async exemptionLookups(date: string): Promise<{
+    /** C'è un catalogo delle esenzioni in vigore alla data. */
+    catalogLoaded: boolean;
     exemptionExists: (code: string) => boolean | undefined;
     exemptionServices: (code: string) => ReadonlySet<string> | undefined;
   }> {
@@ -569,8 +572,18 @@ export class ReferenceData {
         set.add(r.serviceCode);
       }
     }
+    // Un codice assente è inesistente solo se il catalogo copre la sua famiglia (D190).
+    const families = codes ? new Set([...codes].map(exemptionFamily)) : null;
     return {
-      exemptionExists: (code) => (codes ? codes.has(code) : undefined),
+      catalogLoaded: codes !== null,
+      exemptionExists: (code) =>
+        !codes || !families
+          ? undefined
+          : codes.has(code)
+            ? true
+            : families.has(exemptionFamily(code))
+              ? false
+              : undefined,
       // Un'esenzione senza prestazioni nell'elenco non è «nessuna prestazione»: è non nota.
       exemptionServices: (code) => services.get(code),
     };

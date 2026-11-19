@@ -83,6 +83,16 @@ Le trascrizioni in `packages/reference/data/trascrizioni/icd9cm/` vengono dall'e
 
 L'elenco della CMS è un dato pubblico del governo degli Stati Uniti, raccolto nel pacchetto R «icd9» (licenza GPL-3): è servito solo al confronto dei codici nella simulazione del controllo e non è nel repository. Il catalogo d'esempio in `fixtures/banche-dati/trascrizioni/icd9cm/` ha 72 righe della trascrizione e 9 righe del DM 28/10/2020.
 
+### Esenzioni del DPCM LEA (D190)
+
+La trascrizione in `packages/reference/data/trascrizioni/lea/` viene dal PDF qui sotto, scaricato da Simone dalla pagina del Ministero della salute sui LEA (versione del 29/9/2026). È un allegato di un decreto: testo di un atto ufficiale (art. 5 della legge 633/1941, come per gli atti regionali). Il PDF resta fuori dal repository. Che cosa è diverso dal PDF: `docs/banche-dati.md`, «Esenzioni del DPCM LEA».
+
+| Documento                                                                       | Indirizzo                                                                                                    | Byte    | SHA-256                                                            |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------ |
+| DPCM 12/1/2017, allegato 8: elenco malattie e condizioni croniche e invalidanti | Mandato da Simone il 18/11/2026 (file `Allegato_8_Elenco_malattie_e_condizioni_croniche_ed_invalidanti.pdf`) | 295.226 | `39c3434e4ed7aa11e15f0bdf673cfd49c678d83b450ccf3c10cbb6048c6065a7` |
+
+Gli altri allegati mandati da Simone (7, 10, 4D) sono stati letti ma non trascritti (motivi in `docs/banche-dati.md`).
+
 ### Modelli ufficiali dei certificati (D158)
 
 Il testo dei file in `apps/api/modelli/` è copiato dagli atti, con la fonte in ogni file. Le pagine della Gazzetta sono state lette il 18/11/2026 e i PDF restano fuori dal repository.

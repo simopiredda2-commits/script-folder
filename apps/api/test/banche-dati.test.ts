@@ -290,7 +290,9 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     const ref = new ReferenceData(t.db, repo);
     const ex = await ref.exemptionLookups(today);
     expect(ex.exemptionExists('DEMO')).toBe(true);
-    expect(ex.exemptionExists('ZZZ')).toBe(false);
+    // Inesistente solo nelle famiglie che il catalogo contiene (D190).
+    expect(ex.exemptionExists('T99')).toBe(false);
+    expect(ex.exemptionExists('ZZZ')).toBeUndefined();
     expect([...ex.exemptionServices('T01')!]).toEqual(['89.7']);
     expect(ex.exemptionServices('T02')).toBeUndefined();
     expect(await ref.municipality('a074', today)).toMatchObject({
@@ -620,17 +622,25 @@ describe('banche dati via HTTP e nelle regole', () => {
     expect(rules).toContain('R7');
   });
 
-  it('R9 dal catalogo: un’esenzione registrata per il paziente ma assente dal catalogo blocca', async () => {
-    const res = await post(`/api/pazienti/${s.richPatient}/ricette`, {
-      kind: 'pharma_ssn',
-      exemptionCode: 'P00',
-      lines: [
-        { drugName: 'Farmaco di prova', activeIngredient: 'principio di prova', quantity: 1 },
-      ],
-    });
-    const sent = await post(`/api/ricette/${res.json().id}/firma-e-invia`);
-    expect(sent.statusCode).toBe(422);
-    expect(sent.json().errore).toMatch(/R9: Esenzione P00: non esiste nel catalogo/);
+  it('R9 dal catalogo: un’esenzione assente dal catalogo blocca, se il catalogo copre la sua famiglia (D190)', async () => {
+    const send = async (exemptionCode: string) => {
+      const res = await post(`/api/pazienti/${s.richPatient}/ricette`, {
+        kind: 'pharma_ssn',
+        exemptionCode,
+        lines: [
+          { drugName: 'Farmaco di prova', activeIngredient: 'principio di prova', quantity: 1 },
+        ],
+      });
+      return post(`/api/ricette/${res.json().id}/firma-e-invia`);
+    };
+    // Il catalogo d'esempio ha T01 e T02: T99 è della stessa famiglia, quindi non esiste.
+    const covered = await send('T99');
+    expect(covered.statusCode, covered.body).toBe(422);
+    expect(covered.json().errore).toMatch(/R9: Esenzione T99: non esiste nel catalogo/);
+    // P00, registrata per il paziente, è di una famiglia che il catalogo non contiene: non è
+    // «inesistente», e la ricetta parte.
+    const uncovered = await send('P00');
+    expect(uncovered.statusCode, uncovered.body).toBe(200);
   });
 
   it('R17 dall’elenco regionale: una prestazione non associata all’esenzione blocca', async () => {

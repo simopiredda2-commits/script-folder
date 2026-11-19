@@ -691,19 +691,23 @@ describe('pannello amministrativo del paziente (tappa 15)', () => {
         .values({ datasetId: ds!.id, code: 'C01', description: 'Esenzione di prova' });
       const known = await add({ codice: 'C01', dal: day(-10) });
       expect(known.json().avvisi).toEqual([]);
-      const unknown = await add({ codice: 'Z99', dal: day(-10) });
+      // C99 è della famiglia di C01, che il catalogo contiene: non c'è (D190).
+      const unknown = await add({ codice: 'C99', dal: day(-10) });
       expect(unknown.statusCode, unknown.body).toBe(201);
       expect(unknown.json().avvisi).toEqual([
         expect.stringMatching(
-          /^Il codice Z99 non è nel catalogo delle esenzioni in vigore il .*né in quello in vigore oggi/,
+          /^Il codice C99 non è nel catalogo delle esenzioni in vigore il .*né in quello in vigore oggi/,
         ),
       ]);
+      // Z99 è di una famiglia che il catalogo non contiene: non si sa, e nessun avviso.
+      expect((await add({ codice: 'Z99', dal: day(-10) })).json().avvisi).toEqual([]);
       // Prima del catalogo non si sa: nessun avviso per quella data.
       const old = await add({ codice: 'Z98', dal: day(-90), al: day(-70) });
       expect(old.json().avvisi).toEqual([]);
       const v = await view(pid);
       expect(v.catalogoEsenzioni).toBe(true);
-      expect(v.esenzioni.find((e) => e.codice === 'Z99')!.nelCatalogo).toBe(false);
+      expect(v.esenzioni.find((e) => e.codice === 'C99')!.nelCatalogo).toBe(false);
+      expect(v.esenzioni.find((e) => e.codice === 'Z99')!.nelCatalogo).toBeNull();
       expect(v.esenzioni.find((e) => e.codice === 'C01')!.nelCatalogo).toBe(true);
     });
   });

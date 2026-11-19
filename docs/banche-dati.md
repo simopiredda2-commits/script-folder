@@ -95,6 +95,32 @@ Sono estratte in automatico dai PDF e restano **da controllare**. Che cosa è di
 
 Estratte dal manuale da Simone, con un controllo esterno e le correzioni della simulazione del controllo; restano **da controllare** (le controlla la Dr.ssa Rocca). Che cosa è diverso dal PDF e che cosa controllare: `docs/icd9cm.md`.
 
+| File (in `lea/`)               | Atto                                                        | In vigore dal | Voci in vigore |
+| ------------------------------ | ----------------------------------------------------------- | ------------- | -------------- |
+| `allegato-8-malattie-croniche` | DPCM LEA, allegato 8: codici delle malattie croniche (D190) | 30/10/2026    | 247            |
+
+Estratta in automatico dal PDF della pagina del Ministero (versione del 29/9/2026) e **da controllare** (sotto, «Esenzioni del DPCM LEA»).
+
+### Esenzioni del DPCM LEA (D190)
+
+Che cosa c'è nella trascrizione dell'allegato 8:
+
+- i 66 codici della prima parte, uno per condizione (013, 0A31, 0031…), con la descrizione della condizione; 0A02, 0B02 e 0C02, scritti insieme nell'elenco, sono tre codici;
+- i 181 codici della tabella di corrispondenza, uno per malattia ICD9-CM (013.250, 0031.402…), descritti «condizione: malattia» quando le due sono diverse. Le celle che nel PDF vanno a capo, sopra e sotto la riga del codice, sono ricomposte;
+- HIV-2 (p. 6) non è un codice a parte: è 020.042 con il codice aggiuntivo 079.53;
+- il testo è come stampato (anche «cretinina» nella condizione 061), tranne gli spazi dopo una parentesi aperta e il punto e virgola alla fine delle malattie in elenco.
+
+Che cosa controllare: un campione di codici e descrizioni contro il PDF, in particolare le righe ricomposte (colonna `origine`: «prima parte, su più righe»; le malattie di 006, 016, 052, 061 e 068); la data di inizio, oggi il 30/10/2026, da cui in Piemonte valgono le esenzioni 068, 069 e 070.
+
+**Un catalogo parziale non rende «inesistenti» le altre esenzioni.** Il catalogo dice che un codice non esiste solo per le famiglie di codici che contiene: con le sole malattie croniche, un'esenzione per reddito (E…) o per gravidanza (M…) non è inesistente, è non nota, e R9 non la blocca per questo (la blocca solo se non è registrata per il paziente o è scaduta). Le famiglie: i codici che cominciano con una cifra (malattie croniche), quelli con R e una lettera (malattie rare), gli altri per le lettere iniziali.
+
+Che cosa resta fuori, e perché:
+
+- **le prestazioni di ogni esenzione** (terza parte dell'allegato 8): per R17 vale l'elenco regionale, che il SAR usa per bloccare (D.D. 1167/2022). Nella parte nazionale, inoltre, la «visita di controllo» non ha un codice (lo sceglie il medico nel nomenclatore), alcune prestazioni valgono solo in certi casi («limitatamente a…») e alcune condizioni non hanno un elenco («le prestazioni appropriate»): trascritte così, R17 bloccherebbe ricette giuste;
+- **l'allegato 7** (malattie rare, 370 codici): i codici si leggono bene, i nomi no, perché nel PDF si mescolano con le note e con la colonna degli esempi. Serve una fonte strutturata, o un'estrazione controllata come quella dell'ICD-9-CM;
+- **l'allegato 10** (tutela della maternità): elenca le prestazioni per periodo, senza i codici di esenzione da riportare in ricetta;
+- **l'allegato 4D** (note e condizioni di erogabilità): serve con l'allegato 4, il nomenclatore, che dice a quali prestazioni si applica ogni nota.
+
 ### Atti che modificano una tabella (D157)
 
 La Regione non ripubblica il catalogo intero. Pubblica le voci che finiscono e quelle che cominciano. Esempio, la D.D. 710/2026:
