@@ -90,6 +90,7 @@ export async function createScenario(
     | 'sickLeaveGateway'
     | 'regional'
     | 'fse'
+    | 'loginSources'
   > & {
     /** Aggiornamento delle banche dati (D156), costruito con l'orologio della prova. */
     referenceUpdates?: (now: () => Date) => NonNullable<AppDeps['referenceUpdates']>;

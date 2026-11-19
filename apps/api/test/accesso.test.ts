@@ -180,7 +180,7 @@ describe('soglie dello studio: blocco per inattività e tentativi falliti', () =
     await s.app.close();
   });
 
-  it('5 password sbagliate bloccano l’utente per 15 minuti', async () => {
+  it('le password sbagliate fanno aspettare la loro postazione; cinque codici sbagliati bloccano l’utente per 15 minuti', async () => {
     const s = await createScenario(t.db);
     const username = s.users.segreteria.username;
     const attempt = (password: string) =>
@@ -190,9 +190,21 @@ describe('soglie dello studio: blocco per inattività e tentativi falliti', () =
         payload: { username, password, postazione: 'x' },
       });
     for (let i = 0; i < 4; i++) expect((await attempt('sbagliata')).statusCode).toBe(401);
-    // Al quarto errore l'utente non è ancora bloccato.
     expect((await attempt(PASSWORD)).statusCode).toBe(200);
-    for (let i = 0; i < 5; i++) expect((await attempt('sbagliata')).statusCode).toBe(401);
+    // Dopo cinque password sbagliate la postazione aspetta; il conto non si blocca (D188).
+    for (let i = 0; i < 6; i++) expect((await attempt('sbagliata')).statusCode).toBe(401);
+    expect((await attempt(PASSWORD)).statusCode).toBe(429);
+    s.clock.advance(2_000);
+    const right = await attempt(PASSWORD);
+    expect(right.statusCode).toBe(200);
+    // Cinque codici sbagliati sì: chi li scrive conosceva la password.
+    const passaggio = right.json<{ passaggio: string }>().passaggio;
+    for (const codice of ['000001', '000002', '000003', '000004', '000005'])
+      await s.app.inject({
+        method: 'POST',
+        url: '/api/accesso/codice',
+        payload: { passaggio, codice },
+      });
     const blocked = await attempt(PASSWORD);
     expect(blocked.statusCode).toBe(401);
     expect(blocked.json().errore).toMatch(/bloccato/);
@@ -203,10 +215,11 @@ describe('soglie dello studio: blocco per inattività e tentativi falliti', () =
     await s.app.close();
   });
 
-  it('per difetto: 5 minuti, 5 tentativi, 15 minuti; la segreteria non vede diario né riepilogo', async () => {
+  it('per difetto: 5 minuti, 50 password, 5 codici, 15 minuti; la segreteria non vede diario né riepilogo', async () => {
     const [row] = await t.db.insert(studio).values({ name: 'Nuovo studio' }).returning();
     expect(row!.idleLockMinutes).toBe(5);
-    expect(row!.maxFailedLogins).toBe(5);
+    expect(row!.maxFailedLogins).toBe(50);
+    expect(row!.maxFailedCodes).toBe(5);
     expect(row!.failedLoginLockMinutes).toBe(15);
     const s = await createScenario(t.db);
     const [a] = await t.db.select().from(archive).where(eq(archive.id, s.archives.titolare));

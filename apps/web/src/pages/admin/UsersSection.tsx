@@ -28,7 +28,10 @@ interface User {
   stato: 'attivo' | 'sospeso';
   secondoFattoreAttivo: boolean;
   bloccatoFinoA: string | null;
+  /** Password sbagliate di seguito all'accesso (soglia alta, D188). */
   tentativiFalliti: number;
+  /** Codici sbagliati di seguito, e password attuali sbagliate nel cambio (D188). */
+  codiciSbagliati: number;
   passwordDaCambiare: boolean;
   passwordCambiataIl: string | null;
   creatoIl: string;
@@ -505,7 +508,7 @@ function rowActions(u: User): RowAction[] {
   if (!u.ripristinoDalServizio) {
     out.push('password-temporanea');
     if (u.secondoFattoreAttivo) out.push('azzera-secondo-fattore');
-    if (u.bloccatoFinoA || u.tentativiFalliti > 0) out.push('sblocca');
+    if (u.bloccatoFinoA || u.tentativiFalliti > 0 || u.codiciSbagliati > 0) out.push('sblocca');
   }
   if (u.medico?.correzioneCodiceFiscale) out.push('codice-fiscale/ritira');
   return out;
@@ -558,7 +561,10 @@ function UserStatus({ u }: { u: User }) {
         </li>
       )}
       {!u.bloccatoFinoA && u.tentativiFalliti > 0 && (
-        <li>Tentativi falliti: {u.tentativiFalliti}</li>
+        <li>Password sbagliate di seguito: {u.tentativiFalliti}</li>
+      )}
+      {!u.bloccatoFinoA && u.codiciSbagliati > 0 && (
+        <li>Codici sbagliati di seguito: {u.codiciSbagliati}</li>
       )}
       <li>
         Secondo fattore: {u.secondoFattoreAttivo ? 'attivo' : 'si attiva al prossimo accesso'}

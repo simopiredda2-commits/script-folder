@@ -209,12 +209,14 @@ describe('codici e password mandati insieme (seconda revisione, punto 5)', () =>
   let h: ReturnType<typeof helpers>;
 
   beforeAll(async () => {
-    // Le soglie più strette ammesse: 3 tentativi, poi un'ora di blocco.
-    s = await createScenario(t.db, {
-      idleLockMinutes: null,
-      maxFailedLogins: 3,
-      failedLoginLockMinutes: 60,
-    });
+    // Soglie strette: 3 password o 3 codici, poi un'ora di blocco. Le attese per provenienza
+    // (D188) sono spente: qui si guarda il conto dell'utente, e le richieste vengono tutte dallo
+    // stesso indirizzo; le attese hanno le loro prove (blocco-tentativi.test.ts).
+    s = await createScenario(
+      t.db,
+      { idleLockMinutes: null, maxFailedLogins: 3, maxFailedCodes: 3, failedLoginLockMinutes: 60 },
+      { loginSources: null },
+    );
     for (const who of ['titolare', 'collega', 'sostituto', 'segreteria'] as const)
       await login(s, who);
     h = helpers(s);
@@ -510,7 +512,7 @@ describe('attese sui blocchi (seconda revisione, problema nuovo 2)', () => {
   let admin: string;
 
   beforeAll(async () => {
-    s = await createScenario(t.db, { idleLockMinutes: null });
+    s = await createScenario(t.db, { idleLockMinutes: null }, { loginSources: null });
     for (const who of ['titolare', 'collega', 'segreteria', 'sostituto'] as const)
       await login(s, who);
     admin = await login(s, 'amministratore');
@@ -867,7 +869,7 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
   const sfx = randomBytes(2).toString('hex');
 
   beforeAll(async () => {
-    s = await createScenario(t.db, { idleLockMinutes: null });
+    s = await createScenario(t.db, { idleLockMinutes: null }, { loginSources: null });
     c.amministratore = await login(s, 'amministratore');
     c.titolare = await login(s, 'titolare');
     c.segreteria = await login(s, 'segreteria');

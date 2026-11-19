@@ -20,9 +20,20 @@ export const studio = pgTable('studio', {
    * fermata (D29). Vuoto = blocco non attivo.
    */
   idleLockMinutes: integer().default(5),
-  /** Tentativi di accesso falliti prima del blocco temporaneo dell'utente: 5 (D29). */
-  maxFailedLogins: integer().default(5),
-  /** Durata del blocco temporaneo dopo troppi tentativi falliti: 15 minuti (D29). */
+  /**
+   * Password sbagliate di seguito prima del blocco del conto: la soglia alta (D181, D188). Le
+   * sbaglia anche chi conosce solo il nome utente: prima del blocco valgono le attese per indirizzo
+   * e postazione (auth/login-sources.ts). 50: valore provvisorio, da completare.
+   */
+  maxFailedLogins: integer().default(50),
+  /**
+   * Codici a 6 cifre sbagliati di seguito, all'accesso e allo sblocco della sessione, e password
+   * attuali sbagliate nel cambio della password, prima del blocco del conto: 5, la soglia scelta
+   * alla prima fermata (D29). Li sbaglia solo chi ha già la password o una sessione (D188). È anche
+   * il numero di codici che un passaggio dell'accesso guarda.
+   */
+  maxFailedCodes: integer().default(5),
+  /** Durata del blocco del conto, per tutte e due le soglie: 15 minuti (D29). */
   failedLoginLockMinutes: integer().default(15),
   /**
    * Indirizzo completo dello studio (tappa 14): `address` è via e numero civico, poi CAP, comune e

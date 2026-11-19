@@ -12,6 +12,7 @@ import { CertificatesPage } from './pages/CertificatesPage';
 import { ClinicalEntriesPage } from './pages/ClinicalEntriesPage';
 import { DrugHistoryPage, ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
 import { PrescribedDrugsPage, PrescribedServicesPage } from './pages/PrescribedPages';
+import { LocksPage } from './pages/LocksPage';
 import { LockScreen, LoginPage } from './pages/LoginPage';
 import { MeasurementsPage } from './pages/MeasurementsPage';
 import { PasswordPage } from './pages/PasswordPage';
@@ -78,6 +79,7 @@ function Screens() {
           <Route path="/profilo/credenziali" element={<ServiceCredentialsPage />} />
           <Route path="/profilo/recapiti" element={<DoctorContactsPage />} />
           <Route path="/profilo/password" element={<PasswordPage />} />
+          <Route path="/profilo/blocchi" element={<LocksPage />} />
           <Route path="/strumenti" element={<StudioToolsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

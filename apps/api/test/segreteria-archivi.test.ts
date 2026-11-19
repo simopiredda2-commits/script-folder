@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { latestSecretaryDecisions } from '../src/admin/secretary-archives';
 import { createDatabase } from '../src/db/client';
 import { migrationsDir, runMigrations } from '../src/db/migrate';
-import { appUser, archive, archiveSecretary, studio } from '../src/db/schema';
+import { archive, archiveSecretary } from '../src/db/schema';
 import { loadArchiveContext } from '../src/patients/access';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -117,25 +117,25 @@ describe('migrazione 0028: chi lavorava già resta su tutti gli archivi (D181)',
       writeFileSync(journalFile, JSON.stringify(journal));
       await runMigrations(t.pool, dir);
       const db = createDatabase(t.pool);
-      const [st] = await db.insert(studio).values({ name: 'Studio di prova 0028' }).returning();
+      // Studio e utenti si scrivono a mano: lo schema di oggi ha colonne nate dopo la 0028
+      // (per esempio le soglie dei tentativi della 0030).
+      const [st] = (
+        await t.pool.query<{ id: string }>(
+          "insert into studio (name) values ('Studio di prova 0028') returning id",
+        )
+      ).rows;
       const user = async (
         username: string,
         roles: ('owner_doctor' | 'secretary')[],
         awaiting = false,
       ) =>
         (
-          await db
-            .insert(appUser)
-            .values({
-              studioId: st!.id,
-              username,
-              displayName: username,
-              passwordHash: 'impronta-di-prova',
-              roles,
-              awaitingConfirmation: awaiting,
-            })
-            .returning()
-        )[0]!;
+          await t.pool.query<{ id: string }>(
+            `insert into app_user (studio_id, username, display_name, password_hash, roles, awaiting_confirmation)
+             values ($1, $2, $2, 'impronta-di-prova', $3::user_role[], $4) returning id`,
+            [st!.id, username, roles, awaiting],
+          )
+        ).rows[0]!;
       const a = await user('titolare.a', ['owner_doctor']);
       const b = await user('titolare.b', ['owner_doctor']);
       const working = await user('segreteria.lavora', ['secretary']);

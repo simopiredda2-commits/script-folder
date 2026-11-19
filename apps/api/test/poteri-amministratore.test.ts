@@ -84,7 +84,9 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    s = await createScenario(t.db, { idleLockMinutes: null });
+    // Le attese per provenienza (D188) sono spente: qui si guardano il conto e i poteri, con
+    // tutte le richieste dallo stesso indirizzo; le attese hanno le loro prove.
+    s = await createScenario(t.db, { idleLockMinutes: null }, { loginSources: null });
     cookies.amministratore = await login(s, 'amministratore');
     cookies.titolare = await login(s, 'titolare');
     await login(s, 'collega');
@@ -465,7 +467,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
   it('A3: il blocco per tentativi dura al massimo un’ora, e i tentativi falliti portano l’indirizzo della richiesta', async () => {
     for (const minutiBlocco of [1440, 61]) {
       const r = await req(cookies.amministratore, 'PUT', '/api/studio', {
-        sicurezza: { minutiInattivita: 30, tentativiFalliti: 3, minutiBlocco },
+        sicurezza: { minutiInattivita: 30, tentativiFalliti: 50, codiciSbagliati: 3, minutiBlocco },
       });
       expect(r.statusCode, `${minutiBlocco}`).toBe(400);
       expect(r.json().dettagli.problemi).toEqual([
@@ -505,7 +507,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
         ['postazione-prova', 'utente bloccato per troppi tentativi', '127.0.0.1'],
       ]);
     } finally {
-      await setStudio({ maxFailedLogins: 5, failedLoginLockMinutes: 15 });
+      await setStudio({ maxFailedLogins: 50, maxFailedCodes: 5, failedLoginLockMinutes: 15 });
     }
   });
 
@@ -572,7 +574,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
 
       // Senza il blocco dell'utente, il passaggio si chiude da sé dopo i tentativi dello studio:
       // il codice giusto, dopo, non entra.
-      await setStudio({ maxFailedLogins: 3, failedLoginLockMinutes: null });
+      await setStudio({ maxFailedLogins: 3, maxFailedCodes: 3, failedLoginLockMinutes: null });
       const second = (await access(victim.username, PASSWORD)).json().passaggio as string;
       expect((await codeOn(second, '000000')).json().errore).toBe('Codice non valido');
       expect((await codeOn(second, '111111')).json().errore).toBe('Codice non valido');
@@ -582,7 +584,11 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       );
       expect((await challengeOf(second)).triedCodes).toBe(3);
       // Senza soglie dello studio vale il valore per difetto: cinque codici.
-      await setStudio({ maxFailedLogins: null, failedLoginLockMinutes: null });
+      await setStudio({
+        maxFailedLogins: null,
+        maxFailedCodes: null,
+        failedLoginLockMinutes: null,
+      });
       const third = (await access(victim.username, PASSWORD)).json().passaggio as string;
       for (const c of ['000000', '111111', '222222', '333333'])
         expect((await codeOn(third, c)).json().errore).toBe('Codice non valido');
@@ -602,7 +608,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       const fourth = (await access(victim.username, PASSWORD)).json().passaggio as string;
       expect((await codeOn(fourth, codeNow(victim.username))).statusCode).toBe(200);
     } finally {
-      await setStudio({ maxFailedLogins: 5, failedLoginLockMinutes: 15 });
+      await setStudio({ maxFailedLogins: 50, maxFailedCodes: 5, failedLoginLockMinutes: 15 });
     }
   });
 
@@ -1077,7 +1083,8 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     await expect(restoreUser(t.db, { utente: secretary.username, sblocca: true })).rejects.toThrow(
       'L’utente non è bloccato e non ha tentativi falliti: niente da sbloccare',
     );
-    for (let i = 0; i < 5; i++) await access(secretary.username, `sbagliata ${i}`);
+    // La soglia alta per difetto: 50 password sbagliate (D188).
+    for (let i = 0; i < 50; i++) await access(secretary.username, `sbagliata ${i}`);
     expect((await access(secretary.username, PASSWORD)).json().errore).toBe(LOCKED_LOGIN_ERROR);
     const hashBefore = (await userRow(secretary.id)).passwordHash;
     for (const other of [{ secondoFattore: true }, { riattiva: true }, { conferma: true }])

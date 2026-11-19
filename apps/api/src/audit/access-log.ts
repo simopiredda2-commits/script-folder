@@ -109,7 +109,10 @@ export type AccessAction =
   | 'annullamento_ricetta_passata'
   | 'prova_importazione'
   | 'importazione'
-  | 'lettura_importazioni';
+  | 'lettura_importazioni'
+  /** Tappa 16: blocco del conto dopo i tentativi sbagliati e lettura dei suoi avvisi (D188). */
+  | 'conto_bloccato'
+  | 'lettura_blocchi';
 
 export interface AccessEntry {
   studioId?: string | null;

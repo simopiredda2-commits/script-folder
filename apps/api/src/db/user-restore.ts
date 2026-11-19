@@ -326,7 +326,8 @@ export async function restoreUser(
     if (
       input.sblocca &&
       !(target.lockedUntil && target.lockedUntil > t) &&
-      target.failedLogins === 0
+      target.failedLogins === 0 &&
+      target.failedCodes === 0
     )
       throw new Error('L’utente non è bloccato e non ha tentativi falliti: niente da sbloccare');
     if (input.conferma) {
@@ -357,7 +358,7 @@ export async function restoreUser(
     const patch: Partial<typeof appUser.$inferInsert> = {};
     const secondFactorWasInactive = input.secondoFattore && target.totpEnabledAt === null;
     if (input.sblocca) {
-      Object.assign(patch, { failedLogins: 0, lockedUntil: null });
+      Object.assign(patch, { failedLogins: 0, failedCodes: 0, lockedUntil: null });
       actions.push('sblocco');
     } else if (input.rifiuta) {
       // Resta in attesa (la richiesta non cambia), e la sospensione è del server.
@@ -378,6 +379,7 @@ export async function restoreUser(
         passwordHash,
         mustChangePassword: true,
         failedLogins: 0,
+        failedCodes: 0,
         lockedUntil: null,
         totpSecretEnc: null,
         totpEnabledAt: null,
@@ -390,6 +392,7 @@ export async function restoreUser(
           passwordHash,
           mustChangePassword: true,
           failedLogins: 0,
+          failedCodes: 0,
           lockedUntil: null,
         });
         actions.push('password_temporanea');

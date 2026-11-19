@@ -10,11 +10,13 @@ import {
   MUST_CHANGE_PASSWORD_ERROR,
   SERVICE_BUSY_ERROR,
 } from './auth/service';
+import type { LoginSourceLimits } from './auth/login-sources';
 import { createCertificateService } from './certificates/service';
 import type { Config } from './config';
 import { createCredentialService } from './credentials/service';
 import { isPoolTimeout, type Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
+import { registerLockRoutes } from './http/lock-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
 import { registerFollowUpRoutes } from './http/followup-routes';
@@ -125,6 +127,11 @@ export interface AppDeps {
    * servizio non scarica nulla (regola 7); in produzione lo prepara server.ts dalla configurazione.
    */
   referenceUpdates?: ReferenceUpdates;
+  /**
+   * Attese dopo le password sbagliate, per indirizzo e postazione (D188). Per difetto i valori
+   * del servizio (LOGIN_SOURCE_LIMITS); `null` le spegne, solo nelle prove che guardano il conto.
+   */
+  loginSources?: LoginSourceLimits | null;
 }
 
 export function buildApp({
@@ -148,6 +155,7 @@ export function buildApp({
   sendTimeoutMs,
   fse = defaultFse(now),
   referenceUpdates = new ReferenceUpdates(db, null, now ? { now } : {}),
+  loginSources,
 }: AppDeps): FastifyInstance {
   // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
   // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
@@ -160,6 +168,7 @@ export function buildApp({
     sessionMaxHours: config.sessionMaxHours,
     issuer: PRODUCT_NAME,
     now,
+    loginSources,
   });
 
   app.decorate('patientScopedRoutes', [] as { method: string; url: string }[]);
@@ -224,6 +233,7 @@ export function buildApp({
   });
 
   registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
+  registerLockRoutes(app, db, now ?? (() => new Date()));
   const credentials = createCredentialService({
     db,
     encryptionKey: config.encryptionKey,

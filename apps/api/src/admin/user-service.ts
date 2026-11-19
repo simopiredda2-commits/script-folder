@@ -263,6 +263,7 @@ const userColumns = {
   status: appUser.status,
   totpEnabledAt: appUser.totpEnabledAt,
   failedLogins: appUser.failedLogins,
+  failedCodes: appUser.failedCodes,
   lockedUntil: appUser.lockedUntil,
   mustChangePassword: appUser.mustChangePassword,
   passwordChangedAt: appUser.passwordChangedAt,
@@ -297,6 +298,7 @@ export interface UserRow {
   status: 'active' | 'suspended';
   totpEnabledAt: Date | null;
   failedLogins: number;
+  failedCodes: number;
   lockedUntil: Date | null;
   mustChangePassword: boolean;
   passwordChangedAt: Date | null;
@@ -416,6 +418,7 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
     secondoFattoreAttivo: u.totpEnabledAt !== null,
     bloccatoFinoA: u.lockedUntil && u.lockedUntil > c.t ? u.lockedUntil.toISOString() : null,
     tentativiFalliti: u.failedLogins,
+    codiciSbagliati: u.failedCodes,
     passwordDaCambiare: u.mustChangePassword,
     passwordCambiataIl: u.passwordChangedAt?.toISOString() ?? null,
     creatoIl: u.createdAt.toISOString(),
@@ -1348,7 +1351,13 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           throw new Refusal(403, CLINICAL_CREDENTIALS_REFUSAL, target.username);
         await tx
           .update(appUser)
-          .set({ passwordHash, mustChangePassword: true, failedLogins: 0, lockedUntil: null })
+          .set({
+            passwordHash,
+            mustChangePassword: true,
+            failedLogins: 0,
+            failedCodes: 0,
+            lockedUntil: null,
+          })
           .where(and(eq(appUser.id, id), eq(appUser.studioId, actor.studioId)));
         const n = await closeSessions(tx, id, now());
         await logDone(tx, actor, {
@@ -1429,11 +1438,11 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
         if (opensPatientData(target.roles))
           throw new Refusal(403, CLINICAL_UNLOCK_REFUSAL, target.username);
         const locked = target.lockedUntil !== null && target.lockedUntil > now();
-        if (!locked && target.failedLogins === 0)
+        if (!locked && target.failedLogins === 0 && target.failedCodes === 0)
           throw new HttpError(409, 'L’utente non è bloccato e non ha tentativi falliti');
         await tx
           .update(appUser)
-          .set({ failedLogins: 0, lockedUntil: null })
+          .set({ failedLogins: 0, failedCodes: 0, lockedUntil: null })
           .where(eq(appUser.id, id));
         await logDone(tx, actor, {
           azione: 'sblocco',
@@ -1651,6 +1660,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
                     passwordHash,
                     mustChangePassword: true,
                     failedLogins: 0,
+                    failedCodes: 0,
                     lockedUntil: null,
                     totpSecretEnc: null,
                     totpEnabledAt: null,

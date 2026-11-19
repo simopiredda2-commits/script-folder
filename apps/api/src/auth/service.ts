@@ -9,6 +9,17 @@ import { HttpError } from '../http/errors';
 import { hashPassword, verifyPassword } from '../security/password';
 import { decryptSecret, encryptSecret, hashToken, newToken } from '../security/secrets';
 import { newTotpSecret, otpauthUri, verifyTotp } from '../security/totp';
+import { recordLock, type LockKind } from './account-locks';
+import {
+  forgetSources,
+  LOGIN_SOURCE_LIMITS,
+  reserveAttempt,
+  sourcesOf,
+  sourceWaitMessage,
+  type LoginSourceLimits,
+  type Reservation,
+  type Source,
+} from './login-sources';
 
 /**
  * Accesso: nome utente e password, poi il secondo fattore (TOTP), obbligatorio per tutti come
@@ -22,6 +33,11 @@ export interface AuthDeps {
   /** Nome mostrato nell'app di autenticazione: il nome del prodotto. */
   issuer: string;
   now?: () => Date;
+  /**
+   * Attese dopo le password sbagliate, per indirizzo e postazione (D188): per difetto
+   * LOGIN_SOURCE_LIMITS. `null` le spegne: solo per le prove che guardano il conto dell'utente.
+   */
+  loginSources?: LoginSourceLimits | null;
 }
 
 /** Durata del passo intermedio fra password e secondo fattore (decisione D19). */
@@ -131,7 +147,8 @@ export type ChangePasswordResult =
   { ok: true; otherSessionsClosed: number } | { ok: false; status: 400 | 429; message: string };
 
 export type LoginResult =
-  | { ok: false; message: string }
+  /** Con `retryAfterSeconds` la provenienza aspetta (429): la password non si è guardata. */
+  | { ok: false; message: string; retryAfterSeconds?: number }
   | { ok: true; step: 'second_factor'; challengeToken: string }
   | { ok: true; step: 'enroll'; challengeToken: string; otpauthUri: string; secret: string };
 
@@ -146,6 +163,7 @@ const minutes = (n: number) => n * 60_000;
 export function createAuthService(deps: AuthDeps) {
   const { db, encryptionKey } = deps;
   const now = deps.now ?? (() => new Date());
+  const sourceLimits = deps.loginSources === undefined ? LOGIN_SOURCE_LIMITS : deps.loginSources;
 
   async function loadUser(username: string) {
     const rows = await db
@@ -182,36 +200,79 @@ export function createAuthService(deps: AuthDeps) {
   }
 
   /**
-   * Conta un tentativo fallito in un solo comando, sul valore che c'è nel database e non su quello
-   * letto prima (con le richieste in parallelo il «letto più uno» le contava come una sola), e, se
-   * lo studio ha fissato le soglie, alla soglia blocca l'utente e azzera il conto. Dice se adesso
-   * l'utente è bloccato, da questo tentativo o da uno arrivato insieme. Il blocco non supera mai
-   * FAILED_LOGIN_LOCK_MAX_MINUTES, anche con un valore più alto salvato prima del limite. Va
-   * chiamato dentro `onUserRow`: se la riga è occupata oltre l'attesa massima, niente si conta.
+   * Conta un tentativo sbagliato sull'utente, sotto il blocco della sua riga: il valore è quello
+   * che c'è nel database adesso, anche con molte richieste insieme. Due contatori, due soglie
+   * dello studio (D188): le password sbagliate all'accesso, che sbaglia anche chi conosce solo il
+   * nome utente, bloccano il conto alla soglia alta; i codici sbagliati e la password attuale
+   * sbagliata nel cambio, che sbaglia solo chi ha già la password o una sessione, alla soglia
+   * bassa. Alla soglia il contatore torna a zero e il conto si blocca, per al più
+   * FAILED_LOGIN_LOCK_MAX_MINUTES anche con un valore più alto salvato prima del limite; il blocco
+   * va fra quelli da vedere e nel registro. Un conto già bloccato non si allunga e non dà un
+   * avviso nuovo. Dice se adesso l'utente è bloccato, da questo tentativo o da uno arrivato
+   * insieme. Va chiamato dentro `onUserRow`: se la riga è occupata oltre l'attesa massima, niente
+   * si conta.
    */
-  async function registerFailure(tx: Tx, userId: string, st: StudioRow): Promise<boolean> {
-    const max = st.maxFailedLogins;
-    const lockMinutes = st.failedLoginLockMinutes;
+  async function registerFailure(
+    tx: Tx,
+    userId: string,
+    st: StudioRow,
+    kind: LockKind,
+    from: { address: string | null; workstation: string },
+  ): Promise<boolean> {
     const t = now();
-    let set: Partial<Record<'failedLogins' | 'lockedUntil', ReturnType<typeof sql>>>;
-    if (max != null && lockMinutes != null) {
-      const reaches = sql`${appUser.failedLogins} + 1 >= ${max}`;
-      const until = new Date(
-        t.getTime() + minutes(Math.min(lockMinutes, FAILED_LOGIN_LOCK_MAX_MINUTES)),
-      ).toISOString();
-      set = {
-        failedLogins: sql`case when ${reaches} then 0 else ${appUser.failedLogins} + 1 end`,
-        lockedUntil: sql`case when ${reaches} then ${until}::timestamptz else ${appUser.lockedUntil} end`,
-      };
-    } else set = { failedLogins: sql`${appUser.failedLogins} + 1` };
-    const [row] = await withLockTimeout(tx, ACCESS_LOCK_TIMEOUT, () =>
-      tx
+    const fresh = await lockUserRow(tx, userId);
+    if (!fresh) return false;
+    const counter = kind === 'password' ? 'failedLogins' : 'failedCodes';
+    const max = kind === 'password' ? st.maxFailedLogins : st.maxFailedCodes;
+    const lockMinutes = st.failedLoginLockMinutes;
+    const failures = fresh[counter] + 1;
+    const lockedNow = !!fresh.lockedUntil && fresh.lockedUntil > t;
+    if (max == null || lockMinutes == null || failures < max) {
+      await tx
         .update(appUser)
-        .set(set)
-        .where(eq(appUser.id, userId))
-        .returning({ lockedUntil: appUser.lockedUntil }),
-    );
-    return !!row?.lockedUntil && row.lockedUntil > t;
+        .set({ [counter]: failures })
+        .where(eq(appUser.id, userId));
+      return lockedNow;
+    }
+    if (lockedNow) {
+      await tx
+        .update(appUser)
+        .set({ [counter]: 0 })
+        .where(eq(appUser.id, userId));
+      return true;
+    }
+    const capped = Math.min(lockMinutes, FAILED_LOGIN_LOCK_MAX_MINUTES);
+    const until = new Date(t.getTime() + minutes(capped));
+    await tx
+      .update(appUser)
+      .set({ [counter]: 0, lockedUntil: until })
+      .where(eq(appUser.id, userId));
+    await recordLock(tx, {
+      studioId: fresh.studioId,
+      userId,
+      kind,
+      failures,
+      lockedAt: t,
+      lockedUntil: until,
+      minutes: capped,
+      address: from.address,
+      workstation: from.workstation,
+    });
+    return true;
+  }
+
+  /**
+   * Conta il tentativo sulle sue provenienze prima di guardare la password (login-sources.ts). Una
+   * riga occupata oltre l'attesa massima: 503 e niente di fatto, come sulla riga dell'utente.
+   */
+  async function reserveSources(sources: Source[]): Promise<Reservation> {
+    if (!sourceLimits) return { ok: true, wait: 0 };
+    try {
+      return await reserveAttempt(db, sources, now(), sourceLimits, ACCESS_LOCK_TIMEOUT);
+    } catch (e) {
+      if (isLockTimeout(e)) throw new HttpError(503, SERVICE_BUSY_ERROR);
+      throw e;
+    }
   }
 
   /** Chiude il passaggio, se è ancora aperto. */
@@ -281,7 +342,20 @@ export function createAuthService(deps: AuthDeps) {
     /** Indirizzo della richiesta (`req.ip`). */
     address?: string | null;
   }): Promise<LoginResult> {
+    // Prima di tutto la provenienza (D188): se aspetta, la password non si guarda e non si conta.
+    // Quelle respinte qui non vanno nel registro, come quelle con il servizio occupato: ci va la
+    // password sbagliata che ha fatto partire l'attesa, con i secondi.
+    const sources = sourceLimits ? sourcesOf(input.address, input.workstation, sourceLimits) : [];
+    const reserved = await reserveSources(sources);
+    if (!reserved.ok)
+      return {
+        ok: false,
+        message: sourceWaitMessage(reserved.kind, reserved.wait),
+        retryAfterSeconds: reserved.wait,
+      };
+    const waitIfWrong = reserved.wait;
     const found = await loadUser(input.username);
+    const from = { address: input.address ?? null, workstation: input.workstation };
     const logFailure = (reason: string, user?: typeof appUser.$inferSelect) =>
       logAccess(db, {
         studioId: user?.studioId,
@@ -289,7 +363,11 @@ export function createAuthService(deps: AuthDeps) {
         action: 'accesso_fallito',
         outcome: 'fallito',
         workstation: input.workstation,
-        details: { motivo: reason, indirizzo: input.address ?? null },
+        details: {
+          motivo: reason,
+          indirizzo: input.address ?? null,
+          ...(waitIfWrong > 0 ? { attesaSecondi: waitIfWrong } : {}),
+        },
       });
     const generic = { ok: false as const, message: GENERIC_LOGIN_ERROR };
     const locked = { ok: false as const, message: LOCKED_LOGIN_ERROR };
@@ -307,7 +385,7 @@ export function createAuthService(deps: AuthDeps) {
       return locked;
     }
     if (!(await verifyPassword(input.password, user.passwordHash))) {
-      const nowLocked = await onUserRow((tx) => registerFailure(tx, user.id, st));
+      const nowLocked = await onUserRow((tx) => registerFailure(tx, user.id, st, 'password', from));
       await logFailure('password errata', user);
       return nowLocked ? locked : generic;
     }
@@ -361,6 +439,8 @@ export function createAuthService(deps: AuthDeps) {
       await logFailure('in attesa della conferma di un medico titolare', user);
       return { ok: false, message: AWAITING_CONFIRMATION_ERROR };
     }
+    // Passaggio aperto: la password era giusta, la provenienza ricomincia da capo.
+    if (sourceLimits) await forgetSources(db, sources, now(), sourceLimits);
     return out;
   }
 
@@ -415,7 +495,7 @@ export function createAuthService(deps: AuthDeps) {
 
     // Il codice si conta sul passaggio prima di guardarlo: con molte richieste insieme se ne
     // guardano al più `max`, giuste o sbagliate; le altre trovano il passaggio pieno.
-    const max = st.maxFailedLogins ?? CHALLENGE_DEFAULT_CODES;
+    const max = st.maxFailedCodes ?? CHALLENGE_DEFAULT_CODES;
     const tried = await reserveCode(challenge.id, max);
     if (tried === null) {
       const [current] = await db
@@ -444,7 +524,10 @@ export function createAuthService(deps: AuthDeps) {
     // era l'ultimo che il passaggio guarda, il passaggio si chiude. Sul passaggio era già contato.
     const wrongCode = async (): Promise<SessionResult> => {
       const locked = await onUserRow(async (tx) => {
-        const l = await registerFailure(tx, user.id, st);
+        const l = await registerFailure(tx, user.id, st, 'code', {
+          address: input.address ?? null,
+          workstation: challenge.workstation,
+        });
         if (last) await closeChallenge(tx, challenge.id);
         return l;
       });
@@ -517,6 +600,7 @@ export function createAuthService(deps: AuthDeps) {
         .update(appUser)
         .set({
           failedLogins: 0,
+          failedCodes: 0,
           lockedUntil: null,
           totpLastStep: step,
           ...(challenge.purpose === 'enroll'
@@ -638,7 +722,12 @@ export function createAuthService(deps: AuthDeps) {
           )
         : null;
     const wrongCode = async () => {
-      await onUserRow((tx) => registerFailure(tx, user.id, st));
+      await onUserRow((tx) =>
+        registerFailure(tx, user.id, st, 'code', {
+          address,
+          workstation: row.session.workstation,
+        }),
+      );
       await logAccess(db, {
         studioId: user.studioId,
         userId: user.id,
@@ -660,7 +749,7 @@ export function createAuthService(deps: AuthDeps) {
       if (fresh.totpLastStep != null && step <= fresh.totpLastStep) return 'ripetuto';
       await tx
         .update(appUser)
-        .set({ totpLastStep: step, failedLogins: 0 })
+        .set({ totpLastStep: step, failedLogins: 0, failedCodes: 0 })
         .where(eq(appUser.id, user.id));
       await tx
         .update(session)
@@ -728,7 +817,12 @@ export function createAuthService(deps: AuthDeps) {
     // arrivato a metà dà lo stesso 429 alle due (terza revisione dei poteri dell'amministratore).
     const passwordHash = await hashPassword(input.next);
     if (!currentOk) {
-      const nowLocked = await onUserRow((tx) => registerFailure(tx, user.id, st));
+      const nowLocked = await onUserRow((tx) =>
+        registerFailure(tx, user.id, st, 'code', {
+          address: input.address ?? null,
+          workstation: actor.workstation,
+        }),
+      );
       await failed('password attuale errata');
       // Bloccato adesso, da questo tentativo o da uno arrivato insieme: lo stesso 429 che riceve
       // la password giusta con l'utente bloccato, così chi prova non sa se aveva indovinato.
@@ -748,6 +842,7 @@ export function createAuthService(deps: AuthDeps) {
           passwordChangedAt: t,
           mustChangePassword: false,
           failedLogins: 0,
+          failedCodes: 0,
         })
         .where(eq(appUser.id, user.id));
       const others = await tx

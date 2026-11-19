@@ -1,3 +1,4 @@
+import { unseenLockCount } from '../auth/account-locks';
 import { can, ROLE_LABELS } from '@mmg/domain';
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -69,6 +70,8 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       devoCambiarePassword: actor.mustChangePassword,
       // Correzione del codice fiscale dell'amministratore che aspetta il medico (D181).
       codiceFiscaleDaConfermare: !!me?.pending,
+      // Blocchi del conto ancora da vedere: i propri e, per un titolare, dello studio (D188).
+      blocchiDaVedere: await unseenLockCount(db, actor),
     };
   });
 

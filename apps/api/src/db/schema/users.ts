@@ -45,7 +45,17 @@ export const appUser = pgTable(
     totpEnabledAt: timestamp({ withTimezone: true }),
     /** Ultimo intervallo TOTP usato: lo stesso codice non vale due volte. */
     totpLastStep: bigint({ mode: 'number' }),
+    /**
+     * Password sbagliate di seguito all'accesso: le sbaglia anche chi conosce solo il nome utente,
+     * quindi il conto si blocca solo alla soglia alta dello studio (D188).
+     */
     failedLogins: integer().notNull().default(0),
+    /**
+     * Codici a 6 cifre sbagliati di seguito (all'accesso e allo sblocco della sessione) e password
+     * attuali sbagliate nel cambio della password: li sbaglia solo chi ha già la password o una
+     * sessione, e il conto si blocca alla soglia bassa dello studio (D188).
+     */
+    failedCodes: integer().notNull().default(0),
     lockedUntil: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /**

@@ -22,6 +22,7 @@ import {
 } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  accountLock,
   appointment,
   clinicalEntry,
   labResultDetail,
@@ -1778,6 +1779,31 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.goto(`${base}/profilo/password`);
     await page.getByRole('heading', { level: 1, name: 'Cambia la password' }).waitFor();
     await check(page, 'cambio della password', true);
+  });
+
+  it('blocchi del conto: l’avviso nella cornice porta alla pagina, accessibile; visti, l’avviso sparisce (D188)', async () => {
+    // Un blocco della segreteria, con indirizzi di documentazione (RFC 5737): lo vede il titolare.
+    await t.db.insert(accountLock).values({
+      studioId: s.studioId,
+      userId: s.users.segreteria.id,
+      reason: 'passwords',
+      failures: 50,
+      lockedAt: s.clock.now(),
+      lockedUntil: new Date(s.clock.now().getTime() + 15 * 60_000),
+      addresses: ['192.0.2.10', '192.0.2.11'],
+      workstations: ['pc-fuori'],
+    });
+    await page.goto(base);
+    await page.getByText(/Un blocco del conto dopo troppi tentativi sbagliati/).waitFor();
+    await page.getByRole('link', { name: 'Vedi i blocchi' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Blocchi del conto' }).waitFor();
+    await page.getByText('192.0.2.10, 192.0.2.11').waitFor();
+    await check(page, 'blocchi del conto', true);
+    await page.getByRole('button', { name: 'Segna come visti' }).click();
+    await page.getByText('Nessun blocco da vedere.').waitFor();
+    await page.goto(base);
+    await page.getByText('Controllo di prova').waitFor();
+    expect(await page.getByText(/blocchi? del conto dopo troppi tentativi/).count()).toBe(0);
   });
 
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {

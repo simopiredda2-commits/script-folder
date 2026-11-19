@@ -53,7 +53,13 @@ All'installazione, se davanti al servizio c'è un proxy inverso, il suo indirizz
 - L'amministratore crea gli utenti con uno o più ruoli e, per i medici, nome, cognome, codice fiscale (controllato), codice regionale e ASL. La password temporanea si vede una volta e va consegnata di persona (per medici e segreteria la riceve il titolare che conferma, qui sotto); al primo accesso si cambia prima di ogni altra cosa.
 - Il ruolo di titolare crea l'archivio del medico; togliere un ruolo non cancella nulla.
 - Sospendere, riattivare, sbloccare dopo troppi tentativi: dall'elenco, con conferma (per medici e segreteria con i limiti qui sotto). Nessuno agisce su sé stesso e nessuno cambia i propri ruoli; l'ultimo amministratore attivo non si toglie.
-- Password da 12 a 128 caratteri, diversa dalla precedente e dal nome utente; gli errori sulla password attuale contano come tentativi falliti; il cambio chiude le altre sessioni.
+- Password da 12 a 128 caratteri, diversa dalla precedente e dal nome utente; gli errori sulla password attuale contano come codici sbagliati (qui sotto, D188); il cambio chiude le altre sessioni.
+
+### Tentativi sbagliati e blocchi (D188)
+
+- **Attese per provenienza.** Dopo 5 password sbagliate di seguito dalla stessa postazione (a quello stesso indirizzo), o 20 dallo stesso indirizzo, ogni password aspetta: 2 secondi, poi il doppio, fino a 15 minuti. Intanto da lì nessuna password si guarda e chi accede legge «riprova tra …». Una password giusta, o un giorno senza errori, fanno ricominciare da capo. Chi prova da un altro computer non aspetta: il medico entra anche mentre qualcuno, altrove, prova il suo nome utente. Valori provvisori, da completare, nello stato del servizio.
+- **Blocco del conto, due soglie dello studio.** Le password sbagliate bloccano il conto solo alla soglia alta (per difetto 50, da 20 a 100): le sbaglia anche chi conosce solo il nome utente. I codici a 6 cifre sbagliati, all'accesso e allo sblocco della sessione, e la password attuale sbagliata nel cambio bloccano alla soglia di prima (5, da 3 a 10): li sbaglia solo chi ha già la password o una sessione. Il blocco dura 15 minuti (al più 60).
+- **Avviso di ogni blocco** all'utente bloccato e ai medici titolari dello studio, nella cornice, finché ognuno non lo segna come visto nella pagina «Blocchi del conto»: chi, quando, fino a quando, quanti tentativi, da quali indirizzi e postazioni, e che cosa può voler dire. Ogni lettura degli avvisi va nel registro.
 
 ### L'amministratore non si prende l'accesso clinico (D179)
 
@@ -66,7 +72,7 @@ Requisiti, «Utenti e ruoli»: l'amministratore non ha accesso clinico, a meno c
 - **Titolari protetti:** l'amministratore non sospende e non toglie il ruolo a un titolare con pazienti, né all'ultimo titolare attivo e confermato, e non aggiunge segreteria o sostituto a un titolare con pazienti; un titolare con pazienti sospeso si riattiva solo dal server, e un titolare in attesa con pazienti non si rifiuta dal programma. Se nell'archivio del medico è in corso una scrittura (per esempio un'importazione), la sospensione risponde dopo al più 2 secondi «riprova tra qualche minuto».
 - **Pazienti nuovi solo negli archivi aperti:** nell'archivio di un titolare sospeso, non più titolare o in attesa di conferma non entrano pazienti, né a mano né con l'importazione; quegli archivi non si propongono nel nuovo paziente, e un titolare in attesa non si sceglie come medico di famiglia.
 - **Codici del medico corretti:** se l'amministratore corregge il codice regionale di un medico, la sessione del servizio regionale si chiude e la risposta lo dice. Il **codice fiscale** di un medico confermato invece resta quello di prima finché il medico non conferma la correzione dal programma (D181, D184): il medico vede l'avviso, la conferma o la rifiuta in «Recapiti di studio»; alla conferma il codice cambia e le sessioni dei servizi si chiudono. L'amministratore vede la correzione in attesa e la può ritirare. Per chi è ancora in attesa di conferma la correzione vale subito: chi conferma la vede nella richiesta.
-- **Accesso:** il passaggio fra password e codice guarda al più tanti codici quanti i tentativi dello studio, giusti o sbagliati, anche con molte richieste insieme, e non vale per un utente bloccato; un passaggio di attivazione aperto prima non vale dopo l'attivazione; il blocco dura al più 60 minuti; ogni tentativo fallito registra anche l'indirizzo della richiesta (con il proxy in `APP_PROXY_FIDATI`). Con il servizio sovraccarico la risposta è «servizio occupato, riprova» invece di un'attesa senza fine.
+- **Accesso:** il passaggio fra password e codice guarda al più tanti codici quanti i codici sbagliati ammessi dallo studio, giusti o sbagliati, anche con molte richieste insieme, e non vale per un utente bloccato; un passaggio di attivazione aperto prima non vale dopo l'attivazione; il blocco dura al più 60 minuti; ogni tentativo fallito registra anche l'indirizzo della richiesta (con il proxy in `APP_PROXY_FIDATI`). Con il servizio sovraccarico la risposta è «servizio occupato, riprova» invece di un'attesa senza fine.
 
 ## Dati e impostazioni dello studio (D166)
 
@@ -74,7 +80,7 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 
 - **Intestazione dello studio:** vale nei certificati dai modelli quando il medico non ha la sua.
 - **Indirizzo completo:** è il luogo della visita in studio sulla copia INPS.
-- **Sicurezza:** 5 minuti di inattività, 5 tentativi, 15 minuti di blocco (D29); si cambiano qui, entro limiti di buon senso (il blocco al più 60 minuti, perché non tenga fuori un medico per un giorno, D179).
+- **Sicurezza:** 5 minuti di inattività, 50 password sbagliate o 5 codici sbagliati, 15 minuti di blocco (D29, D188); si cambiano qui, entro limiti di buon senso (le password da 20 a 100, i codici da 3 a 10, il blocco al più 60 minuti, perché non tenga fuori un medico per un giorno, D179). Le attese dopo le password sbagliate sono del servizio e si vedono nello stato del servizio.
 - **Tempo di attesa degli invii:** 8 secondi per difetto; la Regione indica 6–8 (D94). Si legge a ogni invio di ricette e certificati.
 - **Soglie degli avvisi sugli accessi anomali** (Garante, linee guida sul dossier sanitario, par. 7, lett. c): vuote, quindi avvisi spenti, finché qualcuno non dà i valori (da completare).
 
@@ -148,7 +154,7 @@ Risposte di Simone alla fermata dopo la tappa 15 in D181: quelle sui poteri dell
 - **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?
 - **Poteri dell'amministratore** (D179, dalle revisioni avversarie):
   - in medicina di gruppo una segreteria confermata da un solo titolare leggeva gli archivi di tutti: risposta di Simone, la conferma per archivio; fatto nella tappa 16 (D185, problema 3);
-  - chi conosce il nome utente di un medico lo tiene fuori un'ora alla volta, ripetendo i tentativi sbagliati: consigliati ritardi crescenti per indirizzo e postazione, con il blocco del conto solo oltre una soglia alta, e un avviso di ogni blocco al medico e ai titolari (problema 4, la parte rimasta);
+  - chi conosce il nome utente di un medico lo tiene fuori un'ora alla volta, ripetendo i tentativi sbagliati: risposta di Simone, attese crescenti per indirizzo e postazione, blocco del conto solo oltre una soglia alta e un avviso di ogni blocco al medico e ai titolari; fatto nella tappa 16 (D188, problema 4);
   - codice fiscale del medico corretto dall'amministratore: risposta di Simone, la correzione resta in sospeso finché il medico non la conferma; fatto nella tappa 16 (D184, problema 12);
   - conferma dal server: come chi gestisce il servizio riconosce il medico. Consigliato di persona, con un documento e il codice regionale, annotato fuori dal programma; l'alternativa è il primo accesso con SPID o CIE, dove c'è l'accesso regionale;
   - `--rifiuta` anche per un utente già confermato (torna in attesa, sospeso dal server, con credenziali nuove alla conferma successiva): consigliato sì;

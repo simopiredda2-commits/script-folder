@@ -115,6 +115,7 @@ describe('codice fiscale corretto dall’amministratore (tappa 16, D181)', () =>
       secondoFattoreAttivo: true,
       bloccatoFinoA: null,
       tentativiFalliti: 0,
+      codiciSbagliati: 0,
       passwordDaCambiare: false,
       passwordCambiataIl: null,
       creatoIl: '2026-11-01T08:00:00Z',
