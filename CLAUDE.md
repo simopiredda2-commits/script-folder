@@ -90,6 +90,7 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 - `DATABASE_URL=postgres://mmg:mmg@localhost:5432/mmg_dev` (valore locale, non un segreto; vedi `.env.example`).
 - `APP_AMBIENTE`: «prova» (per difetto: solo pazienti inventati dove si controlla, seed ammesso) o «produzione» (seed vietato), D170.
 - `APP_PROXY_FIDATI`: indirizzi o reti dei proxy inversi davanti al servizio (vuota per difetto: X-Forwarded-For si ignora), per l'indirizzo vero nel registro dei tentativi falliti (D179).
+- `AURA_AGGIORNAMENTO`: ora del controllo di ogni notte su AURA, ora di Roma (per esempio `02:30`). Vuota per difetto: niente giro di notte; restano le notifiche, il pulsante e il controllo prima della ricetta (D197).
 - La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e alcuni siti pubblici, solo per leggere specifiche, decreti e dati aperti (Sistema TS, Gazzetta Ufficiale, Normattiva, INPS, AIFA anche `drive.aifa.gov.it`, Regione Piemonte, Ministero della Salute, due ASL; D92, D148). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7).
 
 ## Comandi
@@ -138,6 +139,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/aft.md`: condivisione del riepilogo tra i medici dell'AFT, con il consenso del paziente (D161).
 - `docs/amministrazione.md`: Strumenti e amministrazione per ruolo, primo avvio, utenti, studio, postazioni, stampa, elenchi (tappa 14, D163).
 - `docs/importazione.md`: importazione da altri programmi con lo smistamento verso i menu, formati, destinazioni, sicurezza (tappa 15, D173).
+- `docs/aura.md`: collegamento con AURA, oggi simulato: quando si controlla, che cosa si allinea, registro, che cosa non è provato (D197).
 
 ## Le tappe
 
@@ -178,7 +180,7 @@ Quinto blocco (via di Simone del 19/11/2026: «ok. Chiudi tutto ciò che puoi ch
 16. Le scelte della fermata dopo la tappa 15 (D181): ripristino delle credenziali di medici e segreteria anche con SPID o CIE; segreteria confermata per archivio; ritardi crescenti dopo i tentativi falliti, blocco del conto oltre una soglia alta e avviso di ogni blocco; codice fiscale del medico corretto dall'amministratore, in sospeso finché il medico conferma; ricette di altri programmi contate in R11 e R6; scheda intera non riservata nell'AFT; elenchi dello studio scritti dai medici e dall'amministratore.
 17. Diagnosi ICD-9-CM con la ricerca per descrizione (la tabella del Ministero si importa quando si può scaricare) e allegati del DPCM LEA (7, 8, 10, 4D) come trascrizioni controllate. **Fermata dopo la tappa 17**, con lo stesso giro (domande con il pulsante, via, unione).
 
-Fermata dopo la tappa 17 fatta (D191): via, pull request #9 unita. Le verifiche di Simone e della Dr.ssa Rocca si fanno alla fine. Dopo l'unione, nello stesso branch: banche dati aggiornate da chi gestisce il servizio, con il pulsante «Aggiorna adesso» che resta all'amministratore dello studio (D192, D194), soglie dei tentativi confermate, motivo del ritorno da SPID o CIE scritto dal programma (D193). Dopo l'unione della #10: allegato 7 trascritto (D195); l'elenco esenzioni–prestazioni del SAR non si importa perché precedente al nuovo nomenclatore (D196); domande per la prossima fermata in `docs/avanzamento.md`.
+Fermata dopo la tappa 17 fatta (D191): via, pull request #9 unita. Le verifiche di Simone e della Dr.ssa Rocca si fanno alla fine. Dopo l'unione, nello stesso branch: banche dati aggiornate da chi gestisce il servizio, con il pulsante «Aggiorna adesso» che resta all'amministratore dello studio (D192, D194), soglie dei tentativi confermate, motivo del ritorno da SPID o CIE scritto dal programma (D193). Dopo l'unione della #10: allegato 7 trascritto (D195); l'elenco esenzioni–prestazioni del SAR non si importa perché precedente al nuovo nomenclatore (D196). Fermata dopo l'unione della #10 fatta: via, pull request #11 unita; poi, nello stesso branch, AURA con un simulatore (D197). Domande per la prossima fermata in `docs/avanzamento.md`.
 
 ## Come si chiude
 

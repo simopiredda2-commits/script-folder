@@ -144,6 +144,7 @@ In sola lettura per l'amministratore:
 
 - collegamenti con i servizi esterni (oggi tutti simulati, regola 7), con l'ultimo uso;
 - durata massima della sessione;
+- AURA (D197): prossimo giro e ultimo giro di tutti i pazienti, con i numeri dei soli pazienti dello studio; spenta in produzione finché c'è il simulatore;
 - aggiornamento notturno delle banche dati, che fa chi gestisce il servizio per tutti gli studi; l'amministratore può avviarne uno subito, in Banche dati (D191, D194);
 - ambiente dell'installazione («prova» o «produzione»);
 - l'avviso che i salvataggi non li fa il programma.

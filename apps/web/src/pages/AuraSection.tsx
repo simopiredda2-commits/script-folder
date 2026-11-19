@@ -173,13 +173,12 @@ export function AuraSection({
           )}
           {done && <Notice kind={done.kind}>{done.text}</Notice>}
           <ErrorMessage error={error} />
-          <h3>Ultime variazioni da AURA</h3>
+          <h3 id="titolo-variazioni-aura">Ultime variazioni da AURA</h3>
           {s.variazioni.length === 0 ? (
             <p className="tenue">Nessuna variazione arrivata da AURA.</p>
           ) : (
             <div className="tabella-scorrevole">
-              <table className="tabella">
-                <caption>Ultime variazioni arrivate da AURA</caption>
+              <table className="tabella" aria-labelledby="titolo-variazioni-aura">
                 <thead>
                   <tr>
                     <th scope="col">Quando</th>
