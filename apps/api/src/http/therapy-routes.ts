@@ -6,10 +6,38 @@ import type { Database } from '../db/client';
 import { allergyDetail, clinicalEntry, problemDetail, therapy } from '../db/schema';
 import { withActor } from '../db/tx';
 import { guardPatient } from '../patients/access';
+import { studioDate } from '../prescriptions/rules-check';
 import { HttpError } from './errors';
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const text = (max: number) => z.string().trim().max(max).nullable().optional();
+
+/**
+ * Stati della terapia e che cosa vogliono dire (tappa 15):
+ * - in corso (`active`): si ripete e va nello schema orario;
+ * - sospesa (`suspended`): fermata per un motivo, anche una reazione avversa; non si ripete finché
+ *   il medico non la riprende, e il motivo resta scritto nella scheda (D81);
+ * - conclusa (`ended`): finita, con la data di fine vera. Non si ripete, non va nello schema orario
+ *   né nel Profilo sanitario sintetico, e non si riprende: resta tra i farmaci prescritti con il
+ *   suo storico. Una terapia nuova dello stesso farmaco è un'altra scheda.
+ * La data «Al» di una terapia in corso è la fine prevista (obbligatoria per il ciclo); la
+ * conclusione è un fatto, quindi la sua data non può essere nel futuro.
+ */
+export function concludedTherapyIssues(
+  t: { startOn: string; endOn?: string | null },
+  today: string,
+): string[] {
+  if (!t.endOn) return ['Terapia conclusa: manca la data di fine'];
+  const out: string[] = [];
+  if (t.endOn > today)
+    out.push(
+      'Terapia conclusa: la data di fine è nel futuro (una fine prevista va nel campo «Al»)',
+    );
+  if (t.endOn < t.startOn) out.push('Terapia conclusa: la fine viene prima dell’inizio');
+  return out;
+}
+
+const concludeBody = z.object({ fine: isoDate }).strict();
 
 /**
  * Scheda della terapia: il farmaco, come si prende, come va in ricetta, le opzioni (requisiti,
@@ -63,6 +91,11 @@ export const therapyBody = z
     multiPrescription: z.boolean().optional(),
     suggestedS: z.boolean().optional(),
     hospitalH: z.boolean().optional(),
+    /**
+     * Terapia già conclusa, registrata per lo storico (tappa 15): vale solo per una scheda nuova,
+     * con la data di fine. Una terapia in corso si conclude con «Concludi».
+     */
+    concluded: z.boolean().optional(),
   })
   .strict()
   .refine((t) => !t.notSubstitutable || !!t.notSubstitutableReason, {
@@ -135,12 +168,21 @@ export function registerTherapyRoutes(app: FastifyInstance, db: Database, now: (
     const { id } = params.parse(req.params);
     await guardPatient(db, actor, id, 'therapy.write', 'nuova_terapia');
     // Il corpo si valida dopo la guardia: anche una richiesta sbagliata è registrata.
-    const body = normalize(therapyBody.parse(req.body));
+    const { concluded, ...body } = normalize(therapyBody.parse(req.body));
+    if (concluded) {
+      const issues = concludedTherapyIssues(body, studioDate(now()));
+      if (issues.length) throw new HttpError(400, issues.join('. '), { problemi: issues });
+    }
     await checkIndication(id, body.indicationEntryId);
     const [row] = await withActor(db, actor.userId, (tx) =>
       tx
         .insert(therapy)
-        .values({ ...body, patientId: id, createdBy: actor.userId })
+        .values({
+          ...body,
+          patientId: id,
+          createdBy: actor.userId,
+          ...(concluded ? { status: 'ended' as const } : {}),
+        })
         .returning({ id: therapy.id }),
     );
     return reply.status(201).send({ id: row!.id });
@@ -153,8 +195,18 @@ export function registerTherapyRoutes(app: FastifyInstance, db: Database, now: (
     // Il resto si valida dopo la guardia: anche una richiesta sbagliata entra nel registro.
     const { therapyId } = therapyParams.parse(req.params);
     const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
-    await loadTherapy(id, therapyId, reservedAllowed);
-    const body = normalize(therapyBody.parse(req.body));
+    const current = await loadTherapy(id, therapyId, reservedAllowed);
+    const { concluded, ...body } = normalize(therapyBody.parse(req.body));
+    if (concluded !== undefined)
+      throw new HttpError(
+        400,
+        'Terapia già conclusa: si indica solo per una scheda nuova; una terapia in corso si conclude con «Concludi»',
+      );
+    // Una terapia conclusa resta con la sua data di fine vera, anche dopo una modifica.
+    if (current.status === 'ended') {
+      const issues = concludedTherapyIssues(body, studioDate(now()));
+      if (issues.length) throw new HttpError(400, issues.join('. '), { problemi: issues });
+    }
     await checkIndication(id, body.indicationEntryId);
     await withActor(db, actor.userId, (tx) =>
       tx
@@ -163,6 +215,31 @@ export function registerTherapyRoutes(app: FastifyInstance, db: Database, now: (
         .where(eq(therapy.id, therapyId)),
     );
     return { id: therapyId };
+  });
+
+  /**
+   * Conclusione di una terapia in corso o sospesa, con la data di fine vera (tappa 15). Non è la
+   * sospensione: una terapia conclusa non si riprende. Il motivo di una sospensione si toglie
+   * dalla scheda, come quando la si riprende; lo storico delle modifiche lo conserva.
+   */
+  app.post('/api/pazienti/:id/terapie/:therapyId/concludi', scoped, async (req) => {
+    const actor = req.actor!;
+    const { id } = params.parse(req.params);
+    const { context } = await guardPatient(db, actor, id, 'therapy.write', 'modifica_terapia');
+    const { therapyId } = therapyParams.parse(req.params);
+    const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
+    const t = await loadTherapy(id, therapyId, reservedAllowed);
+    if (t.status === 'ended') throw new HttpError(409, 'La terapia è già conclusa');
+    const { fine } = concludeBody.parse(req.body);
+    const issues = concludedTherapyIssues({ startOn: t.startOn, endOn: fine }, studioDate(now()));
+    if (issues.length) throw new HttpError(400, issues.join('. '), { problemi: issues });
+    await withActor(db, actor.userId, (tx) =>
+      tx
+        .update(therapy)
+        .set({ status: 'ended', endOn: fine, suspendedReason: null, updatedAt: now() })
+        .where(eq(therapy.id, therapyId)),
+    );
+    return { stato: 'ended', fine };
   });
 
   /**

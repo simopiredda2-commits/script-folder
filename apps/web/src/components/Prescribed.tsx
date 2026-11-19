@@ -27,6 +27,33 @@ interface Counts {
   ultimoStato: string | null;
   /** Confezioni (o quantità) negli ultimi 12 mesi, ricette inviate o su carta. */
   ultimi12Mesi: number;
+  /** Ricette della stessa voce fatte con un altro programma (tappa 15), contate a parte. */
+  altroProgramma?: { ricette: number; ultimaIl: string | null };
+}
+
+/** Una ricetta fatta con un altro programma, come la restituisce il servizio (tappa 15). */
+export interface PastPrescription {
+  id: string;
+  tipo: 'farmaco' | 'prestazione';
+  data: string;
+  aic: string | null;
+  farmaco: string | null;
+  principioAttivo: string | null;
+  atc: string | null;
+  codice: string | null;
+  descrizione: string | null;
+  quantita: number | null;
+  posologia: string | null;
+  nre: string | null;
+  prescrittore: string | null;
+  note: string | null;
+  programma: string | null;
+  importata: boolean;
+  registrataDa: string | null;
+  registrataIl: string;
+  stato: 'attiva' | 'annullata';
+  annullataIl: string | null;
+  motivoAnnullamento: string | null;
 }
 
 /** Un farmaco prescritto, come lo restituisce il servizio (D152). */
@@ -73,9 +100,20 @@ export function historyHref(patientId: string, key: HistoryKey): string {
   return `/pazienti/${patientId}/farmaci/storico${query(key)}`;
 }
 
-/** «3 ricette, ultima il 12/10/2026 · 1 in preparazione». */
+/** «2 fatte con un altro programma, l'ultima il 10/03/2025»; vuoto se non ce ne sono. */
+export function pastCountsText(c: Counts): string {
+  const n = c.altroProgramma?.ricette ?? 0;
+  if (n === 0) return '';
+  const when = c.altroProgramma?.ultimaIl ? date(c.altroProgramma.ultimaIl) : null;
+  return n === 1
+    ? `1 ricetta fatta con un altro programma${when ? `, il ${when}` : ''}`
+    : `${n} ricette fatte con un altro programma${when ? `, l’ultima il ${when}` : ''}`;
+}
+
+/** «3 ricette, ultima il 12/10/2026 · 1 in preparazione · 2 fatte con un altro programma». */
 export function countsText(c: Counts): string {
-  if (c.ricette === 0) return 'nessuna ricetta';
+  const past = pastCountsText(c);
+  if (c.ricette === 0) return past || 'nessuna ricetta';
   const parts = [
     `${c.prescritte === 1 ? '1 ricetta' : `${c.prescritte} ricette`} inviate o su carta`,
   ];
@@ -83,6 +121,7 @@ export function countsText(c: Counts): string {
   if (c.inPreparazione > 0) parts.push(`${c.inPreparazione} in preparazione`);
   if (c.annullate > 0)
     parts.push(`${c.annullate} ${c.annullate === 1 ? 'annullata' : 'annullate'}`);
+  if (past) parts.push(past);
   return parts.join(' · ');
 }
 

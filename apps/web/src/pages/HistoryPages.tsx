@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader, type RuleIssue } from '../components/common';
 import { Icon } from '../components/Icon';
+import { PastPrescriptionsList } from '../components/PastPrescriptions';
+import type { PastPrescription } from '../components/Prescribed';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { api, ApiError, query } from '../lib/api';
 import { useSession } from '../lib/session';
@@ -24,6 +26,7 @@ import {
   type Summary,
   type TherapyFull,
 } from './RecordPage';
+import { ConcludeTherapyPanel } from './TherapyForm';
 
 interface HistoryEntry {
   ricetta: {
@@ -77,6 +80,29 @@ interface History {
   ultimi12Mesi: number;
   annullateUltimi12Mesi: number;
   voci: HistoryEntry[];
+  /** Ricette della stessa voce fatte con un altro programma (tappa 15), anche le annullate. */
+  ricettePassate?: PastPrescription[];
+}
+
+/**
+ * Le ricette fatte con un altro programma nello storico di una voce: si leggono, con il loro
+ * segno; si registrano e si annullano dai farmaci e dalle prestazioni prescritti.
+ */
+function PastInHistory({ history, patientId }: { history: History; patientId: string }) {
+  const items = history.ricettePassate ?? [];
+  if (items.length === 0) return null;
+  return (
+    <>
+      <h3>Ricette fatte con un altro programma</h3>
+      <PastPrescriptionsList
+        items={items}
+        patientId={patientId}
+        canWrite={false}
+        onChanged={() => undefined}
+        label="Ricette fatte con un altro programma"
+      />
+    </>
+  );
 }
 
 const OPERATION: Record<string, string> = {
@@ -212,7 +238,8 @@ function HistoryTable({
   onChange: () => void;
   patientId: string;
 }) {
-  if (history.voci.length === 0) return <p className="tenue">Nessuna prescrizione finora.</p>;
+  if (history.voci.length === 0)
+    return <p className="tenue">Nessuna ricetta fatta con questo programma.</p>;
   return (
     <div className="tabella-scorrevole">
       <table className="tabella">
@@ -468,6 +495,7 @@ export function TherapyPage() {
     `/api/pazienti/${id}/storico-prescrizioni${query({ terapia: therapyId })}`,
   );
   const [suspending, setSuspending] = useState(false);
+  const [concluding, setConcluding] = useState(false);
   const [done, setDone] = useState<string | null>(
     (location.state as { avviso?: string } | null)?.avviso ?? null,
   );
@@ -485,6 +513,8 @@ export function TherapyPage() {
   const summary = record.data.riepilogo;
   const indication = summary?.problemiAttivi.find((x) => x.id === t.indicationEntryId);
   const suspended = t.status === 'suspended';
+  // Conclusa (tappa 15): finita, con la data di fine vera; non si sospende e non si riprende.
+  const ended = t.status === 'ended';
 
   async function resume() {
     setActionError(null);
@@ -522,7 +552,7 @@ export function TherapyPage() {
             <Link className="pulsante" to={`/pazienti/${id}/schema-orario`}>
               <Icon name="stampa" /> <span>Stampa lo schema orario</span>
             </Link>
-            {isDoctor && !suspended && !suspending && (
+            {isDoctor && !suspended && !ended && !suspending && !concluding && (
               <button type="button" className="pulsante" onClick={() => setSuspending(true)}>
                 <Icon name="blocco" /> <span>Sospendi…</span>
               </button>
@@ -530,6 +560,11 @@ export function TherapyPage() {
             {isDoctor && suspended && (
               <button type="button" className="pulsante" onClick={() => void resume()}>
                 <Icon name="ripeti" /> <span>Riprendi</span>
+              </button>
+            )}
+            {isDoctor && !ended && !suspending && !concluding && (
+              <button type="button" className="pulsante" onClick={() => setConcluding(true)}>
+                <Icon name="fatto" /> <span>Concludi…</span>
               </button>
             )}
           </>
@@ -544,6 +579,26 @@ export function TherapyPage() {
           {t.suspendedReason ? ` Motivo: ${t.suspendedReason}` : ''} Non si ripete e non entra nello
           schema orario finché non la riprendi.
         </Notice>
+      )}
+      {ended && (
+        <Notice kind="info">
+          <strong>Terapia conclusa{t.endOn ? ` il ${date(t.endOn)}` : ''}.</strong> Non si ripete e
+          non entra nello schema orario; resta tra i farmaci prescritti con il suo storico. Per lo
+          stesso farmaco serve una terapia nuova.
+        </Notice>
+      )}
+      {concluding && (
+        <ConcludeTherapyPanel
+          patientId={id!}
+          therapy={t}
+          onCancel={() => setConcluding(false)}
+          onDone={(message) => {
+            setConcluding(false);
+            setDone(message);
+            therapies.reload();
+            record.reload();
+          }}
+        />
       )}
       {suspending && (
         <SuspendPanel
@@ -686,6 +741,7 @@ export function TherapyPage() {
               onChange={history.reload}
               patientId={id!}
             />
+            <PastInHistory history={history.data} patientId={id!} />
           </>
         )}
       </section>
@@ -703,7 +759,12 @@ export function ServiceHistoryPage() {
   const history = useApi<History>(
     `/api/pazienti/${id}/storico-prescrizioni${query({ prestazione: code, descrizione: description })}`,
   );
-  const title = history.data?.voci[0]?.riga.prestazione ?? description ?? code ?? 'Prestazione';
+  const title =
+    history.data?.voci[0]?.riga.prestazione ??
+    history.data?.ricettePassate?.[0]?.descrizione ??
+    description ??
+    code ??
+    'Prestazione';
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
@@ -741,6 +802,7 @@ export function ServiceHistoryPage() {
               onChange={history.reload}
               patientId={id!}
             />
+            <PastInHistory history={history.data} patientId={id!} />
           </>
         )}
       </section>
@@ -763,7 +825,9 @@ export function DrugHistoryPage() {
     `/api/pazienti/${id}/storico-prescrizioni${query({ aic, principio: ingredient, farmaco: name })}`,
   );
   const first = history.data?.voci[0]?.riga;
-  const title = first?.farmaco ?? ingredient ?? name ?? (aic ? `AIC ${aic}` : 'Farmaco');
+  const past = history.data?.ricettePassate?.[0];
+  const title =
+    first?.farmaco ?? past?.farmaco ?? ingredient ?? name ?? (aic ? `AIC ${aic}` : 'Farmaco');
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
@@ -811,6 +875,7 @@ export function DrugHistoryPage() {
               onChange={history.reload}
               patientId={id!}
             />
+            <PastInHistory history={history.data} patientId={id!} />
           </>
         )}
       </section>

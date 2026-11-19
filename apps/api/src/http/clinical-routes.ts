@@ -10,6 +10,7 @@ import {
   CONTACT_TYPES,
   ENTRY_TYPE_LABELS,
   ENTRY_TYPES,
+  LAB_RESULTS_MAX,
   LIFESTYLE_FACTORS,
   MEASURES,
   MOTOR_CAPACITIES,
@@ -17,6 +18,7 @@ import {
   PROBLEM_CATEGORY_LABELS,
   RELATIVES,
   THERAPY_ROUTES,
+  VACCINE_DOSE_MAX,
   can,
 } from '@mmg/domain';
 import { FSE_DICTIONARIES, fseDictionary } from '@mmg/integrations';
@@ -29,11 +31,13 @@ import {
   entryIssues,
   entryPatchBody,
   insertEntry,
+  labResultEntries,
   listEntries,
   listQuery,
   loadEntry,
   measurementSeries,
   newEntryBody,
+  newLabResultsBody,
   newMeasurementsBody,
   patchEntry,
 } from '../clinical/entries';
@@ -90,6 +94,8 @@ export function registerClinicalRoutes(app: FastifyInstance, db: Database, now: 
     parenti: RELATIVES.map((r) => ({ chiave: r.key, nome: r.label })),
     capacitaMotorie: MOTOR_CAPACITIES.map((m) => ({ chiave: m.key, nome: m.label })),
     vieSomministrazione: THERAPY_ROUTES.map((r) => r.label),
+    // Limiti tecnici delle voci della tappa 15, perché l'interfaccia li dica prima di salvare.
+    limiti: { doseVaccino: VACCINE_DOSE_MAX, risultatiReferto: LAB_RESULTS_MAX },
   }));
 
   app.get('/api/pazienti/:id/voci', scoped, async (req) => {
@@ -134,6 +140,26 @@ export function registerClinicalRoutes(app: FastifyInstance, db: Database, now: 
       valore: m.valore,
     }));
     assertNoIssues(entries.flatMap((e) => entryIssues(e, today)));
+    const ids = await withActor(db, actor.userId, async (tx) => {
+      const out: string[] = [];
+      for (const e of entries) out.push(await insertEntry(tx, id, actor.userId, e));
+      return out;
+    });
+    return reply.status(201).send({ ids });
+  });
+
+  /**
+   * Risultati dello stesso referto di laboratorio, scritti insieme (tappa 15): una voce per esame,
+   * in una transazione sola. Scrive il medico, come le altre voci.
+   */
+  app.post('/api/pazienti/:id/esami', scoped, async (req, reply) => {
+    const actor = req.actor!;
+    const { id } = params.parse(req.params);
+    await guardPatient(db, actor, id, 'clinical.write', 'nuova_voce');
+    const entries = labResultEntries(newLabResultsBody.parse(req.body));
+    const today = studioDate(now());
+    // La data è una per tutto il referto: il suo messaggio si dice una volta sola.
+    assertNoIssues([...new Set(entries.flatMap((e) => entryIssues(e, today)))]);
     const ids = await withActor(db, actor.userId, async (tx) => {
       const out: string[] = [];
       for (const e of entries) out.push(await insertEntry(tx, id, actor.userId, e));

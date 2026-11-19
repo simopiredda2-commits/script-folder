@@ -20,6 +20,7 @@ import {
   riskFactorDetail,
   vaccinationDetail,
 } from '../db/schema';
+import { historicalSummary, visibleHistorical } from '../prescriptions/historical';
 import { guardPatient } from './access';
 
 /** Filtri della cronologia, come nella cartella dei requisiti: tutto, visite, ricette, esami. */
@@ -45,6 +46,12 @@ const PRESCRIPTION_LABELS: Record<string, string> = {
   specialist_ssn: 'Ricetta specialistica SSN',
   white: 'Ricetta bianca',
   devices: 'Ricetta per presidi',
+};
+
+/** Ricette fatte con un altro programma (tappa 15): il titolo lo dice sempre. */
+const HISTORICAL_LABELS: Record<string, string> = {
+  farmaco: 'Farmaco, ricetta fatta con un altro programma',
+  prestazione: 'Prestazione, ricetta fatta con un altro programma',
 };
 
 /** Testo breve di ogni voce, dal suo dettaglio. */
@@ -83,7 +90,13 @@ async function details(db: Database, ids: string[]) {
     .select()
     .from(vaccinationDetail)
     .where(inArray(vaccinationDetail.entryId, ids)))
-    set(r.entryId, `Vaccinazione: ${r.vaccine}`, r.lot ? `lotto ${r.lot}` : null);
+    set(
+      r.entryId,
+      `Vaccinazione: ${r.vaccine}`,
+      [r.doseNumber && `dose ${r.doseNumber}`, r.lot && `lotto ${r.lot}`, r.campaign]
+        .filter(Boolean)
+        .join(' · ') || null,
+    );
   for (const r of await db
     .select()
     .from(labResultDetail)
@@ -177,6 +190,18 @@ export async function timeline(db: Database, actor: Actor, patientId: string, ra
           autore: null,
         });
       }
+      // Ricette fatte con un altro programma (tappa 15): un tipo a sé, mai confuse con le nostre.
+      for (const h of await visibleHistorical(db, patientId, reservedAllowed)) {
+        items.push({
+          id: h.id,
+          data: h.prescribedOn,
+          tipo: 'historical_prescription',
+          titolo: HISTORICAL_LABELS[h.kind] ?? 'Ricetta fatta con un altro programma',
+          testo: historicalSummary(h) || h.notes,
+          annullata: !!h.annulledAt,
+          autore: null,
+        });
+      }
     }
   }
   // Attività dei colleghi dell'AFT per questo paziente (registro di AFT, D161).
@@ -212,7 +237,8 @@ export async function labResults(db: Database, actor: Actor, patientId: string) 
     'clinical.diary.read',
     'lettura_esami',
   );
-  const reservedAllowed = can(actor, 'reserved.read', { ...context, now: new Date() }).allowed;
+  const at = { ...context, now: new Date() };
+  const reservedAllowed = can(actor, 'reserved.read', at).allowed;
   const rows = await db
     .select({
       id: clinicalEntry.id,
@@ -235,7 +261,8 @@ export async function labResults(db: Database, actor: Actor, patientId: string) 
       ),
     )
     .orderBy(desc(clinicalEntry.occurredOn), labResultDetail.analyte);
-  return { esami: rows };
+  // Dalla tappa 15 la pagina Esami li aggiunge: li scrive il medico, come le altre voci.
+  return { esami: rows, puoScrivere: can(actor, 'clinical.write', at).allowed };
 }
 
 /** Ultimo valore di ogni parametro negli ultimi 12 mesi, per il riepilogo. */

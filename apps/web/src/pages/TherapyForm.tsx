@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   DataVersions,
   ErrorMessage,
   Loading,
+  Notice,
   PageHeader,
   type DatasetVersion,
 } from '../components/common';
@@ -73,9 +74,30 @@ export interface TherapyDraft {
   notSubstitutableReason: string;
   multiPrescription: boolean;
   typology: Typology;
+  /**
+   * Terapia conclusa (tappa 15): per una scheda nuova, una terapia già finita registrata per lo
+   * storico; per una scheda salvata, lo stato della terapia. Con «conclusa» la data di fine è
+   * obbligatoria e non può essere nel futuro.
+   */
+  concluded: boolean;
 }
 
 type DbDrug = Drug & { equivalenceGroup: string | null };
+
+/** I campi del farmaco presi dalla banca dati: gli stessi per la ricerca e per una ricetta passata. */
+export function drugPatch(d: DbDrug): Partial<TherapyDraft> {
+  return {
+    drugAic: d.aic,
+    drugName: [d.name, d.pack].filter(Boolean).join(' '),
+    activeIngredient: d.activeIngredient,
+    atc: d.atc,
+    drugClass: d.drugClass,
+    equivalenceGroup: d.equivalenceGroup ?? null,
+    dpc: d.dpc,
+    // La nota viene dalla banca dati; si conferma a ogni ricetta (R7).
+    aifaNote: d.aifaNote ?? '',
+  };
+}
 
 const comma = (v: string | null) => (v ?? '').replace('.', ',');
 const sameUnits = (a: string, b: string | null) => a.replace(',', '.') === (b ?? '');
@@ -115,6 +137,7 @@ export function emptyDraft(today: string): TherapyDraft {
     notSubstitutableReason: '',
     multiPrescription: false,
     typology: 'none',
+    concluded: false,
   };
 }
 
@@ -154,11 +177,12 @@ export function draftFromTherapy(t: TherapyFull): TherapyDraft {
     notSubstitutableReason: t.notSubstitutableReason ?? '',
     multiPrescription: t.multiPrescription,
     typology: t.suggestedS ? 'S' : t.hospitalH ? 'H' : 'none',
+    concluded: t.status === 'ended',
   };
 }
 
 /** Gli stessi controlli formali del servizio, detti prima di salvare e vicino al campo. */
-export function validateDraft(d: TherapyDraft): Record<string, string> {
+export function validateDraft(d: TherapyDraft, today = studioToday()): Record<string, string> {
   const e: Record<string, string> = {};
   if (!d.drugName.trim()) e.drugName = 'Scegli un farmaco dalla banca dati o scrivine il nome.';
   if (!/^\d{1,2}$/.test(d.packs.trim()) || Number(d.packs) < 1)
@@ -169,6 +193,11 @@ export function validateDraft(d: TherapyDraft): Record<string, string> {
   if (d.kind === 'cycle' && !d.endOn) e.endOn = 'Ciclo con data di fine: manca la data di fine.';
   else if (d.endOn && d.startOn && d.endOn < d.startOn)
     e.endOn = 'La fine non può venire prima dell’inizio.';
+  // Una terapia conclusa ha la data di fine vera: c'è e non è nel futuro (tappa 15).
+  if (d.concluded && !e.endOn) {
+    if (!d.endOn) e.endOn = 'Terapia conclusa: manca la data di fine.';
+    else if (d.endOn > today) e.endOn = 'Terapia conclusa: la data di fine è nel futuro.';
+  }
   if (d.notSubstitutable && !d.notSubstitutableReason.trim())
     e.notSubstitutableReason = 'Non sostituibile: serve una sintetica motivazione (R13).';
   if (d.typology === 'S' && !d.suggestedByName.trim())
@@ -342,23 +371,7 @@ function DrugChooser({
               <div className="tenue">{drugFacts(d).join(' · ')}</div>
               <div className="codice tenue">AIC {d.aic}</div>
             </div>
-            <button
-              type="button"
-              className="pulsante"
-              onClick={() =>
-                onChoose({
-                  drugAic: d.aic,
-                  drugName: [d.name, d.pack].filter(Boolean).join(' '),
-                  activeIngredient: d.activeIngredient,
-                  atc: d.atc,
-                  drugClass: d.drugClass,
-                  equivalenceGroup: d.equivalenceGroup ?? null,
-                  dpc: d.dpc,
-                  // La nota viene dalla banca dati; si conferma a ogni ricetta (R7).
-                  aifaNote: d.aifaNote ?? '',
-                })
-              }
-            >
+            <button type="button" className="pulsante" onClick={() => onChoose(drugPatch(d))}>
               <Icon name="fatto" /> <span>Scegli</span>
             </button>
           </li>
@@ -515,6 +528,7 @@ export function StudioSuggestorField({
 export function TherapyForm() {
   const { id, therapyId } = useParams<{ id: string; therapyId?: string }>();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
   // Le vie con il codice del dizionario ufficiale vengono dal dominio (tappa 11).
   const routes = useCatalog().data?.vieSomministrazione ?? ROUTES;
@@ -533,6 +547,17 @@ export function TherapyForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<ApiError | null>(null);
   const [saving, setSaving] = useState(false);
+  // Una scheda nuova può partire dal farmaco di una ricetta fatta con un altro programma (tappa
+  // 15): solo con un codice AIC che la banca dati in vigore oggi conosce, e con i dati di oggi.
+  const baseAic = !therapyId ? params.get('aic') : null;
+  const fromPast = params.get('da') === 'altro-programma';
+  const base = useApi<{ farmaco: DbDrug | null }>(
+    baseAic && /^\d{9}$/.test(baseAic) ? `/api/farmaci/${baseAic}` : null,
+  );
+  const baseApplied = useRef(false);
+  const [baseOutcome, setBaseOutcome] = useState<'applicato' | 'tenuto' | 'sconosciuto' | null>(
+    null,
+  );
 
   // Si parte dalla scheda salvata (modifica) o da una scheda vuota (nuova).
   useEffect(() => {
@@ -540,6 +565,20 @@ export function TherapyForm() {
     if (!therapyId) setDraft(emptyDraft(studioToday()));
     else if (existing) setDraft(draftFromTherapy(existing));
   }, [draft, therapyId, existing, setDraft]);
+
+  // Il farmaco di partenza entra solo in una scheda nuova ancora senza farmaco: una scheda già
+  // iniziata con un altro farmaco resta com'è, e lo si dice.
+  useEffect(() => {
+    if (baseApplied.current || !draft || !base.data) return;
+    baseApplied.current = true;
+    const drug = base.data.farmaco;
+    if (!drug) setBaseOutcome('sconosciuto');
+    else if (draft.drugName) setBaseOutcome(draft.drugAic === drug.aic ? 'applicato' : 'tenuto');
+    else {
+      setDraft({ ...draft, ...drugPatch(drug) });
+      setBaseOutcome('applicato');
+    }
+  }, [draft, base.data, setDraft]);
 
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
@@ -579,15 +618,26 @@ export function TherapyForm() {
     setSaving(true);
     try {
       const body = draftBody(d);
+      // «Già conclusa» vale solo per una scheda nuova: una terapia in corso si conclude con
+      // «Concludi», dalla sua scheda.
       const r = therapyId
         ? await api<{ id: string }>(`/api/pazienti/${id}/terapie/${therapyId}`, {
             method: 'PUT',
             body,
           })
-        : await api<{ id: string }>(`/api/pazienti/${id}/terapie`, { method: 'POST', body });
+        : await api<{ id: string }>(`/api/pazienti/${id}/terapie`, {
+            method: 'POST',
+            body: d.concluded ? { ...body, concluded: true } : body,
+          });
       resetDraft();
       void navigate(`/pazienti/${id}/terapie/${r.id}`, {
-        state: { avviso: therapyId ? 'Scheda della terapia salvata.' : 'Terapia aggiunta.' },
+        state: {
+          avviso: therapyId
+            ? 'Scheda della terapia salvata.'
+            : d.concluded
+              ? 'Terapia conclusa registrata.'
+              : 'Terapia aggiunta.',
+        },
       });
     } catch (e) {
       setError(e instanceof ApiError ? e : new ApiError(0, 'Salvataggio non riuscito'));
@@ -626,6 +676,25 @@ export function TherapyForm() {
         }
       />
       <PatientBanner patient={p} summary={summary} />
+      {baseOutcome === 'applicato' && fromPast && (
+        <Notice kind="info">
+          Farmaco di una ricetta fatta con un altro programma, con i dati della banca dati in vigore
+          oggi (AIC <span className="codice">{baseAic}</span>). Completa come si prende: la
+          posologia della ricetta di prima non si copia.
+        </Notice>
+      )}
+      {baseOutcome === 'sconosciuto' && (
+        <Notice kind="avviso">
+          Il codice AIC <span className="codice">{baseAic}</span> non è nella banca dati dei farmaci
+          in vigore oggi: non si può usare come base. Scegli il farmaco qui sotto.
+        </Notice>
+      )}
+      {baseOutcome === 'tenuto' && (
+        <Notice kind="avviso">
+          C’era già una scheda nuova iniziata con «{d.drugName}»: è rimasta com’era. Per partire dal
+          farmaco della ricetta fatta con un altro programma, annulla le modifiche e riprova.
+        </Notice>
+      )}
 
       <form
         className="scheda-terapia"
@@ -794,6 +863,21 @@ export function TherapyForm() {
                   </div>
                 ))}
               </fieldset>
+              {!therapyId && (
+                <Switch
+                  id="giaConclusa"
+                  checked={d.concluded}
+                  onChange={(v) => update({ concluded: v })}
+                  name="Terapia già conclusa"
+                  explanation="Si registra per lo storico, con la data di fine vera: non si ripete e non va nello schema orario."
+                />
+              )}
+              {therapyId && d.concluded && (
+                <p className="aiuto">
+                  Terapia conclusa: la data di fine resta obbligatoria. Per riprendere lo stesso
+                  farmaco serve una terapia nuova.
+                </p>
+              )}
               <div className="campi-riga">
                 <Field id="startOn" label="Dal" error={errors.startOn}>
                   <input
@@ -805,13 +889,20 @@ export function TherapyForm() {
                 </Field>
                 <Field
                   id="endOn"
-                  label={d.kind === 'cycle' ? 'Al (obbligatoria per il ciclo)' : 'Al (facoltativa)'}
+                  label={
+                    d.concluded
+                      ? 'Conclusa il (obbligatoria)'
+                      : d.kind === 'cycle'
+                        ? 'Al (obbligatoria per il ciclo)'
+                        : 'Al (facoltativa)'
+                  }
                   error={errors.endOn}
                 >
                   <input
                     {...described('endOn', errors.endOn)}
                     type="date"
                     value={d.endOn}
+                    max={d.concluded ? studioToday() : undefined}
                     onChange={(e) => update({ endOn: e.target.value })}
                   />
                 </Field>
@@ -1087,5 +1178,93 @@ export function TherapyForm() {
         </div>
       </form>
     </>
+  );
+}
+
+/**
+ * Conclusione di una terapia in corso o sospesa, con la data di fine vera (tappa 15). Non è la
+ * sospensione: la terapia conclusa non si riprende; resta tra i farmaci prescritti con il suo
+ * storico, e per lo stesso farmaco serve una terapia nuova.
+ */
+export function ConcludeTherapyPanel({
+  patientId,
+  therapy,
+  onDone,
+  onCancel,
+}: {
+  patientId: string;
+  therapy: TherapyFull;
+  onDone: (message: string) => void;
+  onCancel: () => void;
+}) {
+  const today = studioToday();
+  const [end, setEnd] = useState(today);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  /** Gli stessi controlli del servizio, detti prima di mandare. */
+  function problem(): string | null {
+    if (!end) return 'Scrivi la data di fine.';
+    if (end > today)
+      return 'La data di fine non può essere nel futuro: una fine prevista va nel campo «Al» della scheda.';
+    if (end < therapy.startOn) return 'La fine non può venire prima dell’inizio.';
+    return null;
+  }
+
+  return (
+    <form
+      className="riquadro pannello-sospensione"
+      aria-labelledby="titolo-conclusione"
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        const p = problem();
+        if (p) {
+          setError(new ApiError(400, p));
+          return;
+        }
+        setBusy(true);
+        setError(null);
+        api(`/api/pazienti/${patientId}/terapie/${therapy.id}/concludi`, {
+          method: 'POST',
+          body: { fine: end },
+        })
+          .then(() =>
+            onDone(
+              `Terapia conclusa il ${date(end)}: è tra le terapie sospese o concluse dei farmaci prescritti.`,
+            ),
+          )
+          .catch((err: unknown) =>
+            setError(err instanceof ApiError ? err : new ApiError(0, 'Servizio non raggiungibile')),
+          )
+          .finally(() => setBusy(false));
+      }}
+    >
+      <h2 id="titolo-conclusione">Concludi la terapia</h2>
+      <p className="aiuto">
+        La terapia finisce: non si ripete, non va nello schema orario e resta tra i farmaci
+        prescritti con il suo storico. Non è una sospensione: una terapia conclusa non si riprende.
+      </p>
+      <div className="campo campo-stretto">
+        <label htmlFor="fine-terapia">Conclusa il</label>
+        <input
+          id="fine-terapia"
+          type="date"
+          min={therapy.startOn}
+          max={today}
+          value={end}
+          onChange={(e) => setEnd(e.target.value)}
+        />
+      </div>
+      <ErrorMessage error={error} />
+      <div className="azioni">
+        <button type="submit" className="pulsante pulsante-primario" disabled={busy}>
+          <Icon name="fatto" /> <span>Concludi la terapia</span>
+        </button>
+        <button type="button" className="pulsante" onClick={onCancel}>
+          <Icon name="annulla" /> <span>Non concludere</span>
+        </button>
+      </div>
+    </form>
   );
 }
