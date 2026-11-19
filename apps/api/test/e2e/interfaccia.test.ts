@@ -1782,10 +1782,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     for (const id of ids.slice(0, 20)) {
       await page.goto(`${base}/pazienti/${id}`);
       await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+      // La cartella entra nella barra con un effetto di React, subito dopo la pagina: ricaricando
+      // la pagina successiva troppo presto (WebKit) la registrazione andava persa. Nell'uso vero
+      // non si ricarica: la barra resta in memoria. Si aspetta che la barra la mostri.
+      await tab(id).waitFor();
     }
     // La barra si aggiorna dopo la pagina: con i motori più lenti (WebKit) si aspetta un attimo.
     await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
-    await expect(activeVisible()).resolves.toBe(true);
+    await expect.poll(activeVisible, { timeout: 5000 }).toBe(true);
     await check(page, 'venti cartelle aperte', true);
 
     // La ventunesima: si chiude quella usata meno di recente, con l'avviso.
@@ -1794,7 +1798,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByText(`chiusa quella di ${names.get(ids[0]!)}, usata meno di recente`).waitFor();
     await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
     await expect(tab(ids[0]!).count()).resolves.toBe(0);
-    await expect(activeVisible()).resolves.toBe(true);
+    await expect.poll(activeVisible, { timeout: 5000 }).toBe(true);
     for (const v of TABLETS) {
       await page.setViewportSize(v);
       // Il riposizionamento segue l'evento di ridimensionamento: si aspetta un attimo.
@@ -1828,7 +1832,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe(
       'Nota lasciata a metà.',
     );
-    await expect(activeVisible()).resolves.toBe(true);
+    await expect.poll(activeVisible, { timeout: 5000 }).toBe(true);
     // Registrata, la bozza non resta: tornando, il modulo è vuoto.
     await page.getByRole('button', { name: 'Registra', exact: true }).click();
     await page.getByText('Voce registrata.').waitFor();

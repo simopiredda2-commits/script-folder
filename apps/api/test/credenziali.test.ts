@@ -341,7 +341,13 @@ describe('credenziali dei servizi e secondo fattore (D100–D102)', () => {
       'sistema_ts:cancellate',
     ])
       expect(ev, e).toContain(e);
-    const dump = JSON.stringify(await t.db.select().from(serviceCredentialEvent));
+    // Solo i campi che potrebbero portare valori: identificativi e date sono casuali, e un UUID
+    // può contenere «4321» per caso (prova che falliva una volta ogni tanto in CI).
+    const dump = JSON.stringify(
+      (await t.db.select().from(serviceCredentialEvent)).map(
+        ({ service, event, workstation, detail }) => ({ service, event, workstation, detail }),
+      ),
+    );
     expect(dump).not.toMatch(/parola|4321|9876|RUPAR-PROVA|TS-PROVA/);
     await rejectsWith(
       t.db.execute(sql`update service_credential_event set event = 'x'`),
