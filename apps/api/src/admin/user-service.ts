@@ -130,7 +130,8 @@ export const ARCHIVE_LOCK_TIMEOUT = '2s';
 export const ARCHIVE_BUSY_REFUSAL =
   'Nell’archivio del medico è in corso una scrittura (per esempio un’importazione): riprova tra qualche minuto.';
 /** I ruoli sono cambiati tra la prima lettura e il blocco: la richiesta si ripete. */
-export const CHANGED_MEANWHILE = 'L’utente è cambiato mentre lo modificavi: rileggi i suoi dati e riprova';
+export const CHANGED_MEANWHILE =
+  'L’utente è cambiato mentre lo modificavi: rileggi i suoi dati e riprova';
 
 const LAST_OWNER =
   'È l’ultimo medico titolare attivo e confermato dello studio: senza di lui, dal programma, nessuno conferma gli utenti con i dati dei pazienti';

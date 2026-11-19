@@ -331,6 +331,10 @@ describe('codici e password mandati insieme (seconda revisione, punto 5)', () =>
     let since = await h.lastSeq();
     await Promise.all(['prima', 'seconda'].map((p) => h.access(victim.username, `sbagliata ${p}`)));
     expect(await h.userRow(victim.id)).toMatchObject({ failedLogins: 2, lockedUntil: null });
+    expect((await h.logSince(victim.id, 'accesso_fallito', since)).map((d) => d.motivo)).toEqual([
+      'password errata',
+      'password errata',
+    ]);
     // Tre insieme, la soglia: bloccata.
     await h.resetUser(victim.id);
     await Promise.all([1, 2, 3].map((i) => h.access(victim.username, `sbagliata ${i}`)));
