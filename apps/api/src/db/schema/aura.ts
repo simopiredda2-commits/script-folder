@@ -1,5 +1,6 @@
 import type { AuraRegistry } from '@mmg/integrations';
 import {
+  date,
   index,
   integer,
   jsonb,
@@ -11,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { patient } from './patients';
 import { studio } from './studio';
+import { appUser, archive } from './users';
 
 /**
  * Collegamento di un paziente con AURA, l'anagrafe regionale degli assistiti (D197): l'identificativo
@@ -100,4 +102,48 @@ export const auraSyncRunStudio = pgTable(
     failed: integer().notNull().default(0),
   },
   (t) => [uniqueIndex().on(t.runId, t.studioId)],
+);
+
+/**
+ * Nuovi assistiti segnalati da AURA (D199): chi ha scelto un medico dello studio e non è ancora nel
+ * suo archivio. Una riga per studio e assistito. Medico o segreteria lo registrano con un clic dalla
+ * pagina Oggi, o scelgono di non registrarlo. Le righe non si cancellano: cambia lo stato, con lo
+ * storico (trigger nella migrazione).
+ */
+export const auraNewPatient = pgTable(
+  'aura_new_patient',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    studioId: uuid()
+      .notNull()
+      .references(() => studio.id),
+    /** L'archivio del medico scelto, dove il paziente entra. */
+    archiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
+    doctorUserId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    auraId: text().notNull(),
+    fiscalCode: text().notNull(),
+    lastName: text().notNull(),
+    firstName: text().notNull(),
+    birthDate: date().notNull(),
+    /** La scelta del medico come la dice AURA. */
+    chosenOn: date().notNull(),
+    expiresOn: date(),
+    /** Anagrafica di AURA quando è arrivata la notifica (residenza, ASL, …). */
+    registry: jsonb().$type<AuraRegistry>(),
+    /**
+     * «da_registrare»; «registrato» (con il paziente); «non_registrato» (scelto da medico o
+     * segreteria); «superato» (la scelta non vale più, o il paziente è già nell'archivio).
+     */
+    status: text().notNull(),
+    patientId: uuid().references(() => patient.id),
+    /** L'ultima volta che AURA l'ha segnalato. */
+    notifiedAt: timestamp({ withTimezone: true }).notNull(),
+    decidedBy: uuid().references(() => appUser.id),
+    decidedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [uniqueIndex().on(t.studioId, t.auraId), index().on(t.archiveId, t.status)],
 );

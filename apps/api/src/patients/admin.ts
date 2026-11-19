@@ -355,8 +355,15 @@ export async function createPatient(
   actor: Actor,
   body: unknown,
   now: Date,
-  /** Altro da scrivere nel registro (per esempio la fonte «AURA», D199). */
-  extraDetails: Record<string, unknown> = {},
+  options: {
+    /** Altro da scrivere nel registro (per esempio la fonte «AURA», D199). */
+    details?: Record<string, unknown>;
+    /**
+     * Paziente temporaneo arrivato da AURA (D199): la sua scelta, con la scadenza, la porta il
+     * collegamento con AURA subito dopo; qui non si chiede.
+     */
+    choiceFromAura?: boolean;
+  } = {},
 ): Promise<{ id: string; avvisi: string[] }> {
   const { archivioId } = archiveOnly.parse(body ?? {});
   const writable = await writableArchives(db, actor, now);
@@ -398,7 +405,7 @@ export async function createPatient(
   assertNoIssues([
     ...lifeDatesIssues(input.identita.nascita, dati.decedutoIl, today),
     ...patientAdminIssues(dati, today),
-    ...(temporary && !input.sceltaTemporanea
+    ...(temporary && !input.sceltaTemporanea && !options.choiceFromAura
       ? ['Per il paziente temporaneo serve la scadenza della scelta']
       : []),
     ...(!temporary && input.sceltaTemporanea
@@ -452,7 +459,7 @@ export async function createPatient(
           motivo: decision.reason,
           archivio: target,
           ...(choice ? { sceltaTemporanea: { dal: choice.dal, scadenza: choice.scadenza } } : {}),
-          ...extraDetails,
+          ...options.details,
         },
       });
       return row!.id;

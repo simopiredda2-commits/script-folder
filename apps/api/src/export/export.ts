@@ -75,6 +75,8 @@ export const HANDLED_SEPARATELY: Record<string, string> = {
     'i file degli allegati: sezione allegati del JSON, cartella allegati/ nello ZIP',
   pss_file:
     'i PDF del Profilo Sanitario Sintetico: sezione documenti_profilo del JSON, cartella profilo-sanitario/ nello ZIP',
+  aura_new_patient:
+    'esportata per archivio: i nuovi assistiti segnalati da AURA (D199), anche quelli non registrati',
 };
 
 type Row = Record<string, unknown>;
@@ -161,6 +163,11 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
   tables.archive_grant = await rows(
     db,
     sql`select * from archive_grant where archive_id = ${archiveId} order by valid_from, id`,
+  );
+  // Nuovi assistiti segnalati da AURA per questo archivio (D199), con l'esito di ognuno.
+  tables.aura_new_patient = await rows(
+    db,
+    sql`select * from aura_new_patient where archive_id = ${archiveId} order by id`,
   );
   // Segreteria confermata o tolta dal titolare per questo archivio (D181): tutte le decisioni.
   tables.archive_secretary = await rows(

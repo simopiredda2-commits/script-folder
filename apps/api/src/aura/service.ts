@@ -7,6 +7,7 @@ import {
   archive,
   auraChange,
   auraLink,
+  auraNewPatient,
   auraSyncRun,
   auraSyncRunStudio,
   doctorProfile,
@@ -473,6 +474,120 @@ export function createAuraService(deps: AuraDeps) {
     ]).finally(() => clearTimeout(timer));
   }
 
+  /**
+   * Nuovi assistiti (D199). Per un assistito notificato da AURA si guardano le sue scelte che valgono
+   * oggi o più avanti, con un medico titolare di uno studio del servizio (riconosciuto dal codice
+   * fiscale, con il suo archivio). Nello studio dove il paziente c'è già (stesso codice fiscale) lo
+   * si allinea; altrimenti entra fra i nuovi assistiti dell'archivio del medico, da registrare. Una
+   * scelta che non vale più, o il decesso, lo toglie dall'elenco. Un assistito che medico o segreteria
+   * hanno scelto di non registrare non si ripropone, finché AURA non manda una scelta nuova.
+   * Un controllo alla volta per assistito, anche con più processi.
+   */
+  async function discover(auraId: string, synced: ReadonlySet<string> = new Set()) {
+    if (!auraAvailable(deps)) return;
+    const toSync: string[] = [];
+    await withActor(db, null, async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`aura-nuovo:${auraId}`}, 0))`,
+      );
+      const fetched = await gateway.getProfile(auraId);
+      if (fetched.outcome !== 'found') return;
+      const profile = fetched.profile;
+      const at = deps.now();
+      const today = studioDate(at);
+      const fiscalCode = profile.fiscalCode.toUpperCase();
+      const doctors = await tx
+        .select({
+          userId: doctorProfile.userId,
+          fiscalCode: doctorProfile.fiscalCode,
+          studioId: appUser.studioId,
+          archiveId: archive.id,
+        })
+        .from(doctorProfile)
+        .innerJoin(appUser, eq(appUser.id, doctorProfile.userId))
+        .innerJoin(archive, eq(archive.ownerUserId, doctorProfile.userId))
+        .where(isNotNull(doctorProfile.fiscalCode));
+      const byCf = new Map(doctors.map((d) => [d.fiscalCode!.toUpperCase(), d]));
+      // Per ogni studio la scelta più recente che vale; nessuna se AURA dice il decesso.
+      const current = new Map<
+        string,
+        { doctor: (typeof doctors)[number]; choice: AuraProfile['choices'][number] }
+      >();
+      if (!profile.registry?.deceasedOn)
+        for (const c of profile.choices) {
+          const d = byCf.get(c.doctorFiscalCode.toUpperCase());
+          const valid = (!c.endedOn || c.endedOn > today) && (!c.expiresOn || c.expiresOn >= today);
+          if (!d || !valid) continue;
+          const seen = current.get(d.studioId);
+          if (!seen || seen.choice.chosenOn < c.chosenOn)
+            current.set(d.studioId, { doctor: d, choice: c });
+        }
+      const rows = await tx.select().from(auraNewPatient).where(eq(auraNewPatient.auraId, auraId));
+      const withdraw = (id: string) =>
+        tx
+          .update(auraNewPatient)
+          .set({ status: 'superato', notifiedAt: at })
+          .where(and(eq(auraNewPatient.id, id), eq(auraNewPatient.status, 'da_registrare')));
+      for (const [studioId, { doctor, choice }] of current) {
+        const row = rows.find((r) => r.studioId === studioId);
+        const [already] = await tx
+          .select({ id: patient.id })
+          .from(patient)
+          .where(and(eq(patient.studioId, studioId), eq(patient.fiscalCode, fiscalCode)));
+        if (already) {
+          // Il paziente c'è già: si collega e si allinea (dopo, fuori da questo blocco).
+          if (!synced.has(already.id)) toSync.push(already.id);
+          if (row) await withdraw(row.id);
+          continue;
+        }
+        const values = {
+          archiveId: doctor.archiveId,
+          doctorUserId: doctor.userId,
+          fiscalCode,
+          lastName: profile.lastName,
+          firstName: profile.firstName,
+          birthDate: profile.birthDate,
+          chosenOn: choice.chosenOn,
+          expiresOn: choice.expiresOn,
+          registry: profile.registry ?? null,
+        };
+        if (!row) {
+          await tx
+            .insert(auraNewPatient)
+            .values({ ...values, studioId, auraId, status: 'da_registrare', notifiedAt: at });
+          continue;
+        }
+        if (row.status === 'registrato') continue;
+        // Una scelta nuova (altro medico o altra data) si ripropone, anche se la prima no.
+        const sameChoice = row.doctorUserId === doctor.userId && row.chosenOn === choice.chosenOn;
+        const status =
+          row.status === 'non_registrato' && sameChoice ? 'non_registrato' : 'da_registrare';
+        const changed =
+          status !== row.status ||
+          row.archiveId !== values.archiveId ||
+          !sameChoice ||
+          row.expiresOn !== values.expiresOn ||
+          row.lastName !== values.lastName ||
+          row.firstName !== values.firstName ||
+          row.birthDate !== values.birthDate ||
+          !sameRegistry(row.registry, values.registry);
+        if (changed)
+          await tx
+            .update(auraNewPatient)
+            .set({
+              ...values,
+              status,
+              notifiedAt: at,
+              ...(status === 'da_registrare' ? { decidedBy: null, decidedAt: null } : {}),
+            })
+            .where(eq(auraNewPatient.id, row.id));
+      }
+      // Dove la scelta non vale più, l'assistito esce dall'elenco.
+      for (const row of rows) if (!current.has(row.studioId)) await withdraw(row.id);
+    });
+    for (const id of toSync) await syncPatient(id, 'notifica');
+  }
+
   /** Differenze di oggi fra l'anagrafica di AURA e la cartella del paziente. */
   async function differences(patientId: string): Promise<RegistryDifference[]> {
     const [row] = await db
@@ -489,6 +604,24 @@ export function createAuraService(deps: AuraDeps) {
     syncPatient,
     refreshIfStale,
     differences,
+    discover,
+
+    /** Nuovi assistiti da registrare negli archivi indicati (D199), con il nome del medico. */
+    async newPatientsFor(studioId: string, archiveIds: readonly string[]) {
+      if (archiveIds.length === 0) return [];
+      return db
+        .select({ c: auraNewPatient, doctor: appUser.displayName })
+        .from(auraNewPatient)
+        .innerJoin(appUser, eq(appUser.id, auraNewPatient.doctorUserId))
+        .where(
+          and(
+            eq(auraNewPatient.studioId, studioId),
+            inArray(auraNewPatient.archiveId, [...archiveIds]),
+            eq(auraNewPatient.status, 'da_registrare'),
+          ),
+        )
+        .orderBy(auraNewPatient.lastName, auraNewPatient.firstName);
+    },
 
     /** Valori di AURA da non usare: non si ripropongono finché AURA non ne manda altri. */
     async dismiss(patientId: string, entries: readonly { campo: string; inAura: string }[]) {
@@ -596,9 +729,9 @@ export function createAuraService(deps: AuraDeps) {
     },
 
     /**
-     * Il giro di ogni notte, o dal server: i pazienti in carico del servizio, e i revocati già
-     * collegati ad AURA (tornano in carico con una scelta nuova, D198). I numeri restano in tutto e
-     * studio per studio: lo stato del servizio di uno studio mostra solo i suoi.
+     * Il giro di ogni notte, o dal server: i pazienti in carico e i temporanei del servizio (D199), e
+     * i revocati già collegati ad AURA (tornano in carico con una scelta nuova, D198). I numeri
+     * restano in tutto e studio per studio: lo stato del servizio di uno studio mostra solo i suoi.
      */
     async syncAll(trigger: 'notte' | 'comando') {
       const startedAt = deps.now();
@@ -614,6 +747,8 @@ export function createAuraService(deps: AuraDeps) {
           .where(
             or(
               eq(patient.status, 'active'),
+              // I temporanei hanno scelte a tempo, anche da AURA (D199): si allineano anche loro.
+              eq(patient.status, 'temporary'),
               and(eq(patient.status, 'revoked'), isNotNull(auraLink.auraId)),
             ),
           );
@@ -684,7 +819,8 @@ export function createAuraService(deps: AuraDeps) {
 
     /**
      * Ascolta le variazioni di AURA: per ogni assistito notificato si controllano i pazienti
-     * collegati. Restituisce la funzione che smette di ascoltare.
+     * collegati. Una scelta notificata, o un assistito già fra i nuovi, passa anche dalla ricerca dei
+     * nuovi assistiti (D199). Restituisce la funzione che smette di ascoltare.
      */
     listen(onError: (err: unknown) => void = () => undefined): () => void {
       return gateway.onNotification((n) => {
@@ -694,6 +830,16 @@ export function createAuraService(deps: AuraDeps) {
             .from(auraLink)
             .where(eq(auraLink.auraId, n.auraId));
           for (const r of rows) await syncPatient(r.patientId, 'notifica');
+          const known =
+            n.event === 'scelta' ||
+            (
+              await db
+                .select({ id: auraNewPatient.id })
+                .from(auraNewPatient)
+                .where(eq(auraNewPatient.auraId, n.auraId))
+                .limit(1)
+            ).length > 0;
+          if (known) await discover(n.auraId, new Set(rows.map((r) => r.patientId)));
         })().catch(onError);
       });
     },
