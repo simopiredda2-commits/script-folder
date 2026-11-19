@@ -24,4 +24,31 @@ export const studio = pgTable('studio', {
   maxFailedLogins: integer().default(5),
   /** Durata del blocco temporaneo dopo troppi tentativi falliti: 15 minuti (D29). */
   failedLoginLockMinutes: integer().default(15),
+  /**
+   * Indirizzo completo dello studio (tappa 14): `address` è via e numero civico, poi CAP, comune e
+   * provincia. Vanno sulla copia del certificato INPS per la visita in studio (D106) e sui documenti.
+   */
+  postalCode: text(),
+  municipality: text(),
+  province: text(),
+  phone: text(),
+  email: text(),
+  pec: text(),
+  /**
+   * Intestazione dello studio, una riga per riga (fino a 6): l'amministratore la imposta
+   * (requisiti, «Utenti e ruoli»); vale quando il medico non ha la sua (D145, D163).
+   */
+  headerText: text(),
+  /** Tempo massimo di attesa dell'invio a SAR, Sistema TS e INPS, in secondi (D94: 6–8). */
+  sendTimeoutSeconds: integer().notNull().default(8),
+  /**
+   * Avvisi sugli accessi anomali (Garante, linee guida sul dossier sanitario, par. 7, lett. c):
+   * cartelle diverse aperte da un utente in un giorno, fascia oraria anomala (dalle ore … alle
+   * ore …), consultazioni dell'AFT di un collega in un giorno. Vuoti: valori da completare, avvisi
+   * spenti (tappa 14).
+   */
+  alertDailyRecords: integer(),
+  alertNightFromHour: integer(),
+  alertNightToHour: integer(),
+  alertAftDaily: integer(),
 });

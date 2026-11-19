@@ -34,6 +34,7 @@ import type {
 } from '@mmg/integrations';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
+import { formatStudioAddress, secondsText, studioSendTimeoutMs } from '../admin/studio-service';
 import type { AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import type { createCredentialService } from '../credentials/service';
@@ -87,11 +88,13 @@ export interface CertificateDeps {
   /** Banca dati dei comuni, per la provincia di nascita sulla copia. */
   reference?: Pick<ReferenceData, 'municipality'>;
   now?: () => Date;
-  /** Tempo massimo di attesa dell'INPS (D105): per difetto lo stesso delle ricette, 8 secondi. */
+  /**
+   * Tempo massimo di attesa dell'INPS (D105). Per difetto lo stesso delle ricette: l'impostazione
+   * dello studio, letta a ogni chiamata (`studio.sendTimeoutSeconds`, 8 secondi per difetto); un
+   * valore dato qui (lo usano le prove) vale sopra quello dello studio.
+   */
   sendTimeoutMs?: number;
 }
-
-export const DEFAULT_CERTIFICATE_TIMEOUT_MS = 8000;
 
 const addressBody = z
   .object({
@@ -432,14 +435,22 @@ export function createCertificateService(deps: CertificateDeps) {
       }
     }
     const [st] = await db
-      .select({ address: studio.address })
+      .select({
+        address: studio.address,
+        postalCode: studio.postalCode,
+        municipality: studio.municipality,
+        province: studio.province,
+      })
       .from(studio)
       .where(eq(studio.id, actor.studioId));
     const availability = c.availability as Availability | null;
-    // Luogo del fac-simile: lo studio per la visita ambulatoriale, la casa per la domiciliare (D106).
+    // Luogo del fac-simile: l'indirizzo completo dello studio per la visita ambulatoriale (via e
+    // civico, CAP, comune, provincia), il comune della casa per la domiciliare (D106).
     const place =
       c.visit === 'A'
-        ? (st?.address ?? null)
+        ? st
+          ? formatStudioAddress(st)
+          : null
         : c.visit === 'D'
           ? (availability?.address?.town ?? (c.residence as CertificateAddress).town)
           : null;
@@ -471,9 +482,12 @@ export function createCertificateService(deps: CertificateDeps) {
     };
   }
 
-  /** Risposta entro il tempo massimo, altrimenti esito incerto. */
-  async function inTime(call: () => Promise<SickLeaveResult>): Promise<SickLeaveResult> {
-    const ms = deps.sendTimeoutMs ?? DEFAULT_CERTIFICATE_TIMEOUT_MS;
+  /** Risposta entro il tempo massimo dello studio, altrimenti esito incerto. */
+  async function inTime(
+    actor: Actor,
+    call: () => Promise<SickLeaveResult>,
+  ): Promise<SickLeaveResult> {
+    const ms = deps.sendTimeoutMs ?? (await studioSendTimeoutMs(db, actor.studioId));
     let timer: NodeJS.Timeout | undefined;
     try {
       return await Promise.race([
@@ -483,7 +497,7 @@ export function createCertificateService(deps: CertificateDeps) {
             () =>
               ok({
                 outcome: 'timeout',
-                message: `Nessuna risposta entro ${ms / 1000} secondi: non si sa se è arrivato all’INPS`,
+                message: `Nessuna risposta entro ${secondsText(ms)}: non si sa se è arrivato all’INPS`,
               }),
             ms,
           );
@@ -587,7 +601,7 @@ export function createCertificateService(deps: CertificateDeps) {
       },
     };
     const started = Date.now();
-    let result = await inTime(() => deps.gateway.send(message, auth));
+    let result = await inTime(actor, () => deps.gateway.send(message, auth));
     const authProblem = result.outcome === 'rejected' ? (result.authProblem ?? null) : null;
     if (result.outcome === 'rejected' && authProblem) {
       await deps.credentials.authRefused(
@@ -665,7 +679,7 @@ export function createCertificateService(deps: CertificateDeps) {
       doctor: await doctorOf(actor),
     };
     const started = Date.now();
-    const result = await inTime(() => deps.gateway.rectify(request, auth));
+    const result = await inTime(actor, () => deps.gateway.rectify(request, auth));
     await record(actor, c.id, 'rettifica', request, result, started);
     if (result.outcome !== 'accepted') return refused(actor, result);
     const [created] = await withActor(db, actor.userId, async (tx) => {
@@ -724,7 +738,7 @@ export function createCertificateService(deps: CertificateDeps) {
       doctor: await doctorOf(actor),
     };
     const started = Date.now();
-    const result = await inTime(() => deps.gateway.cancel(request, auth));
+    const result = await inTime(actor, () => deps.gateway.cancel(request, auth));
     await record(actor, c.id, 'annullamento', request, result, started);
     if (result.outcome !== 'accepted') return refused(actor, result);
     await withActor(db, actor.userId, (tx) =>

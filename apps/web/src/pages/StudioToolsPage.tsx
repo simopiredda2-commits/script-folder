@@ -4,7 +4,16 @@ import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common'
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
+import { toolsSectionsFor } from '../lib/tools-sections';
 import { useApi } from '../lib/useApi';
+import { AdminLogSection } from './admin/AdminLogSection';
+import { ConfirmUsersSection } from './admin/ConfirmUsersSection';
+import { ImportSection } from './admin/ImportSection';
+import { ListsSection } from './admin/ListsSection';
+import { PrintSection } from './admin/PrintSection';
+import { ServiceSection } from './admin/ServiceSection';
+import { StudioSection } from './admin/StudioSection';
+import { UsersSection } from './admin/UsersSection';
 import { AftSection } from './AftSection';
 import { DataUpdatesSection } from './DataUpdatesSection';
 import { LayoutSection, TemplatesSection } from './TemplatesTools';
@@ -73,14 +82,6 @@ function initial(s: Settings | null): Record<FieldKey, string> {
   };
 }
 
-const SECTIONS = [
-  { key: 'modelli', label: 'Modelli dei certificati', doctorOnly: false },
-  { key: 'impaginazione', label: 'Impaginazione', doctorOnly: true },
-  { key: 'fascicolo', label: 'Fascicolo sanitario', doctorOnly: false },
-  { key: 'banche-dati', label: 'Banche dati', doctorOnly: false },
-  { key: 'aft', label: 'AFT', doctorOnly: true },
-] as const;
-
 /**
  * Strumenti dello studio: modelli dei certificati e impaginazione del medico (tappa 13),
  * impostazioni del Fascicolo Sanitario Elettronico (tappa 11), aggiornamento delle banche dati
@@ -88,10 +89,12 @@ const SECTIONS = [
  * valori dell'accreditamento presso il Gateway: le inserisce l'amministratore, gli altri le leggono.
  */
 export function StudioToolsPage() {
-  const { isDoctor } = useSession();
+  const { state } = useSession();
   const [params, setParams] = useSearchParams();
-  const sections = SECTIONS.filter((x) => !x.doctorOnly || isDoctor);
-  const current = sections.find((x) => x.key === params.get('sezione')) ?? sections[0]!;
+  const roles = state.status === 'ready' ? state.me.ruoli.map((r) => r.codice) : [];
+  const sections = toolsSectionsFor(roles);
+  const current = sections.find((x) => x.key === params.get('sezione')) ?? sections[0];
+  if (!current) return <PageHeader title="Strumenti dello studio" />;
   return (
     <>
       <PageHeader title="Strumenti dello studio" />
@@ -108,6 +111,14 @@ export function StudioToolsPage() {
           </button>
         ))}
       </div>
+      {current.key === 'studio' && <StudioSection />}
+      {current.key === 'utenti' && <UsersSection />}
+      {current.key === 'conferme' && <ConfirmUsersSection />}
+      {current.key === 'stampa' && <PrintSection />}
+      {current.key === 'elenchi' && <ListsSection />}
+      {current.key === 'registro' && <AdminLogSection />}
+      {current.key === 'servizio' && <ServiceSection />}
+      {current.key === 'importazione' && <ImportSection />}
       {current.key === 'modelli' && <TemplatesSection />}
       {current.key === 'aft' && <AftSection />}
       {current.key === 'impaginazione' && <LayoutSection />}

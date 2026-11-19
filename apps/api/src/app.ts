@@ -3,11 +3,17 @@ import { PRODUCT_NAME } from '@mmg/brand';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
-import { createAuthService, type Actor } from './auth/service';
+import {
+  type Actor,
+  allowedBeforePasswordChange,
+  createAuthService,
+  MUST_CHANGE_PASSWORD_ERROR,
+  SERVICE_BUSY_ERROR,
+} from './auth/service';
 import { createCertificateService } from './certificates/service';
 import type { Config } from './config';
 import { createCredentialService } from './credentials/service';
-import type { Database } from './db/client';
+import { isPoolTimeout, type Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
@@ -29,6 +35,13 @@ import { registerReminderRoutes } from './http/reminder-routes';
 import { registerTherapyRoutes } from './http/therapy-routes';
 import { registerTodayRoutes } from './http/today-routes';
 import { registerTemplateRoutes } from './http/template-routes';
+import { registerArchiveAdminRoutes } from './admin/archive-routes';
+import { registerStudioListRoutes } from './admin/list-routes';
+import { registerPrintRoutes } from './admin/print-routes';
+import { registerStudioAdminRoutes } from './admin/studio-routes';
+import { registerUserAdminRoutes } from './admin/user-routes';
+import { registerPatientAdminRoutes } from './http/patient-admin-routes';
+import { registerImportRoutes } from './import/routes';
 import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
@@ -77,7 +90,8 @@ declare module 'fastify' {
 
 export interface AppDeps {
   db: Database;
-  config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'>;
+  config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'> &
+    Partial<Pick<Config, 'environment' | 'trustedProxies'>>;
   now?: () => Date;
   logger?: boolean;
   /**
@@ -135,7 +149,11 @@ export function buildApp({
   fse = defaultFse(now),
   referenceUpdates = new ReferenceUpdates(db, null, now ? { now } : {}),
 }: AppDeps): FastifyInstance {
-  const app = Fastify({ logger });
+  // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
+  // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
+  // cliente, scritto dal proxy fidato (tappa 14, revisione dei poteri dell'amministratore).
+  const trusted = config.trustedProxies ?? [];
+  const app = Fastify({ logger, trustProxy: trusted.length > 0 ? [...trusted] : false });
   const auth = createAuthService({
     db,
     encryptionKey: config.encryptionKey,
@@ -170,6 +188,12 @@ export function buildApp({
     if (err instanceof ZodError) {
       return reply.status(400).send({ errore: 'Dati non validi', dettagli: err.issues });
     }
+    // Tutte le connessioni del database occupate oltre l'attesa massima (db/client.ts): il servizio
+    // è occupato, non rotto. Chi chiede riprova; nei log solo il fatto.
+    if (isPoolTimeout(err)) {
+      req.log.warn('nessuna connessione libera al database entro l’attesa massima');
+      return reply.status(503).send({ errore: SERVICE_BUSY_ERROR });
+    }
     req.log.error(err);
     return reply.status(500).send({ errore: 'Errore interno' });
   });
@@ -183,6 +207,13 @@ export function buildApp({
     if (r.status === 'invalid') throw new HttpError(401, 'Sessione non valida o scaduta');
     if (r.status === 'locked') {
       throw new HttpError(423, 'Sessione bloccata per inattività: inserisci il codice a 6 cifre');
+    }
+    // Password temporanea (tappa 14): prima di ogni altra cosa, la password nuova.
+    if (
+      r.actor.mustChangePassword &&
+      !allowedBeforePasswordChange(req.method, req.routeOptions.url)
+    ) {
+      throw new HttpError(403, MUST_CHANGE_PASSWORD_ERROR, { devoCambiarePassword: true });
     }
     req.actor = r.actor;
   });
@@ -217,6 +248,22 @@ export function buildApp({
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
   registerAftRoutes(app, createAftService({ db, now: now ?? (() => new Date()) }));
+  // Strumenti e amministrazione dello studio (tappa 14).
+  const adminDeps = {
+    db,
+    now: now ?? (() => new Date()),
+    sessionMaxHours: config.sessionMaxHours,
+    referenceUpdates,
+    environment: config.environment ?? 'prova',
+  };
+  registerStudioAdminRoutes(app, adminDeps);
+  registerUserAdminRoutes(app, adminDeps);
+  registerPrintRoutes(app, adminDeps);
+  registerArchiveAdminRoutes(app, adminDeps);
+  registerStudioListRoutes(app, adminDeps);
+  // Pannello amministrativo del paziente e importazione da altri programmi (tappa 15).
+  registerPatientAdminRoutes(app, adminDeps);
+  registerImportRoutes(app, adminDeps);
   registerFollowUpRoutes(app, db, now ?? (() => new Date()));
   // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
   const reference = new ReferenceData(db, loadMappings(), {

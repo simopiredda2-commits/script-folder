@@ -46,6 +46,18 @@ export const createBody = z
     codice: z.string().trim().max(40).optional(),
   })
   .strict();
+/**
+ * Modifica dei dati dell'AFT (tappa 14): solo i campi presenti. ASL e codice vuoti si tolgono;
+ * il nome resta obbligatorio, con gli stessi limiti della creazione.
+ */
+export const updateBody = z
+  .object({
+    nome: z.string().trim().min(3).max(120).optional(),
+    asl: z.string().trim().max(120).optional(),
+    codice: z.string().trim().max(40).optional(),
+  })
+  .strict()
+  .refine((b) => Object.values(b).some((v) => v !== undefined), 'Niente da salvare');
 export const inviteBody = z.object({ codiceRegionale: z.string().trim().min(1).max(40) }).strict();
 export const sharingBody = z.object({ condivide: z.boolean() }).strict();
 export const activityBody = z
@@ -203,18 +215,86 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
     });
   }
 
+  /**
+   * Nome, ASL e codice dell'AFT (tappa 14): li cambia un medico titolare che ne fa parte. Il
+   * registro dice quali campi sono cambiati; i valori di prima restano nello storico della tabella.
+   * Ogni rifiuto va nel registro.
+   */
+  async function update(actor: Actor, aftId: string, body: z.infer<typeof updateBody>) {
+    const refuse = async (motivo: string, message: string) => {
+      await logAccess(db, {
+        studioId: actor.studioId,
+        userId: actor.userId,
+        action: 'impostazioni_aft',
+        outcome: 'negato',
+        workstation: actor.workstation,
+        details: { aft: aftId, azione: 'modifica', motivo },
+      });
+      return new HttpError(403, message);
+    };
+    if (!isOwnerDoctor(actor))
+      throw await refuse(
+        'non è un medico titolare',
+        'L’AFT riguarda i medici titolari dello studio',
+      );
+    if (!(await activeMember(db, aftId, actor.userId)))
+      throw await refuse(
+        'non è membro dell’AFT',
+        'I dati dell’AFT li cambia solo un medico che ne fa parte',
+      );
+    const [a] = await db.select().from(aft).where(eq(aft.id, aftId));
+    if (!a) throw new HttpError(404, 'AFT non trovata');
+    const next = {
+      name: body.nome ?? a.name,
+      asl: body.asl === undefined ? a.asl : body.asl || null,
+      code: body.codice === undefined ? a.code : body.codice || null,
+    };
+    const campi = (
+      [
+        ['nome', 'name'],
+        ['asl', 'asl'],
+        ['codice', 'code'],
+      ] as const
+    )
+      .filter(([, column]) => next[column] !== a[column])
+      .map(([field]) => field);
+    const view = (r: typeof a) => ({ id: r.id, nome: r.name, asl: r.asl, codice: r.code });
+    if (campi.length === 0) return view(a);
+    const saved = await withActor(db, actor.userId, async (tx) => {
+      const [row] = await tx.update(aft).set(next).where(eq(aft.id, aftId)).returning();
+      await logAccess(tx, {
+        studioId: actor.studioId,
+        userId: actor.userId,
+        action: 'impostazioni_aft',
+        outcome: 'riuscito',
+        workstation: actor.workstation,
+        details: { aft: aftId, azione: 'modifica', campi },
+      });
+      return row!;
+    });
+    return view(saved);
+  }
+
   /** Invito di un medico titolare, con il suo codice regionale. Entra solo se accetta. */
   async function invite(actor: Actor, aftId: string, body: z.infer<typeof inviteBody>) {
     requireOwnerDoctor(actor);
     if (!(await activeMember(db, aftId, actor.userId)))
       throw new HttpError(403, 'Invita nell’AFT solo chi ne fa parte');
     const doctors = await db
-      .select({ id: appUser.id, roles: appUser.roles, status: appUser.status })
+      .select({
+        id: appUser.id,
+        roles: appUser.roles,
+        status: appUser.status,
+        awaiting: appUser.awaitingConfirmation,
+      })
       .from(doctorProfile)
       .innerJoin(appUser, eq(appUser.id, doctorProfile.userId))
       .where(eq(doctorProfile.regionalCode, body.codiceRegionale));
+    // Solo titolari attivi e confermati (D179): un titolare creato dall'amministratore di un altro
+    // studio, e mai confermato, con il codice regionale di un medico non ne blocca gli inviti e non
+    // li riceve al suo posto (terza revisione).
     const titolari = doctors.filter(
-      (d) => d.roles.includes('owner_doctor') && d.status === 'active',
+      (d) => d.roles.includes('owner_doctor') && d.status === 'active' && !d.awaiting,
     );
     if (titolari.length > 1)
       throw new HttpError(409, 'Più medici con questo codice regionale: invito non possibile');
@@ -570,6 +650,7 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
   return {
     overview,
     create,
+    update,
     invite,
     respond,
     setSharing,

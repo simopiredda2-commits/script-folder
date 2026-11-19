@@ -125,6 +125,7 @@ export const TIMELINE_KIND: Record<string, string> = {
   lab_result: 'Esame di laboratorio',
   report: 'Referto',
   prescription: 'Ricetta',
+  historical_prescription: 'Ricetta di un altro programma',
 };
 
 export const REMINDER_CHANNEL: Record<string, string> = {

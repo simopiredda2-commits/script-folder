@@ -2,10 +2,12 @@ import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { ColourLegend, drugRowClass, OriginTag } from '../components/DrugColours';
 import { Icon } from '../components/Icon';
+import { PastPrescriptionsSection } from '../components/PastPrescriptions';
 import {
   countsText,
   historyHref,
   SERVICE_GROUPS,
+  type PastPrescription,
   type PrescribedDrug,
   type PrescribedService,
 } from '../components/Prescribed';
@@ -15,8 +17,26 @@ import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
 const THERAPY_STATUS: Record<string, string> = {
   suspended: 'Sospesa',
-  ended: 'Terminata',
+  ended: 'Conclusa',
 };
+
+/** Le ricette fatte con un altro programma che i due elenchi restituiscono (tappa 15). */
+interface WithPast {
+  ricettePassate?: PastPrescription[];
+  /** Il medico registra e annulla le ricette passate, come le voci cliniche. */
+  puoRegistrare?: boolean;
+}
+
+/** Il segno delle voci con ricette fatte con un altro programma: la parola, non solo il conto. */
+function PastTag({ c }: { c: PrescribedDrug | PrescribedService }) {
+  if (!c.altroProgramma?.ricette) return null;
+  return (
+    <span className="etichetta">
+      <Icon name="archivio" size={16} />{' '}
+      {c.ricette > 0 ? 'Anche con un altro programma' : 'Con un altro programma'}
+    </span>
+  );
+}
 
 function DrugRow({ d, patientId }: { d: PrescribedDrug; patientId: string }) {
   const t = d.terapia;
@@ -39,6 +59,7 @@ function DrugRow({ d, patientId }: { d: PrescribedDrug; patientId: string }) {
             <span className="etichetta">{THERAPY_STATUS[t.stato]}</span>
           )}
           <OriginTag origin={t?.tipologia ?? null} />
+          <PastTag c={d} />
           {d.notaAifa && <span className="etichetta">Nota {d.notaAifa}</span>}
           {t?.riservata && <span className="etichetta">Riservata</span>}
           {d.aic && <span className="codice tenue">AIC {d.aic}</span>}
@@ -47,6 +68,7 @@ function DrugRow({ d, patientId }: { d: PrescribedDrug; patientId: string }) {
           {countsText(d)}
           {d.ultimi12Mesi > 0 && ` · ${d.ultimi12Mesi} negli ultimi 12 mesi`}
           {t?.stato === 'active' && t.tipo === 'cycle' && t.fine && ` · fino al ${date(t.fine)}`}
+          {t?.stato === 'ended' && t.fine && ` · conclusa il ${date(t.fine)}`}
           {t?.motivoSospensione && ` · sospesa: ${t.motivoSospensione}`}
         </span>
       </div>
@@ -87,13 +109,16 @@ function DrugGroup({
 }
 
 /**
- * Tutti i farmaci prescritti al paziente (D152): in corso, sospesi o terminati, e quelli
- * prescritti senza una terapia in cartella. Ognuno apre il suo storico (D65).
+ * Tutti i farmaci prescritti al paziente (D152): in corso, sospesi o conclusi, e quelli
+ * prescritti senza una terapia in cartella. Ognuno apre il suo storico (D65). Dalla tappa 15 anche
+ * le ricette fatte con un altro programma, contate a parte e in un riquadro loro.
  */
 export function PrescribedDrugsPage() {
   const { id } = useParams<{ id: string }>();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
-  const drugs = useApi<{ farmaci: PrescribedDrug[] }>(`/api/pazienti/${id}/farmaci-prescritti`);
+  const drugs = useApi<{ farmaci: PrescribedDrug[] } & WithPast>(
+    `/api/pazienti/${id}/farmaci-prescritti`,
+  );
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
@@ -133,10 +158,10 @@ export function PrescribedDrugsPage() {
           />
           <DrugGroup
             id="titolo-farmaci-sospesi"
-            title="Terapie sospese o terminate"
+            title="Terapie sospese o concluse"
             drugs={stopped}
             patientId={id!}
-            empty="Nessuna terapia sospesa o terminata."
+            empty="Nessuna terapia sospesa o conclusa."
           />
           <DrugGroup
             id="titolo-farmaci-occasionali"
@@ -144,6 +169,13 @@ export function PrescribedDrugsPage() {
             drugs={occasional}
             patientId={id!}
             empty="Nessun farmaco prescritto senza terapia."
+          />
+          <PastPrescriptionsSection
+            patientId={id!}
+            kind="farmaco"
+            items={drugs.data.ricettePassate ?? []}
+            canWrite={drugs.data.puoRegistrare === true}
+            onChanged={drugs.reload}
           />
         </>
       )}
@@ -155,7 +187,7 @@ export function PrescribedDrugsPage() {
 export function PrescribedServicesPage() {
   const { id } = useParams<{ id: string }>();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
-  const services = useApi<{ prestazioni: PrescribedService[] }>(
+  const services = useApi<{ prestazioni: PrescribedService[] } & WithPast>(
     `/api/pazienti/${id}/prestazioni-prescritte`,
   );
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
@@ -213,6 +245,11 @@ export function PrescribedServicesPage() {
                       <tr key={x.chiave}>
                         <td>
                           <Link to={historyHref(id!, x.storico)}>{x.descrizione}</Link>
+                          {!!x.altroProgramma?.ricette && (
+                            <div>
+                              <PastTag c={x} />
+                            </div>
+                          )}
                         </td>
                         <td className="codice">{x.codice ?? '—'}</td>
                         <td>{countsText(x)}</td>
@@ -225,6 +262,15 @@ export function PrescribedServicesPage() {
             </section>
           );
         })}
+      {services.data && (
+        <PastPrescriptionsSection
+          patientId={id!}
+          kind="prestazione"
+          items={services.data.ricettePassate ?? []}
+          canWrite={services.data.puoRegistrare === true}
+          onChanged={services.reload}
+        />
+      )}
       <p className="aiuto">
         Visite: le prestazioni la cui descrizione nel catalogo comincia con «visita», «prima visita»
         o «televisita», o che dopo un trattino nominano la visita. Tutte le altre sono esami e altre

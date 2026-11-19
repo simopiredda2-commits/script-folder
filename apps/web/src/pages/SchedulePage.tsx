@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
+import { PrintHint } from '../components/PrintHint';
 import { date, studioToday } from '../lib/format';
 import { useSession } from '../lib/session';
 import { patientReading, scheduleMoment, SCHEDULE_MOMENTS } from '../lib/therapy';
@@ -59,6 +60,8 @@ export function SchedulePage() {
             </button>
           }
         />
+        {/* Preferenze di stampa della postazione (tappa 14): la carta si sceglie nella finestra. */}
+        <PrintHint kind="schema_orario" />
         {reservedCount > 0 && (
           <div className="casella">
             <input

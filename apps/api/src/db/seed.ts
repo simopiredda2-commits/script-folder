@@ -8,12 +8,21 @@
  * si attiva al primo accesso.
  */
 import { randomBytes } from 'node:crypto';
-import { buildFiscalCode, type Role } from '@mmg/domain';
+import {
+  buildFiscalCode,
+  parseStudioListData,
+  studioListLabel,
+  type Role,
+  type StudioListKind,
+} from '@mmg/domain';
 import { ageAt, generatePatients, Random } from '@mmg/fixtures';
-import { inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
+import { grantPeriod } from '../admin/archive-service';
+import { insertEntry } from '../clinical/entries';
 import { loadConfig } from '../config';
 import { storeCredentials } from '../credentials/service';
 import { startOfStudioDay } from '../http/today-routes';
+import { insertHistorical } from '../prescriptions/historical';
 import { studioDate } from '../prescriptions/rules-check';
 import { hashPassword } from '../security/password';
 import { createDatabase, createPool } from './client';
@@ -25,18 +34,24 @@ import {
   archive,
   archiveGrant,
   clinicalEntry,
+  historicalPrescription,
   diaryDetail,
   doctorProfile,
   fseSetting,
   exemption,
+  family,
   labResultDetail,
   measurementDetail,
   patient,
+  patientChoice,
   prescription,
   prescriptionLine,
   problemDetail,
   studio,
   therapy,
+  printSetting,
+  studioListItem,
+  workstation,
 } from './schema';
 import {
   DEMO_PATIENTS,
@@ -67,6 +82,11 @@ const FIRST_APPOINTMENT_MS = 8.5 * 3_600_000;
 const TO_SIGN = 3;
 
 const config = loadConfig();
+// I dati dimostrativi non vanno mai in un'installazione vera (regola 1, D170).
+if (config.environment === 'produzione') {
+  console.error('APP_AMBIENTE=produzione: i dati dimostrativi non si creano in produzione.');
+  process.exit(1);
+}
 const pool = createPool(config.databaseUrl);
 const db = createDatabase(pool);
 
@@ -86,10 +106,63 @@ try {
     process.exit(0);
   }
 
+  // Dati dello studio inventati (D12): telefono con prefisso 000, email su example.org, CAP 00000.
   const [st] = await db
     .insert(studio)
-    .values({ name: 'Studio medico dimostrativo', kind: 'single', regionName: 'PIEMONTE' })
+    .values({
+      name: 'Studio medico dimostrativo',
+      kind: 'single',
+      regionName: 'PIEMONTE',
+      address: 'Via dell’Esempio 1',
+      postalCode: '00000',
+      municipality: 'Comune di prova',
+      province: 'TO',
+      phone: '000 0000001',
+      email: 'studio@example.org',
+      pec: 'studio.pec@example.org',
+      headerText:
+        'Studio medico dimostrativo\nVia dell’Esempio 1 – 00000 Comune di prova (TO)\nTel. 000 0000001',
+    })
     .returning();
+  // Postazioni dello studio (tappa 14): servono alle preferenze di stampa.
+  const [amb, seg] = await db
+    .insert(workstation)
+    .values([
+      { studioId: st!.id, name: 'Ambulatorio', shared: true, notes: 'Scrivania del medico' },
+      { studioId: st!.id, name: 'Segreteria', shared: true, notes: 'Banco dell’accoglienza' },
+    ])
+    .returning();
+  // Preferenze di stampa dimostrative, con stampanti inventate (D180). Le copie 0 vogliono dire
+  // «come lo studio»: la colonna non ammette il vuoto.
+  await db.insert(printSetting).values([
+    {
+      studioId: st!.id,
+      workstationId: null,
+      documentKind: 'promemoria',
+      printerName: 'Stampante dello studio',
+      paper: null,
+      copies: 1,
+      reminderVariant: 'completo',
+    },
+    {
+      studioId: st!.id,
+      workstationId: amb!.id,
+      documentKind: 'certificato_modello',
+      printerName: 'Stampante dell’ambulatorio',
+      paper: 'A5',
+      copies: 0,
+      reminderVariant: null,
+    },
+    {
+      studioId: st!.id,
+      workstationId: seg!.id,
+      documentKind: 'promemoria',
+      printerName: 'Stampante della segreteria',
+      paper: null,
+      copies: 0,
+      reminderVariant: 'solo_nre',
+    },
+  ]);
   const passwords = new Map<string, string>();
   const users = new Map<string, string>();
   for (const u of DEMO_USERS) {
@@ -182,15 +255,91 @@ try {
     .insert(archive)
     .values({ studioId: st!.id, ownerUserId: doctorId, name: 'Archivio della Dott.ssa Marchi' })
     .returning();
-  const now = Date.now();
-  await db.insert(archiveGrant).values({
-    archiveId: arc!.id,
-    granteeUserId: users.get('sostituto')!,
-    kind: 'substitution',
-    validFrom: new Date(now),
-    validTo: new Date(now + 14 * 86_400_000),
-    reason: 'Sostituzione dimostrativa di due settimane',
-    grantedBy: doctorId,
+  // Autorizzazioni dimostrative a giorni interi, come le dà il titolare (tappa 14): una in corso,
+  // una scaduta e una revocata, per vedere i tre stati.
+  const dayFrom = (n: number) => studioDate(new Date(Date.now() + n * 86_400_000));
+  await db.insert(archiveGrant).values([
+    {
+      archiveId: arc!.id,
+      granteeUserId: users.get('sostituto')!,
+      kind: 'substitution',
+      ...grantPeriod(dayFrom(0), dayFrom(13)),
+      reason: 'Sostituzione dimostrativa di due settimane',
+      grantedBy: doctorId,
+    },
+    {
+      archiveId: arc!.id,
+      granteeUserId: users.get('sostituto')!,
+      kind: 'substitution',
+      ...grantPeriod(dayFrom(-60), dayFrom(-46)),
+      reason: 'Ferie estive dimostrative',
+      grantedBy: doctorId,
+    },
+    {
+      archiveId: arc!.id,
+      granteeUserId: users.get('sostituto')!,
+      kind: 'substitution',
+      ...grantPeriod(dayFrom(20), dayFrom(27)),
+      reason: 'Congresso dimostrativo, poi annullato',
+      grantedBy: doctorId,
+      revokedAt: new Date(),
+    },
+  ]);
+
+  // Elenchi dello studio (tappa 14), inventati: controllati come quelli scritti a mano. Il
+  // pacchetto di prestazioni no: si compone dal catalogo in vigore, che il seed non importa.
+  const listItems: [StudioListKind, Record<string, unknown>][] = [
+    [
+      'suggeritore',
+      {
+        nome: 'Dott.ssa Carla Esempio',
+        struttura: 'Ospedale di prova, Cardiologia',
+        specialita: 'Cardiologia',
+        telefono: '000 0000021',
+      },
+    ],
+    [
+      'suggeritore',
+      { nome: 'Dott. Luca Prova', struttura: 'Ambulatorio di diabetologia di prova' },
+    ],
+    [
+      'posologia',
+      {
+        testo: '1 compressa una volta al giorno, la sera, per bocca',
+        dose: '1',
+        unita: 'compressa',
+        frequenza: '1 volta al giorno',
+        momento: 'la sera',
+        via: 'per bocca',
+      },
+    ],
+    ['posologia', { testo: '2 inalazioni al bisogno, al massimo 4 volte al giorno' }],
+    [
+      'contatto',
+      {
+        nome: 'Laboratorio analisi di prova',
+        tipo: 'laboratorio',
+        telefono: '000 0000022',
+        email: 'laboratorio@esempio.invalid',
+        note: 'Prelievi dal lunedì al venerdì, 7.30–9.30',
+      },
+    ],
+    ['contatto', { nome: 'CUP di prova', tipo: 'struttura', telefono: '000 0000023' }],
+  ];
+  await withActor(db, doctorId, async (tx) => {
+    for (const [kind, raw] of listItems) {
+      const parsed = parseStudioListData(kind, raw);
+      if (!parsed.ok)
+        throw new Error(`Voce dimostrativa non valida: ${parsed.problems.join('; ')}`);
+      const data = parsed.data as unknown as Record<string, unknown>;
+      await tx.insert(studioListItem).values({
+        studioId: st!.id,
+        kind,
+        label: studioListLabel(kind, data),
+        data,
+        createdBy: doctorId,
+      });
+    }
   });
 
   const people = generatePatients(DEMO_PATIENTS);
@@ -198,6 +347,7 @@ try {
   const midnight = startOfStudioDay(studioDate(new Date())).getTime();
   const secretaryId = users.get('segreteria')!;
   const toSign: { patientId: string; therapyId: string; drug: DemoTherapy }[] = [];
+  const pids: string[] = [];
   await withActor(db, doctorId, async (tx) => {
     for (const [index, p] of people.entries()) {
       const [row] = await tx
@@ -218,10 +368,32 @@ try {
           residenceNumber: p.residence.number,
           residenceTown: p.residence.town,
           residenceProvince: p.residence.province,
+          // Dati SSN e CAP inventati (tappa 15): nessuna ASL o comune veri.
+          residencePostalCode: '00000',
+          asl: 'ASL dimostrativa',
+          district: 'Distretto dimostrativo',
           status: p.status,
+          // Canale del promemoria scelto (R15): uno per email, uno su carta.
+          ...(index === 0
+            ? {
+                reminderChannel: 'email' as const,
+                reminderContact: p.email,
+                reminderChannelChosenOn: '2026-01-15',
+              }
+            : index === 1
+              ? { reminderChannel: 'paper' as const, reminderChannelChosenOn: '2026-01-15' }
+              : {}),
         })
         .returning();
       const pid = row!.id;
+      pids.push(pid);
+      // Scelta del medico registrata a mano, in attesa di AURA (tappa 15).
+      await tx.insert(patientChoice).values({
+        patientId: pid,
+        doctorUserId: doctorId,
+        chosenOn: '2024-01-01',
+        source: 'manual',
+      });
       if (index < APPOINTMENTS_TODAY) {
         const startsAt = new Date(midnight + FIRST_APPOINTMENT_MS + index * QUARTER_MS);
         await tx.insert(appointment).values({
@@ -338,6 +510,80 @@ try {
           drug: profile.therapies[0]!.therapy,
         });
       }
+    }
+    // Un nucleo familiare inventato con due pazienti dello stesso archivio (tappa 15).
+    const [fam] = await tx
+      .insert(family)
+      .values({ studioId: st!.id, label: 'Nucleo dimostrativo' })
+      .returning();
+    await tx
+      .update(patient)
+      .set({ familyId: fam!.id })
+      .where(inArray(patient.id, pids.slice(2, 4)));
+    // Voci nuove della tappa 15 (D176) per i pazienti delle ricette da firmare, quelli delle
+    // schermate: una vaccinazione, un referto di laboratorio, ricette fatte con un altro programma
+    // (una annullata), una terapia conclusa. Valori inventati; nessuna estrazione casuale in più,
+    // così gli altri pazienti dimostrativi restano gli stessi.
+    for (const r of toSign) {
+      await insertEntry(tx, r.patientId, doctorId, {
+        tipo: 'vaccinazione',
+        data: '2026-10-20',
+        vaccino: 'Vaccino antinfluenzale dimostrativo',
+        lotto: 'LOTTO-DEMO-1',
+        dose: 1,
+        campagna: 'Campagna antinfluenzale 2026/2027',
+      });
+      for (const exam of [
+        { esame: 'Glicemia', valore: '92', unita: 'mg/dl', minimo: '70', massimo: '99' },
+        { esame: 'Emoglobina glicata', valore: '5,6', unita: '%', intervallo: '4,0–6,0' },
+        { esame: 'Esame dimostrativo', valore: 'negativo', intervallo: 'negativo' },
+      ])
+        await insertEntry(tx, r.patientId, doctorId, {
+          tipo: 'esame_laboratorio',
+          data: '2026-11-10',
+          ...exam,
+        });
+      const owner = { patientId: r.patientId, archiveId: arc!.id, recordedBy: doctorId };
+      const past = {
+        prescrittore: 'Medico precedente (dimostrativo)',
+        programma: 'Programma precedente',
+      };
+      for (const data of ['2025-09-18', '2025-11-20'])
+        await insertHistorical(tx, owner, {
+          tipo: 'farmaco',
+          data,
+          farmaco: r.drug.drugName,
+          principioAttivo: r.drug.activeIngredient ?? undefined,
+          quantita: 2,
+          ...past,
+        });
+      await insertHistorical(tx, owner, {
+        tipo: 'prestazione',
+        data: '2025-10-02',
+        descrizione: 'VISITA DIMOSTRATIVA',
+        ...past,
+      });
+      const twice = await insertHistorical(tx, owner, {
+        tipo: 'farmaco',
+        data: '2025-11-20',
+        farmaco: r.drug.drugName,
+        quantita: 2,
+        ...past,
+      });
+      await tx
+        .update(historicalPrescription)
+        .set({ annulledAt: new Date(), annulReason: 'Registrata due volte' })
+        .where(eq(historicalPrescription.id, twice));
+      await tx.insert(therapy).values({
+        patientId: r.patientId,
+        drugName: 'Paracetamolo dimostrativo 500 mg',
+        activeIngredient: 'PARACETAMOLO',
+        kind: 'as_needed',
+        startOn: '2026-09-01',
+        endOn: '2026-10-15',
+        status: 'ended',
+        createdBy: doctorId,
+      });
     }
   });
 

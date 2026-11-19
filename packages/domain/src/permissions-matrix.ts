@@ -63,7 +63,8 @@ const columns: Column[] = [
 ];
 
 function cell(col: Column, action: Action): string {
-  const isAdmin = action.startsWith('admin.');
+  // Azioni sullo studio, senza archivio: dell'amministratore, o di più ruoli (STUDIO_ACTION_ROLES).
+  const isAdmin = action.startsWith('admin.') || action.startsWith('studio.');
   const base: AccessContext = isAdmin
     ? { now: at }
     : {

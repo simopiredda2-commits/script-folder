@@ -57,7 +57,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Come si procede
 
-- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`.
+- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`, unita (#6, via del 19/11/2026). Quarto blocco (richieste del 19/11/2026): `tappe-14-15`, unito (#7, via del 19/11/2026).
 - Dopo ogni tappa: test e lint verdi, commit e push (la macchina in cloud può essere riciclata), poi aggiornare `docs/avanzamento.md` con fatto, non fatto, non provato e prossimo passo.
 - **Fermate**: dopo la tappa 2 e dopo la tappa 4. Domande con il pulsante a Simone; spiegare in parole semplici cosa devono verificare lui e la Dr.ssa Rocca (dopo la 2: struttura, modello dei dati, ruoli e permessi; dopo la 4: ciclo della ricetta e regole di prescrizione con le loro fonti) e chiedere il via. Alla prima fermata chiedere anche quale proposta di logo preferisce, con il collegamento a `docs/logo.md` su GitHub, indicando quella consigliata. Se chiede modifiche: farle, aggiornare la PR, richiedere il via. Con il via: unire la PR e continuare. Simone non interviene su GitHub: le PR le unisce Claude.
 - Dopo la tappa 6: stesso giro per l'ultima PR (fatto).
@@ -87,30 +87,34 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 
 - `scripts/avvio-sessione.sh` è l'hook SessionStart (`.claude/settings.json`). Solo se `CLAUDE_CODE_REMOTE=true`: avvia Postgres 16, crea se mancano l'utente `mmg` (password locale `mmg`, con CREATEDB) e il database `mmg_dev`, scrive `DATABASE_URL` e `TZ=Europe/Rome` in `$CLAUDE_ENV_FILE`, installa le dipendenze solo se è cambiato un file che le decide (impronte in `node_modules/.avvio-sessione.sha256`).
 - `DATABASE_URL=postgres://mmg:mmg@localhost:5432/mmg_dev` (valore locale, non un segreto; vedi `.env.example`).
+- `APP_AMBIENTE`: «prova» (per difetto: solo pazienti inventati dove si controlla, seed ammesso) o «produzione» (seed vietato), D170.
+- `APP_PROXY_FIDATI`: indirizzi o reti dei proxy inversi davanti al servizio (vuota per difetto: X-Forwarded-For si ignora), per l'indirizzo vero nel registro dei tentativi falliti (D179).
 - La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e alcuni siti pubblici, solo per leggere specifiche, decreti e dati aperti (Sistema TS, Gazzetta Ufficiale, Normattiva, INPS, AIFA anche `drive.aifa.gov.it`, Regione Piemonte, Ministero della Salute, due ASL; D92, D148). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7).
 
 ## Comandi
 
-| Comando                                                      | Cosa fa                                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `pnpm install`                                               | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                            |
-| `pnpm dev`                                                   | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)  |
-| `pnpm test`                                                  | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python) |
-| `pnpm lint`                                                  | ESLint, Prettier in controllo, tipi di ogni pacchetto                           |
-| `pnpm format`                                                | Prettier in scrittura                                                           |
-| `pnpm db:migrate`                                            | Applica le migrazioni a `DATABASE_URL`                                          |
-| `pnpm db:seed`                                               | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)  |
-| `pnpm banche-dati:importa -- --dati DIR --trascrizioni DIR`  | Importa l'output di `sync/` e le trascrizioni dei PDF                           |
-| `pnpm banche-dati:importa -- --esempio`                      | Lancia `sync/` sul sito d'esempio e importa (banche dati dimostrative)          |
-| `pnpm banche-dati:aggiorna -- --dati DIR --trascrizioni DIR` | Aggiornamento completo: `sync/`, importazione, registro del giro (D156)         |
-| `pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts`      | Fotografa le schermate per `docs/interfaccia.md` (istruzioni nel file)          |
-| `pnpm --filter @mmg/domain docs:permessi`                    | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                      |
-| `pnpm --filter @mmg/rules docs:regole`                       | Rigenera la tabella di `docs/regole.md` dai dati delle regole                   |
-| `pnpm --filter @mmg/api db:generate`                         | Genera una migrazione dallo schema Drizzle                                      |
-| `pnpm fixtures -- --seed 1 --count 20`                       | Pazienti inventati in JSON (stesso seme, stessi pazienti)                       |
-| `pnpm --filter @mmg/brand tokens:css`                        | Rigenera `tokens.css` da `tokens.ts`                                            |
-| `pnpm --filter @mmg/brand logo:proposte`                     | Rigenera le proposte di logo e le tavole di `docs/logo.md`                      |
-| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'`       | Prova un controllo: rosso col guasto, verde dopo il ripristino                  |
+| Comando                                                                                                                                                                    | Cosa fa                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`                                                                                                                                                             | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                                                                          |
+| `pnpm dev`                                                                                                                                                                 | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)                                                |
+| `pnpm test`                                                                                                                                                                | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python)                                               |
+| `pnpm lint`                                                                                                                                                                | ESLint, Prettier in controllo, tipi di ogni pacchetto                                                                         |
+| `pnpm format`                                                                                                                                                              | Prettier in scrittura                                                                                                         |
+| `pnpm db:migrate`                                                                                                                                                          | Applica le migrazioni a `DATABASE_URL`                                                                                        |
+| `pnpm db:seed`                                                                                                                                                             | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)                                                |
+| `pnpm studio:crea -- --nome … --tipo singolo --regione … --amministratore … --nome-amministratore …`                                                                       | Primo avvio di uno studio vero: studio e primo amministratore, password temporanea mostrata una volta                         |
+| `pnpm utente:ripristina -- --utente NOME --mostra`, poi `--conferma --richiesta-il DATA` o `--rifiuta`; anche `--sblocca`, `--secondo-fattore`, `--sospendi`, `--riattiva` | Dal server: legge e conferma o rifiuta chi è in attesa quando nessun titolare può farlo, sblocca, dà credenziali nuove (D179) |
+| `pnpm banche-dati:importa -- --dati DIR --trascrizioni DIR`                                                                                                                | Importa l'output di `sync/` e le trascrizioni dei PDF                                                                         |
+| `pnpm banche-dati:importa -- --esempio`                                                                                                                                    | Lancia `sync/` sul sito d'esempio e importa (banche dati dimostrative)                                                        |
+| `pnpm banche-dati:aggiorna -- --dati DIR --trascrizioni DIR`                                                                                                               | Aggiornamento completo: `sync/`, importazione, registro del giro (D156)                                                       |
+| `pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts`                                                                                                                    | Fotografa le schermate per `docs/interfaccia.md` (istruzioni nel file)                                                        |
+| `pnpm --filter @mmg/domain docs:permessi`                                                                                                                                  | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                                                                    |
+| `pnpm --filter @mmg/rules docs:regole`                                                                                                                                     | Rigenera la tabella di `docs/regole.md` dai dati delle regole                                                                 |
+| `pnpm --filter @mmg/api db:generate`                                                                                                                                       | Genera una migrazione dallo schema Drizzle                                                                                    |
+| `pnpm fixtures -- --seed 1 --count 20`                                                                                                                                     | Pazienti inventati in JSON (stesso seme, stessi pazienti)                                                                     |
+| `pnpm --filter @mmg/brand tokens:css`                                                                                                                                      | Rigenera `tokens.css` da `tokens.ts`                                                                                          |
+| `pnpm --filter @mmg/brand logo:proposte`                                                                                                                                   | Rigenera le proposte di logo e le tavole di `docs/logo.md`                                                                    |
+| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'`                                                                                                                     | Prova un controllo: rosso col guasto, verde dopo il ripristino                                                                |
 
 Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano). Il servizio vuole anche `APP_ENCRYPTION_KEY` (in cloud la imposta l'hook).
 
@@ -130,6 +134,8 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/fse.md`: Fascicolo Sanitario Elettronico 2.0 e Profilo Sanitario Sintetico, con le fonti (D110).
 - `docs/provenienze.md`: da dove viene ogni contenuto, a quali condizioni, chi lo controlla (D142).
 - `docs/aft.md`: condivisione del riepilogo tra i medici dell'AFT, con il consenso del paziente (D161).
+- `docs/amministrazione.md`: Strumenti e amministrazione per ruolo, primo avvio, utenti, studio, postazioni, stampa, elenchi (tappa 14, D163).
+- `docs/importazione.md`: importazione da altri programmi con lo smistamento verso i menu, formati, destinazioni, sicurezza (tappa 15, D173).
 
 ## Le tappe
 
@@ -155,6 +161,15 @@ Terzo giro (via del 18/11/2026, D128), branch `tappe-11-12`, stesso metodo:
 11. Profilo Sanitario Sintetico per il Fascicolo con un simulatore del Gateway, dalle fonti di `docs/fse.md` (prima quelle ancora da leggere).
 12. Condivisione tra i medici dell'AFT che usano il programma. **Fermata dopo la tappa 12**, con lo stesso giro (domande con il pulsante, via, unione), poi fermarsi.
 13. Modelli dei certificati (richiesta diretta di Simone, D143): sportivo non agonistico, porto d'armi, anamnestico per la patente e altri; testi solo dagli atti ufficiali; si compilano i dati del paziente; menu «Modelli» negli strumenti; caratteri, intestazione e dimensioni scelti dal medico. Si fa dopo la 11 e prima della 12; la fermata della 12 copre anche questa.
+
+Terzo giro chiuso: via dato in anticipo da Simone il 19/11/2026 («Do già adesso l'autorizzazione al via»), pull request #6 unita. Le domande di merito di quella fermata (catalogo, AFT, patente) si fanno alla fermata dopo la tappa 15, insieme alle nuove.
+
+Richieste di Simone del 19/11/2026, branch `tappe-14-15`, stesso metodo:
+
+14. Strumenti e amministrazione completi: tutte le impostazioni e i dati modificabili (dati dello studio, utenti e ruoli, password, postazioni e stampa, intestazioni, elenchi dello studio, autorizzazioni sull'archivio, registro delle azioni di amministrazione, avvisi sugli accessi anomali, stato del servizio).
+15. Importazione da altri programmi in vari formati, con lo smistamento dei dati verso i menu (anagrafica e pannello amministrativo del paziente, storia clinica, patologie, farmaci in terapia e prescritti); i menu che mancavano si costruiscono. **Fermata dopo la tappa 15**, con lo stesso giro (domande con il pulsante, via, unione).
+
+Fermata dopo la tappa 15 fatta (D181): via, pull request #7 unita. Le scelte da costruire sono in `docs/avanzamento.md` («Risposte della fermata dopo la tappa 15»): si fanno in un blocco nuovo, quando Simone dà il via.
 
 ## Come si chiude
 

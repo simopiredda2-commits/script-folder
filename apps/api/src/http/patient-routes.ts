@@ -8,6 +8,7 @@ import type { Database } from '../db/client';
 import {
   accessLog,
   allergyDetail,
+  appUser,
   archive,
   clinicalEntry,
   diaryDetail,
@@ -50,12 +51,20 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       .select({ id: archive.id, nome: archive.name })
       .from(archive)
       .where(and(eq(archive.studioId, actor.studioId), eq(archive.ownerUserId, actor.userId)));
+    // Il nome utente serve al modulo del cambio della password (gestori di password).
+    const [me] = await db
+      .select({ username: appUser.username })
+      .from(appUser)
+      .where(eq(appUser.id, actor.userId));
     return {
       id: actor.userId,
       nome: actor.displayName,
+      nomeUtente: me?.username ?? null,
       ruoli: actor.roles.map((r) => ({ codice: r, nome: ROLE_LABELS[r] })),
       postazione: actor.workstation,
       archivio: own ?? null,
+      // Password temporanea: l'interfaccia mostra solo il cambio della password (tappa 14).
+      devoCambiarePassword: actor.mustChangePassword,
     };
   });
 
@@ -259,8 +268,16 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
     .partial()
     .strict();
 
-  /** Che cosa vede la segreteria di questo archivio: lo decide il titolare (D30). */
-  const guardArchiveSettings = async (actor: Actor, archiveId: string) => {
+  /**
+   * Che cosa vede la segreteria di questo archivio: lo decide il titolare (D30). Nel registro la
+   * consultazione e la modifica restano distinte, la modifica con i nomi dei campi (mai i valori).
+   */
+  const guardArchiveSettings = async (
+    actor: Actor,
+    archiveId: string,
+    fase: 'lettura' | 'modifica',
+    campi: string[] = [],
+  ) => {
     const ctx = await loadArchiveContext(db, archiveId);
     const decision = can(actor, 'archive.settings', { ...ctx, now: new Date() });
     await logAccess(db, {
@@ -269,7 +286,12 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       action: 'impostazioni_archivio',
       outcome: decision.allowed ? 'consentito' : 'negato',
       workstation: actor.workstation,
-      details: { archivio: archiveId, motivo: decision.reason },
+      details: {
+        archivio: archiveId,
+        fase,
+        ...(campi.length ? { campi } : {}),
+        motivo: decision.reason,
+      },
     });
     if (!decision.allowed) throw new HttpError(403, decision.reason);
     return ctx;
@@ -277,7 +299,7 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
 
   app.get('/api/archivi/:id/impostazioni', async (req) => {
     const { id } = archiveParams.parse(req.params);
-    const ctx = await guardArchiveSettings(req.actor!, id);
+    const ctx = await guardArchiveSettings(req.actor!, id, 'lettura');
     return {
       segreteriaLeggeDiario: ctx.settings.secretaryCanReadDiary,
       segreteriaLeggeRiepilogo: ctx.settings.secretaryCanReadSummary,
@@ -286,7 +308,13 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
 
   app.patch('/api/archivi/:id/impostazioni', async (req) => {
     const { id } = archiveParams.parse(req.params);
-    await guardArchiveSettings(req.actor!, id);
+    const parsed = settingsBody.safeParse(req.body);
+    await guardArchiveSettings(
+      req.actor!,
+      id,
+      'modifica',
+      parsed.success ? Object.keys(parsed.data) : [],
+    );
     const body = settingsBody.parse(req.body);
     const [row] = await withActor(db, req.actor!.userId, (tx) =>
       tx

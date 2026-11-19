@@ -22,10 +22,11 @@ import {
   type ServiceAuth,
 } from '@mmg/integrations';
 import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
+import type { Tx } from '../db/tx';
 import {
   doctorProfile,
   regionalAuthorizationRequest,
@@ -140,7 +141,25 @@ export async function storeCredentials(
     });
 }
 
-/** Scrive una sessione del secondo fattore: solo per le prove (simulatore). */
+/** Due codici fiscali uguali, senza badare alle maiuscole; un codice mancante non è uguale a nulla. */
+const sameFiscalCode = (a: string | null | undefined, b: string | null | undefined) =>
+  !!a && !!b && a.trim().toUpperCase() === b.trim().toUpperCase();
+
+/** Codice fiscale del medico com'è adesso nel profilo, o null. */
+async function profileFiscalCode(q: Database, userId: string): Promise<string | null> {
+  const [p] = await q
+    .select({ cf: doctorProfile.fiscalCode })
+    .from(doctorProfile)
+    .where(eq(doctorProfile.userId, userId));
+  return p?.cf ?? null;
+}
+
+/**
+ * Scrive una sessione del secondo fattore (D102) o dell'accesso con SPID o CIE (D109), con il
+ * codice fiscale con cui è stata aperta (`subject`): la sessione vale solo finché il profilo del
+ * medico ha quel codice fiscale (regola 4, D111). Il servizio lo passa sempre; nelle prove, senza,
+ * vale il codice fiscale che il medico ha adesso.
+ */
 export async function storeSession(
   db: Database,
   appKey: Buffer,
@@ -153,6 +172,8 @@ export async function storeSession(
     subject?: string | null;
   },
 ) {
+  const subject =
+    input.subject !== undefined ? input.subject : await profileFiscalCode(db, input.userId);
   const values = {
     userId: input.userId,
     service: input.service,
@@ -164,12 +185,63 @@ export async function storeSession(
     validUntil: input.validUntil,
     activatedAt: new Date(),
     mode: input.mode ?? 'email',
-    subject: input.subject ?? null,
+    subject,
   };
   await db
     .insert(serviceSession)
     .values(values)
     .onConflictDoUpdate({ target: [serviceSession.userId, serviceSession.service], set: values });
+}
+
+/**
+ * Chiude le sessioni dei servizi di un medico (Id-Sessione del secondo fattore, accesso regionale
+ * con SPID o CIE) e le sue richieste di accesso regionale ancora aperte. Serve quando
+ * l'amministratore corregge il codice fiscale o il codice regionale del medico, a cui le sessioni
+ * sono legate (D102, D111): il medico le riattiva da «Credenziali dei servizi». Le credenziali
+ * (utente, password, PIN) restano. Solo nel programma: la revoca presso il servizio non parte da
+ * qui. Ogni sessione chiusa resta tra gli eventi delle credenziali, senza valori segreti.
+ */
+export async function closeServiceSessions(
+  q: Database | Tx,
+  input: {
+    userId: string;
+    services: readonly CredentialService[];
+    at: Date;
+    workstation: string | null;
+    detail: string;
+  },
+): Promise<CredentialService[]> {
+  if (input.services.length === 0) return [];
+  const gone = await q
+    .delete(serviceSession)
+    .where(
+      and(
+        eq(serviceSession.userId, input.userId),
+        inArray(serviceSession.service, [...input.services]),
+      ),
+    )
+    .returning({ service: serviceSession.service });
+  if (input.services.includes('rupar_piemonte'))
+    await q
+      .update(regionalAuthorizationRequest)
+      .set({ usedAt: input.at })
+      .where(
+        and(
+          eq(regionalAuthorizationRequest.userId, input.userId),
+          isNull(regionalAuthorizationRequest.usedAt),
+        ),
+      );
+  const closed = CREDENTIAL_SERVICES.filter((s) => gone.some((g) => g.service === s));
+  for (const service of closed)
+    await q.insert(serviceCredentialEvent).values({
+      userId: input.userId,
+      service,
+      event: 'sessione_chiusa',
+      at: input.at,
+      workstation: input.workstation,
+      detail: input.detail,
+    });
+  return closed;
 }
 
 const saveBody = z
@@ -252,14 +324,17 @@ export function createCredentialService(deps: CredentialDeps) {
         validUntil: serviceSession.validUntil,
         activatedAt: serviceSession.activatedAt,
         mode: serviceSession.mode,
+        subject: serviceSession.subject,
       })
       .from(serviceSession)
       .where(eq(serviceSession.userId, actor.userId));
+    const fiscalCode = await profileFiscalCode(db, actor.userId);
     return {
       servizi: CREDENTIAL_SERVICES.map((service) => {
         const c = creds.find((r) => r.service === service);
         const s = sessions.find((r) => r.service === service);
-        const active = !!s && s.validUntil > now();
+        // Aperta con un altro codice fiscale: non vale (regola 4), come in authFor.
+        const active = !!s && s.validUntil > now() && sameFiscalCode(s.subject, fiscalCode);
         return {
           servizio: slugOf(service),
           nome: label(service),
@@ -404,11 +479,14 @@ export function createCredentialService(deps: CredentialDeps) {
       await event(actor, service, 'sessione_rifiutata', r.message);
       throw new HttpError(422, 'Il codice non è valido o è scaduto: chiedine uno nuovo');
     }
+    // Il codice fiscale con cui la sessione si è aperta: se nel frattempo l'amministratore lo ha
+    // corretto, la sessione non vale (authFor).
     await storeSession(db, deps.encryptionKey, {
       userId: actor.userId,
       service,
       token: codice,
       validUntil: new Date(r.validUntil),
+      subject: fiscalCode,
     });
     await event(actor, service, 'sessione_attivata', `fino a ${r.validUntil}`);
     return status(actor);
@@ -574,28 +652,54 @@ export function createCredentialService(deps: CredentialDeps) {
   }
 
   /**
+   * La sessione del servizio del medico, se vale: solo con il codice fiscale con cui è stata aperta
+   * uguale a quello attuale del profilo (regola 4, D111). Se l'amministratore lo ha corretto mentre
+   * la sessione si apriva, la chiusura delle sessioni può arrivare prima del salvataggio (revisione
+   * dei poteri dell'amministratore, problema 8): qui la sessione si chiude e il medico la riapre.
+   */
+  async function sessionFor(userId: string, service: CredentialService) {
+    const [s] = await db.select().from(serviceSession).where(where(userId, service).session);
+    if (!s) return null;
+    if (sameFiscalCode(s.subject, await profileFiscalCode(db, userId))) return s;
+    const gone = await db
+      .delete(serviceSession)
+      // Solo la sessione letta: una riaperta nel frattempo, con il codice giusto, resta.
+      .where(and(where(userId, service).session, eq(serviceSession.tokenEnc, s.tokenEnc)))
+      .returning({ service: serviceSession.service });
+    if (gone.length > 0)
+      await event(
+        { userId },
+        service,
+        'sessione_chiusa',
+        'aperta con un codice fiscale diverso da quello attuale del medico',
+      );
+    throw new HttpError(
+      422,
+      `La sessione ${label(service)} era stata aperta con un codice fiscale diverso da quello attuale del medico: è chiusa. Riattivala in «Credenziali dei servizi»`,
+      { codice: 'SESSIONE_MANCANTE', servizio: slugOf(service) },
+    );
+  }
+
+  /**
    * Per gli invii: credenziali e secondo fattore di chi firma. Se mancano, l'invio si ferma prima
    * di contattare il servizio, con un errore che porta alla pagina giusta.
    */
   async function authFor(userId: string, use: ServiceUse): Promise<ServiceAuth> {
     const service = SERVICE_FOR_USE[use];
+    const s = NEEDS_SECOND_FACTOR[use] ? await sessionFor(userId, service) : null;
     // Accesso regionale con SPID o CIE: il token sostituisce utente, password e PIN RUPAR (D109).
-    if (NEEDS_SECOND_FACTOR[use]) {
-      const [s] = await db.select().from(serviceSession).where(where(userId, service).session);
-      if (s?.mode === 'spid_cie') {
-        if (s.validUntil <= now())
-          throw new HttpError(
-            422,
-            'L’accesso regionale con SPID o CIE è scaduto: entra di nuovo da «Credenziali dei servizi»',
-            { codice: 'SESSIONE_SCADUTA', servizio: slugOf(service) },
-          );
-        const bearer = decryptSecret(key, s.tokenEnc, aad('sessione', userId, service)).toString();
-        return { bearer, sessionId: null };
-      }
+    if (s?.mode === 'spid_cie') {
+      if (s.validUntil <= now())
+        throw new HttpError(
+          422,
+          'L’accesso regionale con SPID o CIE è scaduto: entra di nuovo da «Credenziali dei servizi»',
+          { codice: 'SESSIONE_SCADUTA', servizio: slugOf(service) },
+        );
+      const bearer = decryptSecret(key, s.tokenEnc, aad('sessione', userId, service)).toString();
+      return { bearer, sessionId: null };
     }
     const secret = await requireSecret(userId, service);
     if (!NEEDS_SECOND_FACTOR[use]) return { ...secret, sessionId: null };
-    const [s] = await db.select().from(serviceSession).where(where(userId, service).session);
     if (!s)
       throw new HttpError(
         422,

@@ -155,6 +155,41 @@
       "when": 1795048284424,
       "tag": "0021_registro_aft",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1795049977121,
+      "tag": "0022_amministrazione",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795050701658,
+      "tag": "0023_importazione",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1795055580284,
+      "tag": "0024_conferma_utenti",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1795060935949,
+      "tag": "0025_codici_sbagliati",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795066424463,
+      "tag": "0026_sospeso_dal_servizio",
+      "breakpoints": true
     }
   ]
 }

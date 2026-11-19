@@ -13,6 +13,7 @@ import {
 } from '../db/schema';
 import { HttpError } from '../http/errors';
 import { guardPatient } from '../patients/access';
+import { historicalLine, historicalViews, pastCounts, visibleHistorical } from './historical';
 
 /**
  * Storico delle prescrizioni di un farmaco o di una prestazione (D65, D66): tutte le ricette
@@ -209,11 +210,19 @@ export async function prescriptionHistory(
     .filter(({ p }) => p.status === 'cancelled' && p.sentAt)
     .reduce((n, { line }) => n + line.quantity, 0);
 
+  // Ricette fatte con un altro programma (tappa 15): stesse regole, elenco e conti a parte.
+  const past = (await visibleHistorical(db, patientId, reservedAllowed)).filter((h) =>
+    matchesTarget(target, historicalLine(h)),
+  );
+
   return {
     /** Confezioni (o quantità) prescritte negli ultimi 12 mesi, ricette inviate o su carta. */
     ultimi12Mesi: total,
     /** Inviate e poi annullate negli ultimi 12 mesi: restano nello storico (D70). */
     annullateUltimi12Mesi: cancelled,
+    /** Ricette fatte con un altro programma, anche le annullate; non si ripetono. */
+    ricettePassate: await historicalViews(db, past),
+    altroProgramma: pastCounts(past),
     voci: matches.map(({ line, p }) => ({
       ricetta: {
         id: p.id,

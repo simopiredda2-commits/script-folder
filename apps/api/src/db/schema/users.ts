@@ -10,6 +10,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { studio } from './studio';
 
@@ -46,6 +47,40 @@ export const appUser = pgTable(
     failedLogins: integer().notNull().default(0),
     lockedUntil: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Password temporanea data dall'amministratore: al primo accesso va cambiata prima di ogni
+     * altra cosa (tappa 14).
+     */
+    mustChangePassword: boolean().notNull().default(false),
+    passwordChangedAt: timestamp({ withTimezone: true }),
+    /**
+     * Conferma di un medico titolare (tappa 14): un utente con un ruolo che apre dati dei
+     * pazienti, creato dall'amministratore o a cui l'amministratore aggiunge quel ruolo, non entra
+     * finché un titolare attivo dello studio non lo conferma. Colonna esplicita: gli utenti di
+     * prima, dei dati dimostrativi e delle prove non sono in attesa. Conferme e rifiuti vanno nel
+     * registro delle azioni di amministrazione (qui niente storico: la riga ha l'impronta della
+     * password e il segreto del secondo fattore).
+     */
+    awaitingConfirmation: boolean().notNull().default(false),
+    /** Chi ha chiesto la conferma (l'amministratore che ha creato o cambiato l'utente) e quando. */
+    confirmationRequestedBy: uuid().references((): AnyPgColumn => appUser.id),
+    confirmationRequestedAt: timestamp({ withTimezone: true }),
+    /**
+     * Alla conferma il titolare riceve una password temporanea nuova, da consegnare di persona, e
+     * il secondo fattore si riattiva: per gli utenti nuovi e per chi prima non aveva ruoli con i
+     * dati dei pazienti, di cui l'amministratore può conoscere le credenziali.
+     */
+    confirmationIssuesPassword: boolean().notNull().default(false),
+    /** Il titolare che ha confermato l'ultima richiesta, e quando. */
+    confirmedBy: uuid().references((): AnyPgColumn => appUser.id),
+    confirmedAt: timestamp({ withTimezone: true }),
+    /**
+     * Sospeso da chi gestisce il servizio, sul server (`pnpm utente:ripristina --sospendi` o
+     * `--rifiuta`): dal programma non si riattiva, lo riattiva solo il server (`--riattiva`), che
+     * toglie il segno. Vale solo mentre l'utente è sospeso (tappa 14, revisione dei poteri
+     * dell'amministratore, problema 7).
+     */
+    suspendedByService: boolean().notNull().default(false),
   },
   (t) => [uniqueIndex('app_user_username_key').on(t.username)],
 );
@@ -160,6 +195,14 @@ export const authChallenge = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     usedAt: timestamp({ withTimezone: true }),
+    /**
+     * Codici provati su questo passaggio, giusti o sbagliati: ogni codice si conta prima di
+     * guardarlo, in un solo comando, e arrivati ai tentativi dello studio il passaggio non ne
+     * guarda altri (tappa 14, seconda revisione dei poteri dell'amministratore: con le richieste
+     * in parallelo il conto dopo la verifica lasciava passare centinaia di codici). La colonna si
+     * chiama ancora `failed_codes` dalla migrazione 0025, quando contava solo i codici sbagliati.
+     */
+    triedCodes: integer('failed_codes').notNull().default(0),
   },
   (t) => [uniqueIndex('auth_challenge_token_hash_key').on(t.tokenHash)],
 );

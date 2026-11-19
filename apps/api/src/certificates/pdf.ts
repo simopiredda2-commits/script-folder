@@ -200,11 +200,17 @@ async function render(d: CertificatePrintData, kind: 'A' | 'B'): Promise<Uint8Ar
     bold: true,
   });
   s.y -= 22;
+  // Il luogo sta accanto a protocollo e data; l'indirizzo completo dello studio, se è lungo, va
+  // sulla riga sotto e a capo, perché non esca dal foglio (D106).
+  const placeRoom = RIGHT - 380 - s.bold.widthOfTextAtSize('Luogo', 9) - 4;
+  const placeFits =
+    !d.place || s.regular.widthOfTextAtSize(safe(s.regular, d.place), 9) <= placeRoom;
   s.row([
     ['Protocollo', d.protocol, LEFT],
     ['Data rilascio', ddmmyyyy(d.releaseDate), 230],
-    ['Luogo', d.place, 380],
+    ...(placeFits ? [['Luogo', d.place, 380] as [string, string | null, number]] : []),
   ]);
+  if (!placeFits) s.long('Luogo', d.place);
   if (d.rectifiedProtocol)
     s.row([['Rettifica del certificato protocollo', d.rectifiedProtocol, LEFT]]);
 

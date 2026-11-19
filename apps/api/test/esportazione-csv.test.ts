@@ -23,6 +23,30 @@ describe('formato CSV', () => {
   });
 });
 
+describe('formule nei testi (D172)', () => {
+  it('un testo che comincia con = + - @ prende un apostrofo; numeri, date e altri testi no', () => {
+    const csv = toCsv(
+      ['a'],
+      [
+        { a: '=SOMMA(A1:A9)' },
+        { a: '+39 000 0000001' },
+        { a: '-2+3+cmd' },
+        { a: '@SUM(1)' },
+        { a: -3.5 },
+        { a: 'Nota normale' },
+      ],
+    );
+    expect(csv.split('\r\n').slice(1, 7)).toEqual([
+      "'=SOMMA(A1:A9)",
+      "'+39 000 0000001",
+      "'-2+3+cmd",
+      "'@SUM(1)",
+      '-3.5',
+      'Nota normale',
+    ]);
+  });
+});
+
 describe('esportazione CSV dell’archivio', () => {
   let t: TestDatabase;
   let s: Scenario;

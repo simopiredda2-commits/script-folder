@@ -32,10 +32,21 @@ export function PatientsPage() {
   const { data, error, loading } = useApi<{ pazienti: PatientRow[] }>(
     `/api/pazienti${query({ q })}`,
   );
+  // «Nuovo paziente» solo per chi può registrarne in almeno un archivio (registry.write).
+  const creatable = useApi<{ archivi: unknown[] }>('/api/pazienti/nuovo');
 
   return (
     <>
-      <PageHeader title="Pazienti" />
+      <PageHeader
+        title="Pazienti"
+        actions={
+          creatable.data && creatable.data.archivi.length > 0 ? (
+            <Link className="pulsante pulsante-primario" to="/pazienti/nuovo">
+              <Icon name="aggiungi" /> <span>Nuovo paziente</span>
+            </Link>
+          ) : undefined
+        }
+      />
       <div role="search" className="ricerca">
         <label htmlFor="cerca-paziente">Cerca un paziente</label>
         <div className="ricerca-campo">

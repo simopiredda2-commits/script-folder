@@ -607,13 +607,24 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await check(sec, 'cartella vista dalla segreteria');
       // La segreteria non scrive le terapie e non ha un archivio suo.
       await expect(sec.getByRole('link', { name: 'Nuova terapia' }).count()).resolves.toBe(0);
-      // Né gli strumenti dello studio (modelli, impaginazione, Fascicolo).
+      // Degli strumenti dello studio solo gli elenchi, in sola lettura (D175): niente modelli,
+      // impaginazione né Fascicolo.
+      await sec
+        .getByRole('navigation', { name: 'Sezioni' })
+        .getByRole('link', { name: 'Strumenti' })
+        .click();
+      await sec.getByRole('heading', { level: 2, name: 'Elenchi dello studio' }).waitFor();
       await expect(
         sec
-          .getByRole('navigation', { name: 'Sezioni' })
-          .getByRole('link', { name: 'Strumenti' })
-          .count(),
-      ).resolves.toBe(0);
+          .getByRole('group', { name: 'Sezione degli strumenti' })
+          .getByRole('button')
+          .allInnerTexts(),
+      ).resolves.toEqual(['Elenchi dello studio']);
+      await sec.getByText('qui si consultano', { exact: false }).waitFor();
+      await expect(sec.getByRole('button', { name: 'Aggiungi all’elenco' }).count()).resolves.toBe(
+        0,
+      );
+      await check(sec, 'elenchi dello studio, segreteria');
       await expect(
         sec
           .getByRole('navigation', { name: 'Sezioni' })
@@ -1358,6 +1369,357 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'AFT del titolare, consultazioni e attività', true);
   });
 
+  it('Strumenti dell’amministratore: dati dello studio, postazioni e stato del servizio (tappa 14)', async () => {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    const admin = await ctx.newPage();
+    try {
+      await loginInBrowser(admin, 'amministratore');
+      await admin.goto(`${base}/strumenti?sezione=studio`);
+      await admin
+        .getByRole('heading', { level: 2, name: 'Dati e impostazioni dello studio' })
+        .waitFor();
+      await admin.getByLabel('Regione').fill('PIEMONTE');
+      await admin.getByLabel('Telefono').fill('000 0000002');
+      await admin.getByRole('button', { name: 'Salva i dati dello studio' }).click();
+      await admin.getByText('Dati e impostazioni dello studio salvati.').waitFor();
+      await check(admin, 'dati dello studio, amministratore', true);
+
+      await admin.goto(`${base}/strumenti?sezione=stampa`);
+      await admin.getByRole('heading', { level: 2, name: 'Postazioni dello studio' }).waitFor();
+      await admin.getByLabel('Nome della postazione').fill('Ambulatorio di prova');
+      await admin.getByRole('button', { name: 'Aggiungi la postazione' }).click();
+      await admin
+        .getByRole('table', { name: 'Postazioni attive' })
+        .getByRole('cell', { name: 'Ambulatorio di prova', exact: true })
+        .first()
+        .waitFor();
+      await check(admin, 'postazioni e stampa, amministratore', true);
+      // Preferenze di stampa dello studio (D180): i certificati dai modelli in A5.
+      await admin
+        .getByRole('heading', { level: 3, name: 'Preferenze dello studio e delle postazioni' })
+        .waitFor();
+      await admin
+        .getByRole('button', {
+          name: 'Modifica le preferenze dello studio per «Certificati dai modelli»',
+        })
+        .click();
+      await admin.getByLabel('Stampante consigliata').fill('Stampante di prova');
+      await admin.getByLabel('Carta', { exact: true }).selectOption('A5');
+      await check(admin, 'preferenze di stampa di un documento', true);
+      await admin.getByRole('button', { name: 'Salva le preferenze' }).click();
+      await admin
+        .getByRole('table', { name: 'Preferenze dello studio' })
+        .getByText('Stampante di prova')
+        .waitFor();
+
+      await admin.goto(`${base}/strumenti?sezione=servizio`);
+      await admin.getByRole('heading', { level: 2, name: 'Stato del servizio' }).waitFor();
+      await check(admin, 'stato del servizio', true);
+    } finally {
+      await ctx.close();
+    }
+    // Il medico legge i dati dello studio senza poterli cambiare.
+    await page.goto(`${base}/strumenti?sezione=studio`);
+    await page
+      .getByRole('heading', { level: 2, name: 'Dati e impostazioni dello studio' })
+      .waitFor();
+    await expect(
+      page.getByRole('button', { name: 'Salva i dati dello studio' }).count(),
+    ).resolves.toBe(0);
+    // Il medico vede che cosa vale sulla sua postazione, senza le preferenze delle altre.
+    await page.goto(`${base}/strumenti?sezione=stampa`);
+    await page.getByRole('heading', { level: 3, name: 'Questa postazione' }).waitFor();
+    await page
+      .getByText(/Stampante di prova/)
+      .first()
+      .waitFor();
+    await expect(
+      page
+        .getByRole('heading', { level: 3, name: 'Preferenze dello studio e delle postazioni' })
+        .count(),
+    ).resolves.toBe(0);
+    await check(page, 'postazioni e stampa, medico', true);
+  });
+
+  it('utenti: l’amministratore crea una segreteria, che aspetta; il medico titolare la conferma e riceve la password (tappa 14, D179)', async () => {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    const admin = await ctx.newPage();
+    try {
+      await loginInBrowser(admin, 'amministratore');
+      await admin.goto(`${base}/strumenti?sezione=utenti`);
+      await admin.getByRole('heading', { level: 2, name: 'Utenti e ruoli' }).waitFor();
+      const form = admin.getByRole('form', { name: 'Nuovo utente' });
+      await form.getByLabel('Nome utente').fill('segreteria.e2e');
+      await form.getByLabel('Nome mostrato').fill('Segreteria di prova e2e');
+      await form.getByLabel('Segreteria', { exact: true }).check();
+      await form.getByRole('button', { name: 'Crea l’utente' }).click();
+      await admin.getByText('Utente creato: Segreteria di prova e2e.').waitFor();
+      // L'amministratore non riceve la password di chi lavora con i dati dei pazienti.
+      await expect(admin.locator('.segreto').count()).resolves.toBe(0);
+      await admin
+        .getByRole('table', { name: 'Utenti dello studio' })
+        .getByRole('row')
+        .filter({ hasText: 'segreteria.e2e' })
+        .getByText('In attesa di conferma di un titolare')
+        .waitFor();
+      await check(admin, 'utenti e ruoli, utente in attesa', true);
+    } finally {
+      await ctx.close();
+    }
+    // Il medico titolare la trova fra gli utenti da confermare, la conferma e riceve la password.
+    await page.goto(`${base}/strumenti?sezione=conferme`);
+    await page.getByRole('heading', { level: 2, name: 'Utenti da confermare' }).waitFor();
+    const row = page
+      .getByRole('table', { name: 'Utenti in attesa della conferma di un medico titolare' })
+      .getByRole('row')
+      .filter({ hasText: 'segreteria.e2e' });
+    await row.waitFor();
+    await check(page, 'utenti da confermare', true);
+    page.once('dialog', (d) => void d.accept());
+    await row.getByRole('button', { name: 'Conferma Segreteria di prova e2e' }).click();
+    await page.getByText('Password temporanea di Segreteria di prova e2e').waitFor();
+    await expect(page.locator('.segreto').innerText()).resolves.toMatch(/\S{8,}/);
+    await page.getByRole('button', { name: 'Consegnata: nascondi la password' }).click();
+    await page.getByText('Nessun utente da confermare.').waitFor();
+    await expect(page.locator('.segreto').count()).resolves.toBe(0);
+  });
+
+  it('nuovo paziente e dati amministrativi: identità controllata, canale del promemoria (tappa 15)', async () => {
+    // Un paziente inventato (D12): codice fiscale con la X in dodicesima posizione.
+    const [nuovo] = generatePatients({ seed: `nuovo-paziente-e2e-${s.studioId}`, count: 1 });
+    await page.goto(`${base}/pazienti`);
+    await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
+    await page.getByRole('link', { name: 'Nuovo paziente' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Nuovo paziente' }).waitFor();
+    await page.getByLabel('Cognome').fill(nuovo!.lastName);
+    await page.getByLabel('Nome', { exact: true }).fill(nuovo!.firstName);
+    await page.getByLabel(nuovo!.sex === 'M' ? 'Maschile' : 'Femminile').check();
+    await page.getByLabel('Data di nascita').fill(nuovo!.birthDate);
+    await page.getByLabel('Comune o Stato estero di nascita').fill(nuovo!.birthPlace.name);
+    await page.getByLabel('Codice catastale del luogo di nascita').fill(nuovo!.birthPlace.code);
+    await page.getByLabel('Codice fiscale').fill(nuovo!.fiscalCode);
+    await check(page, 'nuovo paziente', true);
+    await page.getByRole('button', { name: 'Registra il paziente' }).click();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+
+    // Dati amministrativi: il canale del promemoria scelto dal paziente (R15).
+    await page.getByRole('link', { name: 'Dati amministrativi' }).first().click();
+    await page.getByRole('heading', { level: 2, name: 'Canale del promemoria' }).waitFor();
+    await check(page, 'dati amministrativi', true);
+    await page.getByRole('button', { name: 'Modifica canale del promemoria' }).click();
+    await page
+      .getByLabel('Canale scelto dal paziente')
+      .selectOption({ label: 'Promemoria cartaceo' });
+    const promemoria = page.getByRole('region', { name: 'Canale del promemoria' });
+    await promemoria.getByRole('button', { name: /^Salva/ }).click();
+    await promemoria.getByText('Promemoria cartaceo').first().waitFor();
+  });
+
+  it('importazione a passi: file, destinazione proposta, colonne, anteprima, prova, importazione (tappa 15)', async () => {
+    // Pazienti inventati (D12): in prova si importano solo codici fiscali con la X.
+    const nuovi = generatePatients({ seed: `importazione-e2e-${s.studioId}`, count: 3 });
+    const csv = [
+      'Codice fiscale;Cognome;Nome;Sesso;Data di nascita',
+      ...nuovi.map((p) => [p.fiscalCode, p.lastName, p.firstName, p.sex, p.birthDate].join(';')),
+    ].join('\r\n');
+    await page.goto(`${base}/strumenti?sezione=importazione`);
+    await page
+      .getByRole('heading', { level: 2, name: 'Importazione da altri programmi' })
+      .waitFor();
+    await check(page, 'importazione: scegli il file', true);
+    await page.getByLabel('File da importare').setInputFiles({
+      name: 'pazienti-inventati.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(csv, 'utf-8'),
+    });
+    await page.getByRole('button', { name: 'Carica e leggi il file' }).click();
+    await page.getByRole('heading', { level: 4, name: 'File letto' }).waitFor();
+    await page.getByRole('definition').filter({ hasText: 'Punto e virgola (;)' }).waitFor();
+
+    // La destinazione è proposta dai nomi delle colonne: è solo un suggerimento.
+    await page.getByRole('button', { name: 'Avanti: dove vanno i dati' }).click();
+    await page.getByRole('heading', { level: 3, name: '2. Dove vanno i dati' }).waitFor();
+    expect(await page.getByLabel('Dove vanno le righe').inputValue()).toBe('pazienti');
+    await check(page, 'importazione: dove vanno i dati', true);
+
+    await page.getByRole('button', { name: 'Avanti: colonne e campi' }).click();
+    await page.getByRole('heading', { level: 3, name: '3. Colonne e campi' }).waitFor();
+    await check(page, 'importazione: colonne e campi', true);
+
+    await page.getByRole('button', { name: 'Mostra l’anteprima' }).click();
+    await page.getByRole('heading', { level: 3, name: '4. Anteprima' }).waitFor();
+    await page.getByText(nuovi[0]!.lastName).first().waitFor();
+    await check(page, 'importazione: anteprima', true);
+
+    await page.getByRole('button', { name: 'Avanti: prova senza scrivere' }).click();
+    await page.getByRole('heading', { level: 3, name: '5. Prova senza scrivere' }).waitFor();
+    await page.getByRole('button', { name: 'Fai la prova (non scrive nulla)' }).click();
+    await page.getByText('Prova finita: nessun dato è stato scritto.').waitFor();
+    await check(page, 'importazione: prova senza scrivere', true);
+    // La prova non ha scritto nulla.
+    const codici = nuovi.map((p) => p.fiscalCode);
+    const scritti = async () =>
+      (await t.db.select({ cf: patient.fiscalCode }).from(patient)).filter((r) =>
+        codici.includes(r.cf),
+      ).length;
+    expect(await scritti()).toBe(0);
+
+    await page.getByRole('button', { name: 'Avanti: importa' }).click();
+    await page.getByRole('heading', { level: 3, name: '6. Importa' }).waitFor();
+    const importa = page.getByRole('button', { name: 'Importa', exact: true });
+    await expect(importa.isDisabled()).resolves.toBe(true);
+    await page.getByLabel('Ho controllato la prova: importa i dati nel mio archivio').check();
+    await check(page, 'importazione: conferma', true);
+    await importa.click();
+    await page.getByRole('heading', { level: 3, name: '7. Esito' }).waitFor();
+    await page.getByText('Importazione finita.').waitFor();
+    await check(page, 'importazione: esito', true);
+    expect(await scritti()).toBe(3);
+
+    // Il paziente importato si trova nell'elenco, come uno scritto a mano.
+    await page.goto(`${base}/pazienti`);
+    await page.getByLabel('Cerca un paziente').fill(nuovi[0]!.lastName);
+    await page
+      .locator('.paziente-riga', { hasText: new RegExp(nuovi[0]!.lastName, 'i') })
+      .first()
+      .waitFor();
+  });
+
+  it('elenchi dello studio: il medico aggiunge un contatto utile (tappa 14, D175)', async () => {
+    await page.goto(`${base}/strumenti?sezione=elenchi&elenco=contatto`);
+    await page.getByRole('heading', { level: 2, name: 'Elenchi dello studio' }).waitFor();
+    await page.getByLabel('Nome', { exact: true }).fill('Laboratorio di prova e2e');
+    await page.getByLabel('Tipo', { exact: true }).selectOption({ label: 'Laboratorio' });
+    await page.getByLabel('Telefono (facoltativo)').fill('000 0000099');
+    await page.getByRole('button', { name: 'Aggiungi all’elenco' }).click();
+    await page.getByText(/«Laboratorio di prova e2e» aggiunto/).waitFor();
+    await page
+      .getByRole('table', { name: /Contatti utili in uso/ })
+      .getByText('Laboratorio di prova e2e')
+      .waitFor();
+    await check(page, 'elenchi dello studio', true);
+  });
+
+  it('archivio: autorizzazione al sostituto e sua revoca, avvisi da completare; registro di amministrazione (tappa 14, D177)', async () => {
+    await page.goto(`${base}/archivio`);
+    await page.getByRole('heading', { level: 2, name: 'Autorizzazioni sull’archivio' }).waitFor();
+    await page.getByLabel('Medico', { exact: true }).selectOption({ index: 1 });
+    await page.getByLabel('Dal', { exact: true }).fill(studioDate(new Date()));
+    await page.getByLabel('Al (compreso)').fill(studioDayFrom(new Date(), 3));
+    await page.getByLabel('Motivo', { exact: true }).fill('Ferie di prova nel browser');
+    await page.getByRole('button', { name: 'Autorizza', exact: true }).click();
+    const row = page.getByRole('row').filter({ hasText: 'Ferie di prova nel browser' });
+    await row.getByText('Attiva').waitFor();
+    await check(page, 'archivio: autorizzazioni', true);
+    // La revoca chiede conferma e chiude subito.
+    page.once('dialog', (d) => void d.accept());
+    await row.getByRole('button', { name: /^Revoca/ }).click();
+    await row.getByText('Revocata').waitFor();
+    // Avvisi: con le soglie vuote la pagina dice che cosa completare, con la fonte.
+    await page.getByRole('heading', { level: 2, name: 'Avvisi sugli accessi anomali' }).waitFor();
+    await page.getByText('Soglie da completare.').waitFor();
+    await check(page, 'archivio: avvisi sugli accessi anomali');
+
+    await page.goto(`${base}/strumenti?sezione=registro`);
+    await page
+      .getByRole('heading', { level: 2, name: 'Registro delle azioni di amministrazione' })
+      .waitFor();
+    await page
+      .getByRole('cell', { name: /Autorizzazione revocata/ })
+      .first()
+      .waitFor();
+    await check(page, 'registro di amministrazione', true);
+  });
+
+  it('referto di laboratorio con due esami e vaccinazione, scritti a mano (tappa 15, D176)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/esami`);
+    await page.getByRole('heading', { level: 2, name: 'Nuovo referto di laboratorio' }).waitFor();
+    await page.getByLabel('Data del referto').fill(studioDate(new Date()));
+    const first = page.getByRole('group', { name: 'Esame 1' });
+    await first.getByLabel('Esame', { exact: true }).fill('Esame di prova nel browser');
+    await first.getByLabel('Valore', { exact: true }).fill('13,5');
+    await first.getByLabel('Unità di misura').fill('g/dl');
+    await first.getByLabel('Minimo', { exact: true }).fill('12');
+    await first.getByLabel('Massimo', { exact: true }).fill('16');
+    await page.getByRole('button', { name: 'Aggiungi un esame' }).click();
+    const second = page.getByRole('group', { name: 'Esame 2' });
+    await second.getByLabel('Esame', { exact: true }).fill('Altro esame di prova nel browser');
+    await second.getByLabel('Valore', { exact: true }).fill('negativo');
+    await check(page, 'nuovo referto di laboratorio', true);
+    await page.getByRole('button', { name: 'Registra il referto' }).click();
+    await page.getByText('Altro esame di prova nel browser').last().waitFor();
+    await page.getByText('Esame di prova nel browser', { exact: true }).last().waitFor();
+
+    await page.goto(`${base}/pazienti/${s.richPatient}/voci`);
+    await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await page.getByRole('button', { name: 'Vaccinazioni' }).click();
+    await page.getByLabel('Vaccino', { exact: true }).fill('Vaccino di prova nel browser');
+    await page.getByLabel('Campagna vaccinale').fill('Campagna di prova');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.locator('.voce').filter({ hasText: 'Vaccino di prova nel browser' }).waitFor();
+    await check(page, 'voci cliniche: vaccinazioni', true);
+  });
+
+  it('ricetta fatta con un altro programma nei farmaci prescritti; terapia conclusa (tappa 15, D176)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/farmaci`);
+    await page
+      .getByRole('heading', { level: 2, name: /Farmaci prescritti con un altro programma/ })
+      .waitFor();
+    await page
+      .getByRole('button', { name: 'Registra una ricetta fatta con un altro programma' })
+      .click();
+    await page.getByLabel('Data della ricetta').fill('2026-01-15');
+    await page.getByLabel('Nome del farmaco').fill('Farmaco di un altro programma');
+    await page.getByLabel('Programma con cui è stata fatta').fill('Programma di prova');
+    await check(page, 'ricetta fatta con un altro programma', true);
+    await page.getByRole('button', { name: 'Registra la ricetta' }).click();
+    await page
+      .getByText(/Con un altro programma/)
+      .first()
+      .waitFor();
+    await page.getByText('Farmaco di un altro programma').first().waitFor();
+
+    // Una terapia in corso, conclusa dalla sua pagina: non si sospende e non si ripete più.
+    const [t1] = await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .insert(therapy)
+        .values({
+          patientId: s.richPatient,
+          drugName: 'Farmaco da concludere nel browser',
+          kind: 'chronic',
+          startOn: '2026-01-01',
+          createdBy: s.users.titolare.id,
+        })
+        .returning({ id: therapy.id }),
+    );
+    await page.goto(`${base}/pazienti/${s.richPatient}/terapie/${t1!.id}`);
+    await page.getByRole('button', { name: 'Concludi…' }).click();
+    await page.getByRole('heading', { level: 2, name: 'Concludi la terapia' }).waitFor();
+    await page.getByLabel('Conclusa il').fill(studioDate(new Date()));
+    await check(page, 'conclusione della terapia', true);
+    await page.getByRole('button', { name: 'Concludi la terapia' }).click();
+    // L'avviso dell'azione, poi la testata della terapia riletta: «Terapia conclusa il …» compare in
+    // tutti e due, e un browser veloce (Firefox) li mostra insieme.
+    await page.getByText(/è tra le terapie sospese o concluse dei farmaci prescritti/).waitFor();
+    await page.locator('strong', { hasText: /^Terapia conclusa il / }).waitFor();
+    // La pagina rilegge la terapia dopo l'avviso: si aspetta che «Sospendi…» sparisca.
+    await expect
+      .poll(() => page.getByRole('button', { name: 'Sospendi…' }).count(), { timeout: 5000 })
+      .toBe(0);
+  });
+
+  it('pagina della password: regole lette dal servizio, accessibile (tappa 14)', async () => {
+    await page.goto(`${base}/profilo/password`);
+    await page.getByRole('heading', { level: 1, name: 'Cambia la password' }).waitFor();
+    await check(page, 'cambio della password', true);
+  });
+
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {
     // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20. Senza
     // omonimi: il seme cambia a ogni giro, e due «Neri Ada» farebbero cercare la scheda sbagliata.
@@ -1420,18 +1782,23 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     for (const id of ids.slice(0, 20)) {
       await page.goto(`${base}/pazienti/${id}`);
       await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+      // La cartella entra nella barra con un effetto di React, subito dopo la pagina: ricaricando
+      // la pagina successiva troppo presto (WebKit) la registrazione andava persa. Nell'uso vero
+      // non si ricarica: la barra resta in memoria. Si aspetta che la barra la mostri.
+      await tab(id).waitFor();
     }
-    await expect(bar.getByRole('link').count()).resolves.toBe(20);
-    await expect(activeVisible()).resolves.toBe(true);
+    // La barra si aggiorna dopo la pagina: con i motori più lenti (WebKit) si aspetta un attimo.
+    await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
+    await expect.poll(activeVisible, { timeout: 5000 }).toBe(true);
     await check(page, 'venti cartelle aperte', true);
 
     // La ventunesima: si chiude quella usata meno di recente, con l'avviso.
     await page.goto(`${base}/pazienti/${ids[20]}`);
     await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
     await page.getByText(`chiusa quella di ${names.get(ids[0]!)}, usata meno di recente`).waitFor();
-    await expect(bar.getByRole('link').count()).resolves.toBe(20);
+    await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
     await expect(tab(ids[0]!).count()).resolves.toBe(0);
-    await expect(activeVisible()).resolves.toBe(true);
+    await expect.poll(activeVisible, { timeout: 5000 }).toBe(true);
     for (const v of TABLETS) {
       await page.setViewportSize(v);
       // Il riposizionamento segue l'evento di ridimensionamento: si aspetta un attimo.
@@ -1465,7 +1832,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe(
       'Nota lasciata a metà.',
     );
-    await expect(activeVisible()).resolves.toBe(true);
+    await expect.poll(activeVisible, { timeout: 5000 }).toBe(true);
     // Registrata, la bozza non resta: tornando, il modulo è vuoto.
     await page.getByRole('button', { name: 'Registra', exact: true }).click();
     await page.getByText('Voce registrata.').waitFor();

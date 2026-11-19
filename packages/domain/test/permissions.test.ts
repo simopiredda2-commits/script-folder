@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTIONS,
   can,
+  opensPatientData,
+  PATIENT_DATA_ROLES,
   type AccessContext,
   type Action,
   type Actor,
@@ -48,9 +50,11 @@ const ctx = (extra: Partial<AccessContext> = {}): AccessContext => ({
 });
 
 const ok = (a: Actor, action: Action, c: AccessContext = ctx()) => can(a, action, c).allowed;
+/** Azioni sullo studio, non su un archivio (tappa 14). */
+const onStudio = (a: Action) => a.startsWith('admin.') || a.startsWith('studio.');
 
 describe('medico titolare: «tutto sui propri assistiti; firma e invia ricette e certificati»', () => {
-  it.each(ACTIONS.filter((a) => !a.startsWith('admin.')))('può %s sul proprio archivio', (a) => {
+  it.each(ACTIONS.filter((a) => !onStudio(a)))('può %s sul proprio archivio', (a) => {
     expect(ok(titolare, a)).toBe(true);
   });
   it('vede anche le terapie riservate', () => {
@@ -181,8 +185,48 @@ describe('amministratore: «utenti, stampanti, intestazioni, modelli; nessun acc
     'può %s',
     (a) => expect(ok(amministratore, a, {})).toBe(true),
   );
-  it.each(ACTIONS.filter((a) => !a.startsWith('admin.')))('non può %s', (a) => {
+  it.each(ACTIONS.filter((a) => !onStudio(a)))('non può %s', (a) => {
     expect(ok(amministratore, a)).toBe(false);
+  });
+});
+
+describe('azioni sullo studio di più ruoli (tappa 14)', () => {
+  it('gli elenchi dello studio li curano i medici e l’amministratore, non la segreteria', () => {
+    for (const a of [titolare, sostituto, amministratore])
+      expect(ok(a, 'studio.lists', {})).toBe(true);
+    expect(ok(segreteria, 'studio.lists', {})).toBe(false);
+  });
+  it('il registro di amministrazione lo leggono l’amministratore e i titolari', () => {
+    for (const a of [titolare, collega, amministratore])
+      expect(ok(a, 'studio.admin_log', {})).toBe(true);
+    for (const a of [sostituto, segreteria]) expect(ok(a, 'studio.admin_log', {})).toBe(false);
+  });
+  it('gli utenti creati o cambiati dall’amministratore li conferma solo un titolare', () => {
+    for (const a of [titolare, collega, titolareAmministratore])
+      expect(ok(a, 'studio.confirm_users', {})).toBe(true);
+    for (const a of [amministratore, segreteria, sostituto])
+      expect(ok(a, 'studio.confirm_users', {})).toBe(false);
+    expect(ok(titolare, 'studio.confirm_users', ctx())).toBe(false);
+  });
+  it('i ruoli che aprono dati dei pazienti: titolare, sostituto, segreteria; non l’amministratore', () => {
+    expect(PATIENT_DATA_ROLES).toEqual(['owner_doctor', 'secretary', 'substitute_doctor']);
+    for (const a of [titolare, segreteria, sostituto, titolareAmministratore])
+      expect(opensPatientData(a.roles)).toBe(true);
+    expect(opensPatientData(amministratore.roles)).toBe(false);
+    expect(opensPatientData([])).toBe(false);
+    // Coerente con le decisioni: chi apre dati dei pazienti legge l'anagrafica di un archivio,
+    // con un'autorizzazione se non è suo; l'amministratore no.
+    for (const a of [titolare, segreteria, sostituto])
+      expect(ok(a, 'registry.read'), a.userId).toBe(true);
+  });
+  it('non riguardano un archivio', () => {
+    expect(ok(titolare, 'studio.lists', ctx())).toBe(false);
+  });
+  it('le autorizzazioni sull’archivio le dà solo il titolare, sul proprio', () => {
+    expect(ok(titolare, 'archive.grants')).toBe(true);
+    expect(ok(sostituto, 'archive.grants')).toBe(false);
+    expect(ok(collega, 'archive.grants')).toBe(false);
+    expect(ok(amministratore, 'archive.grants')).toBe(false);
   });
 });
 
@@ -207,8 +251,7 @@ describe('regole generali', () => {
   });
   it('un utente senza ruoli non può nulla', () => {
     const nessuno: Actor = { userId: 'u-0', studioId: STUDIO, roles: [] };
-    for (const a of ACTIONS)
-      expect(ok(nessuno, a, a.startsWith('admin.') ? {} : ctx())).toBe(false);
+    for (const a of ACTIONS) expect(ok(nessuno, a, onStudio(a) ? {} : ctx())).toBe(false);
   });
   it('ogni decisione ha un motivo in chiaro', () => {
     expect(can(segreteria, 'prescription.sign_send', ctx()).reason).toMatch(/medico/);

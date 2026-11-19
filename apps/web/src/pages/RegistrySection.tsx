@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import { Notice } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
@@ -139,9 +140,19 @@ export function RegistrySection({
             <dt>Email del datore di lavoro</dt>
             <dd>{p.employerEmail ?? '—'}</dd>
           </dl>
-          <button type="button" className="pulsante" onClick={start}>
-            <Icon name="firma" /> <span>Modifica i recapiti</span>
-          </button>
+          <div className="azioni">
+            <button type="button" className="pulsante" onClick={start}>
+              <Icon name="firma" /> <span>Modifica i recapiti</span>
+            </button>
+            <Link className="pulsante pulsante-piatto" to={`/pazienti/${p.id}/amministrazione`}>
+              <Icon name="apri" /> <span>Tutti i dati amministrativi</span>
+            </Link>
+          </div>
+          <p className="aiuto">
+            Nei dati amministrativi: CAP, dati SSN, stato, cittadini stranieri, canale del
+            promemoria, nucleo familiare, esenzioni, scelta del medico e la correzione
+            dell’identità.
+          </p>
           {saved && <Notice kind="fatto">Recapiti salvati.</Notice>}
         </>
       )}

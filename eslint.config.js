@@ -14,6 +14,8 @@ export default defineConfig(
       '**/.tmp-*/**',
       'docs/prototipi/**',
       'sync/**',
+      // Worktree temporanei degli agenti: copie del repository, non codice da controllare qui.
+      '.claude/worktrees/**',
     ],
   },
   js.configs.recommended,

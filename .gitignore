@@ -33,3 +33,6 @@ playwright-report/
 .idea/
 .vscode/
 .claude/settings.local.json
+
+# Worktree temporanei degli agenti (Claude Code): non entrano nel repository
+.claude/worktrees/

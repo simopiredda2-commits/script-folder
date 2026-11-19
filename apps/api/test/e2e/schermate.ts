@@ -2,10 +2,14 @@
  * Fotografa le schermate principali con i dati dimostrativi, per la revisione (docs/interfaccia.md).
  *
  *   pnpm db:seed && pnpm banche-dati:importa -- --esempio
- *   SCHERMATE_UTENTE=medico SCHERMATE_PASSWORD=… pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts
+ *   SCHERMATE_UTENTE=medico SCHERMATE_PASSWORD=… \
+ *     [SCHERMATE_AMMINISTRATORE=amministratore SCHERMATE_PASSWORD_AMMINISTRATORE=…] \
+ *     pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts
  *
  * Vuole DATABASE_URL e APP_ENCRYPTION_KEY, e un medico che non ha ancora attivato il secondo
- * fattore (il primo accesso dopo il seed). Solo pazienti inventati; nessun sito esterno.
+ * fattore (il primo accesso dopo il seed); lo stesso per l'amministratore, se si danno le sue
+ * credenziali (schermate della tappa 14 che vede solo lui). Solo pazienti inventati; nessun sito
+ * esterno.
  */
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -13,7 +17,8 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { sql } from 'drizzle-orm';
-import { chromium, type Page } from 'playwright';
+import { generatePatients } from '@mmg/fixtures';
+import { chromium, type Browser, type Page } from 'playwright';
 import { buildApp } from '../../src/app';
 import { loadConfig } from '../../src/config';
 import { referenceUpdatesFromConfig } from '../../src/reference/updates-service';
@@ -27,6 +32,8 @@ const OUT = resolve(import.meta.dirname, '..', '..', '..', '..', 'docs', 'scherm
 const user = process.env.SCHERMATE_UTENTE;
 const password = process.env.SCHERMATE_PASSWORD;
 if (!user || !password) throw new Error('Servono SCHERMATE_UTENTE e SCHERMATE_PASSWORD');
+const adminUser = process.env.SCHERMATE_AMMINISTRATORE ?? 'amministratore';
+const adminPassword = process.env.SCHERMATE_PASSWORD_AMMINISTRATORE;
 
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
@@ -45,6 +52,32 @@ async function shot(page: Page, name: string, fullPage = false) {
   await page.waitForLoadState('networkidle');
   await page.screenshot({ path: join(OUT, `${name}.png`), fullPage });
   console.log(`  ${name}.png`);
+}
+
+/** Primo accesso di un utente del seed: password, poi l'attivazione del secondo fattore. */
+async function firstLogin(
+  browser: Browser,
+  base: string,
+  username: string,
+  secret: string,
+  workstation = 'Studio',
+) {
+  const ctx = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 2,
+    locale: 'it-IT',
+  });
+  const p = await ctx.newPage();
+  await p.goto(base);
+  await p.getByLabel('Nome utente').fill(username);
+  await p.getByLabel('Password').fill(secret);
+  await p.getByLabel('Postazione').fill(workstation);
+  await p.getByRole('button', { name: 'Continua' }).click();
+  const code = (await p.locator('.segreto').innerText()).replace(/\s/g, '');
+  await p.getByLabel('Codice a 6 cifre').fill(totp(base32Decode(code), Date.now()));
+  await p.getByRole('button', { name: 'Entra' }).click();
+  await p.getByRole('heading', { level: 1, name: 'Oggi' }).waitFor();
+  return { ctx, page: p };
 }
 
 try {
@@ -205,7 +238,11 @@ try {
   await page.getByLabel('Momento').selectOption('la sera');
   await page.getByLabel('Via', { exact: true }).selectOption('per bocca');
   await page.getByLabel('Istruzioni per il paziente').fill('Dopo cena.');
-  await page.getByText('1 compressa una volta al giorno, la sera, per bocca').waitFor();
+  // La lettura composta dalla scheda (la stessa frase può essere anche una posologia dello studio).
+  await page
+    .getByRole('paragraph')
+    .filter({ hasText: '1 compressa una volta al giorno, la sera, per bocca' })
+    .waitFor();
   await page
     .getByRole('heading', { name: 'Come si prende' })
     .evaluate((el) => el.scrollIntoView({ block: 'start' }));
@@ -441,8 +478,9 @@ try {
   await page.goto(`${base}/profilo/recapiti`);
   await page.getByRole('heading', { level: 1, name: 'Recapiti di studio' }).waitFor();
   await shot(page, '33-recapiti-di-studio');
-  await page.goto(`${base}/strumenti`);
-  await page.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
+  // Le impostazioni del Fascicolo (D133): dalla tappa 14 la pagina apre una sezione alla volta.
+  await page.goto(`${base}/strumenti?sezione=fascicolo`);
+  await page.getByRole('heading', { level: 2, name: 'Fascicolo Sanitario Elettronico' }).waitFor();
   await shot(page, '34-strumenti', true);
 
   // Tappa 13: modelli ufficiali e proposti (D158, D160), e il certificato della patente.
@@ -488,6 +526,112 @@ try {
   await page.getByRole('heading', { level: 1, name: 'Archivio' }).waitFor();
   await page.getByLabel(/La segreteria legge il riepilogo clinico/).waitFor();
   await shot(page, '16-archivio');
+
+  // Tappa 14: autorizzazioni sull'archivio e avvisi sugli accessi anomali (D177).
+  await page
+    .getByRole('table', { name: /Autorizzazioni date sull’archivio/ })
+    .scrollIntoViewIfNeeded();
+  await page.getByRole('heading', { level: 2, name: 'Avvisi sugli accessi anomali' }).waitFor();
+  await shot(page, '50-archivio-autorizzazioni-e-avvisi', true);
+
+  // Tappa 14: elenchi dello studio e registro di amministrazione (D175, D177).
+  await page.goto(`${base}/strumenti?sezione=elenchi&elenco=posologia`);
+  await page.getByRole('table', { name: /Posologie in uso/ }).waitFor();
+  await shot(page, '40-elenchi-dello-studio', true);
+  await page.goto(`${base}/strumenti?sezione=registro`);
+  await page
+    .getByRole('heading', { level: 2, name: 'Registro delle azioni di amministrazione' })
+    .waitFor();
+  await shot(page, '41-registro-di-amministrazione', true);
+
+  // Tappa 15: importazione a passi con un CSV di pazienti inventati, fino alla prova senza
+  // scrivere (D173): le cartelle dimostrative non cambiano.
+  // Solo adulti, come in tutte le schermate (D149).
+  const people = generatePatients({ seed: 'schermate-importazione', count: 40 })
+    .filter((x) => x.birthDate < '2000-01-01')
+    .slice(0, 4);
+  const csv = [
+    'Codice fiscale;Cognome;Nome;Sesso;Data di nascita',
+    ...people.map((x) => [x.fiscalCode, x.lastName, x.firstName, x.sex, x.birthDate].join(';')),
+  ].join('\r\n');
+  await page.goto(`${base}/strumenti?sezione=importazione`);
+  await page.getByLabel('File da importare').setInputFiles({
+    name: 'pazienti-inventati.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(csv, 'utf-8'),
+  });
+  await page.getByRole('button', { name: 'Carica e leggi il file' }).click();
+  await page.getByRole('heading', { level: 4, name: 'File letto' }).waitFor();
+  await page.getByRole('button', { name: 'Avanti: dove vanno i dati' }).click();
+  await page.getByRole('heading', { level: 3, name: '2. Dove vanno i dati' }).waitFor();
+  await shot(page, '42-importazione-destinazioni', true);
+  await page.getByRole('button', { name: 'Avanti: colonne e campi' }).click();
+  await page.getByRole('button', { name: 'Mostra l’anteprima' }).click();
+  await page.getByRole('button', { name: 'Avanti: prova senza scrivere' }).click();
+  await page.getByRole('button', { name: 'Fai la prova (non scrive nulla)' }).click();
+  await page.getByText('Prova finita: nessun dato è stato scritto.').waitFor();
+  await shot(page, '43-importazione-prova', true);
+
+  // Tappa 15: pannello amministrativo del paziente (D169).
+  await page.goto(`${base}/pazienti/nuovo`);
+  await page.getByRole('heading', { level: 1, name: 'Nuovo paziente' }).waitFor();
+  await shot(page, '44-nuovo-paziente', true);
+  await page.goto(`${base}/pazienti/${patientId}/amministrazione`);
+  await page.getByRole('heading', { level: 2, name: 'Canale del promemoria' }).waitFor();
+  await shot(page, '45-dati-amministrativi', true);
+
+  // Tappa 15: menu che mancavano (D176).
+  await page.goto(`${base}/pazienti/${patientId}/esami`);
+  await page.getByRole('heading', { level: 2, name: 'Nuovo referto di laboratorio' }).waitFor();
+  await shot(page, '46-esami-e-referto', true);
+  await page.goto(`${base}/pazienti/${patientId}/voci`);
+  await page.getByRole('button', { name: 'Vaccinazioni' }).click();
+  await page.locator('.voce').filter({ hasText: 'Vaccino antinfluenzale dimostrativo' }).waitFor();
+  await shot(page, '47-vaccinazioni', true);
+  await page.goto(`${base}/pazienti/${patientId}/farmaci`);
+  await page
+    .getByRole('heading', { level: 2, name: /Farmaci prescritti con un altro programma/ })
+    .waitFor();
+  await shot(page, '48-farmaci-prescritti-con-un-altro-programma', true);
+  const ended = await db.execute<{ id: string }>(sql`
+    select id from therapy where patient_id = ${patientId} and status = 'ended' limit 1`);
+  if (ended.rows[0]) {
+    await page.goto(`${base}/pazienti/${patientId}/terapie/${ended.rows[0].id}`);
+    await page.getByText(/Terapia conclusa il/).waitFor();
+    await shot(page, '49-terapia-conclusa');
+  }
+
+  // Tappa 14: le schede che vede solo l'amministratore, se si danno le sue credenziali.
+  if (adminPassword) {
+    // Dalla postazione dell'ambulatorio: «Questa postazione» mostra le sue preferenze di stampa.
+    const admin = await firstLogin(browser, base, adminUser, adminPassword, 'Ambulatorio');
+    // Una segreteria nuova (inventata): aspetta la conferma di un medico titolare (D179).
+    await admin.page.goto(`${base}/strumenti?sezione=utenti`);
+    const form = admin.page.getByRole('form', { name: 'Nuovo utente' });
+    await form.getByLabel('Nome utente').fill('segreteria.pomeriggio');
+    await form.getByLabel('Nome mostrato').fill('Segreteria del pomeriggio');
+    await form.getByLabel('Segreteria', { exact: true }).check();
+    await form.getByRole('button', { name: 'Crea l’utente' }).click();
+    await admin.page.getByText('Utente creato: Segreteria del pomeriggio.').waitFor();
+    for (const [sezione, title, name] of [
+      ['utenti', 'Utenti e ruoli', '51-utenti-e-ruoli'],
+      ['studio', 'Dati e impostazioni dello studio', '52-dati-dello-studio'],
+      ['stampa', 'Postazioni dello studio', '53-postazioni-e-stampa'],
+      ['servizio', 'Stato del servizio', '54-stato-del-servizio'],
+    ] as const) {
+      await admin.page.goto(`${base}/strumenti?sezione=${sezione}`);
+      await admin.page.getByRole('heading', { level: 2, name: title }).waitFor();
+      await shot(admin.page, name, true);
+    }
+    await admin.ctx.close();
+    // Il medico titolare la trova fra gli utenti da confermare, con chi l'ha chiesta e quando.
+    await page.goto(`${base}/strumenti?sezione=conferme`);
+    await page
+      .getByRole('table', { name: 'Utenti in attesa della conferma di un medico titolare' })
+      .getByText('segreteria.pomeriggio')
+      .waitFor();
+    await shot(page, '55-utenti-da-confermare', true);
+  } else console.log('  (schermate dell’amministratore saltate: manca la sua password)');
 
   // Più cartelle aperte insieme (D68, D129): una scheda per paziente nella barra sotto il menu,
   // quella attiva in giallo; ogni scheda riporta all'ultima pagina vista di quel paziente.

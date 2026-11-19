@@ -1,7 +1,7 @@
-import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { createDatabase, createPool, type Database } from '../../src/db/client';
 import { runMigrations } from '../../src/db/migrate';
+import { newTestDatabaseName } from './test-db-names';
 
 export interface TestDatabase {
   name: string;
@@ -32,7 +32,7 @@ function adminUrl(): string {
 export async function createTestDatabase(
   options: { migrate?: boolean } = {},
 ): Promise<TestDatabase> {
-  const name = `mmg_test_${randomBytes(6).toString('hex')}`;
+  const name = newTestDatabaseName();
   const admin = new pg.Client({ connectionString: adminUrl() });
   await admin.connect();
   await admin.query(`CREATE DATABASE ${name}`);

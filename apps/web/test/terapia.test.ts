@@ -134,6 +134,22 @@ describe('scheda della terapia: controlli formali e corpo per il servizio', () =
     expect(validateDraft({ ...d, unitsPerDay: '0,5' })).toEqual({});
   });
 
+  it('terapia conclusa: la data di fine c’è e non è nel futuro (tappa 15)', () => {
+    const today = '2026-11-18';
+    const d = { ...draftFromTherapy(saved), concluded: true };
+    expect(validateDraft(d, today).endOn).toMatch(/Terapia conclusa: manca la data di fine/);
+    expect(validateDraft({ ...d, endOn: '2026-11-19' }, today).endOn).toMatch(/nel futuro/);
+    expect(validateDraft({ ...d, endOn: '2026-11-18' }, today)).toEqual({});
+    // La fine prima dell'inizio resta il messaggio di sempre.
+    expect(validateDraft({ ...d, endOn: '2025-12-31' }, today).endOn).toMatch(/prima dell’inizio/);
+    // Senza «conclusa», una fine nel futuro è la fine prevista: va bene.
+    expect(validateDraft({ ...d, concluded: false, endOn: '2027-01-01' }, today)).toEqual({});
+    // Una terapia salvata come conclusa torna nella scheda come conclusa.
+    expect(draftFromTherapy({ ...saved, status: 'ended' }).concluded).toBe(true);
+    expect(draftFromTherapy(saved).concluded).toBe(false);
+    expect(emptyDraft(today).concluded).toBe(false);
+  });
+
   it('le unità al giorno corrette a mano restano a mano', () => {
     expect(draftFromTherapy(saved).unitsAuto).toBe(true);
     const manual = draftFromTherapy({ ...saved, unitsPerDay: '1.5' });

@@ -4,6 +4,7 @@ import { dateTime } from '../lib/format';
 import { useApi } from '../lib/useApi';
 import { ErrorMessage, Notice } from './common';
 import { Icon } from './Icon';
+import { PrintHint, usePrintPreference } from './PrintHint';
 
 interface Contacts {
   paziente: { email: string | null; telefono: string | null };
@@ -42,8 +43,10 @@ const OUTCOME: Record<string, string> = {
 
 /**
  * Promemoria di una ricetta inviata (tappa 7). Ricetta SSN: promemoria completo o solo NRE, dai
- * dati fissati all'invio. Ricetta bianca: solo il PDF prodotto dal SAC. Email e SMS solo a un
- * recapito del paziente o di un delegato con delega valida (R16); ogni consegna è registrata.
+ * dati fissati all'invio; per primo quello delle preferenze di stampa della postazione (tappa 14),
+ * con il suggerimento di stampante e copie. Ricetta bianca: solo il PDF prodotto dal SAC. Email e
+ * SMS solo a un recapito del paziente o di un delegato con delega valida (R16); ogni consegna è
+ * registrata.
  */
 export function ReminderPanel({
   prescriptionId,
@@ -66,6 +69,13 @@ export function ReminderPanel({
   const white = kind === 'white';
   const base = `/api/ricette/${prescriptionId}/promemoria`;
   const field = channel === 'email' ? 'email' : 'telefono';
+  // Preferenze di stampa (tappa 14): la variante preferita va per prima, in evidenza se è stata
+  // scelta; senza preferenza i pulsanti restano come sempre.
+  const printing = usePrintPreference(white ? 'promemoria_bianca' : 'promemoria');
+  const nreFirst = !white && printing?.variante === 'solo_nre';
+  const chosenVariant = !white && printing !== null && printing.da.variante !== 'predefinito';
+  const hintId = `stampa-promemoria-${prescriptionId}`;
+  const describedBy = printing?.suggerimento ? hintId : undefined;
 
   // Le scelte possibili: il paziente e le deleghe valide oggi, con il recapito del canale.
   const options = contacts.data
@@ -111,28 +121,43 @@ export function ReminderPanel({
     <section className="pannello-promemoria" aria-label="Promemoria della ricetta">
       <h4>Promemoria</h4>
       <div className="azioni">
+        {nreFirst && (
+          <a
+            className={`pulsante${chosenVariant ? ' pulsante-primario' : ''}`}
+            href={`${base}?formato=nre`}
+            target="_blank"
+            rel="noopener"
+            aria-describedby={describedBy}
+            onClick={() => setTimeout(deliveries.reload, 800)}
+          >
+            <Icon name="stampa" /> <span>Solo NRE (PDF)</span>
+          </a>
+        )}
         <a
-          className="pulsante"
+          className={`pulsante${chosenVariant && !nreFirst ? ' pulsante-primario' : ''}`}
           href={base}
           target="_blank"
           rel="noopener"
+          aria-describedby={describedBy}
           onClick={() => setTimeout(deliveries.reload, 800)}
         >
           <Icon name="stampa" />{' '}
           <span>{white ? 'Promemoria del SAC (PDF)' : 'Promemoria (PDF)'}</span>
         </a>
-        {!white && (
+        {!white && !nreFirst && (
           <a
             className="pulsante"
             href={`${base}?formato=nre`}
             target="_blank"
             rel="noopener"
+            aria-describedby={describedBy}
             onClick={() => setTimeout(deliveries.reload, 800)}
           >
             <Icon name="stampa" /> <span>Solo NRE (PDF)</span>
           </a>
         )}
       </div>
+      <PrintHint kind={white ? 'promemoria_bianca' : 'promemoria'} id={hintId} />
       {white && (
         <p className="aiuto">
           Per la ricetta bianca vale solo il promemoria prodotto dal SAC: il programma lo consegna

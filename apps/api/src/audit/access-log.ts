@@ -88,7 +88,28 @@ export type AccessAction =
   | 'pdf_profilo_sanitario'
   | 'impostazioni_aft'
   | 'consultazione_aft'
-  | 'attivita_aft';
+  | 'attivita_aft'
+  /** Tappa 14: azioni di amministrazione (dati in `details.area` e `details.azione`, mai segreti). */
+  | 'amministrazione'
+  | 'cambio_password'
+  | 'autorizzazione_archivio'
+  | 'revoca_autorizzazione'
+  | 'lettura_registro_amministrazione'
+  | 'lettura_avvisi_accessi'
+  /** Tappa 15: pannello amministrativo del paziente, ricette passate, importazione. */
+  | 'nuovo_paziente'
+  | 'modifica_dati_amministrativi'
+  | 'correzione_identita'
+  | 'lettura_dati_amministrativi'
+  | 'nuova_esenzione'
+  | 'modifica_esenzione'
+  | 'nuova_scelta'
+  | 'modifica_scelta'
+  | 'nuova_ricetta_passata'
+  | 'annullamento_ricetta_passata'
+  | 'prova_importazione'
+  | 'importazione'
+  | 'lettura_importazioni';
 
 export interface AccessEntry {
   studioId?: string | null;
@@ -111,6 +132,30 @@ export async function logAccess(db: Database | Tx, entry: AccessEntry): Promise<
     workstation: entry.workstation ?? null,
     details: entry.details ?? {},
   });
+}
+
+/**
+ * La stessa riga per molti pazienti, in un solo comando (importazione). La catena del registro
+ * (migrazione 0002) mette in fila tutte le righe di tutto il servizio fino al commit: con una
+ * richiesta al database per paziente restava presa per secondi, e intanto ogni accesso aspettava
+ * (terza revisione dei poteri dell'amministratore). Il trigger della catena è VOLATILE: ogni riga
+ * vede le precedenti dello stesso comando, e la catena resta senza buchi.
+ */
+export async function logAccessForPatients(
+  db: Database | Tx,
+  patientIds: readonly string[],
+  entry: Omit<AccessEntry, 'patientId'>,
+): Promise<void> {
+  if (patientIds.length === 0) return;
+  // Un solo parametro per tutti gli identificativi (uuid letti dal database): nessun limite sul
+  // numero dei parametri di un comando.
+  const ids = `{${patientIds.join(',')}}`;
+  await db.execute(sql`
+    insert into access_log (studio_id, user_id, patient_id, action, outcome, workstation, details)
+    select ${entry.studioId ?? null}::uuid, ${entry.userId ?? null}::uuid, x.p, ${entry.action},
+      ${entry.outcome}, ${entry.workstation ?? null}, ${JSON.stringify(entry.details ?? {})}::jsonb
+    from unnest(${ids}::uuid[]) with ordinality as x(p, n)
+    order by x.n`);
 }
 
 /** Verifica la catena del registro: null se integra, altrimenti il primo numero rotto. */

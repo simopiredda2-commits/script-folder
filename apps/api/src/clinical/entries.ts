@@ -14,12 +14,15 @@ import {
   ENTRY_KIND,
   ENTRY_TYPES,
   ICD9_DIAGNOSIS_PATTERN,
+  LAB_RESULTS_MAX,
   MEASURE_KEYS,
   MOTOR_CAPACITIES,
   MOTOR_CAPACITY_KEYS,
   PROBLEM_CATEGORIES,
   PROBLEM_CATEGORY_KIND,
   RELATIVE_KEYS,
+  VACCINE_DOSE_MAX,
+  checkLabReference,
   checkProblemDates,
   entryTypeOf,
   keyOf,
@@ -42,9 +45,11 @@ import {
   diaryDetail,
   examinationDetail,
   functionalStatusDetail,
+  labResultDetail,
   measurementDetail,
   problemDetail,
   riskFactorDetail,
+  vaccinationDetail,
 } from '../db/schema';
 import type { Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
@@ -157,6 +162,41 @@ const examination = z
   })
   .strict();
 
+/**
+ * Vaccinazione (tappa 15): vaccino, lotto, numero della dose, campagna; la data è quella della
+ * somministrazione. Il vaccino ha un nome libero: l'elenco ufficiale dei vaccini non è ancora tra
+ * le banche dati (fonte da individuare). Il promemoria serve per la dose successiva.
+ */
+const vaccination = z
+  .object({
+    tipo: z.literal('vaccinazione'),
+    ...common,
+    vaccino: longText(200),
+    lotto: optionalText(50),
+    dose: z.number().int().min(1).max(VACCINE_DOSE_MAX).optional(),
+    campagna: optionalText(200),
+  })
+  .strict();
+
+/** I campi di un risultato di laboratorio, uguali da soli e dentro un referto con più esami. */
+const labFields = {
+  esame: longText(200),
+  /** Il valore come lo scrive il referto: un numero o un testo («negativo», «assente»). */
+  valore: longText(100),
+  unita: optionalText(30),
+  /** Intervallo di riferimento: minimo e massimo, oppure il testo stampato sul referto. */
+  minimo: optionalText(20),
+  massimo: optionalText(20),
+  intervallo: optionalText(200),
+  /** Codice della prestazione nel catalogo regionale, se il referto lo riporta. */
+  codicePrestazione: z.string().trim().toUpperCase().max(40).optional(),
+};
+
+/** Risultato di un esame di laboratorio, con la data del referto (tappa 15). */
+const labResult = z
+  .object({ tipo: z.literal('esame_laboratorio'), ...common, ...labFields })
+  .strict();
+
 export const newEntryBody = z.discriminatedUnion('tipo', [
   problem,
   diary,
@@ -166,8 +206,36 @@ export const newEntryBody = z.discriminatedUnion('tipo', [
   lifestyle,
   examination,
   motorCapacity,
+  vaccination,
+  labResult,
 ]);
 export type NewEntry = z.infer<typeof newEntryBody>;
+
+/**
+ * Più risultati dello stesso referto insieme: una voce per esame, scritte in una transazione
+ * sola (come i parametri della stessa visita, D112): un risultato sbagliato li ferma tutti.
+ */
+export const newLabResultsBody = z
+  .object({
+    data: isoDate,
+    note: optionalText(2000),
+    riservata: z.boolean().optional(),
+    oscurata: z.boolean().optional(),
+    risultati: z.array(z.object(labFields).strict()).min(1).max(LAB_RESULTS_MAX),
+  })
+  .strict();
+
+/** Le voci di un referto con più esami, una per risultato, pronte per `entryIssues`. */
+export function labResultEntries(body: z.infer<typeof newLabResultsBody>): NewEntry[] {
+  return body.risultati.map((r) => ({
+    tipo: 'esame_laboratorio' as const,
+    data: body.data,
+    note: body.note,
+    riservata: body.riservata,
+    oscurata: body.oscurata,
+    ...r,
+  }));
+}
 
 /** Più parametri della stessa visita insieme: pressione, peso, altezza e gli altri. */
 export const newMeasurementsBody = z
@@ -252,6 +320,10 @@ export function entryIssues(e: NewEntry, today: string): string[] {
     const r = parseMeasureValue(e.valore, measureByKey(e.parametro)!);
     if ('error' in r) out.push(r.error);
   }
+  if (e.tipo === 'esame_laboratorio')
+    out.push(
+      ...checkLabReference({ minimo: e.minimo, massimo: e.massimo }).map((m) => `${e.esame}: ${m}`),
+    );
   return out;
 }
 
@@ -356,6 +428,28 @@ export async function insertEntry(
         score: e.punteggio || null,
       });
       break;
+    case 'vaccinazione':
+      await tx.insert(vaccinationDetail).values({
+        entryId,
+        vaccine: e.vaccino,
+        lot: e.lotto || null,
+        doseNumber: e.dose ?? null,
+        campaign: e.campagna || null,
+      });
+      break;
+    case 'esame_laboratorio':
+      // Il valore e gli estremi si conservano come li scrive il referto, senza conversioni.
+      await tx.insert(labResultDetail).values({
+        entryId,
+        analyte: e.esame,
+        value: e.valore,
+        unit: e.unita || null,
+        referenceLow: e.minimo || null,
+        referenceHigh: e.massimo || null,
+        referenceText: e.intervallo || null,
+        serviceCode: e.codicePrestazione || null,
+      });
+      break;
   }
   return entryId;
 }
@@ -398,7 +492,17 @@ export type EntryDetail =
     }
   | { fattore: string; valore: string }
   | { testo: string; scala: string | null; punteggio: string | null }
-  | { capacita: string | null; codice: string };
+  | { capacita: string | null; codice: string }
+  | { vaccino: string; lotto: string | null; dose: number | null; campagna: string | null }
+  | {
+      esame: string;
+      valore: string;
+      unita: string | null;
+      minimo: string | null;
+      massimo: string | null;
+      intervallo: string | null;
+      codicePrestazione: string | null;
+    };
 
 /** I dettagli delle voci, per id. */
 async function loadDetails(db: Database | Tx, ids: string[]) {
@@ -464,6 +568,29 @@ async function loadDetails(db: Database | Tx, ids: string[]) {
     .from(examinationDetail)
     .where(inArray(examinationDetail.entryId, ids)))
     out.set(r.entryId, { testo: r.text, scala: r.scale, punteggio: r.score });
+  for (const r of await db
+    .select()
+    .from(vaccinationDetail)
+    .where(inArray(vaccinationDetail.entryId, ids)))
+    out.set(r.entryId, {
+      vaccino: r.vaccine,
+      lotto: r.lot,
+      dose: r.doseNumber,
+      campagna: r.campaign,
+    });
+  for (const r of await db
+    .select()
+    .from(labResultDetail)
+    .where(inArray(labResultDetail.entryId, ids)))
+    out.set(r.entryId, {
+      esame: r.analyte,
+      valore: r.value,
+      unita: r.unit,
+      minimo: r.referenceLow,
+      massimo: r.referenceHigh,
+      intervallo: r.referenceText,
+      codicePrestazione: r.serviceCode,
+    });
   return out;
 }
 

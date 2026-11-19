@@ -15,6 +15,8 @@ import {
 } from '@mmg/domain';
 import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
+import { printSettingsFor } from '../admin/print-service';
+import { studioHeaderLines } from '../admin/studio-service';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import { appUser, doctorProfile, studioTemplate, templateCertificate } from '../db/schema';
@@ -155,6 +157,24 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
   async function profileOf(userId: string) {
     const [p] = await db.select().from(doctorProfile).where(eq(doctorProfile.userId, userId));
     return p;
+  }
+
+  /**
+   * L'impaginazione con cui si stampa: quella del medico e, se il medico non ha un'intestazione,
+   * quella dello studio, impostata dall'amministratore (D145). Il resto resta del medico.
+   */
+  async function printedLayout(actor: Actor, layout: PrintLayout): Promise<PrintLayout> {
+    if (layout.header.length) return layout;
+    const header = await studioHeaderLines(db, actor.studioId);
+    return header.length ? { ...layout, header } : layout;
+  }
+
+  /**
+   * La carta della postazione per i certificati dai modelli (tappa 14): A4, oppure A5 se è la
+   * preferenza di stampa della postazione o dello studio. I testi dei modelli non cambiano.
+   */
+  async function paperOf(actor: Actor) {
+    return (await printSettingsFor(db, actor, 'certificato_modello')).paper ?? 'A4';
   }
 
   async function studioTemplates(studioId: string) {
@@ -362,8 +382,9 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
     /** Prova di stampa con un'impaginazione (anche non ancora salvata). */
     async layoutPreview(actor: Actor, body: unknown) {
       if (!isDoctor(actor)) throw new HttpError(403, 'L’impaginazione è del medico');
-      const layout = parseLayout(body);
+      const layout = await printedLayout(actor, parseLayout(body));
       return renderTemplatePdf({
+        paper: await paperOf(actor),
         title: 'Prova di impaginazione',
         paragraphs: [
           'Questo testo serve solo a vedere come si stampano i certificati: intestazione, carattere, dimensione, margini e timbro.',
@@ -406,10 +427,11 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
     async preview(actor: Actor, patientId: string, body: unknown) {
       const { template, filled } = await compose(actor, patientId, body, 'anteprima');
       return renderTemplatePdf({
+        paper: await paperOf(actor),
         title: filled.title,
         paragraphs: filled.paragraphs,
         signature: template.signature,
-        layout: layoutOf(await profileOf(actor.userId)),
+        layout: await printedLayout(actor, layoutOf(await profileOf(actor.userId))),
         createdAt: now(),
         parts: partsOf(filled),
       });
@@ -422,7 +444,9 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
         body,
         'rilascio',
       );
-      const layout = layoutOf(await profileOf(actor.userId));
+      // Si conserva l'impaginazione stampata, intestazione dello studio compresa: il certificato
+      // rilasciato non cambia se poi cambia l'intestazione.
+      const layout = await printedLayout(actor, layoutOf(await profileOf(actor.userId)));
       const [row] = await withActor(db, actor.userId, (tx) =>
         tx
           .insert(templateCertificate)
@@ -464,6 +488,9 @@ export function createTemplateService(deps: { db: Database; now?: () => Date }) 
       );
       const r = await load(patientId, certificateId);
       return renderTemplatePdf({
+        // La carta è quella della postazione che stampa: testo e impaginazione restano quelli del
+        // rilascio (D145).
+        paper: await paperOf(actor),
         title: r.templateTitle,
         paragraphs: r.paragraphs,
         signature: r.signature,

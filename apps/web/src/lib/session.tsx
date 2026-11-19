@@ -17,6 +17,10 @@ export interface Me {
   postazione: string | null;
   /** L'archivio di cui l'utente è titolare: impostazioni ed esportazione (pagina Archivio). */
   archivio: { id: string; nome: string } | null;
+  /** Il nome con cui si accede: il modulo del cambio della password lo dà ai gestori di password. */
+  nomeUtente?: string | null;
+  /** Password temporanea (tappa 14): finché non la cambia, l'utente vede solo il cambio. */
+  devoCambiarePassword?: boolean;
 }
 
 type State =
@@ -31,6 +35,8 @@ interface Session {
   logout: () => Promise<void>;
   /** Vero se l'utente è un medico (titolare o sostituto): firma e invia. */
   isDoctor: boolean;
+  /** Vero se l'utente è amministratore dello studio (tappa 14). */
+  isAdmin: boolean;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -69,6 +75,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       refresh,
       logout,
       isDoctor: roles.includes('owner_doctor') || roles.includes('substitute_doctor'),
+      isAdmin: roles.includes('administrator'),
     };
   }, [state, refresh, logout]);
 

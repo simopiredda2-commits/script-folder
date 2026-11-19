@@ -49,14 +49,32 @@ export const ACTIONS = [
   'access_log.read',
   /** Esportazione completa dei dati dell'archivio. */
   'data.export',
+  /** Importazione da altri programmi nell'archivio, con lo smistamento verso i menu (tappa 15). */
+  'data.import',
   /** Impostazioni dell'archivio: che cosa vede la segreteria. */
   'archive.settings',
+  /** Autorizzazioni sull'archivio: sostituto e colleghi di medicina di gruppo (tappa 14). */
+  'archive.grants',
+  /** Dati e impostazioni dello studio: dati, postazioni, sicurezza, invii, avvisi (tappa 14). */
+  'admin.studio',
   'admin.users',
   'admin.printers',
   'admin.headers',
   'admin.templates',
   /** Avviare subito l'aggiornamento delle banche dati, senza aspettare la notte (D156). */
   'admin.reference_data',
+  /**
+   * Elenchi dello studio: medici suggeritori, posologie, pacchetti di prestazioni, contatti utili
+   * (tappa 14). Azione sullo studio, non su un archivio.
+   */
+  'studio.lists',
+  /** Registro delle azioni di amministrazione (utenti, ruoli, impostazioni), in sola lettura. */
+  'studio.admin_log',
+  /**
+   * Confermare (o rifiutare) gli utenti con un ruolo che apre dati dei pazienti, creati
+   * dall'amministratore o a cui l'amministratore ha dato quel ruolo (tappa 14).
+   */
+  'studio.confirm_users',
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -80,13 +98,35 @@ export const ACTION_LABELS: Record<Action, string> = {
   'reminder.print': 'Stampare i promemoria',
   'access_log.read': 'Leggere il registro degli accessi',
   'data.export': 'Esportare tutti i dati dell’archivio',
+  'data.import': 'Importare dati da altri programmi nell’archivio',
   'archive.settings': 'Decidere che cosa vede la segreteria dell’archivio',
+  'archive.grants': 'Autorizzare un sostituto o un collega di gruppo sull’archivio',
+  'admin.studio': 'Modificare i dati e le impostazioni dello studio',
   'admin.users': 'Gestire gli utenti dello studio',
   'admin.printers': 'Gestire le stampanti',
   'admin.headers': 'Gestire le intestazioni',
   'admin.templates': 'Gestire i modelli',
   'admin.reference_data': 'Avviare subito l’aggiornamento delle banche dati',
+  'studio.lists':
+    'Modificare gli elenchi dello studio (suggeritori, posologie, pacchetti, contatti)',
+  'studio.admin_log': 'Leggere il registro delle azioni di amministrazione',
+  'studio.confirm_users':
+    'Confermare gli utenti con i dati dei pazienti creati o cambiati dall’amministratore',
 };
+
+/**
+ * Ruoli che aprono dati dei pazienti (tappa 14). Se li dà l'amministratore, l'utente aspetta la
+ * conferma di un medico titolare; password e secondo fattore di chi li ha non li ripristina
+ * l'amministratore, che altrimenti entrerebbe al suo posto.
+ */
+export const PATIENT_DATA_ROLES: readonly Role[] = [
+  'owner_doctor',
+  'secretary',
+  'substitute_doctor',
+];
+
+export const opensPatientData = (roles: readonly Role[]): boolean =>
+  roles.some((r) => PATIENT_DATA_ROLES.includes(r));
 
 const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'registry.read',
@@ -107,7 +147,9 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'reminder.print',
   'access_log.read',
   'data.export',
+  'data.import',
   'archive.settings',
+  'archive.grants',
 ];
 
 /**
@@ -116,7 +158,12 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
  * i dati sono del titolare (decisione D21).
  */
 const DOCTOR_ON_GRANTED_ARCHIVE: Action[] = DOCTOR_ON_OWN_ARCHIVE.filter(
-  (a) => a !== 'data.export' && a !== 'access_log.read' && a !== 'archive.settings',
+  (a) =>
+    a !== 'data.export' &&
+    a !== 'data.import' &&
+    a !== 'access_log.read' &&
+    a !== 'archive.settings' &&
+    a !== 'archive.grants',
 );
 
 /** Segreteria condivisa dello studio: lavora su tutti gli archivi dello studio. */
@@ -131,6 +178,7 @@ const SECRETARY: Action[] = [
 ];
 
 const ADMINISTRATOR: Action[] = [
+  'admin.studio',
   'admin.users',
   'admin.printers',
   'admin.headers',
@@ -139,6 +187,20 @@ const ADMINISTRATOR: Action[] = [
 ];
 
 export const ADMIN_ACTIONS: readonly Action[] = ADMINISTRATOR;
+
+/**
+ * Azioni sullo studio, non su un archivio, che non sono solo dell'amministratore: chi le fa dipende
+ * dal ruolo (tappa 14). Gli elenchi dello studio li curano i medici e l'amministratore, e la
+ * segreteria li usa; il registro delle azioni di amministrazione lo leggono l'amministratore e i
+ * titolari, perché un ruolo dato da un amministratore apre le cartelle (D163). Per la stessa
+ * ragione gli utenti con i dati dei pazienti creati o cambiati dall'amministratore li conferma un
+ * titolare, mai l'amministratore, la segreteria o il sostituto.
+ */
+export const STUDIO_ACTION_ROLES: Partial<Record<Action, readonly Role[]>> = {
+  'studio.lists': ['owner_doctor', 'substitute_doctor', 'administrator'],
+  'studio.admin_log': ['owner_doctor', 'administrator'],
+  'studio.confirm_users': ['owner_doctor'],
+};
 
 export type GrantKind = 'substitution' | 'group_colleague';
 
@@ -195,6 +257,13 @@ function activeGrant(actor: Actor, ctx: AccessContext): ArchiveGrant | undefined
 
 /** Decide se `actor` può fare `action` nel contesto dato. Per difetto: no. */
 export function can(actor: Actor, action: Action, ctx: AccessContext = {}): Decision {
+  const studioRoles = STUDIO_ACTION_ROLES[action];
+  if (studioRoles) {
+    if (ctx.archive) return deny('Azione sullo studio, non su un archivio');
+    return actor.roles.some((r) => studioRoles.includes(r))
+      ? allow('Ruolo previsto per questa azione dello studio')
+      : deny('Azione non prevista per il tuo ruolo');
+  }
   if (ADMINISTRATOR.includes(action)) {
     if (ctx.archive) return deny('Le azioni di amministrazione non riguardano un archivio');
     return actor.roles.includes('administrator')

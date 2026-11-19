@@ -12,11 +12,18 @@ const BOM = '﻿';
 
 type Row = Record<string, unknown>;
 
+/**
+ * Testi che un foglio di calcolo prenderebbe per una formula (OWASP, «CSV injection»): ora nella
+ * cartella entrano anche testi da file di altri programmi. Nel CSV ricevono un apostrofo davanti;
+ * nel JSON restano come sono (D172).
+ */
+const FORMULA_START = /^[=+\-@\t\r]/;
+
 function cell(value: unknown): string {
   if (value === null || value === undefined) return '';
   let text: string;
   if (value instanceof Date) text = value.toISOString();
-  else if (typeof value === 'string') text = value;
+  else if (typeof value === 'string') text = FORMULA_START.test(value) ? `'${value}` : value;
   else if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
     text = String(value);
   } else text = JSON.stringify(value);
@@ -35,6 +42,8 @@ Un file per tabella, con la prima riga di intestazione (nomi delle colonne del d
 Separatore: punto e virgola. Codifica: UTF-8 con BOM. Righe terminate da CRLF.
 Valori con punto e virgola, virgolette o a capo tra virgolette doppie (RFC 4180).
 Cella vuota = nessun valore. Valori composti (per esempio i dettagli del registro) in JSON.
+Un testo che comincia con = + - @ ha un apostrofo davanti, perché il foglio di calcolo non lo
+prenda per una formula; nell'esportazione in JSON il testo è com'è.
 Date come AAAA-MM-GG; istanti come li scrive il database, in UTC.
 
 allegati.csv elenca i referti e i documenti allegati; i file sono nella cartella allegati/,
