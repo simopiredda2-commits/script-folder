@@ -14,6 +14,7 @@ import {
   OWNER_REACTIVATE_REFUSAL,
   OWNER_ROLE_REMOVAL_REFUSAL,
   OWNER_SUSPEND_REFUSAL,
+  serviceSuspendedRefusal,
 } from '../src/admin/user-service';
 import {
   AWAITING_CONFIRMATION_ERROR,
@@ -41,7 +42,7 @@ import {
   studio,
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
-import { restoreUser } from '../src/db/user-restore';
+import { restoreUser, showRequest } from '../src/db/user-restore';
 import { base32Decode } from '../src/security/base32';
 import { hashPassword } from '../src/security/password';
 import { hashToken, newToken } from '../src/security/secrets';
@@ -197,6 +198,19 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     throw new Error(`Non ci sono ${n} transazioni in attesa di un blocco`);
   };
 
+  /**
+   * Conferma dal server in due passi, come chi gestisce il servizio: legge la richiesta (`--mostra`)
+   * e conferma quella, con la sua data (`--conferma --richiesta-il`).
+   */
+  async function serverConfirm(username: string, extra: { riattiva?: boolean } = {}) {
+    const shown = await showRequest(t.db, { utente: username });
+    return restoreUser(
+      t.db,
+      { utente: username, conferma: true, richiestaIl: shown.requestedAt!, ...extra },
+      { now: s.clock.now },
+    );
+  }
+
   /** Servizio d'accesso sullo stesso database e con la stessa chiave del servizio delle prove. */
   const authService = () =>
     createAuthService({
@@ -321,7 +335,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     expect(more.json().avvisi.at(-1)).toContain(`--utente amm.a1.${sfx} --conferma`);
     expect((await access(`amm.a1.${sfx}`, chosen)).json().errore).toBe(AWAITING_CONFIRMATION_ERROR);
     // Lo conferma chi gestisce il servizio, con credenziali nuove che consegna lui.
-    const done = await restoreUser(t.db, { utente: `amm.a1.${sfx}`, conferma: true });
+    const done = await serverConfirm(`amm.a1.${sfx}`);
     passwordsSeen.push(done.temporaryPassword!);
     expect((await access(`amm.a1.${sfx}`, chosen)).json().errore).toBe(GENERIC_LOGIN_ERROR);
     expect((await access(`amm.a1.${sfx}`, done.temporaryPassword!)).json().passo).toBe(
@@ -334,7 +348,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       utente: `amm.a1.${sfx}`,
     });
     // Adesso un titolare può confermare: il server non lo fa più al suo posto.
-    await expect(restoreUser(t.db, { utente: `finto.a1.${sfx}`, conferma: true })).rejects.toThrow(
+    await expect(serverConfirm(`finto.a1.${sfx}`)).rejects.toThrow(
       /la conferma la fa lui, dal programma/,
     );
     expect((await userRow(id)).awaitingConfirmation).toBe(true);
@@ -350,7 +364,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     });
     expect(real.utente.inAttesaDiConferma).toBe(true);
     expect(real.passwordTemporanea).toBeUndefined();
-    const byServer = await restoreUser(t.db, { utente: `vera.a2.${sfx}`, conferma: true });
+    const byServer = await serverConfirm(`vera.a2.${sfx}`);
     const realCookie = await firstAccess(
       `vera.a2.${sfx}`,
       byServer.temporaryPassword!,
@@ -404,7 +418,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     expect(fake.passwordTemporanea).toBeUndefined();
     expect(fake.avvisi[1]).toMatch(/La password temporanea la riceve il medico titolare/);
     expect((await pendingOf(realCookie)).map((x) => x.id)).toContain(fake.utente.id);
-    await expect(restoreUser(t.db, { utente: `finto.a2.${sfx}`, conferma: true })).rejects.toThrow(
+    await expect(serverConfirm(`finto.a2.${sfx}`)).rejects.toThrow(
       /la conferma la fa lui, dal programma/,
     );
     expect((await userRow(fake.utente.id)).awaitingConfirmation).toBe(true);
@@ -528,7 +542,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       expect((await codeOn(second, codeNow(victim.username))).json().errore).toBe(
         EXPIRED_CHALLENGE_ERROR,
       );
-      expect((await challengeOf(second)).failedCodes).toBe(3);
+      expect((await challengeOf(second)).triedCodes).toBe(3);
       // Senza soglie dello studio vale il valore per difetto: cinque codici.
       await setStudio({ maxFailedLogins: null, failedLoginLockMinutes: null });
       const third = (await access(victim.username, PASSWORD)).json().passaggio as string;
@@ -672,7 +686,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
         and(eq(accessLog.userId, u.utente.id), eq(accessLog.action, 'secondo_fattore_fallito')),
       );
     expect(failed.map((f) => f.details)).toEqual([{ motivo: 'codice errato', indirizzo: null }]);
-    expect((await challengeOf(two)).failedCodes).toBe(1);
+    expect((await challengeOf(two)).triedCodes).toBe(1);
   });
 
   it('C: con il codice giusto l’utente si rilegge sotto blocco: sospeso, in attesa o bloccato nel frattempo, niente sessione', async () => {
@@ -771,7 +785,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     expect(
       listed
         .json()
-        .righe.filter((r: { area: string }) => r.area === 'Profilo')
+        .righe.filter((r: { area: string }) => r.area === 'Profilo del medico')
         .map((r: { azione: string }) => r.azione),
     ).toEqual(['Modifica', 'Modifica']);
     await put('Elena', 'Marchi');
@@ -924,20 +938,25 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       workstation: 'postazione-prova',
       expiresAt: new Date(Date.now() + 3_600_000),
     });
-    await expect(restoreUser(t.db, { utente: `segr.cmd.${sfx}`, conferma: true })).rejects.toThrow(
+    await expect(serverConfirm(`segr.cmd.${sfx}`)).rejects.toThrow(
       'L’utente è sospeso: per confermarlo aggiungi --riattiva',
     );
-    await expect(restoreUser(t.db, { utente: `adm.cmd.${sfx}`, conferma: true })).rejects.toThrow(
-      'L’utente non è in attesa di conferma: niente da confermare',
-    );
     await expect(
-      restoreUser(t.db, { utente: `segr.cmd.${sfx}`, conferma: true, sospendi: true }),
+      restoreUser(t.db, {
+        utente: `adm.cmd.${sfx}`,
+        conferma: true,
+        richiestaIl: s.clock.now().toISOString(),
+      }),
+    ).rejects.toThrow('L’utente non è in attesa di conferma: niente da confermare');
+    await expect(
+      restoreUser(t.db, {
+        utente: `segr.cmd.${sfx}`,
+        conferma: true,
+        sospendi: true,
+        richiestaIl: sec.utente.richiestaDiConferma!.il,
+      }),
     ).rejects.toBeInstanceOf(ZodError);
-    const done = await restoreUser(t.db, {
-      utente: `segr.cmd.${sfx}`,
-      conferma: true,
-      riattiva: true,
-    });
+    const done = await serverConfirm(`segr.cmd.${sfx}`, { riattiva: true });
     passwordsSeen.push(done.temporaryPassword!);
     expect(done).toMatchObject({
       actions: ['riattivazione', 'conferma'],
@@ -1054,28 +1073,105 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
   it('A7: un titolare con pazienti sospeso dal server non lo riattiva l’amministratore', async () => {
     const doctor = s.users.collega;
     await restoreUser(t.db, { utente: doctor.username, sospendi: true });
+    expect(await userRow(doctor.id)).toMatchObject({
+      status: 'suspended',
+      suspendedByService: true,
+    });
     const on = await req(
       cookies.amministratore,
       'POST',
       `/api/studio/utenti/${doctor.id}/riattiva`,
     );
     expect(on.statusCode).toBe(409);
-    expect(on.json().errore).toBe(OWNER_REACTIVATE_REFUSAL);
+    expect(on.json().errore).toBe(serviceSuspendedRefusal(doctor.username));
+    expect(on.json().errore).toContain(
+      `pnpm utente:ripristina -- --utente ${doctor.username} --riattiva`,
+    );
     expect((await userRow(doctor.id)).status).toBe('suspended');
     expect((await adminLog()).at(-1)).toMatchObject({
       outcome: 'negato',
       azione: 'riattivazione',
       utente: doctor.username,
-      motivo: OWNER_REACTIVATE_REFUSAL,
+      motivo: serviceSuspendedRefusal(doctor.username),
     });
     const listed = (await req(cookies.amministratore, 'GET', '/api/studio/utenti'))
       .json()
       .utenti.find((x: { id: string }) => x.id === doctor.id);
-    expect(listed).toMatchObject({ stato: 'sospeso', titolareConPazienti: true });
-    // Lo riattiva chi gestisce il servizio, sul server.
+    expect(listed).toMatchObject({
+      stato: 'sospeso',
+      titolareConPazienti: true,
+      sospesoDalServizio: true,
+    });
+    // Lo riattiva chi gestisce il servizio, sul server: il segno della sospensione si toglie.
     const back = await restoreUser(t.db, { utente: doctor.username, riattiva: true });
     passwordsSeen.push(back.temporaryPassword!);
-    expect((await userRow(doctor.id)).status).toBe('active');
+    expect(await userRow(doctor.id)).toMatchObject({
+      status: 'active',
+      suspendedByService: false,
+    });
+    // Un titolare con pazienti sospeso senza il segno del server (righe di prima di questa
+    // regola): dal programma non si riattiva lo stesso, perché ha pazienti.
+    await t.db.update(appUser).set({ status: 'suspended' }).where(eq(appUser.id, doctor.id));
+    const legacy = await req(
+      cookies.amministratore,
+      'POST',
+      `/api/studio/utenti/${doctor.id}/riattiva`,
+    );
+    expect(legacy.statusCode).toBe(409);
+    expect(legacy.json().errore).toBe(OWNER_REACTIVATE_REFUSAL);
+    await t.db.update(appUser).set({ status: 'active' }).where(eq(appUser.id, doctor.id));
+  });
+
+  it('A7 bis: chi è sospeso dal server, di qualunque ruolo, non lo riattiva l’amministratore; le sue sospensioni sì', async () => {
+    const created = await createUser(cookies.amministratore, {
+      nomeUtente: `segr.a7.${sfx}`,
+      nome: 'Segreteria Sette',
+      ruoli: ['secretary'],
+    });
+    const p1 = await confirm(cookies.titolare, created.utente.id);
+    await firstAccess(`segr.a7.${sfx}`, p1!, 'la segreteria sette lavora');
+    const id = created.utente.id;
+    // Sospesa dal server: dal programma non torna, e le credenziali di prima non valgono.
+    await restoreUser(t.db, { utente: `segr.a7.${sfx}`, sospendi: true }, { now: s.clock.now });
+    const on = await req(cookies.amministratore, 'POST', `/api/studio/utenti/${id}/riattiva`);
+    expect(on.statusCode, on.body).toBe(409);
+    expect(on.json().errore).toBe(serviceSuspendedRefusal(`segr.a7.${sfx}`));
+    expect((await access(`segr.a7.${sfx}`, 'la segreteria sette lavora')).statusCode).toBe(401);
+    expect(
+      (await req(cookies.amministratore, 'GET', '/api/studio/utenti'))
+        .json()
+        .utenti.find((x: { id: string }) => x.id === id),
+    ).toMatchObject({ stato: 'sospeso', sospesoDalServizio: true, titolareConPazienti: false });
+    // Il server la riattiva; poi una sospensione dell'amministratore la riattiva l'amministratore.
+    passwordsSeen.push(
+      (await restoreUser(t.db, { utente: `segr.a7.${sfx}`, riattiva: true }, { now: s.clock.now }))
+        .temporaryPassword!,
+    );
+    const off = await req(cookies.amministratore, 'POST', `/api/studio/utenti/${id}/sospendi`);
+    expect(off.statusCode, off.body).toBe(200);
+    expect(off.json().utente).toMatchObject({ stato: 'sospeso', sospesoDalServizio: false });
+    const back = await req(cookies.amministratore, 'POST', `/api/studio/utenti/${id}/riattiva`);
+    expect(back.statusCode, back.body).toBe(200);
+  });
+
+  it('A7 ter: un titolare finto confermato per errore e sospeso dal server non torna dal programma', async () => {
+    const { adminCookie } = await freshStudio('a7t');
+    const fake = await createUser(adminCookie, {
+      nomeUtente: `finto.a7t.${sfx}`,
+      nome: 'Dott. Finto Settimo',
+      ruoli: ['owner_doctor', 'secretary'],
+      medico: { codiceFiscale: cf('Finto', 'Ivo', 'M'), nome: 'Ivo', cognome: 'Finto' },
+    });
+    // Chi gestisce il servizio lo conferma per errore, poi se ne accorge e lo sospende dal server.
+    passwordsSeen.push((await serverConfirm(`finto.a7t.${sfx}`)).temporaryPassword!);
+    await restoreUser(t.db, { utente: `finto.a7t.${sfx}`, sospendi: true }, { now: s.clock.now });
+    const on = await req(adminCookie, 'POST', `/api/studio/utenti/${fake.utente.id}/riattiva`);
+    expect(on.statusCode, on.body).toBe(409);
+    expect(on.json().errore).toBe(serviceSuspendedRefusal(`finto.a7t.${sfx}`));
+    expect(await userRow(fake.utente.id)).toMatchObject({
+      status: 'suspended',
+      suspendedByService: true,
+    });
   });
 
   it('nessuna password, impronta o segreto nel registro', async () => {

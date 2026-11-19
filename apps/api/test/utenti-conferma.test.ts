@@ -28,7 +28,7 @@ import {
   session,
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
-import { restoreUser } from '../src/db/user-restore';
+import { restoreUser, showRequest } from '../src/db/user-restore';
 import { base32Decode } from '../src/security/base32';
 import { hashPassword } from '../src/security/password';
 import { totp } from '../src/security/totp';
@@ -156,6 +156,15 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     const password = r.json().passwordTemporanea as string | undefined;
     if (password) passwordsSeen.push(password);
     return { password, body: r.json() };
+  }
+
+  /**
+   * Conferma dal server in due passi, come chi gestisce il servizio: legge la richiesta (`--mostra`)
+   * e conferma quella, con la sua data (`--conferma --richiesta-il`).
+   */
+  async function serverConfirm(username: string) {
+    const shown = await showRequest(t.db, { utente: username });
+    return restoreUser(t.db, { utente: username, conferma: true, richiestaIl: shown.requestedAt! });
   }
 
   const adminLog = async (studioId = s.studioId): Promise<Record<string, unknown>[]> =>
@@ -437,17 +446,23 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     expect(first.utente.inAttesaDiConferma).toBe(true);
     expect(first.passwordTemporanea).toBeUndefined();
     expect(first.utente.confermaDalServizio).toBe(true);
+    // L'avviso dice i due passi del server, senza la data: la stampa solo il primo.
     expect(first.avvisi).toEqual([
       expect.stringMatching(/^In attesa della conferma di un medico titolare dello studio/),
-      expect.stringContaining(
-        'lo conferma chi gestisce il servizio, sul server (pnpm utente:ripristina -- --utente primo.titolare --conferma)',
-      ),
+      expect.stringContaining('lo conferma chi gestisce il servizio, sul server'),
     ]);
+    expect(first.avvisi[1]).toContain(
+      '(pnpm utente:ripristina -- --utente primo.titolare --mostra)',
+    );
+    expect(first.avvisi[1]).toContain(
+      '(pnpm utente:ripristina -- --utente primo.titolare --conferma --richiesta-il DATA)',
+    );
+    expect(first.avvisi[1]).not.toContain(first.utente.richiestaDiConferma!.il);
     const ownerId = first.utente.id;
     expect((await userRow(ownerId)).awaitingConfirmation).toBe(true);
     // Nessun titolare può confermarlo dal programma: lo conferma chi gestisce il servizio, con una
     // password nuova che consegna lui; nel registro, senza utente.
-    const byServer = await restoreUser(t.db, { utente: 'primo.titolare', conferma: true });
+    const byServer = await serverConfirm('primo.titolare');
     expect(byServer).toMatchObject({
       actions: ['conferma'],
       status: 'active',
@@ -542,7 +557,7 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       'segreteria.nuova',
     ]);
     // Ora un titolare può confermare: il comando del server rifiuta e rimanda al programma.
-    await expect(restoreUser(t.db, { utente: 'segreteria.nuova', conferma: true })).rejects.toThrow(
+    await expect(serverConfirm('segreteria.nuova')).rejects.toThrow(
       /la conferma la fa lui, dal programma/,
     );
     expect((await userRow(secretary.utente.id)).awaitingConfirmation).toBe(true);
@@ -572,9 +587,7 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     const one = await service.create(a, body('uno', 'Unici'));
     const two = await service.create(a, body('due', 'Duetti'));
     expect([one, two].map((r) => r.passwordTemporanea)).toEqual([undefined, undefined]);
-    passwordsSeen.push(
-      (await restoreUser(t.db, { utente: 'titolare.uno', conferma: true })).temporaryPassword!,
-    );
+    passwordsSeen.push((await serverConfirm('titolare.uno')).temporaryPassword!);
     const request = (await userRow(two.utente.id)).confirmationRequestedAt!.toISOString();
     const confirmed = await service.confirm(
       actorOf({ id: one.utente.id }, ['owner_doctor'], fresh.studioId),

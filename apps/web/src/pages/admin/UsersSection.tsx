@@ -48,6 +48,8 @@ interface User {
   ultimoTitolare: boolean;
   /** In attesa, e nessun titolare può confermarlo: lo conferma chi gestisce il servizio. */
   confermaDalServizio: boolean;
+  /** Sospeso da chi gestisce il servizio, sul server: da qui non si riattiva. */
+  sospesoDalServizio: boolean;
 }
 interface Users {
   utenti: User[];
@@ -117,6 +119,8 @@ const OWNER_WITH_PATIENTS_SUSPENDED =
   'Ha pazienti nel suo archivio: lo riattiva chi gestisce il servizio, sul server.';
 const LAST_OWNER =
   'È l’ultimo medico titolare attivo e confermato: senza di lui nessuno conferma gli utenti dal programma. Per sospenderlo prima va confermato un altro titolare, oppure lo fa chi gestisce il servizio, sul server.';
+const SUSPENDED_BY_SERVICE =
+  'L’ha sospeso chi gestisce il servizio, sul server: lo riattiva solo lui, perché da qui si annullerebbe una decisione presa sul server.';
 
 interface FormValues {
   nomeUtente: string;
@@ -388,7 +392,10 @@ export function UsersSection() {
                     {!u.io && u.ripristinoDalServizio && (
                       <p className="aiuto">{RESTORE_BY_SERVICE}</p>
                     )}
-                    {!u.io && u.titolareConPazienti && (
+                    {!u.io && u.sospesoDalServizio && (
+                      <p className="aiuto">{SUSPENDED_BY_SERVICE}</p>
+                    )}
+                    {!u.io && u.titolareConPazienti && !u.sospesoDalServizio && (
                       <p className="aiuto">
                         {u.stato === 'attivo' ? OWNER_WITH_PATIENTS : OWNER_WITH_PATIENTS_SUSPENDED}
                       </p>
@@ -433,12 +440,13 @@ export function UsersSection() {
  * Le azioni che hanno senso per l'utente della riga, nell'ordine in cui si mostrano. Per medici e
  * segreteria niente password temporanea, azzeramento del secondo fattore né sblocco; un titolare
  * con pazienti non si sospende e non si riattiva da qui, l'ultimo titolare attivo e confermato non
- * si sospende. Il servizio lo controlla comunque.
+ * si sospende, chi è sospeso da chi gestisce il servizio non si riattiva da qui. Il servizio lo
+ * controlla comunque.
  */
 function rowActions(u: User): RowAction[] {
   const out: RowAction[] = [];
   if (u.stato !== 'attivo') {
-    if (!u.titolareConPazienti) out.push('riattiva');
+    if (!u.titolareConPazienti && !u.sospesoDalServizio) out.push('riattiva');
   } else if (!u.titolareConPazienti && !u.ultimoTitolare) out.push('sospendi');
   if (!u.ripristinoDalServizio) {
     out.push('password-temporanea');
@@ -456,7 +464,8 @@ function UserStatus({ u }: { u: User }) {
           'Attivo'
         ) : (
           <strong>
-            <Icon name="blocco" /> Sospeso
+            <Icon name="blocco" />{' '}
+            {u.sospesoDalServizio ? 'Sospeso da chi gestisce il servizio' : 'Sospeso'}
           </strong>
         )}
       </li>

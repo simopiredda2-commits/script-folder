@@ -183,6 +183,13 @@
       "when": 1795060935949,
       "tag": "0025_codici_sbagliati",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1795066424463,
+      "tag": "0026_sospeso_dal_servizio",
+      "breakpoints": true
     }
   ]
 }

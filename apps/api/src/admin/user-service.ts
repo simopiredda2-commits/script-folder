@@ -18,6 +18,7 @@ import { logAccess } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import { closeServiceSessions } from '../credentials/service';
 import type { Database } from '../db/client';
+import { isLockTimeout, withLockTimeout } from '../db/locks';
 import {
   appUser,
   archive,
@@ -42,36 +43,43 @@ import { hashPassword } from '../security/password';
  * 1. chi ha un ruolo che apre dati dei pazienti, creato dall'amministratore o a cui
  *    l'amministratore aggiunge quel ruolo, resta in attesa finché un medico titolare attivo e
  *    confermato dello studio non lo conferma, senza eccezioni, anche il primo titolare di uno studio
- *    vuoto; quando nessun titolare può confermare, conferma chi gestisce il servizio, sul server
- *    (`pnpm utente:ripristina -- --utente NOME --conferma`). L'amministratore non riceve mai la
- *    password temporanea di questi utenti: la riceve chi conferma;
+ *    vuoto; quando nessun titolare può confermare, conferma chi gestisce il servizio, sul server,
+ *    in due passi: legge la richiesta (`pnpm utente:ripristina -- --utente NOME --mostra`) e
+ *    conferma quella letta (`… --conferma --richiesta-il DATA`). L'amministratore non riceve mai
+ *    la password temporanea di questi utenti: la riceve chi conferma;
  * 2. password temporanea, azzeramento del secondo fattore e sblocco dopo i tentativi falliti di
  *    quegli utenti li fa chi gestisce il servizio, sul server (`pnpm utente:ripristina`), non
  *    l'amministratore;
  * 3. un titolare con pazienti nel suo archivio non si sospende, non perde il ruolo e, se è
  *    sospeso, non si riattiva dall'amministratore (prima l'esportazione dei dati, regola 4); e
  *    dal programma non si sospende e non perde il ruolo l'ultimo titolare attivo e confermato,
- *    anche senza pazienti: senza di lui nessuno conferma;
+ *    anche senza pazienti: senza di lui nessuno conferma; chi è sospeso da chi gestisce il
+ *    servizio, qualunque ruolo abbia, lo riattiva solo il server;
  * 4. se l'amministratore corregge codice fiscale o codice regionale di un medico, le sessioni dei
  *    servizi legate a quei codici si chiudono (D111).
  */
 
 const AREA = 'utenti';
 
-/** Azioni sugli utenti, come stanno nel registro (`details.azione`). */
-export type UserAction =
-  | 'elenco'
-  | 'creazione'
-  | 'modifica'
-  | 'sospensione'
-  | 'riattivazione'
-  | 'password_temporanea'
-  | 'azzeramento_secondo_fattore'
-  | 'sblocco'
-  /** Dei medici titolari: elenco, conferma e rifiuto degli utenti in attesa. */
-  | 'elenco_da_confermare'
-  | 'conferma'
-  | 'rifiuto';
+/**
+ * Azioni sugli utenti, come stanno nel registro (`details.azione`). Le ultime tre sono dei medici
+ * titolari: elenco, conferma e rifiuto degli utenti in attesa. Ognuna ha la sua etichetta nel
+ * registro di amministrazione (archive-service.ts).
+ */
+export const USER_ACTIONS = [
+  'elenco',
+  'creazione',
+  'modifica',
+  'sospensione',
+  'riattivazione',
+  'password_temporanea',
+  'azzeramento_secondo_fattore',
+  'sblocco',
+  'elenco_da_confermare',
+  'conferma',
+  'rifiuto',
+] as const;
+export type UserAction = (typeof USER_ACTIONS)[number];
 
 const DOCTOR_ROLES: readonly Role[] = ['owner_doctor', 'substitute_doctor'];
 const isDoctor = (roles: readonly Role[]) => roles.some((r) => DOCTOR_ROLES.includes(r));
@@ -104,6 +112,26 @@ export const OWNER_ROLE_ADD_REFUSAL = `${OWNER_HAS_PATIENTS}: con un altro ruolo
 /** Un titolare con pazienti sospeso (dal server) si riattiva solo dal server. */
 export const OWNER_REACTIVATE_REFUSAL = `${OWNER_HAS_PATIENTS}: sospeso, lo riattiva solo chi gestisce il servizio, sul server`;
 
+/**
+ * Chi è sospeso da chi gestisce il servizio, sul server, si riattiva solo dal server, qualunque
+ * ruolo abbia (seconda revisione dei poteri dell'amministratore, problema 7): dal programma la
+ * riattivazione annullerebbe una decisione presa sul server e rimetterebbe in uso credenziali che
+ * si volevano chiudere.
+ */
+export const serviceSuspendedRefusal = (username: string) =>
+  `L’utente è stato sospeso da chi gestisce il servizio: lo riattiva solo lui, sul server (pnpm utente:ripristina -- --utente ${username} --riattiva)`;
+
+/**
+ * Attesa massima del blocco degli archivi di un titolare, prima di contarne i pazienti: limite di
+ * buon senso, non di una norma. Un'importazione può durare minuti; senza limite la richiesta
+ * resterebbe ferma con una connessione occupata (seconda revisione, problema nuovo 2).
+ */
+export const ARCHIVE_LOCK_TIMEOUT = '2s';
+export const ARCHIVE_BUSY_REFUSAL =
+  'Nell’archivio del medico è in corso una scrittura (per esempio un’importazione): riprova tra qualche minuto.';
+/** I ruoli sono cambiati tra la prima lettura e il blocco: la richiesta si ripete. */
+const CHANGED_MEANWHILE = 'L’utente è cambiato mentre lo modificavi: rileggi i suoi dati e riprova';
+
 const LAST_OWNER =
   'È l’ultimo medico titolare attivo e confermato dello studio: senza di lui, dal programma, nessuno conferma gli utenti con i dati dei pazienti';
 /** L'ultimo titolare attivo e confermato non si perde dal programma, anche senza pazienti. */
@@ -129,10 +157,12 @@ const STILL_AWAITING_NOTICE =
   'L’utente resta in attesa della conferma di un medico titolare: la richiesta ha la data di adesso.';
 /**
  * Nessun titolare attivo e confermato che possa confermare (studio nuovo, titolari sospesi o in
- * attesa): conferma chi gestisce il servizio, sul server, e consegna lui la password.
+ * attesa): conferma chi gestisce il servizio, sul server, e consegna lui la password. In due passi
+ * (seconda revisione, problema nuovo 1): prima legge la richiesta, poi conferma quella che ha letto,
+ * con la sua data. La data non è nell'avviso: la stampa solo il primo passo.
  */
-const serverConfirmNotice = (username: string) =>
-  `Nello studio non c’è un medico titolare attivo e confermato che possa confermarlo: lo conferma chi gestisce il servizio, sul server (pnpm utente:ripristina -- --utente ${username} --conferma), con una password temporanea nuova da consegnare di persona; il secondo fattore si attiva al primo accesso.`;
+export const serverConfirmNotice = (username: string) =>
+  `Nello studio non c’è un medico titolare attivo e confermato che possa confermarlo: lo conferma chi gestisce il servizio, sul server. Prima legge la richiesta e la controlla con l’interessato (pnpm utente:ripristina -- --utente ${username} --mostra), poi conferma la richiesta letta, con la data che il primo comando stampa (pnpm utente:ripristina -- --utente ${username} --conferma --richiesta-il DATA), e consegna di persona una password temporanea nuova; il secondo fattore si attiva al primo accesso.`;
 const WITHDRAWN_NOTICE =
   'Senza ruoli con i dati dei pazienti la conferma non serve più: la richiesta è ritirata.';
 
@@ -214,6 +244,7 @@ const userColumns = {
   confirmationIssuesPassword: appUser.confirmationIssuesPassword,
   confirmedBy: appUser.confirmedBy,
   confirmedAt: appUser.confirmedAt,
+  suspendedByService: appUser.suspendedByService,
 };
 const profileColumns = {
   userId: doctorProfile.userId,
@@ -244,6 +275,8 @@ export interface UserRow {
   confirmationIssuesPassword: boolean;
   confirmedBy: string | null;
   confirmedAt: Date | null;
+  /** Sospeso da chi gestisce il servizio: si riattiva solo dal server. */
+  suspendedByService: boolean;
 }
 interface ProfileRow {
   userId: string;
@@ -382,6 +415,8 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
     ultimoTitolare: c.confirmers.size === 1 && c.confirmers.has(u.id),
     /** In attesa e nessun titolare può confermarlo: lo conferma chi gestisce il servizio. */
     confermaDalServizio: u.awaitingConfirmation && c.confirmers.size === 0,
+    /** Sospeso da chi gestisce il servizio, sul server: dal programma non si riattiva. */
+    sospesoDalServizio: u.status === 'suspended' && u.suspendedByService,
   };
 }
 
@@ -473,18 +508,44 @@ export const otherActiveOwners = (users: readonly UserRow[], exceptId: string | 
   users.filter((u) => u.id !== exceptId && isActiveConfirmedOwner(u));
 
 /**
- * Il titolare ha pazienti nei suoi archivi? Prima si bloccano le righe dei suoi archivi (FOR
- * UPDATE): un paziente che sta entrando tiene la chiave esterna sull'archivio (FOR KEY SHARE), che
- * va in conflitto con questo blocco; così il conteggio aspetta la fine della sua transazione e lo
- * vede, invece di sospendere un titolare che sta ricevendo il primo paziente (revisione dei poteri
- * dell'amministratore, problema 6).
+ * Blocca (FOR UPDATE) le righe degli archivi del titolare, prima di contarne i pazienti. Un
+ * paziente che sta entrando tiene la chiave esterna sull'archivio (FOR KEY SHARE) e, nelle strade
+ * che creano pazienti, anche FOR SHARE (patients/archive-owner.ts): tutti e due vanno in conflitto
+ * con questo blocco. Così il conteggio aspetta la fine di quella transazione e vede il paziente
+ * (revisione dei poteri dell'amministratore, problema 6), e un paziente che arriva dopo trova il
+ * titolare già sospeso e non entra (gara inversa). L'attesa ha un tetto, ARCHIVE_LOCK_TIMEOUT:
+ * allo scadere, 409 con il motivo, nel registro come gli altri rifiuti.
+ *
+ * Si chiama prima di lockStudioUsers (seconda revisione, problema nuovo 2): mentre aspetta
+ * l'archivio, la richiesta non tiene fermi gli utenti dello studio e quindi i loro accessi. Nessuno
+ * stallo reciproco: chi scrive pazienti blocca l'archivio e prende sullo studio e sugli utenti solo
+ * FOR KEY SHARE, compatibile con lockStudioUsers; le sole strade che bloccano sia gli archivi di un
+ * titolare sia gli utenti dello studio (sospensione, riattivazione e ruoli, qui) li prendono in
+ * quest'ordine, e se dopo il blocco degli utenti l'utente risulta titolare senza che i suoi archivi
+ * siano bloccati, la richiesta si ferma (CHANGED_MEANWHILE) invece di bloccarli nell'ordine inverso.
  */
+export async function lockOwnerArchives(
+  tx: Tx,
+  studioId: string,
+  userId: string,
+  username: string,
+): Promise<void> {
+  try {
+    await withLockTimeout(tx, ARCHIVE_LOCK_TIMEOUT, () =>
+      tx
+        .select({ id: archive.id })
+        .from(archive)
+        .where(and(eq(archive.studioId, studioId), eq(archive.ownerUserId, userId)))
+        .for('update'),
+    );
+  } catch (e) {
+    if (isLockTimeout(e)) throw new Refusal(409, ARCHIVE_BUSY_REFUSAL, username);
+    throw e;
+  }
+}
+
+/** Il titolare ha pazienti nei suoi archivi? I suoi archivi vanno bloccati prima. */
 async function ownerHasPatients(tx: Tx, studioId: string, userId: string): Promise<boolean> {
-  await tx
-    .select({ id: archive.id })
-    .from(archive)
-    .where(and(eq(archive.studioId, studioId), eq(archive.ownerUserId, userId)))
-    .for('update');
   return (await ownersWithPatients(tx, studioId, [userId])).has(userId);
 }
 
@@ -826,19 +887,36 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
   async function update(actor: Actor, id: string, body: z.infer<typeof updateUserBody>) {
     return guarded(actor, 'modifica', async () => {
       const doctor = body.medico ? doctorValues(body.medico) : null;
+      const newRoles = (u: UserRow) => (body.ruoli ? uniqueRoles(body.ruoli) : u.roles);
+      // Un titolare che perde il ruolo, o che con un ruolo in più con i dati dei pazienti andrebbe
+      // in attesa: i suoi pazienti si contano, con gli archivi bloccati.
+      const touchesOwner = (u: UserRow) => {
+        const after = newRoles(u);
+        if (sameRoles(u.roles, after) || !u.roles.includes('owner_doctor')) return false;
+        const added = after.filter((r) => PATIENT_DATA_ROLES.includes(r) && !u.roles.includes(r));
+        return !after.includes('owner_doctor') || (added.length > 0 && !u.awaitingConfirmation);
+      };
+      const ownRolesRefusal = (u: UserRow) =>
+        new Refusal(
+          403,
+          'Non puoi cambiare i tuoi ruoli: lo fa un altro amministratore',
+          u.username,
+        );
       const notices = await withActor(db, actor.userId, async (tx) => {
+        // Prima lettura senza blocchi: se serve, gli archivi del titolare si bloccano prima degli
+        // utenti dello studio (problema nuovo 2).
+        const pre = await targetOf(tx, actor, id);
+        if (pre.id === actor.userId && !sameRoles(pre.roles, newRoles(pre)))
+          throw ownRolesRefusal(pre);
+        const archivesLocked = touchesOwner(pre);
+        if (archivesLocked) await lockOwnerArchives(tx, actor.studioId, id, pre.username);
         const users = await lockStudioUsers(tx, actor.studioId);
         const target = users.find((u) => u.id === id);
         if (!target) throw new HttpError(404, 'Utente non trovato');
         const before = target.roles;
-        const after = body.ruoli ? uniqueRoles(body.ruoli) : before;
+        const after = newRoles(target);
         const rolesChanged = !sameRoles(before, after);
-        if (rolesChanged && target.id === actor.userId)
-          throw new Refusal(
-            403,
-            'Non puoi cambiare i tuoi ruoli: lo fa un altro amministratore',
-            target.username,
-          );
+        if (rolesChanged && target.id === actor.userId) throw ownRolesRefusal(target);
         if (
           rolesChanged &&
           before.includes('administrator') &&
@@ -848,13 +926,11 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           ensureOtherActiveAdmin(users, target);
         // Ruoli con i dati dei pazienti che l'utente non aveva.
         const added = after.filter((r) => PATIENT_DATA_ROLES.includes(r) && !before.includes(r));
-        // Un titolare che perde il ruolo, o che con un ruolo in più andrebbe in attesa.
         const keepsRole = after.includes('owner_doctor');
-        if (
-          rolesChanged &&
-          before.includes('owner_doctor') &&
-          (!keepsRole || (added.length > 0 && !target.awaitingConfirmation))
-        ) {
+        if (touchesOwner(target)) {
+          // Diventato titolare dopo la prima lettura: gli archivi non sono bloccati, e bloccarli
+          // adesso, dopo gli utenti, potrebbe stallare con un'altra richiesta.
+          if (!archivesLocked) throw new Refusal(409, CHANGED_MEANWHILE, target.username);
           if (await ownerHasPatients(tx, actor.studioId, id))
             throw new Refusal(
               409,
@@ -1010,39 +1086,47 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
   /**
    * Sospensione (le sessioni si chiudono subito) e riattivazione. Mai sé stessi; mai un titolare
    * con pazienti (scelta 3), né per sospenderlo né per riattivarlo: lo fa chi gestisce il servizio,
-   * sul server; mai l'ultimo titolare attivo e confermato, anche senza pazienti. Chi era in attesa
-   * di conferma, riattivato, resta in attesa con una richiesta nuova: torna nell'elenco dei
-   * titolari.
+   * sul server; mai l'ultimo titolare attivo e confermato, anche senza pazienti; mai la
+   * riattivazione di chi è stato sospeso da chi gestisce il servizio, qualunque ruolo abbia: lo
+   * riattiva il server (problema 7). Chi era in attesa di conferma, riattivato, resta in attesa con
+   * una richiesta nuova: torna nell'elenco dei titolari. Gli archivi di un titolare si bloccano
+   * prima degli utenti dello studio, con un'attesa massima (problema nuovo 2).
    */
   async function setStatus(actor: Actor, id: string, active: boolean) {
     const azione: UserAction = active ? 'riattivazione' : 'sospensione';
     return guarded(actor, azione, async () => {
       const r = await withActor(db, actor.userId, async (tx) => {
-        const users = await lockStudioUsers(tx, actor.studioId);
-        const target = users.find((u) => u.id === id);
-        if (!target) throw new HttpError(404, 'Utente non trovato');
-        if (target.id === actor.userId)
+        const pre = await targetOf(tx, actor, id);
+        if (pre.id === actor.userId)
           throw new Refusal(
             403,
             active
               ? 'Il tuo utente lo riattiva un altro amministratore'
               : 'Non puoi sospendere il tuo utente',
-            target.username,
+            pre.username,
           );
+        const archivesLocked = pre.roles.includes('owner_doctor');
+        if (archivesLocked) await lockOwnerArchives(tx, actor.studioId, id, pre.username);
+        const users = await lockStudioUsers(tx, actor.studioId);
+        const target = users.find((u) => u.id === id);
+        if (!target) throw new HttpError(404, 'Utente non trovato');
         if (active && target.status === 'active') throw new HttpError(409, 'L’utente è già attivo');
         if (!active && target.status === 'suspended')
           throw new HttpError(409, 'L’utente è già sospeso');
+        if (active && target.suspendedByService)
+          throw new Refusal(409, serviceSuspendedRefusal(target.username), target.username);
         if (!active && target.roles.includes('administrator'))
           ensureOtherActiveAdmin(users, target);
-        if (
-          target.roles.includes('owner_doctor') &&
-          (await ownerHasPatients(tx, actor.studioId, id))
-        )
-          throw new Refusal(
-            409,
-            active ? OWNER_REACTIVATE_REFUSAL : OWNER_SUSPEND_REFUSAL,
-            target.username,
-          );
+        if (target.roles.includes('owner_doctor')) {
+          // Diventato titolare dopo la prima lettura: gli archivi non sono bloccati.
+          if (!archivesLocked) throw new Refusal(409, CHANGED_MEANWHILE, target.username);
+          if (await ownerHasPatients(tx, actor.studioId, id))
+            throw new Refusal(
+              409,
+              active ? OWNER_REACTIVATE_REFUSAL : OWNER_SUSPEND_REFUSAL,
+              target.username,
+            );
+        }
         if (!active && isActiveConfirmedOwner(target) && otherActiveOwners(users, id).length === 0)
           throw new Refusal(409, LAST_OWNER_SUSPEND_REFUSAL, target.username);
         const t = now();
@@ -1051,6 +1135,8 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           .update(appUser)
           .set({
             status: active ? 'active' : 'suspended',
+            // Una sospensione dal programma la riattiva il programma.
+            suspendedByService: false,
             ...(reRequest
               ? { confirmationRequestedBy: actor.userId, confirmationRequestedAt: t }
               : {}),
@@ -1264,7 +1350,13 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           // I rifiuti vanno nel registro come gli altri (revisione dei poteri, problema 9).
           if (!target.awaitingConfirmation) throw new Refusal(409, NOT_AWAITING, target.username);
           if (target.status !== 'active')
-            throw new Refusal(409, SUSPENDED_CONFIRM, target.username);
+            throw new Refusal(
+              409,
+              target.suspendedByService
+                ? serviceSuspendedRefusal(target.username)
+                : SUSPENDED_CONFIRM,
+              target.username,
+            );
           if (target.confirmationRequestedAt?.getTime() !== new Date(body.richiestaIl).getTime())
             throw new Refusal(409, STALE_REQUEST, target.username);
           const t = now();
@@ -1338,7 +1430,12 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           if (target.status !== 'active')
             throw new Refusal(409, 'L’utente è già sospeso', target.username);
           const t = now();
-          await tx.update(appUser).set({ status: 'suspended' }).where(eq(appUser.id, id));
+          // Il rifiuto di un titolare dal programma lo può annullare l'amministratore, riattivando
+          // l'utente con una richiesta nuova: non è una sospensione del server.
+          await tx
+            .update(appUser)
+            .set({ status: 'suspended', suspendedByService: false })
+            .where(eq(appUser.id, id));
           const n = await closeSessions(tx, id, t);
           await logDone(tx, actor, {
             azione: 'rifiuto',

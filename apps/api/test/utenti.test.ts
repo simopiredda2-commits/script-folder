@@ -791,13 +791,15 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     expect((await req(second, 'GET', '/api/io')).statusCode).toBe(401);
     expect((await req(first, 'GET', '/api/profilo/password')).json().obbligato).toBe(false);
 
-    // Da una sessione aperta non si provano password a volontà: 5 errori bloccano l'utente.
+    // Da una sessione aperta non si provano password a volontà: 5 errori bloccano l'utente. Il
+    // quinto, che blocca, risponde già 429, come la password giusta con l'utente bloccato: chi
+    // prova (anche con molte richieste insieme) non sa se aveva indovinato.
     for (let i = 0; i < 5; i++) {
       const wrong = await req(first, 'POST', '/api/profilo/password', {
         passwordAttuale: `tentativo-${i}`,
         nuovaPassword: 'una terza password scelta',
       });
-      expect(wrong.statusCode).toBe(400);
+      expect(wrong.statusCode, `errore ${i + 1}`).toBe(i < 4 ? 400 : 429);
     }
     const locked = await req(first, 'POST', '/api/profilo/password', {
       passwordAttuale: 'la seconda password scelta',
