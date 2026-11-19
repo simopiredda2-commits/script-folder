@@ -28,10 +28,10 @@ function advice(l: Lock): string {
   if (l.motivo === 'codes')
     return l.proprio
       ? 'Chi ha scritto i codici conosceva la tua password, oppure aveva una tua sessione aperta. Se non eri tu, cambia la password e avvisa chi gestisce il servizio.'
-      : 'Chi ha scritto i codici conosceva la password di questo utente, oppure aveva una sua sessione aperta. Se non era lui, va cambiata la password.';
+      : 'Chi ha scritto i codici conosceva la password di questo utente, oppure aveva una sua sessione aperta. Se i tentativi non sono suoi, va cambiata la password.';
   return l.proprio
     ? 'Se non eri tu, qualcuno conosce il tuo nome utente e prova a indovinare la password. Da un’altra postazione si entra comunque appena finisce il blocco.'
-    : 'Se non era lui, qualcuno conosce il suo nome utente e prova a indovinare la password.';
+    : 'Se i tentativi non sono suoi, qualcuno conosce il nome utente e prova a indovinare la password.';
 }
 
 /**
