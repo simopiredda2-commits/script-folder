@@ -6,20 +6,20 @@ Tutto sta in **Strumenti**, una scheda per area. Ognuno vede le schede del suo r
 
 ## Chi vede che cosa
 
-| Scheda                      | Amministratore    | Titolare         | Sostituto | Segreteria |
-| --------------------------- | ----------------- | ---------------- | --------- | ---------- |
-| Dati dello studio           | Modifica          | Legge            | Legge     | —          |
-| Utenti e ruoli              | Modifica          | —                | —         | —          |
-| Postazioni e stampa         | Modifica          | Legge            | Legge     | —          |
-| Elenchi dello studio        | Modifica          | Modifica         | Modifica  | Legge      |
-| Modelli dei certificati     | Modifica          | Modifica         | Modifica  | —          |
-| Impaginazione               | —                 | La sua           | La sua    | —          |
-| Fascicolo sanitario         | Modifica          | Legge            | Legge     | —          |
-| Banche dati                 | «Aggiorna adesso» | Legge            | Legge     | —          |
-| AFT                         | —                 | La sua           | —         | —          |
-| Importazione                | —                 | Nel suo archivio | —         | —          |
-| Registro di amministrazione | Legge             | Legge            | —         | —          |
-| Stato del servizio          | Legge             | —                | —         | —          |
+| Scheda                      | Amministratore    | Titolare          | Sostituto         | Segreteria |
+| --------------------------- | ----------------- | ----------------- | ----------------- | ---------- |
+| Dati dello studio           | Modifica          | Legge             | Legge             | —          |
+| Utenti e ruoli              | Modifica          | —                 | —                 | —          |
+| Postazioni e stampa         | Modifica          | La sua postazione | La sua postazione | —          |
+| Elenchi dello studio        | Modifica          | Modifica          | Modifica          | Legge      |
+| Modelli dei certificati     | Modifica          | Modifica          | Modifica          | —          |
+| Impaginazione               | —                 | La sua            | La sua            | —          |
+| Fascicolo sanitario         | Modifica          | Legge             | Legge             | —          |
+| Banche dati                 | «Aggiorna adesso» | Legge             | Legge             | —          |
+| AFT                         | —                 | La sua            | —                 | —          |
+| Importazione                | —                 | Nel suo archivio  | —                 | —          |
+| Registro di amministrazione | Legge             | Legge             | —                 | —          |
+| Stato del servizio          | Legge             | —                 | —                 | —          |
 
 La segreteria vede in Strumenti solo gli elenchi dello studio, in sola lettura: le servono per preparare (D175, che aggiorna D146). La pagina della password è per tutti, dal menu dell'utente.
 
@@ -79,9 +79,12 @@ Nella pagina **Archivio**, solo per il titolare:
 
 In **Strumenti › Registro di amministrazione**, per i titolari e l'amministratore: quando, chi, postazione, area, azione con il dettaglio (nomi dei campi cambiati, mai i valori), esito a parole; a pagine, dalle più recenti. Ogni lettura è registrata. In medicina di gruppo un titolare non vede le autorizzazioni e le impostazioni degli archivi dei colleghi, né le modifiche delle AFT di cui non fa parte; l'amministratore vede tutto lo studio.
 
-## Postazioni
+## Postazioni e stampa (D166, D178, D180)
 
-Il nome che ognuno scrive all'accesso, per ogni computer dello studio, condivisa o personale. Servono alle preferenze di stampa. Si archiviano, non si cancellano.
+- **Postazioni:** il nome che ognuno scrive all'accesso, per ogni computer dello studio, condivisa o personale; il browser lo ricorda dopo una password giusta (D178). Si archiviano, non si cancellano.
+- **Preferenze di stampa** per sei documenti: promemoria SSN, ricetta bianca, certificato INPS, certificati dai modelli, schema orario, Profilo sanitario. Per ognuno: stampante consigliata, copie (da 1 a 5), carta (A4 o A5, solo per i certificati dai modelli e lo schema orario), e per il promemoria che cosa proporre per primo (completo o solo NRE). Vale la postazione, poi lo studio, poi la predefinita, campo per campo.
+- **Chi:** le imposta l'amministratore, per lo studio o per una postazione; medici e segreteria vedono che cosa vale sulla loro postazione e un suggerimento accanto a ogni pulsante di stampa.
+- **Che cosa fa davvero il programma**, che sta nel browser: stampante e copie si suggeriscono e si confermano nella finestra di stampa; la carta dei certificati dai modelli cambia il PDF. I formati dei documenti ufficiali non si scelgono: dove l'atto non è stato letto per la carta resta quello di oggi (promemoria A4, D97; INPS A4; Profilo A4; ricetta bianca il PDF del Sistema TS).
 
 ## Stato del servizio e ambiente (D170)
 
@@ -98,6 +101,10 @@ In sola lettura per l'amministratore:
 Regole di prescrizione (si cambiano con una versione nuova e la sua fonte: D41, D47), testi dei modelli ufficiali (D144), mappature e soglie di vecchiaia delle banche dati (D156), valori fissi del Fascicolo (D133), segreti e certificati del servizio (regola 7), credenziali dei medici (D100), registro degli accessi (non si modifica, D23).
 
 ## Domande per la fermata
+
+- **Stampa diretta**, senza la finestra di stampa (requisiti, «stampa diretta in studio»): consigliata un'impostazione del browser sulla postazione (modalità chiosco), da provare su un computer dello studio; l'alternativa è un programma da installare, contro «nessuna installazione».
+- **Formato del promemoria:** oggi A4; le «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non sono state trovate (D97).
+- **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?
 
 - **Poteri dell'amministratore:** il ripristino delle credenziali dei medici e della segreteria, se dal server o con SPID o CIE (dopo la revisione).
 - **Password:** 12 caratteri, nessuna scadenza, nessuna regola di composizione: c'è una regola da seguire (Garante, AgID, consulente privacy)? La password temporanea deve scadere?

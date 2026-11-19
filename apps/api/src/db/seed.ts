@@ -49,6 +49,7 @@ import {
   problemDetail,
   studio,
   therapy,
+  printSetting,
   studioListItem,
   workstation,
 } from './schema';
@@ -124,9 +125,43 @@ try {
     })
     .returning();
   // Postazioni dello studio (tappa 14): servono alle preferenze di stampa.
-  await db.insert(workstation).values([
-    { studioId: st!.id, name: 'Ambulatorio', shared: true, notes: 'Scrivania del medico' },
-    { studioId: st!.id, name: 'Segreteria', shared: true, notes: 'Banco dell’accoglienza' },
+  const [amb, seg] = await db
+    .insert(workstation)
+    .values([
+      { studioId: st!.id, name: 'Ambulatorio', shared: true, notes: 'Scrivania del medico' },
+      { studioId: st!.id, name: 'Segreteria', shared: true, notes: 'Banco dell’accoglienza' },
+    ])
+    .returning();
+  // Preferenze di stampa dimostrative, con stampanti inventate (D180). Le copie 0 vogliono dire
+  // «come lo studio»: la colonna non ammette il vuoto.
+  await db.insert(printSetting).values([
+    {
+      studioId: st!.id,
+      workstationId: null,
+      documentKind: 'promemoria',
+      printerName: 'Stampante dello studio',
+      paper: null,
+      copies: 1,
+      reminderVariant: 'completo',
+    },
+    {
+      studioId: st!.id,
+      workstationId: amb!.id,
+      documentKind: 'certificato_modello',
+      printerName: 'Stampante dell’ambulatorio',
+      paper: 'A5',
+      copies: 0,
+      reminderVariant: null,
+    },
+    {
+      studioId: st!.id,
+      workstationId: seg!.id,
+      documentKind: 'promemoria',
+      printerName: 'Stampante della segreteria',
+      paper: null,
+      copies: 0,
+      reminderVariant: 'solo_nre',
+    },
   ]);
   const passwords = new Map<string, string>();
   const users = new Map<string, string>();

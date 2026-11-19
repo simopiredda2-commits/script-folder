@@ -1397,6 +1397,23 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .first()
         .waitFor();
       await check(admin, 'postazioni e stampa, amministratore', true);
+      // Preferenze di stampa dello studio (D180): i certificati dai modelli in A5.
+      await admin
+        .getByRole('heading', { level: 3, name: 'Preferenze dello studio e delle postazioni' })
+        .waitFor();
+      await admin
+        .getByRole('button', {
+          name: 'Modifica le preferenze dello studio per «Certificati dai modelli»',
+        })
+        .click();
+      await admin.getByLabel('Stampante consigliata').fill('Stampante di prova');
+      await admin.getByLabel('Carta', { exact: true }).selectOption('A5');
+      await check(admin, 'preferenze di stampa di un documento', true);
+      await admin.getByRole('button', { name: 'Salva le preferenze' }).click();
+      await admin
+        .getByRole('table', { name: 'Preferenze dello studio' })
+        .getByText('Stampante di prova')
+        .waitFor();
 
       await admin.goto(`${base}/strumenti?sezione=servizio`);
       await admin.getByRole('heading', { level: 2, name: 'Stato del servizio' }).waitFor();
@@ -1412,6 +1429,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await expect(
       page.getByRole('button', { name: 'Salva i dati dello studio' }).count(),
     ).resolves.toBe(0);
+    // Il medico vede che cosa vale sulla sua postazione, senza le preferenze delle altre.
+    await page.goto(`${base}/strumenti?sezione=stampa`);
+    await page.getByRole('heading', { level: 3, name: 'Questa postazione' }).waitFor();
+    await page
+      .getByText(/Stampante di prova/)
+      .first()
+      .waitFor();
+    await expect(
+      page
+        .getByRole('heading', { level: 3, name: 'Preferenze dello studio e delle postazioni' })
+        .count(),
+    ).resolves.toBe(0);
+    await check(page, 'postazioni e stampa, medico', true);
   });
 
   it('nuovo paziente e dati amministrativi: identità controllata, canale del promemoria (tappa 15)', async () => {

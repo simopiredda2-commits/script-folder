@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
+import { PrintHint } from '../components/PrintHint';
 import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
 import { useApi } from '../lib/useApi';
@@ -409,6 +410,7 @@ export function HealthProfilePage() {
               </li>
             ))}
           </ul>
+          <PrintHint kind="profilo_sanitario" />
         </section>
       )}
     </>
