@@ -908,13 +908,13 @@ Prove e sabotaggi.
 **D191 · Risposte della fermata dopo la tappa 17 (19/11/2026).** Domande con il pulsante a Simone:
 
 - **Via** all'unione della pull request #9 (tappe 16 e 17), con la CI verde: «ok Via: Unisci. Le verifiche le facciamo alla fine». Unita. Le verifiche di Simone e della Dr.ssa Rocca (cataloghi da controllare, prove sui dispositivi veri) si fanno alla fine, tutte insieme; fino ad allora i cataloghi da controllare restano fuori dal database, come proposto.
-- **Chi aggiorna banche dati e trascrizioni**: «adottiamo la soluzione più facile e semplice per tutti». Interpretata come la proposta consigliata: il fornitore, una volta per tutti gli studi del servizio, con un medico che controlla le trascrizioni (A8). È la più semplice per gli studi, che non fanno nulla, e tutti lavorano con gli stessi dati. Lo studio vede com'è andato l'ultimo aggiornamento; il pulsante «Aggiorna adesso» non è più dell'amministratore dello studio (D192). Da correggere se l'intenzione era un'altra.
+- **Chi aggiorna banche dati e trascrizioni**: «adottiamo la soluzione più facile e semplice per tutti». Interpretata come la proposta consigliata: il fornitore, una volta per tutti gli studi del servizio, con un medico che controlla le trascrizioni (A8). È la più semplice per gli studi, che non fanno nulla, e tutti lavorano con gli stessi dati. Lo studio vede com'è andato l'ultimo aggiornamento; il pulsante «Aggiorna adesso» non è più dell'amministratore dello studio (D192; poi rimesso al via della #10, D194). Da correggere se l'intenzione era un'altra.
 - **Soglie dei tentativi** (D188): «Vanno bene così». Le attese (5 password dalla postazione, 20 dall'indirizzo, da 2 secondi a 15 minuti, una provenienza dimenticata dopo un giorno) e le soglie del conto (50 password, 5 codici) restano queste e non sono più segnate come provvisorie: si riguardano se in studio danno fastidio.
 - **Esenzioni** (D190): «Li scarico io». Simone manda il PDF della D.D. 1167/2022 dal Bollettino (elenco regionale esenzioni–prestazioni, per R17) e un'estrazione dell'allegato 7 (malattie rare), come per l'ICD-9-CM; poi la trascrizione, che controlla la Dr.ssa Rocca. Fino ad allora R17 resta «non verificabile» e le malattie rare restano fuori dal catalogo.
 
 Restano annotati: nome e impronta del PDF del manuale ICD-9-CM, l'accreditamento del programma per SPID e CIE.
 
-**D192 · Le banche dati le aggiorna chi gestisce il servizio (D191).** Le banche dati sono comuni a tutti gli studi del servizio (D156): un aggiornamento avviato da uno studio cambiava i dati di tutti. Scelte:
+**D192 · Le banche dati le aggiorna chi gestisce il servizio (D191).** Superata in parte da D194: il pulsante dello studio resta. Le banche dati sono comuni a tutti gli studi del servizio (D156): un aggiornamento avviato da uno studio cambiava i dati di tutti. Scelte:
 
 - **Ogni notte e dal server.** Restano l'orologio di ogni notte e il comando `pnpm banche-dati:aggiorna` sul server, di chi gestisce il servizio. Il pulsante «Aggiorna adesso», la rotta che lo avviava e l'azione `admin.reference_data` si tolgono: nessun utente di uno studio avvia un aggiornamento.
 - **Lo studio vede lo stato.** Tutti gli utenti continuano a vedere in Strumenti › Banche dati quando parte il prossimo aggiornamento, com'è andato l'ultimo e che cosa aspetta un controllo; la pagina dice che a quei controlli pensa chi gestisce il servizio. Gli aggiornamenti avviati con il pulsante prima di oggi restano nel registro con il loro nome.
@@ -930,3 +930,11 @@ Prove e sabotaggi.
 - **Non cambia:** lo storico di una prestazione o di un farmaco, quando non trova nulla, ha per titolo la parola cercata. È la ricerca stessa, dentro la cartella e a sessione aperta.
 
 Prove (servizio, simulatori, interfaccia) e sette sabotaggi.
+
+**D194 · Il pulsante «Aggiorna adesso» resta all'amministratore dello studio (supera D192 in parte).** Al via della pull request #10 Simone ha scritto: «il pulsante che aggiorna record e database da parte dello studio lo lascerei». Scelte:
+
+- **Come prima di D192.** Le banche dati le aggiorna chi gestisce il servizio, una volta per tutti gli studi, ogni notte e con il comando sul server (D191). In più l'amministratore dello studio può avviare subito un aggiornamento con «Aggiorna adesso», senza aspettare la notte (D156, azione `admin.reference_data`).
+- **Vale per tutti gli studi.** Il giro è lo stesso di ogni notte, e le banche dati sono comuni: la pagina lo dice accanto al pulsante. Ne parte uno alla volta: un secondo avvio trova il primo in corso e non parte.
+- **Prove.** Tornano le prove di D156: solo l'amministratore avvia un giro, poi tutti vedono com'è andato. Le due prove e i due sabotaggi di D192 si tolgono con il controllo che provavano.
+
+Prove (servizio, browser con accessibilità) e un sabotaggio.

@@ -6,21 +6,21 @@ Tutto sta in **Strumenti**, una scheda per area. Ognuno vede le schede del suo r
 
 ## Chi vede che cosa
 
-| Scheda                      | Amministratore | Titolare          | Sostituto                    | Segreteria |
-| --------------------------- | -------------- | ----------------- | ---------------------------- | ---------- |
-| Dati dello studio           | Modifica       | Legge             | Legge                        | —          |
-| Utenti e ruoli              | Modifica       | —                 | —                            | —          |
-| Utenti da confermare        | —              | Conferma          | —                            | —          |
-| Postazioni e stampa         | Modifica       | La sua postazione | La sua postazione            | —          |
-| Elenchi dello studio        | Modifica       | Modifica          | Modifica, mentre sostituisce | Legge      |
-| Modelli dei certificati     | Modifica       | Modifica          | Modifica                     | —          |
-| Impaginazione               | —              | La sua            | La sua                       | —          |
-| Fascicolo sanitario         | Modifica       | Legge             | Legge                        | —          |
-| Banche dati                 | Legge          | Legge             | Legge                        | —          |
-| AFT                         | —              | La sua            | —                            | —          |
-| Importazione                | —              | Nel suo archivio  | —                            | —          |
-| Registro di amministrazione | Legge          | Legge             | —                            | —          |
-| Stato del servizio          | Legge          | —                 | —                            | —          |
+| Scheda                      | Amministratore    | Titolare          | Sostituto                    | Segreteria |
+| --------------------------- | ----------------- | ----------------- | ---------------------------- | ---------- |
+| Dati dello studio           | Modifica          | Legge             | Legge                        | —          |
+| Utenti e ruoli              | Modifica          | —                 | —                            | —          |
+| Utenti da confermare        | —                 | Conferma          | —                            | —          |
+| Postazioni e stampa         | Modifica          | La sua postazione | La sua postazione            | —          |
+| Elenchi dello studio        | Modifica          | Modifica          | Modifica, mentre sostituisce | Legge      |
+| Modelli dei certificati     | Modifica          | Modifica          | Modifica                     | —          |
+| Impaginazione               | —                 | La sua            | La sua                       | —          |
+| Fascicolo sanitario         | Modifica          | Legge             | Legge                        | —          |
+| Banche dati                 | «Aggiorna adesso» | Legge             | Legge                        | —          |
+| AFT                         | —                 | La sua            | —                            | —          |
+| Importazione                | —                 | Nel suo archivio  | —                            | —          |
+| Registro di amministrazione | Legge             | Legge             | —                            | —          |
+| Stato del servizio          | Legge             | —                 | —                            | —          |
 
 La segreteria vede in Strumenti solo gli elenchi dello studio, in sola lettura: le servono per preparare (D175, che aggiorna D146). La pagina della password è per tutti, dal menu dell'utente.
 
@@ -144,7 +144,7 @@ In sola lettura per l'amministratore:
 
 - collegamenti con i servizi esterni (oggi tutti simulati, regola 7), con l'ultimo uso;
 - durata massima della sessione;
-- aggiornamento notturno delle banche dati, che fa chi gestisce il servizio per tutti gli studi (D192);
+- aggiornamento notturno delle banche dati, che fa chi gestisce il servizio per tutti gli studi; l'amministratore può avviarne uno subito, in Banche dati (D191, D194);
 - ambiente dell'installazione («prova» o «produzione»);
 - l'avviso che i salvataggi non li fa il programma.
 

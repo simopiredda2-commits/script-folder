@@ -85,8 +85,6 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   let lastName: string;
   let firstName: string;
   let newTherapyUrl: string;
-  /** Gli aggiornamenti delle banche dati del servizio: li avvia chi lo gestisce (D192). */
-  let updates: ReferenceUpdates;
 
   /** Codice a 6 cifre: ogni accesso usa l'intervallo di 30 secondi successivo. */
   const nextCode = (secret: string) => {
@@ -254,6 +252,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await site.close();
     }
     // Aggiornamento delle banche dati (D156) sul sito d'esempio, ogni notte alle 03:30.
+    let updates!: ReferenceUpdates;
     s = await createScenario(
       t.db,
       {},
@@ -1209,7 +1208,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     }
   });
 
-  it('aggiornamento delle banche dati: quando parte, com’è andato, nessun pulsante nello studio (D156, D192)', async () => {
+  it('aggiornamento delle banche dati: quando parte, com’è andato, «Aggiorna adesso» dell’amministratore per tutti gli studi (D156, D194)', async () => {
     // Chi usa le banche dati vede quando è stata controllata la fonte, e da lì l'aggiornamento.
     await page.goto(`${base}/banche-dati`);
     await page
@@ -1224,18 +1223,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page
       .getByText('Automatico, di notte (orologio del servizio)', { exact: false })
       .waitFor();
+    // Le aggiorna chi gestisce il servizio, per tutti gli studi (D191).
     await page
       .getByText(/le aggiorna chi gestisce il servizio, e lo studio non deve fare nulla/)
       .waitFor();
-    // Nessun utente dello studio avvia un aggiornamento: le banche dati sono di tutti gli studi.
+    // Il medico non è amministratore: niente pulsante.
     await expect(page.getByRole('button', { name: 'Aggiorna adesso' }).count()).resolves.toBe(0);
     await check(page, 'aggiornamento delle banche dati', true);
-
-    // Chi gestisce il servizio lancia il comando sul server; l'amministratore dello studio vede il
-    // giro, e nemmeno lui ha il pulsante.
-    expect((await (await updates.start('comando', 'riga di comando (prova)')).done).outcome).toBe(
-      'ok',
-    );
 
     const ctx = await browser.newContext({
       viewport: { width: 1280, height: 900 },
@@ -1245,10 +1239,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin.goto(`${base}/strumenti?sezione=banche-dati`);
-      await admin
-        .getByText('Comando sul server (riga di comando (prova))', { exact: false })
-        .waitFor();
-      await expect(admin.getByRole('button', { name: 'Aggiorna adesso' }).count()).resolves.toBe(0);
+      // Il pulsante resta all'amministratore dello studio, e dice che vale per tutti (D194).
+      await admin.getByText(/L’aggiornamento vale per tutti gli studi del servizio/).waitFor();
+      await admin.getByRole('button', { name: 'Aggiorna adesso' }).click();
+      // La pagina segue il giro da sola; alla fine l'ultimo è quello del pulsante.
+      await admin.getByText(/Pulsante «Aggiorna adesso» \(/).waitFor({ timeout: 30_000 });
       await admin.getByRole('caption').filter({ hasText: 'Aggiornamenti recenti' }).waitFor();
       await expect(
         admin.getByRole('table', { name: 'Aggiornamenti recenti' }).getByRole('row').count(),

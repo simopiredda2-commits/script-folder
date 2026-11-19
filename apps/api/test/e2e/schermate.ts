@@ -499,16 +499,10 @@ try {
   await page.evaluate(() => window.scrollTo(0, 0));
   await shot(page, '37-certificato-patente', true);
 
-  // D156, D192: aggiornamento delle banche dati, avviato da chi gestisce il servizio con il comando
-  // sul server; lo studio vede com'è andato.
-  await (
-    await referenceUpdates.start('comando', 'riga di comando (schermate)')
-  ).done;
+  // D156: aggiornamento delle banche dati, avviato dall'amministratore dello studio.
   await page.goto(`${base}/strumenti?sezione=banche-dati`);
-  await page
-    .getByText('Comando sul server (riga di comando (schermate))', { exact: false })
-    .first()
-    .waitFor();
+  await page.getByRole('button', { name: 'Aggiorna adesso' }).click();
+  await page.getByText(/Pulsante «Aggiorna adesso» \(/).waitFor({ timeout: 120_000 });
   await shot(page, '38-banche-dati', true);
 
   // Tappa 12: AFT. La prima volta il medico la crea; poi condivide i pazienti con il consenso.

@@ -166,7 +166,7 @@ describe('aggiornamento delle banche dati (D156)', () => {
     });
     await expect(
       beginReferenceUpdate(t.db, setup, {
-        trigger: 'comando',
+        trigger: 'pulsante',
         requestedBy: 'prova',
         now: () => new Date(),
       }),
@@ -211,7 +211,7 @@ describe('aggiornamento delle banche dati (D156)', () => {
   });
 });
 
-describe('aggiornamento visto dalle schermate e avviso di vecchiaia (D156, D192)', () => {
+describe('aggiornamento dalle schermate e avviso di vecchiaia (D156)', () => {
   let t: TestDatabase;
   let s: Scenario;
   let site: ExampleSite;
@@ -266,28 +266,26 @@ describe('aggiornamento visto dalle schermate e avviso di vecchiaia (D156, D192)
     expect(res.json()).toMatchObject({
       configurato: true,
       automatico: { ora: '03:30' },
+      puoAvviare: false,
       ultimo: null,
     });
-    expect(res.json()).not.toHaveProperty('puoAvviare');
   });
 
-  it('nessun utente dello studio avvia un giro: lo avvia chi gestisce il servizio, e tutti vedono com’è andato (D192)', async () => {
-    // Le banche dati sono comuni a tutti gli studi: né l'amministratore né un medico le aggiornano.
-    for (const who of ['amministratore', 'titolare', 'segreteria'] as const) {
-      const cookie = await login(s, who);
-      expect((await post(cookie)).statusCode, who).toBe(404);
-    }
-    expect(updates.inProgress).toBeNull();
-    // Il comando sul server.
-    const { done } = await updates.start('comando', 'riga di comando (prova)');
-    expect((await done).outcome).toBe('ok');
-    const body = (await get(await login(s, 'segreteria'))).json();
-    expect(body.ultimo).toMatchObject({
-      avvio: 'comando',
-      chi: 'riga di comando (prova)',
-      esito: 'ok',
-      daControllare: [],
-    });
+  it('solo l’amministratore avvia un giro; poi tutti vedono com’è andato', async () => {
+    const secretary = await login(s, 'segreteria');
+    expect((await post(secretary)).statusCode).toBe(403);
+    const admin = await login(s, 'amministratore');
+    expect((await get(admin)).json().puoAvviare).toBe(true);
+    const started = await post(admin);
+    expect(started.statusCode, started.body).toBe(202);
+    // Un secondo avvio mentre il primo gira: rifiutato, con l'ora.
+    const again = await post(admin);
+    expect(again.statusCode).toBe(409);
+    expect(again.json().errore).toMatch(/già in corso/);
+    await updates.inProgress;
+    const body = (await get(secretary)).json();
+    expect(body.ultimo).toMatchObject({ avvio: 'pulsante', esito: 'ok', daControllare: [] });
+    expect(body.ultimo.chi).not.toBe('');
     expect(body.giri).toHaveLength(1);
   });
 
@@ -310,6 +308,14 @@ describe('aggiornamento visto dalle schermate e avviso di vecchiaia (D156, D192)
     const s2 = await createScenario(t2.db);
     try {
       const admin = await login(s2, 'amministratore');
+      const res = await s2.app.inject({
+        method: 'POST',
+        url: '/api/banche-dati/aggiornamenti',
+        headers: { cookie: admin },
+        payload: {},
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json().errore).toMatch(/non si aggiornano dal programma/);
       const status = (
         await s2.app.inject({
           method: 'GET',
@@ -317,7 +323,7 @@ describe('aggiornamento visto dalle schermate e avviso di vecchiaia (D156, D192)
           headers: { cookie: admin },
         })
       ).json();
-      expect(status).toMatchObject({ configurato: false, automatico: null, ultimo: null });
+      expect(status).toMatchObject({ configurato: false, automatico: null, puoAvviare: false });
     } finally {
       await s2.app.close();
       await t2.drop();

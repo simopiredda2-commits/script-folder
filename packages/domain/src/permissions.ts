@@ -61,6 +61,8 @@ export const ACTIONS = [
   'admin.printers',
   'admin.headers',
   'admin.templates',
+  /** Avviare subito l'aggiornamento delle banche dati, senza aspettare la notte (D156). */
+  'admin.reference_data',
   /**
    * Elenchi dello studio: medici suggeritori, posologie, pacchetti di prestazioni, contatti utili
    * (tappa 14). Azione sullo studio, non su un archivio.
@@ -104,6 +106,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'admin.printers': 'Gestire le stampanti',
   'admin.headers': 'Gestire le intestazioni',
   'admin.templates': 'Gestire i modelli',
+  'admin.reference_data': 'Avviare subito l’aggiornamento delle banche dati',
   'studio.lists':
     'Modificare gli elenchi dello studio (suggeritori, posologie, pacchetti, contatti)',
   'studio.admin_log': 'Leggere il registro delle azioni di amministrazione',
@@ -180,6 +183,7 @@ const ADMINISTRATOR: Action[] = [
   'admin.printers',
   'admin.headers',
   'admin.templates',
+  'admin.reference_data',
 ];
 
 export const ADMIN_ACTIONS: readonly Action[] = ADMINISTRATOR;
