@@ -85,7 +85,9 @@ export type AccessAction =
   | 'stampa_certificato_modello'
   | 'annullamento_certificato_modello'
   | 'scarto_profilo_sanitario'
-  | 'pdf_profilo_sanitario';
+  | 'pdf_profilo_sanitario'
+  | 'impostazioni_aft'
+  | 'consultazione_aft';
 
 export interface AccessEntry {
   studioId?: string | null;

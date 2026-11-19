@@ -41,6 +41,12 @@ export const CONSENT_KINDS = [
     label: 'Fascicolo: consultazione per profilassi internazionale (Ministero della salute)',
     source: `${DM_FSE}, art. 8, c. 1 e c. 6, lett. c); ${DL_179}, lett. a-ter)`,
   },
+  {
+    // Tappa 12 (D161): consenso specifico e separato, come per il dossier sanitario.
+    key: 'aft_condivisione',
+    label: 'Condivisione del riepilogo con i medici dell’AFT',
+    source: 'Garante privacy, Linee guida in materia di Dossier sanitario, 4/6/2015',
+  },
   { key: 'altro', label: 'Altro consenso', source: null },
 ] as const satisfies readonly ConsentKind[];
 export type ConsentKey = (typeof CONSENT_KINDS)[number]['key'];

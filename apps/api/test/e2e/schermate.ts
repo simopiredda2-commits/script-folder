@@ -16,6 +16,7 @@ import { sql } from 'drizzle-orm';
 import { chromium, type Page } from 'playwright';
 import { buildApp } from '../../src/app';
 import { loadConfig } from '../../src/config';
+import { referenceUpdatesFromConfig } from '../../src/reference/updates-service';
 import { createDatabase, createPool } from '../../src/db/client';
 import { studioDate } from '../../src/prescriptions/rules-check';
 import { base32Decode } from '../../src/security/base32';
@@ -30,8 +31,14 @@ if (!user || !password) throw new Error('Servono SCHERMATE_UTENTE e SCHERMATE_PA
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
 const db = createDatabase(pool);
-const app = buildApp({ db, config: { ...config, cookieSecure: false } });
 const work = mkdtempSync(join(tmpdir(), 'mmg-schermate-'));
+// Aggiornamento delle banche dati sul sito d'esempio (D156), per la schermata degli strumenti.
+const referenceUpdates = referenceUpdatesFromConfig(db, {
+  dataDir: join(work, 'dati-pubblici'),
+  sources: 'esempio',
+  time: '03:30',
+});
+const app = buildApp({ db, config: { ...config, cookieSecure: false }, referenceUpdates });
 mkdirSync(OUT, { recursive: true });
 
 async function shot(page: Page, name: string, fullPage = false) {
@@ -302,9 +309,12 @@ try {
   // Tappa 10: una ricetta specialistica inviata (dal catalogo d'esempio), poi il suo seguito con
   // un referto inventato; presidi per diabetici.
   const found = await page.request.get(`${base}/api/prestazioni?q=prova`);
+  // Con il codice del nomenclatore: la riga della specialistica lo vuole (R10, D154).
   const service = (
-    (await found.json()) as { prestazioni: { regionalCode: string; description: string }[] }
-  ).prestazioni[0]!;
+    (await found.json()) as {
+      prestazioni: { regionalCode: string; nationalCode: string | null; description: string }[];
+    }
+  ).prestazioni.find((p) => p.nationalCode)!;
   const draft = await page.request.post(`${base}/api/pazienti/${patientId}/ricette`, {
     data: {
       kind: 'specialist_ssn',
@@ -314,6 +324,7 @@ try {
       lines: [
         {
           serviceCode: service.regionalCode,
+          serviceNationalCode: service.nationalCode,
           serviceDescription: service.description,
           quantity: 1,
         },
@@ -433,6 +444,45 @@ try {
   await page.goto(`${base}/strumenti`);
   await page.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
   await shot(page, '34-strumenti', true);
+
+  // Tappa 13: modelli ufficiali e proposti (D158, D160), e il certificato della patente.
+  await page.goto(`${base}/strumenti?sezione=modelli`);
+  await page.getByRole('heading', { level: 2, name: 'Modelli ufficiali e proposti' }).waitFor();
+  await shot(page, '36-modelli', true);
+  await page.goto(`${base}/pazienti/${patientId}/certificati-modelli`);
+  await page.getByRole('heading', { level: 1, name: 'Altri certificati' }).waitFor();
+  await page.getByLabel('Modello').selectOption('patente-anamnestico');
+  for (const g of await page.locator('form fieldset.scelta-in-riga').all())
+    await g.getByRole('radio').first().check();
+  await page
+    .getByRole('group', { name: 'In cura presso il medico' })
+    .getByLabel('da un anno o più')
+    .check();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '37-certificato-patente', true);
+
+  // D156: aggiornamento delle banche dati, avviato dall'amministratore dello studio.
+  await page.goto(`${base}/strumenti?sezione=banche-dati`);
+  await page.getByRole('button', { name: 'Aggiorna adesso' }).click();
+  await page.getByText(/Pulsante «Aggiorna adesso» \(/).waitFor({ timeout: 120_000 });
+  await shot(page, '38-banche-dati', true);
+
+  // Tappa 12: AFT. La prima volta il medico la crea; poi condivide i pazienti con il consenso.
+  await page.goto(`${base}/strumenti?sezione=aft`);
+  await page
+    .getByRole('heading', { level: 2, name: 'Aggregazione funzionale territoriale' })
+    .waitFor();
+  if (await page.getByRole('button', { name: 'Crea l’AFT' }).count()) {
+    await page.getByLabel('Nome dell’AFT').fill('AFT dimostrativa');
+    await page.getByLabel('Azienda sanitaria (facoltativo)').fill('ASL dimostrativa');
+    await page.getByRole('button', { name: 'Crea l’AFT' }).click();
+  }
+  await page.getByRole('table', { name: 'Medici dell’AFT nel programma' }).waitFor();
+  const sharing = page.getByLabel(
+    'Condivido con i medici dell’AFT il riepilogo dei miei pazienti che hanno dato il consenso',
+  );
+  if (!(await sharing.isChecked())) await sharing.check();
+  await shot(page, '39-aft', true);
 
   await page.goto(`${base}/archivio`);
   await page.getByRole('heading', { level: 1, name: 'Archivio' }).waitFor();

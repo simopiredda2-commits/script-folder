@@ -15,6 +15,8 @@ import { registerFollowUpRoutes } from './http/followup-routes';
 import { registerFseRoutes } from './http/fse-routes';
 import { createPssService } from './fse/service';
 import { registerPrivacyRoutes } from './http/privacy-routes';
+import { registerAftRoutes } from './http/aft-routes';
+import { createAftService } from './aft/service';
 import { registerCredentialRoutes } from './http/credentials-routes';
 import { registerDoctorProfileRoutes } from './http/doctor-profile-routes';
 import { registerRegionalSimulatorRoutes } from './http/regional-simulator-routes';
@@ -214,6 +216,7 @@ export function buildApp({
   registerTherapyRoutes(app, db, now ?? (() => new Date()));
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
+  registerAftRoutes(app, createAftService({ db, now: now ?? (() => new Date()) }));
   registerFollowUpRoutes(app, db, now ?? (() => new Date()));
   // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
   const reference = new ReferenceData(db, loadMappings(), {

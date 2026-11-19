@@ -129,6 +129,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.
 - `docs/fse.md`: Fascicolo Sanitario Elettronico 2.0 e Profilo Sanitario Sintetico, con le fonti (D110).
 - `docs/provenienze.md`: da dove viene ogni contenuto, a quali condizioni, chi lo controlla (D142).
+- `docs/aft.md`: condivisione del riepilogo tra i medici dell'AFT, con il consenso del paziente (D161).
 
 ## Le tappe
 

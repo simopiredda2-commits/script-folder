@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { CONSENT_KINDS, consentKind, currentConsents, delegationValidOn } from '../src/privacy';
 
 describe('privacy: consensi e deleghe', () => {
-  it('i consensi del Fascicolo hanno la loro fonte; «altro» no', () => {
-    for (const k of CONSENT_KINDS.filter((x) => x.key !== 'altro'))
+  it('i consensi del Fascicolo e dell’AFT hanno la loro fonte; «altro» no', () => {
+    for (const k of CONSENT_KINDS.filter((x) => x.key.startsWith('fse_')))
       expect(k.source, k.key).toMatch(/^DM 7 settembre 2023, art\. 8/);
+    // Condivisione nell'AFT (D161): consenso specifico, come per il dossier sanitario.
+    expect(consentKind('aft_condivisione')!.source).toMatch(/Dossier sanitario/);
     expect(consentKind('altro')!.source).toBeNull();
     expect(consentKind('inesistente')).toBeUndefined();
   });

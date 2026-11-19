@@ -8,6 +8,7 @@ Da verificare con la Dr.ssa Rocca alla prima fermata. Fonte: la tabella «Utenti
 - **Segreteria.** È condivisa dallo studio e lavora su tutti gli archivi: anagrafiche, agenda, richieste dei pazienti, terapie non riservate, bozze di ricette ripetute di terapie croniche, stampa dei promemoria. Non firma e non invia. Il **riepilogo clinico** (allergie, problemi, scadenze) e il **diario** li vede solo se il titolare li abilita per il suo archivio: per difetto sono spenti (scelta della prima fermata, da confermare con il consulente privacy). I dati riservati non li vede mai.
 - **Medico sostituto.** Lavora sull'archivio del titolare solo nel periodo autorizzato, con le proprie credenziali. Ricette e certificati restano a nome suo. Non esporta i dati e non legge il registro: i dati sono del titolare.
 - **Medicina di gruppo.** Non è un ruolo dell'utente ma un modo di organizzare lo studio: più titolari, ognuno con il suo archivio, e una segreteria condivisa. Un collega vede i pazienti di un altro titolare solo con un'**autorizzazione** che il titolare gli dà, con periodo e motivo: confermato da Simone alla prima fermata.
+- **Medici dell'AFT** (tappa 12, D161). Non è un ruolo ma un'appartenenza: titolari di studi diversi che usano il programma. Un collega dell'AFT vede solo il **riepilogo** di un paziente (allergie, problemi, terapie in corso, parametri), solo se il medico curante condivide i suoi pazienti e il paziente ha dato il consenso, scrivendo il motivo. Niente voci oscurate o riservate, niente scritture. Dettagli in `docs/aft.md`.
 - **Amministratore dello studio.** Gestisce utenti, stampanti, intestazioni e modelli. Non ha accesso clinico, a meno che non sia anche medico: un utente può avere più ruoli, per esempio titolare e amministratore.
 - **Paziente.** Fase 2, non c'è ancora.
 
@@ -48,7 +49,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 
 ## Regole che valgono sempre
 
-- Ogni studio vede solo i propri dati.
+- Ogni studio vede solo i propri dati. L'unica eccezione è il riepilogo condiviso nell'AFT, alle condizioni scritte sopra; ogni consultazione entra nel registro del medico curante.
 - Un'autorizzazione vale solo nel suo periodo e finché non è revocata; vale solo per chi è medico (data per errore a un amministratore o alla segreteria, non apre nulla in più).
 - Ogni apertura di una cartella, consentita o negata, entra nel registro degli accessi con utente, paziente, azione, data e postazione, e il motivo della decisione.
 - I dati dei pazienti non si cancellano: si annullano con un motivo. Ogni modifica entra nello storico con l'utente che l'ha fatta.

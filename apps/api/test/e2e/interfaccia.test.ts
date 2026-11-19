@@ -90,7 +90,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     return totp(base32Decode(secret.replace(/\s/g, '')), s.clock.now().getTime());
   };
 
-  async function loginInBrowser(p: Page, who: 'titolare' | 'segreteria' | 'amministratore') {
+  async function loginInBrowser(
+    p: Page,
+    who: 'titolare' | 'collega' | 'segreteria' | 'amministratore',
+  ) {
     await p.goto(base);
     await p.getByLabel('Nome utente').fill(s.users[who].username);
     await p.getByLabel('Password').fill(PASSWORD);
@@ -1279,6 +1282,61 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect((await page.request.get(`${base}${href}`)).headers()['content-type']).toBe(
       'application/pdf',
     );
+  });
+
+  it('AFT: il titolare crea l’AFT e condivide, il collega accetta l’invito e consulta il riepilogo (tappa 12)', async () => {
+    await page.goto(`${base}/strumenti?sezione=aft`);
+    await page
+      .getByRole('heading', { level: 2, name: 'Aggregazione funzionale territoriale' })
+      .waitFor();
+    await page.getByLabel('Nome dell’AFT').fill('AFT di prova');
+    await page.getByRole('button', { name: 'Crea l’AFT' }).click();
+    await page.getByRole('table', { name: 'Medici dell’AFT nel programma' }).waitFor();
+    await page
+      .getByLabel(
+        'Condivido con i medici dell’AFT il riepilogo dei miei pazienti che hanno dato il consenso',
+      )
+      .check();
+    await page.getByLabel('Invita un medico titolare: codice regionale').fill('MMG-PROVA-2');
+    await page.getByRole('button', { name: 'Invita' }).click();
+    await page.getByRole('cell', { name: 'Invitato, in attesa' }).waitFor();
+    await check(page, 'AFT del titolare', true);
+    // Il consenso del paziente, come lo registra lo studio nella sua cartella.
+    const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    const given = await page.request.post(`${base}/api/pazienti/${s.richPatient}/consensi`, {
+      data: { tipo: 'aft_condivisione', stato: 'dato', data: '2026-11-18' },
+    });
+    expect(given.status()).toBe(201);
+
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    const colleague = await ctx.newPage();
+    try {
+      await loginInBrowser(colleague, 'collega');
+      await colleague.goto(`${base}/strumenti?sezione=aft`);
+      await colleague.getByRole('button', { name: 'Accetta l’invito' }).click();
+      await colleague
+        .getByRole('heading', { level: 2, name: 'Riepilogo di un paziente di un collega' })
+        .waitFor();
+      await colleague.getByLabel('Codice fiscale del paziente').fill(rich!.fiscalCode);
+      await colleague
+        .getByLabel('Motivo dell’accesso')
+        .fill('Visita nell’ambulatorio serale dell’AFT');
+      await colleague.getByRole('button', { name: 'Mostra il riepilogo' }).click();
+      await colleague
+        .getByText('Riepilogo condiviso con il consenso del paziente.', { exact: false })
+        .waitFor();
+      await colleague.getByText('Sostanza di prova', { exact: false }).first().waitFor();
+      await expect(colleague.getByText('Farmaco riservato di prova').count()).resolves.toBe(0);
+      await check(colleague, 'AFT del collega, riepilogo', true);
+    } finally {
+      await ctx.close();
+    }
+    // Il titolare vede chi ha consultato e perché.
+    await page.reload();
+    await page.getByRole('cell', { name: 'Visita nell’ambulatorio serale dell’AFT' }).waitFor();
   });
 
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {

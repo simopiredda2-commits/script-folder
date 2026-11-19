@@ -729,3 +729,13 @@ Non provato: il catalogo vero nelle schermate e nelle ricette, perché non è an
 - **Validità tre mesi**, dalla scheda del Ministero della Salute («in data non anteriore ai tre mesi precedenti»), che dice anche che serve solo per il primo rilascio e il primo rinnovo.
 
 Da verificare con la Dr.ssa Rocca prima dell'uso: il testo, i gruppi e le «altre malattie». È una domanda per la fermata, insieme ai moduli che usa oggi.
+
+**D161 · Condivisione del riepilogo tra i medici dell'AFT che usano il programma (tappa 12).** Tra chi usa il nostro programma, la condivisione della medicina di gruppo si estende all'AFT (D104, D110), con le regole del dossier sanitario: il medico curante decide, il paziente consente, si vede il minimo, ogni accesso resta registrato. Scelte:
+
+- **AFT nel programma.** Un medico titolare la crea; i colleghi entrano su invito, con il loro codice regionale, e solo accettando. Un medico sta in una sola AFT alla volta. Chi esce resta nella storia con la data d'uscita: AFT e membri non si cancellano e ogni modifica va nello storico (migrazione 0020).
+- **Il titolare decide.** Per difetto non condivide. Attiva la condivisione dei suoi pazienti nell'AFT, e la spegne quando vuole; uscendo dall'AFT la spegne subito.
+- **Il paziente decide.** Consenso a parte, specifico, «Condivisione del riepilogo con i medici dell'AFT», registrato in cartella come gli altri; revocabile, con effetto immediato.
+- **Il minimo.** Il collega vede solo il riepilogo: allergie e reazioni, problemi, terapie in corso, ultimi parametri, ognuno con il suo stato clinico. Viene dalla composizione del Profilo sanitario (tappa 11), che lascia fuori le voci oscurate e riservate. Nessun conteggio delle voci escluse: chi consulta non deve capire che il paziente ha oscurato qualcosa. Niente scritture.
+- **Come si consulta.** Con il codice fiscale e il motivo dell'accesso, almeno 10 caratteri; nessun elenco dei pazienti dei colleghi. Se il riepilogo non c'è, la risposta è la stessa in ogni caso; il motivo preciso va nel registro del medico curante.
+- **Registro.** Ogni consultazione, consentita o negata, va nel registro degli accessi del medico curante, con il medico, lo studio, il motivo e l'esito. Il titolare la vede in Strumenti › AFT; è anche nell'esportazione completa.
+- **Chi consulta.** Solo i medici titolari. Il sostituto no, per ora: è una domanda per la fermata, come chi può creare un'AFT e se il paziente va avvisato di ogni consultazione.

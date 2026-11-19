@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { AftSection } from './AftSection';
 import { DataUpdatesSection } from './DataUpdatesSection';
 import { LayoutSection, TemplatesSection } from './TemplatesTools';
 
@@ -77,6 +78,7 @@ const SECTIONS = [
   { key: 'impaginazione', label: 'Impaginazione', doctorOnly: true },
   { key: 'fascicolo', label: 'Fascicolo sanitario', doctorOnly: false },
   { key: 'banche-dati', label: 'Banche dati', doctorOnly: false },
+  { key: 'aft', label: 'AFT', doctorOnly: true },
 ] as const;
 
 /**
@@ -107,6 +109,7 @@ export function StudioToolsPage() {
         ))}
       </div>
       {current.key === 'modelli' && <TemplatesSection />}
+      {current.key === 'aft' && <AftSection />}
       {current.key === 'impaginazione' && <LayoutSection />}
       {current.key === 'fascicolo' && <FseSection />}
       {current.key === 'banche-dati' && <DataUpdatesSection />}
