@@ -9,8 +9,9 @@ servizio, così la prova non legge file scritti dallo stesso codice che li legge
 
 Che cosa è vero e che cosa è inventato (docs/provenienze.md):
 - AIFA: intestazioni e righe copiate senza cambiare un byte dai file AIFA letti il 18/11/2026
-  (anagrafica delle confezioni e liste di classe A e H del 30/6/2026). Fonte: AIFA, dati aperti
-  con licenza CC BY 4.0 (https://www.aifa.gov.it/open-data). Le pagine HTML sono nostre.
+  (anagrafica delle confezioni e liste di classe A e H del 30/6/2026) e il 19/11/2026 (lista di
+  trasparenza del 16 novembre 2026, farmaci carenti aggiornati al 17/11/2026). Fonte: AIFA, dati
+  aperti con licenza CC BY 4.0 (https://www.aifa.gov.it/open-data). Le pagine HTML sono nostre.
 - Regione Piemonte, DPC: la riga di DULAGLUTIDE è quella dell'elenco «Farmaci PHT - oggetto di
   DPC» aggiornato al 9/7/2026; il PDF del sito d'esempio è un estratto di prova scritto qui.
 - ISTAT: le intestazioni e le due righe di Agliè e Airasca, lette il 18/11/2026 dal file ISTAT
@@ -157,12 +158,38 @@ CLASSE_H = [
 ]
 
 
+# Lista di trasparenza ed elenco dei farmaci carenti, righe copiate dai file AIFA letti il
+# 19/11/2026 (D202), in cp1252 con \r\n come i file veri: l'intestazione e le righe degli otto
+# farmaci dimostrativi che hanno un equivalente; dei carenti, l'avvertenza, la data, l'intestazione
+# e la riga di AMLODIPINA TEVA ITALIA, con la nota che va a capo dentro le virgolette (\n).
+TRASPARENZA = [
+    'Principio attivo;Confezione di riferimento;ATC;AIC;Farmaco;Confezione;Ditta;Prezzo riferimento SSN;Prezzo Pubblico 16 novembre 2026;Differenza;Nota;Codice gruppo equivalenza',
+    'Amlodipina;28 UNITA\' 5 MG - USO ORALE;C08CA01;38092019;AMLODIPINA DOC GENERICI;"""5 MG COMPRESSE"" 28 COMPRESSE IN BLISTER AL/PVC/PVDC";DOC GENERICI S.R.L.;3,74 €;3,74 €;0,00 €;;DOB',
+    'Amlodipina;28 UNITA\' 5 MG - USO ORALE;C08CA01;37479060;AMLODIPINA EG;"""5 MG COMPRESSE"" 28 CPR IN BLISTER AL/PVC//PE/PVCDC";EG S.P.A.;3,74 €;3,74 €;0,00 €;;DOB',
+    'Amlodipina;28 UNITA\' 5 MG - USO ORALE;C08CA01;38548032;AMLODIPINA TEVA ITALIA;"""5 MG COMPRESSE"" 28 COMPRESSE";TEVA ITALIA S.R.L.;3,74 €;3,74 €;0,00 €;;DOB',
+    'Amlodipina;28 UNITA\' 5 MG - USO ORALE;C08CA01;27428010;NORVASC;"""5 MG COMPRESSE"" 28 COMPRESSE";VIATRIS PHARMA S.R.L.;3,74 €;5,53 €;1,79 €;;DOB',
+    'Atorvastatina;30 UNITA\' 20 MG - USO ORALE;C10AA05;48247023;ATORVASTATINA DOC GENERICS;"""20 MG COMPRESSE RIVESTITE CON FILM"" 30 COMPRESSE IN BLISTER PVC-PE-PVDC/AL";DOC GENERICI S.R.L.;7,96 €;7,96 €;0,00 €;;FTB',
+    'Atorvastatina;30 UNITA\' 20 MG - USO ORALE;C10AA05;33007042;TORVAST;"""20 MG COMPRESSE RIVESTITE CON FILM"" 30 COMPRESSE";VIATRIS PHARMA S.R.L.;7,96 €;10,51 €;2,55 €;;FTB',
+    'Metformina;30 UNITA\' 500 MG - USO ORALE;A10BA02;17758018;GLUCOPHAGE;"""500 MG COMPRESSE RIVESTITE"" 30 COMPRESSE";BRUNO FARMACEUTICI S.P.A.;1,27 €;1,81 €;0,54 €;;A1A',
+    'Metformina;30 UNITA\' 500 MG - USO ORALE;A10BA02;40592103;METFORMINA AUROBINDO;"""500 MG COMPRESSE RIVESTITE CON FILM"" 30 COMPRESSE IN BLISTER PVC/AL";AUROBINDO PHARMA ITALIA S.R.L.;1,27 €;1,27 €;0,00 €;;A1A',
+]
+
+CARENTI = [
+    'NB: I medicinali carenti, per i quali il Titolare AIC non abbia provveduto a comunicare la data effettiva di fine carenza, continueranno ad essere presenti nella “Lista dei farmaci temporaneamente carenti”, anche oltre la “data di fine presunta” inizialmente comunicata e indicata nella presente lista;;;;;;;;;;;;',
+    'Elenco dei farmaci carenti aggiornato al 17/11/2026;;;;;;;;;;;;',
+    'Nome medicinale;Codice AIC;Principio attivo;Forma farmaceutica e dosaggio;Titolare AIC;Data inizio;Fine presunta;Equivalente;Motivazioni;Suggerimenti/Indicazioni AIFA;Nota AIFA;Classe di rimborsabilità;Codice ATC',
+    'AMLODIPINA TEVA ITALIA;038548032;AMLODIPINA BESILATO;"""5 MG COMPRESSE"" 28 COMPRESSE IN BLISTER PVC/PVDC/AL";TEVA ITALIA S.R.L.;02/11/2026;;Sì;Cessata commercializzazione definitiva;Per trattamento alternativo si consiglia di rivolgersi allo specialista o al M.M.G;"cessata commercializzazione definitiva relativa sia al canale retail che al canale ospedaliero:\n- canale retail: cessata commercializzazione a partire dal 02/11/2026\n- canale ospedaliero: cessata commercializzazione a partire dal 15/03/2027";A TOTALE CARICO DEL SSN.;C08CA01',
+]
+
+
 def genera_aifa() -> None:
     pagina = """<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Liste dei farmaci (esempio)</title></head>
 <body><h1>Liste dei farmaci (pagina d'esempio)</h1><ul>
 <li><a href="/aifa/farmaci/confezioni_fornitura.csv">Anagrafica delle confezioni (estratto)</a></li>
 <li><a href="/aifa/documents/20142/3815901/Classe-A_per_principio-attivo_30-6-2026.csv">Classe A (estratto)</a></li>
 <li><a href="/aifa/documents/20142/3815901/Classe-H_per_principio-attivo_30-6-2026.csv">Classe H (estratto)</a></li>
+<li><a href="/aifa/documents/20142/825643/Lista_farmaci_equivalenti.csv">Lista di trasparenza (estratto)</a></li>
+<li><a href="/aifa/documents/20142/847339/elenco_medicinali_carenti.csv">Farmaci carenti (estratto)</a></li>
 </ul></body></html>
 """
     scrivi(SITO / "aifa" / "liste-dei-farmaci.html", pagina.encode("utf-8"))
@@ -170,6 +197,9 @@ def genera_aifa() -> None:
     cartella = SITO / "aifa" / "documents" / "20142" / "3815901"
     scrivi(cartella / "Classe-A_per_principio-attivo_30-6-2026.csv", ("\r\n".join(CLASSE_A) + "\r\n").encode("cp1252"))
     scrivi(cartella / "Classe-H_per_principio-attivo_30-6-2026.csv", ("\r\n".join(CLASSE_H) + "\r\n").encode("cp1252"))
+    documenti = SITO / "aifa" / "documents" / "20142"
+    scrivi(documenti / "825643" / "Lista_farmaci_equivalenti.csv", ("\r\n".join(TRASPARENZA) + "\r\n").encode("cp1252"))
+    scrivi(documenti / "847339" / "elenco_medicinali_carenti.csv", ("\r\n".join(CARENTI) + "\r\n").encode("cp1252"))
 
 
 # --------------------------------------------------------------------------- Regione Piemonte (PDF di prova)

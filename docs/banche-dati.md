@@ -10,18 +10,20 @@ sync/banche_dati.py  →  dati-pubblici/correnti/…, stato.json  →  importazi
 
 ## Che cosa si importa
 
-| Tipo                    | Da dove                                                             | Come            | Serve per                       |
-| ----------------------- | ------------------------------------------------------------------- | --------------- | ------------------------------- |
-| `farmaci`               | AIFA, anagrafica delle confezioni (CSV)                             | file di `sync/` | ricerca farmaci                 |
-| `farmaci_classe`        | AIFA, classe A e H per principio attivo (CSV)                       | file di `sync/` | R8, prezzo, equivalenti         |
-| `farmaci_dpc`           | Regione Piemonte, farmaci PHT in DPC (PDF)                          | trascrizione    | R5, R7, indicazione DPC         |
-| `comuni`                | ISTAT, elenco dei comuni (XLSX)                                     | file di `sync/` | anagrafica, codice fiscale, D12 |
-| `prestazioni`           | Regione Piemonte, catalogo delle prestazioni (PDF)                  | trascrizione    | ricerca prestazioni, R14        |
-| `esenzioni`             | DPCM LEA e atti regionali (PDF)                                     | trascrizione    | R9                              |
-| `esenzioni_prestazioni` | Regione Piemonte, D.D. 1167/2022 (PDF)                              | trascrizione    | R17                             |
-| `diagnosi`              | Ministero della salute, manuale ICD-9-CM 2007 (PDF) e DM 28/10/2020 | trascrizione    | ricerca delle diagnosi (D186)   |
+| Tipo                    | Da dove                                                             | Come            | Serve per                                 |
+| ----------------------- | ------------------------------------------------------------------- | --------------- | ----------------------------------------- |
+| `farmaci`               | AIFA, anagrafica delle confezioni (CSV)                             | file di `sync/` | ricerca farmaci                           |
+| `farmaci_classe`        | AIFA, classe A e H per principio attivo (CSV)                       | file di `sync/` | R8, prezzo, equivalenti                   |
+| `farmaci_trasparenza`   | AIFA, lista di trasparenza dei farmaci equivalenti (CSV)            | file di `sync/` | prezzo di riferimento, equivalenti (D202) |
+| `farmaci_carenti`       | AIFA, elenco dei medicinali carenti (CSV)                           | file di `sync/` | R21, carenze in terapia e in Oggi (D202)  |
+| `farmaci_dpc`           | Regione Piemonte, farmaci PHT in DPC (PDF)                          | trascrizione    | R5, R7, indicazione DPC                   |
+| `comuni`                | ISTAT, elenco dei comuni (XLSX)                                     | file di `sync/` | anagrafica, codice fiscale, D12           |
+| `prestazioni`           | Regione Piemonte, catalogo delle prestazioni (PDF)                  | trascrizione    | ricerca prestazioni, R14                  |
+| `esenzioni`             | DPCM LEA e atti regionali (PDF)                                     | trascrizione    | R9                                        |
+| `esenzioni_prestazioni` | Regione Piemonte, D.D. 1167/2022 (PDF)                              | trascrizione    | R17                                       |
+| `diagnosi`              | Ministero della salute, manuale ICD-9-CM 2007 (PDF) e DM 28/10/2020 | trascrizione    | ricerca delle diagnosi (D186)             |
 
-Non importati per ora: liste di trasparenza, farmaci carenti, registri e piani AIFA, ICD-10-IM. Si aggiungono con un tipo e una mappatura nuovi. Le diagnosi ICD-9-CM: `docs/icd9cm.md`.
+Non importati per ora: registri e piani AIFA, ICD-10-IM. Si aggiungono con un tipo e una mappatura nuovi. Le diagnosi ICD-9-CM: `docs/icd9cm.md`.
 
 ## Lettura dei file
 
@@ -38,17 +40,22 @@ Non importati per ora: liste di trasparenza, farmaci carenti, registri e piani A
 - `colonne`: campo → intestazione; `null` = **da completare**;
 - `costanti`: campo → valore uguale per tutto il file (la classe di un elenco);
 - `nessunValore`: campo facoltativo → espressioni (su tutta la cella) dei valori che nel file vogliono dire «nessun valore», per esempio «-» al posto di un prezzo. Solo quelli visti nei file veri, con il motivo nella nota; il rapporto d'importazione dice quante celle sono state lette così (D148);
+- `zeriDavanti`: campo → lunghezza. Un codice di sole cifre più corto riprende gli zeri davanti che il file ha tolto (l'AIC della lista di trasparenza, D202); il rapporto d'importazione dice quanti valori. Un codice con altri caratteri resta com'è, e il controllo della forma lo segnala;
 - `vecchiaDopoGiorni`: soglia di A6; `null` = da completare (D62).
 
-Stato al 18/11/2026:
+I campi possono essere testo (con la forma attesa: AIC, ATC, codice catastale), numero (scritto all'italiana o con il punto; l'euro in fondo, «5,63 €», non fa parte del numero), sì o no, e data (GG/MM/AAAA o AAAA-MM-GG, solo date vere: niente 31/02).
 
-| Mappatura         | Stato                                                                                                                                                                                                                 |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `istat-comuni`    | Completa. Intestazioni lette dal file ISTAT al 21/02/2026 tramite un'estrazione testuale: da confermare (D56)                                                                                                         |
-| `aifa-anagrafica` | Completa (D148). Intestazioni lette il 18/11/2026 da `confezioni_fornitura.csv`: 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Con la ditta titolare dell'AIC (`RAGIONE_SOCIALE`, D151) |
-| `aifa-classe-a`   | Completa (D148). File del 30/6/2026 in cp1252: 10.766 righe, AIC e prezzi tutti validi. **Non ha la colonna della nota AIFA**                                                                                         |
-| `aifa-classe-h`   | Completa (D148). File del 30/6/2026: 2.487 righe; l'intestazione «Codice AIC» va a capo dentro le virgolette; 117 prezzi senza valore («-» e il prezzo dell'ossigeno a metro cubo, `nessunValore`)                    |
-| `trascrizione-*`  | Complete: il formato è nostro (sotto)                                                                                                                                                                                 |
+Stato al 19/11/2026:
+
+| Mappatura          | Stato                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `istat-comuni`     | Completa. Intestazioni lette dal file ISTAT al 21/02/2026 tramite un'estrazione testuale: da confermare (D56)                                                                                                                                                                                                                                                |
+| `aifa-anagrafica`  | Completa (D148). Intestazioni lette il 18/11/2026 da `confezioni_fornitura.csv`: 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Con la ditta titolare dell'AIC (`RAGIONE_SOCIALE`, D151)                                                                                                                                        |
+| `aifa-classe-a`    | Completa (D148). File del 30/6/2026 in cp1252: 10.766 righe, AIC e prezzi tutti validi. **Non ha la colonna della nota AIFA**                                                                                                                                                                                                                                |
+| `aifa-classe-h`    | Completa (D148). File del 30/6/2026: 2.487 righe; l'intestazione «Codice AIC» va a capo dentro le virgolette; 117 prezzi senza valore («-» e il prezzo dell'ossigeno a metro cubo, `nessunValore`)                                                                                                                                                           |
+| `aifa-trasparenza` | Completa (D202). File del 19/11/2026, prezzi del 16/11/2026, cp1252: 8.598 righe, nessun problema. AIC senza gli zeri davanti (`zeriDavanti`: 8.594 con 8 cifre, 4 con 7); gruppi di equivalenza uguali a quelli della classe A (8.400 AIC in comune). **La colonna «Nota» è un'annotazione in parole, non la nota AIFA** (corregge D148). Soglia: 32 giorni |
+| `aifa-carenti`     | Completa (D202). File aggiornato al 17/11/2026, cp1252: 2.516 righe, nessun problema. Intestazione alla terza riga; «Nota AIFA» è un testo che va a capo nelle virgolette; tre AIC compaiono due volte. Nessuna soglia: AIFA non dichiara una cadenza                                                                                                        |
+| `trascrizione-*`   | Complete: il formato è nostro (sotto)                                                                                                                                                                                                                                                                                                                        |
 
 **Se AIFA cambia le colonne.** `sync/` mette il file nuovo «da verificare» (colonne cambiate). Dopo il controllo: si correggono i nomi delle colonne nella mappatura, si alza la `versione` del file e si rilancia l'importazione. Con una colonna nulla il rapporto dice «mappatura da completare» e riporta l'intestazione vera, letta da `stato.json`.
 
@@ -237,17 +244,18 @@ In sviluppo e nelle prove non c'è `BANCHE_DATI_DIR`, quindi il servizio non chi
 
 Solo fatti che hanno una fonte; l'assenza da un elenco non diventa mai un «no» (D59).
 
-| Fatto                                         | Da dove                                                        | Regola  |
-| --------------------------------------------- | -------------------------------------------------------------- | ------- |
-| A carico del SSN                              | il farmaco è nell'elenco di classe A in vigore                 | R8      |
-| Nota AIFA                                     | DPC (le liste di classe non hanno la colonna)                  | R7      |
-| Piano terapeutico obbligatorio                | DPC, solo se dice `sì`                                         | R5      |
-| Esenzione esistente                           | catalogo delle esenzioni                                       | R9      |
-| Prestazioni di un'esenzione                   | elenco esenzione → prestazioni                                 | R17     |
-| Prescrivibile dal medico di medicina generale | **non noto**: serve una fonte strutturata                      | R8      |
-| Regime di fornitura                           | anagrafica (`FORNITURA`): letto, non ancora usato dalle regole | —       |
-| Unità per confezione                          | **non noto**                                                   | R4, R11 |
-| Antibiotico iniettabile o infusione           | **non noto**                                                   | R3      |
+| Fatto                                         | Da dove                                                                                                                | Regola  |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------- |
+| A carico del SSN                              | il farmaco è nell'elenco di classe A in vigore                                                                         | R8      |
+| Nota AIFA                                     | DPC (le liste di classe non hanno la colonna, e la «Nota» della lista di trasparenza è un'annotazione in parole, D202) | R7      |
+| Piano terapeutico obbligatorio                | DPC, solo se dice `sì`                                                                                                 | R5      |
+| Esenzione esistente                           | catalogo delle esenzioni                                                                                               | R9      |
+| Prestazioni di un'esenzione                   | elenco esenzione → prestazioni                                                                                         | R17     |
+| Prescrivibile dal medico di medicina generale | **non noto**: serve una fonte strutturata                                                                              | R8      |
+| Regime di fornitura                           | anagrafica (`FORNITURA`): letto, non ancora usato dalle regole                                                         | —       |
+| Unità per confezione                          | **non noto**                                                                                                           | R4, R11 |
+| Antibiotico iniettabile o infusione           | **non noto**                                                                                                           | R3      |
+| Farmaco carente                               | elenco AIFA dei carenti in vigore alla data: la carenza cominciata più di recente, se no la prima prevista (D202)      | R21     |
 
 Con un fatto non noto le regole si comportano come senza banca dati (D42): non bloccano e lo dicono.
 
@@ -259,7 +267,7 @@ Servono una sessione; non sono dati dei pazienti, quindi niente registro degli a
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/banche-dati`                | versioni in uso                                                                                                     |
 | `GET /api/farmaci?q=`                 | farmaci per nome, principio attivo, AIC o ATC, con versioni                                                         |
-| `GET /api/farmaci/:aic`               | il farmaco e gli equivalenti del suo gruppo                                                                         |
+| `GET /api/farmaci/:aic`               | il farmaco e gli equivalenti del suo gruppo, dalle liste di classe e dalla lista di trasparenza (D202)              |
 | `GET /api/prestazioni?q=`             | prestazioni per descrizione, branca, codice regionale o nazionale                                                   |
 | `GET /api/esenzioni?q=`               | esenzioni per codice o descrizione                                                                                  |
 | `GET /api/comuni/:codice`             | comune per codice catastale                                                                                         |

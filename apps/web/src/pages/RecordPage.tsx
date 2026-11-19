@@ -5,6 +5,7 @@ import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common'
 import { ColourLegend, drugRowClass, originOf, OriginTag } from '../components/DrugColours';
 import { ServicesSection, type PrescribedService } from '../components/Prescribed';
 import { Icon } from '../components/Icon';
+import { ShortageNote, type DrugShortage } from '../components/Shortage';
 import { api, ApiError, query } from '../lib/api';
 import { age, date, maskedFiscalCode, THERAPY_KIND, TIMELINE_KIND } from '../lib/format';
 import { useSession } from '../lib/session';
@@ -49,6 +50,8 @@ export interface TherapyRow {
   aifaNote: string | null;
   reserved: boolean;
   important: boolean;
+  /** Carenza del farmaco secondo l'elenco AIFA, per le terapie non concluse (D202). */
+  shortage?: DrugShortage | null;
 }
 
 /** La scheda intera, come la restituisce il servizio. */
@@ -407,6 +410,7 @@ export function RecordPage() {
                         {t.aifaNote && <span className="etichetta">Nota {t.aifaNote}</span>}
                         {t.reserved && <span className="etichetta">Riservata</span>}
                       </span>
+                      {t.shortage && <ShortageNote shortage={t.shortage} />}
                     </div>
                     <Link
                       to={`/pazienti/${id}/terapie/${t.id}`}
@@ -463,6 +467,7 @@ export function RecordPage() {
                       {' '}
                       · sospesa{t.suspendedReason ? `: ${t.suspendedReason}` : ''}
                     </span>
+                    {t.shortage && <ShortageNote shortage={t.shortage} />}
                   </li>
                 ))}
               </ul>

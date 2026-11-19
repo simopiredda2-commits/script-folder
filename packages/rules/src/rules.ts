@@ -1,13 +1,13 @@
 import { checkFiscalCode } from '@mmg/domain';
-import type { LineContext, RuleContext, SentLineContext } from './context';
+import type { LineContext, RuleContext, SentLineContext, ShortageFacts } from './context';
 import { addDays, addMonths, daysBetween, italian } from './dates';
 import { value, type Rule, type RuleId } from './ruleset';
 
 /**
- * Le regole di prescrizione R1–R17 dei requisiti, R18 (D154) e lo stato del paziente R19–R20
- * (D199), come controlli formali (regola 3: nessun suggerimento diagnostico o terapeutico). Nessun
- * numero è scritto qui: i valori vengono dal file dei dati (packages/rules/data/), e una regola di
- * lint lo controlla.
+ * Le regole di prescrizione R1–R17 dei requisiti, R18 (D154), lo stato del paziente R19–R20 (D199)
+ * e i farmaci carenti R21 (D202), come controlli formali (regola 3: nessun suggerimento diagnostico
+ * o terapeutico). Nessun numero è scritto qui: i valori vengono dal file dei dati
+ * (packages/rules/data/), e una regola di lint lo controlla.
  */
 
 export interface Issue {
@@ -631,7 +631,41 @@ const evaluators: Record<RuleId, Evaluator> = {
       },
     ];
   },
+
+  // Farmaco nell'elenco AIFA dei farmaci carenti: solo informazione, con le parole dell'elenco
+  // (D202). Vale per ogni ricetta con il farmaco, anche bianca: la carenza non dipende dal SSN.
+  R21: (rule, ctx) =>
+    ctx.prescription.lines.flatMap((line): Issue[] => {
+      const shortage = ctx.drugFacts(line.drugAic)?.shortage;
+      if (!shortage) return [];
+      return [
+        {
+          ruleId: 'R21',
+          severity: severityOf(rule),
+          lineId: line.id,
+          message: `${lineLabel(line)}: ${shortageText(shortage, ctx.date)}`,
+        },
+      ];
+    }),
 };
+
+/**
+ * La carenza in parole, alla data: «carente dal …» se è cominciata, «carenza prevista dal …» se
+ * comincia dopo; motivo, fine presunta ed equivalente come li dice l'elenco AIFA (D202).
+ */
+export function shortageText(s: ShortageFacts, date: string): string {
+  const when = !s.since
+    ? 'nell’elenco AIFA dei farmaci carenti'
+    : s.since <= date
+      ? `nell’elenco AIFA dei farmaci carenti dal ${italian(s.since)}`
+      : `nell’elenco AIFA dei farmaci carenti, carenza prevista dal ${italian(s.since)}`;
+  const parts = [`${when}${s.reason ? ` (${s.reason})` : ''}`];
+  if (s.expectedEnd) parts.push(`fine presunta ${italian(s.expectedEnd)}`);
+  if (s.equivalentAvailable !== null) {
+    parts.push(`equivalente secondo l’elenco: ${s.equivalentAvailable ? 'sì' : 'no'}`);
+  }
+  return parts.join('; ');
+}
 
 export function evaluateRule(
   rule: Rule,

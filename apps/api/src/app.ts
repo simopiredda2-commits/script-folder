@@ -20,6 +20,7 @@ import { isPoolTimeout, type Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerIdentityRoutes } from './http/identity-routes';
 import { registerAuraRoutes } from './http/aura-routes';
+import { registerReportRoutes } from './http/report-routes';
 import { createAuraService } from './aura/service';
 import { ReferenceUpdateScheduler } from './reference/scheduler';
 import { registerIdentitySimulatorRoutes } from './http/identity-simulator-routes';
@@ -302,9 +303,15 @@ export function buildApp({
   });
   if (identity.gateway instanceof SimulatedDigitalIdentity)
     registerIdentitySimulatorRoutes(app, identity.gateway, identityReturns);
-  registerPatientRoutes(app, db);
+  // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5): anche le
+  // terapie e la pagina Oggi le guardano, per i farmaci carenti (D202).
+  const reference = new ReferenceData(db, loadMappings(), {
+    now: now ?? (() => new Date()),
+    expectedSince: (at) => referenceUpdates.expectedSince(at),
+  });
+  registerPatientRoutes(app, db, { reference, now: now ?? (() => new Date()) });
   registerDoctorProfileRoutes(app, db, now ?? (() => new Date()));
-  registerTodayRoutes(app, db, now ?? (() => new Date()));
+  registerTodayRoutes(app, db, now ?? (() => new Date()), reference);
   registerTherapyRoutes(app, db, now ?? (() => new Date()));
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
@@ -363,16 +370,12 @@ export function buildApp({
   registerUserAdminRoutes(app, adminDeps);
   registerPrintRoutes(app, adminDeps);
   registerArchiveAdminRoutes(app, adminDeps);
+  registerReportRoutes(app, { db, now: now ?? (() => new Date()) });
   registerStudioListRoutes(app, adminDeps);
   // Pannello amministrativo del paziente e importazione da altri programmi (tappa 15).
   registerPatientAdminRoutes(app, adminDeps);
   registerImportRoutes(app, adminDeps);
   registerFollowUpRoutes(app, db, now ?? (() => new Date()));
-  // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
-  const reference = new ReferenceData(db, loadMappings(), {
-    now: now ?? (() => new Date()),
-    expectedSince: (at) => referenceUpdates.expectedSince(at),
-  });
   registerReferenceRoutes(app, reference, now ?? (() => new Date()));
   // AURA (D197–D199): con le banche dati, per il nome del luogo di nascita dei nuovi assistiti.
   registerAuraRoutes(app, { db, aura: auraService, now: now ?? (() => new Date()), reference });

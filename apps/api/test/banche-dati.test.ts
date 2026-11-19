@@ -5,7 +5,12 @@ import { loadMappings, readSyncState, sha256 } from '@mmg/reference';
 import { eq, sql } from 'drizzle-orm';
 import { strToU8, zipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { exemption, referenceDataset } from '../src/db/schema';
+import {
+  exemption,
+  refDrugShortage,
+  refDrugTransparency,
+  referenceDataset,
+} from '../src/db/schema';
 import { studioDate } from '../src/prescriptions/rules-check';
 import {
   EXAMPLE_TRANSCRIPTIONS,
@@ -14,7 +19,7 @@ import {
   type ExampleSite,
 } from '../src/reference/example-site';
 import { importReferenceData, type ImportLine } from '../src/reference/importer';
-import { compareEquivalents, ReferenceData } from '../src/reference/lookup';
+import { compareEquivalents, ReferenceData, shortageAt } from '../src/reference/lookup';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -68,6 +73,8 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     expect(keys.sort()).toEqual([
       'aifa_liste/3815901_Classe-A_per_principio-attivo.csv',
       'aifa_liste/3815901_Classe-H_per_principio-attivo.csv',
+      'aifa_liste/825643_Lista_farmaci_equivalenti.csv',
+      'aifa_liste/847339_elenco_medicinali_carenti.csv',
       'aifa_liste/confezioni_fornitura.csv',
       'istat_comuni/Elenco-comuni-italiani.xlsx',
       'piemonte_catalogo/catalogo_prova_allegato_c.pdf',
@@ -97,6 +104,17 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       /price: 2 celle senza valore secondo la mappatura aifa-classe-h/,
     );
     expect(r['piemonte_dpc/farmaci_pht_dpc.pdf']!.outcome).toBe('serve_trascrizione');
+    // Lista di trasparenza (D202): l'AIC senza gli zeri davanti, rimessi dalla mappatura.
+    const tr = r['aifa_liste/825643_Lista_farmaci_equivalenti.csv']!;
+    expect(tr).toMatchObject({ outcome: 'importato', rows: 8 });
+    expect(tr.notes.join('\n')).toMatch(
+      /aic: 8 valori con gli zeri davanti secondo la mappatura aifa-trasparenza/,
+    );
+    // Farmaci carenti: l'intestazione alla terza riga, un testo che va a capo nelle virgolette.
+    expect(r['aifa_liste/847339_elenco_medicinali_carenti.csv']).toMatchObject({
+      outcome: 'importato',
+      rows: 1,
+    });
   });
 
   it('una mappatura da completare ferma il file e il rapporto mostra le intestazioni vere', async () => {
@@ -252,6 +270,54 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     expect(d.has('999999999')).toBe(false);
   });
 
+  it('lista di trasparenza e farmaci carenti (D202): prezzo di riferimento, differenza, carenza', async () => {
+    const ref = new ReferenceData(t.db, repo);
+    const d = await ref.drugs(['027428010', '038548032', '038092019'], today);
+    // Il medicinale di marca: 5,53 € al pubblico, 3,74 € di riferimento, 1,79 € di differenza.
+    expect(d.get('027428010')).toMatchObject({
+      price: '5.53',
+      referencePrice: '3.74',
+      priceDifference: '1.79',
+      transparencyRemark: null,
+      shortage: null,
+    });
+    expect(d.get('027428010')!.facts.shortage).toBeUndefined();
+    // AMLODIPINA TEVA ITALIA, nell'elenco dei carenti del 17/11/2026, con le parole dell'elenco.
+    const teva = d.get('038548032')!;
+    expect(teva.shortage).toEqual({
+      since: '2026-11-02',
+      expectedEnd: null,
+      equivalentAvailable: true,
+      reason: 'Cessata commercializzazione definitiva',
+      aifaAdvice:
+        'Per trattamento alternativo si consiglia di rivolgersi allo specialista o al M.M.G',
+      aifaNote: expect.stringMatching(
+        /^cessata commercializzazione definitiva relativa sia al canale retail che al canale ospedaliero:\n- canale retail/,
+      ),
+      text: 'nell’elenco AIFA dei farmaci carenti dal 02/11/2026 (Cessata commercializzazione definitiva); equivalente secondo l’elenco: sì',
+    });
+    expect(teva.facts.shortage).toEqual({
+      since: '2026-11-02',
+      expectedEnd: null,
+      equivalentAvailable: true,
+      reason: 'Cessata commercializzazione definitiva',
+    });
+    expect(d.get('038092019')!.shortage).toBeNull();
+  });
+
+  it('la carenza che vale alla data: la più recente cominciata, se no la prima prevista', () => {
+    const rows = [
+      { id: 1, startOn: '2026-12-21' },
+      { id: 2, startOn: '2026-10-01' },
+      { id: 3, startOn: '2026-12-18' },
+      { id: 4, startOn: '2026-11-02' },
+    ];
+    expect(shortageAt(rows, '2026-11-19')!.id).toBe(4);
+    expect(shortageAt(rows, '2026-12-19')!.id).toBe(3);
+    expect(shortageAt(rows.slice(0, 1).concat(rows[2]!), '2026-11-19')!.id).toBe(3);
+    expect(shortageAt([], '2026-11-19')).toBeNull();
+  });
+
   it('ricerca per nome, principio attivo, AIC e ATC; equivalenti dal gruppo', async () => {
     const ref = new ReferenceData(t.db, repo);
     const aics = async (q: string) => (await ref.searchDrugs(q, today)).map((x) => x.aic);
@@ -265,10 +331,10 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     expect(await aics('02742')).toEqual(['027428010']);
     expect(await aics('100%')).toEqual([]);
     const eq = await ref.equivalents('038092019', today);
-    expect(eq.map((x) => [x.aic, x.price, x.holder])).toEqual([
-      ['037479060', '3.74', 'EG S.P.A.'],
-      ['038548032', '3.74', 'TEVA ITALIA S.R.L.'],
-      ['027428010', '5.53', 'VIATRIS PHARMA S.R.L.'],
+    expect(eq.map((x) => [x.aic, x.price, x.holder, x.priceDifference])).toEqual([
+      ['037479060', '3.74', 'EG S.P.A.', '0.00'],
+      ['038548032', '3.74', 'TEVA ITALIA S.R.L.', '0.00'],
+      ['027428010', '5.53', 'VIATRIS PHARMA S.R.L.', '1.79'],
     ]);
   });
 
@@ -512,6 +578,61 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     const r = byFile(await imp({ syncDir: copy }));
     expect(r['piemonte_dpc/farmaci_pht_dpc.json']!.outcome).toBe('trascrizione_superata');
   });
+
+  // Ultima del gruppo: aggiunge righe alle versioni importate (si possono aggiungere, non cambiare).
+  it('D202: prezzo più recente, equivalenti e ricerca anche da chi è solo nella lista di trasparenza o fra i carenti', async () => {
+    const datasetOf = async (kind: string) => {
+      const [d] = await t.db
+        .select({ id: referenceDataset.id })
+        .from(referenceDataset)
+        .where(eq(referenceDataset.kind, kind));
+      return d!.id;
+    };
+    await t.db.insert(refDrugTransparency).values([
+      // TRULICITY: 153,48 € nella lista di classe A del 30/6; qui un prezzo più recente.
+      {
+        datasetId: await datasetOf('farmaci_trasparenza'),
+        aic: '043783075',
+        publicPrice: '150.00',
+      },
+      // Un equivalente che è solo nella lista di trasparenza.
+      {
+        datasetId: await datasetOf('farmaci_trasparenza'),
+        aic: '099999990',
+        name: 'EQUIVALENTE DI PROVA',
+        activeIngredient: 'Principio di prova',
+        publicPrice: '3.74',
+        referencePrice: '3.74',
+        priceDifference: '0.00',
+        equivalenceGroup: 'DOB',
+      },
+    ]);
+    // Un farmaco che è solo nell'elenco dei carenti.
+    await t.db.insert(refDrugShortage).values({
+      datasetId: await datasetOf('farmaci_carenti'),
+      aic: '099999991',
+      name: 'CARENTE DI PROVA',
+      startOn: '2026-10-01',
+      equivalentAvailable: false,
+      reason: 'Problemi produttivi',
+    });
+    const ref = new ReferenceData(t.db, repo);
+    const d = await ref.drugs(['043783075', '099999990', '099999991'], today);
+    expect(d.get('043783075')!.price).toBe('150.00');
+    expect(d.get('099999990')).toMatchObject({ name: 'EQUIVALENTE DI PROVA', price: '3.74' });
+    expect(d.get('099999991')).toMatchObject({
+      name: 'CARENTE DI PROVA',
+      shortage: { since: '2026-10-01', equivalentAvailable: false },
+      facts: { shortage: { since: '2026-10-01', reason: 'Problemi produttivi' } },
+    });
+    expect((await ref.equivalents('038092019', today)).map((x) => x.aic)).toContain('099999990');
+    expect((await ref.searchDrugs('equivalente di prova', today)).map((x) => x.aic)).toEqual([
+      '099999990',
+    ]);
+    expect([...(await ref.shortages(['099999991', '038092019'], today)).keys()]).toEqual([
+      '099999991',
+    ]);
+  });
 });
 
 describe('banche dati via HTTP e nelle regole', () => {
@@ -554,7 +675,20 @@ describe('banche dati via HTTP e nelle regole', () => {
     const res = await get('/api/farmaci?q=amlodipina');
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json().farmaci).toHaveLength(4);
-    expect(res.json().versioni.map((v: { kind: string }) => v.kind)).toContain('farmaci');
+    // Tutte le banche dati che i dati del farmaco usano, anche le liste di trasparenza e dei carenti.
+    expect(
+      res
+        .json()
+        .versioni.map((v: { kind: string }) => v.kind)
+        .sort(),
+    ).toEqual([
+      'farmaci',
+      'farmaci_carenti',
+      'farmaci_classe',
+      'farmaci_classe',
+      'farmaci_dpc',
+      'farmaci_trasparenza',
+    ]);
     const one = (await get('/api/farmaci/038092019')).json();
     expect(one.farmaco.name).toBe('AMLODIPINA DOC GENERICI');
     expect(one.equivalenti).toHaveLength(3);
@@ -662,5 +796,31 @@ describe('banche dati via HTTP e nelle regole', () => {
     const r17 = check.problemi.filter((p: { ruleId: string }) => p.ruleId === 'R17');
     expect(r17).toHaveLength(1);
     expect(r17[0].message).toMatch(/PROVA\.02: non è tra le prestazioni dell'esenzione T01/);
+  });
+
+  it('R21 dall’elenco dei carenti (D202): informa con le parole dell’elenco, senza fermare', async () => {
+    const res = await post(`/api/pazienti/${s.richPatient}/ricette`, {
+      kind: 'pharma_ssn',
+      lines: [
+        {
+          drugAic: '038548032',
+          drugName: 'AMLODIPINA TEVA ITALIA',
+          activeIngredient: 'AMLODIPINA BESILATO',
+          quantity: 1,
+        },
+      ],
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const check = (await post(`/api/ricette/${res.json().id}/controlla`)).json();
+    const r21 = check.problemi.filter((p: { ruleId: string }) => p.ruleId === 'R21');
+    expect(r21).toEqual([
+      expect.objectContaining({
+        severity: 'info',
+        message:
+          'AMLODIPINA TEVA ITALIA: nell’elenco AIFA dei farmaci carenti dal 02/11/2026 (Cessata commercializzazione definitiva); equivalente secondo l’elenco: sì',
+      }),
+    ]);
+    const sent = await post(`/api/ricette/${res.json().id}/firma-e-invia`);
+    expect(sent.statusCode, sent.body).toBe(200);
   });
 });

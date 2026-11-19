@@ -25,6 +25,8 @@ import { buildCsvZip } from '../export/csv';
 import { buildExport } from '../export/export';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
 import { labResults, latestMeasurements, timeline } from '../patients/timeline';
+import { studioDate } from '../prescriptions/rules-check';
+import type { DrugShortage, ReferenceData } from '../reference/lookup';
 import { HttpError } from './errors';
 
 const idParams = z.object({ id: z.uuid() });
@@ -45,7 +47,18 @@ const registryPatch = z
   .partial()
   .strict();
 
-export function registerPatientRoutes(app: FastifyInstance, db: Database) {
+export interface PatientRouteDeps {
+  /** Banche dati, per i farmaci carenti delle terapie in corso (D202); senza, nessuna carenza. */
+  reference?: ReferenceData;
+  now?: () => Date;
+}
+
+export function registerPatientRoutes(
+  app: FastifyInstance,
+  db: Database,
+  deps: PatientRouteDeps = {},
+) {
+  const now = deps.now ?? (() => new Date());
   app.get('/api/io', async (req) => {
     const actor = req.actor!;
     // L'archivio di cui l'utente è titolare: impostazioni ed esportazione dall'interfaccia.
@@ -229,7 +242,20 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
         and(eq(therapy.patientId, id), reservedAllowed ? undefined : eq(therapy.reserved, false)),
       )
       .orderBy(therapy.drugName);
-    return { terapie: rows };
+    // Avviso di carenza sui farmaci in terapia (requisiti, «Banche dati»; D202): per le terapie
+    // non concluse con l'AIC, dall'elenco AIFA in vigore oggi.
+    const shortages = deps.reference
+      ? await deps.reference.shortages(
+          rows.filter((r) => r.status !== 'ended' && r.drugAic).map((r) => r.drugAic!),
+          studioDate(now()),
+        )
+      : new Map<string, DrugShortage>();
+    return {
+      terapie: rows.map((r) => ({
+        ...r,
+        shortage: (r.status !== 'ended' && r.drugAic && shortages.get(r.drugAic)) || null,
+      })),
+    };
   });
 
   app.patch('/api/pazienti/:id/anagrafica', { config: { patientScoped: true } }, async (req) => {

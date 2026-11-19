@@ -32,6 +32,13 @@ interface Today {
       scadenza: string;
     }[];
     giorniAvvisoPiani: number | null;
+    /** Farmaci delle terapie in corso nell'elenco AIFA dei carenti, con i pazienti (A7, D202). */
+    farmaciCarenti?: {
+      aic: string;
+      farmaco: string;
+      testo: string;
+      pazienti: { id: string; nome: string; cognome: string }[];
+    }[];
   };
 }
 
@@ -119,6 +126,36 @@ export function TodayPage() {
                   </li>
                 ))}
               </ul>
+            </>
+          )}
+          {(code.farmaciCarenti ?? []).length > 0 && (
+            <>
+              <h3>Farmaci in terapia carenti</h3>
+              <p className="tenue">
+                Terapie in corso con un farmaco nell’elenco AIFA dei farmaci carenti in vigore oggi.
+              </p>
+              {code.farmaciCarenti!.map((d) => (
+                <div key={d.aic} className="carenza-oggi">
+                  <p className="carenza">
+                    <Icon name="avviso" />
+                    <span>
+                      <strong>{d.farmaco}</strong>: {d.testo}.
+                    </span>
+                  </p>
+                  <ul
+                    className="elenco-semplice"
+                    aria-label={`Pazienti con ${d.farmaco} in terapia`}
+                  >
+                    {d.pazienti.map((p) => (
+                      <li key={p.id}>
+                        <Link to={`/pazienti/${p.id}`}>
+                          {p.nome} {p.cognome}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </>
           )}
         </section>

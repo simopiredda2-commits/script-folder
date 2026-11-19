@@ -151,5 +151,5 @@ pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts   # nel browser, con 
 - **Volumi**: un giro di notte su migliaia di pazienti, uno alla volta. I tempi vanno misurati con il servizio vero; il CSI potrebbe offrire una ricerca per molti assistiti insieme.
 - **Scadenza delle scelte a tempo determinato**: lo stato del paziente segue solo la cessazione; la scadenza conta alla ricetta (R20, D199) e per i nuovi assistiti. Come AURA tratta la scadenza va letto nelle specifiche.
 - **Nuovi assistiti senza notifica**: il giro di notte non li trova, perché servirebbe l'elenco degli assistiti di un medico, se le specifiche lo danno.
-- **Cambio di medico dentro lo studio senza il titolare di prima**: lo spostamento lo decide il titolare (scelta di Simone, D200). Se il titolare non c'è (malattia, ferie) lo spostamento aspetta, perché il sostituto non può farlo: domanda per la fermata.
+- **Cambio di medico dentro lo studio senza il titolare di prima**: lo spostamento lo decide il titolare (scelta di Simone, D200). Se il titolare non c'è (malattia, ferie) lo spostamento aspetta, perché il sostituto non può farlo; per Simone non è un problema, perché intanto il sostituto lavora sui pazienti con la sua utenza (fermata dopo l'unione della #14).
 - **Scrittura**: il programma non scrive in AURA, perché scelte e revoche le registra l'ASL.

@@ -3,7 +3,7 @@
  * del database; le colonne dei file d'origine si collegano ai campi nelle mappature (data/).
  */
 
-export type FieldType = 'text' | 'number' | 'boolean';
+export type FieldType = 'text' | 'number' | 'boolean' | 'date';
 
 export interface FieldSpec {
   type: FieldType;
@@ -132,6 +132,51 @@ export const KINDS = {
       section: { type: 'text' },
     },
   },
+  /**
+   * Lista di trasparenza AIFA (farmaci equivalenti): per ogni confezione il prezzo di riferimento
+   * del SSN, il prezzo al pubblico e la differenza (D202). La colonna «Nota» del file è
+   * un'annotazione in parole, non il numero della nota AIFA: si chiama `remark`.
+   */
+  farmaci_trasparenza: {
+    label: 'Lista di trasparenza AIFA',
+    fields: {
+      aic: { ...AIC, required: true },
+      activeIngredient: { type: 'text' },
+      referencePack: { type: 'text' },
+      atc: ATC,
+      name: { type: 'text' },
+      pack: { type: 'text' },
+      holder: { type: 'text' },
+      referencePrice: { type: 'number' },
+      publicPrice: { type: 'number' },
+      priceDifference: { type: 'number' },
+      remark: { type: 'text' },
+      equivalenceGroup: { type: 'text' },
+    },
+  },
+  /**
+   * Farmaci temporaneamente carenti (AIFA), con la motivazione e le indicazioni dell'AIFA (D202).
+   * Un farmaco resta nell'elenco finché il titolare non comunica la fine della carenza, anche
+   * oltre la data di fine presunta (avvertenza in testa al file).
+   */
+  farmaci_carenti: {
+    label: 'Farmaci carenti (AIFA)',
+    fields: {
+      aic: { ...AIC, required: true },
+      name: { type: 'text' },
+      activeIngredient: { type: 'text' },
+      formStrength: { type: 'text' },
+      holder: { type: 'text' },
+      startOn: { type: 'date' },
+      expectedEndOn: { type: 'date' },
+      equivalentAvailable: { type: 'boolean' },
+      reason: { type: 'text' },
+      aifaAdvice: { type: 'text' },
+      aifaNote: { type: 'text' },
+      reimbursementClass: { type: 'text' },
+      atc: ATC,
+    },
+  },
   /** Esenzioni e prestazioni associate per il controllo del SAR (R17), da una trascrizione. */
   esenzioni_prestazioni: {
     label: 'Esenzioni e prestazioni associate',
@@ -169,8 +214,12 @@ export function convertCell(
       }
       return { value: text };
     case 'number': {
-      // Scrittura italiana: 1.234,56; oppure 1234.56.
-      const normalized = text.includes(',') ? text.replace(/\./g, '').replace(',', '.') : text;
+      // Scrittura italiana: 1.234,56; oppure 1234.56. Il simbolo dell'euro in fondo (lista di
+      // trasparenza AIFA, «5,63 €») non fa parte del numero.
+      const amount = text.replace(/\s*€$/u, '');
+      const normalized = amount.includes(',')
+        ? amount.replace(/\./g, '').replace(',', '.')
+        : amount;
       const n = Number(normalized);
       return Number.isFinite(n) && /^-?\d+(?:\.\d+)?$/.test(normalized)
         ? { value: n }
@@ -181,6 +230,19 @@ export function convertCell(
       if (t === 'sì' || t === 'si') return { value: true };
       if (t === 'no') return { value: false };
       return { problem: `«${text}» non è «sì» o «no»` };
+    }
+    case 'date': {
+      // GG/MM/AAAA (elenco dei farmaci carenti) o AAAA-MM-GG; sempre una data vera.
+      const it = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+      const iso = it
+        ? `${it[3]}-${it[2]!.padStart(2, '0')}-${it[1]!.padStart(2, '0')}`
+        : /^\d{4}-\d{2}-\d{2}$/.test(text)
+          ? text
+          : null;
+      const d = iso ? new Date(`${iso}T00:00:00Z`) : null;
+      return iso && d && !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso
+        ? { value: iso }
+        : { problem: `«${text}» non è una data (GG/MM/AAAA)` };
     }
   }
 }

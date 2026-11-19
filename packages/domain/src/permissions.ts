@@ -51,6 +51,8 @@ export const ACTIONS = [
   'data.export',
   /** Importazione da altri programmi nell'archivio, con lo smistamento verso i menu (tappa 15). */
   'data.import',
+  /** Riepiloghi dell'archivio per periodo, con l'esportazione (requisiti, «Riepiloghi»). */
+  'reports.read',
   /** Impostazioni dell'archivio: che cosa vede la segreteria. */
   'archive.settings',
   /** Autorizzazioni sull'archivio: sostituto e colleghi di medicina di gruppo (tappa 14). */
@@ -104,6 +106,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'access_log.read': 'Leggere il registro degli accessi',
   'data.export': 'Esportare tutti i dati dell’archivio',
   'data.import': 'Importare dati da altri programmi nell’archivio',
+  'reports.read': 'Leggere ed esportare i riepiloghi dell’archivio per periodo',
   'archive.settings': 'Decidere che cosa vede la segreteria dell’archivio',
   'archive.grants': 'Autorizzare un sostituto o un collega di gruppo sull’archivio',
   'archive.transfer': 'Spostare un paziente nell’archivio del medico scelto in AURA',
@@ -154,6 +157,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'access_log.read',
   'data.export',
   'data.import',
+  'reports.read',
   'archive.settings',
   'archive.grants',
   'archive.transfer',
@@ -168,6 +172,7 @@ const DOCTOR_ON_GRANTED_ARCHIVE: Action[] = DOCTOR_ON_OWN_ARCHIVE.filter(
   (a) =>
     a !== 'data.export' &&
     a !== 'data.import' &&
+    a !== 'reports.read' &&
     a !== 'access_log.read' &&
     a !== 'archive.settings' &&
     a !== 'archive.grants' &&

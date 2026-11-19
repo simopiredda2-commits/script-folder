@@ -8,6 +8,7 @@ import { DoctorContactsPage } from './pages/DoctorContactsPage';
 import { ExamsPage } from './pages/ExamsPage';
 import { FollowUpPage } from './pages/FollowUpPage';
 import { ArchivePage } from './pages/ArchivePage';
+import { ReportsPage } from './pages/ReportsPage';
 import { CertificatesPage } from './pages/CertificatesPage';
 import { ClinicalEntriesPage } from './pages/ClinicalEntriesPage';
 import { DrugHistoryPage, ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
@@ -81,6 +82,7 @@ function Screens() {
           <Route path="/ricette" element={<SignQueuePage />} />
           <Route path="/banche-dati" element={<DataSearchPage />} />
           <Route path="/archivio" element={<ArchivePage />} />
+          <Route path="/archivio/riepiloghi" element={<ReportsPage />} />
           <Route path="/profilo/credenziali" element={<ServiceCredentialsPage />} />
           <Route path="/profilo/recapiti" element={<DoctorContactsPage />} />
           <Route path="/profilo/password" element={<PasswordPage />} />

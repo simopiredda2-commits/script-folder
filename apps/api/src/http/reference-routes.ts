@@ -13,7 +13,14 @@ const dateQuery = z.object({
 });
 const searchQuery = dateQuery.extend({ q: z.string().trim().min(1).max(100) });
 
-const DRUG_KINDS: DatasetKind[] = ['farmaci', 'farmaci_classe', 'farmaci_dpc'];
+/** Le banche dati che i dati di un farmaco usano: tutte nelle versioni in uso (A6), anche le liste di D202. */
+const DRUG_KINDS: DatasetKind[] = [
+  'farmaci',
+  'farmaci_classe',
+  'farmaci_dpc',
+  'farmaci_trasparenza',
+  'farmaci_carenti',
+];
 
 /**
  * Banche dati pubbliche: non sono dati dei pazienti, servono una sessione ma non la guardia sulla

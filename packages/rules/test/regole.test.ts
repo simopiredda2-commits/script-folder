@@ -83,7 +83,7 @@ const blocks = (c: RuleContext, id: string) =>
 describe('dati delle regole', () => {
   const [ruleset] = loadRulesets();
 
-  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2', () => {
+  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3', () => {
     const all = loadRulesets();
     expect(all.map((r) => r.version)).toEqual([
       '2026-11-18.1',
@@ -91,15 +91,17 @@ describe('dati delle regole', () => {
       '2026-11-18.3',
       '2026-11-19.1',
       '2026-11-19.2',
+      '2026-11-19.3',
     ]);
-    const upTo17 = RULE_IDS.filter((id) => !['R18', 'R19', 'R20'].includes(id));
+    const upTo17 = RULE_IDS.filter((id) => !['R18', 'R19', 'R20', 'R21'].includes(id));
     for (const rs of all.slice(0, 2)) {
       expect(rs.rules.map((r) => r.id).sort()).toEqual([...upTo17].sort());
     }
     for (const rs of all.slice(2, 4)) {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...upTo17, 'R18'].sort());
     }
-    for (const rs of all.slice(4)) {
+    expect(all[4]!.rules.map((r) => r.id).sort()).toEqual([...upTo17, 'R18', 'R19', 'R20'].sort());
+    for (const rs of all.slice(5)) {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...RULE_IDS].sort());
     }
   });
@@ -122,7 +124,7 @@ describe('dati delle regole', () => {
     expect(
       rulesetAt(
         '2026-11-19',
-        all.filter((r) => r.version !== '2026-11-19.2'),
+        all.filter((r) => !['2026-11-19.2', '2026-11-19.3'].includes(r.version)),
       ).version,
     ).toBe('2026-11-19.1');
   });
@@ -132,13 +134,35 @@ describe('dati delle regole', () => {
     const v4 = all.find((r) => r.version === '2026-11-19.1')!;
     const v5 = all.find((r) => r.version === '2026-11-19.2')!;
     expect(v5.effectiveFrom).toBe('2026-11-19');
-    expect(rulesetAt('2026-11-19').version).toBe('2026-11-19.2');
+    expect(
+      rulesetAt(
+        '2026-11-19',
+        all.filter((r) => r.version !== '2026-11-19.3'),
+      ).version,
+    ).toBe('2026-11-19.2');
     for (const r of v5.rules) {
       if (r.id === 'R19' || r.id === 'R20') {
         expect(r.behavior, r.id).toBe(r.id === 'R19' ? 'block' : 'warn');
         expect(r.sources[0]!.title, r.id).toMatch(/D199/);
       } else {
         expect(r, r.id).toEqual(v4.rules.find((x) => x.id === r.id));
+      }
+    }
+  });
+
+  it('dalla 2026-11-19.3 R21 informa sui farmaci carenti (D202); il resto come la 2026-11-19.2', () => {
+    const all = loadRulesets();
+    const v5 = all.find((r) => r.version === '2026-11-19.2')!;
+    const v6 = all.find((r) => r.version === '2026-11-19.3')!;
+    expect(v6.effectiveFrom).toBe('2026-11-19');
+    expect(rulesetAt('2026-11-19').version).toBe('2026-11-19.3');
+    for (const r of v6.rules) {
+      if (r.id === 'R21') {
+        expect(r.behavior).toBe('inform');
+        expect(r.sources[0]!.url).toBe('https://www.aifa.gov.it/liste-dei-farmaci');
+        expect(r.sources.at(-1)!.title).toMatch(/D202/);
+      } else {
+        expect(r, r.id).toEqual(v5.rules.find((x) => x.id === r.id));
       }
     }
   });
@@ -364,8 +388,8 @@ describe('R5, R6 · piano terapeutico', () => {
       sentLines: sent,
       prescription: { lines: [line({ quantity: 2 })] },
     });
-    // In vigore il 25/11/2026: la 2026-11-19.2, con R6 come nella 2026-11-19.1 (D181).
-    expect(run(c).rulesVersion).toBe('2026-11-19.2');
+    // In vigore il 25/11/2026: la 2026-11-19.3, con R6 come nella 2026-11-19.1 (D181).
+    expect(run(c).rulesVersion).toBe('2026-11-19.3');
     expect(blocks(c, 'R6')).toBe(true);
     expect(of(c, 'R6')[0]!.message).toBe(
       'Farmaco di prova 5 mg: il piano autorizza 4 confezioni, già prescritte 3, di cui 2 con un altro programma; residuo 1',
@@ -902,8 +926,68 @@ describe('R19 e R20 · stato del paziente alla ricetta (D199)', () => {
   });
 
   it('le ricette controllate con la versione precedente restano com’erano', () => {
-    const before = loadRulesets().filter((r) => r.version !== '2026-11-19.2');
+    const before = loadRulesets().filter(
+      (r) => !['2026-11-19.2', '2026-11-19.3'].includes(r.version),
+    );
     const dead = withStatus('deceased');
     expect(checkPrescription(dead, before).issues.some((i) => i.ruleId === 'R19')).toBe(false);
+  });
+});
+
+describe('R21 · farmaco carente secondo l’elenco AIFA (D202)', () => {
+  const shortage = (over: Partial<NonNullable<DrugFacts['shortage']>> = {}): DrugFacts => ({
+    shortage: {
+      since: '2026-10-01',
+      expectedEnd: '2027-01-31',
+      equivalentAvailable: true,
+      reason: 'Problemi produttivi',
+      ...over,
+    },
+  });
+
+  it('farmaco carente: informazione con inizio, motivo, fine presunta ed equivalente, senza fermare', () => {
+    const c = ctx({ date: '2026-11-20', facts: shortage() });
+    const [i] = of(c, 'R21');
+    expect(i).toMatchObject({ severity: 'info', lineId: 'l1' });
+    expect(i!.message).toBe(
+      'Farmaco di prova 5 mg: nell’elenco AIFA dei farmaci carenti dal 01/10/2026 (Problemi produttivi); fine presunta 31/01/2027; equivalente secondo l’elenco: sì',
+    );
+    expect(run(c).blocking.some((x) => x.ruleId === 'R21')).toBe(false);
+  });
+
+  it('carenza che comincia dopo la data della ricetta: «prevista»; senza fine né equivalente detti', () => {
+    const c = ctx({
+      date: '2026-11-20',
+      facts: shortage({
+        since: '2026-12-07',
+        expectedEnd: null,
+        equivalentAvailable: null,
+        reason: null,
+      }),
+    });
+    expect(of(c, 'R21')[0]!.message).toBe(
+      'Farmaco di prova 5 mg: nell’elenco AIFA dei farmaci carenti, carenza prevista dal 07/12/2026',
+    );
+    const sameDay = ctx({
+      date: '2026-11-20',
+      facts: shortage({ since: '2026-11-20', equivalentAvailable: false }),
+    });
+    expect(of(sameDay, 'R21')[0]!.message).toMatch(
+      /carenti dal 20\/11\/2026 .*equivalente secondo l’elenco: no$/,
+    );
+  });
+
+  it('vale anche per la ricetta bianca; nessuna informazione se il farmaco non è fra i carenti', () => {
+    expect(
+      of(ctx({ date: '2026-11-20', facts: shortage(), prescription: { kind: 'white' } }), 'R21'),
+    ).toHaveLength(1);
+    expect(of(ctx({ date: '2026-11-20', facts: {} }), 'R21')).toEqual([]);
+    expect(of(ctx({ date: '2026-11-20', facts: undefined }), 'R21')).toEqual([]);
+  });
+
+  it('le ricette controllate con le versioni di prima non hanno la R21', () => {
+    const before = loadRulesets().filter((r) => r.version !== '2026-11-19.3');
+    const c = ctx({ date: '2026-11-20', facts: shortage() });
+    expect(checkPrescription(c, before).issues.some((i) => i.ruleId === 'R21')).toBe(false);
   });
 });

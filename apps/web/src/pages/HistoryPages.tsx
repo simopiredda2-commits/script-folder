@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader, type RuleIssue } from '../components/common';
 import { Icon } from '../components/Icon';
+import { ShortageNote } from '../components/Shortage';
 import { PastPrescriptionsList } from '../components/PastPrescriptions';
 import type { PastPrescription } from '../components/Prescribed';
 import { ReminderPanel } from '../components/ReminderPanel';
@@ -377,7 +378,8 @@ function SuspendPanel({
 }: {
   patientId: string;
   therapy: TherapyFull;
-  onDone: (message: string) => void;
+  /** Con `adverse`, la sospensione era per una reazione avversa: si offre la segnalazione. */
+  onDone: (message: string, adverse: boolean) => void;
   onCancel: () => void;
 }) {
   const [reason, setReason] = useState('');
@@ -414,6 +416,7 @@ function SuspendPanel({
               r.reazioneRegistrata
                 ? `Terapia sospesa. La reazione a ${substance} è ora tra le allergie e reazioni da farmaci, in testata.`
                 : 'Terapia sospesa.',
+              adverse,
             ),
           )
           .catch((err: unknown) => setError(err instanceof ApiError ? err : null))
@@ -460,15 +463,7 @@ function SuspendPanel({
               Se resta vuota si registra il motivo della sospensione.
             </p>
           </div>
-          <p className="aiuto">
-            {LINKS.pharmacovigilanceReport ? (
-              <a href={LINKS.pharmacovigilanceReport} target="_blank" rel="noreferrer">
-                Segnala la sospetta reazione avversa (farmacovigilanza)
-              </a>
-            ) : (
-              'Collegamento alla segnalazione di farmacovigilanza: da completare (indirizzo ufficiale non ancora verificato).'
-            )}
-          </p>
+          <PharmacovigilanceLinks />
         </>
       )}
       <ErrorMessage error={error} />
@@ -485,6 +480,38 @@ function SuspendPanel({
 }
 
 /** Scheda della terapia in tre parti, con le azioni e lo storico delle prescrizioni (D65). */
+/**
+ * Segnalazione di una sospetta reazione avversa (requisiti, «Scheda della terapia»; D82, D202):
+ * le pagine AIFA si aprono in una scheda nuova, senza l'indirizzo della cartella (noreferrer).
+ */
+export function PharmacovigilanceLinks() {
+  const { pharmacovigilanceReport: howTo, pharmacovigilanceOnline: online } = LINKS;
+  if (!howTo && !online)
+    return (
+      <p className="aiuto">
+        Collegamento alla segnalazione di farmacovigilanza: da completare (indirizzo ufficiale non
+        ancora verificato).
+      </p>
+    );
+  return (
+    <p className="aiuto">
+      Segnalazione di farmacovigilanza:{' '}
+      {howTo && (
+        <a href={howTo} target="_blank" rel="noreferrer">
+          come segnalare una sospetta reazione avversa (AIFA)
+        </a>
+      )}
+      {howTo && online && ' oppure '}
+      {online && (
+        <a href={online} target="_blank" rel="noreferrer">
+          segnala online (AIFA)
+        </a>
+      )}
+      . Le pagine si aprono in una scheda nuova.
+    </p>
+  );
+}
+
 export function TherapyPage() {
   const { id, therapyId } = useParams<{ id: string; therapyId: string }>();
   const location = useLocation();
@@ -500,6 +527,8 @@ export function TherapyPage() {
     (location.state as { avviso?: string } | null)?.avviso ?? null,
   );
   const [actionError, setActionError] = useState<ApiError | null>(null);
+  // Dopo una sospensione per reazione avversa si offre la segnalazione (D82, D202).
+  const [offerReport, setOfferReport] = useState(false);
   const t = therapies.data?.terapie.find((x) => x.id === therapyId);
 
   if ((record.loading || therapies.loading) && !t) return <Loading what="dati della terapia" />;
@@ -572,6 +601,7 @@ export function TherapyPage() {
       />
       <PatientBanner patient={p} summary={summary} />
       {done && <Notice kind="fatto">{done}</Notice>}
+      {offerReport && suspended && <PharmacovigilanceLinks />}
       <ErrorMessage error={actionError} />
       {suspended && (
         <Notice kind="avviso">
@@ -579,6 +609,11 @@ export function TherapyPage() {
           {t.suspendedReason ? ` Motivo: ${t.suspendedReason}` : ''} Non si ripete e non entra nello
           schema orario finché non la riprendi.
         </Notice>
+      )}
+      {t.shortage && (
+        <div className="riquadro">
+          <ShortageNote shortage={t.shortage} details />
+        </div>
       )}
       {ended && (
         <Notice kind="info">
@@ -605,9 +640,10 @@ export function TherapyPage() {
           patientId={id!}
           therapy={t}
           onCancel={() => setSuspending(false)}
-          onDone={(message) => {
+          onDone={(message, adverse) => {
             setSuspending(false);
             setDone(message);
+            setOfferReport(adverse);
             therapies.reload();
             record.reload();
           }}
