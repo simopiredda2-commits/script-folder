@@ -180,16 +180,20 @@ export function Shell({ children }: { children: ReactNode }) {
       <main className="app-main" id="contenuto" tabIndex={-1}>
         {!!me?.blocchiDaVedere && location.pathname !== '/profilo/blocchi' && (
           <Notice kind="avviso">
-            {me.blocchiDaVedere === 1
-              ? 'Un blocco del conto dopo troppi tentativi sbagliati, da vedere.'
-              : `${me.blocchiDaVedere} blocchi del conto dopo troppi tentativi sbagliati, da vedere.`}{' '}
-            <Link to="/profilo/blocchi">Vedi i blocchi</Link>
+            <p>
+              {me.blocchiDaVedere === 1
+                ? 'Un blocco del conto dopo troppi tentativi sbagliati, da vedere.'
+                : `${me.blocchiDaVedere} blocchi del conto dopo troppi tentativi sbagliati, da vedere.`}{' '}
+              <Link to="/profilo/blocchi">Vedi i blocchi</Link>
+            </p>
           </Notice>
         )}
         {me?.codiceFiscaleDaConfermare && location.pathname !== '/profilo/recapiti' && (
           <Notice kind="avviso">
-            L’amministratore ha corretto il tuo codice fiscale: finché non lo confermi vale quello
-            di prima. <Link to="/profilo/recapiti">Controlla e conferma</Link>
+            <p>
+              L’amministratore ha corretto il tuo codice fiscale: finché non lo confermi vale quello
+              di prima. <Link to="/profilo/recapiti">Controlla e conferma</Link>
+            </p>
           </Notice>
         )}
         {children}

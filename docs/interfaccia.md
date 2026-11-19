@@ -79,6 +79,7 @@ All'accesso si sceglie un utente del seed (`medico`, `segreteria`, `sostituto`);
 | ![](schermate/63-nuovi-assistiti-in-oggi.png)                   | Oggi: i nuovi assistiti in AURA, cioè chi ha scelto il medico e non è ancora nel suo archivio, con la scelta e la scadenza della scelta temporanea; «Registra» con un clic, o «Non registrare» (D199)                                                                                                                   |
 | ![](schermate/64-nuovo-paziente-temporaneo.png)                 | Nuovo paziente temporaneo in un passo solo: lo stato e le date della scelta del titolare, con la spiegazione dell'avviso alla ricetta quando la scelta è scaduta (D199)                                                                                                                                                 |
 | ![](schermate/65-ricetta-paziente-deceduto.png)                 | Ricetta per un paziente deceduto: non si fa, la pagina lo dice subito con il rimedio, e la testata porta la data del decesso (R19, D199)                                                                                                                                                                                |
+| ![](schermate/66-cambio-di-medico-in-oggi.png)                  | Oggi: il paziente ha scelto in AURA un altro medico dello studio; lo spostamento nel suo archivio lo decide il titolare di prima, con «Sposta» o «Non spostare». Il medico scelto vede chi l'ha scelto e chi decide (D200)                                                                                              |
 
 Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al file), su un database appena preparato con il seed.
 
@@ -101,11 +102,13 @@ Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al f
 La prova nel browser (`apps/api/test/e2e/interfaccia.test.ts`) apre ogni schermata e controlla:
 
 - nessuna violazione WCAG 2.2 A e AA trovata da axe-core;
-- ogni pulsante, collegamento e campo misura almeno 44×44 px; le caselle con la loro etichetta;
+- ogni pulsante, collegamento e campo misura almeno 44×44 px; le caselle con la loro etichetta. Fanno eccezione, come in WCAG, i collegamenti dentro una frase (`<p>`);
 - su tablet, in verticale (768×1024) e in orizzontale (1024×768), la pagina non scorre di lato;
 - contrasti dei colori calcolati da una prova del marchio (testo almeno 4,5:1, elementi grafici almeno 3:1).
 
 Le pagine hanno il salto al contenuto, titoli in ordine, etichette per ogni campo, annunci per i risultati che cambiano e il fuoco sempre visibile.
+
+Negli avvisi il collegamento sta in una frase: lo controlla `apps/web/test/avvisi.test.ts` su tutti i sorgenti, anche per gli avvisi che la prova nel browser non apre. La simulazione del paziente deceduto ha trovato l'avviso di Oggi «AURA segnala il decesso di …» con il nome del paziente scritto fuori da una frase: un bersaglio a sé alto 22 px. Corretto lì e negli altri cinque avvisi scritti allo stesso modo.
 
 ## Che cosa non c'è ancora
 

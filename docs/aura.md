@@ -75,6 +75,21 @@ Ogni cambio di stato è una variazione in parole.
 - **«Non registrare».** L'assistito esce dall'elenco e non si ripropone finché AURA non manda una scelta nuova (altro medico o altra data).
 - **Esce dall'elenco da solo** quando la scelta non vale più, o AURA dice il decesso.
 
+**Cambio di medico dentro lo studio** (D200). Il paziente sceglie in AURA un altro medico dello studio, titolare di un altro archivio.
+
+- **Quando.** A ogni controllo con AURA, dopo l'allineamento dello stato: conta la scelta di AURA che vale oggi, la più recente. Nell'archivio di prima il paziente risulta revocato (D198) finché non si decide.
+- **Chi decide.** Solo il titolare dell'archivio dove il paziente sta (permesso `archive.transfer`): non il sostituto né il collega di gruppo con l'autorizzazione, non la segreteria, non l'amministratore. Ogni no si registra.
+- **In Oggi**, sezione «Cambi di medico nello studio»:
+  - il titolare di prima vede il paziente, il medico scelto e da quando, con «Sposta» e «Non spostare»;
+  - il medico scelto vede chi l'ha scelto e da quando, e chi decide; senza collegamento alla cartella, che non è nel suo archivio.
+- **«Sposta».** Il paziente passa nell'archivio del medico scelto con la cartella intera e lo storico, e lo stato si riallinea con la scelta del nuovo titolare (di nuovo in carico). Si sposta solo il cambio visto: se AURA nel frattempo ha cambiato la scelta, si ricarica. Non si sposta:
+  - con ricette in bozza, da firmare, in invio o con un errore d'invio, o certificati in bozza, in invio o con un errore d'invio: il programma li elenca, si chiudono prima;
+  - mentre un controllo con AURA lavora sullo stesso paziente: chi clicca non aspetta, e lo si dice;
+  - due volte.
+- **«Non spostare».** Il paziente resta nell'archivio di prima e il cambio non si ripropone finché AURA non manda una scelta nuova (altro medico o altra data).
+- **La proposta decade** quando la scelta non vale più, quando il paziente torna dal titolare di prima, o quando è deceduto.
+- **Dopo lo spostamento** ricette e certificati di prima restano nello storico del paziente. Un'importazione fatta nell'archivio di prima non si annulla più per intero se ha scritto dati del paziente spostato.
+
 **Risposte che non tornano.** Se AURA risponde con un profilo che ha un altro codice fiscale, nulla cambia: il collegamento si azzera e al controllo dopo il paziente si cerca di nuovo. Senza rete i dati restano quelli di prima, con il motivo.
 
 **Variazioni.** Ogni variazione resta in parole, con quando e da dove è partito il controllo, e non si modifica né si cancella.
@@ -89,6 +104,7 @@ Ogni cambio di stato è una variazione in parole.
 - Ci va ogni lettura delle variazioni nella pagina Oggi, una riga per paziente mostrato.
 - Ci va ogni scelta su una differenza di anagrafica: dato di AURA usato (con la fonte) o tenuto quello della cartella.
 - Ci va ogni lettura dei nuovi assistiti, ogni registrazione (con la fonte «AURA») e ogni «Non registrare», e ogni tentativo negato (D199).
+- Ci va ogni lettura dei cambi di medico in Oggi, una riga per paziente mostrato, ogni spostamento e ogni «Non spostare», e ogni tentativo negato (D200).
 - Non ci vanno i controlli senza variazioni della notte e delle notifiche: non leggono e non cambiano nulla, e sarebbero una riga per paziente ogni notte.
 
 **Storico.** Il collegamento ha lo storico quando cambia lo stato (identificativo, esito, motivo), non a ogni controllo.
@@ -99,16 +115,17 @@ Ogni cambio di stato è una variazione in parole.
 
 ## Modello dei dati
 
-| Tabella                       | Contenuto                                                                                                                                                      |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `aura_link`                   | Una riga per paziente: identificativo AURA, ultimo controllo, esito e motivo, ultimo allineamento; anagrafica ricevuta e valori tenuti dalla cartella (D198)   |
-| `aura_change`                 | Variazioni arrivate: esenzione, scelta, anagrafica o stato; nuova, cambiata o tolta, in parole; non si modificano                                              |
-| `aura_sync_run`               | Giri di controllo di tutti i pazienti: quando, quanti, con quale messaggio                                                                                     |
-| `aura_sync_run_studio`        | Gli stessi giri, studio per studio: lo stato del servizio di uno studio mostra solo i suoi numeri                                                              |
-| `exemption`, `patient_choice` | In più: annullamento con data, autore e motivo (vincolo: data e motivo insieme), riga annullata ferma                                                          |
-| `aura_new_patient`            | Nuovi assistiti (D199): una riga per studio e assistito, con l'archivio del medico, la scelta, l'anagrafica di AURA e lo stato; storico, nessuna cancellazione |
+| Tabella                       | Contenuto                                                                                                                                                                                                                              |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aura_link`                   | Una riga per paziente: identificativo AURA, ultimo controllo, esito e motivo, ultimo allineamento; anagrafica ricevuta e valori tenuti dalla cartella (D198)                                                                           |
+| `aura_change`                 | Variazioni arrivate: esenzione, scelta, anagrafica o stato; nuova, cambiata o tolta, in parole; non si modificano                                                                                                                      |
+| `aura_sync_run`               | Giri di controllo di tutti i pazienti: quando, quanti, con quale messaggio                                                                                                                                                             |
+| `aura_sync_run_studio`        | Gli stessi giri, studio per studio: lo stato del servizio di uno studio mostra solo i suoi numeri                                                                                                                                      |
+| `exemption`, `patient_choice` | In più: annullamento con data, autore e motivo (vincolo: data e motivo insieme), riga annullata ferma                                                                                                                                  |
+| `aura_new_patient`            | Nuovi assistiti (D199): una riga per studio e assistito, con l'archivio del medico, la scelta, l'anagrafica di AURA e lo stato; storico, nessuna cancellazione                                                                         |
+| `aura_doctor_change`          | Cambi di medico dentro lo studio (D200): una riga per paziente, con l'archivio di prima, quello del medico scelto, la scelta, lo stato (da decidere, spostato, non spostato, superato) e chi ha deciso; storico, nessuna cancellazione |
 
-Migrazioni 0032, 0033, 0034 e 0035. `aura_link` e `aura_change` entrano nell'esportazione dei dati del medico con i pazienti, `aura_new_patient` con l'archivio.
+Migrazioni 0032, 0033, 0034, 0035 e 0036. `aura_link`, `aura_change` e `aura_doctor_change` entrano nell'esportazione dei dati del medico con i pazienti, `aura_new_patient` con l'archivio.
 
 ## Configurazione
 
@@ -124,7 +141,7 @@ Migrazioni 0032, 0033, 0034 e 0035. `aura_link` e `aura_change` entrano nell'esp
 ## Come provarlo
 
 ```sh
-pnpm exec vitest run apps/api/test/aura.test.ts apps/api/test/aura-anagrafica.test.ts apps/api/test/aura-nuovi-assistiti.test.ts apps/web/test/aura.test.tsx
+pnpm exec vitest run apps/api/test/aura.test.ts apps/api/test/aura-anagrafica.test.ts apps/api/test/aura-nuovi-assistiti.test.ts apps/api/test/aura-cambio-medico.test.ts apps/web/test/aura.test.tsx
 pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts   # nel browser, con l'accessibilità
 ```
 
@@ -134,5 +151,5 @@ pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts   # nel browser, con 
 - **Volumi**: un giro di notte su migliaia di pazienti, uno alla volta. I tempi vanno misurati con il servizio vero; il CSI potrebbe offrire una ricerca per molti assistiti insieme.
 - **Scadenza delle scelte a tempo determinato**: lo stato del paziente segue solo la cessazione; la scadenza conta alla ricetta (R20, D199) e per i nuovi assistiti. Come AURA tratta la scadenza va letto nelle specifiche.
 - **Nuovi assistiti senza notifica**: il giro di notte non li trova, perché servirebbe l'elenco degli assistiti di un medico, se le specifiche lo danno.
-- **Paziente in un altro archivio dello studio**: si allinea soltanto, non cambia archivio.
+- **Cambio di medico dentro lo studio senza il titolare di prima**: lo spostamento lo decide il titolare (scelta di Simone, D200). Se il titolare non c'è (malattia, ferie) lo spostamento aspetta, perché il sostituto non può farlo: domanda per la fermata.
 - **Scrittura**: il programma non scrive in AURA, perché scelte e revoche le registra l'ASL.

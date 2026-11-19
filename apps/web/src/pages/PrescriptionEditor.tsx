@@ -115,19 +115,21 @@ function AlreadyPrescribed({
   const r = last.ricetta;
   return (
     <Notice kind="avviso">
-      Già prescritta{prior.length > 1 ? ` ${prior.length} volte; l’ultima` : ''} il{' '}
-      {date(r.inviataIl ?? r.cartaceaIl ?? r.preparataIl)}
-      {r.nre && (
-        <>
-          {' '}
-          (NRE <span className="codice">{r.nre}</span>)
-        </>
-      )}
-      {r.etichettaErogazione
-        ? `. Presso l’ente: ${r.etichettaErogazione.toLowerCase()}.`
-        : '. Stato presso l’ente non ancora verificato.'}{' '}
-      Prima di prescriverla di nuovo, verifica lo stato nello{' '}
-      <Link to={`/pazienti/${patientId}/prestazioni${q}`}>storico della prestazione</Link>.
+      <p>
+        Già prescritta{prior.length > 1 ? ` ${prior.length} volte; l’ultima` : ''} il{' '}
+        {date(r.inviataIl ?? r.cartaceaIl ?? r.preparataIl)}
+        {r.nre && (
+          <>
+            {' '}
+            (NRE <span className="codice">{r.nre}</span>)
+          </>
+        )}
+        {r.etichettaErogazione
+          ? `. Presso l’ente: ${r.etichettaErogazione.toLowerCase()}.`
+          : '. Stato presso l’ente non ancora verificato.'}{' '}
+        Prima di prescriverla di nuovo, verifica lo stato nello{' '}
+        <Link to={`/pazienti/${patientId}/prestazioni${q}`}>storico della prestazione</Link>.
+      </p>
     </Notice>
   );
 }

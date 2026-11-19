@@ -1,7 +1,12 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AuraChangesToday, AuraNewPatientsToday, AuraSection } from '../src/pages/AuraSection';
+import {
+  AuraChangesToday,
+  AuraDoctorChangesToday,
+  AuraNewPatientsToday,
+  AuraSection,
+} from '../src/pages/AuraSection';
 import { ServiceSection } from '../src/pages/admin/ServiceSection';
 
 /** Risposte finte del servizio: per ogni percorso, un corpo (o una funzione per i POST). */
@@ -318,6 +323,117 @@ describe('AURA nell’interfaccia (D197)', () => {
     const second = render(
       <MemoryRouter>
         <AuraNewPatientsToday />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+    expect(second.container.textContent).toBe('');
+  });
+
+  it('cambi di medico in Oggi (D200): il titolare di prima sposta con un clic, o non sposta; l’elenco si ricarica', async () => {
+    const one = {
+      id: 'c1',
+      paziente: { id: 'p3', cognome: 'INVENTATO', nome: 'PAZIENTE' },
+      medico: 'Medico Collega',
+      medicoId: 'u2',
+      sceltaDal: '2026-11-18',
+    };
+    const fetchMock = stub({
+      'GET /api/aura/cambi-medico': { disponibile: true, daDecidere: [one], inArrivo: [] },
+      'POST /api/aura/cambi-medico/c1/sposta': { id: 'c1', stato: 'spostato' },
+      'POST /api/aura/cambi-medico/c1/non-spostare': { id: 'c1', stato: 'non_spostato' },
+    });
+    render(
+      <MemoryRouter>
+        <AuraDoctorChangesToday />
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByRole('heading', { name: /Cambi di medico nello studio/ }),
+    ).toBeTruthy();
+    const row = screen.getByRole('row', { name: /PAZIENTE INVENTATO/ });
+    expect(row.textContent).toMatch(/Medico Collega, dal 18\/11\/2026/);
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Sposta PAZIENTE INVENTATO nell’archivio di Medico Collega',
+      }),
+    );
+    expect(
+      await screen.findByText('PAZIENTE INVENTATO: spostato nell’archivio di Medico Collega.'),
+    ).toBeTruthy();
+    // Il cambio come si vede: medico scelto e data, perché il servizio controlli che sia quello.
+    const sent = fetchMock.mock.calls.find(([u]) => u === '/api/aura/cambi-medico/c1/sposta');
+    expect(sent?.[1]?.method).toBe('POST');
+    expect(JSON.parse(sent?.[1]?.body as string)).toEqual({
+      medico: 'u2',
+      sceltaDal: '2026-11-18',
+    });
+    // L'elenco si ricarica dopo il clic.
+    expect(fetchMock.mock.calls.filter(([u]) => u === '/api/aura/cambi-medico').length).toBe(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Non spostare PAZIENTE INVENTATO' }));
+    expect(
+      await screen.findByText(
+        'PAZIENTE INVENTATO: resta nel tuo archivio. Non si ripropone finché AURA non manda una scelta nuova.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('cambi di medico: con ricette aperte il motivo si legge; il medico scelto è informato, senza pulsanti né collegamento; senza cambi, niente', async () => {
+    const message =
+      'Prima dello spostamento vanno chiuse nell’archivio: 1 ricetta da firmare, 1 certificato in bozza';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        const conflict = init?.method === 'POST';
+        const body = conflict
+          ? { errore: message }
+          : {
+              disponibile: true,
+              daDecidere: [
+                {
+                  id: 'c2',
+                  paziente: { id: 'p4', cognome: 'ALTRO', nome: 'PAZIENTE' },
+                  medico: 'Medico Collega',
+                  sceltaDal: '2026-11-18',
+                },
+              ],
+              inArrivo: [
+                {
+                  id: 'c3',
+                  paziente: { cognome: 'TERZO', nome: 'PAZIENTE' },
+                  daMedico: 'Medico Titolare',
+                  sceltaDal: '2026-11-17',
+                },
+              ],
+            };
+        return Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: conflict ? 409 : 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      }),
+    );
+    const first = render(
+      <MemoryRouter>
+        <AuraDoctorChangesToday />
+      </MemoryRouter>,
+    );
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Sposta PAZIENTE ALTRO nell’archivio di Medico Collega',
+      }),
+    );
+    expect(await screen.findByText(message)).toBeTruthy();
+    // Chi è stato scelto lo sa, ma la cartella non è nel suo archivio: niente collegamento.
+    const incoming = screen.getByText(/PAZIENTE TERZO ti ha scelto in AURA dal 17\/11\/2026/);
+    expect(incoming.textContent).toContain('è ancora nell’archivio di Medico Titolare');
+    expect(incoming.closest('li')!.querySelectorAll('a, button')).toHaveLength(0);
+    first.unmount();
+    vi.unstubAllGlobals();
+    stub({ 'GET /api/aura/cambi-medico': { disponibile: true, daDecidere: [], inArrivo: [] } });
+    const second = render(
+      <MemoryRouter>
+        <AuraDoctorChangesToday />
       </MemoryRouter>,
     );
     await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());

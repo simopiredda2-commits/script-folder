@@ -147,3 +147,48 @@ export const auraNewPatient = pgTable(
   },
   (t) => [uniqueIndex().on(t.studioId, t.auraId), index().on(t.archiveId, t.status)],
 );
+
+/**
+ * Cambi di medico dentro lo studio (D200): AURA dice che il paziente ha scelto un altro medico dello
+ * studio, titolare di un altro archivio. Lo spostamento lo conferma il titolare dell'archivio dove
+ * il paziente sta, con un clic, o sceglie di non spostarlo; il medico scelto lo sa dalla pagina
+ * Oggi. Una riga per paziente: cambia lo stato, con lo storico (trigger nella migrazione), e non si
+ * cancella.
+ */
+export const auraDoctorChange = pgTable(
+  'aura_doctor_change',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    studioId: uuid()
+      .notNull()
+      .references(() => studio.id),
+    patientId: uuid()
+      .notNull()
+      .unique()
+      .references(() => patient.id),
+    /** L'archivio dove il paziente stava quando il controllo con AURA ha trovato la scelta. */
+    fromArchiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
+    /** L'archivio del medico scelto. */
+    toArchiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
+    toDoctorUserId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    /** La scelta del medico come la dice AURA. */
+    chosenOn: date().notNull(),
+    /**
+     * «da_decidere»; «spostato» (dal titolare di prima); «non_spostato» (scelto dal titolare di
+     * prima: non si ripropone finché AURA non manda una scelta nuova); «superato» (la scelta non
+     * vale più, il paziente è già nell'archivio del medico scelto, o è deceduto).
+     */
+    status: text().notNull(),
+    /** L'ultima volta che il controllo con AURA l'ha proposto o ritirato. */
+    detectedAt: timestamp({ withTimezone: true }).notNull(),
+    decidedBy: uuid().references(() => appUser.id),
+    decidedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [index().on(t.fromArchiveId, t.status), index().on(t.toDoctorUserId, t.status)],
+);

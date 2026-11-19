@@ -10,7 +10,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generatePatients } from '@mmg/fixtures';
-import { SimulatedAura } from '@mmg/integrations';
+import { EMPTY_AURA_REGISTRY, SimulatedAura } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import {
@@ -31,6 +31,8 @@ import {
   labResultDetail,
   measurementDetail,
   patient,
+  prescription,
+  prescriptionLine,
   therapy,
 } from '../../src/db/schema';
 import { withActor } from '../../src/db/tx';
@@ -2067,6 +2069,105 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.locator('.testata-avvisi').getByText('Esenzione 013').waitFor();
   });
 
+  it('paziente deceduto (D198, D199): AURA segnala il decesso, il medico lo conferma, la ricetta non si fa', async () => {
+    // Un paziente inventato dell'archivio del titolare che le altre prove nel browser non usano.
+    const deadId = s.patients.titolare.at(-1)!;
+    await t.db
+      .update(patient)
+      .set({ status: 'active', deceasedOn: null, deathCauseIcd: null })
+      .where(eq(patient.id, deadId));
+    const [dead] = await t.db.select().from(patient).where(eq(patient.id, deadId));
+    const name = `${dead!.firstName} ${dead!.lastName}`;
+    // Prima del decesso la segreteria aveva preparato una ricetta: è nella coda «da firmare».
+    const rxId = await withActor(t.db, s.users.segreteria.id, async (tx) => {
+      const [rx] = await tx
+        .insert(prescription)
+        .values({
+          patientId: deadId,
+          archiveId: s.archives.titolare,
+          kind: 'pharma_ssn',
+          status: 'to_sign',
+          preparedBy: s.users.segreteria.id,
+        })
+        .returning({ id: prescription.id });
+      await tx.insert(prescriptionLine).values({
+        prescriptionId: rx!.id,
+        position: 1,
+        drugName: 'Farmaco di prova 10 mg',
+        activeIngredient: 'principio di prova',
+        quantity: 1,
+      });
+      return rx!.id;
+    });
+    // AURA, il simulatore con dati inventati, segnala il decesso.
+    const died = studioDate(new Date(Date.now() - 3 * 86_400_000));
+    const diedIt = died.split('-').reverse().join('/');
+    aura.register({
+      fiscalCode: dead!.fiscalCode,
+      lastName: dead!.lastName,
+      firstName: dead!.firstName,
+      birthDate: dead!.birthDate,
+      exemptions: [],
+      choices: [],
+      registry: { ...EMPTY_AURA_REGISTRY, deceasedOn: died },
+    });
+    await page.goto(`${base}/pazienti/${deadId}/amministrazione#aura`);
+    const section = page.getByRole('region', { name: 'AURA, anagrafe regionale' });
+    await section.getByRole('button', { name: 'Aggiorna da AURA' }).click();
+    await section.getByText(/^Aggiornato da AURA/).waitFor();
+
+    // In Oggi il decesso è in evidenza, da confermare, con il collegamento al pannello.
+    await page.goto(`${base}/`);
+    const today = page.getByRole('region', { name: 'Variazioni da AURA' });
+    await today
+      .getByText(`il ${diedIt}: da confermare nei dati amministrativi.`, { exact: false })
+      .waitFor();
+    await check(page, 'decesso segnalato da AURA in Oggi');
+    await today.getByRole('link', { name }).first().click();
+    await section.getByRole('button', { name: 'Conferma il decesso' }).click();
+    await section.getByText('Decesso confermato.').waitFor();
+    const [after] = await t.db.select().from(patient).where(eq(patient.id, deadId));
+    expect(after).toMatchObject({ status: 'deceased', deceasedOn: died });
+
+    // La ricetta nuova non si fa: la pagina lo dice subito, con il rimedio; la testata ha la data.
+    for (const kind of ['ricetta', 'specialistica']) {
+      await page.goto(`${base}/pazienti/${deadId}/${kind}`);
+      await page
+        .getByRole('alert')
+        .getByText(`Il paziente risulta deceduto il ${diedIt}: la ricetta non si fa.`)
+        .waitFor();
+      await page.locator('.testata-paziente').getByText(`deceduto il ${diedIt}`).waitFor();
+      await expect(page.getByRole('link', { name: 'dati amministrativi' }).count()).resolves.toBe(
+        1,
+      );
+    }
+    await check(page, 'ricetta per un paziente deceduto', true);
+
+    // La ricetta preparata prima del decesso si ferma con R19, anche con «Firma e invia»: non parte.
+    await page.goto(`${base}/ricette`);
+    await page.getByRole('heading', { name: 'Da firmare' }).waitFor();
+    const group = page
+      .locator('.coda-ricette > li')
+      .filter({ has: page.getByRole('link', { name }) });
+    await group
+      .getByText(`Il paziente risulta deceduto il ${diedIt}: la ricetta non si fa`)
+      .first()
+      .waitFor();
+    // R19 blocca: a differenza degli avvisi, nessun campo per un motivo con cui procedere.
+    const reason = group.getByLabel('Motivo per procedere nonostante l’avviso R19');
+    await expect(reason.count()).resolves.toBe(0);
+    await check(page, 'ricetta di un deceduto nella coda da firmare', true);
+    await group.getByRole('button', { name: 'Firma e invia' }).click();
+    await group
+      .getByRole('alert')
+      .getByText(/^R19: Il paziente risulta deceduto/)
+      .waitFor();
+    await expect(reason.count()).resolves.toBe(0);
+    const [still] = await t.db.select().from(prescription).where(eq(prescription.id, rxId));
+    expect(still!.status).toBe('to_sign');
+    expect(still!.sentAt).toBeNull();
+  });
+
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice; le cartelle aperte restano', async () => {
     const bar = page.getByRole('navigation', { name: 'Cartelle aperte' });
     const before = await bar.getByRole('link').count();
@@ -2121,5 +2222,65 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     } finally {
       await anonymous.close();
     }
+  });
+
+  it('cambio di medico dentro lo studio (D200): AURA dice il collega, il titolare di prima sposta il paziente con un clic', async () => {
+    // Un paziente inventato dell'archivio del titolare che le altre prove nel browser non usano.
+    const movingId = s.patients.titolare.at(-2)!;
+    await t.db.update(patient).set({ status: 'active' }).where(eq(patient.id, movingId));
+    const [moving] = await t.db.select().from(patient).where(eq(patient.id, movingId));
+    const name = `${moving!.firstName} ${moving!.lastName}`;
+    const cf = async (userId: string) =>
+      (
+        await t.db
+          .select({ cf: doctorProfile.fiscalCode })
+          .from(doctorProfile)
+          .where(eq(doctorProfile.userId, userId))
+      )[0]!.cf!;
+    // In AURA, il simulatore con dati inventati: da ieri ha scelto il collega dello studio.
+    const yesterday = studioDate(new Date(s.clock.now().getTime() - 86_400_000));
+    aura.register({
+      fiscalCode: moving!.fiscalCode,
+      lastName: moving!.lastName,
+      firstName: moving!.firstName,
+      birthDate: moving!.birthDate,
+      exemptions: [],
+      choices: [
+        {
+          doctorFiscalCode: await cf(s.users.titolare.id),
+          chosenOn: '2020-01-01',
+          expiresOn: null,
+          endedOn: yesterday,
+          endReason: 'Scelta di un altro medico',
+        },
+        {
+          doctorFiscalCode: await cf(s.users.collega.id),
+          chosenOn: yesterday,
+          expiresOn: null,
+          endedOn: null,
+          endReason: null,
+        },
+      ],
+    });
+    await page.goto(`${base}/pazienti/${movingId}/amministrazione#aura`);
+    const section = page.getByRole('region', { name: 'AURA, anagrafe regionale' });
+    await section.getByRole('button', { name: 'Aggiorna da AURA' }).click();
+    await section.getByText(/^Aggiornato da AURA/).waitFor();
+
+    // In Oggi lo decide il titolare di prima: chi, il medico scelto e da quando, con un clic.
+    await page.goto(`${base}/`);
+    const changes = page.getByRole('region', { name: 'Cambi di medico nello studio' });
+    await changes
+      .getByRole('row', { name: new RegExp(name) })
+      .getByText(`Dott. Paolo Serra, dal ${yesterday.split('-').reverse().join('/')}`)
+      .waitFor();
+    await check(page, 'cambio di medico da decidere in Oggi', true);
+    await changes
+      .getByRole('button', { name: `Sposta ${name} nell’archivio di Dott. Paolo Serra` })
+      .click();
+    await changes.getByText(`${name}: spostato nell’archivio di Dott. Paolo Serra.`).waitFor();
+    await check(page, 'paziente spostato nell’archivio del collega');
+    const [after] = await t.db.select().from(patient).where(eq(patient.id, movingId));
+    expect(after).toMatchObject({ archiveId: s.archives.collega, status: 'active' });
   });
 });

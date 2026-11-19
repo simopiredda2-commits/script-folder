@@ -198,8 +198,10 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
       )}
       {outcome?.esito === 'auth' && (
         <Notice kind="errore">
-          {outcome.messaggio} La ricetta non cambia: si rimanda così com’è.{' '}
-          <Link to={CREDENTIALS_PATH}>Apri «Credenziali dei servizi»</Link>
+          <p>
+            {outcome.messaggio} La ricetta non cambia: si rimanda così com’è.{' '}
+            <Link to={CREDENTIALS_PATH}>Apri «Credenziali dei servizi»</Link>
+          </p>
         </Notice>
       )}
       {paper && <Notice kind="fatto">Ricetta rossa pronta per la stampa. {paper}.</Notice>}

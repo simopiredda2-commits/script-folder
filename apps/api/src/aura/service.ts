@@ -1,11 +1,14 @@
 import type { AuraExemption, AuraGateway, AuraProfile, AuraRegistry } from '@mmg/integrations';
-import { and, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { logAccess } from '../audit/access-log';
+import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import {
   appUser,
   archive,
   auraChange,
+  auraDoctorChange,
   auraLink,
   auraNewPatient,
   auraSyncRun,
@@ -14,8 +17,11 @@ import {
   exemption,
   patient,
   patientChoice,
+  prescription,
+  sickLeaveCertificate,
 } from '../db/schema';
 import { withActor, type Tx } from '../db/tx';
+import { HttpError } from '../http/errors';
 import { studioDate } from '../prescriptions/rules-check';
 import {
   registryDifferences,
@@ -89,7 +95,7 @@ function choiceText(
 }
 
 interface Change {
-  kind: 'esenzione' | 'scelta' | 'anagrafica' | 'stato';
+  kind: 'esenzione' | 'scelta' | 'anagrafica' | 'stato' | 'archivio';
   change: 'nuova' | 'cambiata' | 'tolta';
   subject: string;
   description: string;
@@ -303,6 +309,170 @@ async function alignStatus(
   return null;
 }
 
+/** Le scelte di AURA che valgono oggi: iniziate, non cessate, non scadute. */
+const inForceOn = (
+  c: { chosenOn: string; endedOn: string | null; expiresOn: string | null },
+  today: string,
+) =>
+  c.chosenOn <= today &&
+  (!c.endedOn || c.endedOn > today) &&
+  (!c.expiresOn || c.expiresOn >= today);
+
+/**
+ * Cambio di medico dentro lo studio (D200). Se la scelta di AURA che vale oggi, la più recente, è di
+ * un altro medico dello studio, titolare di un altro archivio, lo spostamento si propone al
+ * titolare dell'archivio dove il paziente sta. La stessa scelta, già proposta o già rifiutata, non
+ * si ripropone; una scelta nuova sì. Senza una scelta così, con il paziente deceduto o già
+ * nell'archivio del medico scelto, la proposta decade.
+ */
+async function proposeDoctorChange(
+  tx: Tx,
+  patientId: string,
+  by: { at: Date; today: string },
+): Promise<Change | null> {
+  const [row] = await tx
+    .select({
+      studioId: patient.studioId,
+      archiveId: patient.archiveId,
+      status: patient.status,
+      owner: archive.ownerUserId,
+      ownerName: appUser.displayName,
+    })
+    .from(patient)
+    .innerJoin(archive, eq(archive.id, patient.archiveId))
+    .innerJoin(appUser, eq(appUser.id, archive.ownerUserId))
+    .where(eq(patient.id, patientId));
+  if (!row) return null;
+  const [current] = await tx
+    .select()
+    .from(auraDoctorChange)
+    .where(eq(auraDoctorChange.patientId, patientId));
+  const withdraw = async () => {
+    if (current?.status === 'da_decidere')
+      await tx
+        .update(auraDoctorChange)
+        .set({ status: 'superato', detectedAt: by.at })
+        .where(eq(auraDoctorChange.id, current.id));
+    return null;
+  };
+  if (row.status === 'deceased') return withdraw();
+  const choices = await tx
+    .select({ c: patientChoice, archiveId: archive.id, name: appUser.displayName })
+    .from(patientChoice)
+    .innerJoin(
+      archive,
+      and(eq(archive.ownerUserId, patientChoice.doctorUserId), eq(archive.studioId, row.studioId)),
+    )
+    .innerJoin(appUser, eq(appUser.id, patientChoice.doctorUserId))
+    .where(
+      and(
+        eq(patientChoice.patientId, patientId),
+        eq(patientChoice.source, 'aura'),
+        isNull(patientChoice.annulledAt),
+      ),
+    );
+  const valid = choices.filter(({ c }) => inForceOn(c, by.today));
+  const latest = valid.reduce<(typeof valid)[number] | null>(
+    (a, b) => (!a || a.c.chosenOn < b.c.chosenOn ? b : a),
+    null,
+  );
+  // Un medico con più archivi nello studio: non si sa in quale; nessuna proposta.
+  const targets = latest ? valid.filter((v) => v.c.id === latest.c.id) : [];
+  if (
+    !latest ||
+    targets.length !== 1 ||
+    latest.c.doctorUserId === row.owner ||
+    latest.archiveId === row.archiveId
+  )
+    return withdraw();
+  const values = {
+    studioId: row.studioId,
+    fromArchiveId: row.archiveId,
+    toArchiveId: latest.archiveId,
+    toDoctorUserId: latest.c.doctorUserId,
+    chosenOn: latest.c.chosenOn,
+  };
+  const same =
+    !!current &&
+    current.fromArchiveId === values.fromArchiveId &&
+    current.toArchiveId === values.toArchiveId &&
+    current.toDoctorUserId === values.toDoctorUserId &&
+    current.chosenOn === values.chosenOn;
+  if (same && (current.status === 'da_decidere' || current.status === 'non_spostato')) return null;
+  if (current)
+    await tx
+      .update(auraDoctorChange)
+      .set({
+        ...values,
+        status: 'da_decidere',
+        detectedAt: by.at,
+        decidedBy: null,
+        decidedAt: null,
+      })
+      .where(eq(auraDoctorChange.id, current.id));
+  else
+    await tx
+      .insert(auraDoctorChange)
+      .values({ ...values, patientId, status: 'da_decidere', detectedAt: by.at });
+  return {
+    kind: 'archivio',
+    change: 'nuova',
+    subject: latest.name,
+    description: `Scelta in AURA di ${latest.name} dal ${itDate(latest.c.chosenOn)}: lo spostamento nel suo archivio lo decide ${row.ownerName}`,
+  };
+}
+
+/** Pratiche aperte che fermano lo spostamento (D200), in parole: «1 ricetta da firmare». */
+const OPEN_PRESCRIPTIONS = ['draft', 'to_sign', 'sending', 'error'] as const;
+const OPEN_CERTIFICATES = ['draft', 'sending', 'error'] as const;
+const OPEN_LABEL: Record<string, string> = {
+  draft: 'in bozza',
+  to_sign: 'da firmare',
+  sending: 'in invio',
+  error: 'con un errore d’invio',
+};
+
+async function openItems(tx: Tx, patientId: string): Promise<string[]> {
+  const rx = await tx
+    .select({ status: prescription.status, n: count() })
+    .from(prescription)
+    .where(
+      and(
+        eq(prescription.patientId, patientId),
+        inArray(prescription.status, [...OPEN_PRESCRIPTIONS]),
+      ),
+    )
+    .groupBy(prescription.status);
+  const certs = await tx
+    .select({ status: sickLeaveCertificate.status, n: count() })
+    .from(sickLeaveCertificate)
+    .where(
+      and(
+        eq(sickLeaveCertificate.patientId, patientId),
+        inArray(sickLeaveCertificate.status, [...OPEN_CERTIFICATES]),
+      ),
+    )
+    .groupBy(sickLeaveCertificate.status);
+  const words = (n: number, one: string, many: string, status: string) =>
+    `${n} ${n === 1 ? one : many} ${OPEN_LABEL[status]}`;
+  return [
+    ...OPEN_PRESCRIPTIONS.flatMap((st) => {
+      const r = rx.find((x) => x.status === st);
+      return r ? [words(r.n, 'ricetta', 'ricette', st)] : [];
+    }),
+    ...OPEN_CERTIFICATES.flatMap((st) => {
+      const r = certs.find((x) => x.status === st);
+      return r ? [words(r.n, 'certificato', 'certificati', st)] : [];
+    }),
+  ];
+}
+
+/** Il cambio di medico come l'ha visto chi decide: medico scelto e data della scelta. */
+export interface SeenDoctorChange {
+  doctorUserId: string;
+  chosenOn: string;
+}
+
 export function createAuraService(deps: AuraDeps) {
   const { db, gateway } = deps;
 
@@ -430,6 +600,8 @@ export function createAuraService(deps: AuraDeps) {
       }
       const status = await alignStatus(tx, p.id, { at, today: studioDate(at) });
       if (status) list.push(status);
+      const move = await proposeDoctorChange(tx, p.id, { at, today: studioDate(at) });
+      if (move) list.push(move);
       if (list.length)
         await tx
           .insert(auraChange)
@@ -621,6 +793,172 @@ export function createAuraService(deps: AuraDeps) {
           ),
         )
         .orderBy(auraNewPatient.lastName, auraNewPatient.firstName);
+    },
+
+    /**
+     * Cambi di medico da decidere nello studio (D200), con il medico scelto e il titolare
+     * dell'archivio dove il paziente sta. Solo quelli con il paziente ancora in quell'archivio.
+     */
+    async pendingDoctorChanges(studioId: string) {
+      const owner = alias(appUser, 'titolare_di_prima');
+      return db
+        .select({
+          c: auraDoctorChange,
+          lastName: patient.lastName,
+          firstName: patient.firstName,
+          toName: appUser.displayName,
+          fromName: owner.displayName,
+        })
+        .from(auraDoctorChange)
+        .innerJoin(
+          patient,
+          and(
+            eq(patient.id, auraDoctorChange.patientId),
+            eq(patient.archiveId, auraDoctorChange.fromArchiveId),
+          ),
+        )
+        .innerJoin(appUser, eq(appUser.id, auraDoctorChange.toDoctorUserId))
+        .innerJoin(archive, eq(archive.id, auraDoctorChange.fromArchiveId))
+        .innerJoin(owner, eq(owner.id, archive.ownerUserId))
+        .where(
+          and(eq(auraDoctorChange.studioId, studioId), eq(auraDoctorChange.status, 'da_decidere')),
+        )
+        .orderBy(patient.lastName, patient.firstName);
+    },
+
+    /**
+     * «Sposta» (D200): il paziente passa nell'archivio del medico scelto, con la cartella intera, e
+     * lo stato si riallinea con la scelta del nuovo titolare. Il permesso lo controlla chi chiama.
+     * Si sposta solo il cambio che chi decide ha visto, senza pratiche aperte, e non mentre un
+     * controllo con AURA lavora sullo stesso paziente: chi clicca non aspetta il blocco.
+     */
+    async moveToChosenDoctor(
+      changeId: string,
+      actor: Pick<Actor, 'userId' | 'studioId' | 'workstation'>,
+      seen: SeenDoctorChange,
+    ) {
+      return withActor(db, actor.userId, async (tx) => {
+        const [first] = await tx
+          .select({ patientId: auraDoctorChange.patientId })
+          .from(auraDoctorChange)
+          .where(eq(auraDoctorChange.id, changeId));
+        if (!first) throw new HttpError(404, 'Cambio di medico non trovato');
+        const lock = await tx.execute<{ preso: boolean }>(
+          sql`select pg_try_advisory_xact_lock(hashtextextended(${`aura:${first.patientId}`}, 0)) as preso`,
+        );
+        if (!lock.rows[0]?.preso)
+          throw new HttpError(
+            409,
+            'Controllo con AURA in corso per questo paziente: riprova tra poco',
+          );
+        const [c] = await tx
+          .select()
+          .from(auraDoctorChange)
+          .where(eq(auraDoctorChange.id, changeId))
+          .for('update');
+        if (c!.status !== 'da_decidere')
+          throw new HttpError(
+            409,
+            c!.status === 'spostato' ? 'Già spostato' : 'Non è più da decidere: ricarica la pagina',
+          );
+        if (c!.toDoctorUserId !== seen.doctorUserId || c!.chosenOn !== seen.chosenOn)
+          throw new HttpError(409, 'AURA ha cambiato la scelta del paziente: ricarica la pagina');
+        const [p] = await tx
+          .select()
+          .from(patient)
+          .where(eq(patient.id, c!.patientId))
+          .for('update');
+        if (p!.archiveId !== c!.fromArchiveId)
+          throw new HttpError(409, 'Il paziente non è più in questo archivio: ricarica la pagina');
+        const open = await openItems(tx, p!.id);
+        if (open.length)
+          throw new HttpError(409, `Prima dello spostamento vanno chiuse: ${open.join(', ')}`, {
+            aperte: open,
+          });
+        const at = deps.now();
+        await tx
+          .update(patient)
+          .set({ archiveId: c!.toArchiveId, updatedAt: at })
+          .where(eq(patient.id, p!.id));
+        await tx
+          .update(auraDoctorChange)
+          .set({ status: 'spostato', decidedBy: actor.userId, decidedAt: at })
+          .where(eq(auraDoctorChange.id, c!.id));
+        const [to] = await tx
+          .select({ name: appUser.displayName })
+          .from(appUser)
+          .where(eq(appUser.id, c!.toDoctorUserId));
+        const list: Change[] = [
+          {
+            kind: 'archivio',
+            change: 'cambiata',
+            subject: to!.name,
+            description: `Spostato nell’archivio di ${to!.name}, scelto in AURA dal ${itDate(c!.chosenOn)}`,
+          },
+        ];
+        const status = await alignStatus(tx, p!.id, { at, today: studioDate(at) });
+        if (status) list.push(status);
+        await tx.insert(auraChange).values(
+          list.map((x) => ({
+            ...x,
+            studioId: p!.studioId,
+            patientId: p!.id,
+            at,
+            trigger: 'manuale',
+          })),
+        );
+        await logAccess(tx, {
+          studioId: actor.studioId,
+          userId: actor.userId,
+          patientId: p!.id,
+          action: 'spostamento_archivio',
+          outcome: 'riuscito',
+          workstation: actor.workstation,
+          details: { da: c!.fromArchiveId, a: c!.toArchiveId, cambio: c!.id },
+        });
+        const [after] = await tx
+          .select({ status: patient.status })
+          .from(patient)
+          .where(eq(patient.id, p!.id));
+        return { patientId: p!.id, archiveId: c!.toArchiveId, status: after!.status };
+      });
+    },
+
+    /**
+     * «Non spostare» (D200): il paziente resta dov'è, e il cambio non si ripropone finché AURA non
+     * manda una scelta nuova. Vale per il cambio che chi decide ha visto.
+     */
+    async keepInArchive(
+      changeId: string,
+      actor: Pick<Actor, 'userId' | 'studioId' | 'workstation'>,
+      seen: SeenDoctorChange,
+    ) {
+      return withActor(db, actor.userId, async (tx) => {
+        const [c] = await tx
+          .select()
+          .from(auraDoctorChange)
+          .where(eq(auraDoctorChange.id, changeId))
+          .for('update');
+        if (!c) throw new HttpError(404, 'Cambio di medico non trovato');
+        if (c.status !== 'da_decidere')
+          throw new HttpError(409, 'Non è più da decidere: ricarica la pagina');
+        if (c.toDoctorUserId !== seen.doctorUserId || c.chosenOn !== seen.chosenOn)
+          throw new HttpError(409, 'AURA ha cambiato la scelta del paziente: ricarica la pagina');
+        await tx
+          .update(auraDoctorChange)
+          .set({ status: 'non_spostato', decidedBy: actor.userId, decidedAt: deps.now() })
+          .where(eq(auraDoctorChange.id, c.id));
+        await logAccess(tx, {
+          studioId: actor.studioId,
+          userId: actor.userId,
+          patientId: c.patientId,
+          action: 'cambio_medico_non_spostato',
+          outcome: 'riuscito',
+          workstation: actor.workstation,
+          details: { da: c.fromArchiveId, a: c.toArchiveId, cambio: c.id },
+        });
+        return { patientId: c.patientId };
+      });
     },
 
     /** Valori di AURA da non usare: non si ripropongono finché AURA non ne manda altri. */

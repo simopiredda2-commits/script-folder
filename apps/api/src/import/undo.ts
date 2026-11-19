@@ -1,8 +1,14 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { logAccess } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
-import { clinicalEntry, historicalPrescription, importBatch, importOrigin } from '../db/schema';
+import {
+  clinicalEntry,
+  historicalPrescription,
+  importBatch,
+  importOrigin,
+  patient,
+} from '../db/schema';
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
 
@@ -14,6 +20,9 @@ import { HttpError } from '../http/errors';
  * Pazienti creati o completati, esenzioni, scelte del medico, nuclei familiari e terapie non hanno
  * ancora uno stato «annullato» (serve una migrazione): un'importazione che li ha scritti non si
  * annulla da qui, e il messaggio lo dice.
+ *
+ * Nemmeno se ha scritto dati di pazienti passati poi nell'archivio di un altro medico dello studio
+ * (D200): il titolare dell'archivio di prima non tocca più quelle cartelle.
  */
 
 /** Tabelle che si annullano con un motivo. */
@@ -67,6 +76,32 @@ export async function undoBatch(
   const pastIds = origins
     .filter((o) => o.tableName === 'historical_prescription')
     .map((o) => o.rowId);
+  const touched = [
+    ...(entryIds.length
+      ? await db
+          .select({ id: clinicalEntry.patientId })
+          .from(clinicalEntry)
+          .where(inArray(clinicalEntry.id, entryIds))
+      : []),
+    ...(pastIds.length
+      ? await db
+          .select({ id: historicalPrescription.patientId })
+          .from(historicalPrescription)
+          .where(inArray(historicalPrescription.id, pastIds))
+      : []),
+  ];
+  const patientIds = [...new Set(touched.map((r) => r.id))];
+  const moved = patientIds.length
+    ? await db
+        .select({ id: patient.id })
+        .from(patient)
+        .where(and(inArray(patient.id, patientIds), ne(patient.archiveId, batch.archiveId)))
+    : [];
+  if (moved.length)
+    throw new HttpError(
+      409,
+      `${moved.length === 1 ? 'Un paziente di questa importazione è passato' : `${moved.length} pazienti di questa importazione sono passati`} nell’archivio di un altro medico: l’importazione non si annulla più per intero.`,
+    );
   return withActor(db, actor.userId, async (tx) => {
     const entries = entryIds.length
       ? await tx

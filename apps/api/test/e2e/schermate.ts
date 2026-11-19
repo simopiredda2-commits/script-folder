@@ -17,6 +17,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { sql } from 'drizzle-orm';
+import { buildFiscalCode } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
 import { EMPTY_AURA_REGISTRY, SimulatedAura } from '@mmg/integrations';
 import { chromium, type Browser, type Page } from 'playwright';
@@ -879,6 +880,66 @@ try {
   await page.goto(`${base}/pazienti/${other.id}/ricetta`);
   await page.getByText(/la ricetta non si fa/).waitFor();
   await shot(page, '65-ricetta-paziente-deceduto');
+
+  // D200: un secondo titolare dello studio, inventato e senza accesso, con il suo archivio. Un
+  // paziente dimostrativo della Dott.ssa Marchi lo sceglie in AURA: il cambio è da decidere in Oggi.
+  const colleague = (
+    await db.execute<{ id: string; studio: string }>(sql`
+      insert into app_user (studio_id, username, display_name, password_hash, roles)
+      select a.studio_id, 'collega.dimostrativo', 'Dott. Paolo Serra', 'nessun accesso',
+        array['owner_doctor']::user_role[]
+      from archive a join doctor_profile d on d.user_id = a.owner_user_id
+      where d.regional_code = 'DEMO-0001'
+      returning id, studio_id as studio`)
+  ).rows[0]!;
+  const colleagueCf = buildFiscalCode({
+    surname: 'Serra',
+    name: 'Paolo',
+    birthDate: '1972-02-02',
+    sex: 'M',
+    placeCode: 'X001',
+  });
+  await db.execute(sql`
+    insert into doctor_profile (user_id, regional_code, asl, first_name, last_name, fiscal_code)
+    values (${colleague.id}, 'DEMO-0003', 'ASL dimostrativa', 'Paolo', 'Serra', ${colleagueCf})`);
+  await db.execute(sql`
+    insert into archive (studio_id, owner_user_id, name)
+    values (${colleague.studio}, ${colleague.id}, 'Archivio del Dott. Serra')`);
+  const moving = (
+    await db.execute<{ id: string; cf: string; ln: string; fn: string; bd: string }>(sql`
+      select id, fiscal_code as cf, last_name as ln, first_name as fn, birth_date::text as bd
+      from patient
+      where id not in (${diabetic.id}, ${other.id}) and status = 'active'
+      order by birth_date desc, last_name
+      limit 1`)
+  ).rows[0];
+  if (!moving) throw new Error('Serve un terzo paziente dimostrativo in carico');
+  const chosenOn = studioDate(new Date(Date.now() - 86_400_000));
+  aura.register({
+    fiscalCode: moving.cf,
+    lastName: moving.ln,
+    firstName: moving.fn,
+    birthDate: moving.bd,
+    exemptions: [],
+    choices: [
+      {
+        doctorFiscalCode: doctorCf,
+        chosenOn: '2015-01-01',
+        expiresOn: null,
+        endedOn: chosenOn,
+        endReason: 'Scelta di un altro medico',
+      },
+      { doctorFiscalCode: colleagueCf, chosenOn, expiresOn: null, endedOn: null, endReason: null },
+    ],
+  });
+  await page.goto(`${base}/pazienti/${moving.id}/amministrazione#aura`);
+  await auraSection.getByRole('button', { name: 'Aggiorna da AURA' }).click();
+  await auraSection.getByText(/^Aggiornato da AURA/).waitFor();
+  await page.goto(base);
+  const changesRegion = page.getByRole('region', { name: 'Cambi di medico nello studio' });
+  await changesRegion.getByRole('table', { name: 'Pazienti da spostare' }).waitFor();
+  await changesRegion.scrollIntoViewIfNeeded();
+  await shot(page, '66-cambio-di-medico-in-oggi');
 
   await browser.close();
   await new Promise((ok) => web.close(ok));

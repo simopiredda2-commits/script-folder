@@ -122,7 +122,10 @@ export type AccessAction =
   | 'aggiornamento_aura'
   | 'lettura_variazioni_aura'
   | 'lettura_nuovi_assistiti_aura'
-  | 'nuovo_assistito_non_registrato';
+  | 'nuovo_assistito_non_registrato'
+  | 'lettura_cambi_medico'
+  | 'spostamento_archivio'
+  | 'cambio_medico_non_spostato';
 
 export interface AccessEntry {
   studioId?: string | null;

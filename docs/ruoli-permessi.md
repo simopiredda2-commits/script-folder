@@ -41,6 +41,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Importare dati da altri programmi nell’archivio | Sì | No | No | No | No | No |
 | Decidere che cosa vede la segreteria dell’archivio | Sì | No | No | No | No | No |
 | Autorizzare un sostituto o un collega di gruppo sull’archivio | Sì | No | No | No | No | No |
+| Spostare un paziente nell’archivio del medico scelto in AURA | Sì | No | No | No | No | No |
 | Modificare i dati e le impostazioni dello studio | No | No | No | No | No | Sì |
 | Gestire gli utenti dello studio | No | No | No | No | No | Sì |
 | Gestire le stampanti | No | No | No | No | No | Sì |
