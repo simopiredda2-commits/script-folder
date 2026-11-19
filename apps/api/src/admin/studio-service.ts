@@ -793,6 +793,7 @@ export function createStudioAdminService(deps: AdminDeps) {
           prossimoGiro: updates.nextRun()?.toISOString() ?? null,
         },
         salvataggi: { nelProgramma: false },
+        ambiente: deps.environment,
       };
     },
   };

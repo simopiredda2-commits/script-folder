@@ -1,3 +1,4 @@
+import type { AppEnvironment } from '../config';
 import type { Database } from '../db/client';
 import type { ReferenceUpdates } from '../reference/updates-service';
 
@@ -9,4 +10,6 @@ export interface AdminDeps {
   sessionMaxHours: number;
   /** Aggiornamento delle banche dati (D156): configurato o no, ora del giro notturno. */
   referenceUpdates: ReferenceUpdates;
+  /** Ambiente dell'installazione (D170): in «prova» solo pazienti inventati. */
+  environment: AppEnvironment;
 }

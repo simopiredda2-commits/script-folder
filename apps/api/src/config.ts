@@ -13,6 +13,14 @@ export interface ReferenceUpdateConfig {
   time?: string;
 }
 
+/**
+ * Ambiente dell'installazione (D170). In «prova» (il valore per difetto) il programma accetta solo
+ * pazienti inventati dove può controllarlo (regola 1, D12) e i dati dimostrativi; in «produzione»
+ * il seed dimostrativo non parte.
+ */
+export type AppEnvironment = 'produzione' | 'prova';
+export const APP_ENVIRONMENTS: readonly AppEnvironment[] = ['produzione', 'prova'];
+
 /** Configurazione del servizio, letta dall'ambiente. Nessun valore segreto ha un default. */
 export interface Config {
   databaseUrl: string;
@@ -26,6 +34,15 @@ export interface Config {
   cookieSecure: boolean;
   /** Aggiornamento delle banche dati; null = il servizio non le aggiorna (sviluppo, prove). */
   referenceUpdate: ReferenceUpdateConfig | null;
+  /** Ambiente dell'installazione, da APP_AMBIENTE (D170). */
+  environment: AppEnvironment;
+}
+
+function environmentOf(raw: string | undefined): AppEnvironment {
+  const v = (raw ?? 'prova').trim().toLowerCase();
+  if (!(APP_ENVIRONMENTS as readonly string[]).includes(v))
+    throw new Error(`APP_AMBIENTE=${raw}: valori ammessi «produzione» o «prova»`);
+  return v as AppEnvironment;
 }
 
 /**
@@ -72,5 +89,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     sessionMaxHours: Number(env.SESSION_MAX_HOURS ?? 12),
     cookieSecure: env.COOKIE_SECURE !== 'false',
     referenceUpdate: referenceUpdateConfig(env),
+    environment: environmentOf(env.APP_AMBIENTE),
   };
 }

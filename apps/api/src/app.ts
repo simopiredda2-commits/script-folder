@@ -89,7 +89,8 @@ declare module 'fastify' {
 
 export interface AppDeps {
   db: Database;
-  config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'>;
+  config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'> &
+    Partial<Pick<Config, 'environment'>>;
   now?: () => Date;
   logger?: boolean;
   /**
@@ -242,6 +243,7 @@ export function buildApp({
     now: now ?? (() => new Date()),
     sessionMaxHours: config.sessionMaxHours,
     referenceUpdates,
+    environment: config.environment ?? 'prova',
   };
   registerStudioAdminRoutes(app, adminDeps);
   registerUserAdminRoutes(app, adminDeps);

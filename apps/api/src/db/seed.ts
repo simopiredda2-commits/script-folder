@@ -70,6 +70,11 @@ const FIRST_APPOINTMENT_MS = 8.5 * 3_600_000;
 const TO_SIGN = 3;
 
 const config = loadConfig();
+// I dati dimostrativi non vanno mai in un'installazione vera (regola 1, D170).
+if (config.environment === 'produzione') {
+  console.error('APP_AMBIENTE=produzione: i dati dimostrativi non si creano in produzione.');
+  process.exit(1);
+}
 const pool = createPool(config.databaseUrl);
 const db = createDatabase(pool);
 
@@ -261,14 +266,12 @@ try {
       const pid = row!.id;
       pids.push(pid);
       // Scelta del medico registrata a mano, in attesa di AURA (tappa 15).
-      await tx
-        .insert(patientChoice)
-        .values({
-          patientId: pid,
-          doctorUserId: doctorId,
-          chosenOn: '2024-01-01',
-          source: 'manual',
-        });
+      await tx.insert(patientChoice).values({
+        patientId: pid,
+        doctorUserId: doctorId,
+        chosenOn: '2024-01-01',
+        source: 'manual',
+      });
       if (index < APPOINTMENTS_TODAY) {
         const startsAt = new Date(midnight + FIRST_APPOINTMENT_MS + index * QUARTER_MS);
         await tx.insert(appointment).values({
