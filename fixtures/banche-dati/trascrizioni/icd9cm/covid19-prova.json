@@ -1,0 +1,13 @@
+{
+  "tipo": "diagnosi",
+  "serie": "icd9cm-diagnosi",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "Prova del DM 28 ottobre 2020: alcuni codici della COVID-19 (GU n. 26 dell’1/2/2021, allegato 1)",
+  "in_vigore_dal": "2021-02-02",
+  "trascritto_da": "Persona di prova",
+  "trascritto_il": "2026-11-19",
+  "controllato_da": "Seconda persona di prova",
+  "solo_modifiche": true
+}

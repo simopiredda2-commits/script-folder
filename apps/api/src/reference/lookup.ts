@@ -1,10 +1,15 @@
 import {
   type DatasetKind,
+  diagnosisByCode,
+  type DiagnosisHit,
+  type DiagnosisIndex,
+  indexDiagnoses,
   indexServices,
   KINDS,
   loadServiceSearchData,
   type MappingSet,
   SERVICE_SEARCH_DATA,
+  searchDiagnoses,
   searchServices,
   type ServiceIndex,
 } from '@mmg/reference';
@@ -12,6 +17,7 @@ import type { DrugFacts } from '@mmg/rules';
 import { and, desc, eq, ilike, inArray, isNotNull, lte, or, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
+  refDiagnosis,
   refDpcDrug,
   refDrug,
   refDrugClass,
@@ -102,6 +108,12 @@ interface ServiceRow {
  */
 const SERVICE_INDEXES = new Map<string, ServiceIndex<ServiceRow>>();
 const MAX_SERVICE_INDEXES = 8;
+
+/** Indici delle diagnosi ICD-9-CM, per versione del catalogo, come quelli delle prestazioni. */
+const DIAGNOSIS_INDEXES = new Map<string, DiagnosisIndex>();
+const MAX_DIAGNOSIS_INDEXES = 4;
+/** Quante diagnosi mostra al più una ricerca: oltre, si precisa la domanda. */
+const DIAGNOSIS_SEARCH_LIMIT = 50;
 const MS_PER_DAY = 86_400_000;
 
 function daysBetween(from: string, to: string): number {
@@ -431,6 +443,55 @@ export class ReferenceData {
       SERVICE_INDEXES.delete(SERVICE_INDEXES.keys().next().value!);
     }
     SERVICE_INDEXES.set(key, index);
+    return index;
+  }
+
+  /**
+   * Diagnosi ICD-9-CM per descrizione o per codice (D186), nel catalogo in vigore alla data. Senza
+   * catalogo in uso (per esempio una trascrizione ancora da controllare) nessun risultato.
+   */
+  async searchDiagnoses(
+    q: string,
+    date: string,
+    limit = DIAGNOSIS_SEARCH_LIMIT,
+  ): Promise<{ hits: DiagnosisHit[]; total: number }> {
+    const index = await this.diagnosisIndex(date);
+    if (!index || !q.trim()) return { hits: [], total: 0 };
+    return searchDiagnoses(index, q, limit);
+  }
+
+  /**
+   * La voce del catalogo ICD-9-CM in vigore alla data per un codice: null se il codice non c'è,
+   * undefined se nessun catalogo è in uso.
+   */
+  async diagnosis(code: string, date: string): Promise<DiagnosisHit | null | undefined> {
+    const index = await this.diagnosisIndex(date);
+    return index ? diagnosisByCode(index, code) : undefined;
+  }
+
+  private async diagnosisIndex(date: string): Promise<DiagnosisIndex | undefined> {
+    const ids = await this.ids('diagnosi', date);
+    if (!ids.length) return undefined;
+    const key = [...ids].sort().join(',');
+    const cached = DIAGNOSIS_INDEXES.get(key);
+    if (cached) return cached;
+    const rows = await this.db
+      .select({
+        code: refDiagnosis.code,
+        description: refDiagnosis.description,
+        parentCode: refDiagnosis.parentCode,
+        includedTerms: refDiagnosis.includedTerms,
+        notes: refDiagnosis.notes,
+        chapter: refDiagnosis.chapter,
+        section: refDiagnosis.section,
+      })
+      .from(refDiagnosis)
+      .where(inArray(refDiagnosis.datasetId, ids));
+    const index = indexDiagnoses(rows);
+    if (DIAGNOSIS_INDEXES.size >= MAX_DIAGNOSIS_INDEXES) {
+      DIAGNOSIS_INDEXES.delete(DIAGNOSIS_INDEXES.keys().next().value!);
+    }
+    DIAGNOSIS_INDEXES.set(key, index);
     return index;
   }
 

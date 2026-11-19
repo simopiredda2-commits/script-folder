@@ -163,6 +163,26 @@ export const refExemptionService = pgTable(
   (t) => [index().on(t.datasetId, t.exemptionCode)],
 );
 
+/**
+ * Diagnosi ICD-9-CM (D186): codice, titolo, padre (la gerarchia), termini inclusi, note di inclusione
+ * ed esclusione, capitolo e sezione. Un codice con sottocodici è una categoria.
+ */
+export const refDiagnosis = pgTable(
+  'ref_diagnosis',
+  {
+    id: rowId(),
+    datasetId: datasetId(),
+    code: text().notNull(),
+    description: text().notNull(),
+    parentCode: text(),
+    includedTerms: text(),
+    notes: text(),
+    chapter: text(),
+    section: text(),
+  },
+  (t) => [index().on(t.datasetId, t.code)],
+);
+
 /** Tabella dei dati di ogni tipo di banca dati. */
 export const REFERENCE_TABLES = {
   farmaci: refDrug,
@@ -172,6 +192,7 @@ export const REFERENCE_TABLES = {
   prestazioni: refService,
   esenzioni: refExemption,
   esenzioni_prestazioni: refExemptionService,
+  diagnosi: refDiagnosis,
 } as const;
 
 /**

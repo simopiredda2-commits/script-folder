@@ -147,6 +147,44 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     expect(dpc!.originSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it('diagnosi ICD-9-CM (D186): il catalogo e poi le aggiunte COVID-19 del DM 28/10/2020', async () => {
+    const r = byFile(await imp());
+    // Già importati dal giro di prima (stessa impronta): le note dicono quando.
+    expect(r['icd9cm/diagnosi-prova.json']!.outcome).toBe('gia_importato');
+    expect(r['icd9cm/covid19-prova.json']!.outcome).toBe('gia_importato');
+    const versions = await t.db
+      .select()
+      .from(referenceDataset)
+      .where(eq(referenceDataset.kind, 'diagnosi'));
+    expect(
+      versions
+        .map((v) => [v.series, v.validFrom, v.rows, v.checkedBy])
+        .sort((a, b) => String(a[1]).localeCompare(String(b[1]))),
+    ).toEqual([
+      ['icd9cm-diagnosi', '2009-01-01', 72, 'Seconda persona di prova'],
+      ['icd9cm-diagnosi', '2021-02-02', 81, 'Seconda persona di prova'],
+    ]);
+    // A5: la versione dipende dalla data; prima del 2/2/2021 la COVID-19 non c'è.
+    const ref = new ReferenceData(t.db, repo);
+    const covid = async (d: string) =>
+      (await ref.searchDiagnoses('covid', d)).hits.map((h) => h.code);
+    expect(await covid('2021-02-01')).toEqual([]);
+    expect(await covid('2021-02-02')).toEqual([
+      '043',
+      '043.1',
+      '043.11',
+      '043.12',
+      '480.4',
+      '480.41',
+      '480.42',
+    ]);
+    expect((await ref.diagnosis('V07.0', '2021-02-02'))!.category).toBe(true);
+    expect((await ref.diagnosis('V07.0', '2021-02-01'))!.category).toBe(false);
+    // Prima del catalogo nessuna versione: «non noto», non «codice sconosciuto».
+    expect(await ref.diagnosis('401.9', '2008-12-31')).toBeUndefined();
+    expect(await ref.diagnosis('999.99', '2026-11-19')).toBeNull();
+  });
+
   it('un secondo giro non cambia nulla', async () => {
     const before = await t.db.select().from(referenceDataset);
     const r = await imp();
@@ -363,6 +401,55 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       rmSync(join(dir, 'righe.json'));
     });
 
+    it('diagnosi: codice ripetuto o padre che manca, il file non entra; con --accetta-scarti solo le voci buone', async () => {
+      const header = 'codice;descrizione;codice_padre;termini_inclusi;note;capitolo;sezione\n';
+      write(
+        'diagnosi-doppie',
+        `${header}493;Asma;;;;;\n493.9;Asma, non specificata;493;;;;\n493.91;Asma, tipo non specificato, con stato asmatico;493.9;;;;\n493.91;Asma, tipo non specificato, con riacutizzazione;493.9;;;;\n942.40;Ustione del tronco, sede non specificata;942.4;;;;\n`,
+        sheet({ tipo: 'diagnosi', serie: 'diagnosi-prova-doppie' }),
+      );
+      const refused = byFile(await imp({ transcriptionsDir: dir }))['diagnosi-doppie.json']!;
+      expect(refused.outcome).toBe('righe_non_valide');
+      expect(refused.notes).toEqual(
+        expect.arrayContaining([
+          'voce 493.91: codice ripetuto',
+          "voce 942.40: il padre 942.4 non c'è",
+        ]),
+      );
+      const accepted = byFile(await imp({ transcriptionsDir: dir, acceptDiscarded: true }))[
+        'diagnosi-doppie.json'
+      ]!;
+      expect(accepted).toMatchObject({ outcome: 'importato', rows: 3 });
+      const [ds] = await t.db
+        .select()
+        .from(referenceDataset)
+        .where(eq(referenceDataset.series, 'diagnosi-prova-doppie'));
+      expect(ds!.discardedRows).toBe(2);
+      rmSync(join(dir, 'diagnosi-doppie.csv'));
+      rmSync(join(dir, 'diagnosi-doppie.json'));
+    });
+
+    it('diagnosi: un atto che lascia un sottocodice senza padre non si applica', async () => {
+      const header = 'codice;descrizione;codice_padre;termini_inclusi;note;capitolo;sezione\n';
+      const serie = 'diagnosi-prova-atto';
+      write(
+        'diagnosi-base',
+        `${header}480;Polmonite virale;;;;;\n480.9;Polmonite virale, non specificata;480;;;;\n`,
+        sheet({ tipo: 'diagnosi', serie, in_vigore_dal: '2009-01-01' }),
+      );
+      write(
+        'diagnosi-atto',
+        `operazione;${header}aggiunge;480.41;Polmonite in COVID-19, virus identificato;480.4;;;;\n`,
+        sheet({ tipo: 'diagnosi', serie, in_vigore_dal: '2021-02-02', solo_modifiche: true }),
+      );
+      const r = byFile(await imp({ transcriptionsDir: dir }));
+      expect(r['diagnosi-base.json']).toMatchObject({ outcome: 'importato', rows: 2 });
+      expect(r['diagnosi-atto.json']!.outcome).toBe('righe_non_valide');
+      expect(r['diagnosi-atto.json']!.notes).toContain("voce 480.41: il padre 480.4 non c'è");
+      for (const f of ['diagnosi-base', 'diagnosi-atto'])
+        for (const ext of ['csv', 'json']) rmSync(join(dir, `${f}.${ext}`));
+    });
+
     it('scheda incompleta, colonne sbagliate, PDF d’origine sconosciuto', async () => {
       write('senza-controllo', 'principio_attivo\nx\n', { ...sheet(), controllato_da: '' });
       write('colonne', 'principio;atc\nx;\n', sheet({ serie: 'dpc-prova-colonne' }));
@@ -475,6 +562,37 @@ describe('banche dati via HTTP e nelle regole', () => {
     expect((await get('/api/comuni/A074')).json().comune.name).toBe('Agliè');
     expect((await get('/api/banche-dati')).json().versioni.length).toBeGreaterThan(5);
     expect((await get('/api/farmaci?q=')).statusCode).toBe(400);
+  });
+
+  it('diagnosi ICD-9-CM (D186): ricerca per descrizione o codice, e la voce di un codice', async () => {
+    const found = (
+      await get(`/api/diagnosi?q=${encodeURIComponent('asma riacutizzazione')}`)
+    ).json();
+    expect(found.diagnosi).toEqual([
+      expect.objectContaining({
+        code: '493.92',
+        description: 'Asma, tipo non specificato, con riacutizzazione',
+        category: false,
+        path: [
+          { code: '493', description: 'Asma' },
+          { code: '493.9', description: 'Asma, non specificata' },
+        ],
+      }),
+    ]);
+    expect(found.totale).toBe(1);
+    expect(found.versioni.map((v: { kind: string }) => v.kind)).toEqual(['diagnosi']);
+    const one = (await get('/api/diagnosi/4019')).json();
+    expect(one).toMatchObject({ disponibile: true, diagnosi: { code: '401.9' } });
+    expect((await get('/api/diagnosi/999.99')).json()).toMatchObject({
+      disponibile: true,
+      diagnosi: null,
+    });
+    expect((await get('/api/diagnosi/401.9?data=2008-12-31')).json()).toMatchObject({
+      disponibile: false,
+      diagnosi: null,
+    });
+    expect((await get('/api/diagnosi?q=')).statusCode).toBe(400);
+    expect((await get('/api/diagnosi?q=asma', {})).statusCode).toBe(401);
   });
 
   it('servono una sessione', async () => {

@@ -4,6 +4,7 @@ import { type MappingSet, parseMappings } from './mapping';
 
 export * from './changes';
 export * from './csv';
+export * from './diagnoses';
 export * from './files';
 export * from './kinds';
 export * from './mapping';
@@ -14,8 +15,9 @@ export * from './xlsx';
 export const DATA_DIR = join(import.meta.dirname, '..', 'data');
 
 /**
- * Trascrizioni degli atti regionali che il programma porta con sé (D159): il catalogo delle
- * prestazioni e gli atti che lo modificano. Entrano in uso quando una persona le ha controllate.
+ * Trascrizioni che il programma porta con sé: il catalogo regionale delle prestazioni e gli atti che
+ * lo modificano (D159), le diagnosi ICD-9-CM (D186). Entrano in uso quando una persona le ha
+ * controllate.
  */
 export const REGIONAL_TRANSCRIPTIONS = join(DATA_DIR, 'trascrizioni');
 

@@ -21,6 +21,17 @@ const ATC: FieldSpec = {
   pattern: /^[A-Z](?:\d{2}(?:[A-Z](?:[A-Z](?:\d{2})?)?)?)?$/,
   patternLabel: 'codice ATC (per esempio N02BE01)',
 };
+/**
+ * Codice ICD-9-CM delle diagnosi come lo scrive l'elenco sistematico: categorie di tre cifre (001–999),
+ * codici V di due cifre (V01–V91) ed E di tre (E800–E999), con al più due decimali (uno per i codici
+ * E). Più stretto dello schema del certificato (sick-leave), che accetta anche forme che la
+ * classificazione non usa.
+ */
+const ICD9: FieldSpec = {
+  type: 'text',
+  pattern: /^(?:\d{3}(?:\.\d{1,2})?|V\d{2}(?:\.\d{1,2})?|E\d{3}(?:\.\d)?)$/,
+  patternLabel: 'codice ICD-9-CM (per esempio 401.9, 250.00, V17.3, E880.0)',
+};
 
 export const KINDS = {
   /** Anagrafica dei farmaci (AIFA): una riga per confezione. */
@@ -100,6 +111,25 @@ export const KINDS = {
     fields: {
       code: { type: 'text', required: true },
       description: { type: 'text', required: true },
+    },
+  },
+  /**
+   * Diagnosi ICD-9-CM, versione italiana 2007 (elenco sistematico delle malattie e dei
+   * traumatismi), da una trascrizione controllata del PDF del Ministero (D186). Il codice del padre
+   * dà la gerarchia: un codice con sottocodici è una categoria.
+   */
+  diagnosi: {
+    label: 'Diagnosi ICD-9-CM',
+    /** Il codice identifica una voce negli atti che aggiungono e tolgono voci (D157). */
+    changeKey: ['code'],
+    fields: {
+      code: { ...ICD9, required: true },
+      description: { type: 'text', required: true },
+      parentCode: ICD9,
+      includedTerms: { type: 'text' },
+      notes: { type: 'text' },
+      chapter: { type: 'text' },
+      section: { type: 'text' },
     },
   },
   /** Esenzioni e prestazioni associate per il controllo del SAR (R17), da una trascrizione. */

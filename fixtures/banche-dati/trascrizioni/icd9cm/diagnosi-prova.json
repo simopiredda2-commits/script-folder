@@ -1,0 +1,13 @@
+{
+  "tipo": "diagnosi",
+  "serie": "icd9cm-diagnosi",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "Elenco di prova delle diagnosi ICD-9-CM: righe della versione italiana 2007 (elenco sistematico)",
+  "in_vigore_dal": "2009-01-01",
+  "trascritto_da": "Persona di prova",
+  "trascritto_il": "2026-11-19",
+  "controllato_da": "Seconda persona di prova",
+  "nota": "Righe vere della trascrizione del programma (packages/reference/data/trascrizioni/icd9cm), scelte per le prove e i dati dimostrativi."
+}
