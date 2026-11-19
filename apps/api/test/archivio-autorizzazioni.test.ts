@@ -775,6 +775,14 @@ describe('archivio del titolare: autorizzazioni, registro di amministrazione, av
       expect(JSON.stringify(righe)).not.toMatch(/false|true/);
     });
 
+    it('in medicina di gruppo ogni titolare vede le azioni sul suo archivio, non su quelli dei colleghi', async () => {
+      const about = (righe: AdminRow[]) =>
+        righe.filter((r) => (r.dettaglio ?? '').includes('Archivio Marchi'));
+      expect(about((await page(c.titolare, '?limite=200')).righe).length).toBeGreaterThan(0);
+      expect(about((await page(c.collega, '?limite=200')).righe)).toEqual([]);
+      expect(about((await page(c.amministratore, '?limite=200')).righe).length).toBeGreaterThan(0);
+    });
+
     it('a pagine, dalle più recenti, solo le righe dello studio', async () => {
       // Un'azione nell'altro studio: non deve comparire.
       expect(

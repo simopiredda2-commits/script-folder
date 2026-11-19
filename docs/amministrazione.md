@@ -77,7 +77,7 @@ Nella pagina **Archivio**, solo per il titolare:
 
 ## Registro di amministrazione (D177)
 
-In **Strumenti › Registro di amministrazione**, per i titolari e l'amministratore: quando, chi, postazione, area, azione con il dettaglio (nomi dei campi cambiati, mai i valori), esito a parole; a pagine, dalle più recenti. Ogni lettura è registrata.
+In **Strumenti › Registro di amministrazione**, per i titolari e l'amministratore: quando, chi, postazione, area, azione con il dettaglio (nomi dei campi cambiati, mai i valori), esito a parole; a pagine, dalle più recenti. Ogni lettura è registrata. In medicina di gruppo un titolare non vede le autorizzazioni e le impostazioni degli archivi dei colleghi, né le modifiche delle AFT di cui non fa parte; l'amministratore vede tutto lo studio.
 
 ## Postazioni
 

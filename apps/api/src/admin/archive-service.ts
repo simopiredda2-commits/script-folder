@@ -1,5 +1,5 @@
 import { can, ROLE_LABELS, type Action, type Role } from '@mmg/domain';
-import { and, desc, eq, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, ne, notInArray, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { logAccess, type AccessAction } from '../audit/access-log';
@@ -7,6 +7,7 @@ import type { Actor } from '../auth/service';
 import {
   accessLog,
   aft,
+  aftMember,
   appUser,
   archive,
   archiveGrant,
@@ -878,6 +879,48 @@ export function createArchiveAdminService({ db, now }: Pick<AdminDeps, 'db' | 'n
         403,
         'Il registro delle azioni di amministrazione lo leggono i medici titolari e l’amministratore dello studio',
       );
+    // In medicina di gruppo un titolare vede le azioni sullo studio e sugli utenti, e quelle sul
+    // suo archivio e sulle sue AFT: non le autorizzazioni e le impostazioni degli archivi dei
+    // colleghi. L'amministratore vede tutto lo studio.
+    const scoped = !actor.roles.includes('administrator');
+    const ownArchives = scoped
+      ? (
+          await db
+            .select({ id: archive.id })
+            .from(archive)
+            .where(and(eq(archive.studioId, actor.studioId), eq(archive.ownerUserId, actor.userId)))
+        ).map((a) => a.id)
+      : [];
+    const ownAfts = scoped
+      ? (
+          await db
+            .select({ id: aftMember.aftId })
+            .from(aftMember)
+            .where(eq(aftMember.userId, actor.userId))
+        ).map((a) => a.id)
+      : [];
+    const archiveScoped: AccessAction[] = [
+      'autorizzazione_archivio',
+      'revoca_autorizzazione',
+      'impostazioni_archivio',
+    ];
+    const visible = scoped
+      ? or(
+          notInArray(accessLog.action, [...archiveScoped, 'impostazioni_aft']),
+          and(
+            inArray(accessLog.action, archiveScoped),
+            ownArchives.length
+              ? inArray(sql<string>`${accessLog.details}->>'archivio'`, ownArchives)
+              : sql`false`,
+          ),
+          and(
+            eq(accessLog.action, 'impostazioni_aft'),
+            ownAfts.length
+              ? inArray(sql<string>`${accessLog.details}->>'aft'`, ownAfts)
+              : sql`false`,
+          ),
+        )
+      : undefined;
     const rows = await db
       .select({
         seq: accessLog.seq,
@@ -894,6 +937,7 @@ export function createArchiveAdminService({ db, now }: Pick<AdminDeps, 'db' | 'n
         and(
           eq(accessLog.studioId, actor.studioId),
           inArray(accessLog.action, [...ADMIN_LOG_ACTIONS]),
+          visible,
           q.prima ? lt(accessLog.seq, q.prima) : undefined,
         ),
       )
