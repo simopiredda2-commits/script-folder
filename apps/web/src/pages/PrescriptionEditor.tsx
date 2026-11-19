@@ -15,6 +15,15 @@ import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
 import { ACCESS_TYPE, date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
 import { usePersistentState } from '../lib/storage';
+import {
+  count,
+  listPath,
+  packageLines,
+  useStudioList,
+  type ListItem,
+  type PackageLine,
+  type PackageService,
+} from '../lib/studio-lists';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, posology, type Patient, type Summary, type TherapyRow } from './RecordPage';
 
@@ -163,6 +172,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
       : null,
   );
   const versions = useApi<{ versioni: DatasetVersion[] }>(`/api/banche-dati`);
+  // Elenchi dello studio (tappa 14): i pacchetti nella specialistica, le posologie nei farmaci.
+  const packages = useStudioList(mode === 'specialistica' ? 'pacchetto' : null);
+  const posologies = useStudioList(mode === 'farmaci' ? 'posologia' : null);
   const [draft, setDraft, resetDraft] = usePersistentState<{
     id: string;
     status: string;
@@ -186,6 +198,8 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   );
 
   const add = (l: Omit<Line, 'key'>) => setLines((ls) => [...ls, { ...l, key: newKey() }]);
+  // Le posologie dello studio, come suggerimenti nella posologia delle righe dei farmaci.
+  const posologyTexts = [...new Set((posologies.data?.voci ?? []).map((p) => p.etichetta))];
   const update = (key: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
@@ -367,6 +381,16 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               )}
           </ul>
           {mode === 'specialistica' && (
+            <PackagePicker
+              packages={packages.data?.voci ?? null}
+              inPrescription={lines.map((l) => l.serviceCode)}
+              disabled={locked}
+              onAdd={(added) =>
+                setLines((ls) => [...ls, ...added.map((l) => ({ ...l, key: newKey() }))])
+              }
+            />
+          )}
+          {mode === 'specialistica' && (
             <ManualServiceForm disabled={locked} onAdd={(l) => add({ ...l, quantity: 1 })} />
           )}
           {mode === 'farmaci' && (therapies.data?.terapie ?? []).length > 0 && (
@@ -457,6 +481,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                         <label htmlFor={`p-${l.key}`}>Posologia</label>
                         <input
                           id={`p-${l.key}`}
+                          list={posologyTexts.length ? 'posologie-studio' : undefined}
                           value={l.posologyText ?? ''}
                           onChange={(e) => update(l.key, { posologyText: e.target.value })}
                         />
@@ -552,6 +577,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               </li>
             ))}
           </ol>
+          {posologyTexts.length > 0 && (
+            <datalist id="posologie-studio">
+              {posologyTexts.map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
+          )}
 
           <fieldset className="dati-ricetta" disabled={locked}>
             <legend>Dati della ricetta</legend>
@@ -697,6 +729,118 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         </section>
       </div>
     </>
+  );
+}
+
+interface PackageOutcome {
+  name: string;
+  added: number;
+  missing: PackageService[];
+  already: PackageService[];
+  noCatalog: boolean;
+}
+
+/**
+ * Pacchetti dello studio (tappa 14): «Aggiungi un pacchetto» mette in ricetta le sue prestazioni,
+ * cercate nel catalogo in vigore come dalla ricerca delle prestazioni, con i due codici (D154).
+ * Quelle che il catalogo in vigore non ha non si aggiungono e si dicono; quelle già in ricetta non
+ * si ripetono. Finché l'elenco non arriva (packages null) non si vede nulla.
+ */
+export function PackagePicker({
+  packages,
+  inPrescription,
+  disabled,
+  onAdd,
+}: {
+  packages: ListItem<'pacchetto'>[] | null;
+  inPrescription: (string | null | undefined)[];
+  disabled: boolean;
+  onAdd: (lines: PackageLine[]) => void;
+}) {
+  const [chosen, setChosen] = useState('');
+  const [outcome, setOutcome] = useState<PackageOutcome | null>(null);
+  if (!packages) return null;
+  if (packages.length === 0)
+    return (
+      <p className="aiuto">
+        I pacchetti di prestazioni dello studio si preparano in{' '}
+        <Link to={listPath('pacchetto')}>Strumenti › Elenchi dello studio</Link>.
+      </p>
+    );
+  const pkg = packages.find((p) => p.id === chosen);
+  const addPackage = () => {
+    if (!pkg) return;
+    const r = packageLines(pkg, inPrescription);
+    if (r.add.length) onAdd(r.add);
+    setOutcome({
+      name: pkg.etichetta,
+      added: r.add.length,
+      missing: r.missing,
+      already: r.already,
+      noCatalog: pkg.catalogo === null,
+    });
+  };
+  return (
+    <fieldset disabled={disabled}>
+      <legend>Aggiungi un pacchetto</legend>
+      <div className="campo">
+        <label htmlFor="pacchetto-studio">Pacchetto dello studio</label>
+        <select
+          id="pacchetto-studio"
+          value={chosen}
+          onChange={(e) => {
+            setChosen(e.target.value);
+            setOutcome(null);
+          }}
+        >
+          <option value="">Scegli un pacchetto</option>
+          {packages.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.etichetta} ({count(p.dati.prestazioni.length, 'prestazione', 'prestazioni')})
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="azioni">
+        <button type="button" className="pulsante" disabled={!pkg} onClick={addPackage}>
+          <Icon name="aggiungi" /> <span>Aggiungi in ricetta</span>
+        </button>
+      </div>
+      {outcome && outcome.added > 0 && (
+        <Notice kind="fatto">
+          {outcome.added === 1 ? 'Aggiunta' : 'Aggiunte'}{' '}
+          {count(outcome.added, 'prestazione', 'prestazioni')} del pacchetto «{outcome.name}».
+        </Notice>
+      )}
+      {outcome && outcome.missing.length > 0 && (
+        <Notice kind="avviso">
+          <p>
+            {outcome.noCatalog
+              ? 'Nessun catalogo delle prestazioni in uso: le prestazioni del pacchetto non si possono cercare e non si aggiungono:'
+              : outcome.missing.length === 1
+                ? 'Non aggiunta, perché non è nel catalogo in vigore oggi:'
+                : 'Non aggiunte, perché non sono nel catalogo in vigore oggi:'}
+          </p>
+          <ul>
+            {outcome.missing.map((s) => (
+              <li key={s.codice}>
+                <span className="codice">{s.codice}</span> {s.descrizione}
+              </li>
+            ))}
+          </ul>
+          <p>
+            Cercale nel catalogo, oppure aggiorna il pacchetto in{' '}
+            <Link to={listPath('pacchetto')}>Strumenti › Elenchi dello studio</Link>.
+          </p>
+        </Notice>
+      )}
+      {outcome && outcome.already.length > 0 && (
+        <Notice kind="info">
+          Già in ricetta, non {outcome.already.length === 1 ? 'aggiunta' : 'aggiunte'} di nuovo:{' '}
+          {outcome.already.map((s) => s.codice).join(', ')}.
+        </Notice>
+      )}
+    </fieldset>
   );
 }
 

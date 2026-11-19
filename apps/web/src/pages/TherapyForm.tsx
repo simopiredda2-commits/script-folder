@@ -20,6 +20,16 @@ import {
   TIMES_OF_DAY,
 } from '../lib/therapy';
 import { useCatalog } from '../lib/clinical';
+import {
+  hasPosologyParts,
+  listPath,
+  matchingPosology,
+  matchingSuggestor,
+  posologyPatch,
+  suggestorLabel,
+  useStudioList,
+  type ListItem,
+} from '../lib/studio-lists';
 import { useApi } from '../lib/useApi';
 import { drugFacts, useDebounced, type Drug } from './PrescriptionEditor';
 import { PatientBanner, type Patient, type Summary, type TherapyFull } from './RecordPage';
@@ -404,6 +414,101 @@ function DrugChooser({
 }
 
 /**
+ * Posologie dello studio (tappa 14): scegliendone una si riempiono le parti che ha (dose, unità,
+ * frequenza, momento, via); le altre restano come sono, e tutto si può correggere. La scelta mostra
+ * la posologia che i campi hanno già, se c'è. Finché l'elenco non arriva (items null) non si vede
+ * nulla: la scheda funziona anche senza.
+ */
+export function StudioPosologyField({
+  items,
+  draft,
+  onChoose,
+}: {
+  items: ListItem<'posologia'>[] | null;
+  draft: Pick<TherapyDraft, 'dose' | 'doseUnit' | 'frequency' | 'timeOfDay' | 'route'>;
+  onChoose: (patch: Partial<TherapyDraft>) => void;
+}) {
+  if (!items) return null;
+  const usable = items.filter((p) => hasPosologyParts(p.dati));
+  if (usable.length === 0)
+    return (
+      <p className="aiuto">
+        Le posologie dello studio si preparano in{' '}
+        <Link to={listPath('posologia')}>Strumenti › Elenchi dello studio</Link>.
+      </p>
+    );
+  return (
+    <Field
+      id="posologiaStudio"
+      label="Posologia dello studio"
+      help="Riempie dose, unità, frequenza, momento e via come nell’elenco dello studio; poi si possono correggere."
+    >
+      <select
+        {...described('posologiaStudio', undefined, true)}
+        value={matchingPosology(usable, draft)}
+        onChange={(e) => {
+          const p = usable.find((x) => x.id === e.target.value);
+          if (p) onChoose(posologyPatch(p.dati));
+        }}
+      >
+        <option value="">Scegli una posologia dello studio</option>
+        {usable.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.etichetta}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+/** Medici suggeritori dello studio (tappa 14): scegliendone uno si riempiono medico e struttura. */
+export function StudioSuggestorField({
+  items,
+  name,
+  facility,
+  onChoose,
+}: {
+  items: ListItem<'suggeritore'>[] | null;
+  name: string;
+  facility: string;
+  onChoose: (patch: Partial<TherapyDraft>) => void;
+}) {
+  if (!items) return null;
+  if (items.length === 0)
+    return (
+      <p className="aiuto">
+        I medici suggeritori dello studio si preparano in{' '}
+        <Link to={listPath('suggeritore')}>Strumenti › Elenchi dello studio</Link>.
+      </p>
+    );
+  return (
+    <Field
+      id="suggeritoreStudio"
+      label="Dall’elenco dello studio"
+      help="Riempie medico e struttura; poi si possono correggere."
+    >
+      <select
+        {...described('suggeritoreStudio', undefined, true)}
+        value={matchingSuggestor(items, name, facility)}
+        onChange={(e) => {
+          const s = items.find((x) => x.id === e.target.value);
+          if (s)
+            onChoose({ suggestedByName: s.dati.nome, suggestedByFacility: s.dati.struttura ?? '' });
+        }}
+      >
+        <option value="">Scegli un medico suggeritore</option>
+        {items.map((s) => (
+          <option key={s.id} value={s.id}>
+            {suggestorLabel(s.dati)}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+/**
  * Scheda della terapia, nuova o da modificare (requisiti, «Scheda della terapia»). Si salva la
  * scheda intera; quello che si sta scrivendo è ricordato per paziente, come la ricetta (D68).
  */
@@ -416,6 +521,9 @@ export function TherapyForm() {
   const therapies = useApi<{ terapie: TherapyFull[] }>(
     therapyId ? `/api/pazienti/${id}/terapie` : null,
   );
+  // Elenchi dello studio (tappa 14): posologie e medici suggeritori, scelte che riempiono i campi.
+  const posologies = useStudioList('posologia');
+  const suggestors = useStudioList('suggeritore');
   const existing = therapyId ? therapies.data?.terapie.find((t) => t.id === therapyId) : null;
   const [draft, setDraft, resetDraft] = usePersistentState<TherapyDraft | null>(
     `terapia:${id}:${therapyId ?? 'nuova'}`,
@@ -603,6 +711,11 @@ export function TherapyForm() {
 
             <section className="riquadro" aria-labelledby="titolo-come">
               <h2 id="titolo-come">Come si prende</h2>
+              <StudioPosologyField
+                items={posologies.data?.voci ?? null}
+                draft={d}
+                onChoose={update}
+              />
               <div className="campi-riga">
                 <Field id="dose" label="Dose" narrow>
                   <input
@@ -908,6 +1021,12 @@ export function TherapyForm() {
               <p className="aiuto">
                 Si compila quando la terapia arriva da uno specialista o da una dimissione.
               </p>
+              <StudioSuggestorField
+                items={suggestors.data?.voci ?? null}
+                name={d.suggestedByName}
+                facility={d.suggestedByFacility}
+                onChoose={update}
+              />
               <Field id="suggestedByName" label="Medico" error={errors.suggestedByName}>
                 <input
                   {...described('suggestedByName', errors.suggestedByName)}
