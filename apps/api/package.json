@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit -p . && tsc --noEmit -p test/e2e",
     "db:seed": "tsx src/db/seed.ts",
+    "studio:crea": "tsx src/db/first-studio-cli.ts",
     "banche-dati:importa": "tsx src/reference/cli.ts",
     "banche-dati:aggiorna": "tsx src/reference/update-cli.ts"
   },
