@@ -1444,6 +1444,52 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'postazioni e stampa, medico', true);
   });
 
+  it('utenti: l’amministratore crea una segreteria, che aspetta; il medico titolare la conferma e riceve la password (tappa 14, D179)', async () => {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    const admin = await ctx.newPage();
+    try {
+      await loginInBrowser(admin, 'amministratore');
+      await admin.goto(`${base}/strumenti?sezione=utenti`);
+      await admin.getByRole('heading', { level: 2, name: 'Utenti e ruoli' }).waitFor();
+      const form = admin.getByRole('form', { name: 'Nuovo utente' });
+      await form.getByLabel('Nome utente').fill('segreteria.e2e');
+      await form.getByLabel('Nome mostrato').fill('Segreteria di prova e2e');
+      await form.getByLabel('Segreteria', { exact: true }).check();
+      await form.getByRole('button', { name: 'Crea l’utente' }).click();
+      await admin.getByText('Utente creato: Segreteria di prova e2e.').waitFor();
+      // L'amministratore non riceve la password di chi lavora con i dati dei pazienti.
+      await expect(admin.locator('.segreto').count()).resolves.toBe(0);
+      await admin
+        .getByRole('table', { name: 'Utenti dello studio' })
+        .getByRole('row')
+        .filter({ hasText: 'segreteria.e2e' })
+        .getByText('In attesa di conferma di un titolare')
+        .waitFor();
+      await check(admin, 'utenti e ruoli, utente in attesa', true);
+    } finally {
+      await ctx.close();
+    }
+    // Il medico titolare la trova fra gli utenti da confermare, la conferma e riceve la password.
+    await page.goto(`${base}/strumenti?sezione=conferme`);
+    await page.getByRole('heading', { level: 2, name: 'Utenti da confermare' }).waitFor();
+    const row = page
+      .getByRole('table', { name: 'Utenti in attesa della conferma di un medico titolare' })
+      .getByRole('row')
+      .filter({ hasText: 'segreteria.e2e' });
+    await row.waitFor();
+    await check(page, 'utenti da confermare', true);
+    page.once('dialog', (d) => void d.accept());
+    await row.getByRole('button', { name: 'Conferma Segreteria di prova e2e' }).click();
+    await page.getByText('Password temporanea di Segreteria di prova e2e').waitFor();
+    await expect(page.locator('.segreto').innerText()).resolves.toMatch(/\S{8,}/);
+    await page.getByRole('button', { name: 'Consegnata: nascondi la password' }).click();
+    await page.getByText('Nessun utente da confermare.').waitFor();
+    await expect(page.locator('.segreto').count()).resolves.toBe(0);
+  });
+
   it('nuovo paziente e dati amministrativi: identità controllata, canale del promemoria (tappa 15)', async () => {
     // Un paziente inventato (D12): codice fiscale con la X in dodicesima posizione.
     const [nuovo] = generatePatients({ seed: `nuovo-paziente-e2e-${s.studioId}`, count: 1 });
