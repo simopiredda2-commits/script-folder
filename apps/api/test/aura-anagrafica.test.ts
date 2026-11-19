@@ -174,11 +174,14 @@ describe('AURA: revoca e anagrafica da confermare (D198)', () => {
 
   it('anagrafica diversa in AURA: si vede come differenza e non entra da sola', async () => {
     const before = await rich();
+    expect(before.residenceProvince).toBeTruthy();
     aura.setRegistry(auraId, {
       asl: 'ASL TO5',
       residenceTown: 'MONCALIERI',
       // Lo stesso indirizzo, scritto in un altro modo: non è una differenza.
       residenceStreet: `  ${(before.residenceStreet ?? '').toUpperCase()}  `,
+      // Un campo vuoto in AURA non propone di svuotare quello della cartella.
+      residenceProvince: '   ',
     });
     await until(async () => (await state()).differenze.length > 0);
     const diffs = (await state()).differenze;
@@ -369,10 +372,18 @@ describe('AURA di notte: anche i revocati collegati, per tornare in carico (D198
   });
 });
 
+/** Un'anagrafe lenta a rispondere: i controlli insieme si sovrappongono davvero. */
+class SlowAura extends SilentAura {
+  override async getProfile(auraId: string) {
+    await new Promise((r) => setTimeout(r, 50));
+    return super.getProfile(auraId);
+  }
+}
+
 describe('AURA: un controllo alla volta per paziente (D198)', () => {
   it('tre controlli insieme: la stessa esenzione entra una volta sola', async () => {
     const t = await createTestDatabase();
-    const aura = new SilentAura();
+    const aura = new SlowAura();
     const s = await createScenario(t.db, {}, { aura: { gateway: aura } });
     try {
       await t.db
