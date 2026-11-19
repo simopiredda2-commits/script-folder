@@ -222,7 +222,8 @@ function KindPanel({ kind }: { kind: KindInfo }) {
         />
       ) : (
         <Notice kind="info">
-          Gli elenchi dello studio li aggiornano i medici e l’amministratore: qui si consultano.
+          Gli elenchi dello studio li aggiornano i medici titolari, l’amministratore e il sostituto
+          mentre sostituisce: qui si consultano.
         </Notice>
       )}
       <ErrorMessage error={error} />

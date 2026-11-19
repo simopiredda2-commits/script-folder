@@ -1,3 +1,4 @@
+import { unseenLockCount } from '../auth/account-locks';
 import { can, ROLE_LABELS } from '@mmg/domain';
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -12,6 +13,7 @@ import {
   archive,
   clinicalEntry,
   diaryDetail,
+  doctorProfile,
   exemption,
   patient,
   problemDetail,
@@ -53,8 +55,9 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       .where(and(eq(archive.studioId, actor.studioId), eq(archive.ownerUserId, actor.userId)));
     // Il nome utente serve al modulo del cambio della password (gestori di password).
     const [me] = await db
-      .select({ username: appUser.username })
+      .select({ username: appUser.username, pending: doctorProfile.pendingFiscalCode })
       .from(appUser)
+      .leftJoin(doctorProfile, eq(doctorProfile.userId, appUser.id))
       .where(eq(appUser.id, actor.userId));
     return {
       id: actor.userId,
@@ -65,6 +68,10 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       archivio: own ?? null,
       // Password temporanea: l'interfaccia mostra solo il cambio della password (tappa 14).
       devoCambiarePassword: actor.mustChangePassword,
+      // Correzione del codice fiscale dell'amministratore che aspetta il medico (D181).
+      codiceFiscaleDaConfermare: !!me?.pending,
+      // Blocchi del conto ancora da vedere: i propri e, per un titolare, dello studio (D188).
+      blocchiDaVedere: await unseenLockCount(db, actor),
     };
   });
 

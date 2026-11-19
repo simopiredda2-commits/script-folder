@@ -22,6 +22,7 @@ import type { Actor } from '../auth/service';
 import { appUser, refService, studioListItem } from '../db/schema';
 import { withActor, type Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
+import { studioGrantsOf } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
 import { ReferenceData } from '../reference/lookup';
 import type { AdminDeps } from './deps';
@@ -29,7 +30,8 @@ import type { AdminDeps } from './deps';
 /**
  * Elenchi dello studio (tappa 14): medici suggeritori, posologie, pacchetti di prestazioni,
  * contatti utili. Li legge ogni utente dello studio, segreteria compresa, perché li usa; li
- * scrivono i medici e l'amministratore (`studio.lists`). I campi di ogni tipo li controlla il
+ * scrivono i titolari, l'amministratore e il sostituto mentre ha un'autorizzazione attiva su un
+ * archivio dello studio (`studio.lists`, D181). I campi di ogni tipo li controlla il
  * dominio (`@mmg/domain`, studio-lists). Una voce non si cancella: si archivia. Ogni scrittura va
  * nel registro come «amministrazione», con i campi cambiati; anche i tentativi negati.
  */
@@ -65,6 +67,9 @@ type ItemRow = typeof studioListItem.$inferSelect;
 const NO_CATALOG =
   'Nessun catalogo delle prestazioni in uso: un pacchetto si compone dal catalogo. Il catalogo si importa con le banche dati (Strumenti › Banche dati)';
 const DENIED = 'Gli elenchi dello studio li modificano i medici e l’amministratore dello studio';
+/** Il sostituto senza un'autorizzazione attiva su un archivio dello studio (D181). */
+const DENIED_WITHOUT_GRANT =
+  'Il sostituto modifica gli elenchi dello studio solo mentre ha un’autorizzazione attiva su un archivio dello studio';
 
 /** Controlla un corpo: i problemi tutti insieme, ognuno detto in chiaro. */
 function parse<T>(schema: z.ZodType<T>, input: unknown): T {
@@ -146,9 +151,17 @@ export function createStudioListService({ db, now }: AdminDeps) {
   // Solo per sapere quale catalogo è in vigore a una data: le stesse versioni della ricerca.
   const reference = new ReferenceData(db);
 
+  /**
+   * Chi scrive gli elenchi: i titolari, l'amministratore e il sostituto mentre ha
+   * un'autorizzazione attiva su un archivio dello studio (D181).
+   */
+  async function decideLists(actor: Actor) {
+    return can(actor, 'studio.lists', { grants: await studioGrantsOf(db, actor), now: now() });
+  }
+
   /** Il permesso, oppure 403: il tentativo negato resta nel registro, con che cosa si tentava. */
   async function requireLists(actor: Actor, attempted: string, extra: Record<string, unknown>) {
-    const d = can(actor, 'studio.lists');
+    const d = await decideLists(actor);
     if (d.allowed) return;
     await logAccess(db, {
       studioId: actor.studioId,
@@ -165,7 +178,10 @@ export function createStudioListService({ db, now }: AdminDeps) {
         motivo: d.reason,
       },
     });
-    throw new HttpError(403, DENIED);
+    throw new HttpError(
+      403,
+      actor.roles.includes('substitute_doctor') ? DENIED_WITHOUT_GRANT : DENIED,
+    );
   }
 
   async function logChange(tx: Tx, actor: Actor, details: Record<string, unknown>) {
@@ -336,7 +352,7 @@ export function createStudioListService({ db, now }: AdminDeps) {
         limiti: STUDIO_LIST_LIMITS,
         // Se c'è un catalogo delle prestazioni in uso alla data: senza, i pacchetti non si compongono.
         catalogo: catalog === undefined ? null : catalog !== null,
-        puoModificare: can(actor, 'studio.lists').allowed,
+        puoModificare: (await decideLists(actor)).allowed,
       };
     },
 

@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-18.4",
+  "versione": "2026-11-19.1",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -132,6 +132,23 @@
       },
       "vecchiaDopoGiorni": null,
       "nota": "Formato della trascrizione definito in docs/banche-dati.md."
+    },
+    {
+      "id": "trascrizione-diagnosi",
+      "titolo": "Ministero della salute: diagnosi ICD-9-CM 2007 (trascrizione)",
+      "tipo": "diagnosi",
+      "origine": "trascrizione",
+      "colonne": {
+        "code": "codice",
+        "description": "descrizione",
+        "parentCode": "codice_padre",
+        "includedTerms": "termini_inclusi",
+        "notes": "note",
+        "chapter": "capitolo",
+        "section": "sezione"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md; che cosa è diverso dal PDF in docs/icd9cm.md (D186). Nessuna soglia di vecchiaia: la classificazione cambia solo con un decreto."
     }
   ]
 }

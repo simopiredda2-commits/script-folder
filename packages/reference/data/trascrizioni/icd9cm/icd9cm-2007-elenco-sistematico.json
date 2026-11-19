@@ -1,0 +1,13 @@
+{
+  "tipo": "diagnosi",
+  "serie": "icd9cm-diagnosi",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "Ministero della salute: Classificazione internazionale delle malattie, dei traumatismi e degli interventi chirurgici e delle procedure diagnostiche e terapeutiche, versione italiana 2007 della ICD-9-CM, elenco sistematico delle malattie e dei traumatismi (adottata con il DM 18 dicembre 2008, GU n. 56 del 9/3/2009, dal 1° gennaio 2009)",
+  "in_vigore_dal": "2009-01-01",
+  "trascritto_da": "Simone Piredda, estrazione dal PDF del manuale, con un controllo esterno; correzioni e codici composti dalle legende di Claude Code",
+  "trascritto_il": "2026-11-19",
+  "controllato_da": null,
+  "nota": "Estrazione mandata da Simone il 19/11/2026 (CSV delle diagnosi, SHA-256 d60f1582…e4d6, dopo il controllo esterno). Corretti i codici e i titoli sbagliati nel PDF, con le prove; composti dalle legende stampate i codici di 531–535 (quinta cifra) e di E800–E841 (quarta cifra); ricostruite 3 righe che mancano; E978 resta fuori (nessun testo italiano). Che cosa è diverso dal PDF e che cosa controllare: docs/icd9cm.md. Colonna «origine»: come stampato, corretto, composto dalla legenda, ricostruito."
+}

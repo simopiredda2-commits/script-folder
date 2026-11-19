@@ -14,7 +14,8 @@ export function registerStudioListRoutes(app: FastifyInstance, deps: AdminDeps):
   // Li legge ogni utente dello studio, segreteria compresa: li usa nelle schede e nelle ricette.
   app.get('/api/studio/elenchi', async (req) => service.list(req.actor!, req.query));
 
-  // Li scrivono i medici e l'amministratore. Una voce non si cancella: si archivia.
+  // Li scrivono i titolari, l'amministratore e il sostituto mentre sostituisce (D181). Una voce
+  // non si cancella: si archivia.
   app.post('/api/studio/elenchi', async (req, reply) =>
     reply.status(201).send(await service.create(req.actor!, req.body)),
   );

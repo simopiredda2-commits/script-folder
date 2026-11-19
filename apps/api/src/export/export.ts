@@ -160,6 +160,11 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     db,
     sql`select * from archive_grant where archive_id = ${archiveId} order by valid_from, id`,
   );
+  // Segreteria confermata o tolta dal titolare per questo archivio (D181): tutte le decisioni.
+  tables.archive_secretary = await rows(
+    db,
+    sql`select * from archive_secretary where archive_id = ${archiveId} order by seq`,
+  );
   // Elenchi dello studio (tappa 14): suggeritori, posologie, pacchetti e contatti, anche archiviati.
   tables.studio_list_item = await rows(
     db,

@@ -292,16 +292,25 @@ export const ACTION_LABELS: Record<string, string> = {
   password_temporanea: 'Password temporanea',
   azzeramento_secondo_fattore: 'Azzeramento del secondo fattore',
   sblocco: 'Sblocco dopo i tentativi falliti',
+  ripristino: 'Ripristino delle credenziali',
+  identita_collegata: 'Identità digitale collegata',
+  identita_scollegata: 'Identità digitale scollegata',
   archiviazione: 'Archiviazione',
   elenco_da_confermare: 'Consultazione degli utenti da confermare',
   conferma: 'Conferma',
   rifiuto: 'Rifiuto della conferma',
   consultazione_richiesta: 'Consultazione della richiesta di conferma',
+  ritiro_codice_fiscale: 'Ritiro della correzione del codice fiscale',
+  conferma_codice_fiscale: 'Conferma del codice fiscale corretto',
+  rifiuto_codice_fiscale: 'Rifiuto del codice fiscale corretto',
+  conferma_archivio: 'Segreteria confermata per l’archivio',
+  rifiuto_archivio: 'Segreteria tolta dall’archivio',
 };
 
 /** Da dove viene l'azione, quando non dal programma (`details.tramite`): solo valori noti. */
 const VIA_LABELS: Record<string, string> = {
   'comando del server': 'dal server, con il comando di chi gestisce il servizio',
+  'SPID o CIE': 'dall’utente stesso, con SPID o CIE',
 };
 
 /** «nomeUtente» o «password_temporanea» → «nome utente», «password temporanea». */
@@ -368,6 +377,11 @@ export function describeAdminEntry(
         const after = roleList(d.ruoliDopo);
         add(before !== after && `ruoli: ${before} → ${after}`);
       }
+      // Correzione del codice fiscale del medico (D181): aspetta la sua conferma.
+      add(
+        d.codiceFiscaleInAttesaDelMedico === true &&
+          'codice fiscale in attesa della conferma del medico',
+      );
       break;
     }
     case 'cambio_password':

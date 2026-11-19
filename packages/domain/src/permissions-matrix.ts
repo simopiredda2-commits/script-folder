@@ -65,14 +65,21 @@ const columns: Column[] = [
 function cell(col: Column, action: Action): string {
   // Azioni sullo studio, senza archivio: dell'amministratore, o di più ruoli (STUDIO_ACTION_ROLES).
   const isAdmin = action.startsWith('admin.') || action.startsWith('studio.');
-  const base: AccessContext = isAdmin
-    ? { now: at }
-    : {
-        archive: own,
-        grants: col.grants,
-        settings: { secretaryCanReadDiary: false, secretaryCanReadSummary: false },
-        now: at,
-      };
+  if (isAdmin) {
+    // Il sostituto scrive gli elenchi solo con un'autorizzazione attiva (D181).
+    const withGrants = can(col.actor, action, { grants: col.grants, now: at }).allowed;
+    const alone = can(col.actor, action, { now: at }).allowed;
+    if (withGrants && !alone) return 'Con un’autorizzazione attiva';
+    return alone ? 'Sì' : 'No';
+  }
+  const base: AccessContext = {
+    archive: own,
+    grants: col.grants,
+    settings: { secretaryCanReadDiary: false, secretaryCanReadSummary: false },
+    // La segreteria della colonna è confermata dal titolare per questo archivio (D181).
+    secretaries: ['segreteria'],
+    now: at,
+  };
   if (!can(col.actor, action, base).allowed) {
     if (action === 'clinical.summary.read') {
       const configurable = can(col.actor, action, {

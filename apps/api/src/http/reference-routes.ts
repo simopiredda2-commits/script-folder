@@ -73,6 +73,32 @@ export function registerReferenceRoutes(
     };
   });
 
+  // Diagnosi ICD-9-CM (D186): ricerca per descrizione o codice, e la voce di un codice scritto a mano.
+  app.get('/api/diagnosi', async (req) => {
+    const q = searchQuery.parse(req.query);
+    const date = dateOf(q);
+    const found = await reference.searchDiagnoses(q.q, date);
+    return {
+      data: date,
+      diagnosi: found.hits,
+      totale: found.total,
+      versioni: await reference.versions(date, ['diagnosi']),
+    };
+  });
+
+  app.get('/api/diagnosi/:codice', async (req) => {
+    const { codice } = z.object({ codice: z.string().trim().min(1).max(10) }).parse(req.params);
+    const date = dateOf(dateQuery.parse(req.query));
+    const found = await reference.diagnosis(codice, date);
+    return {
+      data: date,
+      // null: catalogo in uso ma codice assente; disponibile false: nessun catalogo in uso.
+      diagnosi: found ?? null,
+      disponibile: found !== undefined,
+      versioni: await reference.versions(date, ['diagnosi']),
+    };
+  });
+
   app.get('/api/comuni/:codice', async (req) => {
     const { codice } = z.object({ codice: z.string().regex(/^[A-Za-z]\d{3}$/) }).parse(req.params);
     const date = dateOf(dateQuery.parse(req.query));

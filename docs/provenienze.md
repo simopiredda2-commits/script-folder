@@ -66,6 +66,33 @@ Le trascrizioni in `packages/reference/data/trascrizioni/piemonte_catalogo/` son
 | Regione Piemonte, D.D. 590/2026, parte 2 di 3: allegato A, laboratorio                                    | Mandato da Simone il 18/11/2026 (file `DD590-2026_parte2di3_laboratorio.pdf`, 87 pagine)                 | 1.286.532 | `0f44a555331e593b319c74f5b49a603c08ccd9153836fefe81aa33476a9401af` |
 | Regione Piemonte, D.D. 590/2026, parte 3 di 3: allegato A, branche 12–26, e allegato B                    | Mandato da Simone il 18/11/2026 (file `DD590-2026_parte3di3_branche12-26_coda_AllegatoB.pdf`, 77 pagine) | 1.616.458 | `8ef8f8c872b9a8d5093b07facff117fa9b514242158a85ab302022fb78d0aa4d` |
 
+### Diagnosi ICD-9-CM (D186)
+
+Le trascrizioni in `packages/reference/data/trascrizioni/icd9cm/` vengono dall'estrazione qui sotto (la versione italiana 2007 della ICD-9-CM, manuale del Ministero della salute, classificazione adottata con il DM 18/12/2008) e dalle pagine 31–35 della Gazzetta del DM 28/10/2020. Che cosa è diverso dal PDF: `docs/icd9cm.md`. Né il PDF del manuale né i file dell'estrazione sono nel repository. Il nome e l'impronta del PDF del manuale da cui Simone ha estratto i dati non sono annotati: vanno scritti qui. Le condizioni d'uso del manuale non sono scritte nei file: è la classificazione ufficiale adottata con un decreto (art. 5 della legge 633/1941, come per gli atti regionali), da confermare.
+
+| Documento                                                                       | Indirizzo                                                                         | Byte       | SHA-256                                                            |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------ |
+| Estrazione di Simone, CSV delle diagnosi, dopo il controllo esterno (usata)     | Mandata da Simone il 19/11/2026 (file `ICD9-CM_2008_diagnosi.csv`)                | 3.632.899  | `d60f1582e9b23b36951174de09f3d049798cce6a9c8e50410a05d58fde10e4d6` |
+| Estrazione di Simone, note dei capitoli e delle sezioni, con le legende (usata) | Mandata da Simone il 19/11/2026 (file `ICD9-CM_2008.json`)                        | 7.349.487  | `b8d1a3ed4edeb579d62b470fac88ebbd47a7ccb377c8faa982837ecf38d54cf0` |
+| Estrazione di Simone, foglio delle anomalie con le correzioni proposte          | Mandata da Simone il 19/11/2026 (file `ICD9-CM_2008_anomalie.csv`)                | 15.132     | `55833ab12447239c4cc080f9908f2bbd81f2027c4c6b4f68dead69d64414c06b` |
+| Estrazione di Simone, tutto in un foglio di calcolo (stesso contenuto)          | Mandata da Simone il 19/11/2026 (file `ICD9-CM_2008_italiano.xlsx`)               | 1.442.836  | `6b21ab641049063b570ad7ee3dde209bd14d0f8871223816f6e55eac9aca89c7` |
+| Estrazione di Simone, prima del controllo esterno (sostituita)                  | Mandata da Simone il 19/11/2026 (file `ICD9-CM_2008_diagnosi.csv`)                | 3.631.493  | `a50e92f3ca39db1dbdee7a431c9f475260a82cda3f482c30479af3101a0e0b0a` |
+| DM 18/12/2008, GU n. 56 del 9/3/2009 (adozione della versione italiana 2007)    | `https://www.gazzettaufficiale.it/eli/gu/2009/03/09/56/sg/pdf`                    | 10.692.800 | `61286fab385669c786d7289ff7ec5af1a30bebd846da57c70cb12ed361ee8667` |
+| DM 28/10/2020, GU n. 26 dell'1/2/2021 (integrazioni COVID-19, allegato 1)       | `https://www.gazzettaufficiale.it/eli/gu/2021/02/01/26/sg/pdf`                    | 4.328.707  | `085d5684d14c026275fe351e6eede95ef244e9b910959d58cfb2b5d62f5e4afb` |
+| Elenco ICD-9-CM della CMS (Stati Uniti), versioni 23–32: solo per il confronto  | `https://raw.githubusercontent.com/jackwasey/icd9/master/data/icd9Billable.RData` | 316.872    | `a93e77f1f89835d4816c108e894c385a9fe1815bca0625a5ebfd728d1b85be5d` |
+
+L'elenco della CMS è un dato pubblico del governo degli Stati Uniti, raccolto nel pacchetto R «icd9» (licenza GPL-3): è servito solo al confronto dei codici nella simulazione del controllo e non è nel repository. Il catalogo d'esempio in `fixtures/banche-dati/trascrizioni/icd9cm/` ha 72 righe della trascrizione e 9 righe del DM 28/10/2020.
+
+### Esenzioni del DPCM LEA (D190)
+
+La trascrizione in `packages/reference/data/trascrizioni/lea/` viene dal PDF qui sotto, scaricato da Simone dalla pagina del Ministero della salute sui LEA (versione del 29/9/2026). È un allegato di un decreto: testo di un atto ufficiale (art. 5 della legge 633/1941, come per gli atti regionali). Il PDF resta fuori dal repository. Che cosa è diverso dal PDF: `docs/banche-dati.md`, «Esenzioni del DPCM LEA».
+
+| Documento                                                                       | Indirizzo                                                                                                    | Byte    | SHA-256                                                            |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------ |
+| DPCM 12/1/2017, allegato 8: elenco malattie e condizioni croniche e invalidanti | Mandato da Simone il 18/11/2026 (file `Allegato_8_Elenco_malattie_e_condizioni_croniche_ed_invalidanti.pdf`) | 295.226 | `39c3434e4ed7aa11e15f0bdf673cfd49c678d83b450ccf3c10cbb6048c6065a7` |
+
+Gli altri allegati mandati da Simone (7, 10, 4D) sono stati letti ma non trascritti (motivi in `docs/banche-dati.md`).
+
 ### Modelli ufficiali dei certificati (D158)
 
 Il testo dei file in `apps/api/modelli/` è copiato dagli atti, con la fonte in ogni file. Le pagine della Gazzetta sono state lette il 18/11/2026 e i PDF restano fuori dal repository.

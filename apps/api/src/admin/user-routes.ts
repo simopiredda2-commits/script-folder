@@ -65,6 +65,13 @@ export function registerUserAdminRoutes(app: FastifyInstance, deps: AdminDeps): 
     users.unlock(req.actor!, idOf(req)),
   );
 
+  // Correzione del codice fiscale di un medico non ancora confermata da lui (D181): si ritira.
+  app.post(
+    '/api/studio/utenti/:id/codice-fiscale/ritira',
+    admin('ritiro_codice_fiscale'),
+    async (req) => users.withdrawFiscalCode(req.actor!, idOf(req)),
+  );
+
   // Conferma dei medici titolari: utenti con i dati dei pazienti creati o cambiati
   // dall'amministratore.
   app.get('/api/studio/utenti/da-confermare', confirmer('elenco_da_confermare'), async (req) =>
@@ -77,5 +84,17 @@ export function registerUserAdminRoutes(app: FastifyInstance, deps: AdminDeps): 
 
   app.post('/api/studio/utenti/:id/rifiuta', confirmer('rifiuto'), async (req) =>
     users.refuse(req.actor!, idOf(req)),
+  );
+
+  // In medicina di gruppo ogni titolare conferma la segreteria per il suo archivio, o la toglie
+  // (D181).
+  app.post(
+    '/api/studio/utenti/:id/archivio/conferma',
+    confirmer('conferma_archivio'),
+    async (req) => users.decideForArchive(req.actor!, idOf(req), true),
+  );
+
+  app.post('/api/studio/utenti/:id/archivio/rifiuta', confirmer('rifiuto_archivio'), async (req) =>
+    users.decideForArchive(req.actor!, idOf(req), false),
   );
 }

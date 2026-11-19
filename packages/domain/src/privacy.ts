@@ -44,7 +44,7 @@ export const CONSENT_KINDS = [
   {
     // Tappa 12 (D161): consenso specifico e separato, come per il dossier sanitario.
     key: 'aft_condivisione',
-    label: 'Condivisione del riepilogo con i medici dell’AFT',
+    label: 'Condivisione della scheda sanitaria con i medici dell’AFT (senza le voci riservate)',
     source:
       'Garante privacy, Linee guida in materia di Dossier sanitario, 4/6/2015, par. 3 (consenso autonomo e specifico)',
   },

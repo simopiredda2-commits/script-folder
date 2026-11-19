@@ -16,6 +16,8 @@ interface Doctor {
   asl: string | null;
   nome: string | null;
   cognome: string | null;
+  /** Correzione del codice fiscale che aspetta il medico (D181): fino ad allora vale l'altro. */
+  correzioneCodiceFiscale?: { proposto: string; da: string | null; il: string | null } | null;
 }
 interface User {
   id: string;
@@ -26,12 +28,24 @@ interface User {
   stato: 'attivo' | 'sospeso';
   secondoFattoreAttivo: boolean;
   bloccatoFinoA: string | null;
+  /** Password sbagliate di seguito all'accesso (soglia alta, D188). */
   tentativiFalliti: number;
+  /** Codici sbagliati di seguito, e password attuali sbagliate nel cambio (D188). */
+  codiciSbagliati: number;
   passwordDaCambiare: boolean;
   passwordCambiataIl: string | null;
   creatoIl: string;
   medico: Doctor | null;
   archivio: { id: string; nome: string } | null;
+  /** Per la segreteria: archivio per archivio, la decisione del suo titolare (D181). */
+  archiviSegreteria?:
+    | {
+        archivio: { id: string; nome: string };
+        stato: 'confermata' | 'rifiutata' | 'da_confermare';
+        da: string | null;
+        il: string | null;
+      }[]
+    | null;
   io: boolean;
   /** Ruolo con i dati dei pazienti dato dall'amministratore: non entra finché un titolare non conferma. */
   inAttesaDiConferma: boolean;
@@ -63,7 +77,12 @@ interface Result {
 }
 
 type RowAction =
-  'sospendi' | 'riattiva' | 'password-temporanea' | 'azzera-secondo-fattore' | 'sblocca';
+  | 'sospendi'
+  | 'riattiva'
+  | 'password-temporanea'
+  | 'azzera-secondo-fattore'
+  | 'sblocca'
+  | 'codice-fiscale/ritira';
 
 const DOCTOR_ROLES: RoleCode[] = ['owner_doctor', 'substitute_doctor'];
 const isDoctor = (roles: RoleCode[]) => roles.some((r) => DOCTOR_ROLES.includes(r));
@@ -101,6 +120,12 @@ const ROW_ACTIONS: Record<
     confirm: ({ nome: n }) =>
       `Azzerare il secondo fattore di ${n}? Le sue sessioni si chiudono; al prossimo accesso lo attiverà di nuovo con l’app di autenticazione.`,
     done: (n, k) => `Secondo fattore azzerato per ${n}. Sessioni chiuse: ${k}.`,
+  },
+  'codice-fiscale/ritira': {
+    label: 'Ritira la correzione del codice fiscale',
+    confirm: ({ nome: n }) =>
+      `Ritirare la correzione del codice fiscale di ${n}? Resta il codice di adesso; il medico non avrà più niente da confermare.`,
+    done: (n) => `Correzione del codice fiscale ritirata: per ${n} resta il codice di prima.`,
   },
   sblocca: {
     label: 'Sblocca',
@@ -356,6 +381,17 @@ export function UsersSection() {
                         <li>
                           <span className="codice">{u.medico.codiceFiscale ?? '—'}</span>
                         </li>
+                        {u.medico.correzioneCodiceFiscale && (
+                          <li>
+                            <strong>
+                              <Icon name="avviso" /> Correzione in attesa del medico:
+                            </strong>{' '}
+                            <span className="codice">
+                              {u.medico.correzioneCodiceFiscale.proposto}
+                            </span>
+                            . Finché il medico non la conferma vale il codice di adesso.
+                          </li>
+                        )}
                         <li>Codice regionale: {u.medico.codiceRegionale ?? 'da completare'}</li>
                         {u.medico.asl && <li>{u.medico.asl}</li>}
                       </ul>
@@ -363,7 +399,24 @@ export function UsersSection() {
                       '—'
                     )}
                   </td>
-                  <td>{u.archivio?.nome ?? '—'}</td>
+                  <td>
+                    {u.archiviSegreteria ? (
+                      <ul className="opzioni">
+                        {u.archiviSegreteria.map((a) => (
+                          <li key={a.archivio.id}>
+                            {a.archivio.nome}:{' '}
+                            {a.stato === 'confermata'
+                              ? 'confermata dal titolare'
+                              : a.stato === 'rifiutata'
+                                ? 'non ci lavora'
+                                : 'da confermare dal titolare'}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      (u.archivio?.nome ?? '—')
+                    )}
+                  </td>
                   <td>
                     <ul className="elenco-azioni">
                       <li>
@@ -455,8 +508,9 @@ function rowActions(u: User): RowAction[] {
   if (!u.ripristinoDalServizio) {
     out.push('password-temporanea');
     if (u.secondoFattoreAttivo) out.push('azzera-secondo-fattore');
-    if (u.bloccatoFinoA || u.tentativiFalliti > 0) out.push('sblocca');
+    if (u.bloccatoFinoA || u.tentativiFalliti > 0 || u.codiciSbagliati > 0) out.push('sblocca');
   }
+  if (u.medico?.correzioneCodiceFiscale) out.push('codice-fiscale/ritira');
   return out;
 }
 
@@ -507,7 +561,10 @@ function UserStatus({ u }: { u: User }) {
         </li>
       )}
       {!u.bloccatoFinoA && u.tentativiFalliti > 0 && (
-        <li>Tentativi falliti: {u.tentativiFalliti}</li>
+        <li>Password sbagliate di seguito: {u.tentativiFalliti}</li>
+      )}
+      {!u.bloccatoFinoA && u.codiciSbagliati > 0 && (
+        <li>Codici sbagliati di seguito: {u.codiciSbagliati}</li>
       )}
       <li>
         Secondo fattore: {u.secondoFattoreAttivo ? 'attivo' : 'si attiva al prossimo accesso'}

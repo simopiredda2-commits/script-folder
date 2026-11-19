@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { DiagnosisCodeInfo, DiagnosisSearch } from '../components/DiagnosisSearch';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import {
@@ -490,9 +491,19 @@ function NewEntryForm({
                 })}
             </div>
             {str('categoria') !== 'organo_mancante' && (
-              <p className="aiuto" id={fid('codice-aiuto')}>
-                Facoltativo; nel formato ICD-9-CM, per esempio 401.9 o V17.3.
-              </p>
+              <>
+                <p className="aiuto" id={fid('codice-aiuto')}>
+                  Facoltativo; nel formato ICD-9-CM, per esempio 401.9 o V17.3.
+                </p>
+                <DiagnosisCodeInfo code={str('codice')} />
+                <DiagnosisSearch
+                  onPick={(d) => {
+                    set('codice', d.code);
+                    // La descrizione, se è ancora vuota, è il titolo della classificazione.
+                    if (!str('descrizione')) set('descrizione', d.description);
+                  }}
+                />
+              </>
             )}
             <fieldset className="scelta-in-riga">
               <legend>Stato</legend>
@@ -543,6 +554,11 @@ function NewEntryForm({
             <p className="aiuto">
               Per il Profilo sanitario sintetico servono il parente e il codice della patologia.
             </p>
+            <DiagnosisCodeInfo code={str('codiceFamiliare')} />
+            <DiagnosisSearch
+              label="Cerca la patologia per descrizione"
+              onPick={(d) => set('codiceFamiliare', d.code)}
+            />
           </>
         )}
         {tipo === 'allergia' && (

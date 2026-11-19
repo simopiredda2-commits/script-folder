@@ -1,0 +1,13 @@
+{
+  "tipo": "esenzioni",
+  "serie": "lea-esenzioni-malattie-croniche",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "DPCM 12 gennaio 2017 (livelli essenziali di assistenza), allegato 8: elenco delle malattie e condizioni croniche e invalidanti e tabella di corrispondenza con i codici ICD9-CM (versione della pagina del Ministero della salute del 29/9/2026)",
+  "in_vigore_dal": "2026-10-30",
+  "trascritto_da": "Claude Code, estrazione automatica dal PDF",
+  "trascritto_il": "2026-11-19",
+  "controllato_da": null,
+  "nota": "PDF mandato da Simone, SHA-256 in docs/provenienze.md. Dalla prima parte i 66 codici delle condizioni (013, 0A31, 0031…); dalla tabella di corrispondenza i 181 codici con la malattia (013.250…), descritti «condizione: malattia» quando sono diverse. HIV-2 (p. 6) non è un codice a parte: è 020.042 con il codice aggiuntivo 079.53. Le prestazioni associate a ogni esenzione (terza parte) non sono qui: per R17 vale l'elenco regionale (D.D. 1167/2022). Data di inizio da verificare: da questa versione valgono in Piemonte le esenzioni 068, 069 e 070 (dal 30/10/2026). Che cosa controllare: docs/banche-dati.md, «Esenzioni del DPCM LEA»."
+}

@@ -29,6 +29,7 @@ import {
   accessLog,
   appUser,
   archive,
+  archiveSecretary,
   authChallenge,
   patient,
   serviceSession,
@@ -208,12 +209,14 @@ describe('codici e password mandati insieme (seconda revisione, punto 5)', () =>
   let h: ReturnType<typeof helpers>;
 
   beforeAll(async () => {
-    // Le soglie più strette ammesse: 3 tentativi, poi un'ora di blocco.
-    s = await createScenario(t.db, {
-      idleLockMinutes: null,
-      maxFailedLogins: 3,
-      failedLoginLockMinutes: 60,
-    });
+    // Soglie strette: 3 password o 3 codici, poi un'ora di blocco. Le attese per provenienza
+    // (D188) sono spente: qui si guarda il conto dell'utente, e le richieste vengono tutte dallo
+    // stesso indirizzo; le attese hanno le loro prove (blocco-tentativi.test.ts).
+    s = await createScenario(
+      t.db,
+      { idleLockMinutes: null, maxFailedLogins: 3, maxFailedCodes: 3, failedLoginLockMinutes: 60 },
+      { loginSources: null },
+    );
     for (const who of ['titolare', 'collega', 'sostituto', 'segreteria'] as const)
       await login(s, who);
     h = helpers(s);
@@ -509,7 +512,7 @@ describe('attese sui blocchi (seconda revisione, problema nuovo 2)', () => {
   let admin: string;
 
   beforeAll(async () => {
-    s = await createScenario(t.db, { idleLockMinutes: null });
+    s = await createScenario(t.db, { idleLockMinutes: null }, { loginSources: null });
     for (const who of ['titolare', 'collega', 'segreteria', 'sostituto'] as const)
       await login(s, who);
     admin = await login(s, 'amministratore');
@@ -866,7 +869,7 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
   const sfx = randomBytes(2).toString('hex');
 
   beforeAll(async () => {
-    s = await createScenario(t.db, { idleLockMinutes: null });
+    s = await createScenario(t.db, { idleLockMinutes: null }, { loginSources: null });
     c.amministratore = await login(s, 'amministratore');
     c.titolare = await login(s, 'titolare');
     c.segreteria = await login(s, 'segreteria');
@@ -899,6 +902,14 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
       `la password del dottor ${surname}`,
     );
     const [own] = await t.db.select().from(archive).where(eq(archive.ownerUserId, id));
+    // Il titolare nuovo conferma la segreteria per il suo archivio (D181): qui si provano gli
+    // stati del titolare, non la conferma della segreteria.
+    const sec = await h.req(
+      cookie,
+      'POST',
+      `/api/studio/utenti/${s.users.segreteria.id}/archivio/conferma`,
+    );
+    expect(sec.statusCode, sec.body).toBe(200);
     return { id, cookie, archiveId: own!.id };
   }
 
@@ -1066,6 +1077,15 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
     expect(created.statusCode, created.body).toBe(201);
     const id = created.json().utente.id as string;
     const [own] = await t.db.select().from(archive).where(eq(archive.ownerUserId, id));
+    // Come se la segreteria fosse già confermata per quell'archivio (D181): qui si prova che
+    // l'archivio di un titolare in attesa resta chiuso ai pazienti nuovi anche per lei.
+    await t.db.insert(archiveSecretary).values({
+      archiveId: own!.id,
+      userId: s.users.segreteria.id,
+      decision: 'confermata',
+      decidedBy: null,
+      decidedAt: new Date(),
+    });
     return { id, archiveId: own!.id };
   }
 
@@ -1301,26 +1321,29 @@ describe('sessione dei servizi durante la correzione del codice fiscale (seconda
       payload: { codice: asked.json().codiceDiProva as string },
     });
     await entered;
-    // L'amministratore corregge il codice fiscale mentre il servizio verifica il codice.
+    // L'amministratore corregge il codice fiscale mentre il servizio verifica il codice, e il
+    // medico conferma la correzione (D181): il codice cambia durante la verifica.
+    const corrected = buildFiscalCode({
+      surname: 'Marchi',
+      name: 'Elena',
+      birthDate: '1971-02-02',
+      sex: 'F',
+      placeCode: 'X001',
+    });
     const fix = await s.app.inject({
       method: 'PATCH',
       url: `/api/studio/utenti/${s.users.titolare.id}`,
       headers: { cookie: admin },
-      payload: {
-        medico: {
-          codiceFiscale: buildFiscalCode({
-            surname: 'Marchi',
-            name: 'Elena',
-            birthDate: '1971-02-02',
-            sex: 'F',
-            placeCode: 'X001',
-          }),
-          nome: 'Elena',
-          cognome: 'Marchi',
-        },
-      },
+      payload: { medico: { codiceFiscale: corrected, nome: 'Elena', cognome: 'Marchi' } },
     });
     expect(fix.statusCode, fix.body).toBe(200);
+    const accepted = await s.app.inject({
+      method: 'POST',
+      url: '/api/profilo/codice-fiscale/conferma',
+      headers: { cookie: doctor },
+      payload: { proposto: corrected },
+    });
+    expect(accepted.statusCode, accepted.body).toBe(200);
     gated.gate = null;
     release();
     expect((await confirming).statusCode).toBe(200);

@@ -2,6 +2,7 @@ import { can, PRINT_LIMITS, type Action } from '@mmg/domain';
 import { and, arrayContains, asc, count, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
+import { LOGIN_SOURCE_LIMITS } from '../auth/login-sources';
 import { FAILED_LOGIN_LOCK_MAX_MINUTES, type Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import {
@@ -37,7 +38,14 @@ type WorkstationRow = typeof workstation.$inferSelect;
 export const STUDIO_LIMITS = {
   /** I requisiti: la sessione si blocca dopo «pochi minuti» di inattività. */
   idleLockMinutes: { min: 1, max: 30 },
-  maxFailedLogins: { min: 3, max: 10 },
+  /**
+   * Password sbagliate prima del blocco del conto: la soglia alta (D188). Sotto 20 il blocco
+   * tornerebbe a tenere fuori un medico con poche password a caso; oltre 100 non sarebbe più un
+   * blocco.
+   */
+  maxFailedLogins: { min: 20, max: 100 },
+  /** Codici sbagliati prima del blocco: i limiti della soglia di prima (D29, D188). */
+  maxFailedCodes: { min: 3, max: 10 },
   /**
    * Al massimo un'ora (prima 1440 minuti): dopo la revisione dei poteri dell'amministratore, un
    * blocco lungo terrebbe fuori un medico per un giorno intero a chi conosce il suo nome utente.
@@ -194,7 +202,14 @@ const securityBody = z
       'Minuti di inattività prima del blocco',
       STUDIO_LIMITS.idleLockMinutes,
     ),
-    tentativiFalliti: integer('Tentativi falliti prima del blocco', STUDIO_LIMITS.maxFailedLogins),
+    tentativiFalliti: integer(
+      'Password sbagliate prima del blocco del conto',
+      STUDIO_LIMITS.maxFailedLogins,
+    ),
+    codiciSbagliati: integer(
+      'Codici sbagliati prima del blocco del conto',
+      STUDIO_LIMITS.maxFailedCodes,
+    ),
     minutiBlocco: integer('Durata del blocco', STUDIO_LIMITS.failedLoginLockMinutes, ' minuti'),
   })
   .strict();
@@ -296,6 +311,7 @@ interface StudioValues {
   intestazione: string[];
   minutiInattivita: number | null;
   tentativiFalliti: number | null;
+  codiciSbagliati: number | null;
   minutiBlocco: number | null;
   secondiAttesa: number;
   cartelleAlGiorno: number | null;
@@ -319,6 +335,7 @@ function valuesOf(s: StudioRow): StudioValues {
     intestazione: headerLinesOf(s.headerText),
     minutiInattivita: s.idleLockMinutes,
     tentativiFalliti: s.maxFailedLogins,
+    codiciSbagliati: s.maxFailedCodes,
     minutiBlocco: s.failedLoginLockMinutes,
     secondiAttesa: s.sendTimeoutSeconds,
     cartelleAlGiorno: s.alertDailyRecords,
@@ -343,6 +360,7 @@ const COLUMNS = {
   intestazione: 'headerText',
   minutiInattivita: 'idleLockMinutes',
   tentativiFalliti: 'maxFailedLogins',
+  codiciSbagliati: 'maxFailedCodes',
   minutiBlocco: 'failedLoginLockMinutes',
   secondiAttesa: 'sendTimeoutSeconds',
   cartelleAlGiorno: 'alertDailyRecords',
@@ -381,8 +399,13 @@ function studioGaps(v: StudioValues): string[] {
     out.push(
       'Indirizzo completo (via e numero civico, CAP, comune, provincia): va sulla copia del certificato INPS per la visita in studio',
     );
-  if (v.minutiInattivita == null || v.tentativiFalliti == null || v.minutiBlocco == null)
-    out.push('Sicurezza dell’accesso: senza tutti e tre i valori il blocco non è attivo');
+  if (
+    v.minutiInattivita == null ||
+    v.tentativiFalliti == null ||
+    v.codiciSbagliati == null ||
+    v.minutiBlocco == null
+  )
+    out.push('Sicurezza dell’accesso: senza tutti i valori il blocco non è attivo');
   return out;
 }
 
@@ -527,6 +550,7 @@ export function createStudioAdminService(deps: AdminDeps) {
       sicurezza: {
         minutiInattivita: v.minutiInattivita,
         tentativiFalliti: v.tentativiFalliti,
+        codiciSbagliati: v.codiciSbagliati,
         minutiBlocco: v.minutiBlocco,
       },
       invii: { secondiAttesa: v.secondiAttesa, avviso: timeoutNotice(v.secondiAttesa) },
@@ -805,6 +829,15 @@ export function createStudioAdminService(deps: AdminDeps) {
         sessione: {
           durataMassimaOre: deps.sessionMaxHours,
           minutiInattivita: s.idleLockMinutes,
+        },
+        // Attese dopo le password sbagliate (D188): valori del servizio, provvisori, da completare.
+        attese: {
+          postazione: LOGIN_SOURCE_LIMITS.workstationFree,
+          indirizzo: LOGIN_SOURCE_LIMITS.addressFree,
+          primaSecondi: LOGIN_SOURCE_LIMITS.firstWaitSeconds,
+          massimaSecondi: LOGIN_SOURCE_LIMITS.maxWaitSeconds,
+          dimenticaDopoOre: LOGIN_SOURCE_LIMITS.forgetAfterHours,
+          daCompletare: true,
         },
         bancheDati: {
           configurato: updates.configured,

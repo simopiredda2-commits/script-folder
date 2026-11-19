@@ -56,6 +56,30 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
       payload: { username, password, postazione: 'postazione-prova' },
     });
 
+  /**
+   * Blocca il conto con cinque codici sbagliati sul passaggio aperto dalla password giusta: la
+   * soglia bassa dello studio (D188). Le password sbagliate bloccano solo alla soglia alta.
+   */
+  async function lockWithCodes(username: string, password: string) {
+    const body = (await access(username, password)).json<{ passaggio: string; segreto?: string }>();
+    const passaggio = body.passaggio;
+    // Il segreto: quello da attivare, quello di un accesso di questa prova o dello scenario.
+    const scenarioUser = Object.values(s.users).find((u) => u.username === username);
+    const secret = body.segreto
+      ? base32Decode(body.segreto)
+      : (secrets.get(username) ?? s.secrets.get(scenarioUser?.id ?? ''));
+    const valid = new Set(
+      secret ? [-30_000, 0, 30_000].map((d) => totp(secret, s.clock.now().getTime() + d)) : [],
+    );
+    const wrong = ['000000', '111111', '222222', '333333', '444444', '555555', '666666'];
+    for (const codice of wrong.filter((c) => !valid.has(c)).slice(0, 5))
+      await s.app.inject({
+        method: 'POST',
+        url: '/api/accesso/codice',
+        payload: { passaggio, codice },
+      });
+  }
+
   /** Accesso completo con una password qualsiasi; il secondo fattore si attiva se serve. */
   async function loginAs(username: string, password: string): Promise<string> {
     const res = await access(username, password);
@@ -276,7 +300,8 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     expect(wrong.statusCode).toBe(400);
     expect(wrong.json().errore).toBe('La password attuale non è corretta');
     const [afterWrong] = await t.db.select().from(appUser).where(eq(appUser.id, u.id));
-    expect(afterWrong!.failedLogins).toBe(1);
+    // A sessione aperta conta fra i codici sbagliati, con la soglia bassa (D188).
+    expect([afterWrong!.failedLogins, afterWrong!.failedCodes]).toEqual([0, 1]);
 
     const ok = await change(u.password, 'una frase lunga e nuova');
     expect(ok.statusCode, ok.body).toBe(200);
@@ -415,6 +440,7 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
       asl: 'ASL di prova',
       nome: 'Luca',
       cognome: 'Verdi',
+      correzioneCodiceFiscale: null,
     });
     expect(u.body.utente.archivio.nome).toBe('Archivio di Luca Verdi');
     const arcs = await t.db.select().from(archive).where(eq(archive.ownerUserId, u.id));
@@ -739,8 +765,7 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     const chosen = 'la password del bloccato';
     await firstAccess(other.username, other.password!, chosen);
     expect((await admin('POST', `/api/studio/utenti/${other.id}/sblocca`)).statusCode).toBe(409);
-    for (let i = 0; i < 5; i++)
-      expect((await access(other.username, 'sbagliata')).statusCode).toBe(401);
+    await lockWithCodes(other.username, chosen);
     expect((await access(other.username, chosen)).json().errore).toMatch(/bloccato/);
     const listed = (await admin('GET', '/api/studio/utenti'))
       .json()
@@ -751,13 +776,16 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     ).toBe(403);
     const r = await admin('POST', `/api/studio/utenti/${other.id}/sblocca`);
     expect(r.statusCode, r.body).toBe(200);
-    expect(r.json().utente).toMatchObject({ bloccatoFinoA: null, tentativiFalliti: 0 });
+    expect(r.json().utente).toMatchObject({
+      bloccatoFinoA: null,
+      tentativiFalliti: 0,
+      codiciSbagliati: 0,
+    });
     expect((await access(other.username, chosen)).statusCode).toBe(200);
 
     // Un medico titolare bloccato: l'amministratore no, lo sblocca il server o la fine del blocco.
     const doctor = s.users.collega;
-    for (let i = 0; i < 5; i++)
-      expect((await access(doctor.username, 'sbagliata')).statusCode).toBe(401);
+    await lockWithCodes(doctor.username, PASSWORD);
     const refused = await admin('POST', `/api/studio/utenti/${doctor.id}/sblocca`);
     expect(refused.statusCode).toBe(403);
     expect(refused.json().errore).toBe(CLINICAL_UNLOCK_REFUSAL);

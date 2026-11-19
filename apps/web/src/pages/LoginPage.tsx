@@ -116,6 +116,11 @@ export function LoginPage() {
             <button type="submit" className="pulsante pulsante-primario" disabled={busy}>
               Continua
             </button>
+            <p>
+              <a href="/ripristino">
+                Password o codice persi, o conto bloccato? Ripristina con SPID o CIE
+              </a>
+            </p>
           </form>
         )}
         {step.kind !== 'password' && (

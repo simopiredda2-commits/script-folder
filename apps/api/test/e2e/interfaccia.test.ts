@@ -22,8 +22,10 @@ import {
 } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  accountLock,
   appointment,
   clinicalEntry,
+  doctorProfile,
   labResultDetail,
   measurementDetail,
   patient,
@@ -962,7 +964,18 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
     // Un problema nuovo, poi annullato con il motivo: resta in elenco, segnato.
     await page.getByLabel('Descrizione').fill('Problema della prova nel browser');
-    await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+    // Il codice si cerca nel catalogo ICD-9-CM per descrizione (D186); la descrizione già scritta resta.
+    await page.getByRole('button', { name: 'Cerca il codice per descrizione' }).click();
+    await page.getByRole('searchbox').fill('ipertensione non specificata');
+    await page.getByRole('button', { name: 'Usa 401.9' }).waitFor();
+    // Accessibilità, bersagli di 44 px e tablet anche con la ricerca aperta e i risultati.
+    await check(page, 'ricerca delle diagnosi', true);
+    await page.getByRole('button', { name: 'Usa 401.9' }).click();
+    await expect(page.getByLabel('Codice ICD-9-CM').inputValue()).resolves.toBe('401.9');
+    await page.getByText('Ipertensione essenziale non specificata').waitFor();
+    await expect(page.getByLabel('Descrizione').inputValue()).resolves.toBe(
+      'Problema della prova nel browser',
+    );
     await page.getByRole('button', { name: 'Registra', exact: true }).click();
     await page.getByText('Voce registrata.').waitFor();
     const item = page.locator('.voce').filter({ hasText: 'Problema della prova nel browser' });
@@ -1337,7 +1350,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     );
   });
 
-  it('AFT: il titolare crea l’AFT e condivide, il collega accetta l’invito e consulta il riepilogo (tappa 12)', async () => {
+  it('AFT: il titolare crea l’AFT e condivide, il collega accetta l’invito e consulta la scheda (tappa 12, D187)', async () => {
     await page.goto(`${base}/strumenti?sezione=aft`);
     await page
       .getByRole('heading', { level: 2, name: 'Aggregazione funzionale territoriale' })
@@ -1347,7 +1360,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('table', { name: 'Medici dell’AFT nel programma' }).waitFor();
     await page
       .getByLabel(
-        'Condivido con i medici dell’AFT il riepilogo dei miei pazienti che hanno dato il consenso',
+        'Condivido con i medici dell’AFT la scheda dei miei pazienti che hanno dato il consenso',
       )
       .check();
     await page.getByLabel('Invita un medico titolare: codice regionale').fill('MMG-PROVA-2');
@@ -1373,21 +1386,28 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await colleague.goto(`${base}/strumenti?sezione=aft`);
       await colleague.getByRole('button', { name: 'Accetta l’invito' }).click();
       await colleague
-        .getByRole('heading', { level: 2, name: 'Riepilogo di un paziente di un collega' })
+        .getByRole('heading', { level: 2, name: 'Scheda di un paziente di un collega' })
         .waitFor();
       await colleague.getByLabel('Codice fiscale del paziente').fill(rich!.fiscalCode);
       await colleague
         .getByLabel('Motivo dell’accesso')
         .fill('Visita nell’ambulatorio serale dell’AFT');
-      await colleague.getByRole('button', { name: 'Mostra il riepilogo' }).click();
+      await colleague.getByRole('button', { name: 'Mostra la scheda' }).click();
       await colleague
-        .getByText('Riepilogo condiviso con il consenso del paziente.', { exact: false })
+        .getByText('Scheda condivisa con il consenso del paziente.', { exact: false })
         .waitFor();
       await colleague.getByText('Sostanza di prova', { exact: false }).first().waitFor();
       await expect(colleague.getByText('Farmaco riservato di prova').count()).resolves.toBe(0);
-      // Si dice che il riepilogo può non essere completo (Garante, par. 5.1).
-      await colleague.getByText('Il riepilogo può non essere completo', { exact: false }).waitFor();
-      await check(colleague, 'AFT del collega, riepilogo', true);
+      // Si dice che la scheda può non essere completa (Garante, par. 5.1).
+      await colleague.getByText('La scheda può non essere completa', { exact: false }).waitFor();
+      // La scheda intera non riservata, sotto il riepilogo (D187).
+      await colleague
+        .getByRole('heading', {
+          level: 4,
+          name: 'Scheda: note di visita, esami, ricette e altre voci',
+        })
+        .waitFor();
+      await check(colleague, 'AFT del collega, scheda', true);
       // L'attività svolta va nel registro di AFT e nella cronologia del medico curante.
       await colleague.getByLabel('Tipologia').selectOption('ambulatorio');
       await colleague.getByLabel('Esito', { exact: true }).fill('Controllo pressorio di prova');
@@ -1762,6 +1782,31 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'cambio della password', true);
   });
 
+  it('blocchi del conto: l’avviso nella cornice porta alla pagina, accessibile; visti, l’avviso sparisce (D188)', async () => {
+    // Un blocco della segreteria, con indirizzi di documentazione (RFC 5737): lo vede il titolare.
+    await t.db.insert(accountLock).values({
+      studioId: s.studioId,
+      userId: s.users.segreteria.id,
+      reason: 'passwords',
+      failures: 50,
+      lockedAt: s.clock.now(),
+      lockedUntil: new Date(s.clock.now().getTime() + 15 * 60_000),
+      addresses: ['192.0.2.10', '192.0.2.11'],
+      workstations: ['pc-fuori'],
+    });
+    await page.goto(base);
+    await page.getByText(/Un blocco del conto dopo troppi tentativi sbagliati/).waitFor();
+    await page.getByRole('link', { name: 'Vedi i blocchi' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Blocchi del conto' }).waitFor();
+    await page.getByText('192.0.2.10, 192.0.2.11').waitFor();
+    await check(page, 'blocchi del conto', true);
+    await page.getByRole('button', { name: 'Segna come visti' }).click();
+    await page.getByText('Nessun blocco da vedere.').waitFor();
+    await page.goto(base);
+    await page.getByText('Controllo di prova').waitFor();
+    expect(await page.getByText(/blocchi? del conto dopo troppi tentativi/).count()).toBe(0);
+  });
+
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {
     // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20. Senza
     // omonimi: il seme cambia a ogni giro, e due «Neri Ada» farebbero cercare la scheda sbagliata.
@@ -1901,5 +1946,45 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('button', { name: 'Sblocca' }).click();
     await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
     await expect(bar.getByRole('link').count()).resolves.toBe(before);
+  });
+
+  // In fondo: cambia la password del sostituto, che le prove prima non usano più.
+  it('ripristino con SPID o CIE senza sessione: nome utente, pagina simulata, password nuova (D189)', async () => {
+    const [profile] = await t.db
+      .select({ cf: doctorProfile.fiscalCode })
+      .from(doctorProfile)
+      .where(eq(doctorProfile.userId, s.users.sostituto.id));
+    const anonymous = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    try {
+      const p = await anonymous.newPage();
+      await p.goto(base);
+      await p.getByRole('link', { name: /Ripristina con SPID o CIE/ }).click();
+      await p.getByRole('heading', { level: 1, name: 'Ripristino con SPID o CIE' }).waitFor();
+      await check(p, 'avvio del ripristino', true);
+      await p.getByLabel('Nome utente').fill(s.users.sostituto.username);
+      await p.getByLabel('Postazione').fill('casa del sostituto');
+      await p.getByRole('button', { name: 'Entra con SPID o CIE' }).click();
+      // La pagina simulata, servita dal programma solo in prova.
+      await p.getByRole('heading', { name: 'Accesso con SPID o CIE simulato' }).waitFor();
+      await p.getByLabel('Codice fiscale di chi entra').fill(profile!.cf!);
+      await p.getByRole('button', { name: 'Entra con SPID (simulato)' }).click();
+      await p.getByText(/Riconosciuto con SPID/).waitFor();
+      await check(p, 'password nuova del ripristino', true);
+      await p.getByLabel('Nuova password', { exact: true }).fill('il sostituto ritrova la sua');
+      await p.getByLabel('Ripeti la nuova password').fill('il sostituto ritrova la sua');
+      await p.getByRole('button', { name: 'Salva la password nuova' }).click();
+      await p.getByText('Credenziali ripristinate: entra con la password nuova.').waitFor();
+      await p.getByRole('link', { name: 'Vai all’accesso' }).click();
+      await p.getByLabel('Nome utente').fill(s.users.sostituto.username);
+      await p.getByLabel('Password').fill('il sostituto ritrova la sua');
+      await p.getByLabel('Postazione').fill('casa del sostituto');
+      await p.getByRole('button', { name: 'Continua' }).click();
+      await p.getByLabel('Codice a 6 cifre').waitFor();
+    } finally {
+      await anonymous.close();
+    }
   });
 });

@@ -6,21 +6,21 @@ Tutto sta in **Strumenti**, una scheda per area. Ognuno vede le schede del suo r
 
 ## Chi vede che cosa
 
-| Scheda                      | Amministratore    | Titolare          | Sostituto         | Segreteria |
-| --------------------------- | ----------------- | ----------------- | ----------------- | ---------- |
-| Dati dello studio           | Modifica          | Legge             | Legge             | —          |
-| Utenti e ruoli              | Modifica          | —                 | —                 | —          |
-| Utenti da confermare        | —                 | Conferma          | —                 | —          |
-| Postazioni e stampa         | Modifica          | La sua postazione | La sua postazione | —          |
-| Elenchi dello studio        | Modifica          | Modifica          | Modifica          | Legge      |
-| Modelli dei certificati     | Modifica          | Modifica          | Modifica          | —          |
-| Impaginazione               | —                 | La sua            | La sua            | —          |
-| Fascicolo sanitario         | Modifica          | Legge             | Legge             | —          |
-| Banche dati                 | «Aggiorna adesso» | Legge             | Legge             | —          |
-| AFT                         | —                 | La sua            | —                 | —          |
-| Importazione                | —                 | Nel suo archivio  | —                 | —          |
-| Registro di amministrazione | Legge             | Legge             | —                 | —          |
-| Stato del servizio          | Legge             | —                 | —                 | —          |
+| Scheda                      | Amministratore    | Titolare          | Sostituto                    | Segreteria |
+| --------------------------- | ----------------- | ----------------- | ---------------------------- | ---------- |
+| Dati dello studio           | Modifica          | Legge             | Legge                        | —          |
+| Utenti e ruoli              | Modifica          | —                 | —                            | —          |
+| Utenti da confermare        | —                 | Conferma          | —                            | —          |
+| Postazioni e stampa         | Modifica          | La sua postazione | La sua postazione            | —          |
+| Elenchi dello studio        | Modifica          | Modifica          | Modifica, mentre sostituisce | Legge      |
+| Modelli dei certificati     | Modifica          | Modifica          | Modifica                     | —          |
+| Impaginazione               | —                 | La sua            | La sua                       | —          |
+| Fascicolo sanitario         | Modifica          | Legge             | Legge                        | —          |
+| Banche dati                 | «Aggiorna adesso» | Legge             | Legge                        | —          |
+| AFT                         | —                 | La sua            | —                            | —          |
+| Importazione                | —                 | Nel suo archivio  | —                            | —          |
+| Registro di amministrazione | Legge             | Legge             | —                            | —          |
+| Stato del servizio          | Legge             | —                 | —                            | —          |
 
 La segreteria vede in Strumenti solo gli elenchi dello studio, in sola lettura: le servono per preparare (D175, che aggiorna D146). La pagina della password è per tutti, dal menu dell'utente.
 
@@ -53,7 +53,20 @@ All'installazione, se davanti al servizio c'è un proxy inverso, il suo indirizz
 - L'amministratore crea gli utenti con uno o più ruoli e, per i medici, nome, cognome, codice fiscale (controllato), codice regionale e ASL. La password temporanea si vede una volta e va consegnata di persona (per medici e segreteria la riceve il titolare che conferma, qui sotto); al primo accesso si cambia prima di ogni altra cosa.
 - Il ruolo di titolare crea l'archivio del medico; togliere un ruolo non cancella nulla.
 - Sospendere, riattivare, sbloccare dopo troppi tentativi: dall'elenco, con conferma (per medici e segreteria con i limiti qui sotto). Nessuno agisce su sé stesso e nessuno cambia i propri ruoli; l'ultimo amministratore attivo non si toglie.
-- Password da 12 a 128 caratteri, diversa dalla precedente e dal nome utente; gli errori sulla password attuale contano come tentativi falliti; il cambio chiude le altre sessioni.
+- Password da 12 a 128 caratteri, diversa dalla precedente e dal nome utente; gli errori sulla password attuale contano come codici sbagliati (qui sotto, D188); il cambio chiude le altre sessioni.
+
+### Ripristino con SPID o CIE (D189)
+
+- Dalla pagina di accesso, «Ripristina con SPID o CIE»: nome utente e postazione, poi SPID o CIE. Se la persona riconosciuta ha il codice fiscale dell'utente, sceglie una password nuova e, se ha perso l'app, azzera il secondo fattore. Il conto si sblocca e tutte le sessioni si chiudono.
+- Vale per medici e segreteria attivi, confermati e non sospesi dal server. Per il medico conta il codice fiscale del suo profilo; la segreteria collega prima la sua identità dal suo profilo («Cambia la password» › «SPID o CIE per il ripristino»), con il codice a 6 cifre di adesso. Gli amministratori no.
+- Nel registro di amministrazione: «Ripristino delle credenziali, dall'utente stesso, con SPID o CIE», e i collegamenti dell'identità.
+- Oggi SPID e CIE sono simulati: in produzione il ripristino resta spento finché il programma non è accreditato come fornitore di servizi (da completare).
+
+### Tentativi sbagliati e blocchi (D188)
+
+- **Attese per provenienza.** Dopo 5 password sbagliate di seguito dalla stessa postazione (a quello stesso indirizzo), o 20 dallo stesso indirizzo, ogni password aspetta: 2 secondi, poi il doppio, fino a 15 minuti. Intanto da lì nessuna password si guarda e chi accede legge «riprova tra …». Una password giusta, o un giorno senza errori, fanno ricominciare da capo. Chi prova da un altro computer non aspetta: il medico entra anche mentre qualcuno, altrove, prova il suo nome utente. Valori provvisori, da completare, nello stato del servizio.
+- **Blocco del conto, due soglie dello studio.** Le password sbagliate bloccano il conto solo alla soglia alta (per difetto 50, da 20 a 100): le sbaglia anche chi conosce solo il nome utente. I codici a 6 cifre sbagliati, all'accesso e allo sblocco della sessione, e la password attuale sbagliata nel cambio bloccano alla soglia di prima (5, da 3 a 10): li sbaglia solo chi ha già la password o una sessione. Il blocco dura 15 minuti (al più 60).
+- **Avviso di ogni blocco** all'utente bloccato e ai medici titolari dello studio, nella cornice, finché ognuno non lo segna come visto nella pagina «Blocchi del conto»: chi, quando, fino a quando, quanti tentativi, da quali indirizzi e postazioni, e che cosa può voler dire. Ogni lettura degli avvisi va nel registro.
 
 ### L'amministratore non si prende l'accesso clinico (D179)
 
@@ -62,11 +75,11 @@ Requisiti, «Utenti e ruoli»: l'amministratore non ha accesso clinico, a meno c
 - **Conferma di un titolare.** Chi ha un ruolo con i dati dei pazienti (medico titolare, medico sostituto, segreteria), creato dall'amministratore o con uno di quei ruoli aggiunto da lui, resta «in attesa di conferma» e non entra. Lo conferma o lo rifiuta un medico titolare attivo dello studio, in **Strumenti › Utenti da confermare**, dopo aver visto ruoli e dati; si conferma solo la richiesta letta. La password temporanea la riceve il titolare, una volta sola, e la consegna di persona: l'amministratore non la vede mai. Il rifiuto sospende l'utente.
 - **Senza un titolare che possa confermare** (studio nuovo, titolari tutti sospesi o in attesa) decide chi gestisce il servizio, sul server, in due passi: `--mostra`, poi `--conferma --richiesta-il DATA` oppure `--rifiuta` (sopra, «Primo avvio»). Nessuna eccezione per il primo titolare.
 - **Nomi e dati senza caratteri nascosti:** nei nomi, nei dati del medico e nei testi dello studio non entrano caratteri di controllo, a capo o invisibili, che sul terminale del server potrebbero far leggere una richiesta diversa da quella vera.
-- **Credenziali di medici e segreteria solo dal server:** password temporanea, azzeramento del secondo fattore, sblocco dopo i tentativi falliti, con `pnpm utente:ripristina` (`--secondo-fattore`, `--sblocca`, `--sospendi`, `--riattiva`); ogni azione va nel registro con «tramite: comando del server». Per gli amministratori si fa da Strumenti. Chi è sospeso o rifiutato dal server si riattiva solo dal server.
+- **Credenziali di medici e segreteria dal server, o da loro stessi con SPID o CIE:** password temporanea, azzeramento del secondo fattore, sblocco dopo i tentativi falliti, con `pnpm utente:ripristina` (`--secondo-fattore`, `--sblocca`, `--sospendi`, `--riattiva`); ogni azione va nel registro con «tramite: comando del server». In più medici e segreteria ripristinano da soli password, secondo fattore e blocco con SPID o CIE (qui sotto, D189). Per gli amministratori si fa da Strumenti. Chi è sospeso o rifiutato dal server si riattiva solo dal server.
 - **Titolari protetti:** l'amministratore non sospende e non toglie il ruolo a un titolare con pazienti, né all'ultimo titolare attivo e confermato, e non aggiunge segreteria o sostituto a un titolare con pazienti; un titolare con pazienti sospeso si riattiva solo dal server, e un titolare in attesa con pazienti non si rifiuta dal programma. Se nell'archivio del medico è in corso una scrittura (per esempio un'importazione), la sospensione risponde dopo al più 2 secondi «riprova tra qualche minuto».
 - **Pazienti nuovi solo negli archivi aperti:** nell'archivio di un titolare sospeso, non più titolare o in attesa di conferma non entrano pazienti, né a mano né con l'importazione; quegli archivi non si propongono nel nuovo paziente, e un titolare in attesa non si sceglie come medico di famiglia.
-- **Codici del medico corretti:** se l'amministratore corregge il codice fiscale o il codice regionale di un medico, le sessioni dei servizi legate a quel codice si chiudono e la risposta lo dice.
-- **Accesso:** il passaggio fra password e codice guarda al più tanti codici quanti i tentativi dello studio, giusti o sbagliati, anche con molte richieste insieme, e non vale per un utente bloccato; un passaggio di attivazione aperto prima non vale dopo l'attivazione; il blocco dura al più 60 minuti; ogni tentativo fallito registra anche l'indirizzo della richiesta (con il proxy in `APP_PROXY_FIDATI`). Con il servizio sovraccarico la risposta è «servizio occupato, riprova» invece di un'attesa senza fine.
+- **Codici del medico corretti:** se l'amministratore corregge il codice regionale di un medico, la sessione del servizio regionale si chiude e la risposta lo dice. Il **codice fiscale** di un medico confermato invece resta quello di prima finché il medico non conferma la correzione dal programma (D181, D184): il medico vede l'avviso, la conferma o la rifiuta in «Recapiti di studio»; alla conferma il codice cambia e le sessioni dei servizi si chiudono. L'amministratore vede la correzione in attesa e la può ritirare. Per chi è ancora in attesa di conferma la correzione vale subito: chi conferma la vede nella richiesta.
+- **Accesso:** il passaggio fra password e codice guarda al più tanti codici quanti i codici sbagliati ammessi dallo studio, giusti o sbagliati, anche con molte richieste insieme, e non vale per un utente bloccato; un passaggio di attivazione aperto prima non vale dopo l'attivazione; il blocco dura al più 60 minuti; ogni tentativo fallito registra anche l'indirizzo della richiesta (con il proxy in `APP_PROXY_FIDATI`). Con il servizio sovraccarico la risposta è «servizio occupato, riprova» invece di un'attesa senza fine.
 
 ## Dati e impostazioni dello studio (D166)
 
@@ -74,13 +87,25 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 
 - **Intestazione dello studio:** vale nei certificati dai modelli quando il medico non ha la sua.
 - **Indirizzo completo:** è il luogo della visita in studio sulla copia INPS.
-- **Sicurezza:** 5 minuti di inattività, 5 tentativi, 15 minuti di blocco (D29); si cambiano qui, entro limiti di buon senso (il blocco al più 60 minuti, perché non tenga fuori un medico per un giorno, D179).
+- **Sicurezza:** 5 minuti di inattività, 50 password sbagliate o 5 codici sbagliati, 15 minuti di blocco (D29, D188); si cambiano qui, entro limiti di buon senso (le password da 20 a 100, i codici da 3 a 10, il blocco al più 60 minuti, perché non tenga fuori un medico per un giorno, D179). Le attese dopo le password sbagliate sono del servizio e si vedono nello stato del servizio.
 - **Tempo di attesa degli invii:** 8 secondi per difetto; la Regione indica 6–8 (D94). Si legge a ogni invio di ricette e certificati.
 - **Soglie degli avvisi sugli accessi anomali** (Garante, linee guida sul dossier sanitario, par. 7, lett. c): vuote, quindi avvisi spenti, finché qualcuno non dà i valori (da completare).
 
+## Segreteria per archivio (D181, D185)
+
+In medicina di gruppo ogni titolare conferma la segreteria per il suo archivio: finché non lo fa, la segreteria non vede i suoi pazienti, nemmeno l'anagrafica.
+
+- Il titolare che conferma la segreteria come utente la conferma anche per il suo archivio. Gli altri titolari la trovano in **Strumenti › Utenti da confermare**, sotto «Segreteria sul tuo archivio»: «Conferma per il mio archivio» o «Non sul mio archivio». Lì vedono anche la segreteria che lavora già sul loro archivio, con «Togli dal mio archivio».
+- Un archivio nuovo, di un titolare nuovo, parte senza segreteria: la conferma il nuovo titolare.
+- Se l'amministratore toglie o ridà il ruolo di segreteria, le conferme di prima non valgono più: ogni titolare decide di nuovo.
+- La conferma dal server (quando nessun titolare può confermare) non dà nessun archivio: lo dà ogni titolare per il suo.
+- In **Utenti e ruoli** l'amministratore vede, per ogni segreteria, archivio per archivio: confermata dal titolare, non ci lavora, da confermare.
+- Ogni decisione si aggiunge e non si cambia; vale l'ultima. Conferme e tolte vanno nel registro delle azioni di amministrazione e nell'esportazione completa dell'archivio.
+- Le segreterie confermate prima di questa regola restano su tutti gli archivi dello studio, come lavoravano (migrazione 0028): ogni titolare le può togliere dal suo.
+
 ## Elenchi dello studio (D175)
 
-Quattro elenchi comuni dello studio, in **Strumenti › Elenchi dello studio**: li scrivono titolare, sostituto e amministratore, li leggono tutti, segreteria compresa. Non contengono dati dei pazienti. Una voce non si cancella: si archivia, perché una terapia o una ricetta può averla usata.
+Quattro elenchi comuni dello studio, in **Strumenti › Elenchi dello studio**: li scrivono i titolari, l'amministratore e il sostituto mentre ha un'autorizzazione attiva su un archivio dello studio (D181); li leggono tutti, segreteria compresa. Non contengono dati dei pazienti. Una voce non si cancella: si archivia, perché una terapia o una ricetta può averla usata.
 
 | Elenco                   | Campi                                                                                        | Dove si usa                                                                         |
 | ------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
@@ -130,17 +155,17 @@ Regole di prescrizione (si cambiano con una versione nuova e la sua fonte: D41, 
 
 Risposte di Simone alla fermata dopo la tappa 15 in D181: quelle sui poteri dell'amministratore, sul blocco, sul codice fiscale del medico e sugli elenchi cambiano il programma e si costruiscono in un blocco nuovo; le altre restano con la scelta di oggi.
 
-- **Elenchi dello studio** (dalla revisione del piano): posologie e pacchetti sono contenuto clinico. Consigliata: li scrivono solo i medici, il sostituto solo con un'autorizzazione attiva; suggeritori e contatti anche l'amministratore. Oggi li scrivono titolare, sostituto e amministratore.
+- **Elenchi dello studio** (dalla revisione del piano): posologie e pacchetti sono contenuto clinico. Risposta di Simone (D181): «solo i medici e l'amministratore». Fatto nella tappa 16: li scrivono i titolari, l'amministratore e il sostituto solo con un'autorizzazione attiva su un archivio dello studio; senza, li legge e il tentativo di scrivere resta nel registro.
 - **Stampa diretta**, senza la finestra di stampa (requisiti, «stampa diretta in studio»): consigliata un'impostazione del browser sulla postazione (modalità chiosco), da provare su un computer dello studio; l'alternativa è un programma da installare, contro «nessuna installazione».
 - **Formato del promemoria:** oggi A4; le «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non sono state trovate (D97).
 - **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?
 - **Poteri dell'amministratore** (D179, dalle revisioni avversarie):
-  - in medicina di gruppo una segreteria confermata da un solo titolare legge gli archivi di tutti: consigliata la conferma per archivio, cioè ogni titolare per il suo (problema 3);
-  - chi conosce il nome utente di un medico lo tiene fuori un'ora alla volta, ripetendo i tentativi sbagliati: consigliati ritardi crescenti per indirizzo e postazione, con il blocco del conto solo oltre una soglia alta, e un avviso di ogni blocco al medico e ai titolari (problema 4, la parte rimasta);
-  - codice fiscale del medico corretto dall'amministratore: oggi si chiudono le sessioni dei servizi; consigliata anche la conferma del medico stesso, perché un codice sbagliato gli impedisce di prescrivere (problema 12);
+  - in medicina di gruppo una segreteria confermata da un solo titolare leggeva gli archivi di tutti: risposta di Simone, la conferma per archivio; fatto nella tappa 16 (D185, problema 3);
+  - chi conosce il nome utente di un medico lo tiene fuori un'ora alla volta, ripetendo i tentativi sbagliati: risposta di Simone, attese crescenti per indirizzo e postazione, blocco del conto solo oltre una soglia alta e un avviso di ogni blocco al medico e ai titolari; fatto nella tappa 16 (D188, problema 4);
+  - codice fiscale del medico corretto dall'amministratore: risposta di Simone, la correzione resta in sospeso finché il medico non la conferma; fatto nella tappa 16 (D184, problema 12);
   - conferma dal server: come chi gestisce il servizio riconosce il medico. Consigliato di persona, con un documento e il codice regionale, annotato fuori dal programma; l'alternativa è il primo accesso con SPID o CIE, dove c'è l'accesso regionale;
   - `--rifiuta` anche per un utente già confermato (torna in attesa, sospeso dal server, con credenziali nuove alla conferma successiva): consigliato sì;
-  - ripristino delle credenziali di medici e segreteria: dal server, come oggi (consigliata), o anche in autonomia con SPID o CIE (D109);
+  - ripristino delle credenziali di medici e segreteria: risposta di Simone, anche in autonomia con SPID o CIE; fatto nella tappa 16 (D189), con SPID e CIE simulati;
   - utenti con i dati dei pazienti creati, o sospesi dal server, prima di questa versione, solo negli ambienti di prova: nessuno è in attesa né segnato (problema 10); consigliato lasciarli come sono;
   - un avviso al titolare quando c'è un utente da confermare, per esempio in «Oggi».
 - **Password:** 12 caratteri, nessuna scadenza, nessuna regola di composizione: c'è una regola da seguire (Garante, AgID, consulente privacy)? La password temporanea deve scadere?

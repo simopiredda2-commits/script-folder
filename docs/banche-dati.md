@@ -10,17 +10,18 @@ sync/banche_dati.py  →  dati-pubblici/correnti/…, stato.json  →  importazi
 
 ## Che cosa si importa
 
-| Tipo                    | Da dove                                            | Come            | Serve per                       |
-| ----------------------- | -------------------------------------------------- | --------------- | ------------------------------- |
-| `farmaci`               | AIFA, anagrafica delle confezioni (CSV)            | file di `sync/` | ricerca farmaci                 |
-| `farmaci_classe`        | AIFA, classe A e H per principio attivo (CSV)      | file di `sync/` | R8, prezzo, equivalenti         |
-| `farmaci_dpc`           | Regione Piemonte, farmaci PHT in DPC (PDF)         | trascrizione    | R5, R7, indicazione DPC         |
-| `comuni`                | ISTAT, elenco dei comuni (XLSX)                    | file di `sync/` | anagrafica, codice fiscale, D12 |
-| `prestazioni`           | Regione Piemonte, catalogo delle prestazioni (PDF) | trascrizione    | ricerca prestazioni, R14        |
-| `esenzioni`             | DPCM LEA e atti regionali (PDF)                    | trascrizione    | R9                              |
-| `esenzioni_prestazioni` | Regione Piemonte, D.D. 1167/2022 (PDF)             | trascrizione    | R17                             |
+| Tipo                    | Da dove                                                             | Come            | Serve per                       |
+| ----------------------- | ------------------------------------------------------------------- | --------------- | ------------------------------- |
+| `farmaci`               | AIFA, anagrafica delle confezioni (CSV)                             | file di `sync/` | ricerca farmaci                 |
+| `farmaci_classe`        | AIFA, classe A e H per principio attivo (CSV)                       | file di `sync/` | R8, prezzo, equivalenti         |
+| `farmaci_dpc`           | Regione Piemonte, farmaci PHT in DPC (PDF)                          | trascrizione    | R5, R7, indicazione DPC         |
+| `comuni`                | ISTAT, elenco dei comuni (XLSX)                                     | file di `sync/` | anagrafica, codice fiscale, D12 |
+| `prestazioni`           | Regione Piemonte, catalogo delle prestazioni (PDF)                  | trascrizione    | ricerca prestazioni, R14        |
+| `esenzioni`             | DPCM LEA e atti regionali (PDF)                                     | trascrizione    | R9                              |
+| `esenzioni_prestazioni` | Regione Piemonte, D.D. 1167/2022 (PDF)                              | trascrizione    | R17                             |
+| `diagnosi`              | Ministero della salute, manuale ICD-9-CM 2007 (PDF) e DM 28/10/2020 | trascrizione    | ricerca delle diagnosi (D186)   |
 
-Non importati per ora: liste di trasparenza, farmaci carenti, registri e piani AIFA, ICD-9-CM e ICD-10-IM. Si aggiungono con un tipo e una mappatura nuovi.
+Non importati per ora: liste di trasparenza, farmaci carenti, registri e piani AIFA, ICD-10-IM. Si aggiungono con un tipo e una mappatura nuovi. Le diagnosi ICD-9-CM: `docs/icd9cm.md`.
 
 ## Lettura dei file
 
@@ -77,7 +78,7 @@ I PDF non si estraggono da soli. Una persona copia i dati in un CSV (UTF-8, sepa
 
 ### Trascrizioni che il programma porta con sé (D159)
 
-`packages/reference/data/trascrizioni/` contiene le trascrizioni degli atti regionali, ed è la cartella delle trascrizioni per difetto (`BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` la sostituiscono). Oggi:
+`packages/reference/data/trascrizioni/` contiene le trascrizioni degli atti regionali e delle diagnosi ICD-9-CM, ed è la cartella delle trascrizioni per difetto (`BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` la sostituiscono). Oggi:
 
 | File (in `piemonte_catalogo/`) | Atto                                     | In vigore dal | Voci in vigore |
 | ------------------------------ | ---------------------------------------- | ------------- | -------------- |
@@ -86,6 +87,39 @@ I PDF non si estraggono da soli. Una persona copia i dati in un CSV (UTF-8, sepa
 | `dd710-2026-dal-2027-01-13`    | D.D. 710/2026, allegato B, modifiche     | 13/01/2027    | 5093           |
 
 Sono estratte in automatico dai PDF e restano **da controllare**. Che cosa è diverso dal PDF e che cosa controllare: `docs/catalogo-regionale.md`.
+
+| File (in `icd9cm/`)              | Atto                                                   | In vigore dal | Voci in vigore |
+| -------------------------------- | ------------------------------------------------------ | ------------- | -------------- |
+| `icd9cm-2007-elenco-sistematico` | versione italiana 2007 della ICD-9-CM (DM 18/12/2008)  | 01/01/2009    | 16293          |
+| `dm-2020-10-28-covid19`          | DM 28/10/2020, integrazioni per la COVID-19, modifiche | 02/02/2021    | 16317          |
+
+Estratte dal manuale da Simone, con un controllo esterno e le correzioni della simulazione del controllo; restano **da controllare** (le controlla la Dr.ssa Rocca). Che cosa è diverso dal PDF e che cosa controllare: `docs/icd9cm.md`.
+
+| File (in `lea/`)               | Atto                                                        | In vigore dal | Voci in vigore |
+| ------------------------------ | ----------------------------------------------------------- | ------------- | -------------- |
+| `allegato-8-malattie-croniche` | DPCM LEA, allegato 8: codici delle malattie croniche (D190) | 30/10/2026    | 247            |
+
+Estratta in automatico dal PDF della pagina del Ministero (versione del 29/9/2026) e **da controllare** (sotto, «Esenzioni del DPCM LEA»).
+
+### Esenzioni del DPCM LEA (D190)
+
+Che cosa c'è nella trascrizione dell'allegato 8:
+
+- i 66 codici della prima parte, uno per condizione (013, 0A31, 0031…), con la descrizione della condizione; 0A02, 0B02 e 0C02, scritti insieme nell'elenco, sono tre codici;
+- i 181 codici della tabella di corrispondenza, uno per malattia ICD9-CM (013.250, 0031.402…), descritti «condizione: malattia» quando le due sono diverse. Le celle che nel PDF vanno a capo, sopra e sotto la riga del codice, sono ricomposte;
+- HIV-2 (p. 6) non è un codice a parte: è 020.042 con il codice aggiuntivo 079.53;
+- il testo è come stampato (anche «cretinina» nella condizione 061), tranne gli spazi dopo una parentesi aperta e il punto e virgola alla fine delle malattie in elenco.
+
+Che cosa controllare: un campione di codici e descrizioni contro il PDF, in particolare le righe ricomposte (colonna `origine`: «prima parte, su più righe»; le malattie di 006, 016, 052, 061 e 068); la data di inizio, oggi il 30/10/2026, da cui in Piemonte valgono le esenzioni 068, 069 e 070.
+
+**Un catalogo parziale non rende «inesistenti» le altre esenzioni.** Il catalogo dice che un codice non esiste solo per le famiglie di codici che contiene: con le sole malattie croniche, un'esenzione per reddito (E…) o per gravidanza (M…) non è inesistente, è non nota, e R9 non la blocca per questo (la blocca solo se non è registrata per il paziente o è scaduta). Le famiglie: i codici che cominciano con una cifra (malattie croniche), quelli con R e una lettera (malattie rare), gli altri per le lettere iniziali.
+
+Che cosa resta fuori, e perché:
+
+- **le prestazioni di ogni esenzione** (terza parte dell'allegato 8): per R17 vale l'elenco regionale, che il SAR usa per bloccare (D.D. 1167/2022). Nella parte nazionale, inoltre, la «visita di controllo» non ha un codice (lo sceglie il medico nel nomenclatore), alcune prestazioni valgono solo in certi casi («limitatamente a…») e alcune condizioni non hanno un elenco («le prestazioni appropriate»): trascritte così, R17 bloccherebbe ricette giuste;
+- **l'allegato 7** (malattie rare, 370 codici): i codici si leggono bene, i nomi no, perché nel PDF si mescolano con le note e con la colonna degli esempi. Serve una fonte strutturata, o un'estrazione controllata come quella dell'ICD-9-CM;
+- **l'allegato 10** (tutela della maternità): elenca le prestazioni per periodo, senza i codici di esenzione da riportare in ricetta;
+- **l'allegato 4D** (note e condizioni di erogabilità): serve con l'allegato 4, il nomenclatore, che dice a quali prestazioni si applica ogni nota.
 
 ### Atti che modificano una tabella (D157)
 
@@ -119,24 +153,26 @@ aggiunge;45.30.1A;45.30.1;ASPORTAZIONE O DEMOLIZIONE DI LESIONE DEL DUODENO IN C
 
 Colonne dei CSV trascritti:
 
-| Tipo                    | Colonne                                                                | Note                                        |
-| ----------------------- | ---------------------------------------------------------------------- | ------------------------------------------- |
-| `farmaci_dpc`           | `principio_attivo;atc;nota_aifa;piano_terapeutico`                     | `piano_terapeutico`: `sì` o `no`            |
-| `prestazioni`           | `codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note` | tariffa scritta all'italiana (`20,66`)      |
-| `esenzioni`             | `codice;descrizione`                                                   | il catalogo completo, non solo le patologie |
-| `esenzioni_prestazioni` | `esenzione;prestazione`                                                | una riga per ogni prestazione associata     |
+| Tipo                    | Colonne                                                                 | Note                                                                                           |
+| ----------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `farmaci_dpc`           | `principio_attivo;atc;nota_aifa;piano_terapeutico`                      | `piano_terapeutico`: `sì` o `no`                                                               |
+| `prestazioni`           | `codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note`  | tariffa scritta all'italiana (`20,66`)                                                         |
+| `esenzioni`             | `codice;descrizione`                                                    | il catalogo completo, non solo le patologie                                                    |
+| `esenzioni_prestazioni` | `esenzione;prestazione`                                                 | una riga per ogni prestazione associata                                                        |
+| `diagnosi`              | `codice;descrizione;codice_padre;termini_inclusi;note;capitolo;sezione` | il padre è il codice senza l'ultima cifra; le altre colonne (pagina, origine) non si importano |
 
 ## Controlli all'importazione
 
-| Controllo                                                                   | Esito                                                                                                     |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Il file in `correnti/` ha l'impronta scritta da `sync/` in `stato.json`     | altrimenti **errore**, non si importa                                                                     |
-| La mappatura ha una colonna per ogni campo obbligatorio                     | altrimenti «da completare», con l'intestazione vera                                                       |
-| Il file ha tutte le colonne della mappatura                                 | altrimenti «colonne mancanti», con quali                                                                  |
-| Ogni valore ha la forma attesa (AIC 9 cifre, codice catastale, ATC, numeri) | altrimenti «righe non valide», con riga, campo e motivo; `--accetta-scarti` importa le righe valide (D61) |
-| Stessa serie e stessa impronta già importate                                | «già importato»: un secondo giro non cambia nulla                                                         |
-| Una versione nuova in attesa di verifica in `sync/`                         | segnalata; resta in uso quella precedente                                                                 |
-| Comuni con un codice catastale che inizia con X                             | avviso: è la lettera dei luoghi inventati (D12, D64)                                                      |
+| Controllo                                                                                             | Esito                                                                                                      |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Il file in `correnti/` ha l'impronta scritta da `sync/` in `stato.json`                               | altrimenti **errore**, non si importa                                                                      |
+| La mappatura ha una colonna per ogni campo obbligatorio                                               | altrimenti «da completare», con l'intestazione vera                                                        |
+| Il file ha tutte le colonne della mappatura                                                           | altrimenti «colonne mancanti», con quali                                                                   |
+| Ogni valore ha la forma attesa (AIC 9 cifre, codice catastale, ATC, numeri)                           | altrimenti «righe non valide», con riga, campo e motivo; `--accetta-scarti` importa le righe valide (D61)  |
+| Diagnosi: ogni codice una volta, il padre è il codice senza l'ultima cifra e c'è (anche dopo un atto) | altrimenti «righe non valide», con la voce e il motivo; `--accetta-scarti` toglie le voci sbagliate (D186) |
+| Stessa serie e stessa impronta già importate                                                          | «già importato»: un secondo giro non cambia nulla                                                          |
+| Una versione nuova in attesa di verifica in `sync/`                                                   | segnalata; resta in uso quella precedente                                                                  |
+| Comuni con un codice catastale che inizia con X                                                       | avviso: è la lettera dei luoghi inventati (D12, D64)                                                       |
 
 Le forme dei codici: AIC di 9 cifre (tutti i 160.101 dell'anagrafica AIFA letta il 18/11/2026; la lista di trasparenza li scrive invece senza lo zero iniziale, a 8 cifre, e per questo non è ancora mappata); codice catastale con una lettera e tre cifre (DM 23/12/1976 e file ISTAT); codice ISTAT di 6 cifre e sigla di due lettere (file ISTAT); ATC con la struttura a livelli lettera, due cifre, lettera, lettera, due cifre (struttura dell'OMS; tutti gli ATC dell'anagrafica AIFA la rispettano).
 
@@ -222,6 +258,8 @@ Servono una sessione; non sono dati dei pazienti, quindi niente registro degli a
 | `GET /api/prestazioni?q=`             | prestazioni per descrizione, branca, codice regionale o nazionale                                                   |
 | `GET /api/esenzioni?q=`               | esenzioni per codice o descrizione                                                                                  |
 | `GET /api/comuni/:codice`             | comune per codice catastale                                                                                         |
+| `GET /api/diagnosi?q=`                | diagnosi ICD-9-CM per parole o codice, con i padri, se è una categoria, quante voci in tutto e le versioni (D186)   |
+| `GET /api/diagnosi/:codice`           | la voce di un codice (con o senza punto); `disponibile: false` se nessun catalogo è in uso                          |
 | `GET /api/banche-dati/aggiornamenti`  | ora e prossimo aggiornamento, giro in corso, ultimo giro con le cose da controllare, ultimi dieci giri              |
 | `POST /api/banche-dati/aggiornamenti` | avvia subito un giro (solo l'amministratore dello studio); 409 se uno è in corso o se il servizio non è configurato |
 

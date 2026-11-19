@@ -1,10 +1,20 @@
 import { SimulatedGateway } from '@mmg/integrations';
+import { rulesetAt } from '@mmg/rules';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { prescription, prescriptionCheck, prescriptionLine, therapy } from '../src/db/schema';
-import { createRulesCheck } from '../src/prescriptions/rules-check';
+import {
+  historicalPrescription,
+  prescription,
+  prescriptionCheck,
+  prescriptionLine,
+  therapy,
+} from '../src/db/schema';
+import { createRulesCheck, studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+
+/** La versione delle regole in vigore oggi: le prove non la scrivono a mano, così una versione nuova non le rompe. */
+const currentRules = () => rulesetAt(studioDate(new Date())).version;
 
 describe('regole di prescrizione prima dell’invio', () => {
   let t: TestDatabase;
@@ -58,13 +68,13 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(res.statusCode).toBe(422);
     const body = res.json();
     expect(body.errore).toMatch(/R2/);
-    expect(body.dettagli.versioneRegole).toBe('2026-11-18.3');
+    expect(body.dettagli.versioneRegole).toBe(currentRules());
     expect(body.dettagli.problemi.some((p: { ruleId: string }) => p.ruleId === 'R2')).toBe(true);
     const [row] = await t.db.select().from(prescription).where(eq(prescription.id, id));
     expect(row!.status).toBe('draft');
     const [c] = await checks(id);
     expect(c!.outcome).toBe('bloccato');
-    expect(c!.rulesVersion).toBe('2026-11-18.3');
+    expect(c!.rulesVersion).toBe(currentRules());
   });
 
   it('R7: la nota AIFA va confermata; la conferma resta registrata con la versione delle regole', async () => {
@@ -83,7 +93,7 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(ok.statusCode, ok.body).toBe(200);
     const [row] = await t.db.select().from(prescription).where(eq(prescription.id, id));
     expect(row!.status).toBe('sent');
-    expect(row!.rulesVersion).toBe('2026-11-18.3');
+    expect(row!.rulesVersion).toBe(currentRules());
     const passed = (await checks(id)).find((c) => c.outcome === 'superato')!;
     expect(passed.confirmedAifaNotes).toEqual([l!.id]);
   });
@@ -129,6 +139,48 @@ describe('regole di prescrizione prima dell’invio', () => {
       expect(p.remedy).toBeTruthy();
     }
     expect(res.json().errore).toMatch(/ — /);
+  });
+
+  it('R11 conta una ricetta fatta con un altro programma e lo dice; quella annullata no (D181)', async () => {
+    const [ther] = await t.db.select().from(therapy).where(eq(therapy.patientId, s.richPatient));
+    await t.db.update(therapy).set({ unitsPerDay: '1' }).where(eq(therapy.id, ther!.id));
+    const fiveDaysAgo = studioDate(new Date(Date.now() - 5 * 86_400_000));
+    const imported = {
+      patientId: s.richPatient,
+      archiveId: s.archives.titolare,
+      kind: 'farmaco',
+      prescribedOn: fiveDaysAgo,
+      drugName: 'Farmaco di prova 5 mg',
+      activeIngredient: 'Principio di prova',
+      quantity: 1,
+      sourceProgram: 'Programma di prova',
+      recordedBy: s.users.titolare.id,
+    };
+    const [wrong] = await t.db
+      .insert(historicalPrescription)
+      .values({ ...imported, annulledAt: new Date(), annulReason: 'Importata per errore' })
+      .returning();
+    expect(wrong).toBeDefined();
+    const line = {
+      therapyId: ther!.id,
+      drugName: 'Farmaco di prova 5 mg',
+      activeIngredient: 'principio di prova',
+      quantity: 1,
+    };
+    const r11Of = async () => {
+      const id = await draft({ kind: 'pharma_ssn', lines: [line] });
+      const preview = await post(`/api/ricette/${id}/controlla`);
+      expect(preview.statusCode, preview.body).toBe(200);
+      const body = preview.json<{ problemi: { ruleId: string; message: string }[] }>();
+      return body.problemi.filter((i) => i.ruleId === 'R11');
+    };
+    // Solo quella annullata: niente da dire.
+    expect(await r11Of()).toEqual([]);
+    await t.db.insert(historicalPrescription).values(imported);
+    const [r11] = await r11Of();
+    expect(r11!.message).toMatch(
+      /^Farmaco di prova 5 mg: la ricetta del \d{2}\/\d{2}\/\d{4}, fatta con un altro programma \(Programma di prova\), copre fino al \d{2}\/\d{2}\/\d{4} compreso$/,
+    );
   });
 
   it('R11: ricetta in anticipo sulla copertura: solo un’informazione, registrata con il controllo', async () => {

@@ -517,7 +517,7 @@ try {
   }
   await page.getByRole('table', { name: 'Medici dell’AFT nel programma' }).waitFor();
   const sharing = page.getByLabel(
-    'Condivido con i medici dell’AFT il riepilogo dei miei pazienti che hanno dato il consenso',
+    'Condivido con i medici dell’AFT la scheda dei miei pazienti che hanno dato il consenso',
   );
   if (!(await sharing.isChecked())) await sharing.check();
   await shot(page, '39-aft', true);
@@ -632,6 +632,50 @@ try {
       .waitFor();
     await shot(page, '55-utenti-da-confermare', true);
   } else console.log('  (schermate dell’amministratore saltate: manca la sua password)');
+
+  // Tappa 16 (D188): un blocco inventato del conto della segreteria, con indirizzi di
+  // documentazione (RFC 5737); il medico titolare vede l'avviso nella cornice e la pagina.
+  const secretaries = await db.execute<{ id: string; studio_id: string }>(sql`
+    select id, studio_id from app_user where 'secretary' = any(roles) order by username limit 1`);
+  const secretary = secretaries.rows[0];
+  if (secretary) {
+    await db.execute(sql`
+      insert into account_lock
+        (studio_id, user_id, reason, failures, locked_at, locked_until, addresses, workstations)
+      values (${secretary.studio_id}, ${secretary.id}, 'passwords', 50, now(),
+        now() + interval '15 minutes', array['192.0.2.10', '192.0.2.11'], array['pc-fuori'])`);
+    await page.goto(base);
+    await page.getByRole('link', { name: 'Vedi i blocchi' }).waitFor();
+    await shot(page, '56-avviso-dei-blocchi');
+    await page.getByRole('link', { name: 'Vedi i blocchi' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Blocchi del conto' }).waitFor();
+    await shot(page, '57-blocchi-del-conto', true);
+  }
+
+  // Tappa 16 (D189): ripristino con SPID o CIE, senza sessione; la pagina di SPID è il simulatore.
+  const doctors = await db.execute<{ fiscal_code: string }>(sql`
+    select p.fiscal_code from app_user u join doctor_profile p on p.user_id = u.id
+    where u.username = ${user}`);
+  const anonymous = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    deviceScaleFactor: 2,
+    locale: 'it-IT',
+  });
+  const anon = await anonymous.newPage();
+  await anon.goto(`${base}/ripristino`);
+  await anon.getByRole('heading', { level: 1, name: 'Ripristino con SPID o CIE' }).waitFor();
+  await shot(anon, '58-ripristino-con-spid-o-cie');
+  const fiscalCode = doctors.rows[0]?.fiscal_code;
+  if (fiscalCode) {
+    await anon.getByLabel('Nome utente').fill(user);
+    await anon.getByLabel('Postazione').fill('Casa');
+    await anon.getByRole('button', { name: 'Entra con SPID o CIE' }).click();
+    await anon.getByLabel('Codice fiscale di chi entra').fill(fiscalCode);
+    await anon.getByRole('button', { name: 'Entra con SPID (simulato)' }).click();
+    await anon.getByText(/Riconosciuto con SPID/).waitFor();
+    await shot(anon, '59-ripristino-password-nuova');
+  }
+  await anonymous.close();
 
   // Più cartelle aperte insieme (D68, D129): una scheda per paziente nella barra sotto il menu,
   // quella attiva in giallo; ogni scheda riporta all'ultima pagina vista di quel paziente.

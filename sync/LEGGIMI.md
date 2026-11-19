@@ -14,6 +14,7 @@ Lo script scarica le banche dati pubbliche che servono all'ambiente di test dell
 | `piemonte_catalogo` | Regione Piemonte: catalogo delle prestazioni, D.D. 710/2026 (PDF) | da confermare al primo giro |
 | `piemonte_esenzioni_prestazioni` | Regione Piemonte: esenzioni e prestazioni associate, D.D. 1167/2022 (PDF) | verificata |
 | `piemonte_bur_osserva` | Bollettino regionale: segnala gli atti nuovi su catalogo, esenzioni, DPC e ricette, senza scaricarli | da confermare al primo giro |
+| `salute_icd9cm` | Ministero della Salute: manuale ICD-9-CM 2007 (PDF) e tabella sintetica dei codici; i dati entrano da una trascrizione controllata (D186) | da confermare al primo giro |
 | `salute_nsis_class` | Ministero della Salute: ICD-10-IM, CIPI e tabelle di transcodifica da ICD-9-CM | da confermare al primo giro |
 | `istat_comuni` | ISTAT: elenco dei comuni (link permanente) | verificata |
 
@@ -22,7 +23,7 @@ Lo script scarica le banche dati pubbliche che servono all'ambiente di test dell
 Restano fuori, perché non sono file da scaricare:
 - la banca dati Farmadati, che è a licenza;
 - AURA, SAR/SAC, Fascicolo sanitario e INPS, che sono servizi con credenziali;
-- le esenzioni e l'ICD-9-CM, per cui non ho trovato un file strutturato ufficiale.
+- le esenzioni, per cui non ho trovato un file strutturato ufficiale (l'ICD-9-CM è nel PDF del manuale: si trascrive, D186).
 
 I dettagli sono in `fonti.json`, alla voce `non_scaricabili`.
 

@@ -17,6 +17,7 @@ import {
   readSyncState,
   readTable,
   sha256,
+  structureProblems,
 } from '@mmg/reference';
 import { and, desc, eq, lt } from 'drizzle-orm';
 import type { Database } from '../db/client';
@@ -203,30 +204,36 @@ async function importRecords(
       notes: [...line.notes, `colonne non trovate: ${out.missingColumns.join('; ')}`],
     };
   }
-  if (out.problems.length && !opts.acceptDiscarded) {
+  // Controlli sull'elenco intero (le diagnosi: codici ripetuti, padri che mancano).
+  const structure = structureProblems(meta.kind, out.records);
+  const problems = [
+    ...out.problems.map((p) => `riga ${p.line}, ${p.field}: ${p.problem}`),
+    ...structure.map((p) => `voce ${p.problem}`),
+  ];
+  if (problems.length && !opts.acceptDiscarded) {
     return {
       ...line,
       outcome: 'righe_non_valide',
       notes: [
         ...line.notes,
-        `${out.problems.length} problemi; il file non è stato importato. Dopo il controllo si può importare con --accetta-scarti`,
-        ...out.problems
-          .slice(0, MAX_LISTED_PROBLEMS)
-          .map((p) => `riga ${p.line}, ${p.field}: ${p.problem}`),
+        `${problems.length} problemi; il file non è stato importato. Dopo il controllo si può importare con --accetta-scarti`,
+        ...problems.slice(0, MAX_LISTED_PROBLEMS),
       ],
     };
   }
-  const discarded = new Set(out.problems.map((p) => p.line)).size;
-  await store(opts, meta, out.records, discarded);
-  const warnings = warningsFor(meta.kind, out.records);
-  const visits = meta.kind === 'prestazioni' ? visitNotes(out.records) : [];
+  const dropped = new Set(structure.map((p) => p.index));
+  const records = out.records.filter((_, i) => !dropped.has(i));
+  const discarded = new Set(out.problems.map((p) => p.line)).size + dropped.size;
+  await store(opts, meta, records, discarded);
+  const warnings = warningsFor(meta.kind, records);
+  const visits = meta.kind === 'prestazioni' ? visitNotes(records) : [];
   const noValue = Object.entries(out.noValue).map(
     ([field, n]) => `${field}: ${n} celle senza valore secondo la mappatura ${mapping.id}`,
   );
   return {
     ...line,
     outcome: 'importato',
-    rows: out.records.length,
+    rows: records.length,
     notes: [
       ...line.notes,
       ...noValue,
@@ -301,28 +308,34 @@ async function importChanges(
   );
   const applied = applyChanges(meta.kind, baseRecords, parsed.changes);
   const problems = [...parsed.problems, ...applied.problems];
-  if (problems.length && !opts.acceptDiscarded) {
+  // L'elenco che risulta dall'atto si controlla come una versione intera.
+  const structure = structureProblems(meta.kind, applied.records);
+  const listed = [
+    ...problems.map((p) => `riga ${p.line}, ${p.field}: ${p.problem}`),
+    ...structure.map((p) => `voce ${p.problem}`),
+  ];
+  if (listed.length && !opts.acceptDiscarded) {
     return {
       ...line,
       outcome: 'righe_non_valide',
       notes: [
         ...line.notes,
-        `${problems.length} problemi; l'atto non è stato applicato. Dopo il controllo si può applicare con --accetta-scarti`,
-        ...problems
-          .slice(0, MAX_LISTED_PROBLEMS)
-          .map((p) => `riga ${p.line}, ${p.field}: ${p.problem}`),
+        `${listed.length} problemi; l'atto non è stato applicato. Dopo il controllo si può applicare con --accetta-scarti`,
+        ...listed.slice(0, MAX_LISTED_PROBLEMS),
       ],
     };
   }
-  await store(opts, meta, applied.records, new Set(problems.map((p) => p.line)).size);
-  const visits = meta.kind === 'prestazioni' ? visitNotes(applied.records) : [];
+  const dropped = new Set(structure.map((p) => p.index));
+  const records = applied.records.filter((_, i) => !dropped.has(i));
+  await store(opts, meta, records, new Set(problems.map((p) => p.line)).size + dropped.size);
+  const visits = meta.kind === 'prestazioni' ? visitNotes(records) : [];
   return {
     ...line,
     outcome: 'importato',
-    rows: applied.records.length,
+    rows: records.length,
     notes: [
       ...line.notes,
-      `modifiche alla versione del ${base.validFrom} (${base.act ?? base.title}): ${applied.added} voci aggiunte, ${applied.replaced} sostituite, ${applied.removed} tolte; ${applied.records.length} voci in tutto`,
+      `modifiche alla versione del ${base.validFrom} (${base.act ?? base.title}): ${applied.added} voci aggiunte, ${applied.replaced} sostituite, ${applied.removed} tolte; ${records.length} voci in tutto`,
       ...visits,
     ],
   };

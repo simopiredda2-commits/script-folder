@@ -33,6 +33,7 @@ import {
   appUser,
   archive,
   archiveGrant,
+  archiveSecretary,
   clinicalEntry,
   historicalPrescription,
   diaryDetail,
@@ -255,6 +256,14 @@ try {
     .insert(archive)
     .values({ studioId: st!.id, ownerUserId: doctorId, name: 'Archivio della Dott.ssa Marchi' })
     .returning();
+  // La segreteria dimostrativa lavora sull'archivio: la titolare l'ha confermata per il suo (D181).
+  await db.insert(archiveSecretary).values({
+    archiveId: arc!.id,
+    userId: users.get('segreteria')!,
+    decision: 'confermata',
+    decidedBy: doctorId,
+    decidedAt: new Date(),
+  });
   // Autorizzazioni dimostrative a giorni interi, come le dà il titolare (tappa 14): una in corso,
   // una scaduta e una revocata, per vedere i tre stati.
   const dayFrom = (n: number) => studioDate(new Date(Date.now() + n * 86_400_000));

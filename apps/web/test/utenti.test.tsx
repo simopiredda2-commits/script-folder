@@ -104,6 +104,7 @@ const row = (over: Record<string, unknown>) => ({
   secondoFattoreAttivo: true,
   bloccatoFinoA: null,
   tentativiFalliti: 0,
+  codiciSbagliati: 0,
   passwordDaCambiare: false,
   passwordCambiataIl: null,
   creatoIl: '2026-11-01T08:00:00Z',

@@ -85,6 +85,20 @@
       "nota": "Indirizzo del numero corrente da verificare. Non scarica nulla: segnala gli atti nuovi da leggere."
     },
     {
+      "id": "salute_icd9cm",
+      "ente": "Ministero della Salute",
+      "titolo": "ICD-9-CM 2007, versione italiana: manuale (indice alfabetico ed elenco sistematico) e tabella sintetica dei codici",
+      "tipo": "pagina",
+      "url": "https://www.salute.gov.it/new/it/tema/assistenza-ospedaliera/il-manuale-icd9cm/",
+      "filtro": "\\.(?:pdf|ods|zip|csv)(?:$|[/?#])",
+      "licenza": "da verificare",
+      "cadenza_alla_fonte": "cambia solo con un decreto (ultima integrazione: DM 28/10/2020, COVID-19); dal 1/1/2027 la sostituisce ICD-10-IM nei sistemi informativi sanitari (DM 23/10/2025)",
+      "alimenta": "diagnosi ICD-9-CM: problemi del paziente e certificati di malattia, dalla trascrizione controllata (D186)",
+      "verificata": false,
+      "nota": "Indirizzo e voci della pagina dagli estratti di un motore di ricerca (18/11/2026): il sito blocca l'ambiente in cloud. Secondo gli estratti la pagina offre anche una «Tabella sintetica dei codici» (ODS e ZIP con CSV): se c'è, è il file strutturato con cui confrontare la trascrizione.",
+      "max_file": 20
+    },
+    {
       "id": "salute_nsis_class",
       "ente": "Ministero della Salute",
       "titolo": "ICD-10-IM e CIPI: elenchi e tabelle di transcodifica da ICD-9-CM",
@@ -129,8 +143,8 @@
     },
     {
       "nome": "ICD-9-CM 2007 (versione italiana)",
-      "perche": "non ho trovato un file strutturato ufficiale; i codici compaiono nelle tabelle di transcodifica del Ministero (fonte salute_nsis_class)",
-      "serve_per": "problemi del paziente"
+      "perche": "il manuale è in PDF (fonte salute_icd9cm): i dati entrano da una trascrizione controllata (D186); la «tabella sintetica dei codici» che la pagina citerebbe è da verificare al primo giro",
+      "serve_per": "problemi del paziente, certificati di malattia"
     }
   ]
 }

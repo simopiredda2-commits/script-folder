@@ -1,7 +1,18 @@
 import { buildFiscalCode } from '@mmg/domain';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { accessLog, allergyDetail, clinicalEntry, doctorProfile, patient } from '../src/db/schema';
+import {
+  accessLog,
+  allergyDetail,
+  archive,
+  clinicalEntry,
+  diaryDetail,
+  doctorProfile,
+  patient,
+  prescription,
+  prescriptionLine,
+  therapy,
+} from '../src/db/schema';
 import { withActor } from '../src/db/tx';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -63,6 +74,70 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
       await tx
         .insert(allergyDetail)
         .values({ entryId: e!.id, substance: 'Sostanza oscurata di prova', drugRelated: false });
+      // Una nota annullata: un errore corretto, non va ai colleghi (D187).
+      const [annulled] = await tx
+        .insert(clinicalEntry)
+        .values({
+          patientId: a.richPatient,
+          kind: 'diary',
+          occurredOn: '2026-11-12',
+          authorUserId: a.users.titolare.id,
+          status: 'annulled',
+          annulledAt: new Date('2026-11-12T10:00:00Z'),
+          annulledBy: a.users.titolare.id,
+          annulReason: 'Paziente sbagliato',
+        })
+        .returning();
+      await tx
+        .insert(diaryDetail)
+        .values({ entryId: annulled!.id, contactType: 'office', text: 'Nota annullata di prova.' });
+      // Ricette inviate: una con una riga di una terapia riservata, una con i dati oscurati.
+      const [arch] = await tx.select().from(archive).where(eq(archive.id, a.archives.titolare));
+      const [reserved] = await tx
+        .select()
+        .from(therapy)
+        .where(
+          and(
+            eq(therapy.patientId, a.richPatient),
+            eq(therapy.drugName, 'Farmaco riservato di prova'),
+          ),
+        );
+      const sent = (obscured: boolean) =>
+        tx
+          .insert(prescription)
+          .values({
+            patientId: a.richPatient,
+            archiveId: arch!.id,
+            kind: 'pharma_ssn',
+            preparedBy: a.users.titolare.id,
+            status: 'sent',
+            sentAt: new Date('2026-11-13T09:00:00Z'),
+            obscured,
+          })
+          .returning();
+      const [mixed] = await sent(false);
+      await tx.insert(prescriptionLine).values([
+        {
+          prescriptionId: mixed!.id,
+          position: 1,
+          drugName: 'Farmaco inviato di prova',
+          quantity: 2,
+        },
+        {
+          prescriptionId: mixed!.id,
+          position: 2,
+          drugName: 'Farmaco riservato di prova',
+          quantity: 1,
+          therapyId: reserved!.id,
+        },
+      ]);
+      const [hidden] = await sent(true);
+      await tx.insert(prescriptionLine).values({
+        prescriptionId: hidden!.id,
+        position: 1,
+        drugName: 'Farmaco con i dati oscurati di prova',
+        quantity: 1,
+      });
     });
   });
   afterAll(async () => {
@@ -198,7 +273,7 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
     // Il medico curante non condivide ancora.
     const notSharing = await consult();
     expect(notSharing.statusCode).toBe(404);
-    expect(notSharing.json<{ errore: string }>().errore).toMatch(/Nessun riepilogo condiviso/);
+    expect(notSharing.json<{ errore: string }>().errore).toMatch(/Nessuna scheda condivisa/);
     expect(await lastLog()).toMatchObject({
       studioId: a.studioId,
       userId: b.users.titolare.id,
@@ -227,7 +302,7 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
     });
   });
 
-  it('con il consenso il collega vede il riepilogo, senza voci riservate e oscurate', async () => {
+  it('con il consenso il collega vede il riepilogo e la scheda, senza voci riservate, oscurate o annullate', async () => {
     const given = await req(
       a,
       cookies.aSegreteria!,
@@ -246,9 +321,13 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
     // le voci del paziente di prova sono tutte precedenti.
     const onlyNew = await consult();
     expect(onlyNew.statusCode, onlyNew.body).toBe(200);
-    expect(onlyNew.json<{ soloDal: string; riepilogo: Record<string, string[]> }>()).toMatchObject({
+    expect(
+      onlyNew.json<{ soloDal: string; riepilogo: Record<string, string[]>; scheda: unknown[] }>(),
+    ).toMatchObject({
       soloDal: '2026-11-18',
       riepilogo: { allergie: [], problemi: [], terapie: [], parametri: [] },
+      // La scheda segue la stessa data: le voci e le ricette di prova sono tutte precedenti.
+      scheda: [],
     });
     const previous = await req(
       a,
@@ -271,6 +350,17 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
     expect(all).toContain('Farmaco di prova 5 mg');
     expect(all).not.toContain('Sostanza oscurata di prova');
     expect(all).not.toContain('Farmaco riservato di prova');
+    // La scheda intera non riservata (D181, D187): diario, voci cliniche, ricette.
+    const sheet = JSON.stringify(res.json<{ scheda: unknown[] }>().scheda);
+    expect(sheet).toContain('Visita di controllo, paziente inventato.');
+    expect(sheet).toContain('Problema di prova');
+    expect(sheet).toContain('Allergia: Sostanza di prova');
+    expect(sheet).toContain('Farmaco inviato di prova × 2');
+    expect(sheet).not.toContain('Nota riservata di prova.');
+    expect(sheet).not.toContain('Sostanza oscurata di prova');
+    expect(sheet).not.toContain('Nota annullata di prova.');
+    expect(sheet).not.toContain('Farmaco riservato di prova');
+    expect(sheet).not.toContain('Farmaco con i dati oscurati di prova');
     // Nemmeno un indizio che qualcosa è oscurato o riservato.
     expect(res.body).not.toMatch(/oscurat|riservat|esclus/i);
     expect(await lastLog()).toMatchObject({ outcome: 'consentito', studioId: a.studioId });

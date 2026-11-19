@@ -73,7 +73,12 @@ interface StudioView {
   dati: Record<string, string | null>;
   indirizzoCompleto: string | null;
   intestazione: string[];
-  sicurezza: { minutiInattivita: number; tentativiFalliti: number; minutiBlocco: number };
+  sicurezza: {
+    minutiInattivita: number;
+    tentativiFalliti: number;
+    codiciSbagliati: number;
+    minutiBlocco: number;
+  };
   invii: { secondiAttesa: number; avviso: string | null };
   avvisi: {
     cartelleAlGiorno: number | null;
@@ -173,7 +178,12 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
       const v = await read(who);
       expect(v.dati.nome).toBe('Studio di prova');
       expect(v.dati.regione).toBe('PIEMONTE');
-      expect(v.sicurezza).toEqual({ minutiInattivita: 5, tentativiFalliti: 5, minutiBlocco: 15 });
+      expect(v.sicurezza).toEqual({
+        minutiInattivita: 5,
+        tentativiFalliti: 50,
+        codiciSbagliati: 5,
+        minutiBlocco: 15,
+      });
       expect(v.invii).toEqual({ secondiAttesa: 8, avviso: null });
       expect([v.puoModificare, v.puoModificareIntestazione]).toEqual([false, false]);
     }
@@ -295,7 +305,7 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
 
   it('limiti di buon senso per sicurezza, attesa e soglie degli avvisi', async () => {
     const res = await put({
-      sicurezza: { minutiInattivita: 0, tentativiFalliti: 2, minutiBlocco: 4 },
+      sicurezza: { minutiInattivita: 0, tentativiFalliti: 19, codiciSbagliati: 2, minutiBlocco: 4 },
       invii: { secondiAttesa: 61 },
       avvisi: {
         cartelleAlGiorno: 0,
@@ -307,7 +317,8 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
     expect(res.statusCode).toBe(400);
     expect(problems(res)).toEqual([
       'Minuti di inattività prima del blocco: un numero intero da 1 a 30',
-      'Tentativi falliti prima del blocco: un numero intero da 3 a 10',
+      'Password sbagliate prima del blocco del conto: un numero intero da 20 a 100',
+      'Codici sbagliati prima del blocco del conto: un numero intero da 3 a 10',
       'Durata del blocco: un numero intero da 5 a 60 minuti',
       'Tempo massimo di attesa degli invii: un numero intero da 1 a 60 secondi',
       'Cartelle diverse aperte da un utente in un giorno: un numero intero da 1 a 10000',
@@ -318,38 +329,87 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
     // Il blocco è un requisito: dal modulo non si spegne.
     expect(
       problems(
-        await put({ sicurezza: { minutiInattivita: null, tentativiFalliti: 5, minutiBlocco: 15 } }),
+        await put({
+          sicurezza: {
+            minutiInattivita: null,
+            tentativiFalliti: 50,
+            codiciSbagliati: 5,
+            minutiBlocco: 15,
+          },
+        }),
       ),
     ).toEqual(['Minuti di inattività prima del blocco: un numero intero da 1 a 30']);
+    // Oltre cento password non è più un blocco.
+    expect(
+      problems(
+        await put({
+          sicurezza: {
+            minutiInattivita: 5,
+            tentativiFalliti: 101,
+            codiciSbagliati: 11,
+            minutiBlocco: 15,
+          },
+        }),
+      ),
+    ).toEqual([
+      'Password sbagliate prima del blocco del conto: un numero intero da 20 a 100',
+      'Codici sbagliati prima del blocco del conto: un numero intero da 3 a 10',
+    ]);
     expect(problems(await put({ invii: { secondiAttesa: 7.5 } }))).toEqual([
       'Tempo massimo di attesa degli invii: un numero intero da 1 a 60 secondi',
     ]);
     // Ai limiti si salva; fuori dai 6–8 secondi della Regione resta un avviso.
     const edge = await put({
-      sicurezza: { minutiInattivita: 30, tentativiFalliti: 10, minutiBlocco: 60 },
+      sicurezza: {
+        minutiInattivita: 30,
+        tentativiFalliti: 100,
+        codiciSbagliati: 10,
+        minutiBlocco: 60,
+      },
       invii: { secondiAttesa: 60 },
     });
     expect(edge.statusCode, edge.body).toBe(200);
     expect(edge.json<StudioView>().invii.avviso).toMatch(/da 6 a 8 secondi/);
     const back = await put({
-      sicurezza: { minutiInattivita: 5, tentativiFalliti: 5, minutiBlocco: 15 },
+      sicurezza: {
+        minutiInattivita: 5,
+        tentativiFalliti: 50,
+        codiciSbagliati: 5,
+        minutiBlocco: 15,
+      },
       invii: { secondiAttesa: 8 },
     });
     expect(back.json<StudioView>().invii.avviso).toBeNull();
-    // Il blocco per tentativi falliti usa i valori nuovi: con 3, al terzo errore l'utente è fermo.
-    await put({ sicurezza: { minutiInattivita: 5, tentativiFalliti: 3, minutiBlocco: 15 } });
-    for (let i = 0; i < 3; i++)
+    // Il blocco per password sbagliate usa i valori nuovi: con 20, alla ventesima l'utente è
+    // fermo. Ognuna da un indirizzo diverso, perché le attese per provenienza non la fermino prima.
+    await put({
+      sicurezza: {
+        minutiInattivita: 5,
+        tentativiFalliti: 20,
+        codiciSbagliati: 5,
+        minutiBlocco: 15,
+      },
+    });
+    for (let i = 0; i < 20; i++)
       await s.app.inject({
         method: 'POST',
         url: '/api/accesso',
         payload: { username: s.users.collega.username, password: 'sbagliata', postazione: 'p' },
+        remoteAddress: `10.20.${i}.1`,
       });
     const [collega] = await t.db
       .select({ lockedUntil: appUser.lockedUntil })
       .from(appUser)
       .where(eq(appUser.id, s.users.collega.id));
     expect(collega!.lockedUntil).not.toBeNull();
-    await put({ sicurezza: { minutiInattivita: 5, tentativiFalliti: 5, minutiBlocco: 15 } });
+    await put({
+      sicurezza: {
+        minutiInattivita: 5,
+        tentativiFalliti: 50,
+        codiciSbagliati: 5,
+        minutiBlocco: 15,
+      },
+    });
   });
 
   it('soglie degli avvisi: vuote vuol dire spente e da completare, con la fonte; la fascia vuole tutte e due le ore', async () => {

@@ -12,11 +12,18 @@ import {
   type FiscalCodeProblem,
   type Role,
 } from '@mmg/domain';
-import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import { closeServiceSessions } from '../credentials/service';
+import {
+  decisionOf,
+  latestSecretaryDecisions,
+  recordSecretaryDecision,
+  resetSecretaryDecisions,
+  type DecisionRow,
+} from './secretary-archives';
 import type { Database } from '../db/client';
 import { isLockTimeout, withLockTimeout } from '../db/locks';
 import {
@@ -79,6 +86,11 @@ export const USER_ACTIONS = [
   'elenco_da_confermare',
   'conferma',
   'rifiuto',
+  /** Ritiro di una correzione del codice fiscale di un medico, prima che lui la confermi (D181). */
+  'ritiro_codice_fiscale',
+  /** Il titolare conferma la segreteria per il suo archivio, o la toglie (D181). */
+  'conferma_archivio',
+  'rifiuto_archivio',
 ] as const;
 export type UserAction = (typeof USER_ACTIONS)[number];
 
@@ -251,6 +263,7 @@ const userColumns = {
   status: appUser.status,
   totpEnabledAt: appUser.totpEnabledAt,
   failedLogins: appUser.failedLogins,
+  failedCodes: appUser.failedCodes,
   lockedUntil: appUser.lockedUntil,
   mustChangePassword: appUser.mustChangePassword,
   passwordChangedAt: appUser.passwordChangedAt,
@@ -266,6 +279,9 @@ const userColumns = {
 const profileColumns = {
   userId: doctorProfile.userId,
   fiscalCode: doctorProfile.fiscalCode,
+  pendingFiscalCode: doctorProfile.pendingFiscalCode,
+  pendingFiscalCodeBy: doctorProfile.pendingFiscalCodeBy,
+  pendingFiscalCodeAt: doctorProfile.pendingFiscalCodeAt,
   regionalCode: doctorProfile.regionalCode,
   asl: doctorProfile.asl,
   firstName: doctorProfile.firstName,
@@ -282,6 +298,7 @@ export interface UserRow {
   status: 'active' | 'suspended';
   totpEnabledAt: Date | null;
   failedLogins: number;
+  failedCodes: number;
   lockedUntil: Date | null;
   mustChangePassword: boolean;
   passwordChangedAt: Date | null;
@@ -298,6 +315,10 @@ export interface UserRow {
 interface ProfileRow {
   userId: string;
   fiscalCode: string | null;
+  /** Correzione proposta dall'amministratore, in attesa del medico (D181). */
+  pendingFiscalCode: string | null;
+  pendingFiscalCodeBy: string | null;
+  pendingFiscalCodeAt: Date | null;
   regionalCode: string | null;
   asl: string | null;
   firstName: string | null;
@@ -380,6 +401,9 @@ interface ViewContext {
   withPatients: Set<string>;
   /** Titolari attivi e confermati dello studio: quelli che possono confermare. */
   confirmers: Set<string>;
+  /** Archivi dello studio e decisioni dei titolari sulla segreteria (D181). */
+  archives: ArchiveRow[];
+  secretaryDecisions: Map<string, DecisionRow>;
 }
 
 function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewContext) {
@@ -394,6 +418,7 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
     secondoFattoreAttivo: u.totpEnabledAt !== null,
     bloccatoFinoA: u.lockedUntil && u.lockedUntil > c.t ? u.lockedUntil.toISOString() : null,
     tentativiFalliti: u.failedLogins,
+    codiciSbagliati: u.failedCodes,
     passwordDaCambiare: u.mustChangePassword,
     passwordCambiataIl: u.passwordChangedAt?.toISOString() ?? null,
     creatoIl: u.createdAt.toISOString(),
@@ -404,6 +429,14 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
           asl: p.asl,
           nome: p.firstName,
           cognome: p.lastName,
+          /** La correzione del codice fiscale in attesa del medico: fino ad allora vale l'altro. */
+          correzioneCodiceFiscale: p.pendingFiscalCode
+            ? {
+                proposto: p.pendingFiscalCode,
+                da: who(p.pendingFiscalCodeBy),
+                il: p.pendingFiscalCodeAt?.toISOString() ?? null,
+              }
+            : null,
         }
       : null,
     archivio: a ? { id: a.id, nome: a.name } : null,
@@ -434,6 +467,21 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
     confermaDalServizio: u.awaitingConfirmation && c.confirmers.size === 0,
     /** Sospeso da chi gestisce il servizio, sul server: dal programma non si riattiva. */
     sospesoDalServizio: u.status === 'suspended' && u.suspendedByService,
+    /**
+     * Per la segreteria, archivio per archivio: confermata dal titolare, tolta, o da confermare
+     * (D181). In medicina di gruppo ogni titolare decide per il suo.
+     */
+    archiviSegreteria: u.roles.includes('secretary')
+      ? c.archives.map((a) => {
+          const d = c.secretaryDecisions.get(`${a.id}:${u.id}`);
+          return {
+            archivio: { id: a.id, nome: a.name },
+            stato: decisionOf(c.secretaryDecisions, a.id, u.id),
+            da: d ? who(d.decidedBy) : null,
+            il: d?.decidedAt.toISOString() ?? null,
+          };
+        })
+      : null,
   };
 }
 
@@ -457,7 +505,14 @@ function pendingView(u: UserRow, p: ProfileRow | null, names: Map<string, string
     },
     /** Alla conferma il titolare riceve la password temporanea da consegnare di persona. */
     passwordAllaConferma: u.confirmationIssuesPassword,
-    medico: p ? { nome: p.firstName, cognome: p.lastName, codiceFiscale: p.fiscalCode } : null,
+    medico: p
+      ? {
+          nome: p.firstName,
+          cognome: p.lastName,
+          codiceFiscale: p.fiscalCode,
+          codiceFiscaleInAttesaDelMedico: p.pendingFiscalCode,
+        }
+      : null,
   };
 }
 
@@ -579,7 +634,7 @@ function ensureOtherActiveAdmin(users: readonly UserRow[], target: UserRow) {
 }
 
 /** Avviso sulle sessioni dei servizi chiuse dopo una correzione dei codici del medico. */
-function servicesNotice(what: string, closed: readonly CredentialService[]): string {
+export function servicesNotice(what: string, closed: readonly CredentialService[]): string {
   const list = closed.map((s) => CREDENTIAL_SERVICE_LABELS[s]).join(' e ');
   return closed.length === 1
     ? `${what} del medico cambiato: chiusa la sua sessione ${list}. Il medico la riattiva da «Credenziali dei servizi».`
@@ -600,10 +655,24 @@ interface DoneDetails {
   richiestaRitirata?: boolean;
   /** Sessioni dei servizi del medico chiuse dopo la correzione dei suoi codici (scelta 4). */
   sessioniServiziChiuse?: CredentialService[];
+  /** Il codice fiscale corretto aspetta la conferma del medico (D181). */
+  codiceFiscaleInAttesaDelMedico?: boolean;
+  /** L'archivio su cui il titolare ha deciso per la segreteria (D181). */
+  archivio?: string;
   /** Per conferme e rifiuti: chi aveva chiesto la conferma, e quando. */
   richiestaDa?: string | null;
   richiestaIl?: string | null;
 }
+
+/** Segreteria e archivi in medicina di gruppo (D181). */
+export const SECRETARY_OWN_ARCHIVE_NOTICE =
+  'La segreteria lavora sul tuo archivio. Sugli archivi degli altri titolari dello studio dopo la loro conferma.';
+export const SECRETARY_ARCHIVES_RESET_NOTICE =
+  'Ruolo di segreteria cambiato: le conferme dei titolari per i loro archivi non valgono più, ognuno la conferma di nuovo per il suo.';
+
+/** Correzione del codice fiscale di un medico fatta dall'amministratore (D181). */
+export const FISCAL_CODE_PENDING_NOTICE =
+  'La correzione del codice fiscale resta in sospeso finché il medico non la conferma dal programma: fino ad allora vale quello di prima, anche per i servizi.';
 
 export function createUserAdminService({ db, now }: { db: Database; now: () => Date }) {
   const logRefusal = (actor: Actor, azione: UserAction, utente: string | null, motivo: string) =>
@@ -714,12 +783,22 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
 
   async function one(actor: Actor, id: string): Promise<UserView> {
     const u = await targetOf(db, actor, id);
+    const archives = await db
+      .select(archiveColumns)
+      .from(archive)
+      .where(eq(archive.studioId, actor.studioId))
+      .orderBy(asc(archive.name));
     return view(u, await profileOf(db, id), await ownArchive(db, actor, id), {
       actorId: actor.userId,
       t: now(),
       names: await studioNames(db, actor.studioId),
       withPatients: await ownersWithPatients(db, actor.studioId, [id]),
       confirmers: await confirmersOf(db, actor.studioId),
+      archives,
+      secretaryDecisions: await latestSecretaryDecisions(db, {
+        archiveIds: archives.map((a) => a.id),
+        userIds: [id],
+      }),
     });
   }
 
@@ -739,6 +818,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       .select({
         userId: doctorProfile.userId,
         fiscalCode: doctorProfile.fiscalCode,
+        pendingFiscalCode: doctorProfile.pendingFiscalCode,
         regionalCode: doctorProfile.regionalCode,
       })
       .from(doctorProfile)
@@ -748,12 +828,15 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           eq(appUser.studioId, actor.studioId),
           or(
             eq(doctorProfile.fiscalCode, d.fiscalCode),
+            // Anche una correzione in attesa di un altro medico (D181): due medici con lo stesso
+            // codice, dopo le due conferme, non devono esserci.
+            eq(doctorProfile.pendingFiscalCode, d.fiscalCode),
             d.regionalCode ? eq(doctorProfile.regionalCode, d.regionalCode) : undefined,
           ),
         ),
       );
     const others = rows.filter((r) => r.userId !== exceptUserId);
-    if (others.some((r) => r.fiscalCode === d.fiscalCode))
+    if (others.some((r) => r.fiscalCode === d.fiscalCode || r.pendingFiscalCode === d.fiscalCode))
       throw new HttpError(409, 'Codice fiscale già di un altro utente dello studio');
     if (d.regionalCode && others.some((r) => r.regionalCode === d.regionalCode))
       throw new HttpError(409, 'Codice regionale già di un altro medico dello studio');
@@ -785,6 +868,11 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       names: new Map(users.map((u) => [u.id, u.displayName])),
       withPatients: await ownersWithPatients(db, actor.studioId),
       confirmers: new Set(users.filter(isActiveConfirmedOwner).map((u) => u.id)),
+      archives,
+      secretaryDecisions: await latestSecretaryDecisions(db, {
+        archiveIds: archives.map((a) => a.id),
+        userIds: users.filter((u) => u.roles.includes('secretary')).map((u) => u.id),
+      }),
     };
     return {
       utenti: users.map((u) =>
@@ -984,8 +1072,32 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           patch.roles = after;
           campi.push('ruoli');
         }
-        const doctorChanges = doctor ? changedDoctorFields(profile ?? undefined, doctor) : [];
+        // Correzione del codice fiscale di un medico confermato che ce l'ha già: resta in sospeso,
+        // e vale quello di prima, finché il medico non la conferma dal programma (D181). Chi è o
+        // va in attesa di conferma non ha ancora lavorato con il suo codice: la correzione vale
+        // subito, e chi conferma la vede nella richiesta. Lo stesso codice di adesso, o di nuovo
+        // quello proposto, non cambia nulla: la correzione si ritira a parte.
+        const willAwait =
+          added.length > 0 || (target.awaitingConfirmation && opensPatientData(after));
+        const cfProposal =
+          doctor &&
+          !willAwait &&
+          profile?.fiscalCode &&
+          doctor.fiscalCode !== profile.fiscalCode &&
+          doctor.fiscalCode !== profile.pendingFiscalCode
+            ? doctor.fiscalCode
+            : null;
+        const written = doctor
+          ? {
+              ...doctor,
+              fiscalCode: willAwait
+                ? doctor.fiscalCode
+                : (profile?.fiscalCode ?? doctor.fiscalCode),
+            }
+          : null;
+        const doctorChanges = written ? changedDoctorFields(profile ?? undefined, written) : [];
         campi.push(...doctorChanges);
+        if (cfProposal) campi.push('medico.codiceFiscale');
         const own = await ownArchive(tx, actor, id);
         // Un titolare senza archivio (dati di prima) lo riceve anche se nient'altro cambia.
         const needsArchive = after.includes('owner_doctor') && !own;
@@ -1017,11 +1129,29 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
 
         if (Object.keys(patch).length > 0)
           await tx.update(appUser).set(patch).where(eq(appUser.id, id));
-        if (doctor && doctorChanges.length > 0)
+        if (
+          written &&
+          (doctorChanges.length > 0 || cfProposal || (willAwait && profile?.pendingFiscalCode))
+        ) {
+          const set = {
+            ...written,
+            ...(cfProposal
+              ? {
+                  pendingFiscalCode: cfProposal,
+                  pendingFiscalCodeBy: actor.userId,
+                  pendingFiscalCodeAt: t,
+                }
+              : {}),
+            // In attesa di conferma il codice scritto vale subito: una correzione di prima decade.
+            ...(willAwait && profile?.pendingFiscalCode
+              ? { pendingFiscalCode: null, pendingFiscalCodeBy: null, pendingFiscalCodeAt: null }
+              : {}),
+          };
           await tx
             .insert(doctorProfile)
-            .values({ userId: id, ...doctor })
-            .onConflictDoUpdate({ target: doctorProfile.userId, set: doctor });
+            .values({ userId: id, ...set })
+            .onConflictDoUpdate({ target: doctorProfile.userId, set });
+        }
         const out: string[] = [];
         if (needsArchive) {
           const name = archiveName(
@@ -1040,6 +1170,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           out.push(`L’archivio «${own.name}» torna al suo titolare.`);
         if (profile && isDoctor(before) && !isDoctor(after))
           out.push('I dati del medico restano registrati: non si cancella nulla.');
+        if (cfProposal) out.push(FISCAL_CODE_PENDING_NOTICE);
 
         // Codici del medico corretti (scelta 4): le sessioni dei servizi legate a quei codici
         // si chiudono. Il codice fiscale vale per tutti e due i servizi (D102, D111), il codice
@@ -1061,6 +1192,18 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
             out.push(
               servicesNotice(cfChanged ? 'Codice fiscale' : 'Codice regionale', servicesClosed),
             );
+        }
+
+        // Il ruolo di segreteria tolto o ridato: le conferme dei titolari per i loro archivi non
+        // valgono più, ognuno decide di nuovo (D181).
+        if (before.includes('secretary') !== after.includes('secretary')) {
+          const reset = await resetSecretaryDecisions(tx, {
+            studioId: actor.studioId,
+            userId: id,
+            by: actor.userId,
+            at: t,
+          });
+          if (reset > 0 && after.includes('secretary')) out.push(SECRETARY_ARCHIVES_RESET_NOTICE);
         }
 
         // Chi va in attesa non lavora più finché non è confermato.
@@ -1093,6 +1236,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           ...(withdrawn ? { richiestaRitirata: true } : {}),
           ...(startsWaiting ? { sessioniChiuse: sessionsClosed } : {}),
           ...(servicesClosed.length > 0 ? { sessioniServiziChiuse: servicesClosed } : {}),
+          ...(cfProposal ? { codiceFiscaleInAttesaDelMedico: true } : {}),
         });
         return out;
       });
@@ -1207,7 +1351,13 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           throw new Refusal(403, CLINICAL_CREDENTIALS_REFUSAL, target.username);
         await tx
           .update(appUser)
-          .set({ passwordHash, mustChangePassword: true, failedLogins: 0, lockedUntil: null })
+          .set({
+            passwordHash,
+            mustChangePassword: true,
+            failedLogins: 0,
+            failedCodes: 0,
+            lockedUntil: null,
+          })
           .where(and(eq(appUser.id, id), eq(appUser.studioId, actor.studioId)));
         const n = await closeSessions(tx, id, now());
         await logDone(tx, actor, {
@@ -1288,11 +1438,11 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
         if (opensPatientData(target.roles))
           throw new Refusal(403, CLINICAL_UNLOCK_REFUSAL, target.username);
         const locked = target.lockedUntil !== null && target.lockedUntil > now();
-        if (!locked && target.failedLogins === 0)
+        if (!locked && target.failedLogins === 0 && target.failedCodes === 0)
           throw new HttpError(409, 'L’utente non è bloccato e non ha tentativi falliti');
         await tx
           .update(appUser)
-          .set({ failedLogins: 0, lockedUntil: null })
+          .set({ failedLogins: 0, failedCodes: 0, lockedUntil: null })
           .where(eq(appUser.id, id));
         await logDone(tx, actor, {
           azione: 'sblocco',
@@ -1337,7 +1487,127 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       utenti: rows.map((u) =>
         pendingView(u, profiles.find((p) => p.userId === u.id) ?? null, names),
       ),
+      ...(await secretariesOfMyArchive(actor)),
     };
+  }
+
+  /**
+   * Le segreterie dello studio, già confermate come utenti, che il titolare non ha ancora
+   * confermato per il suo archivio (D181): finché non lo fa, non lo vedono.
+   */
+  async function secretariesOfMyArchive(actor: Actor) {
+    const mine = await ownArchive(db, actor, actor.userId);
+    if (!mine) return { perArchivio: [], sulMioArchivio: [] };
+    const secretaries = (
+      await db
+        .select(userColumns)
+        .from(appUser)
+        .where(
+          and(
+            eq(appUser.studioId, actor.studioId),
+            eq(appUser.status, 'active'),
+            eq(appUser.awaitingConfirmation, false),
+            sql`'secretary' = any(${appUser.roles})`,
+          ),
+        )
+        .orderBy(asc(appUser.displayName), asc(appUser.username))
+    ).filter((u) => u.id !== actor.userId);
+    const decisions = await latestSecretaryDecisions(db, {
+      archiveIds: [mine.id],
+      userIds: secretaries.map((u) => u.id),
+    });
+    const item = (u: UserRow) => ({
+      id: u.id,
+      nomeUtente: u.username,
+      nome: u.displayName,
+      ruoli: roleList(u.roles),
+      archivio: { id: mine.id, nome: mine.name },
+    });
+    return {
+      // Da confermare per il mio archivio: senza la mia conferma non lo vedono.
+      perArchivio: secretaries
+        .filter((u) => decisionOf(decisions, mine.id, u.id) === 'da_confermare')
+        .map(item),
+      // Lavorano sul mio archivio: le posso togliere.
+      sulMioArchivio: secretaries
+        .filter((u) => decisionOf(decisions, mine.id, u.id) === 'confermata')
+        .map(item),
+    };
+  }
+
+  /**
+   * Il titolare conferma la segreteria per il suo archivio, o la toglie (D181). Vale per una
+   * segreteria attiva e già confermata come utente; chi è in attesa si conferma prima come utente.
+   */
+  async function decideForArchive(actor: Actor, id: string, confirmed: boolean) {
+    const azione: UserAction = confirmed ? 'conferma_archivio' : 'rifiuto_archivio';
+    return guarded(
+      actor,
+      azione,
+      async () => {
+        await withActor(db, actor.userId, async (tx) => {
+          const users = await lockStudioUsers(tx, actor.studioId);
+          const target = users.find((u) => u.id === id);
+          if (!target) throw new HttpError(404, 'Utente non trovato');
+          ensureActiveOwner(users, actor, target);
+          const mine = await ownArchive(tx, actor, actor.userId);
+          if (!mine)
+            throw new Refusal(409, 'Non hai un archivio tuo nello studio', target.username);
+          if (!target.roles.includes('secretary'))
+            throw new Refusal(
+              409,
+              'Solo la segreteria si conferma per un archivio',
+              target.username,
+            );
+          if (target.awaitingConfirmation)
+            throw new Refusal(
+              409,
+              'È in attesa di conferma come utente: prima la si conferma, nell’elenco qui sopra',
+              target.username,
+            );
+          if (confirmed && target.status !== 'active')
+            throw new Refusal(409, SUSPENDED_CONFIRM, target.username);
+          const decisions = await latestSecretaryDecisions(tx, {
+            archiveIds: [mine.id],
+            userIds: [id],
+          });
+          const current = decisionOf(decisions, mine.id, id);
+          if (confirmed ? current === 'confermata' : current === 'rifiutata')
+            throw new HttpError(
+              409,
+              confirmed
+                ? 'È già confermata per il tuo archivio'
+                : 'Non lavora già sul tuo archivio',
+            );
+          const t = now();
+          await recordSecretaryDecision(tx, {
+            archiveId: mine.id,
+            userId: id,
+            decision: confirmed ? 'confermata' : 'rifiutata',
+            by: actor.userId,
+            at: t,
+          });
+          await logDone(tx, actor, {
+            azione,
+            utente: target.username,
+            utenteId: id,
+            ruoliPrima: target.roles,
+            ruoliDopo: target.roles,
+            campi: ['archivio'],
+            archivio: mine.id,
+          });
+        });
+        return {
+          utente: await one(actor, id).catch(() => null),
+          avvisi: [
+            confirmed
+              ? 'Confermata per il tuo archivio: da adesso la segreteria lo vede.'
+              : 'Tolta dal tuo archivio: da adesso la segreteria non lo vede. Gli altri archivi non cambiano.',
+          ],
+        };
+      },
+      requireConfirmer,
+    );
   }
 
   /**
@@ -1390,6 +1660,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
                     passwordHash,
                     mustChangePassword: true,
                     failedLogins: 0,
+                    failedCodes: 0,
                     lockedUntil: null,
                     totpSecretEnc: null,
                     totpEnabledAt: null,
@@ -1399,6 +1670,27 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
             })
             .where(eq(appUser.id, id));
           const n = issues ? await closeSessions(tx, id, t) : 0;
+          // La segreteria lavora sull'archivio del titolare che la conferma; sugli altri archivi
+          // dopo la conferma dei loro titolari (D181).
+          const mine = target.roles.includes('secretary')
+            ? await ownArchive(tx, actor, actor.userId)
+            : null;
+          const alreadyMine =
+            !!mine &&
+            decisionOf(
+              await latestSecretaryDecisions(tx, { archiveIds: [mine.id], userIds: [id] }),
+              mine.id,
+              id,
+            ) === 'confermata';
+          const onMyArchive = !!mine && !alreadyMine;
+          if (onMyArchive)
+            await recordSecretaryDecision(tx, {
+              archiveId: mine.id,
+              userId: id,
+              decision: 'confermata',
+              by: actor.userId,
+              at: t,
+            });
           await logDone(tx, actor, {
             azione: 'conferma',
             utente: target.username,
@@ -1410,15 +1702,16 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
             richiestaIl: target.confirmationRequestedAt?.toISOString() ?? null,
             ...(issues ? { sessioniChiuse: n } : {}),
           });
-          return issues;
+          return { issues, onMyArchive };
         });
         return {
           utente: await pendingOne(actor, id),
-          ...(fresh ? { passwordTemporanea: password } : {}),
+          ...(fresh.issues ? { passwordTemporanea: password } : {}),
           avvisi: [
-            fresh
+            fresh.issues
               ? 'Utente confermato. Consegna di persona la password temporanea: al primo accesso l’utente attiva il secondo fattore e sceglie la sua password.'
               : 'Utente confermato: entra con la sua password e il suo secondo fattore.',
+            ...(fresh.onMyArchive ? [SECRETARY_OWN_ARCHIVE_NOTICE] : []),
           ],
         };
       },
@@ -1492,10 +1785,44 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
     );
   }
 
+  /**
+   * L'amministratore ritira una correzione del codice fiscale che il medico non ha ancora
+   * confermato (D181). Resta il codice di adesso.
+   */
+  async function withdrawFiscalCode(actor: Actor, id: string) {
+    return guarded(actor, 'ritiro_codice_fiscale', async () => {
+      await withActor(db, actor.userId, async (tx) => {
+        const target = await targetOf(tx, actor, id);
+        const [p] = await tx
+          .select({ pending: doctorProfile.pendingFiscalCode })
+          .from(doctorProfile)
+          .where(eq(doctorProfile.userId, id))
+          .for('update');
+        if (!p?.pending)
+          throw new HttpError(409, 'Nessuna correzione del codice fiscale in attesa del medico');
+        await tx
+          .update(doctorProfile)
+          .set({ pendingFiscalCode: null, pendingFiscalCodeBy: null, pendingFiscalCodeAt: null })
+          .where(eq(doctorProfile.userId, id));
+        await logDone(tx, actor, {
+          azione: 'ritiro_codice_fiscale',
+          utente: target.username,
+          utenteId: id,
+          ruoliPrima: target.roles,
+          ruoliDopo: target.roles,
+          campi: ['medico.codiceFiscale'],
+        });
+      });
+      return { utente: await one(actor, id) };
+    });
+  }
+
   return {
     requireAdmin,
     requireConfirmer,
     list,
+    withdrawFiscalCode,
+    decideForArchive,
     create,
     update,
     setStatus,

@@ -13,6 +13,15 @@ interface ServiceStatus {
     ultimoUso: { quando: string; ambiente: string; operazione: string; esito: string } | null;
   }[];
   sessione: { durataMassimaOre: number; minutiInattivita: number | null };
+  /** Attese dopo le password sbagliate (D188): valori del servizio, provvisori. */
+  attese: {
+    postazione: number;
+    indirizzo: number;
+    primaSecondi: number;
+    massimaSecondi: number;
+    dimenticaDopoOre: number;
+    daCompletare: boolean;
+  };
   bancheDati: { configurato: boolean; ora: string | null; prossimoGiro: string | null };
   salvataggi: { nelProgramma: boolean };
 }
@@ -92,6 +101,17 @@ export function ServiceSection() {
               ? 'non attivo'
               : `dopo ${s.sessione.minutiInattivita} minuti`}{' '}
             (in «Dati dello studio»)
+          </dd>
+        </div>
+        <div>
+          <dt>Attese dopo le password sbagliate</dt>
+          <dd>
+            Dopo {s.attese.postazione} password sbagliate di seguito dalla stessa postazione, o{' '}
+            {s.attese.indirizzo} dallo stesso indirizzo, ogni password aspetta: prima{' '}
+            {s.attese.primaSecondi} secondi, poi il doppio, fino a {s.attese.massimaSecondi / 60}{' '}
+            minuti. Una password giusta, o {s.attese.dimenticaDopoOre} ore senza errori, fanno
+            ricominciare da capo.
+            {s.attese.daCompletare && ' Valori provvisori, da completare.'}
           </dd>
         </div>
       </dl>

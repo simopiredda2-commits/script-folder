@@ -26,7 +26,9 @@ interface StudioView {
   intestazione: string[];
   sicurezza: {
     minutiInattivita: number | null;
+    /** Password sbagliate prima del blocco del conto: la soglia alta (D188). */
     tentativiFalliti: number | null;
+    codiciSbagliati: number | null;
     minutiBlocco: number | null;
   };
   invii: { secondiAttesa: number; avviso: string | null };
@@ -42,6 +44,7 @@ interface StudioView {
   limiti: {
     idleLockMinutes: Range;
     maxFailedLogins: Range;
+    maxFailedCodes: Range;
     failedLoginLockMinutes: Range;
     sendTimeoutSeconds: Range;
     alertDailyRecords: Range;
@@ -67,6 +70,7 @@ type Fields = {
   intestazione: string;
   minutiInattivita: string;
   tentativiFalliti: string;
+  codiciSbagliati: string;
   minutiBlocco: string;
   secondiAttesa: string;
   cartelleAlGiorno: string;
@@ -92,6 +96,7 @@ function initial(d: StudioView): Fields {
     intestazione: d.intestazione.join('\n'),
     minutiInattivita: str(d.sicurezza.minutiInattivita),
     tentativiFalliti: str(d.sicurezza.tentativiFalliti),
+    codiciSbagliati: str(d.sicurezza.codiciSbagliati),
     minutiBlocco: str(d.sicurezza.minutiBlocco),
     secondiAttesa: str(d.invii.secondiAttesa),
     cartelleAlGiorno: str(d.avvisi.cartelleAlGiorno),
@@ -203,6 +208,7 @@ function StudioForm({
                 sicurezza: {
                   minutiInattivita: number(f.minutiInattivita),
                   tentativiFalliti: number(f.tentativiFalliti),
+                  codiciSbagliati: number(f.codiciSbagliati),
                   minutiBlocco: number(f.minutiBlocco),
                 },
                 invii: { secondiAttesa: number(f.secondiAttesa) },
@@ -421,11 +427,17 @@ function StudioForm({
             range: l.idleLockMinutes,
             help: `Dopo questi minuti senza attività la sessione si blocca. Da ${l.idleLockMinutes.min} a ${l.idleLockMinutes.max}.`,
           })}
-          {input('tentativiFalliti', 'Tentativi falliti prima del blocco', {
+          {input('tentativiFalliti', 'Password sbagliate prima del blocco del conto', {
             type: 'number',
             required: true,
             range: l.maxFailedLogins,
-            help: `Dopo questi accessi sbagliati di seguito l’utente resta bloccato. Da ${l.maxFailedLogins.min} a ${l.maxFailedLogins.max}.`,
+            help: `Le sbaglia anche chi conosce solo il nome utente: prima del blocco, dopo le prime password sbagliate, la postazione o l’indirizzo da cui arrivano aspettano. Soglia provvisoria, da completare. Da ${l.maxFailedLogins.min} a ${l.maxFailedLogins.max}.`,
+          })}
+          {input('codiciSbagliati', 'Codici sbagliati prima del blocco del conto', {
+            type: 'number',
+            required: true,
+            range: l.maxFailedCodes,
+            help: `Codici a 6 cifre sbagliati all’accesso o allo sblocco, e password attuale sbagliata nel cambio: li sbaglia solo chi ha già la password o una sessione. Da ${l.maxFailedCodes.min} a ${l.maxFailedCodes.max}.`,
           })}
           {input('minutiBlocco', 'Durata del blocco (minuti)', {
             type: 'number',

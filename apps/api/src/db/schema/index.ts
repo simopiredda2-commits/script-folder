@@ -16,3 +16,5 @@ export * from './aft';
 export * from './aft-activity';
 export * from './studio-admin';
 export * from './imports';
+export * from './login-protection';
+export * from './identity';

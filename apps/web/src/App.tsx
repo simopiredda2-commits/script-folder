@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router';
 import { Loading } from './components/common';
 import { Shell } from './components/Shell';
 import { OpenRecordsProvider } from './lib/openRecords';
@@ -12,6 +12,9 @@ import { CertificatesPage } from './pages/CertificatesPage';
 import { ClinicalEntriesPage } from './pages/ClinicalEntriesPage';
 import { DrugHistoryPage, ServiceHistoryPage, TherapyPage } from './pages/HistoryPages';
 import { PrescribedDrugsPage, PrescribedServicesPage } from './pages/PrescribedPages';
+import { IdentityPage } from './pages/IdentityPage';
+import { LocksPage } from './pages/LocksPage';
+import { RecoveryPage } from './pages/RecoveryPage';
 import { LockScreen, LoginPage } from './pages/LoginPage';
 import { MeasurementsPage } from './pages/MeasurementsPage';
 import { PasswordPage } from './pages/PasswordPage';
@@ -35,8 +38,11 @@ import { PatientAdminPage } from './pages/PatientAdminPage';
 /** Le schermate dopo l'accesso. */
 function Screens() {
   const { state } = useSession();
+  const { pathname } = useLocation();
   if (state.status === 'loading') return <Loading what="dati della sessione" />;
-  if (state.status === 'anonymous') return <LoginPage />;
+  // Il ripristino con SPID o CIE (D189) è per chi non riesce a entrare: senza sessione.
+  if (state.status === 'anonymous')
+    return pathname.startsWith('/ripristino') ? <RecoveryPage /> : <LoginPage />;
   if (state.status === 'locked') return <LockScreen />;
   // Password temporanea (tappa 14): prima di ogni altra schermata, la password nuova.
   if (state.me.devoCambiarePassword) return <PasswordPage forced />;
@@ -78,6 +84,8 @@ function Screens() {
           <Route path="/profilo/credenziali" element={<ServiceCredentialsPage />} />
           <Route path="/profilo/recapiti" element={<DoctorContactsPage />} />
           <Route path="/profilo/password" element={<PasswordPage />} />
+          <Route path="/profilo/blocchi" element={<LocksPage />} />
+          <Route path="/profilo/identita" element={<IdentityPage />} />
           <Route path="/strumenti" element={<StudioToolsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

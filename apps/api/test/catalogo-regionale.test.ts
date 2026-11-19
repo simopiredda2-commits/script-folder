@@ -59,8 +59,11 @@ describe('catalogo regionale in vigore, nel database (D159)', () => {
       mappings: loadMappings(),
       importedBy: 'prova',
     });
+  // Nella stessa cartella ci sono anche le diagnosi ICD-9-CM (D186): qui solo il catalogo regionale.
   const outcomes = (report: ImportLine[]) =>
-    report.map((l) => [l.file.replace(/^.*\//, ''), l.outcome]);
+    report
+      .filter((l) => l.file.startsWith('piemonte_catalogo/'))
+      .map((l) => [l.file.replace(/^.*\//, ''), l.outcome]);
   const versions = async () =>
     (
       await t.db
@@ -86,7 +89,9 @@ describe('catalogo regionale in vigore, nel database (D159)', () => {
       ['dd710-2026-dal-2026-10-30.json', 'trascrizione_da_controllare'],
       ['dd710-2026-dal-2027-01-13.json', 'trascrizione_da_controllare'],
     ]);
-    expect(report[0]!.notes.join(' ')).toMatch(/nessuno l'ha ancora controllata/);
+    expect(report.find((l) => l.file.startsWith('piemonte_catalogo/'))!.notes.join(' ')).toMatch(
+      /nessuno l'ha ancora controllata/,
+    );
     expect(await versions()).toEqual([]);
     expect(await search('luteotropina', '2026-11-19')).toEqual([]);
   });

@@ -546,8 +546,9 @@ export async function adminView(
       choices.map((c) => c.c.id),
     ),
   };
-  const { exemptionExists } = await new ReferenceData(db).exemptionLookups(today);
-  const catalog = exemptionExists('') !== undefined;
+  const { exemptionExists, catalogLoaded: catalog } = await new ReferenceData(db).exemptionLookups(
+    today,
+  );
   return {
     paziente: {
       id: p.id,
@@ -578,7 +579,10 @@ export async function adminView(
       daAura: e.source === 'aura',
       importata: imported.exemption.get(e.id) ?? null,
       stato: exemptionState(e, today),
-      /** Nel catalogo delle esenzioni in vigore oggi; null senza catalogo. */
+      /**
+       * Nel catalogo delle esenzioni in vigore oggi; null senza catalogo, o se il catalogo non ha
+       * la famiglia del codice (D190).
+       */
       nelCatalogo: exemptionExists(e.code) ?? null,
     })),
     scelte: choices.map(({ c, doctor }) => ({

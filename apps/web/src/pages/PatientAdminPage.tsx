@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { DiagnosisCodeInfo, DiagnosisSearch } from '../components/DiagnosisSearch';
 import { Icon, type IconName } from '../components/Icon';
 import { api, query, type ApiError } from '../lib/api';
 import { date, dateTime } from '../lib/format';
@@ -127,6 +128,8 @@ interface FieldDef {
   onlyIf?: (v: Partial<Record<AdminKey, string | null>>) => boolean;
   /** Quando il campo compare, propone la data di oggi. */
   today?: boolean;
+  /** Codice ICD-9-CM: con la ricerca nel catalogo e il titolo del codice scritto (D186). */
+  diagnosis?: boolean;
 }
 
 interface Group {
@@ -187,6 +190,7 @@ const GROUPS: Group[] = [
         upper: true,
         onlyIf: deceased,
         help: 'Il codice, per esempio 410.9 o V17.3.',
+        diagnosis: true,
       },
     ],
   },
@@ -414,6 +418,12 @@ function FieldsSection({
                         <p className="aiuto" id={helpId}>
                           {f.help}
                         </p>
+                      )}
+                      {f.diagnosis && (
+                        <>
+                          <DiagnosisCodeInfo code={values[f.key] ?? ''} />
+                          <DiagnosisSearch onPick={(d) => change(f.key, d.code)} />
+                        </>
                       )}
                     </div>
                   );

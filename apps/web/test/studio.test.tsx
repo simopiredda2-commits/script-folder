@@ -8,7 +8,8 @@ import { WorkstationsPanel } from '../src/pages/admin/WorkstationsPanel';
 
 const limits = {
   idleLockMinutes: { min: 1, max: 30 },
-  maxFailedLogins: { min: 3, max: 10 },
+  maxFailedLogins: { min: 20, max: 100 },
+  maxFailedCodes: { min: 3, max: 10 },
   failedLoginLockMinutes: { min: 5, max: 60 },
   sendTimeoutSeconds: { min: 1, max: 60 },
   alertDailyRecords: { min: 1, max: 10000 },
@@ -38,7 +39,7 @@ const studio = (over: Record<string, unknown> = {}) => ({
   ],
   indirizzoCompleto: 'Via di Prova 1, 10100 Comune di prova (TO)',
   intestazione: [],
-  sicurezza: { minutiInattivita: 5, tentativiFalliti: 5, minutiBlocco: 15 },
+  sicurezza: { minutiInattivita: 5, tentativiFalliti: 50, codiciSbagliati: 5, minutiBlocco: 15 },
   invii: { secondiAttesa: 8, avviso: null },
   avvisi: {
     cartelleAlGiorno: null,
@@ -138,7 +139,12 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
           email: null,
           pec: null,
         },
-        sicurezza: { minutiInattivita: 5, tentativiFalliti: 5, minutiBlocco: 15 },
+        sicurezza: {
+          minutiInattivita: 5,
+          tentativiFalliti: 50,
+          codiciSbagliati: 5,
+          minutiBlocco: 15,
+        },
         invii: { secondiAttesa: 8 },
         avvisi: {
           cartelleAlGiorno: null,
@@ -274,6 +280,14 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
             },
           ],
           sessione: { durataMassimaOre: 12, minutiInattivita: 5 },
+          attese: {
+            postazione: 5,
+            indirizzo: 20,
+            primaSecondi: 2,
+            massimaSecondi: 900,
+            dimenticaDopoOre: 24,
+            daCompletare: true,
+          },
           bancheDati: { configurato: false, ora: null, prossimoGiro: null },
           salvataggi: { nelProgramma: false },
         },
@@ -288,6 +302,12 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
     expect(within(table).getByText('Simulatore')).toBeTruthy();
     expect(within(table).getByText(/invio, accettato \(simulatore\)/)).toBeTruthy();
     expect(screen.getByText(/12 ore/)).toBeTruthy();
+    // Le attese dopo le password sbagliate (D188), con i valori provvisori.
+    expect(
+      screen.getByText(
+        /Dopo 5 password sbagliate di seguito dalla stessa postazione, o 20 dallo stesso indirizzo, ogni password aspetta: prima 2 secondi, poi il doppio, fino a 15 minuti\..*Valori provvisori, da completare\./,
+      ),
+    ).toBeTruthy();
     expect(screen.getByText(/il backup lo fa chi gestisce il server/)).toBeTruthy();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();

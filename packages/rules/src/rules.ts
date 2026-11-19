@@ -1,5 +1,5 @@
 import { checkFiscalCode } from '@mmg/domain';
-import type { LineContext, RuleContext } from './context';
+import type { LineContext, RuleContext, SentLineContext } from './context';
 import { addDays, addMonths, daysBetween, italian } from './dates';
 import { value, type Rule, type RuleId } from './ruleset';
 
@@ -32,6 +32,27 @@ const isSsnPharma = (ctx: RuleContext) => ctx.prescription.kind === 'pharma_ssn'
 /** Codici confrontati senza punti né spazi: 89.7 e 897 sono lo stesso codice. */
 const compactCode = (code: string) => code.replace(/[\s.]/g, '').toUpperCase();
 const lineLabel = (l: LineContext) => l.drugName ?? l.drugAic ?? l.serviceCode ?? 'riga';
+
+/** Principio attivo confrontato senza maiuscole né spazi in più: i file di altri programmi variano. */
+const ingredientKey = (v: string | null) => v?.trim().toLowerCase().replace(/\s+/g, ' ') || null;
+
+/**
+ * Le ricette fatte con altri programmi (D176) contano in R6 e R11 dalle versioni delle regole che
+ * lo dicono (D181); prima no, così i controlli di allora restano verificabili.
+ */
+const countsOtherPrograms = (rule: Rule) => value(rule, 'countOtherPrograms') === 1;
+
+/** «fatta con un altro programma», con il nome se il file lo diceva. */
+const otherProgramLabel = (s: SentLineContext) =>
+  s.otherProgram?.name
+    ? `fatta con un altro programma (${s.otherProgram.name})`
+    : 'fatta con un altro programma';
+
+/** La ricetta fatta con un altro programma è dello stesso farmaco della riga: AIC o principio attivo. */
+const sameDrugAs = (line: LineContext, s: SentLineContext) =>
+  (line.drugAic !== null && s.drugAic === line.drugAic) ||
+  (ingredientKey(line.activeIngredient) !== null &&
+    ingredientKey(s.activeIngredient) === ingredientKey(line.activeIngredient));
 
 function validExemption(ctx: RuleContext, code: string | null) {
   if (!code) return undefined;
@@ -181,26 +202,39 @@ const evaluators: Record<RuleId, Evaluator> = {
 
   R6: (rule, ctx) => {
     const issues: Issue[] = [];
+    const withOthers = countsOtherPrograms(rule);
     for (const line of ctx.prescription.lines) {
       const { valid } = planFor(ctx, line);
       if (!valid || valid.packsAuthorized === null) continue;
-      const used = ctx.sentLines
-        .filter(
-          (s) =>
-            s.sentOn >= valid.grantedOn &&
-            s.sentOn <= valid.expiresOn &&
-            ((line.therapy && s.therapyId === line.therapy.id) ||
+      const inPlan = ctx.sentLines.filter(
+        (s) =>
+          s.sentOn >= valid.grantedOn &&
+          s.sentOn <= valid.expiresOn &&
+          (s.otherProgram
+            ? withOthers && sameDrugAs(line, s)
+            : (line.therapy && s.therapyId === line.therapy.id) ||
               (line.drugAic !== null && s.drugAic === line.drugAic) ||
               (line.activeIngredient !== null && s.activeIngredient === line.activeIngredient)),
-        )
-        .reduce((n, s) => n + s.quantity, 0);
+      );
+      const counted = inPlan.filter((s) => s.quantity !== null);
+      const used = counted.reduce((n, s) => n + s.quantity!, 0);
+      const fromOthers = counted.filter((s) => s.otherProgram).reduce((n, s) => n + s.quantity!, 0);
       const residual = valid.packsAuthorized - used;
       if (line.quantity > residual) {
+        const others = fromOthers > 0 ? `, di cui ${fromOthers} con un altro programma` : '';
         issues.push({
           ruleId: 'R6',
           severity: severityOf(rule),
           lineId: line.id,
-          message: `${lineLabel(line)}: il piano autorizza ${valid.packsAuthorized} confezioni, già prescritte ${used}; residuo ${Math.max(residual, 0)}`,
+          message: `${lineLabel(line)}: il piano autorizza ${valid.packsAuthorized} confezioni, già prescritte ${used}${others}; residuo ${Math.max(residual, 0)}`,
+        });
+      }
+      for (const s of inPlan.filter((x) => x.quantity === null)) {
+        issues.push({
+          ruleId: 'R6',
+          severity: 'info',
+          lineId: line.id,
+          message: `${lineLabel(line)}: la ricetta del ${italian(s.sentOn)} ${otherProgramLabel(s)} non dice quante confezioni: il residuo del piano non la conta`,
         });
       }
     }
@@ -341,11 +375,32 @@ const evaluators: Record<RuleId, Evaluator> = {
       const t = line.therapy;
       const unitsPerPack = ctx.drugFacts(line.drugAic)?.unitsPerPack;
       if (!t || t.kind !== 'chronic' || !t.unitsPerDay || !unitsPerPack) continue;
-      const last = ctx.sentLines
-        .filter((s) => s.therapyId === t.id && s.sentOn <= ctx.date)
+      // Le ricette di questo programma per la terapia; dalle versioni che lo dicono anche quelle
+      // fatte con altri programmi per lo stesso farmaco, che non sono collegate alla terapia.
+      const before = ctx.sentLines.filter(
+        (s) =>
+          s.sentOn <= ctx.date &&
+          (s.otherProgram
+            ? countsOtherPrograms(rule) && sameDrugAs(line, s)
+            : s.therapyId === t.id),
+      );
+      const last = before
+        .filter((s) => s.quantity !== null)
         .sort((a, b) => b.sentOn.localeCompare(a.sentOn))[0];
+      // Una ricetta fatta con un altro programma più recente, senza il numero di confezioni: non
+      // si sa che cosa copre, e lo si dice.
+      for (const s of before.filter(
+        (x) => x.quantity === null && (!last || x.sentOn > last.sentOn),
+      )) {
+        issues.push({
+          ruleId: 'R11',
+          severity: 'info',
+          lineId: line.id,
+          message: `${lineLabel(line)}: la ricetta del ${italian(s.sentOn)} ${otherProgramLabel(s)} non dice quante confezioni: il contatore non la conta`,
+        });
+      }
       if (!last) continue;
-      const coverageDays = (unitsPerPack * last.quantity) / t.unitsPerDay;
+      const coverageDays = (unitsPerPack * last.quantity!) / t.unitsPerDay;
       const elapsed = daysBetween(last.sentOn, ctx.date);
       if (elapsed >= coverageDays * threshold) continue;
       const until = addDays(last.sentOn, Math.ceil(coverageDays) - 1);
@@ -353,7 +408,8 @@ const evaluators: Record<RuleId, Evaluator> = {
       // «Avvisa»: serve un motivo per procedere. «Informa» (scelta della seconda fermata): solo
       // l'informazione; un motivo scritto resta comunque registrato.
       const asksReason = severityOf(rule) === 'warn' && !reason;
-      const coverage = `la ricetta del ${italian(last.sentOn)} copre fino al ${italian(until)} compreso`;
+      const made = last.otherProgram ? `, ${otherProgramLabel(last)},` : '';
+      const coverage = `la ricetta del ${italian(last.sentOn)}${made} copre fino al ${italian(until)} compreso`;
       issues.push({
         ruleId: 'R11',
         severity: asksReason ? 'warn' : 'info',

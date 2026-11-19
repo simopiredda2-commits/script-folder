@@ -202,6 +202,15 @@ export const STUDIO_ACTION_ROLES: Partial<Record<Action, readonly Role[]>> = {
   'studio.confirm_users': ['owner_doctor'],
 };
 
+/**
+ * Ruoli che per un'azione sullo studio vogliono anche un'autorizzazione attiva su un archivio
+ * dello studio (D181): il sostituto scrive gli elenchi dello studio solo mentre sostituisce un
+ * titolare. Le autorizzazioni da guardare le passa chi chiama, tutte e solo dello studio.
+ */
+export const STUDIO_ACTION_GRANT_ROLES: Partial<Record<Action, readonly Role[]>> = {
+  'studio.lists': ['substitute_doctor'],
+};
+
 export type GrantKind = 'substitution' | 'group_colleague';
 
 /** Autorizzazione di un medico su un archivio non suo. */
@@ -226,6 +235,11 @@ export interface AccessContext {
   grants?: readonly ArchiveGrant[];
   /** Impostazioni dell'archivio decise dal titolare (D30). Assenti = spente. */
   settings?: { secretaryCanReadDiary: boolean; secretaryCanReadSummary?: boolean };
+  /**
+   * Segreterie confermate dal titolare per questo archivio (D181): in medicina di gruppo ogni
+   * titolare conferma la segreteria per il suo. Assenti = nessuna.
+   */
+  secretaries?: readonly string[];
   /** Risorsa toccata, quando conta. */
   resource?: { reserved?: boolean; therapyKind?: 'chronic' | 'as_needed' | 'cycle' };
   now?: Date;
@@ -260,9 +274,19 @@ export function can(actor: Actor, action: Action, ctx: AccessContext = {}): Deci
   const studioRoles = STUDIO_ACTION_ROLES[action];
   if (studioRoles) {
     if (ctx.archive) return deny('Azione sullo studio, non su un archivio');
-    return actor.roles.some((r) => studioRoles.includes(r))
-      ? allow('Ruolo previsto per questa azione dello studio')
-      : deny('Azione non prevista per il tuo ruolo');
+    const roles = actor.roles.filter((r) => studioRoles.includes(r));
+    if (roles.length === 0) return deny('Azione non prevista per il tuo ruolo');
+    const grantRoles = STUDIO_ACTION_GRANT_ROLES[action] ?? [];
+    if (roles.some((r) => !grantRoles.includes(r)))
+      return allow('Ruolo previsto per questa azione dello studio');
+    const now = ctx.now ?? new Date();
+    const active = ctx.grants?.some(
+      (g) =>
+        g.granteeUserId === actor.userId && !g.revokedAt && g.validFrom <= now && now <= g.validTo,
+    );
+    return active
+      ? allow('Autorizzazione attiva su un archivio dello studio')
+      : deny('Serve un’autorizzazione attiva su un archivio dello studio');
   }
   if (ADMINISTRATOR.includes(action)) {
     if (ctx.archive) return deny('Le azioni di amministrazione non riguardano un archivio');
@@ -308,7 +332,11 @@ export function can(actor: Actor, action: Action, ctx: AccessContext = {}): Deci
   }
 
   if (actor.roles.includes('secretary')) {
-    if (action === 'clinical.diary.read') {
+    if (!ctx.secretaries?.includes(actor.userId)) {
+      candidates.push(
+        deny('La segreteria lavora su questo archivio dopo la conferma del suo titolare'),
+      );
+    } else if (action === 'clinical.diary.read') {
       candidates.push(
         ctx.settings?.secretaryCanReadDiary
           ? allow('Il titolare consente alla segreteria di leggere il diario')

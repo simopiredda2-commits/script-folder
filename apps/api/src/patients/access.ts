@@ -4,12 +4,15 @@ import { logAccess, type AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import { archive, archiveGrant, patient, studio } from '../db/schema';
+import { confirmedSecretaries } from '../admin/secretary-archives';
 import { HttpError } from '../http/errors';
 
 export interface ArchiveContext {
   archive: { id: string; studioId: string; ownerUserId: string };
   grants: ArchiveGrant[];
   settings: { secretaryCanReadDiary: boolean; secretaryCanReadSummary: boolean };
+  /** Segreterie confermate dal titolare per questo archivio (D181). */
+  secretaries: string[];
 }
 
 export async function loadArchiveContext(db: Database, archiveId: string): Promise<ArchiveContext> {
@@ -34,7 +37,29 @@ export async function loadArchiveContext(db: Database, archiveId: string): Promi
       secretaryCanReadDiary: a.archive.secretaryCanReadDiary,
       secretaryCanReadSummary: a.archive.secretaryCanReadSummary,
     },
+    secretaries: await confirmedSecretaries(db, archiveId),
   };
+}
+
+/**
+ * Le autorizzazioni di un medico sugli archivi del suo studio, per le azioni sullo studio che le
+ * vogliono (D181: il sostituto scrive gli elenchi dello studio solo mentre sostituisce). Tutte,
+ * anche scadute o revocate: quali valgono adesso lo decide `can()`.
+ */
+export async function studioGrantsOf(db: Database, actor: Actor): Promise<ArchiveGrant[]> {
+  const rows = await db
+    .select({ g: archiveGrant })
+    .from(archiveGrant)
+    .innerJoin(archive, eq(archive.id, archiveGrant.archiveId))
+    .where(and(eq(archiveGrant.granteeUserId, actor.userId), eq(archive.studioId, actor.studioId)));
+  return rows.map(({ g }) => ({
+    archiveId: g.archiveId,
+    granteeUserId: g.granteeUserId,
+    kind: g.kind,
+    validFrom: g.validFrom,
+    validTo: g.validTo,
+    revokedAt: g.revokedAt,
+  }));
 }
 
 /**

@@ -210,7 +210,9 @@ describe('Strumenti › Elenchi dello studio (tappa 14)', () => {
     expect(within(table).queryByRole('button')).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Nuova posologia' })).toBeNull();
     expect(
-      screen.getByText(/li aggiornano i medici e l’amministratore: qui si consultano/),
+      screen.getByText(
+        /li aggiornano i medici titolari, l’amministratore e il sostituto\s+mentre sostituisce: qui si consultano/,
+      ),
     ).toBeTruthy();
   });
 

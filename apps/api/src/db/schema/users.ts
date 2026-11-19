@@ -1,5 +1,6 @@
 import {
   bigint,
+  bigserial,
   boolean,
   customType,
   index,
@@ -44,7 +45,17 @@ export const appUser = pgTable(
     totpEnabledAt: timestamp({ withTimezone: true }),
     /** Ultimo intervallo TOTP usato: lo stesso codice non vale due volte. */
     totpLastStep: bigint({ mode: 'number' }),
+    /**
+     * Password sbagliate di seguito all'accesso: le sbaglia anche chi conosce solo il nome utente,
+     * quindi il conto si blocca solo alla soglia alta dello studio (D188).
+     */
     failedLogins: integer().notNull().default(0),
+    /**
+     * Codici a 6 cifre sbagliati di seguito (all'accesso e allo sblocco della sessione) e password
+     * attuali sbagliate nel cambio della password: li sbaglia solo chi ha già la password o una
+     * sessione, e il conto si blocca alla soglia bassa dello studio (D188).
+     */
+    failedCodes: integer().notNull().default(0),
     lockedUntil: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /**
@@ -81,6 +92,14 @@ export const appUser = pgTable(
      * dell'amministratore, problema 7).
      */
     suspendedByService: boolean().notNull().default(false),
+    /**
+     * Identità digitale collegata dall'utente stesso (D189): il codice fiscale che SPID o CIE
+     * hanno riconosciuto, a sessione aperta e con il codice a 6 cifre. Serve a chi non ha un
+     * profilo di medico (la segreteria) per ripristinare da sé le credenziali; per il medico vale
+     * il codice fiscale del suo profilo. L'amministratore non lo scrive.
+     */
+    identityFiscalCode: text(),
+    identityLinkedAt: timestamp({ withTimezone: true }),
   },
   (t) => [uniqueIndex('app_user_username_key').on(t.username)],
 );
@@ -96,6 +115,13 @@ export const doctorProfile = pgTable('doctor_profile', {
   regionalCode: text(),
   /** Codice fiscale del medico: va sul promemoria (DM 2 novembre 2011, allegato 2, campo 20). */
   fiscalCode: text(),
+  /**
+   * Correzione del codice fiscale proposta dall'amministratore (D181): resta in sospeso, e vale
+   * quello di prima, finché il medico non la conferma dal programma.
+   */
+  pendingFiscalCode: text(),
+  pendingFiscalCodeBy: uuid().references(() => appUser.id),
+  pendingFiscalCodeAt: timestamp({ withTimezone: true }),
   asl: text(),
   headerText: text(),
   stampText: text(),
@@ -157,6 +183,36 @@ export const archiveGrant = pgTable('archive_grant', {
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   revokedAt: timestamp({ withTimezone: true }),
 });
+
+export const secretaryArchiveDecision = pgEnum('secretary_archive_decision', [
+  'confermata',
+  'rifiutata',
+  'da_confermare',
+]);
+
+/**
+ * Segreteria e archivio (D181): in medicina di gruppo ogni titolare conferma la segreteria per il
+ * suo archivio. Ogni riga è una decisione e non si cambia: vale l'ultima. Senza righe, o con
+ * l'ultima «da confermare» (per esempio quando il ruolo di segreteria torna), la segreteria non
+ * vede l'archivio finché il titolare non la conferma. `decidedBy` è vuoto per le decisioni prese
+ * fuori dal programma (la migrazione che ha introdotto la regola).
+ */
+export const archiveSecretary = pgTable(
+  'archive_secretary',
+  {
+    seq: bigserial({ mode: 'number' }).primaryKey(),
+    archiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
+    userId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    decision: secretaryArchiveDecision().notNull(),
+    decidedBy: uuid().references(() => appUser.id),
+    decidedAt: timestamp({ withTimezone: true }).notNull(),
+  },
+  (t) => [index().on(t.archiveId, t.userId, t.seq)],
+);
 
 /** Sessione di lavoro su una postazione. Il token è conservato solo come impronta. */
 export const session = pgTable(

@@ -6,6 +6,7 @@ import { patientIdOf, recordLabel, useOpenRecords, MAX_OPEN_RECORDS } from '../l
 import { useApi } from '../lib/useApi';
 import { useSession } from '../lib/session';
 import { toolsSectionsFor } from '../lib/tools-sections';
+import { Notice } from './common';
 import { Icon, type IconName } from './Icon';
 import { Logo } from './Logo';
 import { Signature } from './Signature';
@@ -177,6 +178,20 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
       <OpenRecordsBar />
       <main className="app-main" id="contenuto" tabIndex={-1}>
+        {!!me?.blocchiDaVedere && location.pathname !== '/profilo/blocchi' && (
+          <Notice kind="avviso">
+            {me.blocchiDaVedere === 1
+              ? 'Un blocco del conto dopo troppi tentativi sbagliati, da vedere.'
+              : `${me.blocchiDaVedere} blocchi del conto dopo troppi tentativi sbagliati, da vedere.`}{' '}
+            <Link to="/profilo/blocchi">Vedi i blocchi</Link>
+          </Notice>
+        )}
+        {me?.codiceFiscaleDaConfermare && location.pathname !== '/profilo/recapiti' && (
+          <Notice kind="avviso">
+            L’amministratore ha corretto il tuo codice fiscale: finché non lo confermi vale quello
+            di prima. <Link to="/profilo/recapiti">Controlla e conferma</Link>
+          </Notice>
+        )}
         {children}
       </main>
       <footer className="app-footer">

@@ -190,6 +190,41 @@
       "when": 1795066424463,
       "tag": "0026_sospeso_dal_servizio",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1795087666095,
+      "tag": "0027_codice_fiscale_da_confermare",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1795088682289,
+      "tag": "0028_segreteria_per_archivio",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795091279390,
+      "tag": "0029_catalogo_diagnosi_icd9",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795093882185,
+      "tag": "0030_protezione_accesso",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795095925096,
+      "tag": "0031_identita_digitale",
+      "breakpoints": true
     }
   ]
 }

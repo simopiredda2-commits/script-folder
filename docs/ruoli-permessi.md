@@ -5,7 +5,7 @@ Da verificare con la Dr.ssa Rocca alla prima fermata. Fonte: la tabella «Utenti
 ## I ruoli
 
 - **Medico titolare.** Ha un archivio, cioè i pazienti che lo hanno scelto. Sul proprio archivio può tutto: firma e invia ricette e certificati, legge il registro degli accessi, esporta i dati.
-- **Segreteria.** È condivisa dallo studio e lavora su tutti gli archivi: anagrafiche, agenda, richieste dei pazienti, terapie non riservate, bozze di ricette ripetute di terapie croniche, stampa dei promemoria. Non firma e non invia. Il **riepilogo clinico** (allergie, problemi, scadenze) e il **diario** li vede solo se il titolare li abilita per il suo archivio: per difetto sono spenti (scelta della prima fermata, da confermare con il consulente privacy). I dati riservati non li vede mai.
+- **Segreteria.** È condivisa dallo studio e lavora sugli archivi dei titolari che l'hanno confermata, ognuno per il suo (D181, D185): finché un titolare non la conferma, il suo archivio non lo vede. Lì fa: anagrafiche, agenda, richieste dei pazienti, terapie non riservate, bozze di ricette ripetute di terapie croniche, stampa dei promemoria. Non firma e non invia. Il **riepilogo clinico** (allergie, problemi, scadenze) e il **diario** li vede solo se il titolare li abilita per il suo archivio: per difetto sono spenti (scelta della prima fermata, da confermare con il consulente privacy). I dati riservati non li vede mai.
 - **Medico sostituto.** Lavora sull'archivio del titolare solo nel periodo autorizzato, con le proprie credenziali. Ricette e certificati restano a nome suo. Non esporta i dati e non legge il registro: i dati sono del titolare.
 - **Medicina di gruppo.** Non è un ruolo dell'utente ma un modo di organizzare lo studio: più titolari, ognuno con il suo archivio, e una segreteria condivisa. Un collega vede i pazienti di un altro titolare solo con un'**autorizzazione** che il titolare gli dà, con periodo e motivo: confermato da Simone alla prima fermata.
 - **Medici dell'AFT** (tappa 12, D161). Non è un ruolo ma un'appartenenza: titolari di studi diversi che usano il programma. Un collega dell'AFT vede solo il **riepilogo** di un paziente (allergie, problemi, terapie in corso, parametri), solo se il medico curante condivide i suoi pazienti e il paziente ha dato il consenso, scrivendo il motivo. Niente voci oscurate o riservate, niente scritture. Dettagli in `docs/aft.md`.
@@ -47,7 +47,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Gestire le intestazioni | No | No | No | No | No | Sì |
 | Gestire i modelli | No | No | No | No | No | Sì |
 | Avviare subito l’aggiornamento delle banche dati | No | No | No | No | No | Sì |
-| Modificare gli elenchi dello studio (suggeritori, posologie, pacchetti, contatti) | Sì | No | Sì | Sì | Sì | Sì |
+| Modificare gli elenchi dello studio (suggeritori, posologie, pacchetti, contatti) | Sì | No | Con un’autorizzazione attiva | Sì | Sì | Sì |
 | Leggere il registro delle azioni di amministrazione | Sì | No | No | Sì | Sì | Sì |
 | Confermare gli utenti con i dati dei pazienti creati o cambiati dall’amministratore | Sì | No | No | Sì | Sì | No |
 
@@ -56,6 +56,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 ## Regole che valgono sempre
 
 - Ogni studio vede solo i propri dati. L'unica eccezione è il riepilogo condiviso nell'AFT, alle condizioni scritte sopra; ogni consultazione entra nel registro del medico curante.
+- La segreteria lavora su un archivio solo dopo la conferma del suo titolare; il titolare la può togliere, e se il ruolo di segreteria viene tolto o ridato le conferme di prima non valgono più (D185).
 - Un'autorizzazione vale solo nel suo periodo e finché non è revocata; vale solo per chi è medico (data per errore a un amministratore o alla segreteria, non apre nulla in più).
 - Ogni apertura di una cartella, consentita o negata, entra nel registro degli accessi con utente, paziente, azione, data e postazione, e il motivo della decisione.
 - I dati dei pazienti non si cancellano: si annullano con un motivo. Ogni modifica entra nello storico con l'utente che l'ha fatta.
@@ -65,5 +66,8 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 - Nome utente e password, poi il **secondo fattore obbligatorio per tutti** (codice a 6 cifre da un'app di autenticazione, standard TOTP). Al primo accesso il secondo fattore si attiva. SPID e CIE arriveranno più avanti.
 - Messaggio uguale per utente sconosciuto e password sbagliata, per non rivelare quali utenti esistono.
 - Lo stesso codice non vale due volte; il passaggio fra password e codice scade dopo 5 minuti; una sessione dura al massimo 12 ore.
-- Dopo **5 minuti** di inattività la sessione si blocca e si sblocca con il **codice a 6 cifre** dell'app. **5** tentativi falliti (password o codice) bloccano l'utente per **15 minuti**. Valori scelti da Simone alla prima fermata; sono impostazioni dello studio e si possono cambiare (il blocco al più 60 minuti, D179).
-- Durante il blocco non vale nemmeno il codice di un passaggio già aperto; il passaggio fra password e codice guarda al più tanti codici quanti i tentativi dello studio, giusti o sbagliati, anche con molte richieste insieme, e vale una volta sola (D179).
+- Dopo **5 minuti** di inattività la sessione si blocca e si sblocca con il **codice a 6 cifre** dell'app (valore scelto da Simone alla prima fermata).
+- **Tentativi sbagliati** (D188): dopo **5** password sbagliate dalla stessa postazione, o **20** dallo stesso indirizzo, ogni password aspetta, da 2 secondi a 15 minuti; il conto si blocca per **15 minuti** dopo **50** password sbagliate o **5** codici sbagliati (all'accesso, allo sblocco, o la password attuale nel cambio). Soglie e durata sono impostazioni dello studio (il blocco al più 60 minuti, D179); le attese sono del servizio. Valori provvisori, da completare, tranne i 5 codici e i 15 minuti (D29).
+- Ogni blocco del conto lo vedono l'utente bloccato e i **medici titolari** dello studio, nella cornice, finché ognuno non lo segna come visto; la lettura va nel registro.
+- **Ripristino con SPID o CIE** (D189): medici e segreteria attivi e confermati ripristinano da sé password, secondo fattore e blocco, se SPID o CIE riconoscono il codice fiscale del loro utente (del profilo per il medico, collegato da lei stessa per la segreteria). Gli amministratori no. In produzione con il simulatore è spento.
+- Durante il blocco non vale nemmeno il codice di un passaggio già aperto; il passaggio fra password e codice guarda al più tanti codici quanti i codici sbagliati ammessi dallo studio, giusti o sbagliati, anche con molte richieste insieme, e vale una volta sola (D179).

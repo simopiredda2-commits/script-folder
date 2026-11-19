@@ -34,16 +34,21 @@ export function registerAuthRoutes(
       expires: expiresAt,
     });
 
-  app.post('/api/accesso', { config: { public: true } }, async (req) => {
+  app.post('/api/accesso', { config: { public: true } }, async (req, reply) => {
     const body = loginBody.parse(req.body);
     // L'indirizzo della richiesta va nel registro dei tentativi falliti: la postazione la scrive
-    // chi accede, l'indirizzo no (tappa 14).
+    // chi accede, l'indirizzo no (tappa 14). Con l'indirizzo contano anche le attese (D188).
     const r = await auth.login({
       username: body.username,
       password: body.password,
       workstation: body.postazione,
       address: req.ip,
     });
+    if (!r.ok && r.retryAfterSeconds !== undefined) {
+      // La provenienza aspetta: 429, con l'attesa anche nell'intestazione Retry-After (RFC 9110).
+      reply.header('retry-after', String(r.retryAfterSeconds));
+      throw new HttpError(429, r.message, { attesaSecondi: r.retryAfterSeconds });
+    }
     if (!r.ok) throw new HttpError(401, r.message);
     if (r.step === 'second_factor')
       return { passo: 'secondo-fattore', passaggio: r.challengeToken };
