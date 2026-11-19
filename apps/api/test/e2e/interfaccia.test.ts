@@ -962,7 +962,18 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
     // Un problema nuovo, poi annullato con il motivo: resta in elenco, segnato.
     await page.getByLabel('Descrizione').fill('Problema della prova nel browser');
-    await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+    // Il codice si cerca nel catalogo ICD-9-CM per descrizione (D186); la descrizione già scritta resta.
+    await page.getByRole('button', { name: 'Cerca il codice per descrizione' }).click();
+    await page.getByRole('searchbox').fill('ipertensione non specificata');
+    await page.getByRole('button', { name: 'Usa 401.9' }).waitFor();
+    // Accessibilità, bersagli di 44 px e tablet anche con la ricerca aperta e i risultati.
+    await check(page, 'ricerca delle diagnosi', true);
+    await page.getByRole('button', { name: 'Usa 401.9' }).click();
+    await expect(page.getByLabel('Codice ICD-9-CM').inputValue()).resolves.toBe('401.9');
+    await page.getByText('Ipertensione essenziale non specificata').waitFor();
+    await expect(page.getByLabel('Descrizione').inputValue()).resolves.toBe(
+      'Problema della prova nel browser',
+    );
     await page.getByRole('button', { name: 'Registra', exact: true }).click();
     await page.getByText('Voce registrata.').waitFor();
     const item = page.locator('.voce').filter({ hasText: 'Problema della prova nel browser' });

@@ -19,7 +19,10 @@ import {
  * rispetto al PDF è in docs/catalogo-regionale.md.
  */
 const mapping = mappingForTranscription(loadMappings(), 'prestazioni')!;
-const { found, invalid } = findTranscriptions(REGIONAL_TRANSCRIPTIONS);
+const all = findTranscriptions(REGIONAL_TRANSCRIPTIONS);
+// Nella stessa cartella ci sono anche le diagnosi ICD-9-CM (D186): qui solo il catalogo regionale.
+const found = all.found.filter((f) => f.path.startsWith('piemonte_catalogo/'));
+const { invalid } = all;
 const sheet = (name: string) => {
   const t = found.find((f) => f.path.endsWith(`${name}.json`));
   if (!t) throw new Error(`manca la scheda ${name}`);

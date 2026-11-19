@@ -128,6 +128,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/logo.md`: proposte di logo.
 - `docs/banche-dati.md`: importazione delle banche dati, mappature, trascrizioni, versioni.
 - `docs/catalogo-regionale.md`: catalogo regionale in vigore, trascritto dai PDF, e che cosa controllare (D159).
+- `docs/icd9cm.md`: catalogo delle diagnosi ICD-9-CM (versione italiana 2007 e aggiunte COVID-19), che cosa è diverso dal PDF e che cosa controllare (D186).
 - `docs/interfaccia.md`: schermate (in `docs/schermate/`), accessibilità, che cosa manca.
 - `docs/credenziali.md`: credenziali dei servizi (Sistema TS, RUPAR) e secondo fattore.
 - `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.

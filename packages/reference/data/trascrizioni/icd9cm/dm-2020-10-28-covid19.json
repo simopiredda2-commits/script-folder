@@ -1,0 +1,14 @@
+{
+  "tipo": "diagnosi",
+  "serie": "icd9cm-diagnosi",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "DM 28 ottobre 2020, integrazione della classificazione ICD-9-CM per la malattia da SARS-CoV-2 (COVID-19) (GU n. 26 dell’1/2/2021), allegato 1",
+  "in_vigore_dal": "2021-02-02",
+  "trascritto_da": "Claude Code, dalle pagine 31–35 della Gazzetta trasformate in immagine",
+  "trascritto_il": "2026-11-19",
+  "controllato_da": null,
+  "solo_modifiche": true,
+  "nota": "In vigore il giorno dopo la pubblicazione (art. 3). 24 codici nuovi, di cui 17 finali; esclusioni e note aggiunte a 18 codici già presenti, in fondo alle loro note con «(DM 28/10/2020)». Il codice V07.0 diventa una categoria e non si usa per la codifica (nota del decreto). Che cosa controllare: docs/icd9cm.md."
+}

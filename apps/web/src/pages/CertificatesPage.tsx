@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { DiagnosisCodeInfo, DiagnosisSearch } from '../components/DiagnosisSearch';
 import { Icon } from '../components/Icon';
 import { PrintHint } from '../components/PrintHint';
 import { api, ApiError } from '../lib/api';
@@ -388,6 +389,7 @@ function CertificateForm({
             <p className="aiuto" id="codice-diagnosi-aiuto">
               Per esempio 487.1. Serve il codice o la descrizione.
             </p>
+            <DiagnosisCodeInfo code={d.codiceDiagnosi} />
           </div>
           <div className="campo">
             <label htmlFor="note-diagnosi">Diagnosi</label>
@@ -404,6 +406,7 @@ function CertificateForm({
             </p>
           </div>
         </div>
+        <DiagnosisSearch onPick={(x) => set({ codiceDiagnosi: x.code })} />
         <div className="scelta-in-riga">
           <div className="casella">
             <input

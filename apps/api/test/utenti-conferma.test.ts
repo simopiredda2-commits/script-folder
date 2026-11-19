@@ -382,10 +382,10 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       (await req(cookie, 'GET', '/api/pazienti')).json().pazienti as unknown[];
     expect(await seen()).toHaveLength(5);
     const theirs = async () =>
-      (await req(cookies.collega, 'GET', '/api/studio/utenti/da-confermare')).json() as {
+      (await req(cookies.collega, 'GET', '/api/studio/utenti/da-confermare')).json<{
         perArchivio: { id: string; archivio: { nome: string } }[];
         sulMioArchivio: { id: string }[];
-      };
+      }>();
     expect((await theirs()).perArchivio.find((x) => x.id === id)?.archivio.nome).toBe(
       'Archivio Serra',
     );
