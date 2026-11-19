@@ -266,8 +266,12 @@ export const ADMIN_LOG_ACTIONS = [
   'impostazioni_aft',
 ] as const satisfies readonly AccessAction[];
 
-/** Nomi delle aree e delle azioni scritte dalle sezioni di Strumenti (`details.area`, `.azione`). */
-const AREA_LABELS: Record<string, string> = {
+/**
+ * Nomi delle aree e delle azioni scritte dalle sezioni di Strumenti e dal comando del server
+ * (`details.area`, `.azione`): ognuna ha la sua etichetta in italiano, e un'area o un'azione nuova
+ * senza etichetta la fa notare la prova del registro. Mai valori, solo nomi fissi.
+ */
+export const AREA_LABELS: Record<string, string> = {
   studio: 'Dati dello studio',
   utenti: 'Utenti e ruoli',
   postazioni: 'Postazioni',
@@ -276,17 +280,28 @@ const AREA_LABELS: Record<string, string> = {
   intestazioni: 'Intestazioni',
   elenchi: 'Elenchi dello studio',
   modelli: 'Modelli',
+  profilo: 'Profilo del medico',
 };
-const ACTION_LABELS: Record<string, string> = {
+export const ACTION_LABELS: Record<string, string> = {
   elenco: 'Consultazione dell’elenco',
+  lettura: 'Consultazione',
   creazione: 'Creazione',
   modifica: 'Modifica',
   sospensione: 'Sospensione',
   riattivazione: 'Riattivazione',
   password_temporanea: 'Password temporanea',
   azzeramento_secondo_fattore: 'Azzeramento del secondo fattore',
-  sblocco: 'Sblocco',
+  sblocco: 'Sblocco dopo i tentativi falliti',
   archiviazione: 'Archiviazione',
+  elenco_da_confermare: 'Consultazione degli utenti da confermare',
+  conferma: 'Conferma',
+  rifiuto: 'Rifiuto della conferma',
+  consultazione_richiesta: 'Consultazione della richiesta di conferma',
+};
+
+/** Da dove viene l'azione, quando non dal programma (`details.tramite`): solo valori noti. */
+const VIA_LABELS: Record<string, string> = {
+  'comando del server': 'dal server, con il comando di chi gestisce il servizio',
 };
 
 /** «nomeUtente» o «password_temporanea» → «nome utente», «password temporanea». */
@@ -344,6 +359,7 @@ export function describeAdminEntry(
       const act = text(d.azione);
       area = a ? (AREA_LABELS[a] ?? capital(words(a))) : 'Amministrazione';
       azione = act ? (ACTION_LABELS[act] ?? capital(words(act))) : 'Azione';
+      add(text(d.tramite) && VIA_LABELS[text(d.tramite)!]);
       add(text(d.utente) && `utente ${text(d.utente)}`);
       const ws = d.postazione as { nome?: unknown } | undefined;
       add(ws && text(ws.nome) && `postazione «${text(ws.nome)}»`);

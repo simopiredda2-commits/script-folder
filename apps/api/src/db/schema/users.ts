@@ -74,6 +74,13 @@ export const appUser = pgTable(
     /** Il titolare che ha confermato l'ultima richiesta, e quando. */
     confirmedBy: uuid().references((): AnyPgColumn => appUser.id),
     confirmedAt: timestamp({ withTimezone: true }),
+    /**
+     * Sospeso da chi gestisce il servizio, sul server (`pnpm utente:ripristina --sospendi` o
+     * `--rifiuta`): dal programma non si riattiva, lo riattiva solo il server (`--riattiva`), che
+     * toglie il segno. Vale solo mentre l'utente è sospeso (tappa 14, revisione dei poteri
+     * dell'amministratore, problema 7).
+     */
+    suspendedByService: boolean().notNull().default(false),
   },
   (t) => [uniqueIndex('app_user_username_key').on(t.username)],
 );
@@ -189,10 +196,13 @@ export const authChallenge = pgTable(
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     usedAt: timestamp({ withTimezone: true }),
     /**
-     * Codici sbagliati su questo passaggio: arrivati ai tentativi dello studio, il passaggio si
-     * chiude (tappa 14, dopo la revisione dei poteri dell'amministratore).
+     * Codici provati su questo passaggio, giusti o sbagliati: ogni codice si conta prima di
+     * guardarlo, in un solo comando, e arrivati ai tentativi dello studio il passaggio non ne
+     * guarda altri (tappa 14, seconda revisione dei poteri dell'amministratore: con le richieste
+     * in parallelo il conto dopo la verifica lasciava passare centinaia di codici). La colonna si
+     * chiama ancora `failed_codes` dalla migrazione 0025, quando contava solo i codici sbagliati.
      */
-    failedCodes: integer().notNull().default(0),
+    triedCodes: integer('failed_codes').notNull().default(0),
   },
   (t) => [uniqueIndex('auth_challenge_token_hash_key').on(t.tokenHash)],
 );

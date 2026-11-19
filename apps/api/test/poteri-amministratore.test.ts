@@ -1,4 +1,6 @@
+import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { buildFiscalCode } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
 import { and, asc, eq } from 'drizzle-orm';
@@ -14,7 +16,10 @@ import {
   OWNER_REACTIVATE_REFUSAL,
   OWNER_ROLE_REMOVAL_REFUSAL,
   OWNER_SUSPEND_REFUSAL,
+  serviceSuspendedRefusal,
+  USER_ACTIONS,
 } from '../src/admin/user-service';
+import { ACTION_LABELS, AREA_LABELS, describeAdminEntry } from '../src/admin/archive-service';
 import {
   AWAITING_CONFIRMATION_ERROR,
   createAuthService,
@@ -41,7 +46,12 @@ import {
   studio,
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
-import { restoreUser } from '../src/db/user-restore';
+import {
+  RESTORE_LOG_ACTIONS,
+  restoreUser,
+  showRequest,
+  STALE_SERVER_REQUEST,
+} from '../src/db/user-restore';
 import { base32Decode } from '../src/security/base32';
 import { hashPassword } from '../src/security/password';
 import { hashToken, newToken } from '../src/security/secrets';
@@ -197,6 +207,47 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     throw new Error(`Non ci sono ${n} transazioni in attesa di un blocco`);
   };
 
+  /**
+   * Conferma dal server in due passi, come chi gestisce il servizio: legge la richiesta (`--mostra`)
+   * e conferma quella, con la sua data (`--conferma --richiesta-il`).
+   */
+  async function serverConfirm(username: string, extra: { riattiva?: boolean } = {}) {
+    const shown = await showRequest(t.db, { utente: username });
+    return restoreUser(
+      t.db,
+      { utente: username, conferma: true, richiestaIl: shown.requestedAt!, ...extra },
+      { now: s.clock.now },
+    );
+  }
+
+  /**
+   * Il comando del server come lo lancia chi gestisce il servizio, dalla radice del repository
+   * (`pnpm utente:ripristina -- …`), sul database di prova: uscita, testo e errori.
+   */
+  const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+  const runCli = (args: string[]) =>
+    new Promise<{ code: number; out: string; err: string }>((resolve) => {
+      execFile(
+        'pnpm',
+        ['utente:ripristina', '--', ...args],
+        {
+          cwd: ROOT,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            DATABASE_URL: t.url,
+            APP_ENCRYPTION_KEY: randomBytes(32).toString('base64'),
+          },
+        },
+        (error, stdout, stderr) =>
+          resolve({
+            code: error ? (typeof error.code === 'number' ? error.code : 1) : 0,
+            out: stdout,
+            err: stderr,
+          }),
+      );
+    });
+
   /** Servizio d'accesso sullo stesso database e con la stessa chiave del servizio delle prove. */
   const authService = () =>
     createAuthService({
@@ -321,7 +372,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     expect(more.json().avvisi.at(-1)).toContain(`--utente amm.a1.${sfx} --conferma`);
     expect((await access(`amm.a1.${sfx}`, chosen)).json().errore).toBe(AWAITING_CONFIRMATION_ERROR);
     // Lo conferma chi gestisce il servizio, con credenziali nuove che consegna lui.
-    const done = await restoreUser(t.db, { utente: `amm.a1.${sfx}`, conferma: true });
+    const done = await serverConfirm(`amm.a1.${sfx}`);
     passwordsSeen.push(done.temporaryPassword!);
     expect((await access(`amm.a1.${sfx}`, chosen)).json().errore).toBe(GENERIC_LOGIN_ERROR);
     expect((await access(`amm.a1.${sfx}`, done.temporaryPassword!)).json().passo).toBe(
@@ -334,7 +385,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       utente: `amm.a1.${sfx}`,
     });
     // Adesso un titolare può confermare: il server non lo fa più al suo posto.
-    await expect(restoreUser(t.db, { utente: `finto.a1.${sfx}`, conferma: true })).rejects.toThrow(
+    await expect(serverConfirm(`finto.a1.${sfx}`)).rejects.toThrow(
       /la conferma la fa lui, dal programma/,
     );
     expect((await userRow(id)).awaitingConfirmation).toBe(true);
@@ -350,7 +401,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     });
     expect(real.utente.inAttesaDiConferma).toBe(true);
     expect(real.passwordTemporanea).toBeUndefined();
-    const byServer = await restoreUser(t.db, { utente: `vera.a2.${sfx}`, conferma: true });
+    const byServer = await serverConfirm(`vera.a2.${sfx}`);
     const realCookie = await firstAccess(
       `vera.a2.${sfx}`,
       byServer.temporaryPassword!,
@@ -404,7 +455,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     expect(fake.passwordTemporanea).toBeUndefined();
     expect(fake.avvisi[1]).toMatch(/La password temporanea la riceve il medico titolare/);
     expect((await pendingOf(realCookie)).map((x) => x.id)).toContain(fake.utente.id);
-    await expect(restoreUser(t.db, { utente: `finto.a2.${sfx}`, conferma: true })).rejects.toThrow(
+    await expect(serverConfirm(`finto.a2.${sfx}`)).rejects.toThrow(
       /la conferma la fa lui, dal programma/,
     );
     expect((await userRow(fake.utente.id)).awaitingConfirmation).toBe(true);
@@ -528,7 +579,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       expect((await codeOn(second, codeNow(victim.username))).json().errore).toBe(
         EXPIRED_CHALLENGE_ERROR,
       );
-      expect((await challengeOf(second)).failedCodes).toBe(3);
+      expect((await challengeOf(second)).triedCodes).toBe(3);
       // Senza soglie dello studio vale il valore per difetto: cinque codici.
       await setStudio({ maxFailedLogins: null, failedLoginLockMinutes: null });
       const third = (await access(victim.username, PASSWORD)).json().passaggio as string;
@@ -672,7 +723,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
         and(eq(accessLog.userId, u.utente.id), eq(accessLog.action, 'secondo_fattore_fallito')),
       );
     expect(failed.map((f) => f.details)).toEqual([{ motivo: 'codice errato', indirizzo: null }]);
-    expect((await challengeOf(two)).failedCodes).toBe(1);
+    expect((await challengeOf(two)).triedCodes).toBe(1);
   });
 
   it('C: con il codice giusto l’utente si rilegge sotto blocco: sospeso, in attesa o bloccato nel frattempo, niente sessione', async () => {
@@ -771,7 +822,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     expect(
       listed
         .json()
-        .righe.filter((r: { area: string }) => r.area === 'Profilo')
+        .righe.filter((r: { area: string }) => r.area === 'Profilo del medico')
         .map((r: { azione: string }) => r.azione),
     ).toEqual(['Modifica', 'Modifica']);
     await put('Elena', 'Marchi');
@@ -924,20 +975,25 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       workstation: 'postazione-prova',
       expiresAt: new Date(Date.now() + 3_600_000),
     });
-    await expect(restoreUser(t.db, { utente: `segr.cmd.${sfx}`, conferma: true })).rejects.toThrow(
+    await expect(serverConfirm(`segr.cmd.${sfx}`)).rejects.toThrow(
       'L’utente è sospeso: per confermarlo aggiungi --riattiva',
     );
-    await expect(restoreUser(t.db, { utente: `adm.cmd.${sfx}`, conferma: true })).rejects.toThrow(
-      'L’utente non è in attesa di conferma: niente da confermare',
-    );
     await expect(
-      restoreUser(t.db, { utente: `segr.cmd.${sfx}`, conferma: true, sospendi: true }),
+      restoreUser(t.db, {
+        utente: `adm.cmd.${sfx}`,
+        conferma: true,
+        richiestaIl: s.clock.now().toISOString(),
+      }),
+    ).rejects.toThrow('L’utente non è in attesa di conferma: niente da confermare');
+    await expect(
+      restoreUser(t.db, {
+        utente: `segr.cmd.${sfx}`,
+        conferma: true,
+        sospendi: true,
+        richiestaIl: sec.utente.richiestaDiConferma!.il,
+      }),
     ).rejects.toBeInstanceOf(ZodError);
-    const done = await restoreUser(t.db, {
-      utente: `segr.cmd.${sfx}`,
-      conferma: true,
-      riattiva: true,
-    });
+    const done = await serverConfirm(`segr.cmd.${sfx}`, { riattiva: true });
     passwordsSeen.push(done.temporaryPassword!);
     expect(done).toMatchObject({
       actions: ['riattivazione', 'conferma'],
@@ -1054,28 +1110,404 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
   it('A7: un titolare con pazienti sospeso dal server non lo riattiva l’amministratore', async () => {
     const doctor = s.users.collega;
     await restoreUser(t.db, { utente: doctor.username, sospendi: true });
+    expect(await userRow(doctor.id)).toMatchObject({
+      status: 'suspended',
+      suspendedByService: true,
+    });
     const on = await req(
       cookies.amministratore,
       'POST',
       `/api/studio/utenti/${doctor.id}/riattiva`,
     );
     expect(on.statusCode).toBe(409);
-    expect(on.json().errore).toBe(OWNER_REACTIVATE_REFUSAL);
+    expect(on.json().errore).toBe(serviceSuspendedRefusal(doctor.username));
+    expect(on.json().errore).toContain(
+      `pnpm utente:ripristina -- --utente ${doctor.username} --riattiva`,
+    );
     expect((await userRow(doctor.id)).status).toBe('suspended');
     expect((await adminLog()).at(-1)).toMatchObject({
       outcome: 'negato',
       azione: 'riattivazione',
       utente: doctor.username,
-      motivo: OWNER_REACTIVATE_REFUSAL,
+      motivo: serviceSuspendedRefusal(doctor.username),
     });
     const listed = (await req(cookies.amministratore, 'GET', '/api/studio/utenti'))
       .json()
       .utenti.find((x: { id: string }) => x.id === doctor.id);
-    expect(listed).toMatchObject({ stato: 'sospeso', titolareConPazienti: true });
-    // Lo riattiva chi gestisce il servizio, sul server.
+    expect(listed).toMatchObject({
+      stato: 'sospeso',
+      titolareConPazienti: true,
+      sospesoDalServizio: true,
+    });
+    // Lo riattiva chi gestisce il servizio, sul server: il segno della sospensione si toglie.
     const back = await restoreUser(t.db, { utente: doctor.username, riattiva: true });
     passwordsSeen.push(back.temporaryPassword!);
-    expect((await userRow(doctor.id)).status).toBe('active');
+    expect(await userRow(doctor.id)).toMatchObject({
+      status: 'active',
+      suspendedByService: false,
+    });
+    // Un titolare con pazienti sospeso senza il segno del server (righe di prima di questa
+    // regola): dal programma non si riattiva lo stesso, perché ha pazienti.
+    await t.db.update(appUser).set({ status: 'suspended' }).where(eq(appUser.id, doctor.id));
+    const legacy = await req(
+      cookies.amministratore,
+      'POST',
+      `/api/studio/utenti/${doctor.id}/riattiva`,
+    );
+    expect(legacy.statusCode).toBe(409);
+    expect(legacy.json().errore).toBe(OWNER_REACTIVATE_REFUSAL);
+    await t.db.update(appUser).set({ status: 'active' }).where(eq(appUser.id, doctor.id));
+  });
+
+  it('A7 bis: chi è sospeso dal server, di qualunque ruolo, non lo riattiva l’amministratore; le sue sospensioni sì', async () => {
+    const created = await createUser(cookies.amministratore, {
+      nomeUtente: `segr.a7.${sfx}`,
+      nome: 'Segreteria Sette',
+      ruoli: ['secretary'],
+    });
+    const p1 = await confirm(cookies.titolare, created.utente.id);
+    await firstAccess(`segr.a7.${sfx}`, p1!, 'la segreteria sette lavora');
+    const id = created.utente.id;
+    // Sospesa dal server: dal programma non torna, e le credenziali di prima non valgono.
+    await restoreUser(t.db, { utente: `segr.a7.${sfx}`, sospendi: true }, { now: s.clock.now });
+    const on = await req(cookies.amministratore, 'POST', `/api/studio/utenti/${id}/riattiva`);
+    expect(on.statusCode, on.body).toBe(409);
+    expect(on.json().errore).toBe(serviceSuspendedRefusal(`segr.a7.${sfx}`));
+    expect((await access(`segr.a7.${sfx}`, 'la segreteria sette lavora')).statusCode).toBe(401);
+    expect(
+      (await req(cookies.amministratore, 'GET', '/api/studio/utenti'))
+        .json()
+        .utenti.find((x: { id: string }) => x.id === id),
+    ).toMatchObject({ stato: 'sospeso', sospesoDalServizio: true, titolareConPazienti: false });
+    // Il server la riattiva; poi una sospensione dell'amministratore la riattiva l'amministratore.
+    passwordsSeen.push(
+      (await restoreUser(t.db, { utente: `segr.a7.${sfx}`, riattiva: true }, { now: s.clock.now }))
+        .temporaryPassword!,
+    );
+    const off = await req(cookies.amministratore, 'POST', `/api/studio/utenti/${id}/sospendi`);
+    expect(off.statusCode, off.body).toBe(200);
+    expect(off.json().utente).toMatchObject({ stato: 'sospeso', sospesoDalServizio: false });
+    const back = await req(cookies.amministratore, 'POST', `/api/studio/utenti/${id}/riattiva`);
+    expect(back.statusCode, back.body).toBe(200);
+  });
+
+  it('A7 ter: un titolare finto confermato per errore e sospeso dal server non torna dal programma', async () => {
+    const { adminCookie } = await freshStudio('a7t');
+    const fake = await createUser(adminCookie, {
+      nomeUtente: `finto.a7t.${sfx}`,
+      nome: 'Dott. Finto Settimo',
+      ruoli: ['owner_doctor', 'secretary'],
+      medico: { codiceFiscale: cf('Finto', 'Ivo', 'M'), nome: 'Ivo', cognome: 'Finto' },
+    });
+    // Chi gestisce il servizio lo conferma per errore, poi se ne accorge e lo sospende dal server.
+    passwordsSeen.push((await serverConfirm(`finto.a7t.${sfx}`)).temporaryPassword!);
+    await restoreUser(t.db, { utente: `finto.a7t.${sfx}`, sospendi: true }, { now: s.clock.now });
+    const on = await req(adminCookie, 'POST', `/api/studio/utenti/${fake.utente.id}/riattiva`);
+    expect(on.statusCode, on.body).toBe(409);
+    expect(on.json().errore).toBe(serviceSuspendedRefusal(`finto.a7t.${sfx}`));
+    expect(await userRow(fake.utente.id)).toMatchObject({
+      status: 'suspended',
+      suspendedByService: true,
+    });
+  });
+
+  it('A1 bis: la conferma dal server mostra che cosa conferma e vale solo per la richiesta letta', async () => {
+    const { fresh, adminCookie } = await freshStudio('a1b');
+    const username = `chiesto.a1b.${sfx}`;
+    const u = await createUser(adminCookie, {
+      nomeUtente: username,
+      nome: 'Dott.ssa Anna Chiesta',
+      ruoli: ['owner_doctor'],
+      medico: {
+        codiceFiscale: cf('Chiesta', 'Anna', 'F'),
+        nome: 'Anna',
+        cognome: 'Chiesta',
+        codiceRegionale: 'MMG-A1B-1',
+        asl: 'ASL di prova',
+      },
+    });
+    const id = u.utente.id;
+    const before = await userRow(id);
+    // Primo passo: la richiesta com'è adesso, senza cambiare nulla.
+    const shown = await showRequest(t.db, { utente: username });
+    expect(shown).toMatchObject({
+      username,
+      displayName: 'Dott.ssa Anna Chiesta',
+      studioName: 'Studio a1b',
+      roles: ['owner_doctor'],
+      roleNames: ['Medico titolare'],
+      doctor: {
+        firstName: 'Anna',
+        lastName: 'Chiesta',
+        fiscalCode: cf('Chiesta', 'Anna', 'F'),
+        regionalCode: 'MMG-A1B-1',
+        asl: 'ASL di prova',
+      },
+      status: 'active',
+      suspendedByService: false,
+      awaitingConfirmation: true,
+      requestedBy: { username: `adm.a1b.${sfx}`, displayName: 'Amministratore a1b' },
+      requestedAt: u.utente.richiestaDiConferma!.il,
+      ownerCanConfirm: false,
+    });
+    expect(await userRow(id)).toEqual(before);
+    // Nel registro solo che il server l'ha letta, con la data della richiesta: nessun valore.
+    expect((await adminLog(fresh.studioId)).at(-1)).toEqual({
+      userId: null,
+      outcome: 'riuscito',
+      workstation: null,
+      area: 'utenti',
+      azione: 'consultazione_richiesta',
+      tramite: 'comando del server',
+      utente: username,
+      utenteId: id,
+      richiestaIl: shown.requestedAt,
+    });
+    // Senza la data non si conferma: prima si legge.
+    await expect(restoreUser(t.db, { utente: username, conferma: true })).rejects.toBeInstanceOf(
+      ZodError,
+    );
+    // Prima che chi gestisce il servizio confermi, l'amministratore cambia ruoli, nome e dati del
+    // medico: la conferma con la data letta si rifiuta e non cambia nulla.
+    s.clock.advance(60_000);
+    const changed = await req(adminCookie, 'PATCH', `/api/studio/utenti/${id}`, {
+      ruoli: ['owner_doctor', 'secretary'],
+      nome: 'Dott. Luca Altro',
+      medico: { codiceFiscale: cf('Altro', 'Luca', 'M'), nome: 'Luca', cognome: 'Altro' },
+    });
+    expect(changed.statusCode, changed.body).toBe(200);
+    await expect(
+      restoreUser(t.db, { utente: username, conferma: true, richiestaIl: shown.requestedAt! }),
+    ).rejects.toThrow(STALE_SERVER_REQUEST);
+    expect(await userRow(id)).toMatchObject({ awaitingConfirmation: true, status: 'active' });
+    // Riletta: ruoli, nome e dati nuovi, con una data nuova; con quella si conferma.
+    const again = await showRequest(t.db, { utente: username });
+    expect(again).toMatchObject({
+      displayName: 'Dott. Luca Altro',
+      roleNames: ['Medico titolare', 'Segreteria'],
+      doctor: { firstName: 'Luca', lastName: 'Altro', fiscalCode: cf('Altro', 'Luca', 'M') },
+    });
+    expect(again.requestedAt).not.toBe(shown.requestedAt);
+    const done = await restoreUser(
+      t.db,
+      { utente: username, conferma: true, richiestaIl: again.requestedAt! },
+      { now: s.clock.now },
+    );
+    passwordsSeen.push(done.temporaryPassword!);
+    expect(done.actions).toEqual(['conferma']);
+    expect((await userRow(id)).awaitingConfirmation).toBe(false);
+    // --mostra va da solo.
+    await expect(
+      restoreUser(t.db, { utente: username, mostra: true, sblocca: true }),
+    ).rejects.toBeInstanceOf(ZodError);
+  });
+
+  it('--rifiuta: l’utente resta in attesa e diventa sospeso dal server; dal programma non torna', async () => {
+    const { fresh, adminCookie } = await freshStudio('rif');
+    const username = `rifiutato.${sfx}`;
+    const u = await createUser(adminCookie, {
+      nomeUtente: username,
+      nome: 'Dott. Rifiutato',
+      ruoli: ['owner_doctor'],
+      medico: { codiceFiscale: cf('Rifiuti', 'Rino', 'M'), nome: 'Rino', cognome: 'Rifiuti' },
+    });
+    const id = u.utente.id;
+    const shown = await showRequest(t.db, { utente: username });
+    const r = await restoreUser(t.db, { utente: username, rifiuta: true }, { now: s.clock.now });
+    expect(r).toMatchObject({
+      actions: ['rifiuto'],
+      temporaryPassword: null,
+      status: 'suspended',
+      suspendedByService: true,
+      awaitingConfirmation: true,
+    });
+    const row = await userRow(id);
+    expect(row).toMatchObject({
+      status: 'suspended',
+      suspendedByService: true,
+      awaitingConfirmation: true,
+    });
+    expect(row.confirmationRequestedAt!.toISOString()).toBe(shown.requestedAt);
+    expect((await adminLog(fresh.studioId)).at(-1)).toEqual({
+      userId: null,
+      outcome: 'riuscito',
+      workstation: null,
+      area: 'utenti',
+      azione: 'rifiuto',
+      tramite: 'comando del server',
+      utente: username,
+      utenteId: id,
+      ruoliPrima: ['owner_doctor'],
+      ruoliDopo: ['owner_doctor'],
+      campi: ['stato'],
+      sessioniChiuse: 0,
+      attesaConferma: true,
+      richiestaDa: `adm.rif.${sfx}`,
+      richiestaIl: shown.requestedAt,
+    });
+    // L'amministratore non lo riattiva; l'elenco lo dice sospeso dal servizio.
+    const on = await req(adminCookie, 'POST', `/api/studio/utenti/${id}/riattiva`);
+    expect(on.statusCode).toBe(409);
+    expect(on.json().errore).toBe(serviceSuspendedRefusal(username));
+    expect(
+      (await req(adminCookie, 'GET', '/api/studio/utenti'))
+        .json()
+        .utenti.find((x: { id: string }) => x.id === id),
+    ).toMatchObject({ stato: 'sospeso', inAttesaDiConferma: true, sospesoDalServizio: true });
+    // Il server non lo conferma senza riattivarlo e non lo rifiuta due volte; --rifiuta va da solo
+    // e vale solo per chi è in attesa.
+    await expect(
+      restoreUser(t.db, { utente: username, conferma: true, richiestaIl: shown.requestedAt! }),
+    ).rejects.toThrow('L’utente è sospeso: per confermarlo aggiungi --riattiva');
+    await expect(restoreUser(t.db, { utente: username, rifiuta: true })).rejects.toThrow(
+      /già sospeso da chi gestisce il servizio/,
+    );
+    await expect(
+      restoreUser(t.db, { utente: username, rifiuta: true, sospendi: true }),
+    ).rejects.toBeInstanceOf(ZodError);
+    await expect(restoreUser(t.db, { utente: `adm.rif.${sfx}`, rifiuta: true })).rejects.toThrow(
+      /non è in attesa di conferma: niente da rifiutare/,
+    );
+    // Riattivato dal server: torna in attesa con una richiesta nuova del server, senza il segno.
+    const later = () => new Date(s.clock.now().getTime() + 60_000);
+    const back = await restoreUser(t.db, { utente: username, riattiva: true }, { now: later });
+    passwordsSeen.push(back.temporaryPassword!);
+    expect(await userRow(id)).toMatchObject({
+      status: 'active',
+      suspendedByService: false,
+      awaitingConfirmation: true,
+      confirmationRequestedBy: null,
+    });
+  });
+
+  it('comando del server come processo vero: --mostra stampa ruoli e dati del medico, --conferma vuole la data stampata, --rifiuta', async () => {
+    const { adminCookie } = await freshStudio('cli');
+    const username = `doppio.cli.${sfx}`;
+    const u = await createUser(adminCookie, {
+      nomeUtente: username,
+      nome: 'Dott. Ugo Doppio',
+      ruoli: ['owner_doctor', 'secretary'],
+      medico: {
+        codiceFiscale: cf('Doppio', 'Ugo', 'M'),
+        nome: 'Ugo',
+        cognome: 'Doppio',
+        codiceRegionale: 'MMG-CLI-1',
+        asl: 'ASL di prova',
+      },
+    });
+    const secretary = await createUser(adminCookie, {
+      nomeUtente: `segr.cli.${sfx}`,
+      nome: 'Segreteria del Comando',
+      ruoli: ['secretary'],
+    });
+    const date = u.utente.richiestaDiConferma!.il;
+    // Primo passo: la richiesta, con i ruoli in italiano e i dati del medico.
+    const shown = await runCli(['--utente', username, '--mostra']);
+    expect(shown.code, shown.err).toBe(0);
+    expect(shown.out).toMatch(/ruoli:\s+Medico titolare, Segreteria/);
+    expect(shown.out).toMatch(
+      new RegExp(
+        `dati del medico:\\s+nome Ugo, cognome Doppio, codice fiscale ${cf('Doppio', 'Ugo', 'M')}, codice regionale MMG-CLI-1, ASL ASL di prova`,
+      ),
+    );
+    expect(shown.out).toMatch(
+      new RegExp(`richiesta di:\\s+adm\\.cli\\.${sfx} \\(Amministratore cli\\)`),
+    );
+    expect(shown.out).toMatch(new RegExp(`richiesta il:\\s+${date.replace(/\./g, '\\.')}`));
+    expect(shown.out).toContain(`--utente ${username} --conferma --richiesta-il ${date}`);
+    expect((await userRow(u.utente.id)).awaitingConfirmation).toBe(true);
+    // Senza la data, o con un'altra: rifiuta, uscita 1, e non cambia nulla.
+    const noDate = await runCli(['--utente', username, '--conferma']);
+    expect(noDate.code).toBe(1);
+    expect(noDate.err).toContain(
+      '--richiesta-il: serve la data della richiesta che stampa --mostra',
+    );
+    const otherDate = await runCli([
+      '--utente',
+      username,
+      '--conferma',
+      '--richiesta-il',
+      '2026-01-01T00:00:00.000Z',
+    ]);
+    expect(otherDate.code).toBe(1);
+    expect(otherDate.err).toContain('rileggila con --mostra');
+    expect((await userRow(u.utente.id)).awaitingConfirmation).toBe(true);
+    // Con la data stampata: confermato, la password si vede una volta.
+    const ok = await runCli(['--utente', username, '--conferma', '--richiesta-il', date]);
+    expect(ok.code, ok.err).toBe(0);
+    const password = /password temporanea:\s+(\S+)/.exec(ok.out)?.[1];
+    expect(password).toMatch(/^[A-Za-z0-9_-]{16}$/);
+    passwordsSeen.push(password!);
+    expect((await userRow(u.utente.id)).awaitingConfirmation).toBe(false);
+    // --rifiuta: la segreteria resta in attesa, sospesa dal server.
+    const no = await runCli(['--utente', `segr.cli.${sfx}`, '--rifiuta']);
+    expect(no.code, no.err).toBe(0);
+    expect(no.out).toContain('richiesta rifiutata');
+    expect(await userRow(secretary.utente.id)).toMatchObject({
+      status: 'suspended',
+      suspendedByService: true,
+      awaitingConfirmation: true,
+    });
+  }, 180_000);
+
+  it('registro di amministrazione: ogni area e ogni azione ha la sua etichetta, e le azioni del server lo dicono', async () => {
+    const names = { archives: new Map<string, string>(), afts: new Map<string, string>() };
+    // Le azioni scritte dal programma e dal comando del server, e quelle delle altre sezioni.
+    const actions = [
+      ...USER_ACTIONS,
+      ...RESTORE_LOG_ACTIONS,
+      'lettura',
+      'creazione',
+      'modifica',
+      'archiviazione',
+    ];
+    for (const azione of actions) expect(ACTION_LABELS[azione], azione).toBeTruthy();
+    for (const area of ['studio', 'utenti', 'postazioni', 'stampa', 'elenchi', 'profilo'])
+      expect(AREA_LABELS[area], area).toBeTruthy();
+    expect(
+      describeAdminEntry(
+        'amministrazione',
+        'riuscito',
+        { area: 'profilo', azione: 'modifica' },
+        names,
+      ),
+    ).toEqual({ area: 'Profilo del medico', azione: 'Modifica', dettaglio: null });
+    expect(
+      describeAdminEntry(
+        'amministrazione',
+        'riuscito',
+        { area: 'utenti', azione: 'rifiuto', tramite: 'comando del server', utente: 'x.y' },
+        names,
+      ),
+    ).toEqual({
+      area: 'Utenti e ruoli',
+      azione: 'Rifiuto della conferma',
+      dettaglio: 'Dal server, con il comando di chi gestisce il servizio · utente x.y',
+    });
+    // Un valore sconosciuto di «tramite» non si mostra.
+    expect(
+      describeAdminEntry(
+        'amministrazione',
+        'riuscito',
+        { area: 'utenti', azione: 'conferma', tramite: 'un testo qualsiasi' },
+        names,
+      ).dettaglio,
+    ).toBeNull();
+    // Nel registro dello studio: le azioni del server di queste prove, con le etichette.
+    const listed = (
+      await req(cookies.amministratore, 'GET', '/api/studio/registro-amministrazione')
+    ).json().righe as { area: string; azione: string; dettaglio: string | null }[];
+    const byServer = listed.filter((r) => r.dettaglio?.startsWith('Dal server'));
+    // Sblocco della segreteria, sospensione e riattivazione (con la password nuova) dei medici.
+    expect(new Set(byServer.map((r) => r.azione))).toEqual(
+      new Set([
+        'Sblocco dopo i tentativi falliti',
+        'Sospensione',
+        'Riattivazione',
+        'Password temporanea',
+      ]),
+    );
+    expect(byServer.every((r) => r.area === 'Utenti e ruoli')).toBe(true);
   });
 
   it('nessuna password, impronta o segreto nel registro', async () => {

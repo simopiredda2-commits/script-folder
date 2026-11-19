@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { parseTime } from './reference/scheduler';
 import { parseKey } from './security/secrets';
 
@@ -36,6 +37,12 @@ export interface Config {
   referenceUpdate: ReferenceUpdateConfig | null;
   /** Ambiente dell'installazione, da APP_AMBIENTE (D170). */
   environment: AppEnvironment;
+  /**
+   * Proxy inversi fidati, da APP_PROXY_FIDATI: indirizzi IP o reti CIDR. Vuoto (per difetto):
+   * nessun proxy fidato, l'intestazione X-Forwarded-For si ignora e l'indirizzo della richiesta è
+   * quello della connessione. Con un proxy fidato vale l'indirizzo del cliente che il proxy scrive.
+   */
+  trustedProxies: string[];
 }
 
 function environmentOf(raw: string | undefined): AppEnvironment {
@@ -43,6 +50,31 @@ function environmentOf(raw: string | undefined): AppEnvironment {
   if (!(APP_ENVIRONMENTS as readonly string[]).includes(v))
     throw new Error(`APP_AMBIENTE=${raw}: valori ammessi «produzione» o «prova»`);
   return v as AppEnvironment;
+}
+
+/**
+ * APP_PROXY_FIDATI: indirizzi IPv4 o IPv6, o reti CIDR (indirizzo/prefisso), separati da virgole.
+ * L'indirizzo della richiesta va nel registro dei tentativi d'accesso falliti (tappa 14): dietro un
+ * proxy, senza questa variabile, sarebbe sempre quello del proxy; fidarsi di qualunque mittente lo
+ * farebbe scegliere a chi accede. Un valore non valido ferma l'avvio invece di essere indovinato.
+ */
+export function trustedProxiesOf(raw: string | undefined): string[] {
+  const items = (raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const item of items) {
+    const [address = '', prefix, ...rest] = item.split('/');
+    const family = isIP(address);
+    const maxPrefix = family === 6 ? 128 : 32;
+    const prefixOk =
+      prefix === undefined || (/^\d{1,3}$/.test(prefix) && Number(prefix) <= maxPrefix);
+    if (family === 0 || rest.length > 0 || !prefixOk)
+      throw new Error(
+        `APP_PROXY_FIDATI=${raw}: «${item}» non è un indirizzo IP né una rete CIDR. Valori ammessi: indirizzi o reti separati da virgole, per esempio 127.0.0.1 oppure 10.0.0.0/24; vuoto, nessun proxy fidato.`,
+      );
+  }
+  return items;
 }
 
 /**
@@ -90,5 +122,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     cookieSecure: env.COOKIE_SECURE !== 'false',
     referenceUpdate: referenceUpdateConfig(env),
     environment: environmentOf(env.APP_AMBIENTE),
+    trustedProxies: trustedProxiesOf(env.APP_PROXY_FIDATI),
   };
 }

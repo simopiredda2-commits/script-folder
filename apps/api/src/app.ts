@@ -90,7 +90,7 @@ declare module 'fastify' {
 export interface AppDeps {
   db: Database;
   config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'> &
-    Partial<Pick<Config, 'environment'>>;
+    Partial<Pick<Config, 'environment' | 'trustedProxies'>>;
   now?: () => Date;
   logger?: boolean;
   /**
@@ -148,7 +148,11 @@ export function buildApp({
   fse = defaultFse(now),
   referenceUpdates = new ReferenceUpdates(db, null, now ? { now } : {}),
 }: AppDeps): FastifyInstance {
-  const app = Fastify({ logger });
+  // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
+  // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
+  // cliente, scritto dal proxy fidato (tappa 14, revisione dei poteri dell'amministratore).
+  const trusted = config.trustedProxies ?? [];
+  const app = Fastify({ logger, trustProxy: trusted.length > 0 ? [...trusted] : false });
   const auth = createAuthService({
     db,
     encryptionKey: config.encryptionKey,

@@ -21,6 +21,7 @@ import { appUser, archive, importBatch, importProfile } from '../db/schema';
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { loadArchiveContext } from '../patients/access';
+import { archiveClosedToNewPatients } from '../patients/archive-owner';
 import { studioDate } from '../prescriptions/rules-check';
 import { ReferenceData } from '../reference/lookup';
 import { entryHandlers } from './destinations';
@@ -442,6 +443,11 @@ export function registerImportRoutes(app: FastifyInstance, deps: AdminDeps): voi
             409,
             'Un’altra importazione è in corso su questo archivio: riprova tra poco.',
           );
+        // Il titolare si ricontrolla sotto il blocco della riga dell'archivio, tenuto fino alla
+        // fine: una sospensione arrivata un istante prima ferma l'importazione, una che arriva
+        // durante aspetta e poi vede i pazienti nuovi (gara inversa della sospensione, tappa 14).
+        const closed = await archiveClosedToNewPatients(tx, archiveId);
+        if (closed) throw new HttpError(409, closed);
         const r = await runImport(
           {
             tx,

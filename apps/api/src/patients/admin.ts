@@ -40,6 +40,7 @@ import { HttpError } from '../http/errors';
 import { studioDate } from '../prescriptions/rules-check';
 import { ReferenceData } from '../reference/lookup';
 import { loadArchiveContext, visibleArchives, type ArchiveContext } from './access';
+import { archiveClosedToNewPatients } from './archive-owner';
 
 /**
  * Pannello amministrativo del paziente (tappa 15): nuovo paziente, anagrafica completa, dati SSN,
@@ -321,6 +322,9 @@ export const newPatientSchema = z
 
 const archiveOnly = z.object({ archivioId: z.uuid().optional() }).loose();
 
+/** L'archivio non accetta pazienti nuovi: il titolare è sospeso o non è più titolare. */
+class ArchiveClosed extends Error {}
+
 /**
  * Registra un paziente nuovo. Prima il permesso (registry.write sull'archivio, registrato anche se
  * negato), poi i dati, poi il doppione; il registro dice chi l'ha creato, con quale permesso.
@@ -375,6 +379,10 @@ export async function createPatient(
   let id: string;
   try {
     id = await withActor(db, actor.userId, async (tx) => {
+      // Il titolare dell'archivio si ricontrolla sotto il blocco della riga dell'archivio: sospeso
+      // (anche un istante prima), il paziente non entra (gara inversa della sospensione).
+      const closed = await archiveClosedToNewPatients(tx, target);
+      if (closed) throw new ArchiveClosed(closed);
       const [row] = await tx
         .insert(patient)
         .values({
@@ -399,6 +407,8 @@ export async function createPatient(
       return row!.id;
     });
   } catch (err) {
+    if (err instanceof ArchiveClosed)
+      throw await denied(409, err.message, { archivio: target, motivo: err.message });
     // Due registrazioni dello stesso codice fiscale nello stesso momento: vince la prima.
     if (isUniqueViolation(err))
       throw new HttpError(409, 'Il codice fiscale è appena stato registrato per un altro paziente');
