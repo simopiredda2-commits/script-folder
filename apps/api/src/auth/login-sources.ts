@@ -36,7 +36,8 @@ export interface LoginSourceLimits {
 }
 
 /**
- * Valori provvisori, di buon senso e non di una norma: da completare (D188). Cinque password come
+ * Valori di buon senso e non di una norma (D188), confermati da Simone alla fermata dopo la tappa 17
+ * (D191): si riguardano se in studio danno fastidio. Cinque password come
  * la soglia di prima (D29); venti dallo stesso indirizzo, perché uno studio esce su internet con un
  * indirizzo solo per tutti i computer; da 2 secondi a 15 minuti, la durata del blocco di prima.
  */

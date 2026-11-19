@@ -23,7 +23,7 @@ export const studio = pgTable('studio', {
   /**
    * Password sbagliate di seguito prima del blocco del conto: la soglia alta (D181, D188). Le
    * sbaglia anche chi conosce solo il nome utente: prima del blocco valgono le attese per indirizzo
-   * e postazione (auth/login-sources.ts). 50: valore provvisorio, da completare.
+   * e postazione (auth/login-sources.ts). 50: confermato alla fermata dopo la tappa 17 (D191).
    */
   maxFailedLogins: integer().default(50),
   /**

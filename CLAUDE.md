@@ -57,7 +57,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Come si procede
 
-- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`, unita (#6, via del 19/11/2026). Quarto blocco (richieste del 19/11/2026): `tappe-14-15`, unito (#7, via del 19/11/2026). Correzione di una prova instabile con WebKit: unita (#8). Quinto blocco (via del 19/11/2026, D182): branch `ccr-9780f0fd-iyj18e`, tappe 16 e 17.
+- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`, unita (#6, via del 19/11/2026). Quarto blocco (richieste del 19/11/2026): `tappe-14-15`, unito (#7, via del 19/11/2026). Correzione di una prova instabile con WebKit: unita (#8). Quinto blocco (via del 19/11/2026, D182): branch `ccr-9780f0fd-iyj18e`, tappe 16 e 17, unito (#9, via del 19/11/2026). Dopo l'unione lo stesso branch, ripartito da `main`, porta le modifiche che seguono dalle risposte della fermata (D191).
 - Dopo ogni tappa: test e lint verdi, commit e push (la macchina in cloud può essere riciclata), poi aggiornare `docs/avanzamento.md` con fatto, non fatto, non provato e prossimo passo.
 - **Fermate**: dopo la tappa 2 e dopo la tappa 4. Domande con il pulsante a Simone; spiegare in parole semplici cosa devono verificare lui e la Dr.ssa Rocca (dopo la 2: struttura, modello dei dati, ruoli e permessi; dopo la 4: ciclo della ricetta e regole di prescrizione con le loro fonti) e chiedere il via. Alla prima fermata chiedere anche quale proposta di logo preferisce, con il collegamento a `docs/logo.md` su GitHub, indicando quella consigliata. Se chiede modifiche: farle, aggiornare la PR, richiedere il via. Con il via: unire la PR e continuare. Simone non interviene su GitHub: le PR le unisce Claude.
 - Dopo la tappa 6: stesso giro per l'ultima PR (fatto).
@@ -176,6 +176,8 @@ Quinto blocco (via di Simone del 19/11/2026: «ok. Chiudi tutto ciò che puoi ch
 
 16. Le scelte della fermata dopo la tappa 15 (D181): ripristino delle credenziali di medici e segreteria anche con SPID o CIE; segreteria confermata per archivio; ritardi crescenti dopo i tentativi falliti, blocco del conto oltre una soglia alta e avviso di ogni blocco; codice fiscale del medico corretto dall'amministratore, in sospeso finché il medico conferma; ricette di altri programmi contate in R11 e R6; scheda intera non riservata nell'AFT; elenchi dello studio scritti dai medici e dall'amministratore.
 17. Diagnosi ICD-9-CM con la ricerca per descrizione (la tabella del Ministero si importa quando si può scaricare) e allegati del DPCM LEA (7, 8, 10, 4D) come trascrizioni controllate. **Fermata dopo la tappa 17**, con lo stesso giro (domande con il pulsante, via, unione).
+
+Fermata dopo la tappa 17 fatta (D191): via, pull request #9 unita. Le verifiche di Simone e della Dr.ssa Rocca si fanno alla fine. Dopo l'unione, nello stesso branch: banche dati aggiornate da chi gestisce il servizio (D192), soglie dei tentativi confermate, motivo del ritorno da SPID o CIE scritto dal programma (D193); l'allegato 7 e la D.D. 1167/2022 quando arrivano i file di Simone.
 
 ## Come si chiude
 

@@ -286,7 +286,6 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
             primaSecondi: 2,
             massimaSecondi: 900,
             dimenticaDopoOre: 24,
-            daCompletare: true,
           },
           bancheDati: { configurato: false, ora: null, prossimoGiro: null },
           salvataggi: { nelProgramma: false },
@@ -302,12 +301,14 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
     expect(within(table).getByText('Simulatore')).toBeTruthy();
     expect(within(table).getByText(/invio, accettato \(simulatore\)/)).toBeTruthy();
     expect(screen.getByText(/12 ore/)).toBeTruthy();
-    // Le attese dopo le password sbagliate (D188), con i valori provvisori.
+    // Le attese dopo le password sbagliate (D188), con i valori confermati alla fermata (D191):
+    // non più segnate come provvisorie.
     expect(
       screen.getByText(
-        /Dopo 5 password sbagliate di seguito dalla stessa postazione, o 20 dallo stesso indirizzo, ogni password aspetta: prima 2 secondi, poi il doppio, fino a 15 minuti\..*Valori provvisori, da completare\./,
+        /Dopo 5 password sbagliate di seguito dalla stessa postazione, o 20 dallo stesso indirizzo, ogni password aspetta: prima 2 secondi, poi il doppio, fino a 15 minuti\./,
       ),
     ).toBeTruthy();
+    expect(screen.queryByText(/provvisori/)).toBeNull();
     expect(screen.getByText(/il backup lo fa chi gestisce il server/)).toBeTruthy();
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
