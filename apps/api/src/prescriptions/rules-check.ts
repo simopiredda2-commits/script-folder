@@ -1,10 +1,11 @@
 import { checkPrescription, type DrugFacts, type LineContext, type RuleContext } from '@mmg/rules';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import type { ReferenceData } from '../reference/lookup';
 import {
   delegation,
   exemption,
+  historicalPrescription,
   patient,
   prescription,
   prescriptionLine,
@@ -64,6 +65,18 @@ export async function buildRuleContext(
     .from(prescriptionLine)
     .innerJoin(prescription, eq(prescription.id, prescriptionLine.prescriptionId))
     .where(and(eq(prescription.patientId, p.patientId), eq(prescription.status, 'sent')));
+  // Ricette di farmaci fatte con altri programmi e importate (D176): R6 e R11 le contano dalle
+  // versioni delle regole che lo dicono (D181). Quelle annullate qui, importate per errore, no.
+  const fromOtherPrograms = await db
+    .select()
+    .from(historicalPrescription)
+    .where(
+      and(
+        eq(historicalPrescription.patientId, p.patientId),
+        eq(historicalPrescription.kind, 'farmaco'),
+        isNull(historicalPrescription.annulledAt),
+      ),
+    );
 
   const lineContexts: LineContext[] = lines.map((l) => {
     const t = therapies.find((x) => x.id === l.therapyId);
@@ -159,15 +172,25 @@ export async function buildRuleContext(
       })
       .from(therapeuticPlan)
       .where(and(eq(therapeuticPlan.patientId, p.patientId), eq(therapeuticPlan.status, 'active'))),
-    sentLines: sent
-      .filter((s) => s.sentAt)
-      .map((s) => ({
-        therapyId: s.line.therapyId,
-        drugAic: s.line.drugAic,
-        activeIngredient: s.line.activeIngredient,
-        quantity: s.line.quantity,
-        sentOn: studioDate(s.sentAt!),
+    sentLines: [
+      ...sent
+        .filter((s) => s.sentAt)
+        .map((s) => ({
+          therapyId: s.line.therapyId,
+          drugAic: s.line.drugAic,
+          activeIngredient: s.line.activeIngredient,
+          quantity: s.line.quantity,
+          sentOn: studioDate(s.sentAt!),
+        })),
+      ...fromOtherPrograms.map((h) => ({
+        therapyId: null,
+        drugAic: h.drugAic,
+        activeIngredient: h.activeIngredient,
+        quantity: h.quantity,
+        sentOn: h.prescribedOn,
+        otherProgram: { name: h.sourceProgram },
       })),
+    ],
     drugFacts: drugFacts ?? (() => undefined),
     exemptionExists,
     exemptionServices,

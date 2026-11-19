@@ -8,6 +8,7 @@ import {
   type DrugFacts,
   type LineContext,
   type RuleContext,
+  type SentLineContext,
 } from '../src';
 
 const CF = buildFiscalCode({
@@ -84,12 +85,37 @@ describe('dati delle regole', () => {
 
   it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3', () => {
     const all = loadRulesets();
-    expect(all.map((r) => r.version)).toEqual(['2026-11-18.1', '2026-11-18.2', '2026-11-18.3']);
+    expect(all.map((r) => r.version)).toEqual([
+      '2026-11-18.1',
+      '2026-11-18.2',
+      '2026-11-18.3',
+      '2026-11-19.1',
+    ]);
     const upTo17 = RULE_IDS.filter((id) => id !== 'R18');
     for (const rs of all.slice(0, 2)) {
       expect(rs.rules.map((r) => r.id).sort()).toEqual([...upTo17].sort());
     }
-    expect(all[2]!.rules.map((r) => r.id).sort()).toEqual([...RULE_IDS].sort());
+    for (const rs of all.slice(2)) {
+      expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...RULE_IDS].sort());
+    }
+  });
+
+  it('dal 19/11/2026 R6 e R11 contano le ricette di altri programmi (D181); il resto come la .3', () => {
+    const all = loadRulesets();
+    const v3 = all.find((r) => r.version === '2026-11-18.3')!;
+    const v4 = all.find((r) => r.version === '2026-11-19.1')!;
+    expect(v4.effectiveFrom).toBe('2026-11-19');
+    for (const r of v4.rules) {
+      const before = v3.rules.find((x) => x.id === r.id)!;
+      if (r.id === 'R6' || r.id === 'R11') {
+        expect(r.values, r.id).toEqual({ ...before.values, countOtherPrograms: 1 });
+        expect(r.behavior, r.id).toBe(before.behavior);
+        expect(r.sources.at(-1)!.title, r.id).toMatch(/D181/);
+      } else {
+        expect(r, r.id).toEqual(before);
+      }
+    }
+    expect(rulesetAt('2026-11-19').version).toBe('2026-11-19.1');
   });
 
   it('la versione .2 rende R11 solo informativo (seconda fermata); la .1 resta com’era', () => {
@@ -283,6 +309,83 @@ describe('R5, R6 · piano terapeutico', () => {
     const over = ctx({ ...base, prescription: { lines: [line({ quantity: 2 })] } });
     expect(of(over, 'R6')[0]!.message).toMatch(/residuo 1/);
   });
+
+  // Ricette fatte con altri programmi (D176), importate: senza terapia collegata.
+  const other = (extra: Partial<SentLineContext> = {}): SentLineContext => ({
+    therapyId: null,
+    drugAic: 'AIC-PROVA-1',
+    activeIngredient: null,
+    quantity: 2,
+    sentOn: '2026-10-15',
+    otherProgram: { name: 'Programma di prova' },
+    ...extra,
+  });
+
+  it('R6 dalla versione del 19/11/2026: le ricette di altri programmi contano, e il messaggio lo dice', () => {
+    const sent = [
+      {
+        therapyId: null,
+        drugAic: 'AIC-PROVA-1',
+        activeIngredient: null,
+        quantity: 1,
+        sentOn: '2026-10-01',
+      },
+      other(),
+    ];
+    const c = ctx({
+      date: '2026-11-25',
+      facts: { requiresPlan: true },
+      plans: [plan('2027-01-01', 4)],
+      sentLines: sent,
+      prescription: { lines: [line({ quantity: 2 })] },
+    });
+    expect(run(c).rulesVersion).toBe('2026-11-19.1');
+    expect(blocks(c, 'R6')).toBe(true);
+    expect(of(c, 'R6')[0]!.message).toBe(
+      'Farmaco di prova 5 mg: il piano autorizza 4 confezioni, già prescritte 3, di cui 2 con un altro programma; residuo 1',
+    );
+    // Stesso principio attivo scritto diversamente: è lo stesso farmaco.
+    const byIngredient = ctx({
+      date: '2026-11-25',
+      facts: { requiresPlan: true },
+      plans: [{ ...plan('2027-01-01', 4), drugAic: null, activeIngredient: 'principio di prova' }],
+      sentLines: [
+        other({ drugAic: 'AIC-ALTRO', activeIngredient: ' Principio  di PROVA ', quantity: 3 }),
+      ],
+      prescription: { lines: [line({ quantity: 2 })] },
+    });
+    expect(of(byIngredient, 'R6')[0]!.message).toMatch(
+      /già prescritte 3, di cui 3 con un altro programma; residuo 1/,
+    );
+  });
+
+  it('R6 con le versioni di prima: le ricette di altri programmi non contano', () => {
+    const c = ctx({
+      date: '2026-11-18',
+      facts: { requiresPlan: true },
+      plans: [plan('2027-01-01', 4)],
+      sentLines: [other({ quantity: 3 })],
+      prescription: { lines: [line({ quantity: 2 })] },
+    });
+    expect(run(c).rulesVersion).toBe('2026-11-18.3');
+    expect(of(c, 'R6')).toEqual([]);
+  });
+
+  it('R6: una ricetta di un altro programma senza confezioni non si conta, e lo si dice', () => {
+    const c = ctx({
+      date: '2026-11-25',
+      facts: { requiresPlan: true },
+      plans: [plan('2027-01-01', 4)],
+      sentLines: [other({ quantity: null })],
+      prescription: { lines: [line({ quantity: 1 })] },
+    });
+    expect(blocks(c, 'R6')).toBe(false);
+    const [info] = of(c, 'R6');
+    expect(info!.severity).toBe('info');
+    expect(info!.message).toBe(
+      'Farmaco di prova 5 mg: la ricetta del 15/10/2026 fatta con un altro programma (Programma di prova) non dice quante confezioni: il residuo del piano non la conta',
+    );
+  });
 });
 
 describe('R7 · nota AIFA', () => {
@@ -473,6 +576,61 @@ describe('R11 · contatore delle confezioni (esempio dei requisiti)', () => {
   it('se il medico scrive un motivo, resta registrato', () => {
     const r = run(at('2027-11-11', { R11: 'Partenza per un viaggio' }));
     expect(r.reasonsUsed).toEqual({ R11: 'Partenza per un viaggio' });
+  });
+  it('dal 19/11/2026 conta anche una ricetta più recente fatta con un altro programma (D181)', () => {
+    const c = ctx({
+      date: '2027-11-11',
+      facts: { unitsPerPack: 28 },
+      prescription: { lines: [line({ therapy })] },
+      sentLines: [
+        {
+          therapyId: 't1',
+          drugAic: 'AIC-PROVA-1',
+          activeIngredient: null,
+          quantity: 1,
+          sentOn: '2027-09-01',
+        },
+        {
+          therapyId: null,
+          drugAic: 'AIC-PROVA-1',
+          activeIngredient: null,
+          quantity: 1,
+          sentOn: '2027-10-21',
+          otherProgram: { name: null },
+        },
+      ],
+    });
+    const [issue] = of(c, 'R11');
+    expect(issue!.severity).toBe('info');
+    expect(issue!.message).toBe(
+      'Farmaco di prova 5 mg: la ricetta del 21/10/2027, fatta con un altro programma, copre fino al 17/11/2027 compreso',
+    );
+    // Con la versione di prima conta solo la ricetta di questo programma, che copre fino al 28/9.
+    const v3 = loadRulesets().find((r) => r.version === '2026-11-18.3')!;
+    expect(checkPrescription(c, [v3]).issues.filter((i) => i.ruleId === 'R11')).toEqual([]);
+  });
+  it('una ricetta di un altro programma senza confezioni: il contatore non la conta, e lo dice', () => {
+    const c = ctx({
+      date: '2027-11-11',
+      facts: { unitsPerPack: 28 },
+      prescription: { lines: [line({ therapy })] },
+      sentLines: [
+        {
+          therapyId: null,
+          drugAic: null,
+          activeIngredient: 'Principio di prova',
+          quantity: null,
+          sentOn: '2027-11-01',
+          otherProgram: { name: 'Programma di prova' },
+        },
+      ],
+    });
+    expect(of(c, 'R11').map((i) => [i.severity, i.message])).toEqual([
+      [
+        'info',
+        'Farmaco di prova 5 mg: la ricetta del 01/11/2027 fatta con un altro programma (Programma di prova) non dice quante confezioni: il contatore non la conta',
+      ],
+    ]);
   });
   it('con la versione .1 (avviso) il motivo era obbligatorio: le ricette di allora restano verificabili', () => {
     const [v1] = loadRulesets();

@@ -60,8 +60,14 @@ export interface SentLineContext {
   therapyId: string | null;
   drugAic: string | null;
   activeIngredient: string | null;
-  quantity: number;
+  /** Confezioni. Null solo per una ricetta fatta con un altro programma che non le dice. */
+  quantity: number | null;
   sentOn: string;
+  /**
+   * Ricetta fatta con un altro programma e importata (D176): non è collegata a una terapia.
+   * R6 e R11 la contano dalle versioni delle regole che lo dicono (D181).
+   */
+  otherProgram?: { name: string | null };
 }
 
 export interface RuleContext {
