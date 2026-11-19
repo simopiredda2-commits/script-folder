@@ -8,6 +8,7 @@ import {
 } from '../components/common';
 import { Icon } from '../components/Icon';
 import { ServiceResultText } from '../components/ServiceResult';
+import { ShortageNote } from '../components/Shortage';
 import { query } from '../lib/api';
 import { money } from '../lib/format';
 import { useApi } from '../lib/useApi';
@@ -37,27 +38,37 @@ function Equivalents({ aic }: { aic: string }) {
   if (r.data.equivalenti.length === 0)
     return <p className="tenue">Nessun altro medicinale nello stesso gruppo.</p>;
   return (
-    <table className="tabella">
-      <caption>Medicinali dello stesso gruppo di equivalenza</caption>
-      <thead>
-        <tr>
-          <th scope="col">Medicinale</th>
-          <th scope="col">Ditta</th>
-          <th scope="col">AIC</th>
-          <th scope="col">Prezzo</th>
-        </tr>
-      </thead>
-      <tbody>
-        {r.data.equivalenti.map((e) => (
-          <tr key={e.aic}>
-            <td>{[e.name, e.pack].filter(Boolean).join(' ')}</td>
-            <td>{e.holder ?? '—'}</td>
-            <td className="codice">{e.aic}</td>
-            <td className="numero">{money(e.price)}</td>
+    <div className="tabella-scorrevole">
+      <table className="tabella">
+        <caption>Medicinali dello stesso gruppo di equivalenza</caption>
+        <thead>
+          <tr>
+            <th scope="col">Medicinale</th>
+            <th scope="col">Ditta</th>
+            <th scope="col">AIC</th>
+            <th scope="col" className="numero">
+              Prezzo
+            </th>
+            <th scope="col" className="numero">
+              Differenza dal riferimento
+            </th>
+            <th scope="col">Carenza</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {r.data.equivalenti.map((e) => (
+            <tr key={e.aic}>
+              <td>{[e.name, e.pack].filter(Boolean).join(' ')}</td>
+              <td>{e.holder ?? '—'}</td>
+              <td className="codice">{e.aic}</td>
+              <td className="numero">{money(e.price)}</td>
+              <td className="numero">{money(e.priceDifference) || '—'}</td>
+              <td>{e.shortage ? <ShortageNote shortage={e.shortage} /> : '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -159,6 +170,7 @@ export function DataSearchPage() {
                       AIC {d.aic}
                       {d.atc ? ` · ATC ${d.atc}` : ''}
                     </div>
+                    {d.shortage && <ShortageNote shortage={d.shortage} details />}
                   </div>
                   <button
                     type="button"

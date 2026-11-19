@@ -10,6 +10,7 @@ import {
 } from '../components/common';
 import { Icon } from '../components/Icon';
 import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
+import { ShortageNote, type DrugShortage } from '../components/Shortage';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
@@ -40,6 +41,13 @@ export interface Drug {
   planRequired: boolean | null;
   /** Ditta titolare dell'AIC: per i generici, il fornitore (D151). */
   holder: string | null;
+  /** Lista di trasparenza AIFA (D202): prezzo di riferimento e differenza dal prezzo al pubblico. */
+  referencePrice?: string | null;
+  priceDifference?: string | null;
+  /** Annotazione della lista di trasparenza, in parole. */
+  transparencyRemark?: string | null;
+  /** Carenza secondo l'elenco AIFA in vigore (D202). */
+  shortage?: DrugShortage | null;
 }
 
 export type Service = ServiceResultData;
@@ -144,6 +152,11 @@ export function drugFacts(d: Drug): string[] {
     d.dpc && 'in DPC',
     d.planRequired && 'piano terapeutico obbligatorio',
     d.price && money(d.price),
+    d.referencePrice && `prezzo di riferimento ${money(d.referencePrice)}`,
+    d.priceDifference &&
+      Number(d.priceDifference) > 0 &&
+      `differenza dal riferimento ${money(d.priceDifference)}`,
+    d.transparencyRemark,
   ].filter((x): x is string => !!x);
 }
 
@@ -360,6 +373,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   <strong>{d.name ?? d.activeIngredient}</strong>
                   <div className="tenue">{drugFacts(d).join(' · ')}</div>
                   <div className="codice tenue">AIC {d.aic}</div>
+                  {d.shortage && <ShortageNote shortage={d.shortage} />}
                 </div>
                 <button
                   type="button"

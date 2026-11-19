@@ -799,7 +799,17 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Motivo della sospensione').fill('Reazione cutanea di prova');
     await page.getByLabel(/È una reazione avversa/).check();
     await page.getByLabel('Reazione osservata (facoltativa)').fill('Eritema di prova');
-    await page.getByText(/farmacovigilanza: da completare/).waitFor();
+    // La segnalazione di farmacovigilanza (D82, D202): le pagine AIFA, in una scheda nuova.
+    const report = page.getByRole('link', {
+      name: 'come segnalare una sospetta reazione avversa (AIFA)',
+    });
+    await expect(report.getAttribute('href')).resolves.toBe(
+      'https://www.aifa.gov.it/content/segnalazioni-reazioni-avverse',
+    );
+    await expect(report.getAttribute('rel')).resolves.toBe('noreferrer');
+    await expect(
+      page.getByRole('link', { name: 'segnala online (AIFA)' }).getAttribute('href'),
+    ).resolves.toBe('https://servizionline.aifa.gov.it/schedasegnalazioni/#/');
     await check(page, 'sospensione della terapia');
     await page.getByRole('button', { name: 'Sospendi la terapia' }).click();
     await page
@@ -807,6 +817,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .waitFor();
     await page.locator('.testata-avvisi').getByText('Allergia: AMLODIPINA BESILATO').waitFor();
     await page.getByText(/Motivo: Reazione cutanea di prova/).waitFor();
+    // Dopo la sospensione la segnalazione resta offerta.
+    await page.getByRole('link', { name: 'segnala online (AIFA)' }).waitFor();
     await check(page, 'terapia sospesa', true);
     await page.goto(`${base}/pazienti/${s.richPatient}`);
     await page.getByRole('heading', { name: 'Terapie sospese' }).waitFor();
@@ -2304,6 +2316,62 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect(csv.headers()['content-type']).toMatch(/^text\/csv/);
     expect((await csv.text()).split('\r\n')[0]).toBe(
       '\uFEFFSezione;Data;Tipo;Cognome;Nome;Codice fiscale;Dettaglio;Medico',
+    );
+  });
+
+  it('farmaci carenti (D202): avviso in Oggi, in cartella, nella scheda e nella ricerca con gli equivalenti', async () => {
+    // AMLODIPINA TEVA ITALIA è nell'elenco dei carenti del sito d'esempio (riga vera del 17/11/2026).
+    const [row] = await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .insert(therapy)
+        .values({
+          patientId: s.richPatient,
+          drugAic: '038548032',
+          drugName: 'AMLODIPINA TEVA ITALIA 5 MG COMPRESSE',
+          activeIngredient: 'AMLODIPINA BESILATO',
+          kind: 'chronic',
+          startOn: '2026-01-01',
+          createdBy: s.users.titolare.id,
+        })
+        .returning({ id: therapy.id }),
+    );
+    await gotoNewPage(page, `${base}/`);
+    await page.getByRole('heading', { name: 'Farmaci in terapia carenti' }).waitFor();
+    const patients = page.getByRole('list', {
+      name: 'Pazienti con AMLODIPINA TEVA ITALIA 5 MG COMPRESSE in terapia',
+    });
+    await patients.getByRole('link').first().waitFor();
+    await check(page, 'Oggi con un farmaco carente in terapia', true);
+    await patients.getByRole('link').first().click();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    await page
+      .locator('.terapia-riga')
+      .filter({ hasText: 'AMLODIPINA TEVA ITALIA' })
+      .getByText(/^Farmaco carente: nell’elenco AIFA dei farmaci carenti dal 02\/11\/2026/)
+      .waitFor();
+    await check(page, 'cartella con un farmaco carente', true);
+    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}/terapie/${row!.id}`);
+    await page.getByText(/Indicazioni AIFA: Per trattamento alternativo/).waitFor();
+    await check(page, 'scheda della terapia con la carenza', true);
+    // Nella ricerca: la carenza con i dettagli; gli equivalenti con la differenza e la carenza.
+    await gotoNewPage(page, `${base}/banche-dati`);
+    await page
+      .getByLabel('Nome commerciale, principio attivo, codice AIC o ATC')
+      .fill('amlodipina');
+    const teva = page.locator('.risultato').filter({ hasText: 'AMLODIPINA TEVA ITALIA' });
+    await teva.getByText(/^Farmaco carente:/).waitFor();
+    const doc = page.locator('.risultato').filter({ hasText: 'AMLODIPINA DOC GENERICI' });
+    await doc.getByRole('button', { name: 'Mostra gli equivalenti' }).click();
+    const table = doc.getByRole('table', { name: 'Medicinali dello stesso gruppo di equivalenza' });
+    await table.getByRole('row', { name: /NORVASC .* 5,53\s€ 1,79\s€/ }).waitFor();
+    await table.getByRole('row', { name: /TEVA ITALIA .*Farmaco carente:/ }).waitFor();
+    await check(page, 'ricerca dei farmaci con la carenza e gli equivalenti', true);
+    // Concluse le prove, la terapia non resta in corso per le altre pagine.
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .update(therapy)
+        .set({ status: 'ended', endOn: studioDate(new Date()) })
+        .where(eq(therapy.id, row!.id)),
     );
   });
 });

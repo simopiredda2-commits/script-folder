@@ -5,7 +5,12 @@ import { loadMappings, readSyncState, sha256 } from '@mmg/reference';
 import { eq, sql } from 'drizzle-orm';
 import { strToU8, zipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { exemption, referenceDataset } from '../src/db/schema';
+import {
+  exemption,
+  refDrugShortage,
+  refDrugTransparency,
+  referenceDataset,
+} from '../src/db/schema';
 import { studioDate } from '../src/prescriptions/rules-check';
 import {
   EXAMPLE_TRANSCRIPTIONS,
@@ -289,6 +294,7 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       aifaNote: expect.stringMatching(
         /^cessata commercializzazione definitiva relativa sia al canale retail che al canale ospedaliero:\n- canale retail/,
       ),
+      text: 'nell’elenco AIFA dei farmaci carenti dal 02/11/2026 (Cessata commercializzazione definitiva); equivalente secondo l’elenco: sì',
     });
     expect(teva.facts.shortage).toEqual({
       since: '2026-11-02',
@@ -571,6 +577,61 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     expect(run.code, run.output).toBe(0);
     const r = byFile(await imp({ syncDir: copy }));
     expect(r['piemonte_dpc/farmaci_pht_dpc.json']!.outcome).toBe('trascrizione_superata');
+  });
+
+  // Ultima del gruppo: aggiunge righe alle versioni importate (si possono aggiungere, non cambiare).
+  it('D202: prezzo più recente, equivalenti e ricerca anche da chi è solo nella lista di trasparenza o fra i carenti', async () => {
+    const datasetOf = async (kind: string) => {
+      const [d] = await t.db
+        .select({ id: referenceDataset.id })
+        .from(referenceDataset)
+        .where(eq(referenceDataset.kind, kind));
+      return d!.id;
+    };
+    await t.db.insert(refDrugTransparency).values([
+      // TRULICITY: 153,48 € nella lista di classe A del 30/6; qui un prezzo più recente.
+      {
+        datasetId: await datasetOf('farmaci_trasparenza'),
+        aic: '043783075',
+        publicPrice: '150.00',
+      },
+      // Un equivalente che è solo nella lista di trasparenza.
+      {
+        datasetId: await datasetOf('farmaci_trasparenza'),
+        aic: '099999990',
+        name: 'EQUIVALENTE DI PROVA',
+        activeIngredient: 'Principio di prova',
+        publicPrice: '3.74',
+        referencePrice: '3.74',
+        priceDifference: '0.00',
+        equivalenceGroup: 'DOB',
+      },
+    ]);
+    // Un farmaco che è solo nell'elenco dei carenti.
+    await t.db.insert(refDrugShortage).values({
+      datasetId: await datasetOf('farmaci_carenti'),
+      aic: '099999991',
+      name: 'CARENTE DI PROVA',
+      startOn: '2026-10-01',
+      equivalentAvailable: false,
+      reason: 'Problemi produttivi',
+    });
+    const ref = new ReferenceData(t.db, repo);
+    const d = await ref.drugs(['043783075', '099999990', '099999991'], today);
+    expect(d.get('043783075')!.price).toBe('150.00');
+    expect(d.get('099999990')).toMatchObject({ name: 'EQUIVALENTE DI PROVA', price: '3.74' });
+    expect(d.get('099999991')).toMatchObject({
+      name: 'CARENTE DI PROVA',
+      shortage: { since: '2026-10-01', equivalentAvailable: false },
+      facts: { shortage: { since: '2026-10-01', reason: 'Problemi produttivi' } },
+    });
+    expect((await ref.equivalents('038092019', today)).map((x) => x.aic)).toContain('099999990');
+    expect((await ref.searchDrugs('equivalente di prova', today)).map((x) => x.aic)).toEqual([
+      '099999990',
+    ]);
+    expect([...(await ref.shortages(['099999991', '038092019'], today)).keys()]).toEqual([
+      '099999991',
+    ]);
   });
 });
 

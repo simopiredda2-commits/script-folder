@@ -1,10 +1,26 @@
 import { rulesetAt, value } from '@mmg/rules';
-import { and, asc, count, eq, gte, inArray, lt, lte, or } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, isNotNull, lt, lte, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { Database } from '../db/client';
-import { appointment, patient, patientRequest, prescription, therapeuticPlan } from '../db/schema';
+import {
+  appointment,
+  patient,
+  patientRequest,
+  prescription,
+  therapeuticPlan,
+  therapy,
+} from '../db/schema';
 import { visibleArchives } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
+import type { DrugShortage, ReferenceData } from '../reference/lookup';
+
+/** Un farmaco carente in terapia, con i pazienti che lo prendono (A7, D202). */
+interface ShortDrug {
+  aic: string;
+  farmaco: string;
+  testo: string;
+  pazienti: { id: string; nome: string; cognome: string }[];
+}
 
 const MS_PER_DAY = 86_400_000;
 
@@ -27,7 +43,12 @@ export function startOfStudioDay(date: string): Date {
  * «Oggi»: appuntamenti del giorno e code di lavoro. Le code non sono tabelle ma viste calcolate,
  * come dicono i requisiti; l'anagrafica dei pazienti in agenda non apre la cartella.
  */
-export function registerTodayRoutes(app: FastifyInstance, db: Database, now: () => Date) {
+export function registerTodayRoutes(
+  app: FastifyInstance,
+  db: Database,
+  now: () => Date,
+  reference?: ReferenceData,
+) {
   app.get('/api/oggi', async (req) => {
     const actor = req.actor!;
     const date = studioDate(now());
@@ -130,6 +151,58 @@ export function registerTodayRoutes(app: FastifyInstance, db: Database, now: () 
             .orderBy(asc(therapeuticPlan.expiresOn))
         : [];
 
+    // A7 dei requisiti, per le carenze (D202): i farmaci delle terapie in corso che sono
+    // nell'elenco AIFA dei carenti in vigore oggi, con i pazienti interessati. A chi legge le
+    // terapie dell'archivio (anche la segreteria, che prepara le ripetizioni), e le terapie
+    // riservate solo a chi le legge.
+    const therapyArchives = reference ? await visibleArchives(db, actor, 'therapy.read') : [];
+    const inTherapy =
+      reference && therapyArchives.length
+        ? await db
+            .select({
+              aic: therapy.drugAic,
+              farmaco: therapy.drugName,
+              pazienteId: patient.id,
+              nome: patient.firstName,
+              cognome: patient.lastName,
+            })
+            .from(therapy)
+            .innerJoin(patient, eq(patient.id, therapy.patientId))
+            .where(
+              and(
+                inArray(patient.archiveId, therapyArchives),
+                eq(therapy.status, 'active'),
+                isNotNull(therapy.drugAic),
+                reservedArchives.length
+                  ? or(eq(therapy.reserved, false), inArray(patient.archiveId, reservedArchives))
+                  : eq(therapy.reserved, false),
+              ),
+            )
+            // A parità di paziente, il nome del farmaco: lo stesso elenco a ogni lettura.
+            .orderBy(asc(patient.lastName), asc(patient.firstName), asc(therapy.drugName))
+        : [];
+    const shortages = reference
+      ? await reference.shortages(
+          inTherapy.map((t) => t.aic!),
+          date,
+        )
+      : new Map<string, DrugShortage>();
+    const shortDrugs = new Map<string, ShortDrug>();
+    for (const t of inTherapy) {
+      const s = shortages.get(t.aic!);
+      if (!s) continue;
+      const entry: ShortDrug = shortDrugs.get(t.aic!) ?? {
+        aic: t.aic!,
+        farmaco: t.farmaco,
+        testo: s.text,
+        pazienti: [],
+      };
+      // Lo stesso paziente con due terapie dello stesso farmaco compare una volta.
+      if (!entry.pazienti.some((p) => p.id === t.pazienteId))
+        entry.pazienti.push({ id: t.pazienteId, nome: t.nome, cognome: t.cognome });
+      shortDrugs.set(t.aic!, entry);
+    }
+
     return {
       data: date,
       appuntamenti: appointments
@@ -141,6 +214,9 @@ export function registerTodayRoutes(app: FastifyInstance, db: Database, now: () 
         richiesteAperte: openRequests,
         pianiInScadenza: plans,
         giorniAvvisoPiani: warnDays,
+        farmaciCarenti: [...shortDrugs.values()].sort((a, b) =>
+          a.farmaco.localeCompare(b.farmaco, 'it'),
+        ),
       },
     };
   });

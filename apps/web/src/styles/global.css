@@ -783,6 +783,23 @@ legend {
   color: var(--color-danger);
 }
 
+/* Farmaco carente secondo l'elenco AIFA (D202): simbolo, parola e testo dell'elenco. */
+.carenza {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  color: var(--color-warning);
+}
+
+.carenza .icona {
+  flex: none;
+  margin-top: 0.2rem;
+}
+
+.carenza-annotazione {
+  white-space: pre-line;
+}
+
 .esito-info {
   color: var(--color-info);
 }

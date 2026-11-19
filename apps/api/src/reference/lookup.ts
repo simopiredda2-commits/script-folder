@@ -14,7 +14,7 @@ import {
   searchServices,
   type ServiceIndex,
 } from '@mmg/reference';
-import type { DrugFacts } from '@mmg/rules';
+import { shortageText, type DrugFacts } from '@mmg/rules';
 import { and, desc, eq, ilike, inArray, isNotNull, lte, or, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
@@ -107,8 +107,30 @@ export interface DrugShortage {
   expectedEnd: string | null;
   equivalentAvailable: boolean | null;
   reason: string | null;
+  /** «Suggerimenti/Indicazioni AIFA» dell'elenco. */
   aifaAdvice: string | null;
+  /** «Nota AIFA» dell'elenco: un testo in parole, non il numero di una nota AIFA. */
   aifaNote: string | null;
+  /** La carenza in parole alla data della consultazione, come nella R21. */
+  text: string;
+}
+
+type ShortageRow = typeof refDrugShortage.$inferSelect;
+
+/** La riga dell'elenco come carenza, con il testo alla data. */
+function toShortage(row: ShortageRow, date: string): DrugShortage {
+  const facts = {
+    since: row.startOn,
+    expectedEnd: row.expectedEndOn,
+    equivalentAvailable: row.equivalentAvailable,
+    reason: row.reason,
+  };
+  return {
+    ...facts,
+    aifaAdvice: row.aifaAdvice,
+    aifaNote: row.aifaNote,
+    text: shortageText(facts, date),
+  };
 }
 
 const SEARCH_LIMIT = 30;
@@ -391,9 +413,11 @@ export class ReferenceData {
           ...s.map((x) => x.holder),
         ]),
         drugClass: classA ? 'A' : pick(c.map((x) => x.drugClass)),
+        // Il prezzo al pubblico della lista di trasparenza è il più recente (esce ogni mese, il 15):
+        // vale prima di quello delle liste di classe (D202).
         price: pick([
-          ...(classA ? [classA] : c).map((x) => x.price),
           ...t.map((x) => x.publicPrice),
+          ...(classA ? [classA] : c).map((x) => x.price),
         ]),
         equivalenceGroup: pick([
           ...c.map((x) => x.equivalenceGroup),
@@ -405,18 +429,33 @@ export class ReferenceData {
         referencePrice: pick(t.map((x) => x.referencePrice)),
         priceDifference: pick(t.map((x) => x.priceDifference)),
         transparencyRemark: pick(t.map((x) => x.remark)),
-        shortage: shortage
-          ? {
-              since: shortage.startOn,
-              expectedEnd: shortage.expectedEndOn,
-              equivalentAvailable: shortage.equivalentAvailable,
-              reason: shortage.reason,
-              aifaAdvice: shortage.aifaAdvice,
-              aifaNote: shortage.aifaNote,
-            }
-          : null,
+        shortage: shortage ? toShortage(shortage, date) : null,
         facts,
       });
+    }
+    return out;
+  }
+
+  /**
+   * Le carenze alla data per gli AIC dati (D202), una per AIC come nella R21: per le terapie in
+   * corso e per la pagina Oggi. Senza l'elenco importato, nessuna carenza.
+   */
+  async shortages(aics: readonly string[], date: string): Promise<Map<string, DrugShortage>> {
+    const wanted = [...new Set(aics)];
+    const out = new Map<string, DrugShortage>();
+    if (!wanted.length) return out;
+    const ids = await this.ids('farmaci_carenti', date);
+    if (!ids.length) return out;
+    const rows = await this.db
+      .select()
+      .from(refDrugShortage)
+      .where(and(inArray(refDrugShortage.datasetId, ids), inArray(refDrugShortage.aic, wanted)));
+    for (const aic of wanted) {
+      const row = shortageAt(
+        rows.filter((r) => r.aic === aic),
+        date,
+      );
+      if (row) out.set(aic, toShortage(row, date));
     }
     return out;
   }
