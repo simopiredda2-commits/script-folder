@@ -210,6 +210,13 @@ legend {
   border-bottom: 1px solid var(--color-divider);
 }
 
+/* Nel piede il nome e «by SCRIPT» stanno sulla stessa riga, centrati in verticale. */
+.firma-piede {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
 .app-footer {
   justify-content: space-between;
   border-top: 1px solid var(--color-divider);

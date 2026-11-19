@@ -176,8 +176,9 @@ export function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <footer className="app-footer">
-        <span>
-          {PRODUCT_NAME} <Signature />
+        <span className="firma-piede">
+          <span>{PRODUCT_NAME}</span>
+          <Signature />
         </span>
         <span>Solo pazienti inventati in questo ambiente</span>
       </footer>
