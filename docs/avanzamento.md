@@ -622,6 +622,11 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
   - il temporaneo con la scelta che vale non dà avvisi, fino al giorno della scadenza compreso.
 - **Il giro di ogni notte comprende anche i temporanei.**
 - **Un difetto evitato prima dell'uso**: nella prima versione il secondo «Registra» aspettava il blocco dell'assistito tenendo occupata una connessione al database; con molte richieste insieme le connessioni potevano finire. Ora il blocco non si aspetta, e chi arriva secondo riceve «Registrazione già in corso».
+- **Un difetto trovato dalla CI, presente dalla tappa 6.**
+  - Il problema: la pagina dei pazienti, all'apertura, programmava un aggiornamento dell'indirizzo per la ricerca. Con un clic veloce su «Nuovo paziente», o su un paziente, quell'aggiornamento poteva riportare all'elenco, perché React Router naviga con una transizione.
+  - Come si è visto: nella CI del push è caduta così la prova nel browser della tappa 15.
+  - La correzione: il testo cercato entra subito nell'indirizzo, e la richiesta al servizio parte dopo la pausa; nessuna navigazione in ritardo.
+  - La prova: `apps/web/test/pazienti.test.tsx` (3), con il sabotaggio.
 - **Prove**:
   - `apps/api/test/aura-nuovi-assistiti.test.ts` (11);
   - `apps/api/test/stato-paziente-ricetta.test.ts` (4);
@@ -630,7 +635,7 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
   - `apps/web/test/stato-paziente.test.tsx` (3) e due prove nuove in `apps/web/test/aura.test.tsx`;
   - nel browser, il paziente temporaneo e i nuovi assistiti, con il controllo di accessibilità.
 
-  Lo scenario delle prove tiene in carico il paziente con la cartella piena: con R19 e R20 uno stato dato a caso avrebbe reso instabili le prove delle ricette. Trentasette sabotaggi, tutti rossi con il guasto e verdi dopo il ripristino.
+  Lo scenario delle prove tiene in carico il paziente con la cartella piena: con R19 e R20 uno stato dato a caso avrebbe reso instabili le prove delle ricette. Trentasette sabotaggi di D199, più quello della ricerca dei pazienti, tutti rossi con il guasto e verdi dopo il ripristino.
 
 **Non fatto**: il giro di notte non trova i nuovi assistiti senza notifica (servirebbe l'elenco degli assistiti di un medico, dalle specifiche AURA--SER-01); un paziente che c'è già in un altro archivio dello studio non cambia archivio (domanda per la fermata).
 
@@ -2052,3 +2057,4 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D199: il pulsante dice di chi si tratta                                                                       | AuraSection.tsx: «Registra» senza il nome                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D199: codice fiscale mascherato in Oggi                                                                       | AuraSection.tsx: codice in chiaro                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D199: l'elenco si ricarica dopo il clic                                                                       | AuraSection.tsx: nessuna ricarica                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| Pazienti: nessuna navigazione in ritardo dalla ricerca                                                        | PatientsPage.tsx: indirizzo aggiornato in ritardo, anche all'apertura                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

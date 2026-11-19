@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { query } from '../lib/api';
 import { age, date, maskedFiscalCode } from '../lib/format';
 import { useApi } from '../lib/useApi';
+import { useDebounced } from './PrescriptionEditor';
 
 interface PatientRow {
   id: string;
@@ -15,20 +16,18 @@ interface PatientRow {
   stato: string;
 }
 
-const SEARCH_DELAY_MS = 250;
-
 /** Elenco pazienti con ricerca per nome, cognome, codice fiscale, anno di nascita, telefono. */
 export function PatientsPage() {
   const [params, setParams] = useSearchParams();
   const [text, setText] = useState(params.get('q') ?? '');
-  useEffect(() => {
-    const t = setTimeout(
-      () => setParams(text ? { q: text } : {}, { replace: true }),
-      SEARCH_DELAY_MS,
-    );
-    return () => clearTimeout(t);
-  }, [text, setParams]);
-  const q = params.get('q') ?? '';
+  // Il testo entra subito nell'indirizzo, a ogni tasto, per tornare alla stessa ricerca; la
+  // richiesta al servizio parte dopo una pausa. Nessuna navigazione in ritardo: partita mentre si
+  // apre un'altra pagina (React Router naviga con una transizione), riportava all'elenco.
+  const search = (value: string) => {
+    setText(value);
+    setParams(value ? { q: value } : {}, { replace: true });
+  };
+  const q = useDebounced(text);
   const { data, error, loading } = useApi<{ pazienti: PatientRow[] }>(
     `/api/pazienti${query({ q })}`,
   );
@@ -55,7 +54,7 @@ export function PatientsPage() {
             id="cerca-paziente"
             type="search"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => search(e.target.value)}
             placeholder="Cognome, nome, codice fiscale, anno di nascita o telefono"
             autoComplete="off"
           />
