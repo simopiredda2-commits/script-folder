@@ -441,7 +441,7 @@ try {
   await page.goto(`${base}/profilo/recapiti`);
   await page.getByRole('heading', { level: 1, name: 'Recapiti di studio' }).waitFor();
   await shot(page, '33-recapiti-di-studio');
-  await page.goto(`${base}/strumenti`);
+  await page.goto(`${base}/strumenti?sezione=modelli`);
   await page.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
   await shot(page, '34-strumenti', true);
 

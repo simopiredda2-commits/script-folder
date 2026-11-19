@@ -29,6 +29,11 @@ import { registerReminderRoutes } from './http/reminder-routes';
 import { registerTherapyRoutes } from './http/therapy-routes';
 import { registerTodayRoutes } from './http/today-routes';
 import { registerTemplateRoutes } from './http/template-routes';
+import { registerArchiveAdminRoutes } from './admin/archive-routes';
+import { registerStudioListRoutes } from './admin/list-routes';
+import { registerPrintRoutes } from './admin/print-routes';
+import { registerStudioAdminRoutes } from './admin/studio-routes';
+import { registerUserAdminRoutes } from './admin/user-routes';
 import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
@@ -217,6 +222,13 @@ export function buildApp({
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
   registerAftRoutes(app, createAftService({ db, now: now ?? (() => new Date()) }));
+  // Strumenti e amministrazione dello studio (tappa 14).
+  const adminDeps = { db, now: now ?? (() => new Date()) };
+  registerStudioAdminRoutes(app, adminDeps);
+  registerUserAdminRoutes(app, adminDeps);
+  registerPrintRoutes(app, adminDeps);
+  registerArchiveAdminRoutes(app, adminDeps);
+  registerStudioListRoutes(app, adminDeps);
   registerFollowUpRoutes(app, db, now ?? (() => new Date()));
   // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
   const reference = new ReferenceData(db, loadMappings(), {

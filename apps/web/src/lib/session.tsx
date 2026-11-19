@@ -31,6 +31,8 @@ interface Session {
   logout: () => Promise<void>;
   /** Vero se l'utente è un medico (titolare o sostituto): firma e invia. */
   isDoctor: boolean;
+  /** Vero se l'utente è amministratore dello studio (tappa 14). */
+  isAdmin: boolean;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -69,6 +71,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       refresh,
       logout,
       isDoctor: roles.includes('owner_doctor') || roles.includes('substitute_doctor'),
+      isAdmin: roles.includes('administrator'),
     };
   }, [state, refresh, logout]);
 

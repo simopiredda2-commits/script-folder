@@ -5,6 +5,12 @@ import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { AdminLogSection } from './admin/AdminLogSection';
+import { ListsSection } from './admin/ListsSection';
+import { PrintSection } from './admin/PrintSection';
+import { ServiceSection } from './admin/ServiceSection';
+import { StudioSection } from './admin/StudioSection';
+import { UsersSection } from './admin/UsersSection';
 import { AftSection } from './AftSection';
 import { DataUpdatesSection } from './DataUpdatesSection';
 import { LayoutSection, TemplatesSection } from './TemplatesTools';
@@ -73,13 +79,28 @@ function initial(s: Settings | null): Record<FieldKey, string> {
   };
 }
 
-const SECTIONS = [
-  { key: 'modelli', label: 'Modelli dei certificati', doctorOnly: false },
-  { key: 'impaginazione', label: 'Impaginazione', doctorOnly: true },
-  { key: 'fascicolo', label: 'Fascicolo sanitario', doctorOnly: false },
-  { key: 'banche-dati', label: 'Banche dati', doctorOnly: false },
-  { key: 'aft', label: 'AFT', doctorOnly: true },
-] as const;
+type RoleCode = 'owner_doctor' | 'substitute_doctor' | 'secretary' | 'administrator';
+const DOCTORS: RoleCode[] = ['owner_doctor', 'substitute_doctor'];
+const ALL: RoleCode[] = ['owner_doctor', 'substitute_doctor', 'administrator'];
+
+/** Sezioni di Strumenti e chi le vede (tappa 14); chi può modificare lo decide il servizio. */
+const SECTIONS: { key: string; label: string; roles: RoleCode[] }[] = [
+  { key: 'studio', label: 'Dati dello studio', roles: ALL },
+  { key: 'utenti', label: 'Utenti e ruoli', roles: ['administrator'] },
+  { key: 'stampa', label: 'Postazioni e stampa', roles: ALL },
+  { key: 'elenchi', label: 'Elenchi dello studio', roles: ALL },
+  { key: 'modelli', label: 'Modelli dei certificati', roles: ALL },
+  { key: 'impaginazione', label: 'Impaginazione', roles: DOCTORS },
+  { key: 'fascicolo', label: 'Fascicolo sanitario', roles: ALL },
+  { key: 'banche-dati', label: 'Banche dati', roles: ALL },
+  { key: 'aft', label: 'AFT', roles: ['owner_doctor'] },
+  {
+    key: 'registro',
+    label: 'Registro di amministrazione',
+    roles: ['owner_doctor', 'administrator'],
+  },
+  { key: 'servizio', label: 'Stato del servizio', roles: ['administrator'] },
+];
 
 /**
  * Strumenti dello studio: modelli dei certificati e impaginazione del medico (tappa 13),
@@ -88,10 +109,12 @@ const SECTIONS = [
  * valori dell'accreditamento presso il Gateway: le inserisce l'amministratore, gli altri le leggono.
  */
 export function StudioToolsPage() {
-  const { isDoctor } = useSession();
+  const { state } = useSession();
   const [params, setParams] = useSearchParams();
-  const sections = SECTIONS.filter((x) => !x.doctorOnly || isDoctor);
-  const current = sections.find((x) => x.key === params.get('sezione')) ?? sections[0]!;
+  const roles = state.status === 'ready' ? state.me.ruoli.map((r) => r.codice) : [];
+  const sections = SECTIONS.filter((x) => x.roles.some((r) => roles.includes(r)));
+  const current = sections.find((x) => x.key === params.get('sezione')) ?? sections[0];
+  if (!current) return <PageHeader title="Strumenti dello studio" />;
   return (
     <>
       <PageHeader title="Strumenti dello studio" />
@@ -108,6 +131,12 @@ export function StudioToolsPage() {
           </button>
         ))}
       </div>
+      {current.key === 'studio' && <StudioSection />}
+      {current.key === 'utenti' && <UsersSection />}
+      {current.key === 'stampa' && <PrintSection />}
+      {current.key === 'elenchi' && <ListsSection />}
+      {current.key === 'registro' && <AdminLogSection />}
+      {current.key === 'servizio' && <ServiceSection />}
       {current.key === 'modelli' && <TemplatesSection />}
       {current.key === 'aft' && <AftSection />}
       {current.key === 'impaginazione' && <LayoutSection />}

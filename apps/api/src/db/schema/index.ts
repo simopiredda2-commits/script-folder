@@ -14,3 +14,4 @@ export * from './fse';
 export * from './templates';
 export * from './aft';
 export * from './aft-activity';
+export * from './studio-admin';

@@ -46,6 +46,12 @@ export const appUser = pgTable(
     failedLogins: integer().notNull().default(0),
     lockedUntil: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Password temporanea data dall'amministratore: al primo accesso va cambiata prima di ogni
+     * altra cosa (tappa 14).
+     */
+    mustChangePassword: boolean().notNull().default(false),
+    passwordChangedAt: timestamp({ withTimezone: true }),
   },
   (t) => [uniqueIndex('app_user_username_key').on(t.username)],
 );

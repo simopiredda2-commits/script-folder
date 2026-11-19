@@ -88,7 +88,14 @@ export type AccessAction =
   | 'pdf_profilo_sanitario'
   | 'impostazioni_aft'
   | 'consultazione_aft'
-  | 'attivita_aft';
+  | 'attivita_aft'
+  /** Tappa 14: azioni di amministrazione (dati in `details.area` e `details.azione`, mai segreti). */
+  | 'amministrazione'
+  | 'cambio_password'
+  | 'autorizzazione_archivio'
+  | 'revoca_autorizzazione'
+  | 'lettura_registro_amministrazione'
+  | 'lettura_avvisi_accessi';
 
 export interface AccessEntry {
   studioId?: string | null;

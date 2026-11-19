@@ -39,11 +39,15 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Leggere il registro degli accessi | Sì | No | No | No | No | No |
 | Esportare tutti i dati dell’archivio | Sì | No | No | No | No | No |
 | Decidere che cosa vede la segreteria dell’archivio | Sì | No | No | No | No | No |
+| Autorizzare un sostituto o un collega di gruppo sull’archivio | Sì | No | No | No | No | No |
+| Modificare i dati e le impostazioni dello studio | No | No | No | No | No | Sì |
 | Gestire gli utenti dello studio | No | No | No | No | No | Sì |
 | Gestire le stampanti | No | No | No | No | No | Sì |
 | Gestire le intestazioni | No | No | No | No | No | Sì |
 | Gestire i modelli | No | No | No | No | No | Sì |
 | Avviare subito l’aggiornamento delle banche dati | No | No | No | No | No | Sì |
+| Modificare gli elenchi dello studio (suggeritori, posologie, pacchetti, contatti) | Sì | No | Sì | Sì | Sì | Sì |
+| Leggere il registro delle azioni di amministrazione | Sì | No | No | Sì | Sì | Sì |
 
 <!-- matrice:fine -->
 
