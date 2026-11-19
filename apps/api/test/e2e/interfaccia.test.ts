@@ -2223,4 +2223,64 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await anonymous.close();
     }
   });
+
+  it('cambio di medico dentro lo studio (D200): AURA dice il collega, il titolare di prima sposta il paziente con un clic', async () => {
+    // Un paziente inventato dell'archivio del titolare che le altre prove nel browser non usano.
+    const movingId = s.patients.titolare.at(-2)!;
+    await t.db.update(patient).set({ status: 'active' }).where(eq(patient.id, movingId));
+    const [moving] = await t.db.select().from(patient).where(eq(patient.id, movingId));
+    const name = `${moving!.firstName} ${moving!.lastName}`;
+    const cf = async (userId: string) =>
+      (
+        await t.db
+          .select({ cf: doctorProfile.fiscalCode })
+          .from(doctorProfile)
+          .where(eq(doctorProfile.userId, userId))
+      )[0]!.cf!;
+    // In AURA, il simulatore con dati inventati: da ieri ha scelto il collega dello studio.
+    const yesterday = studioDate(new Date(s.clock.now().getTime() - 86_400_000));
+    aura.register({
+      fiscalCode: moving!.fiscalCode,
+      lastName: moving!.lastName,
+      firstName: moving!.firstName,
+      birthDate: moving!.birthDate,
+      exemptions: [],
+      choices: [
+        {
+          doctorFiscalCode: await cf(s.users.titolare.id),
+          chosenOn: '2020-01-01',
+          expiresOn: null,
+          endedOn: yesterday,
+          endReason: 'Scelta di un altro medico',
+        },
+        {
+          doctorFiscalCode: await cf(s.users.collega.id),
+          chosenOn: yesterday,
+          expiresOn: null,
+          endedOn: null,
+          endReason: null,
+        },
+      ],
+    });
+    await page.goto(`${base}/pazienti/${movingId}/amministrazione#aura`);
+    const section = page.getByRole('region', { name: 'AURA, anagrafe regionale' });
+    await section.getByRole('button', { name: 'Aggiorna da AURA' }).click();
+    await section.getByText(/^Aggiornato da AURA/).waitFor();
+
+    // In Oggi lo decide il titolare di prima: chi, il medico scelto e da quando, con un clic.
+    await page.goto(`${base}/`);
+    const changes = page.getByRole('region', { name: 'Cambi di medico nello studio' });
+    await changes
+      .getByRole('row', { name: new RegExp(name) })
+      .getByText(`Dott. Paolo Serra, dal ${yesterday.split('-').reverse().join('/')}`)
+      .waitFor();
+    await check(page, 'cambio di medico da decidere in Oggi', true);
+    await changes
+      .getByRole('button', { name: `Sposta ${name} nell’archivio di Dott. Paolo Serra` })
+      .click();
+    await changes.getByText(`${name}: spostato nell’archivio di Dott. Paolo Serra.`).waitFor();
+    await check(page, 'paziente spostato nell’archivio del collega');
+    const [after] = await t.db.select().from(patient).where(eq(patient.id, movingId));
+    expect(after).toMatchObject({ archiveId: s.archives.collega, status: 'active' });
+  });
 });

@@ -1394,6 +1394,40 @@ describe('importazione da altri programmi', () => {
       expect(entry!.status).toBe('active');
     });
 
+    it('un paziente passato nell’archivio di un altro medico blocca l’annullamento (D200)', async () => {
+      const { id } = await flow(
+        'spostato.csv',
+        csv([header, [BALDI, '12/08/2024', 'Nota inventata di un paziente poi spostato']]),
+        diaryParts(),
+      );
+      const [baldi] = await t.db.select().from(patient).where(eq(patient.fiscalCode, BALDI));
+      await t.db
+        .update(patient)
+        .set({ archiveId: s.archives.collega })
+        .where(eq(patient.id, baldi!.id));
+      try {
+        const res = await inject('POST', `/api/importazioni/${id}/annulla`, doctor, {
+          motivo: 'Errore',
+        });
+        expect(res.statusCode).toBe(409);
+        expect(res.json<{ errore: string }>().errore).toBe(
+          'Un paziente di questa importazione è passato nell’archivio di un altro medico: l’importazione non si annulla più per intero.',
+        );
+        const [b] = await t.db.select().from(importBatch).where(eq(importBatch.id, id));
+        expect(b!.status).toBe('importato');
+      } finally {
+        await t.db
+          .update(patient)
+          .set({ archiveId: baldi!.archiveId })
+          .where(eq(patient.id, baldi!.id));
+      }
+      // Di nuovo nell'archivio dell'importazione: si annulla.
+      const again = await inject('POST', `/api/importazioni/${id}/annulla`, doctor, {
+        motivo: 'Errore',
+      });
+      expect(again.statusCode, again.body).toBe(200);
+    });
+
     it('un’importazione che ha creato pazienti non si annulla da qui, e lo dice', async () => {
       const [b] = await t.db
         .select()

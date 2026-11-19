@@ -13,7 +13,7 @@ export type AuraOutcome =
 
 export interface AuraChange {
   quando: string;
-  tipo: 'esenzione' | 'scelta' | 'anagrafica' | 'stato';
+  tipo: 'esenzione' | 'scelta' | 'anagrafica' | 'stato' | 'archivio';
   variazione: 'nuova' | 'cambiata' | 'tolta';
   descrizione: string;
   avvio?: 'notte' | 'notifica' | 'manuale' | 'ricetta';
@@ -61,6 +61,7 @@ const KIND_LABEL: Record<AuraChange['tipo'], string> = {
   scelta: 'Scelta del medico',
   anagrafica: 'Anagrafica',
   stato: 'Stato del paziente',
+  archivio: 'Archivio',
 };
 
 /** Il decesso si dice in parole; gli altri dati come sono. */
@@ -555,6 +556,147 @@ export function AuraNewPatientsToday() {
           <Link to={`/pazienti/${existing.id}`}>Apri la cartella del paziente già registrato</Link>
         </p>
       )}
+    </section>
+  );
+}
+
+/** Un cambio di medico dentro lo studio da decidere (D200), per il titolare di prima. */
+export interface DoctorChange {
+  id: string;
+  paziente: { id: string; cognome: string; nome: string };
+  medico: string;
+  medicoId: string;
+  sceltaDal: string;
+}
+
+/** Lo stesso cambio visto dal medico scelto: chi l'ha scelto e chi decide. */
+export interface IncomingDoctorChange {
+  id: string;
+  paziente: { cognome: string; nome: string };
+  daMedico: string;
+  sceltaDal: string;
+}
+
+/**
+ * Cambi di medico dentro lo studio (D200), nella pagina Oggi. Il titolare dell'archivio dove il
+ * paziente sta decide con un clic: «Sposta» nell'archivio del medico scelto in AURA, o «Non
+ * spostare». Il medico scelto sa chi l'ha scelto e chi decide; la cartella non è nel suo archivio,
+ * quindi niente collegamento.
+ */
+export function AuraDoctorChangesToday() {
+  const r = useApi<{ daDecidere: DoctorChange[]; inArrivo: IncomingDoctorChange[] }>(
+    '/api/aura/cambi-medico',
+  );
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  // Una risposta inattesa non deve far cadere la pagina Oggi.
+  const toDecide = Array.isArray(r.data?.daDecidere) ? r.data.daDecidere : [];
+  const incoming = Array.isArray(r.data?.inArrivo) ? r.data.inArrivo : [];
+  if (toDecide.length === 0 && incoming.length === 0 && !done && !error) return null;
+
+  async function act(c: DoctorChange, move: boolean) {
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    const name = `${c.paziente.nome} ${c.paziente.cognome}`;
+    // Il cambio come si vede qui: se AURA nel frattempo cambia la scelta, il servizio lo dice.
+    const body = { medico: c.medicoId, sceltaDal: c.sceltaDal };
+    try {
+      if (move) {
+        await api(`/api/aura/cambi-medico/${c.id}/sposta`, { method: 'POST', body });
+        setDone(`${name}: spostato nell’archivio di ${c.medico}.`);
+      } else {
+        await api(`/api/aura/cambi-medico/${c.id}/non-spostare`, { method: 'POST', body });
+        setDone(
+          `${name}: resta nel tuo archivio. Non si ripropone finché AURA non manda una scelta nuova.`,
+        );
+      }
+    } catch (e) {
+      setError(failure(e));
+    } finally {
+      setBusy(false);
+      r.reload();
+    }
+  }
+
+  return (
+    <section aria-labelledby="titolo-cambi-medico" className="riquadro">
+      <h2 id="titolo-cambi-medico">
+        <Icon name="archivio" /> Cambi di medico nello studio
+      </h2>
+      {toDecide.length > 0 && (
+        <>
+          <h3>Da decidere</h3>
+          <p className="tenue">
+            Hanno scelto in AURA un altro medico dello studio. Lo spostamento nel suo archivio lo
+            decidi tu: la cartella passa intera, con lo storico.
+          </p>
+          <div className="tabella-scorrevole">
+            <table className="tabella">
+              <caption>Pazienti da spostare</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Paziente</th>
+                  <th scope="col">Scelta in AURA</th>
+                  <th scope="col">Azioni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {toDecide.map((c) => {
+                  const name = `${c.paziente.nome} ${c.paziente.cognome}`;
+                  return (
+                    <tr key={c.id}>
+                      <th scope="row">{name}</th>
+                      <td>
+                        {c.medico}, dal {date(c.sceltaDal)}
+                      </td>
+                      <td>
+                        <div className="azioni">
+                          <button
+                            type="button"
+                            className="pulsante pulsante-primario"
+                            disabled={busy}
+                            // Il nome comincia con il testo visibile, e dice chi e dove.
+                            aria-label={`Sposta ${name} nell’archivio di ${c.medico}`}
+                            onClick={() => void act(c, true)}
+                          >
+                            <Icon name="archivio" /> <span>Sposta</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="pulsante pulsante-piatto"
+                            disabled={busy}
+                            aria-label={`Non spostare ${name}`}
+                            onClick={() => void act(c, false)}
+                          >
+                            <Icon name="annulla" /> <span>Non spostare</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+      {incoming.length > 0 && (
+        <>
+          <h3>Ti hanno scelto</h3>
+          <ul className="elenco-semplice">
+            {incoming.map((c) => (
+              <li key={c.id}>
+                {c.paziente.nome} {c.paziente.cognome} ti ha scelto in AURA dal {date(c.sceltaDal)}:
+                è ancora nell’archivio di {c.daMedico}, che decide lo spostamento.
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {done && <Notice kind="fatto">{done}</Notice>}
+      <ErrorMessage error={error} />
     </section>
   );
 }

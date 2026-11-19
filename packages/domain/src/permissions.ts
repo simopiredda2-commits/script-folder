@@ -55,6 +55,11 @@ export const ACTIONS = [
   'archive.settings',
   /** Autorizzazioni sull'archivio: sostituto e colleghi di medicina di gruppo (tappa 14). */
   'archive.grants',
+  /**
+   * Spostare un paziente nell'archivio del medico dello studio che ha scelto in AURA (D200): lo
+   * decide il titolare dell'archivio dove il paziente sta.
+   */
+  'archive.transfer',
   /** Dati e impostazioni dello studio: dati, postazioni, sicurezza, invii, avvisi (tappa 14). */
   'admin.studio',
   'admin.users',
@@ -101,6 +106,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'data.import': 'Importare dati da altri programmi nell’archivio',
   'archive.settings': 'Decidere che cosa vede la segreteria dell’archivio',
   'archive.grants': 'Autorizzare un sostituto o un collega di gruppo sull’archivio',
+  'archive.transfer': 'Spostare un paziente nell’archivio del medico scelto in AURA',
   'admin.studio': 'Modificare i dati e le impostazioni dello studio',
   'admin.users': 'Gestire gli utenti dello studio',
   'admin.printers': 'Gestire le stampanti',
@@ -150,6 +156,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'data.import',
   'archive.settings',
   'archive.grants',
+  'archive.transfer',
 ];
 
 /**
@@ -163,7 +170,8 @@ const DOCTOR_ON_GRANTED_ARCHIVE: Action[] = DOCTOR_ON_OWN_ARCHIVE.filter(
     a !== 'data.import' &&
     a !== 'access_log.read' &&
     a !== 'archive.settings' &&
-    a !== 'archive.grants',
+    a !== 'archive.grants' &&
+    a !== 'archive.transfer',
 );
 
 /** Segreteria condivisa dello studio: lavora su tutti gli archivi dello studio. */

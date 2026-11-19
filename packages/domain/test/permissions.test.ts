@@ -261,6 +261,22 @@ describe('azioni sullo studio di più ruoli (tappa 14)', () => {
     expect(ok(collega, 'archive.grants')).toBe(false);
     expect(ok(amministratore, 'archive.grants')).toBe(false);
   });
+  it('lo spostamento nell’archivio del medico scelto in AURA lo decide solo il titolare (D200)', () => {
+    expect(ok(titolare, 'archive.transfer')).toBe(true);
+    // Né il sostituto né il collega di gruppo, anche con l'autorizzazione attiva.
+    const grants = ctx({
+      grants: [
+        sostituzione,
+        { ...sostituzione, granteeUserId: collega.userId, kind: 'group_colleague' },
+      ],
+    });
+    expect(ok(sostituto, 'archive.transfer', grants)).toBe(false);
+    expect(ok(collega, 'archive.transfer', grants)).toBe(false);
+    expect(ok(segreteria, 'archive.transfer', ctx({ secretaries: [segreteria.userId] }))).toBe(
+      false,
+    );
+    expect(ok(amministratore, 'archive.transfer')).toBe(false);
+  });
 });
 
 describe('autorizzazioni date per errore a chi non è medico', () => {

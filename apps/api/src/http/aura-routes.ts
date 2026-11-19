@@ -8,7 +8,7 @@ import type { AuraService } from '../aura/service';
 import type { Actor } from '../auth/service';
 import { logAccess, logAccessForPatients, type AccessAction } from '../audit/access-log';
 import type { Database } from '../db/client';
-import { auraNewPatient } from '../db/schema';
+import { auraDoctorChange, auraNewPatient } from '../db/schema';
 import { withActor } from '../db/tx';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
 import { createPatient, updateAdmin } from '../patients/admin';
@@ -17,6 +17,10 @@ import type { ReferenceData } from '../reference/lookup';
 import { HttpError } from './errors';
 
 const idParams = z.object({ id: z.uuid() });
+/** Il cambio di medico come l'ha visto chi decide (D200): se AURA nel frattempo cambia, si ricarica. */
+const seenBody = z
+  .object({ medico: z.uuid(), sceltaDal: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })
+  .strict();
 const changesQuery = z.object({ giorni: z.coerce.number().int().min(1).max(90).default(7) });
 /** Per ogni differenza: il valore di AURA che si è visto, e se usarlo o no. */
 const choicesBody = z
@@ -200,6 +204,112 @@ export function registerAuraRoutes(
       details: { nuovoAssistito: id, archivio: c.archiveId },
     });
     return { id, stato: 'non_registrato' };
+  });
+
+  /** Un cambio di medico dello studio di chi chiede (D200); 404 se non c'è. */
+  async function doctorChange(actor: Actor, id: string) {
+    const [c] = await db
+      .select()
+      .from(auraDoctorChange)
+      .where(and(eq(auraDoctorChange.id, id), eq(auraDoctorChange.studioId, actor.studioId)));
+    if (!c) throw new HttpError(404, 'Cambio di medico non trovato');
+    return c;
+  }
+
+  /** Decide solo il titolare dell'archivio dove il paziente sta (archive.transfer). Un no si registra. */
+  async function guardDoctorChange(
+    actor: Actor,
+    c: typeof auraDoctorChange.$inferSelect,
+    action: AccessAction,
+  ) {
+    const decision = can(actor, 'archive.transfer', {
+      ...(await loadArchiveContext(db, c.fromArchiveId)),
+      now: now(),
+    });
+    if (decision.allowed) return;
+    await logAccess(db, {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      patientId: c.patientId,
+      action,
+      outcome: 'negato',
+      workstation: actor.workstation,
+      details: { permesso: 'archive.transfer', cambio: c.id, motivo: decision.reason },
+    });
+    throw new HttpError(403, decision.reason);
+  }
+
+  /**
+   * Cambi di medico dentro lo studio (D200): per il titolare dell'archivio dove il paziente sta,
+   * quelli da decidere; per il medico scelto, chi l'ha scelto e chi decide, senza il collegamento
+   * alla cartella (non è nel suo archivio). Le letture restano nel registro, paziente per paziente.
+   */
+  app.get('/api/aura/cambi-medico', async (req) => {
+    const actor = req.actor!;
+    const own = new Set(await visibleArchives(db, actor, 'archive.transfer'));
+    const rows = await aura.pendingDoctorChanges(actor.studioId);
+    const toDecide = rows.filter((r) => own.has(r.c.fromArchiveId));
+    const incoming = rows.filter(
+      (r) => !own.has(r.c.fromArchiveId) && r.c.toDoctorUserId === actor.userId,
+    );
+    await logAccessForPatients(
+      db,
+      [...new Set([...toDecide, ...incoming].map((r) => r.c.patientId))],
+      {
+        studioId: actor.studioId,
+        userId: actor.userId,
+        action: 'lettura_cambi_medico',
+        outcome: 'consentito',
+        workstation: actor.workstation,
+      },
+    );
+    return {
+      disponibile: aura.available(),
+      daDecidere: toDecide.map((r) => ({
+        id: r.c.id,
+        paziente: { id: r.c.patientId, cognome: r.lastName, nome: r.firstName },
+        medico: r.toName,
+        medicoId: r.c.toDoctorUserId,
+        sceltaDal: r.c.chosenOn,
+      })),
+      inArrivo: incoming.map((r) => ({
+        id: r.c.id,
+        paziente: { cognome: r.lastName, nome: r.firstName },
+        daMedico: r.fromName,
+        sceltaDal: r.c.chosenOn,
+      })),
+    };
+  });
+
+  /** «Sposta» (D200): il paziente passa nell'archivio del medico scelto in AURA. */
+  app.post('/api/aura/cambi-medico/:id/sposta', async (req) => {
+    const actor = req.actor!;
+    const { id } = idParams.parse(req.params);
+    const c = await doctorChange(actor, id);
+    // Prima la guardia: anche una richiesta sbagliata lascia la sua riga nel registro.
+    await guardDoctorChange(actor, c, 'spostamento_archivio');
+    const seen = seenBody.parse(req.body);
+    const r = await aura.moveToChosenDoctor(id, actor, {
+      doctorUserId: seen.medico,
+      chosenOn: seen.sceltaDal,
+    });
+    return {
+      id,
+      stato: 'spostato',
+      paziente: { id: r.patientId, archivio: r.archiveId },
+      statoPaziente: r.status,
+    };
+  });
+
+  /** «Non spostare» (D200): resta nell'archivio, e non si ripropone senza una scelta nuova. */
+  app.post('/api/aura/cambi-medico/:id/non-spostare', async (req) => {
+    const actor = req.actor!;
+    const { id } = idParams.parse(req.params);
+    const c = await doctorChange(actor, id);
+    await guardDoctorChange(actor, c, 'cambio_medico_non_spostato');
+    const seen = seenBody.parse(req.body);
+    await aura.keepInArchive(id, actor, { doctorUserId: seen.medico, chosenOn: seen.sceltaDal });
+    return { id, stato: 'non_spostato' };
   });
 
   app.get('/api/pazienti/:id/aura', scoped, async (req) => {

@@ -253,6 +253,13 @@
       "when": 1795115180048,
       "tag": "0035_aura_nuovi_assistiti",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1795120578409,
+      "tag": "0036_aura_cambio_medico",
+      "breakpoints": true
     }
   ]
 }
