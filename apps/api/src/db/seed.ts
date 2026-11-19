@@ -29,9 +29,11 @@ import {
   doctorProfile,
   fseSetting,
   exemption,
+  family,
   labResultDetail,
   measurementDetail,
   patient,
+  patientChoice,
   prescription,
   prescriptionLine,
   problemDetail,
@@ -218,6 +220,7 @@ try {
   const midnight = startOfStudioDay(studioDate(new Date())).getTime();
   const secretaryId = users.get('segreteria')!;
   const toSign: { patientId: string; therapyId: string; drug: DemoTherapy }[] = [];
+  const pids: string[] = [];
   await withActor(db, doctorId, async (tx) => {
     for (const [index, p] of people.entries()) {
       const [row] = await tx
@@ -238,10 +241,34 @@ try {
           residenceNumber: p.residence.number,
           residenceTown: p.residence.town,
           residenceProvince: p.residence.province,
+          // Dati SSN e CAP inventati (tappa 15): nessuna ASL o comune veri.
+          residencePostalCode: '00000',
+          asl: 'ASL dimostrativa',
+          district: 'Distretto dimostrativo',
           status: p.status,
+          // Canale del promemoria scelto (R15): uno per email, uno su carta.
+          ...(index === 0
+            ? {
+                reminderChannel: 'email' as const,
+                reminderContact: p.email,
+                reminderChannelChosenOn: '2026-01-15',
+              }
+            : index === 1
+              ? { reminderChannel: 'paper' as const, reminderChannelChosenOn: '2026-01-15' }
+              : {}),
         })
         .returning();
       const pid = row!.id;
+      pids.push(pid);
+      // Scelta del medico registrata a mano, in attesa di AURA (tappa 15).
+      await tx
+        .insert(patientChoice)
+        .values({
+          patientId: pid,
+          doctorUserId: doctorId,
+          chosenOn: '2024-01-01',
+          source: 'manual',
+        });
       if (index < APPOINTMENTS_TODAY) {
         const startsAt = new Date(midnight + FIRST_APPOINTMENT_MS + index * QUARTER_MS);
         await tx.insert(appointment).values({
@@ -359,6 +386,15 @@ try {
         });
       }
     }
+    // Un nucleo familiare inventato con due pazienti dello stesso archivio (tappa 15).
+    const [fam] = await tx
+      .insert(family)
+      .values({ studioId: st!.id, label: 'Nucleo dimostrativo' })
+      .returning();
+    await tx
+      .update(patient)
+      .set({ familyId: fam!.id })
+      .where(inArray(patient.id, pids.slice(2, 4)));
   });
 
   // Ripetizioni preparate dalla segreteria, in attesa della firma del medico.
