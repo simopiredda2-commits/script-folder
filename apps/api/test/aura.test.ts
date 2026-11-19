@@ -154,17 +154,9 @@ describe('AURA: esenzioni e scelte dall’anagrafe regionale (D197)', () => {
         },
       ],
     });
-    // Nello scenario il paziente può essere «revocato»: con una scelta in corso del titolare in
-    // AURA torna in carico da solo (D198), e anche questo è una variazione.
-    const [{ status: before }] = (await t.db
-      .select({ status: patient.status })
-      .from(patient)
-      .where(eq(patient.id, s.richPatient))) as [{ status: string }];
+    // Nello scenario il paziente principale è in carico (D199): due esenzioni e una scelta.
     const res = await sync();
-    expect(res.json()).toMatchObject({
-      esito: 'aggiornato',
-      variazioni: before === 'revoked' ? 4 : 3,
-    });
+    expect(res.json()).toMatchObject({ esito: 'aggiornato', variazioni: 3 });
     expect(res.json().stato).toMatchObject({ idAura: auraId, esito: 'aggiornato' });
     expect((await fromAura()).map((e) => [e.code, e.validTo])).toEqual([
       ['013', null],

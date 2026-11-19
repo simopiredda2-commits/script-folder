@@ -274,6 +274,20 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     });
   }
 
+  /**
+   * Per un paziente deceduto la ricetta non si prepara (D199): né la bozza, né la ripetizione. Una
+   * bozza fatta prima la ferma R19, ai controlli prima dell'invio.
+   */
+  function assertNotDeceased(p: { status: string; deceasedOn: string | null }) {
+    if (p.status !== 'deceased') return;
+    throw new HttpError(
+      409,
+      p.deceasedOn
+        ? `Il paziente risulta deceduto il ${p.deceasedOn.split('-').reverse().join('/')}: la ricetta non si fa`
+        : 'Il paziente risulta deceduto: la ricetta non si fa',
+    );
+  }
+
   /** Il medico prepara una ricetta nuova (bozza). Il corpo si valida dopo la guardia. */
   async function createDraft(actor: Actor, patientId: string, body: unknown) {
     const { patient: p } = await guardPatient(
@@ -283,6 +297,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       'prescription.draft',
       'ricetta_bozza',
     );
+    assertNotDeceased(p);
     return insertDraft(actor, patientId, p.archiveId, draftSchema.parse(body), 'draft');
   }
 
@@ -301,6 +316,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       'ricetta_ripetizione',
       { therapyKind: 'chronic' },
     );
+    assertNotDeceased(p);
     const { terapie: therapyIds } = repeatSchema.parse(body);
     const rows = await db
       .select()

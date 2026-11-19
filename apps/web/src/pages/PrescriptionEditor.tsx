@@ -263,8 +263,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
 
   const title = mode === 'farmaci' ? 'Nuova ricetta' : 'Ricetta specialistica';
   const locked = draft !== null;
-
-  return (
+  const header = (
     <>
       <PageHeader
         title={title}
@@ -278,6 +277,30 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         }
       />
       <PatientBanner patient={p} summary={record.data.riepilogo} />
+    </>
+  );
+
+  // Paziente deceduto: la ricetta non si fa (R19, D199). Lo si dice subito, con il rimedio.
+  if (p.status === 'deceased')
+    return (
+      <>
+        {header}
+        <Notice kind="errore">
+          <p>
+            <strong>
+              Il paziente risulta deceduto{p.deceasedOn ? ` il ${date(p.deceasedOn)}` : ''}: la
+              ricetta non si fa.
+            </strong>{' '}
+            Se lo stato è sbagliato, correggilo nei{' '}
+            <Link to={`/pazienti/${id}/amministrazione`}>dati amministrativi</Link> della cartella.
+          </p>
+        </Notice>
+      </>
+    );
+
+  return (
+    <>
+      {header}
 
       <div className="griglia-ricetta">
         <section className="riquadro" aria-labelledby="titolo-cerca">

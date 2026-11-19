@@ -4,9 +4,10 @@ import { addDays, addMonths, daysBetween, italian } from './dates';
 import { value, type Rule, type RuleId } from './ruleset';
 
 /**
- * Le regole di prescrizione R1–R17 dei requisiti, come controlli formali (regola 3: nessun
- * suggerimento diagnostico o terapeutico). Nessun numero è scritto qui: i valori vengono dal
- * file dei dati (packages/rules/data/), e una regola di lint lo controlla.
+ * Le regole di prescrizione R1–R17 dei requisiti, R18 (D154) e lo stato del paziente R19–R20
+ * (D199), come controlli formali (regola 3: nessun suggerimento diagnostico o terapeutico). Nessun
+ * numero è scritto qui: i valori vengono dal file dei dati (packages/rules/data/), e una regola di
+ * lint lo controlla.
  */
 
 export interface Issue {
@@ -98,6 +99,19 @@ function chronicRaiseMissing(rule: Rule, ctx: RuleContext, line: LineContext): s
   }
   return missing;
 }
+
+/** Una scelta del medico vale alla data: iniziata, non cessata, non scaduta (D199). */
+const choiceInForce = (
+  c: { chosenOn: string; expiresOn: string | null; endedOn: string | null },
+  date: string,
+) =>
+  c.chosenOn <= date &&
+  (c.endedOn === null || c.endedOn > date) &&
+  (c.expiresOn === null || date <= c.expiresOn);
+
+/** La data più recente fra quelle date, o null. */
+const latestDate = (dates: (string | null)[]) =>
+  dates.filter((d): d is string => d !== null).sort((a, b) => b.localeCompare(a))[0] ?? null;
 
 const evaluators: Record<RuleId, Evaluator> = {
   R1: (rule, ctx) => {
@@ -561,6 +575,61 @@ const evaluators: Record<RuleId, Evaluator> = {
         lineId: l.id,
         message: `${lineLabel(l)}: non è tra le prestazioni dell'esenzione ${p.exemptionCode}. Spostala su una ricetta senza esenzione o usa un'altra esenzione valida`,
       }));
+  },
+
+  // Paziente deceduto nella cartella: la ricetta non si fa (D199).
+  R19: (rule, ctx) => {
+    if (ctx.patient.status !== 'deceased') return [];
+    const on = ctx.patient.deceasedOn;
+    return [
+      {
+        ruleId: 'R19',
+        severity: severityOf(rule),
+        message: on
+          ? `Il paziente risulta deceduto il ${italian(on)}: la ricetta non si fa`
+          : 'Il paziente risulta deceduto: la ricetta non si fa',
+        remedy: 'Se lo stato è sbagliato, correggilo nei «Dati amministrativi» della cartella',
+      },
+    ];
+  },
+
+  // Paziente revocato, o temporaneo senza una scelta in corso: avviso con un motivo (D199). Il
+  // temporaneo con la scelta che vale non dà avvisi.
+  R20: (rule, ctx) => {
+    const status = ctx.patient.status;
+    if (status !== 'revoked' && status !== 'temporary') return [];
+    const choices = ctx.choices ?? [];
+    if (status === 'temporary' && choices.some((c) => choiceInForce(c, ctx.date))) return [];
+    let what: string;
+    if (status === 'revoked') {
+      const ended = latestDate(
+        choices.map((c) => (c.endedOn && c.endedOn <= ctx.date ? c.endedOn : null)),
+      );
+      what = ended
+        ? `Paziente revocato: la scelta del medico è cessata il ${italian(ended)}`
+        : 'Paziente revocato: non è più in carico';
+    } else {
+      const expired = latestDate(
+        choices.map((c) => (c.expiresOn && c.expiresOn < ctx.date ? c.expiresOn : null)),
+      );
+      what = expired
+        ? `Paziente temporaneo: la scelta è scaduta il ${italian(expired)}`
+        : 'Paziente temporaneo senza una scelta in corso';
+    }
+    const reason = ctx.reasons.R20?.trim();
+    const asksReason = severityOf(rule) === 'warn' && !reason;
+    return [
+      {
+        ruleId: 'R20',
+        severity: asksReason ? 'warn' : 'info',
+        ...(asksReason ? { needs: 'reason' as const } : {}),
+        message: asksReason
+          ? `${what}. Serve un motivo per procedere`
+          : reason
+            ? `${what}; motivo registrato: ${reason}`
+            : what,
+      },
+    ];
   },
 };
 

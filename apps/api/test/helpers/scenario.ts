@@ -246,7 +246,12 @@ export async function createScenario(
     grantedBy: users.titolare.id,
   });
 
-  const people = generatePatients({ seed: `scenario-${suffix}`, count: 8 });
+  // Il paziente con la cartella piena (il primo) è sempre in carico: le prove delle ricette non
+  // dipendono dal caso, perché da R19 e R20 (D199) lo stato conta alla ricetta. Gli altri hanno lo
+  // stato che dà il generatore.
+  const people = generatePatients({ seed: `scenario-${suffix}`, count: 8 }).map((p, i) =>
+    i === 0 ? { ...p, status: 'active' as const } : p,
+  );
   const insertPatients = async (list: typeof people, archiveId: string) => {
     const rows = await withActor(db, users.titolare.id, (tx) =>
       tx

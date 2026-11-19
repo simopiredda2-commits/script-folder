@@ -21,7 +21,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #9 (19/11/2026)**, nello stesso branch ripartito da `main`: le modifiche che seguono dalle risposte. Banche dati aggiornate da chi gestisce il servizio (D192), con il pulsante «Aggiorna adesso» che resta all'amministratore dello studio e vale per tutti gli studi (D194), soglie dei tentativi non più provvisorie (D191), motivo del ritorno da SPID o CIE scritto dal programma e non dall'indirizzo (D193). Pull request #10, unita con il via di Simone («Via, unisci»), con il pulsante rimesso come ha chiesto. Le verifiche di Simone e della Dr.ssa Rocca si fanno alla fine; l'allegato 7 e la D.D. 1167/2022 si trascrivono quando arrivano i file di Simone.
 - **Dopo l'unione della #10 (19/11/2026)**, nello stesso branch: regola nuova in `CLAUDE.md` (non chiedere a Simone ciò che si può fare da sé); PDF del manuale ICD-9-CM indicato da Simone, con l'impronta (`docs/provenienze.md`); allegato 7 trascritto (D195); elenco esenzioni–prestazioni del SAR analizzato e non importato (D196). Fermata fatta: via, pull request #11 unita (risposte in «Risposte della fermata dopo l'unione della #10»).
 - **Dopo l'unione della #11 (19/11/2026)**, nello stesso branch ripartito da `main`: AURA con un simulatore (D197), sezione «Dopo l'unione della #11 – AURA con un simulatore». Simone ha mandato la PEC al CSI Piemonte, in copia alla Regione. Fermata fatta: via, pull request #12 unita (risposte in «Risposte della fermata dopo l'unione della #11»).
-- **Dopo l'unione della #12 (19/11/2026)**, nello stesso branch: revoca automatica e anagrafica da AURA da confermare (D198), con la correzione dei controlli in parallelo; sezione «Dopo l'unione della #12 – Revoca e anagrafica da AURA». Domande nella sezione «Domande per la prossima fermata».
+- **Dopo l'unione della #12 (19/11/2026)**, nello stesso branch: revoca automatica e anagrafica da AURA da confermare (D198), con la correzione dei controlli in parallelo; sezione «Dopo l'unione della #12 – Revoca e anagrafica da AURA». Fermata fatta: via, pull request #13 unita (risposte in «Risposte della fermata dopo l'unione della #12»).
+- **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199).
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -836,11 +837,26 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Annotate dopo l'unione della #12, da fare con il pulsante:
+Da scrivere alla fine del blocco di D199.
 
-1. **Via all'unione della pull request di revoca e anagrafica da AURA** (D198).
-2. **Nuovi assistiti da AURA**: chi sceglie il medico e non è ancora nell'archivio oggi non entra. Proposta: un elenco «Nuovi assistiti in AURA» nella pagina Oggi, registrati con un clic dai dati di AURA da medico o segreteria. Alternative: registrati da soli; per ora no.
-3. **Verifiche alla fine**: restano quelle della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7).
+## Risposte della fermata dopo l'unione della #12 (19/11/2026)
+
+Simone ha risposto con il pulsante:
+
+- **Via**: «Via: unisci». Pull request #13 unita in `main`. Le prove del push dello stesso commit erano tutte verdi, WebKit compreso. Sulla pull request la prova con WebKit si è fermata due volte all'installazione del browser, prima di qualsiasi prova del programma: annullata, e `main` era già contenuto nel branch.
+- **Nuovi assistiti da AURA**: «Elenco in Oggi, un clic». Da fare (D199).
+
+Richiesta di Simone dopo la fermata: «il medico deve poter inserire un paziente in incarico temporaneo e dunque poter prescrivere esami o farmaci. già previsto?». In parte.
+
+- C'erano lo stato «temporaneo», la scelta con la scadenza e le ricette.
+- Mancavano due cose: lo stato si sceglieva solo dopo la registrazione, e alla ricetta il programma non guardava lo stato di nessun paziente.
+
+La proposta: lo stato e la scadenza della scelta già in «Nuovo paziente»; alla ricetta il paziente deceduto blocca, il revocato dà un avviso, il temporaneo dà un avviso solo quando la scelta è scaduta. Simone: «ok, procedi così». Da fare (D199).
+
+## Domande della fermata dopo l'unione della #12 (chiuse)
+
+1. Via all'unione della pull request di revoca e anagrafica da AURA (D198).
+2. Nuovi assistiti da AURA: elenco in Oggi con un clic (consigliata), registrati da soli, o per ora no.
 
 ## Risposte della fermata dopo l'unione della #11 (19/11/2026)
 

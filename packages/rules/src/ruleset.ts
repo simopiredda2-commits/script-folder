@@ -2,7 +2,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
 
-/** Identificativi delle regole dei requisiti. */
+/**
+ * Identificativi delle regole: R1–R17 dei requisiti; R18 chiesta da Simone (D154); R19 e R20 sullo
+ * stato del paziente, per scelta di Simone (D199).
+ */
 export const RULE_IDS = [
   'R1',
   'R2',
@@ -22,6 +25,8 @@ export const RULE_IDS = [
   'R16',
   'R17',
   'R18',
+  'R19',
+  'R20',
 ] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 
