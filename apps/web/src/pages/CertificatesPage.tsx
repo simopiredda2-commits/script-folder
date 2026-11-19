@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
+import { PrintHint } from '../components/PrintHint';
 import { api, ApiError } from '../lib/api';
 import {
   BENEFITS,
@@ -651,6 +652,8 @@ function CertificateCard({
           </>
         )}
       </div>
+      {/* Preferenze di stampa della postazione per la copia e l'attestato (tappa 14). */}
+      {c.stato === 'sent' && <PrintHint kind="certificato_inps" />}
       {c.stato === 'sent' && !contacts.email && (
         <p className="tenue">Nessuna email del lavoratore in anagrafica.</p>
       )}

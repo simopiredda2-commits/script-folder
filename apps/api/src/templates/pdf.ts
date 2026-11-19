@@ -1,4 +1,4 @@
-import type { FilledParts, PrintFont, PrintLayout } from '@mmg/domain';
+import type { FilledParts, PaperSize, PrintFont, PrintLayout } from '@mmg/domain';
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib';
 
 /**
@@ -21,9 +21,18 @@ export interface TemplatePrintData {
    * data, altre firme a sinistra. Assente per i certificati rilasciati prima.
    */
   parts?: FilledParts | null;
+  /**
+   * Carta della postazione per i certificati dai modelli (tappa 14): A4 per difetto, A5 se è la
+   * preferenza di stampa. Cambiano solo le pagine: testo, impaginazione del medico e firme restano.
+   */
+  paper?: PaperSize;
 }
 
-const A4: [number, number] = [595.28, 841.89];
+/** Pagine in punti PDF, in verticale (ISO 216): A4 è quella usata da sempre. */
+const PAGES: Record<PaperSize, [number, number]> = {
+  A4: [595.28, 841.89],
+  A5: [419.53, 595.28],
+};
 const MM = 72 / 25.4;
 
 const FONTS: Record<PrintFont, { regular: StandardFonts; bold: StandardFonts }> = {
@@ -67,14 +76,15 @@ export async function renderTemplatePdf(d: TemplatePrintData): Promise<Uint8Arra
   const size = d.layout.fontSize;
   const lead = size * 1.45;
   const margin = d.layout.marginMm * MM;
-  const width = A4[0] - 2 * margin;
-  let page: PDFPage = doc.addPage(A4);
-  let y = A4[1] - margin;
+  const sheet = PAGES[d.paper ?? 'A4'];
+  const width = sheet[0] - 2 * margin;
+  let page: PDFPage = doc.addPage(sheet);
+  let y = sheet[1] - margin;
 
   const ensure = (needed: number) => {
     if (y - needed < margin) {
-      page = doc.addPage(A4);
-      y = A4[1] - margin;
+      page = doc.addPage(sheet);
+      y = sheet[1] - margin;
     }
   };
   const text = (
@@ -143,7 +153,7 @@ export async function renderTemplatePdf(d: TemplatePrintData): Promise<Uint8Arra
 
   // Testo: un paragrafo dopo l'altro. Un paragrafo che sta in una pagina non si spezza: se non
   // c'è posto va alla pagina dopo, così una dichiarazione resta intera accanto alla sua firma.
-  const usable = A4[1] - 2 * margin;
+  const usable = sheet[1] - 2 * margin;
   // L'ultimo paragrafo resta sulla pagina di luogo, data e firme: la dichiarazione finale va con
   // chi la firma.
   const stamp = d.layout.stamp
