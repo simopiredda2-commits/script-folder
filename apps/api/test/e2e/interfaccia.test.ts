@@ -1701,7 +1701,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await page.goto(`${base}/pazienti/${id}`);
       await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
     }
-    await expect(bar.getByRole('link').count()).resolves.toBe(20);
+    // La barra si aggiorna dopo la pagina: con i motori più lenti (WebKit) si aspetta un attimo.
+    await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
     await expect(activeVisible()).resolves.toBe(true);
     await check(page, 'venti cartelle aperte', true);
 
@@ -1709,7 +1710,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.goto(`${base}/pazienti/${ids[20]}`);
     await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
     await page.getByText(`chiusa quella di ${names.get(ids[0]!)}, usata meno di recente`).waitFor();
-    await expect(bar.getByRole('link').count()).resolves.toBe(20);
+    await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
     await expect(tab(ids[0]!).count()).resolves.toBe(0);
     await expect(activeVisible()).resolves.toBe(true);
     for (const v of TABLETS) {
