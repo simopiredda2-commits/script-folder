@@ -160,6 +160,11 @@ export function Shell({ children }: { children: ReactNode }) {
                 <span>Credenziali</span>
               </NavLink>
             )}
+            {/* La propria password del programma, per tutti (tappa 14). */}
+            <NavLink to="/profilo/password" className="pulsante pulsante-piatto">
+              <Icon name="lucchetto" />
+              <span>Password</span>
+            </NavLink>
             <button
               type="button"
               className="pulsante pulsante-piatto"

@@ -3,7 +3,12 @@ import { PRODUCT_NAME } from '@mmg/brand';
 import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
-import { createAuthService, type Actor } from './auth/service';
+import {
+  allowedBeforePasswordChange,
+  createAuthService,
+  MUST_CHANGE_PASSWORD_ERROR,
+  type Actor,
+} from './auth/service';
 import { createCertificateService } from './certificates/service';
 import type { Config } from './config';
 import { createCredentialService } from './credentials/service';
@@ -188,6 +193,13 @@ export function buildApp({
     if (r.status === 'invalid') throw new HttpError(401, 'Sessione non valida o scaduta');
     if (r.status === 'locked') {
       throw new HttpError(423, 'Sessione bloccata per inattività: inserisci il codice a 6 cifre');
+    }
+    // Password temporanea (tappa 14): prima di ogni altra cosa, la password nuova.
+    if (
+      r.actor.mustChangePassword &&
+      !allowedBeforePasswordChange(req.method, req.routeOptions.url)
+    ) {
+      throw new HttpError(403, MUST_CHANGE_PASSWORD_ERROR, { devoCambiarePassword: true });
     }
     req.actor = r.actor;
   });

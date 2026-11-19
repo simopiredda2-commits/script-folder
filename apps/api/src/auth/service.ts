@@ -1,9 +1,10 @@
 import type { Role } from '@mmg/domain';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, ne } from 'drizzle-orm';
 import { logAccess } from '../audit/access-log';
 import type { Database } from '../db/client';
 import { appUser, authChallenge, session, studio } from '../db/schema';
-import { verifyPassword } from '../security/password';
+import { withActor } from '../db/tx';
+import { hashPassword, verifyPassword } from '../security/password';
 import { decryptSecret, encryptSecret, hashToken, newToken } from '../security/secrets';
 import { newTotpSecret, otpauthUri, verifyTotp } from '../security/totp';
 
@@ -33,7 +34,56 @@ export interface Actor {
   displayName: string;
   sessionId: string;
   workstation: string;
+  /**
+   * Password temporanea data dall'amministratore (tappa 14): finché non la cambia, l'utente può
+   * solo sapere chi è, cambiarla e uscire.
+   */
+  mustChangePassword: boolean;
 }
+
+/**
+ * Regole della password scelta dall'utente (tappa 14). I requisiti e le decisioni non ne fissano:
+ * una lunghezza minima di buon senso, con il secondo fattore sempre obbligatorio, e nessuna regola
+ * su maiuscole, cifre o simboli. La lunghezza massima evita a scrypt testi enormi.
+ */
+export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MAX_LENGTH = 128;
+
+/** Che cosa non va nella password nuova, o null. Le lunghezze si contano in caratteri. */
+export function passwordProblem(
+  next: string,
+  ctx: { username: string; current: string },
+): string | null {
+  const length = [...next.normalize('NFC')].length;
+  if (length < PASSWORD_MIN_LENGTH)
+    return `La nuova password deve avere almeno ${PASSWORD_MIN_LENGTH} caratteri`;
+  if (length > PASSWORD_MAX_LENGTH)
+    return `La nuova password può avere al massimo ${PASSWORD_MAX_LENGTH} caratteri`;
+  if (next.normalize('NFC') === ctx.current.normalize('NFC'))
+    return 'La nuova password deve essere diversa da quella attuale';
+  if (next.trim().toLowerCase() === ctx.username.trim().toLowerCase())
+    return 'La password non può essere il nome utente';
+  return null;
+}
+
+export const MUST_CHANGE_PASSWORD_ERROR = 'Cambia la password temporanea prima di continuare';
+
+/**
+ * Le sole rotte con la sessione aperte a chi deve ancora cambiare la password temporanea; l'uscita
+ * è pubblica e resta sempre possibile.
+ */
+const BEFORE_PASSWORD_CHANGE = new Set([
+  'GET /api/io',
+  'GET /api/profilo/password',
+  'POST /api/profilo/password',
+]);
+
+export function allowedBeforePasswordChange(method: string, url: string | undefined): boolean {
+  return BEFORE_PASSWORD_CHANGE.has(`${method} ${url ?? ''}`);
+}
+
+export type ChangePasswordResult =
+  { ok: true; otherSessionsClosed: number } | { ok: false; status: 400 | 429; message: string };
 
 export type LoginResult =
   | { ok: false; message: string }
@@ -281,6 +331,7 @@ export function createAuthService(deps: AuthDeps) {
       displayName: user.displayName,
       sessionId: s.id,
       workstation: s.workstation,
+      mustChangePassword: user.mustChangePassword,
     };
     if (s.lockedAt) return { status: 'locked', actor };
     const idle = st.idleLockMinutes;
@@ -351,6 +402,91 @@ export function createAuthService(deps: AuthDeps) {
     return true;
   }
 
+  /**
+   * Cambio della propria password (tappa 14), anche quella temporanea data dall'amministratore.
+   * Serve la password attuale: gli errori contano come tentativi falliti, perché da una sessione
+   * rubata non si possa provare una password dopo l'altra. Dopo il cambio le altre sessioni
+   * dell'utente si chiudono, quella in uso resta; i passaggi d'accesso a metà non valgono più.
+   */
+  async function changePassword(
+    actor: Actor,
+    input: { current: string; next: string },
+  ): Promise<ChangePasswordResult> {
+    const rows = await db
+      .select({ user: appUser, studio })
+      .from(appUser)
+      .innerJoin(studio, eq(studio.id, appUser.studioId))
+      .where(eq(appUser.id, actor.userId));
+    const row = rows[0];
+    if (!row) return { ok: false, status: 400, message: 'Utente non trovato' };
+    const { user, studio: st } = row;
+    const t = now();
+    const failed = (motivo: string) =>
+      logAccess(db, {
+        studioId: user.studioId,
+        userId: user.id,
+        action: 'cambio_password',
+        outcome: 'fallito',
+        workstation: actor.workstation,
+        details: { motivo },
+      });
+    if (user.lockedUntil && user.lockedUntil > t) {
+      await failed('utente bloccato per troppi tentativi');
+      return {
+        ok: false,
+        status: 429,
+        message: 'Troppi tentativi falliti: riprova tra qualche minuto',
+      };
+    }
+    const problem = passwordProblem(input.next, {
+      username: user.username,
+      current: input.current,
+    });
+    if (problem) return { ok: false, status: 400, message: problem };
+    if (!(await verifyPassword(input.current, user.passwordHash))) {
+      await registerFailure(user, st);
+      await failed('password attuale errata');
+      return { ok: false, status: 400, message: 'La password attuale non è corretta' };
+    }
+    const passwordHash = await hashPassword(input.next);
+    const closed = await withActor(db, user.id, async (tx) => {
+      await tx
+        .update(appUser)
+        .set({
+          passwordHash,
+          passwordChangedAt: t,
+          mustChangePassword: false,
+          failedLogins: 0,
+        })
+        .where(eq(appUser.id, user.id));
+      const others = await tx
+        .update(session)
+        .set({ revokedAt: t })
+        .where(
+          and(
+            eq(session.userId, user.id),
+            isNull(session.revokedAt),
+            ne(session.id, actor.sessionId),
+          ),
+        )
+        .returning({ id: session.id });
+      await tx
+        .update(authChallenge)
+        .set({ usedAt: t })
+        .where(and(eq(authChallenge.userId, user.id), isNull(authChallenge.usedAt)));
+      await logAccess(tx, {
+        studioId: user.studioId,
+        userId: user.id,
+        action: 'cambio_password',
+        outcome: 'riuscito',
+        workstation: actor.workstation,
+        details: { obbligato: user.mustChangePassword, altreSessioniChiuse: others.length },
+      });
+      return others.length;
+    });
+    return { ok: true, otherSessionsClosed: closed };
+  }
+
   async function logout(sessionToken: string): Promise<void> {
     const row = await loadSession(sessionToken);
     if (!row || row.session.revokedAt) return;
@@ -364,7 +500,7 @@ export function createAuthService(deps: AuthDeps) {
     });
   }
 
-  return { login, verifySecondFactor, authenticate, unlock, logout };
+  return { login, verifySecondFactor, authenticate, unlock, changePassword, logout };
 }
 
 export type AuthService = ReturnType<typeof createAuthService>;
