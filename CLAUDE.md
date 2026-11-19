@@ -47,6 +47,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 - **Regola: con Simone si scrive sempre e solo in italiano.** Vale per ogni messaggio, compresi gli aggiornamenti intermedi, le domande e le descrizioni dei comandi, e per documenti, commit e PR. Codice in inglese, tranne i termini normativi senza equivalente (impegnativa, esenzione, DPC); interfaccia in italiano.
 - Alle fermate le domande si fanno con il pulsante (AskUserQuestion): poche, ognuna con le opzioni e quella consigliata, mai «dimmi tu» in prosa. **Tra le fermate nessuna domanda**: si annotano in `docs/avanzamento.md`.
+- **Regola: non chiedere a Simone ciò che puoi fare da te** (richiesta di Simone del 19/11/2026). Scaricare un file, cercare un atto o una fonte, estrarre o trascrivere dati, provare qualcosa: prima si prova, poi si dice che è fatto. A Simone si chiede solo ciò che da qui non si può fare: decisioni, verifiche cliniche, credenziali e atti amministrativi, file da siti che bloccano questo ambiente (dopo averli provati, dicendo quale sito e quale errore).
 - Se un dettaglio non è deciso: scegli, scrivi scelta e motivo in `docs/decisioni.md`, vai avanti.
 - Se qualcosa è irreversibile: non farlo, annotalo in `docs/avanzamento.md` e prosegui con il resto.
 - Nessun valore inventato o ricostruito a memoria: si legge dal file o dalla fonte, e si dice sempre che cosa non è stato provato.
