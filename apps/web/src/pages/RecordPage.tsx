@@ -248,6 +248,9 @@ export function RecordPage() {
       />
       <PatientBanner patient={p} summary={riepilogo} />
       <nav className="collegamenti-cartella" aria-label="Sezioni della cartella">
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/amministrazione`}>
+          <Icon name="pazienti" /> <span>Dati amministrativi</span>
+        </Link>
         <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/farmaci`}>
           <Icon name="terapia" /> <span>Farmaci prescritti</span>
         </Link>
