@@ -308,8 +308,12 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
       ],
       perMedico: [{ medico: 'Dott.ssa Elena Marchi', numero: 3 }],
     });
-    // I conteggi non hanno nomi di pazienti: una riga nel registro, senza paziente.
-    expect(res.body).not.toContain(first.lastName);
+    // I conteggi non hanno pazienti: né codice fiscale, né identificativo, né campi del paziente;
+    // una riga nel registro, senza paziente. (Non il cognome: lo scenario genera pazienti diversi a
+    // ogni giro, e un paziente può chiamarsi come un medico, che nei conteggi c'è.)
+    expect(res.body).not.toContain(first.fiscalCode);
+    expect(res.body).not.toContain(first.id);
+    expect(res.body).not.toMatch(/"(paziente|pazienteId|cognome|codiceFiscale)"/);
     expect(await lastLog(s.users.titolare.id, 'lettura_riepiloghi')).toMatchObject({
       patientId: null,
       outcome: 'consentito',
@@ -368,7 +372,8 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
       for (const path of ['riepiloghi', 'riepiloghi/esportazione']) {
         const res = await get(who, `/api/archivi/${s.archives.titolare}/${path}${MARCH}`);
         expect(res.statusCode, `${who} ${path}`).toBe(403);
-        expect(res.body).not.toContain(first.lastName);
+        expect(res.body).not.toContain(first.fiscalCode);
+        expect(res.body).not.toContain(first.id);
       }
       expect(await lastLog(s.users[who].id, 'esportazione_riepiloghi')).toMatchObject({
         outcome: 'negato',
