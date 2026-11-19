@@ -901,6 +901,13 @@ describe('archivio del titolare: autorizzazioni, registro di amministrazione, av
         [u.sostituto.id, P[3]!, d1, '06:00'],
         [u.titolare.id, P[1]!, d1, '21:59'],
         [u.titolare.id, P[1]!, d1, '22:00'],
+        // Un'importazione di notte del titolare, una riga per paziente: non sono cartelle aperte
+        // e non è un accesso nella fascia (operazione massiva, nella storia delle importazioni).
+        [u.titolare.id, P[0]!, d1, '23:00', 'importazione'],
+        [u.titolare.id, P[1]!, d1, '23:00', 'importazione'],
+        [u.titolare.id, P[2]!, d1, '23:00', 'importazione'],
+        [u.titolare.id, P[3]!, d1, '23:00', 'importazione'],
+        [u.titolare.id, P[4]!, d1, '23:00', 'importazione'],
         // Quaranta giorni fa: fuori dal periodo di 30 giorni.
         [u.segreteria.id, P[0]!, d40, '10:00'],
         [u.segreteria.id, P[1]!, d40, '10:05'],

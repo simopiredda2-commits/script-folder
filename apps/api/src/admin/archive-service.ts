@@ -173,6 +173,12 @@ const ALERT_ORDER: AlertKind[] = [
 
 /** Le azioni dell'AFT su un paziente: le conta il loro avviso, non quello delle cartelle. */
 const AFT_ACTIONS = sql`('consultazione_aft', 'attivita_aft')`;
+/**
+ * Operazioni massive del titolare sul suo archivio, una riga per paziente toccato: non sono
+ * cartelle aperte. Restano nel registro di ogni paziente e nella storia delle importazioni; negli
+ * avvisi farebbero scattare le soglie a ogni file importato (dalla revisione del piano).
+ */
+const BULK_ACTIONS = sql`('importazione')`;
 
 type RuleState = 'attiva' | 'da_completare' | 'non_valida';
 interface AlertRules {
@@ -747,7 +753,7 @@ export function createArchiveAdminService({ db, now }: Pick<AdminDeps, 'db' | 'n
         await grouped(sql`select l.user_id, ${day} as giorno,
             count(distinct l.patient_id)::int as conteggio, count(distinct l.patient_id)::int as cartelle,
             min(l.at) as primo, max(l.at) as ultimo
-          ${base} and l.action not in ${AFT_ACTIONS}
+          ${base} and l.action not in ${AFT_ACTIONS} and l.action not in ${BULK_ACTIONS}
           group by l.user_id, giorno having count(distinct l.patient_id) > ${daily.soglia}`),
       );
 
@@ -764,7 +770,7 @@ export function createArchiveAdminService({ db, now }: Pick<AdminDeps, 'db' | 'n
         await grouped(sql`select l.user_id, ${day} as giorno,
             count(*)::int as conteggio, count(distinct l.patient_id)::int as cartelle,
             min(l.at) as primo, max(l.at) as ultimo
-          ${base} and ${inBand}
+          ${base} and ${inBand} and l.action not in ${BULK_ACTIONS}
           group by l.user_id, giorno`),
       );
     }

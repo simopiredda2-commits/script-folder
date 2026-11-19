@@ -73,7 +73,7 @@ Quattro elenchi comuni dello studio, in **Strumenti › Elenchi dello studio**: 
 Nella pagina **Archivio**, solo per il titolare:
 
 - **Autorizzazioni sull'archivio:** elenco con medico, tipo, periodo, motivo, chi l'ha data e lo stato (attiva, futura, scaduta, revocata); «Nuova autorizzazione» con tipo, medico, dal e al (giorni interi), motivo; «Revoca», con conferma, chiude subito. Sostituzione ai sostituti; medicina di gruppo agli altri titolari, solo in uno studio di gruppo.
-- **Avvisi sugli accessi anomali** degli ultimi 7, 30 o 90 giorni: cartelle diverse aperte da un utente in un giorno, accessi nella fascia oraria, consultazioni dell'AFT di un collega in un giorno. Con le soglie vuote la pagina dice quali completare e la fonte (Garante, linee guida sul dossier sanitario, par. 7, lett. c).
+- **Avvisi sugli accessi anomali** degli ultimi 7, 30 o 90 giorni: cartelle diverse aperte da un utente in un giorno, accessi nella fascia oraria, consultazioni dell'AFT di un collega in un giorno. Con le soglie vuote la pagina dice quali completare e la fonte (Garante, linee guida sul dossier sanitario, par. 7, lett. c). Le importazioni non contano: sono un'operazione massiva, nella storia delle importazioni.
 
 ## Registro di amministrazione (D177)
 
