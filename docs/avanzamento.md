@@ -524,7 +524,7 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
    - Simulazione del controllo: codici confrontati con l'elenco ufficiale statunitense del 2007 (dopo le correzioni coincidono tutti, tranne E978); titoli in contraddizione, tagliati, fratelli con lo stesso titolo, figli in contraddizione con il padre. Il confronto titolo per titolo con molti agenti è stato fermato.
    - Programma: tipo `diagnosi`, tabella `ref_diagnosis` (migrazione 0029), controlli sull'elenco intero all'importazione, ricerca per parole o codice con i titoli dei padri, rotte `/api/diagnosi`, campi di ricerca nei problemi, nell'anamnesi familiare, nel certificato e nella causa del decesso, titolo del codice scritto a mano con gli avvisi. Catalogo d'esempio con righe vere per le prove e i dati dimostrativi. Fonte `salute_icd9cm` controllata ogni notte da `sync/`.
    - Prove: `packages/reference/test/diagnosi.test.ts`, `icd9cm.test.ts`, `apps/api/test/banche-dati.test.ts`, `apps/web/test/diagnosi.test.tsx`. Otto sabotaggi.
-   - Non provato: il catalogo vero nel database (resta fuori finché non è controllato); la fonte del Ministero da `sync/` (il sito blocca l'ambiente in cloud). Da annotare: nome e impronta del PDF del manuale.
+   - Non provato: il catalogo vero nel database (resta fuori finché non è controllato); la fonte del Ministero da `sync/` (il sito blocca l'ambiente in cloud). Nome e impronta del PDF del manuale (indicato da Simone): in `docs/provenienze.md`.
 
 2. **Allegati del DPCM LEA** (D190): fatto in parte.
    - Allegato 8 trascritto come catalogo delle esenzioni, **da controllare**: 247 codici (66 condizioni e 181 malattie della tabella di corrispondenza), dal 30/10/2026. In `packages/reference/data/trascrizioni/lea/`, impronta del PDF in `docs/provenienze.md`.
@@ -771,7 +771,7 @@ Dettagli in D191. Simone ha risposto con il pulsante:
 - **Soglie dei tentativi**: «Vanno bene così». Non più segnate come provvisorie.
 - **Esenzioni**: «Li scarico io». Simone manda il PDF della D.D. 1167/2022 e un'estrazione dell'allegato 7; poi la trascrizione, che controlla la Dr.ssa Rocca.
 
-Restano annotati: nome e impronta del PDF del manuale ICD-9-CM; l'accreditamento del programma per SPID e CIE.
+Resta annotato l'accreditamento del programma per SPID e CIE. Il PDF del manuale ICD-9-CM l'ha indicato Simone (copia sul sito dell'Università di Padova): nome e impronta sono in `docs/provenienze.md`.
 
 ## Domande della fermata dopo la tappa 17 (chiuse)
 

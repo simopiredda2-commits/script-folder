@@ -912,7 +912,7 @@ Prove e sabotaggi.
 - **Soglie dei tentativi** (D188): «Vanno bene così». Le attese (5 password dalla postazione, 20 dall'indirizzo, da 2 secondi a 15 minuti, una provenienza dimenticata dopo un giorno) e le soglie del conto (50 password, 5 codici) restano queste e non sono più segnate come provvisorie: si riguardano se in studio danno fastidio.
 - **Esenzioni** (D190): «Li scarico io». Simone manda il PDF della D.D. 1167/2022 dal Bollettino (elenco regionale esenzioni–prestazioni, per R17) e un'estrazione dell'allegato 7 (malattie rare), come per l'ICD-9-CM; poi la trascrizione, che controlla la Dr.ssa Rocca. Fino ad allora R17 resta «non verificabile» e le malattie rare restano fuori dal catalogo.
 
-Restano annotati: nome e impronta del PDF del manuale ICD-9-CM, l'accreditamento del programma per SPID e CIE.
+Restano annotati: nome e impronta del PDF del manuale ICD-9-CM (poi indicato da Simone e registrato in `docs/provenienze.md`), l'accreditamento del programma per SPID e CIE.
 
 **D192 · Le banche dati le aggiorna chi gestisce il servizio (D191).** Superata in parte da D194: il pulsante dello studio resta. Le banche dati sono comuni a tutti gli studi del servizio (D156): un aggiornamento avviato da uno studio cambiava i dati di tutti. Scelte:
 
