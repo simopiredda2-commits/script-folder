@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { DEFAULT_PRINT_LAYOUT } from '@mmg/domain';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { accessLog, changeHistory, printSetting, studio, workstation } from '../src/db/schema';
@@ -512,5 +512,58 @@ describe('preferenze di stampa (tappa 14)', () => {
     expect(pages[0]).toContain('Primo paragrafo breve.');
     expect(pages[0]).toContain('Riga lunga 1.');
     expect(pages.join(' ')).toContain('Riga lunga 35.');
+  });
+
+  it('salvare le preferenze dello studio non va in stallo con il registro di un accesso sbagliato (terza revisione)', async () => {
+    const saved0 = await put(setting({ tipo: 'schema_orario', stampante: 'Stampante di prima' }));
+    expect(saved0.statusCode, saved0.body).toBe(200);
+    const [row] = await t.db
+      .select({ id: printSetting.id })
+      .from(printSetting)
+      .where(
+        and(
+          eq(printSetting.studioId, s.studioId),
+          isNull(printSetting.workstationId),
+          eq(printSetting.documentKind, 'schema_orario'),
+        ),
+      );
+    const waiters = async () =>
+      (
+        await t.pool.query<{ n: number }>(
+          "select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'",
+        )
+      ).rows[0]!.n;
+    const pause = () => new Promise((r) => setTimeout(r, 25));
+    const holder = await t.pool.connect();
+    let saved: Awaited<ReturnType<typeof put>>;
+    let failed: Awaited<ReturnType<typeof put>>;
+    try {
+      await holder.query('begin');
+      await holder.query('select id from print_setting where id = $1 for update', [row!.id]);
+      // Il salvataggio blocca lo studio e aspetta la riga della preferenza, tenuta dalla prova.
+      const saving = put(setting({ tipo: 'schema_orario', stampante: 'Stampante di dopo' }));
+      for (let i = 0; i < 400 && (await waiters()) < 1; i++) await pause();
+      // Un accesso sbagliato di un utente dello studio scrive la sua riga del registro, che punta
+      // allo studio: con lo studio bloccato FOR UPDATE resterebbe fermo, con la catena in mano.
+      const failing = s.app.inject({
+        method: 'POST',
+        url: '/api/accesso',
+        payload: {
+          username: s.users.segreteria.username,
+          password: 'una password sbagliata di prova',
+          postazione: 'postazione di prova',
+        },
+      });
+      let done = false;
+      void failing.then(() => (done = true));
+      for (let i = 0; i < 40 && !done && (await waiters()) < 2; i++) await pause();
+      await holder.query('commit');
+      [saved, failed] = await Promise.all([saving, failing]);
+    } finally {
+      await holder.query('rollback').catch(() => undefined);
+      holder.release();
+    }
+    expect(saved.statusCode, saved.body).toBe(200);
+    expect(failed.statusCode, failed.body).toBe(401);
   });
 });

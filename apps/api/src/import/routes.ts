@@ -15,7 +15,7 @@ import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z, ZodError } from 'zod';
 import type { AdminDeps } from '../admin/deps';
-import { logAccess, type AccessAction } from '../audit/access-log';
+import { logAccess, logAccessForPatients, type AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import { appUser, archive, importBatch, importProfile } from '../db/schema';
 import { withActor } from '../db/tx';
@@ -483,26 +483,23 @@ export function registerImportRoutes(app: FastifyInstance, deps: AdminDeps): voi
             finishedAt: deps.now(),
           })
           .where(eq(importBatch.id, batch.id));
-        for (const patientId of [...r.newPatients, ...r.existingPatients])
-          await logAccess(tx, {
-            studioId: actor.studioId,
-            userId: actor.userId,
-            patientId,
-            action,
-            outcome: 'consentito',
-            workstation: actor.workstation,
-            details: { permesso: 'data.import', importazione: batch.id },
-          });
-        for (const patientId of r.foreignPatients)
-          await logAccess(tx, {
-            studioId: actor.studioId,
-            userId: actor.userId,
-            patientId,
-            action,
-            outcome: 'negato',
-            workstation: actor.workstation,
-            details: { permesso: 'data.import', importazione: batch.id, motivo: FOREIGN },
-          });
+        // Una riga per paziente, ma in un comando solo per esito (logAccessForPatients).
+        await logAccessForPatients(tx, [...r.newPatients, ...r.existingPatients], {
+          studioId: actor.studioId,
+          userId: actor.userId,
+          action,
+          outcome: 'consentito',
+          workstation: actor.workstation,
+          details: { permesso: 'data.import', importazione: batch.id },
+        });
+        await logAccessForPatients(tx, [...r.foreignPatients], {
+          studioId: actor.studioId,
+          userId: actor.userId,
+          action,
+          outcome: 'negato',
+          workstation: actor.workstation,
+          details: { permesso: 'data.import', importazione: batch.id, motivo: FOREIGN },
+        });
         await logAccess(tx, {
           studioId: actor.studioId,
           userId: actor.userId,

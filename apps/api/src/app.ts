@@ -4,15 +4,16 @@ import { sql } from 'drizzle-orm';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 import {
+  type Actor,
   allowedBeforePasswordChange,
   createAuthService,
   MUST_CHANGE_PASSWORD_ERROR,
-  type Actor,
+  SERVICE_BUSY_ERROR,
 } from './auth/service';
 import { createCertificateService } from './certificates/service';
 import type { Config } from './config';
 import { createCredentialService } from './credentials/service';
-import type { Database } from './db/client';
+import { isPoolTimeout, type Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
@@ -186,6 +187,12 @@ export function buildApp({
     }
     if (err instanceof ZodError) {
       return reply.status(400).send({ errore: 'Dati non validi', dettagli: err.issues });
+    }
+    // Tutte le connessioni del database occupate oltre l'attesa massima (db/client.ts): il servizio
+    // è occupato, non rotto. Chi chiede riprova; nei log solo il fatto.
+    if (isPoolTimeout(err)) {
+      req.log.warn('nessuna connessione libera al database entro l’attesa massima');
+      return reply.status(503).send({ errore: SERVICE_BUSY_ERROR });
     }
     req.log.error(err);
     return reply.status(500).send({ errore: 'Errore interno' });

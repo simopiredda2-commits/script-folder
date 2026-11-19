@@ -367,11 +367,15 @@ export function createPrintService(deps: AdminDeps) {
             );
           station = w;
         } else {
+          // FOR NO KEY UPDATE, non FOR UPDATE: mette in fila due salvataggi dello studio senza
+          // fermare le righe del registro che puntano allo studio (chiave esterna, FOR KEY SHARE).
+          // Con FOR UPDATE un accesso sbagliato, fermo sullo studio con la catena del registro in
+          // mano, e questo salvataggio, fermo sulla catena, andavano in stallo (terza revisione).
           await tx
             .select({ id: studio.id })
             .from(studio)
             .where(eq(studio.id, actor.studioId))
-            .for('update');
+            .for('no key update');
         }
         const [current] = (await settingRows(tx, actor.studioId, station?.id ?? null)).filter(
           (r) => r.documentKind === kind,

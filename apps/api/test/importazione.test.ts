@@ -22,6 +22,7 @@ import {
   therapy,
   vaccinationDetail,
 } from '../src/db/schema';
+import { verifyAccessLog } from '../src/audit/access-log';
 import { withActor } from '../src/db/tx';
 import { importError } from '../src/import/errors';
 import { studioDate } from '../src/prescriptions/rules-check';
@@ -377,6 +378,8 @@ describe('importazione da altri programmi', () => {
         .where(and(eq(accessLog.patientId, p!.id), eq(accessLog.action, 'importazione')));
       expect(logs).toHaveLength(1);
       expect(logs[0]!.details).toMatchObject({ importazione: batchId });
+      // Le righe dei pazienti si scrivono in un comando solo: la catena del registro resta intera.
+      expect(await verifyAccessLog(t.db)).toBeNull();
     });
 
     it('la stessa importazione una seconda volta non scrive nulla di nuovo', async () => {
