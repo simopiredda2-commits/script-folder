@@ -478,8 +478,9 @@ try {
   await page.goto(`${base}/profilo/recapiti`);
   await page.getByRole('heading', { level: 1, name: 'Recapiti di studio' }).waitFor();
   await shot(page, '33-recapiti-di-studio');
-  await page.goto(`${base}/strumenti?sezione=modelli`);
-  await page.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
+  // Le impostazioni del Fascicolo (D133): dalla tappa 14 la pagina apre una sezione alla volta.
+  await page.goto(`${base}/strumenti?sezione=fascicolo`);
+  await page.getByRole('heading', { level: 2, name: 'Fascicolo Sanitario Elettronico' }).waitFor();
   await shot(page, '34-strumenti', true);
 
   // Tappa 13: modelli ufficiali e proposti (D158, D160), e il certificato della patente.
@@ -604,6 +605,14 @@ try {
   if (adminPassword) {
     // Dalla postazione dell'ambulatorio: «Questa postazione» mostra le sue preferenze di stampa.
     const admin = await firstLogin(browser, base, adminUser, adminPassword, 'Ambulatorio');
+    // Una segreteria nuova (inventata): aspetta la conferma di un medico titolare (D179).
+    await admin.page.goto(`${base}/strumenti?sezione=utenti`);
+    const form = admin.page.getByRole('form', { name: 'Nuovo utente' });
+    await form.getByLabel('Nome utente').fill('segreteria.pomeriggio');
+    await form.getByLabel('Nome mostrato').fill('Segreteria del pomeriggio');
+    await form.getByLabel('Segreteria', { exact: true }).check();
+    await form.getByRole('button', { name: 'Crea l’utente' }).click();
+    await admin.page.getByText('Utente creato: Segreteria del pomeriggio.').waitFor();
     for (const [sezione, title, name] of [
       ['utenti', 'Utenti e ruoli', '51-utenti-e-ruoli'],
       ['studio', 'Dati e impostazioni dello studio', '52-dati-dello-studio'],
@@ -615,6 +624,13 @@ try {
       await shot(admin.page, name, true);
     }
     await admin.ctx.close();
+    // Il medico titolare la trova fra gli utenti da confermare, con chi l'ha chiesta e quando.
+    await page.goto(`${base}/strumenti?sezione=conferme`);
+    await page
+      .getByRole('table', { name: 'Utenti in attesa della conferma di un medico titolare' })
+      .getByText('segreteria.pomeriggio')
+      .waitFor();
+    await shot(page, '55-utenti-da-confermare', true);
   } else console.log('  (schermate dell’amministratore saltate: manca la sua password)');
 
   // Più cartelle aperte insieme (D68, D129): una scheda per paziente nella barra sotto il menu,

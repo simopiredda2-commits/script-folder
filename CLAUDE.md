@@ -92,27 +92,28 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 
 ## Comandi
 
-| Comando                                                                                              | Cosa fa                                                                                               |
-| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `pnpm install`                                                                                       | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                                                  |
-| `pnpm dev`                                                                                           | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)                        |
-| `pnpm test`                                                                                          | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python)                       |
-| `pnpm lint`                                                                                          | ESLint, Prettier in controllo, tipi di ogni pacchetto                                                 |
-| `pnpm format`                                                                                        | Prettier in scrittura                                                                                 |
-| `pnpm db:migrate`                                                                                    | Applica le migrazioni a `DATABASE_URL`                                                                |
-| `pnpm db:seed`                                                                                       | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)                        |
-| `pnpm studio:crea -- --nome … --tipo singolo --regione … --amministratore … --nome-amministratore …` | Primo avvio di uno studio vero: studio e primo amministratore, password temporanea mostrata una volta |
-| `pnpm banche-dati:importa -- --dati DIR --trascrizioni DIR`                                          | Importa l'output di `sync/` e le trascrizioni dei PDF                                                 |
-| `pnpm banche-dati:importa -- --esempio`                                                              | Lancia `sync/` sul sito d'esempio e importa (banche dati dimostrative)                                |
-| `pnpm banche-dati:aggiorna -- --dati DIR --trascrizioni DIR`                                         | Aggiornamento completo: `sync/`, importazione, registro del giro (D156)                               |
-| `pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts`                                              | Fotografa le schermate per `docs/interfaccia.md` (istruzioni nel file)                                |
-| `pnpm --filter @mmg/domain docs:permessi`                                                            | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                                            |
-| `pnpm --filter @mmg/rules docs:regole`                                                               | Rigenera la tabella di `docs/regole.md` dai dati delle regole                                         |
-| `pnpm --filter @mmg/api db:generate`                                                                 | Genera una migrazione dallo schema Drizzle                                                            |
-| `pnpm fixtures -- --seed 1 --count 20`                                                               | Pazienti inventati in JSON (stesso seme, stessi pazienti)                                             |
-| `pnpm --filter @mmg/brand tokens:css`                                                                | Rigenera `tokens.css` da `tokens.ts`                                                                  |
-| `pnpm --filter @mmg/brand logo:proposte`                                                             | Rigenera le proposte di logo e le tavole di `docs/logo.md`                                            |
-| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'`                                               | Prova un controllo: rosso col guasto, verde dopo il ripristino                                        |
+| Comando                                                                                                           | Cosa fa                                                                                                     |
+| ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `pnpm install`                                                                                                    | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                                                        |
+| `pnpm dev`                                                                                                        | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)                              |
+| `pnpm test`                                                                                                       | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python)                             |
+| `pnpm lint`                                                                                                       | ESLint, Prettier in controllo, tipi di ogni pacchetto                                                       |
+| `pnpm format`                                                                                                     | Prettier in scrittura                                                                                       |
+| `pnpm db:migrate`                                                                                                 | Applica le migrazioni a `DATABASE_URL`                                                                      |
+| `pnpm db:seed`                                                                                                    | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)                              |
+| `pnpm studio:crea -- --nome … --tipo singolo --regione … --amministratore … --nome-amministratore …`              | Primo avvio di uno studio vero: studio e primo amministratore, password temporanea mostrata una volta       |
+| `pnpm utente:ripristina -- --utente NOME [--conferma] [--sblocca] [--secondo-fattore] [--sospendi \| --riattiva]` | Dal server: conferma di chi è in attesa quando nessun titolare può farlo, sblocco, credenziali nuove (D179) |
+| `pnpm banche-dati:importa -- --dati DIR --trascrizioni DIR`                                                       | Importa l'output di `sync/` e le trascrizioni dei PDF                                                       |
+| `pnpm banche-dati:importa -- --esempio`                                                                           | Lancia `sync/` sul sito d'esempio e importa (banche dati dimostrative)                                      |
+| `pnpm banche-dati:aggiorna -- --dati DIR --trascrizioni DIR`                                                      | Aggiornamento completo: `sync/`, importazione, registro del giro (D156)                                     |
+| `pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts`                                                           | Fotografa le schermate per `docs/interfaccia.md` (istruzioni nel file)                                      |
+| `pnpm --filter @mmg/domain docs:permessi`                                                                         | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                                                  |
+| `pnpm --filter @mmg/rules docs:regole`                                                                            | Rigenera la tabella di `docs/regole.md` dai dati delle regole                                               |
+| `pnpm --filter @mmg/api db:generate`                                                                              | Genera una migrazione dallo schema Drizzle                                                                  |
+| `pnpm fixtures -- --seed 1 --count 20`                                                                            | Pazienti inventati in JSON (stesso seme, stessi pazienti)                                                   |
+| `pnpm --filter @mmg/brand tokens:css`                                                                             | Rigenera `tokens.css` da `tokens.ts`                                                                        |
+| `pnpm --filter @mmg/brand logo:proposte`                                                                          | Rigenera le proposte di logo e le tavole di `docs/logo.md`                                                  |
+| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'`                                                            | Prova un controllo: rosso col guasto, verde dopo il ripristino                                              |
 
 Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano). Il servizio vuole anche `APP_ENCRYPTION_KEY` (in cloud la imposta l'hook).
 

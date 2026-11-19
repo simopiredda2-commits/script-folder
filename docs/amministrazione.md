@@ -10,6 +10,7 @@ Tutto sta in **Strumenti**, una scheda per area. Ognuno vede le schede del suo r
 | --------------------------- | ----------------- | ----------------- | ----------------- | ---------- |
 | Dati dello studio           | Modifica          | Legge             | Legge             | —          |
 | Utenti e ruoli              | Modifica          | —                 | —                 | —          |
+| Utenti da confermare        | —                 | Conferma          | —                 | —          |
 | Postazioni e stampa         | Modifica          | La sua postazione | La sua postazione | —          |
 | Elenchi dello studio        | Modifica          | Modifica          | Modifica          | Legge      |
 | Modelli dei certificati     | Modifica          | Modifica          | Modifica          | —          |
@@ -34,13 +35,31 @@ pnpm studio:crea -- --nome "Studio medico …" --tipo singolo --regione PIEMONTE
 
 Il comando applica le migrazioni, crea lo studio e il primo amministratore (senza accesso clinico) e mostra una sola volta la password temporanea. Al primo accesso si attiva il secondo fattore e si cambia la password; poi l'amministratore crea gli altri utenti da Strumenti. In produzione (`APP_AMBIENTE=produzione`, D170) i dati dimostrativi non si possono creare.
 
+Il primo medico titolare lo crea l'amministratore, ma resta in attesa: nello studio non c'è ancora un titolare che possa confermarlo. Lo conferma chi gestisce il servizio, sul server, e la password temporanea si vede solo lì, una volta, da consegnare al medico (D179):
+
+```sh
+pnpm utente:ripristina -- --utente nome.cognome --conferma
+```
+
+Da lì in poi medici e segreteria li conferma un titolare, dal programma. Con un titolare attivo e confermato il comando rifiuta e rimanda alla conferma dal programma.
+
 ## Utenti e ruoli (D164) e password (D165)
 
-- L'amministratore crea gli utenti con uno o più ruoli e, per i medici, nome, cognome, codice fiscale (controllato), codice regionale e ASL. La password temporanea si vede una volta e va consegnata di persona; al primo accesso si cambia prima di ogni altra cosa.
+- L'amministratore crea gli utenti con uno o più ruoli e, per i medici, nome, cognome, codice fiscale (controllato), codice regionale e ASL. La password temporanea si vede una volta e va consegnata di persona (per medici e segreteria la riceve il titolare che conferma, qui sotto); al primo accesso si cambia prima di ogni altra cosa.
 - Il ruolo di titolare crea l'archivio del medico; togliere un ruolo non cancella nulla.
-- Sospendere, riattivare, sbloccare dopo troppi tentativi: dall'elenco, con conferma. Nessuno agisce su sé stesso e nessuno cambia i propri ruoli; l'ultimo amministratore attivo non si toglie.
+- Sospendere, riattivare, sbloccare dopo troppi tentativi: dall'elenco, con conferma (per medici e segreteria con i limiti qui sotto). Nessuno agisce su sé stesso e nessuno cambia i propri ruoli; l'ultimo amministratore attivo non si toglie.
 - Password da 12 a 128 caratteri, diversa dalla precedente e dal nome utente; gli errori sulla password attuale contano come tentativi falliti; il cambio chiude le altre sessioni.
-- Limiti ai poteri dell'amministratore sull'accesso clinico: dopo la revisione (sezione in costruzione, decisione a parte).
+
+### L'amministratore non si prende l'accesso clinico (D179)
+
+Requisiti, «Utenti e ruoli»: l'amministratore non ha accesso clinico, a meno che non sia anche medico. Chi crea gli utenti e ne gestisce le credenziali, però, potrebbe creare un medico o una segreteria, o ripristinarne la password, ed entrare al suo posto. Per questo, con le correzioni di una revisione avversaria:
+
+- **Conferma di un titolare.** Chi ha un ruolo con i dati dei pazienti (medico titolare, medico sostituto, segreteria), creato dall'amministratore o con uno di quei ruoli aggiunto da lui, resta «in attesa di conferma» e non entra. Lo conferma o lo rifiuta un medico titolare attivo dello studio, in **Strumenti › Utenti da confermare**, dopo aver visto ruoli e dati; si conferma solo la richiesta letta. La password temporanea la riceve il titolare, una volta sola, e la consegna di persona: l'amministratore non la vede mai. Il rifiuto sospende l'utente.
+- **Senza un titolare che possa confermare** (studio nuovo, titolari tutti sospesi o in attesa) conferma chi gestisce il servizio, sul server: `pnpm utente:ripristina -- --utente NOME --conferma`. Nessuna eccezione per il primo titolare.
+- **Credenziali di medici e segreteria solo dal server:** password temporanea, azzeramento del secondo fattore, sblocco dopo i tentativi falliti, con `pnpm utente:ripristina` (`--secondo-fattore`, `--sblocca`, `--sospendi`, `--riattiva`); ogni azione va nel registro con «tramite: comando del server». Per gli amministratori si fa da Strumenti.
+- **Titolari protetti:** l'amministratore non sospende e non toglie il ruolo a un titolare con pazienti, né all'ultimo titolare attivo e confermato, e non aggiunge segreteria o sostituto a un titolare con pazienti; un titolare con pazienti sospeso dal server si riattiva solo dal server.
+- **Codici del medico corretti:** se l'amministratore corregge il codice fiscale o il codice regionale di un medico, le sessioni dei servizi legate a quel codice si chiudono e la risposta lo dice.
+- **Accesso:** il codice del secondo fattore non vale per un utente bloccato; il passaggio fra password e codice si chiude dopo tanti codici sbagliati quanti i tentativi dello studio; il blocco dura al più 60 minuti; ogni tentativo fallito registra anche l'indirizzo della richiesta.
 
 ## Dati e impostazioni dello studio (D166)
 
@@ -48,7 +67,7 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 
 - **Intestazione dello studio:** vale nei certificati dai modelli quando il medico non ha la sua.
 - **Indirizzo completo:** è il luogo della visita in studio sulla copia INPS.
-- **Sicurezza:** 5 minuti di inattività, 5 tentativi, 15 minuti di blocco (D29); si cambiano qui, entro limiti di buon senso.
+- **Sicurezza:** 5 minuti di inattività, 5 tentativi, 15 minuti di blocco (D29); si cambiano qui, entro limiti di buon senso (il blocco al più 60 minuti, perché non tenga fuori un medico per un giorno, D179).
 - **Tempo di attesa degli invii:** 8 secondi per difetto; la Regione indica 6–8 (D94). Si legge a ogni invio di ricette e certificati.
 - **Soglie degli avvisi sugli accessi anomali** (Garante, linee guida sul dossier sanitario, par. 7, lett. c): vuote, quindi avvisi spenti, finché qualcuno non dà i valori (da completare).
 
@@ -106,8 +125,12 @@ Regole di prescrizione (si cambiano con una versione nuova e la sua fonte: D41, 
 - **Stampa diretta**, senza la finestra di stampa (requisiti, «stampa diretta in studio»): consigliata un'impostazione del browser sulla postazione (modalità chiosco), da provare su un computer dello studio; l'alternativa è un programma da installare, contro «nessuna installazione».
 - **Formato del promemoria:** oggi A4; le «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non sono state trovate (D97).
 - **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?
-
-- **Poteri dell'amministratore:** il ripristino delle credenziali dei medici e della segreteria, se dal server o con SPID o CIE (dopo la revisione).
+- **Poteri dell'amministratore** (D179, dalla revisione avversaria):
+  - in medicina di gruppo una segreteria confermata da un solo titolare legge gli archivi di tutti: consigliata la conferma di ogni titolare il cui archivio diventa visibile (problema 3);
+  - ripristino delle credenziali di medici e segreteria: dal server, come oggi (consigliata), o anche in autonomia con SPID o CIE (D109);
+  - codice fiscale del medico corretto dall'amministratore: oggi si chiudono le sessioni dei servizi; consigliata anche la conferma del medico stesso, perché un codice sbagliato gli impedisce di prescrivere (problema 12);
+  - utenti con i dati dei pazienti creati prima di questa versione, solo negli ambienti di prova: nessuno è in attesa (problema 10); consigliato lasciarli come sono;
+  - un avviso al titolare quando c'è un utente da confermare, per esempio in «Oggi».
 - **Password:** 12 caratteri, nessuna scadenza, nessuna regola di composizione: c'è una regola da seguire (Garante, AgID, consulente privacy)? La password temporanea deve scadere?
 - **Salvataggi:** i requisiti mettono i backup cifrati giornalieri nella versione 1; oggi il programma non li fa.
 - **Blocco per inattività:** su tutte le postazioni o solo su quelle condivise, come dicono i requisiti?
