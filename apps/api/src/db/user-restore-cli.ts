@@ -102,7 +102,11 @@ try {
   for (const a of r.actions) console.log(`  ${DONE[a]}`);
   if (r.secondFactorWasInactive)
     console.log('  secondo fattore: non era attivo, si attiva al prossimo accesso');
-  console.log(`  sessioni chiuse: ${r.closedSessions}`);
+  console.log(
+    r.actions.includes('sblocco')
+      ? '  sessioni: restano aperte, lo sblocco non cambia le credenziali'
+      : `  sessioni chiuse: ${r.closedSessions}`,
+  );
   if (r.temporaryPassword) {
     console.log(`  password temporanea:  ${r.temporaryPassword}`);
     console.log(

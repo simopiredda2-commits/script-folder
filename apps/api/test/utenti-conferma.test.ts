@@ -373,6 +373,21 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       richiestaIl: pending.richiesta.il,
     });
     expect(again.statusCode).toBe(409);
+    // I due rifiuti della conferma (richiesta cambiata, non più in attesa) sono nel registro.
+    expect(
+      (await adminLog())
+        .filter(
+          (e) =>
+            e.outcome === 'negato' && e.azione === 'conferma' && e.utente === 'nuova.segreteria',
+        )
+        .map((e) => [e.userId, e.motivo]),
+    ).toEqual([
+      [
+        s.users.titolare.id,
+        'La richiesta è cambiata dopo che l’hai letta: controlla di nuovo i dati dell’utente e conferma',
+      ],
+      [s.users.titolare.id, 'L’utente non è in attesa di conferma'],
+    ]);
     const listed = (await req(cookies.amministratore, 'GET', '/api/studio/utenti'))
       .json()
       .utenti.find((x: { id: string }) => x.id === id);

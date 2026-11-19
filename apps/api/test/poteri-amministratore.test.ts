@@ -630,6 +630,51 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     );
   });
 
+  it('C: lo stesso codice giusto su due passaggi insieme apre una sola sessione', async () => {
+    const auth = authService();
+    const u = await createUser(cookies.amministratore, {
+      nomeUtente: `amm.d.${sfx}`,
+      nome: 'Amministratore del Codice Doppio',
+      ruoli: ['administrator'],
+    });
+    const chosen = 'la password del codice doppio';
+    await firstAccess(`amm.d.${sfx}`, u.passwordTemporanea!, chosen);
+    const one = (await access(`amm.d.${sfx}`, chosen)).json().passaggio as string;
+    const two = (await access(`amm.d.${sfx}`, chosen)).json().passaggio as string;
+    const code = codeNow(`amm.d.${sfx}`);
+    // Tutti e due leggono l'ultimo codice usato prima che il primo lo scriva: il secondo lo
+    // rilegge sotto blocco, dopo il primo, e non vale.
+    const holder = await t.pool.connect();
+    let results: SessionResult[];
+    try {
+      await holder.query('begin');
+      await holder.query('select pg_advisory_xact_lock(4620119)');
+      const first = auth.verifySecondFactor({ challengeToken: one, code });
+      await waiting(1);
+      const second = auth.verifySecondFactor({ challengeToken: two, code });
+      await waiting(2);
+      await holder.query('commit');
+      results = await Promise.all([first, second]);
+    } finally {
+      holder.release();
+    }
+    expect(results.map((r) => r.ok)).toEqual([true, false]);
+    expect(results[1]).toEqual({ ok: false, message: 'Codice non valido' });
+    // La sessione del primo accesso e una sola nuova.
+    expect(await t.db.select().from(session).where(eq(session.userId, u.utente.id))).toHaveLength(
+      2,
+    );
+    // Il codice ripetuto conta come un codice sbagliato: nel registro e sul passaggio.
+    const failed = await t.db
+      .select()
+      .from(accessLog)
+      .where(
+        and(eq(accessLog.userId, u.utente.id), eq(accessLog.action, 'secondo_fattore_fallito')),
+      );
+    expect(failed.map((f) => f.details)).toEqual([{ motivo: 'codice errato', indirizzo: null }]);
+    expect((await challengeOf(two)).failedCodes).toBe(1);
+  });
+
   it('C: con il codice giusto l’utente si rilegge sotto blocco: sospeso, in attesa o bloccato nel frattempo, niente sessione', async () => {
     const auth = authService();
     const u = await createUser(cookies.amministratore, {
@@ -801,6 +846,19 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       ['rupar_piemonte', 'sessione_chiusa'],
       ['sistema_ts', 'sessione_chiusa'],
     ]);
+    // Una sessione salvata senza il codice fiscale con cui è stata aperta (per esempio prima di
+    // questa regola) non vale nemmeno lei.
+    await storeSession(t.db, s.encryptionKey, {
+      userId: doctor.id,
+      service: 'sistema_ts',
+      token: 'sessione-di-prova-senza-codice',
+      validUntil: later(),
+      subject: null,
+    });
+    await expect(credentials.authFor(doctor.id, 'ricetta_bianca')).rejects.toMatchObject({
+      statusCode: 422,
+      details: { codice: 'SESSIONE_MANCANTE' },
+    });
     // Con il codice fiscale attuale la sessione vale; la pagina delle credenziali mostra spenta
     // quella aperta con il codice di prima.
     await storeSession(t.db, s.encryptionKey, {

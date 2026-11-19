@@ -330,7 +330,9 @@ export function createAuthService(deps: AuthDeps) {
       now().getTime(),
       challenge.purpose === 'enroll' ? null : (user.totpLastStep ?? null),
     );
-    if (step === null) {
+    // Codice sbagliato: conta per l'utente e per il passaggio, che si chiude ai tentativi dello
+    // studio.
+    const wrongCode = async (): Promise<SessionResult> => {
       const locked = await registerFailure(user, st);
       const closed = await countWrongCode(
         challenge.id,
@@ -339,11 +341,12 @@ export function createAuthService(deps: AuthDeps) {
       await failure(db, { motivo: 'codice errato', ...(closed ? { passaggioChiuso: true } : {}) });
       if (locked) return { ok: false, message: LOCKED_LOGIN_ERROR };
       return { ok: false, message: closed ? TOO_MANY_CODES_ERROR : 'Codice non valido' };
-    }
+    };
+    if (step === null) return wrongCode();
 
     const { token, hash } = newToken();
     const expiresAt = new Date(now().getTime() + deps.sessionMaxHours * 3_600_000);
-    return db.transaction(async (tx): Promise<SessionResult> => {
+    const done = await db.transaction(async (tx): Promise<SessionResult | 'ripetuto'> => {
       // L'utente com'è adesso, bloccato fino alla fine: una sospensione, un'attesa o un blocco
       // arrivati dopo la prima lettura fermano la sessione.
       const [fresh] = await tx
@@ -365,13 +368,14 @@ export function createAuthService(deps: AuthDeps) {
         await failure(tx, { motivo: 'utente bloccato per troppi tentativi' });
         return { ok: false, message: LOCKED_LOGIN_ERROR };
       }
-      // Lo stesso codice usato nel frattempo su un altro passaggio non vale una seconda volta.
+      // Lo stesso codice usato nel frattempo su un altro passaggio non vale una seconda volta:
+      // conta come un codice sbagliato, come quando arriva dopo.
       if (
         challenge.purpose !== 'enroll' &&
         fresh.totpLastStep != null &&
         step <= fresh.totpLastStep
       )
-        return { ok: false, message: 'Codice non valido' };
+        return 'ripetuto';
       // Il passaggio si consuma una volta sola: se un'altra richiesta l'ha già usato o chiuso,
       // qui ci si ferma.
       const used = await tx
@@ -417,6 +421,7 @@ export function createAuthService(deps: AuthDeps) {
       });
       return { ok: true, sessionToken: token, expiresAt };
     });
+    return done === 'ripetuto' ? wrongCode() : done;
   }
 
   async function loadSession(sessionToken: string) {
