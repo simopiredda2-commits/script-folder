@@ -23,7 +23,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #11 (19/11/2026)**, nello stesso branch ripartito da `main`: AURA con un simulatore (D197), sezione «Dopo l'unione della #11 – AURA con un simulatore». Simone ha mandato la PEC al CSI Piemonte, in copia alla Regione. Fermata fatta: via, pull request #12 unita (risposte in «Risposte della fermata dopo l'unione della #11»).
 - **Dopo l'unione della #12 (19/11/2026)**, nello stesso branch: revoca automatica e anagrafica da AURA da confermare (D198), con la correzione dei controlli in parallelo; sezione «Dopo l'unione della #12 – Revoca e anagrafica da AURA». Fermata fatta: via, pull request #13 unita (risposte in «Risposte della fermata dopo l'unione della #12»).
 - **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199). Fermata fatta: via, pull request #14 unita (risposte in «Risposte della fermata dopo l'unione della #13»).
-- **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200).
+- **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Pull request #15, in attesa del via alla fermata.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
