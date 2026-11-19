@@ -9,7 +9,7 @@ import { WorkstationsPanel } from '../src/pages/admin/WorkstationsPanel';
 const limits = {
   idleLockMinutes: { min: 1, max: 30 },
   maxFailedLogins: { min: 3, max: 10 },
-  failedLoginLockMinutes: { min: 5, max: 1440 },
+  failedLoginLockMinutes: { min: 5, max: 60 },
   sendTimeoutSeconds: { min: 1, max: 60 },
   alertDailyRecords: { min: 1, max: 10000 },
   alertAftDaily: { min: 1, max: 1000 },

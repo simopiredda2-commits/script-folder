@@ -6,7 +6,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import {
   CLINICAL_CREDENTIALS_REFUSAL,
+  CLINICAL_UNLOCK_REFUSAL,
   createUserAdminService,
+  LAST_OWNER_SUSPEND_REFUSAL,
   NOT_CONFIRMER,
   OWNER_ROLE_ADD_REFUSAL,
   OWNER_ROLE_REMOVAL_REFUSAL,
@@ -125,6 +127,7 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
         nomeUtente: string;
         inAttesaDiConferma: boolean;
         richiestaDiConferma: { da: string | null; il: string } | null;
+        confermaDalServizio: boolean;
       };
       passwordTemporanea?: string;
       avvisi: string[];
@@ -370,6 +373,21 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       richiestaIl: pending.richiesta.il,
     });
     expect(again.statusCode).toBe(409);
+    // I due rifiuti della conferma (richiesta cambiata, non più in attesa) sono nel registro.
+    expect(
+      (await adminLog())
+        .filter(
+          (e) =>
+            e.outcome === 'negato' && e.azione === 'conferma' && e.utente === 'nuova.segreteria',
+        )
+        .map((e) => [e.userId, e.motivo]),
+    ).toEqual([
+      [
+        s.users.titolare.id,
+        'La richiesta è cambiata dopo che l’hai letta: controlla di nuovo i dati dell’utente e conferma',
+      ],
+      [s.users.titolare.id, 'L’utente non è in attesa di conferma'],
+    ]);
     const listed = (await req(cookies.amministratore, 'GET', '/api/studio/utenti'))
       .json()
       .utenti.find((x: { id: string }) => x.id === id);
@@ -380,7 +398,10 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     });
     // Nel registro: chi ha confermato, che cosa, per quale richiesta.
     expect(
-      (await adminLog()).find((e) => e.azione === 'conferma' && e.utente === 'nuova.segreteria'),
+      (await adminLog()).find(
+        (e) =>
+          e.azione === 'conferma' && e.utente === 'nuova.segreteria' && e.outcome === 'riuscito',
+      ),
     ).toMatchObject({
       userId: s.users.titolare.id,
       outcome: 'riuscito',
@@ -393,7 +414,7 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     });
   });
 
-  it('il primo titolare di uno studio senza titolari entra; poi gli altri aspettano lui, anche dopo una sospensione', async () => {
+  it('anche il primo titolare di uno studio vuoto aspetta: lo conferma chi gestisce il servizio, poi lui conferma gli altri', async () => {
     const fresh = await createFirstStudio(t.db, {
       nome: 'Studio nuovo di prova',
       tipo: 'singolo',
@@ -412,13 +433,40 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       ruoli: ['owner_doctor'],
       medico: { codiceFiscale: cf('Primi', 'Anna', 'F'), nome: 'Anna', cognome: 'Primi' },
     });
-    // Nessun titolare attivo e nessun paziente: non serve la conferma.
-    expect(first.utente.inAttesaDiConferma).toBe(false);
-    expect(first.avvisi).toEqual([expect.stringMatching(/^Primo medico titolare dello studio/)]);
+    // Nessuna eccezione di avvio: aspetta, e l'amministratore non riceve la sua password.
+    expect(first.utente.inAttesaDiConferma).toBe(true);
+    expect(first.passwordTemporanea).toBeUndefined();
+    expect(first.utente.confermaDalServizio).toBe(true);
+    expect(first.avvisi).toEqual([
+      expect.stringMatching(/^In attesa della conferma di un medico titolare dello studio/),
+      expect.stringContaining(
+        'lo conferma chi gestisce il servizio, sul server (pnpm utente:ripristina -- --utente primo.titolare --conferma)',
+      ),
+    ]);
     const ownerId = first.utente.id;
+    expect((await userRow(ownerId)).awaitingConfirmation).toBe(true);
+    // Nessun titolare può confermarlo dal programma: lo conferma chi gestisce il servizio, con una
+    // password nuova che consegna lui; nel registro, senza utente.
+    const byServer = await restoreUser(t.db, { utente: 'primo.titolare', conferma: true });
+    expect(byServer).toMatchObject({
+      actions: ['conferma'],
+      status: 'active',
+      awaitingConfirmation: false,
+    });
+    passwordsSeen.push(byServer.temporaryPassword!);
+    expect((await adminLog(fresh.studioId)).at(-1)).toMatchObject({
+      userId: null,
+      outcome: 'riuscito',
+      area: 'utenti',
+      azione: 'conferma',
+      tramite: 'comando del server',
+      utente: 'primo.titolare',
+      campi: ['conferma', 'password', 'secondoFattore'],
+      richiestaDa: 'amministratore.nuovo',
+    });
     const ownerCookie = await firstAccess(
       'primo.titolare',
-      first.passwordTemporanea!,
+      byServer.temporaryPassword!,
       'il primo titolare entra',
     );
     expect((await req(ownerCookie, 'GET', '/api/io')).json().archivio.nome).toBe(
@@ -479,6 +527,8 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     });
     expect(second.utente.inAttesaDiConferma).toBe(true);
     expect(second.passwordTemporanea).toBeUndefined();
+    // Nessun titolare attivo: l'avviso dice la strada del server.
+    expect(second.avvisi[1]).toMatch(/--utente secondo\.titolare --conferma/);
     // Il primo titolare torna (comando del server, password nuova) e conferma.
     const back = await restoreUser(t.db, { utente: 'primo.titolare', riattiva: true });
     expect(back.actions).toEqual(['password_temporanea', 'riattivazione']);
@@ -491,12 +541,17 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       'secondo.titolare',
       'segreteria.nuova',
     ]);
+    // Ora un titolare può confermare: il comando del server rifiuta e rimanda al programma.
+    await expect(restoreUser(t.db, { utente: 'segreteria.nuova', conferma: true })).rejects.toThrow(
+      /la conferma la fa lui, dal programma/,
+    );
+    expect((await userRow(secretary.utente.id)).awaitingConfirmation).toBe(true);
     const confirmed = await confirm(ownerAgain, second.utente.id);
     expect(confirmed.password).toBeDefined();
     await firstAccess('secondo.titolare', confirmed.password!, 'il secondo titolare entra');
   });
 
-  it('non nascono due «primi titolari» con due richieste insieme', async () => {
+  it('due sospensioni insieme non lasciano lo studio senza un titolare che possa confermare', async () => {
     const fresh = await createFirstStudio(t.db, {
       nome: 'Studio delle richieste insieme',
       tipo: 'gruppo',
@@ -513,8 +568,22 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       ruoli: ['owner_doctor'] as Role[],
       medico: { codiceFiscale: cf(surname, 'Carlo', 'M'), nome: 'Carlo', cognome: surname },
     });
+    // Due titolari senza pazienti: il primo lo conferma il server, il secondo il primo.
+    const one = await service.create(a, body('uno', 'Unici'));
+    const two = await service.create(a, body('due', 'Duetti'));
+    expect([one, two].map((r) => r.passwordTemporanea)).toEqual([undefined, undefined]);
+    passwordsSeen.push(
+      (await restoreUser(t.db, { utente: 'titolare.uno', conferma: true })).temporaryPassword!,
+    );
+    const request = (await userRow(two.utente.id)).confirmationRequestedAt!.toISOString();
+    const confirmed = await service.confirm(
+      actorOf({ id: one.utente.id }, ['owner_doctor'], fresh.studioId),
+      two.utente.id,
+      { richiestaIl: request },
+    );
+    passwordsSeen.push(confirmed.passwordTemporanea!);
     // La prova tiene il blocco con cui il registro mette in fila le sue righe (migrazione 0002):
-    // la prima creazione resta aperta, con lo studio bloccato, finché la seconda non è partita.
+    // la prima sospensione resta aperta, con lo studio bloccato, finché la seconda non è partita.
     const waiting = async (n: number) => {
       for (let i = 0; i < 400; i++) {
         const { rows } = await t.pool.query<{ n: number }>(
@@ -526,22 +595,35 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       throw new Error(`Non ci sono ${n} transazioni in attesa di un blocco`);
     };
     const holder = await t.pool.connect();
-    let results: Awaited<ReturnType<typeof service.create>>[];
+    let results: PromiseSettledResult<unknown>[];
     try {
       await holder.query('begin');
       await holder.query('select pg_advisory_xact_lock(4620119)');
-      const one = service.create(a, body('uno', 'Unici'));
+      const first = service.setStatus(a, one.utente.id, false);
       await waiting(1);
-      const two = service.create(a, body('due', 'Duetti'));
+      const second = service.setStatus(a, two.utente.id, false);
       await waiting(2);
       await holder.query('commit');
-      results = await Promise.all([one, two]);
+      results = await Promise.allSettled([first, second]);
     } finally {
       holder.release();
     }
-    for (const r of results) if (r.passwordTemporanea) passwordsSeen.push(r.passwordTemporanea);
-    expect(results.map((r) => r.utente.inAttesaDiConferma)).toEqual([false, true]);
-    expect(results.map((r) => r.passwordTemporanea === undefined)).toEqual([false, true]);
+    // Una sola passa: per la seconda il titolare rimasto è l'ultimo attivo e confermato.
+    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'rejected']);
+    expect((results[1] as PromiseRejectedResult).reason).toMatchObject({
+      statusCode: 409,
+      message: LAST_OWNER_SUSPEND_REFUSAL,
+    });
+    expect([(await userRow(one.utente.id)).status, (await userRow(two.utente.id)).status]).toEqual([
+      'suspended',
+      'active',
+    ]);
+    expect((await adminLog(fresh.studioId)).at(-1)).toMatchObject({
+      outcome: 'negato',
+      azione: 'sospensione',
+      utente: 'titolare.due',
+      motivo: LAST_OWNER_SUSPEND_REFUSAL,
+    });
   });
 
   it('un ruolo con i dati dei pazienti aggiunto a un utente esistente lo rimette in attesa', async () => {
@@ -736,7 +818,7 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     expect(demoted.json().avvisi[0]).toMatch(/resta con tutti i suoi dati/);
   });
 
-  it('l’amministratore non ripristina password e secondo fattore di medici e segreteria; sblocca sì', async () => {
+  it('l’amministratore non ripristina password e secondo fattore di medici e segreteria, e non li sblocca', async () => {
     for (const u of [s.users.titolare, s.users.sostituto, s.users.segreteria]) {
       const before = await userRow(u.id);
       for (const action of ['password-temporanea', 'azzera-secondo-fattore']) {
@@ -757,15 +839,23 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
         restore(u.id),
       ),
     ).toEqual([true, true, true, false]);
-    // Lo sblocco dopo i tentativi falliti non cambia le credenziali: resta all'amministratore.
+    // Nemmeno lo sblocco dopo i tentativi falliti: riaprirebbe i tentativi su credenziali che
+    // non sono sue. Lo fa chi gestisce il servizio, sul server, o il blocco finisce da solo.
     expect((await access(s.users.sostituto.username, 'sbagliata')).statusCode).toBe(401);
     const unlock = await req(
       cookies.amministratore,
       'POST',
       `/api/studio/utenti/${s.users.sostituto.id}/sblocca`,
     );
-    expect(unlock.statusCode, unlock.body).toBe(200);
-    expect(unlock.json().utente.tentativiFalliti).toBe(0);
+    expect(unlock.statusCode).toBe(403);
+    expect(unlock.json().errore).toBe(CLINICAL_UNLOCK_REFUSAL);
+    expect((await userRow(s.users.sostituto.id)).failedLogins).toBe(1);
+    expect((await adminLog()).at(-1)).toMatchObject({
+      outcome: 'negato',
+      azione: 'sblocco',
+      utente: s.users.sostituto.username,
+      motivo: CLINICAL_UNLOCK_REFUSAL,
+    });
   });
 
   it('codice fiscale o codice regionale del medico corretti: si chiudono le sessioni dei servizi legate', async () => {
@@ -1055,12 +1145,15 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     expect((await access('da.rifiutare', known)).json().errore).toBe(AWAITING_CONFIRMATION_ERROR);
     const done = await confirm(cookies.titolare, id);
     expect(done.password).toBeDefined();
+    // Anche i rifiuti 409 della conferma e del rifiuto vanno nel registro, con il motivo.
     const log = (await adminLog()).filter((e) => e.utente === 'da.rifiutare');
-    expect(log.map((e) => [e.azione, e.outcome])).toEqual([
-      ['creazione', 'riuscito'],
-      ['rifiuto', 'riuscito'],
-      ['riattivazione', 'riuscito'],
-      ['conferma', 'riuscito'],
+    expect(log.map((e) => [e.azione, e.outcome, e.motivo ?? null])).toEqual([
+      ['creazione', 'riuscito', null],
+      ['rifiuto', 'riuscito', null],
+      ['rifiuto', 'negato', 'L’utente è già sospeso'],
+      ['conferma', 'negato', 'L’utente è sospeso: prima lo riattiva l’amministratore'],
+      ['riattivazione', 'riuscito', null],
+      ['conferma', 'riuscito', null],
     ]);
     expect(log.find((e) => e.azione === 'rifiuto')).toMatchObject({
       userId: s.users.titolare.id,

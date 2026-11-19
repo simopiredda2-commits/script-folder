@@ -2,7 +2,7 @@ import { can, PRINT_LIMITS, type Action } from '@mmg/domain';
 import { and, arrayContains, asc, count, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
-import type { Actor } from '../auth/service';
+import { FAILED_LOGIN_LOCK_MAX_MINUTES, type Actor } from '../auth/service';
 import type { Database } from '../db/client';
 import {
   appUser,
@@ -37,7 +37,11 @@ export const STUDIO_LIMITS = {
   /** I requisiti: la sessione si blocca dopo «pochi minuti» di inattività. */
   idleLockMinutes: { min: 1, max: 30 },
   maxFailedLogins: { min: 3, max: 10 },
-  failedLoginLockMinutes: { min: 5, max: 1440 },
+  /**
+   * Al massimo un'ora (prima 1440 minuti): dopo la revisione dei poteri dell'amministratore, un
+   * blocco lungo terrebbe fuori un medico per un giorno intero a chi conosce il suo nome utente.
+   */
+  failedLoginLockMinutes: { min: 5, max: FAILED_LOGIN_LOCK_MAX_MINUTES },
   sendTimeoutSeconds: { min: 1, max: 60 },
   alertDailyRecords: { min: 1, max: 10000 },
   alertAftDaily: { min: 1, max: 1000 },

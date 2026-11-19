@@ -1,7 +1,7 @@
 import { buildFiscalCode, type Role } from '@mmg/domain';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createUserAdminService } from '../src/admin/user-service';
+import { CLINICAL_UNLOCK_REFUSAL, createUserAdminService } from '../src/admin/user-service';
 import type { Actor } from '../src/auth/service';
 import { accessLog, appUser, archive, doctorProfile } from '../src/db/schema';
 import { base32Decode } from '../src/security/base32';
@@ -310,8 +310,9 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
       .select()
       .from(accessLog)
       .where(and(eq(accessLog.userId, u.id), eq(accessLog.action, 'cambio_password')));
+    // Il tentativo fallito porta anche l'indirizzo della richiesta, che chi accede non sceglie.
     expect(changes.map((c) => [c.outcome, c.details])).toEqual([
-      ['fallito', { motivo: 'password attuale errata' }],
+      ['fallito', { motivo: 'password attuale errata', indirizzo: '127.0.0.1' }],
       ['riuscito', { obbligato: true, altreSessioniChiuse: 0 }],
     ]);
   });
@@ -728,23 +729,41 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     expect((await req(again, 'GET', '/api/io')).statusCode).toBe(200);
   });
 
-  it('sblocco: tentativi a zero, blocco tolto', async () => {
-    const target = s.users.collega;
-    expect((await admin('POST', `/api/studio/utenti/${target.id}/sblocca`)).statusCode).toBe(409);
+  it('sblocco: tentativi a zero, blocco tolto; per medici e segreteria no', async () => {
+    // Un altro amministratore, senza dati dei pazienti: lo sblocca l'amministratore.
+    const other = await createUser({
+      nomeUtente: 'amministratore.bloccato',
+      nome: 'Amministratore Bloccato',
+      ruoli: ['administrator'],
+    });
+    const chosen = 'la password del bloccato';
+    await firstAccess(other.username, other.password!, chosen);
+    expect((await admin('POST', `/api/studio/utenti/${other.id}/sblocca`)).statusCode).toBe(409);
     for (let i = 0; i < 5; i++)
-      expect((await access(target.username, 'sbagliata')).statusCode).toBe(401);
-    expect((await access(target.username, PASSWORD)).json().errore).toMatch(/bloccato/);
+      expect((await access(other.username, 'sbagliata')).statusCode).toBe(401);
+    expect((await access(other.username, chosen)).json().errore).toMatch(/bloccato/);
     const listed = (await admin('GET', '/api/studio/utenti'))
       .json()
-      .utenti.find((x: { id: string }) => x.id === target.id);
+      .utenti.find((x: { id: string }) => x.id === other.id);
     expect(listed.bloccatoFinoA).not.toBeNull();
     expect(
       (await admin('POST', `/api/studio/utenti/${s.users.amministratore.id}/sblocca`)).statusCode,
     ).toBe(403);
-    const r = await admin('POST', `/api/studio/utenti/${target.id}/sblocca`);
+    const r = await admin('POST', `/api/studio/utenti/${other.id}/sblocca`);
     expect(r.statusCode, r.body).toBe(200);
     expect(r.json().utente).toMatchObject({ bloccatoFinoA: null, tentativiFalliti: 0 });
-    expect((await access(target.username, PASSWORD)).statusCode).toBe(200);
+    expect((await access(other.username, chosen)).statusCode).toBe(200);
+
+    // Un medico titolare bloccato: l'amministratore no, lo sblocca il server o la fine del blocco.
+    const doctor = s.users.collega;
+    for (let i = 0; i < 5; i++)
+      expect((await access(doctor.username, 'sbagliata')).statusCode).toBe(401);
+    const refused = await admin('POST', `/api/studio/utenti/${doctor.id}/sblocca`);
+    expect(refused.statusCode).toBe(403);
+    expect(refused.json().errore).toBe(CLINICAL_UNLOCK_REFUSAL);
+    expect((await access(doctor.username, PASSWORD)).json().errore).toMatch(/bloccato/);
+    s.clock.advance(16 * 60_000);
+    expect((await access(doctor.username, PASSWORD)).statusCode).toBe(200);
   });
 
   it('cambio volontario: le altre sessioni si chiudono, quella in uso resta; gli errori bloccano', async () => {

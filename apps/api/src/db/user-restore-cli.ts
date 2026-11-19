@@ -5,11 +5,17 @@
  *   pnpm utente:ripristina -- --utente NOME --secondo-fattore    … e secondo fattore da riattivare
  *   pnpm utente:ripristina -- --utente NOME --riattiva           riattiva, con una password nuova
  *   pnpm utente:ripristina -- --utente NOME --sospendi           sospende, senza password nuova
+ *   pnpm utente:ripristina -- --utente NOME --sblocca            toglie il blocco dei tentativi
+ *   pnpm utente:ripristina -- --utente NOME --conferma           conferma chi è in attesa, quando
+ *                                                                nessun titolare può farlo
  *
  * Per medici e segreteria è l'unica strada: l'amministratore dello studio non dà loro password
- * temporanee e non azzera il loro secondo fattore. La password temporanea si vede solo qui, una
- * volta: si consegna di persona. Le sessioni dell'utente si chiudono; ogni azione va nel registro
- * delle azioni di amministrazione con «tramite: comando del server». Non applica migrazioni.
+ * temporanee, non azzera il loro secondo fattore e non toglie il loro blocco. La conferma dal
+ * server serve quando nello studio non c'è un medico titolare attivo e confermato (per esempio il
+ * primo titolare di uno studio nuovo); con --riattiva conferma anche un utente sospeso. La password
+ * temporanea si vede solo qui, una volta: si consegna di persona. Le sessioni dell'utente si
+ * chiudono (non con --sblocca); ogni azione va nel registro delle azioni di amministrazione con
+ * «tramite: comando del server». Non applica migrazioni.
  */
 import { parseArgs } from 'node:util';
 import { z, ZodError } from 'zod';
@@ -20,8 +26,11 @@ import { restoreUser, type RestoreAction } from './user-restore';
 // Messaggi di controllo in italiano, come nel servizio (D85).
 z.config(z.locales.it());
 
-const USAGE =
-  'Uso: pnpm utente:ripristina -- --utente NOME [--secondo-fattore] [--sospendi | --riattiva]';
+const USAGE = [
+  'Uso: pnpm utente:ripristina -- --utente NOME [--secondo-fattore] [--sospendi | --riattiva]',
+  '     pnpm utente:ripristina -- --utente NOME --sblocca',
+  '     pnpm utente:ripristina -- --utente NOME --conferma [--riattiva]',
+].join('\n');
 
 /** Nomi delle opzioni del comando per i campi dei dati. */
 const FLAGS: Record<string, string> = {
@@ -29,6 +38,8 @@ const FLAGS: Record<string, string> = {
   secondoFattore: 'secondo-fattore',
   sospendi: 'sospendi',
   riattiva: 'riattiva',
+  sblocca: 'sblocca',
+  conferma: 'conferma',
 };
 
 const DONE: Record<RestoreAction, string> = {
@@ -36,6 +47,9 @@ const DONE: Record<RestoreAction, string> = {
   azzeramento_secondo_fattore: 'secondo fattore azzerato: si riattiva al prossimo accesso',
   sospensione: 'utente sospeso',
   riattivazione: 'utente riattivato',
+  sblocco: 'blocco tolto: tentativi falliti a zero, password e secondo fattore come prima',
+  conferma:
+    'utente confermato: password temporanea nuova e secondo fattore da riattivare al primo accesso',
 };
 
 let values: {
@@ -43,6 +57,8 @@ let values: {
   'secondo-fattore'?: boolean;
   sospendi?: boolean;
   riattiva?: boolean;
+  sblocca?: boolean;
+  conferma?: boolean;
 };
 try {
   ({ values } = parseArgs({
@@ -53,6 +69,8 @@ try {
       'secondo-fattore': { type: 'boolean' },
       sospendi: { type: 'boolean' },
       riattiva: { type: 'boolean' },
+      sblocca: { type: 'boolean' },
+      conferma: { type: 'boolean' },
     },
   }));
 } catch (err) {
@@ -77,12 +95,18 @@ try {
     secondoFattore: values['secondo-fattore'] ?? false,
     sospendi: values.sospendi ?? false,
     riattiva: values.riattiva ?? false,
+    sblocca: values.sblocca ?? false,
+    conferma: values.conferma ?? false,
   });
   console.log(`Utente ${r.username} (${r.displayName}), studio «${r.studioName}».`);
   for (const a of r.actions) console.log(`  ${DONE[a]}`);
   if (r.secondFactorWasInactive)
     console.log('  secondo fattore: non era attivo, si attiva al prossimo accesso');
-  console.log(`  sessioni chiuse: ${r.closedSessions}`);
+  console.log(
+    r.actions.includes('sblocco')
+      ? '  sessioni: restano aperte, lo sblocco non cambia le credenziali'
+      : `  sessioni chiuse: ${r.closedSessions}`,
+  );
   if (r.temporaryPassword) {
     console.log(`  password temporanea:  ${r.temporaryPassword}`);
     console.log(

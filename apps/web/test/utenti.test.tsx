@@ -115,6 +115,8 @@ const row = (over: Record<string, unknown>) => ({
   confermato: null,
   ripristinoDalServizio: false,
   titolareConPazienti: false,
+  ultimoTitolare: false,
+  confermaDalServizio: false,
   ...over,
 });
 
@@ -265,6 +267,110 @@ describe('utenti dello studio (tappa 14)', () => {
     expect(await screen.findByText(/la riceve il medico titolare che lo conferma/)).toBeTruthy();
     expect(screen.queryByText(/Consegnala di persona/)).toBeNull();
     expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({ ruoli: ['secretary'] });
+  });
+
+  it('sblocco solo per chi non apre dati dei pazienti; ultimo titolare e titolare con pazienti sospeso senza azioni; conferma dal servizio detta a parole', async () => {
+    const OWNER_ROLE = [{ codice: 'owner_doctor', nome: 'Medico titolare' }];
+    const SECRETARY_ROLE = [{ codice: 'secretary', nome: 'Segreteria' }];
+    fakeService({
+      '/api/studio/utenti': () => ({
+        status: 200,
+        body: {
+          ruoli: USERS.ruoli,
+          utenti: [
+            row({
+              id: 'a1',
+              nomeUtente: 'amministratore',
+              nome: 'Andrea Conti',
+              ruoli: ADMIN_ROLE,
+              io: true,
+            }),
+            row({
+              id: 'a2',
+              nomeUtente: 'amministratore.due',
+              nome: 'Bruna Galli',
+              ruoli: ADMIN_ROLE,
+              bloccatoFinoA: '2026-11-19T11:00:00Z',
+            }),
+            row({
+              id: 't1',
+              nomeUtente: 'titolare.ultimo',
+              nome: 'Dott. Bruno Ultimi',
+              ruoli: OWNER_ROLE,
+              ripristinoDalServizio: true,
+              ultimoTitolare: true,
+              bloccatoFinoA: '2026-11-19T11:00:00Z',
+            }),
+            row({
+              id: 't2',
+              nomeUtente: 'titolare.sospeso',
+              nome: 'Dott. Carlo Sospesi',
+              ruoli: OWNER_ROLE,
+              stato: 'sospeso',
+              ripristinoDalServizio: true,
+              titolareConPazienti: true,
+            }),
+            row({
+              id: 's1',
+              nomeUtente: 'segreteria.bloccata',
+              nome: 'Marta Servi',
+              ruoli: SECRETARY_ROLE,
+              ripristinoDalServizio: true,
+              tentativiFalliti: 2,
+              confermato: { da: null, il: '2026-11-18T09:00:00Z' },
+            }),
+            row({
+              id: 'w1',
+              nomeUtente: 'primo.titolare',
+              nome: 'Dott.ssa Anna Primi',
+              ruoli: OWNER_ROLE,
+              ripristinoDalServizio: true,
+              inAttesaDiConferma: true,
+              richiestaDiConferma: { da: 'Andrea Conti', il: '2026-11-19T10:00:00Z' },
+              confermaDalServizio: true,
+            }),
+          ],
+        },
+      }),
+    });
+    render(<UsersSection />);
+    const table = await screen.findByRole('table', { name: 'Utenti dello studio' });
+    const rows = within(table).getAllByRole('row');
+    const byName = (n: string) =>
+      rows.find((r) => r.querySelector('th')?.textContent?.startsWith(n))!;
+    // Sblocco: l'amministratore bloccato sì; medici e segreteria no, con la strada del server.
+    expect(
+      within(byName('Bruna Galli')).getByRole('button', { name: 'Sblocca per Bruna Galli' }),
+    ).toBeTruthy();
+    for (const n of ['Dott. Bruno Ultimi', 'Marta Servi']) {
+      expect(within(byName(n)).queryByRole('button', { name: /Sblocca/ }), n).toBeNull();
+      expect(
+        within(byName(n)).getByText(
+          /il blocco dopo i tentativi falliti lo toglie chi gestisce il servizio/,
+        ),
+      ).toBeTruthy();
+    }
+    // L'ultimo titolare attivo e confermato non si sospende da qui, e si dice perché.
+    const last = byName('Dott. Bruno Ultimi');
+    expect(within(last).queryByRole('button', { name: /Sospendi/ })).toBeNull();
+    expect(within(last).getByText(/È l’ultimo medico titolare attivo e confermato/)).toBeTruthy();
+    // Un titolare con pazienti sospeso non si riattiva da qui.
+    const suspended = byName('Dott. Carlo Sospesi');
+    expect(within(suspended).queryByRole('button', { name: /Riattiva/ })).toBeNull();
+    expect(
+      within(suspended).getByText(
+        'Ha pazienti nel suo archivio: lo riattiva chi gestisce il servizio, sul server.',
+      ),
+    ).toBeTruthy();
+    // Conferma data, o da dare, da chi gestisce il servizio.
+    expect(byName('Marta Servi').textContent).toMatch(/Confermato da chi gestisce il servizio il/);
+    expect(
+      within(byName('Dott.ssa Anna Primi')).getByText(
+        /Nessun medico titolare attivo e confermato può confermarlo: lo conferma chi gestisce il servizio, sul server/,
+      ),
+    ).toBeTruthy();
+    // Nel testo della sezione, anche il primo titolare aspetta la conferma.
+    expect(screen.getByText(/anche il primo\s+medico titolare/)).toBeTruthy();
   });
 
   it('senza conferma non parte nulla', async () => {
