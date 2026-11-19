@@ -431,7 +431,7 @@ const evaluators: Record<RuleId, Evaluator> = {
         message:
           'Il paziente non ha registrato la scelta di questo canale: un canale diverso dalla carta si usa solo su sua richiesta',
         remedy:
-          'Registra in cartella la scelta del paziente (canale, recapito e data), oppure consegna il promemoria cartaceo',
+          'Registra la scelta del paziente (canale, recapito e data) nei «Dati amministrativi» della cartella, in «Canale del promemoria», oppure consegna il promemoria cartaceo',
       });
     }
     return issues;
