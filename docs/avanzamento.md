@@ -469,7 +469,7 @@ Domanda di Simone: «La schermata con più schede pazienti aperte l'hai testata?
 
 **Prossimo passo**: tappa 13 (modelli dei certificati, D143), poi tappa 12, poi la fermata.
 
-### Tappa 14 – Strumenti e amministrazione completi (in corso)
+### Tappa 14 – Strumenti e amministrazione completi (fatta)
 
 Richiesta di Simone del 19/11/2026 (D163). Branch `tappe-14-15`; ogni sezione costruita in un suo branch e unita qui.
 
@@ -481,11 +481,11 @@ Richiesta di Simone del 19/11/2026 (D163). Branch `tappe-14-15`; ogni sezione co
   - elenchi dello studio: suggeritori, posologie, pacchetti dal catalogo, contatti; usati nella scheda della terapia e nella ricetta; in sola lettura per la segreteria; nell'esportazione completa (D175).
   - archivio del titolare: autorizzazioni a sostituti e colleghi di gruppo, avvisi sugli accessi anomali con le soglie dello studio, registro di amministrazione in Strumenti, dati dell'AFT modificabili (D177).
   - preferenze di stampa per documento, per lo studio e per postazione, con il suggerimento accanto a ogni pulsante di stampa e i certificati dai modelli in A4 o A5 (D180); la postazione si ricorda nel browser (D178).
-- In corso: rafforzamento dei poteri dell'amministratore dopo una revisione (l'amministratore non deve potersi prendere l'accesso clinico).
-- Come provarlo: Strumenti con l'utente amministratore; prove `apps/api/test/utenti.test.ts`, `studio.test.ts`, `primo-avvio.test.ts`, `database-di-prova.test.ts`, `apps/web/test/utenti.test.tsx`, `studio.test.tsx`; prove nel browser «Strumenti dell'amministratore» e «pagina della password».
-- Non provato: stampa su stampanti vere; schermate ancora da rifare.
+  - poteri dell'amministratore (D179): chi crea con i dati dei pazienti lo conferma un titolare, che riceve la password; senza un titolare che possa confermare conferma il server (`pnpm utente:ripristina -- --utente NOME --conferma`); credenziali di medici e segreteria solo dal server; titolari protetti; blocco al più 60 minuti; corretti i problemi di una revisione avversaria con prove d'attacco, poi verificati da una seconda revisione.
+- Come provarlo: Strumenti con l'utente amministratore e con il medico titolare («Utenti da confermare»); prove `apps/api/test/utenti.test.ts`, `utenti-conferma.test.ts`, `studio.test.ts`, `primo-avvio.test.ts`, `database-di-prova.test.ts`, `elenchi.test.ts`, `archivio-autorizzazioni.test.ts`, `stampa.test.ts`, `apps/web/test/utenti.test.tsx`, `studio.test.tsx`, `strumenti.test.ts`; prove nel browser «Strumenti dell'amministratore», «utenti: l'amministratore crea una segreteria…», «elenchi dello studio», «archivio: autorizzazione al sostituto…», «pagina della password»; schermate 40–41 e 50–55.
+- Non provato: stampanti vere, carta A5 vera, stampa senza finestra; il comando del server in un ambiente vero; la revoca presso i servizi delle sessioni chiuse quando cambiano i codici del medico; gli avvisi sugli accessi anomali con soglie vere (restano spenti finché non si danno i valori); lettori di schermo e tablet veri.
 
-### Tappa 15 – Importazione da altri programmi (in corso)
+### Tappa 15 – Importazione da altri programmi (fatta)
 
 Richiesta di Simone del 19/11/2026. Stesso branch.
 
@@ -493,8 +493,8 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
   - pannello amministrativo del paziente (D169): nuovo paziente, dati amministrativi completi, correzione dell'identità con motivo, esenzioni, scelta del medico, nucleo familiare; dati dimostrativi nel seed; causa del decesso solo al medico (D171);
   - importazione a passi in Strumenti › Importazione (D173, `docs/importazione.md`): CSV, XLSX, JSON e la nostra esportazione completa; 16 destinazioni verso i menu della cartella (anche scelta del medico e nucleo familiare, D174), con gli stessi controlli dell'inserimento a mano; anteprima, prova senza scrivere, importazione in una transazione, rapporto riga per riga in CSV, provenienza di ogni riga, annullamento, profili; in prova solo pazienti inventati (D170).
   - menu che mancavano (D176): vaccinazioni ed esami di laboratorio scritti a mano, ricette fatte con altri programmi in «Farmaci prescritti» e «Visite ed esami prescritti», terapie concluse; l'importazione li scrive con gli stessi inserimenti a mano.
-- Come provarlo: «Nuovo paziente» nell'elenco dei pazienti, «Dati amministrativi» nella cartella, Strumenti › Importazione come titolare; prove `apps/api/test/pannello-paziente.test.ts`, `importazione.test.ts`, `importazione-lettori.test.ts`, `importazione-esportazione.test.ts`, `importazione-pannello.test.ts`, `importazione-voci-nuove.test.ts`, `destinazioni.test.ts`, `packages/domain/test/patient-registry.test.ts`, `import-destinations.test.ts`, `apps/web/test/destinazioni.test.ts`; prove nel browser «nuovo paziente e dati amministrativi» e «importazione a passi».
-- Non provato: file veri di altri programmi (per regola, solo file inventati); archivi grandi; più istanze del servizio; nel browser, le parti nuove di D176 (referto nella pagina Esami, schede Vaccinazioni ed Esami, ricette passate nei prescritti, terapia conclusa): da fare con le schermate.
+- Come provarlo: «Nuovo paziente» nell'elenco dei pazienti, «Dati amministrativi» nella cartella, Strumenti › Importazione come titolare; prove `apps/api/test/pannello-paziente.test.ts`, `importazione.test.ts`, `importazione-lettori.test.ts`, `importazione-esportazione.test.ts`, `importazione-pannello.test.ts`, `importazione-voci-nuove.test.ts`, `destinazioni.test.ts`, `packages/domain/test/patient-registry.test.ts`, `import-destinations.test.ts`, `apps/web/test/destinazioni.test.ts`; prove nel browser «nuovo paziente e dati amministrativi», «importazione a passi», «referto di laboratorio con due esami e vaccinazione», «ricetta fatta con un altro programma…; terapia conclusa»; schermate 42–49.
+- Non provato: file veri di altri programmi (per regola, solo file inventati); archivi grandi; più istanze del servizio.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
