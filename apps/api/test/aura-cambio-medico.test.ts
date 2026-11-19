@@ -115,7 +115,7 @@ describe('AURA: cambio di medico dentro lo studio (D200)', () => {
         .select()
         .from(accessLog)
         .where(and(eq(accessLog.userId, userId), eq(accessLog.action, action)))
-        .orderBy(desc(accessLog.at))
+        .orderBy(desc(accessLog.seq))
         .limit(1)
     )[0];
   /** Le notifiche arrivano senza aspettare la risposta: si aspetta che siano applicate. */

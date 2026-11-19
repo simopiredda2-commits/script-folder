@@ -127,9 +127,11 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
         on: string,
         name: string,
         campaign: string | null,
+        author = titolare.id,
+        annulled = false,
       ) =>
         tx.insert(vaccinationDetail).values({
-          entryId: await entry(patientId, 'vaccination', on, titolare.id),
+          entryId: await entry(patientId, 'vaccination', on, author, annulled),
           vaccine: name,
           doseNumber: 1,
           campaign,
@@ -138,6 +140,9 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
       await vaccine(first.id, '2001-03-07', 'Antinfluenzale', '2000/2001');
       await vaccine(second.id, '2001-03-08', 'Antinfluenzale', '2000/2001');
       await vaccine(second.id, '2001-03-09', 'Antitetanica', null);
+      // Fuori: annullata, o di un paziente di un altro archivio.
+      await vaccine(first.id, '2001-03-11', 'Antinfluenzale', '2000/2001', titolare.id, true);
+      await vaccine(other, '2001-03-07', 'Antinfluenzale', '2000/2001', s.users.collega.id);
 
       const rx = async (
         values: Partial<typeof prescription.$inferInsert> & { patientId: string },
@@ -252,7 +257,7 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
         .select()
         .from(accessLog)
         .where(and(eq(accessLog.userId, userId), eq(accessLog.action, action)))
-        .orderBy(desc(accessLog.at))
+        .orderBy(desc(accessLog.seq))
         .limit(1)
     )[0];
 
