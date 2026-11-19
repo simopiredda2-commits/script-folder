@@ -68,7 +68,7 @@ export function registerAuraRoutes(
   app.post('/api/pazienti/:id/aura/differenze', scoped, async (req) => {
     const actor = req.actor!;
     const { id } = idParams.parse(req.params);
-    const { scelte } = choicesBody.parse(req.body);
+    // Prima la guardia: anche una richiesta sbagliata lascia la sua riga nel registro.
     const { patient, context } = await guardPatient(
       db,
       actor,
@@ -76,6 +76,7 @@ export function registerAuraRoutes(
       'registry.write',
       'modifica_dati_amministrativi',
     );
+    const { scelte } = choicesBody.parse(req.body);
     const current = await aura.differences(id);
     const chosen = scelte.map((s) => {
       const d = current.find((c) => c.campo === s.campo);

@@ -138,9 +138,7 @@ const itDate = (iso: string) => iso.split('-').reverse().join('/');
 export function registryText(diffs: readonly RegistryDifference[]): string {
   return `Anagrafica diversa in AURA, da confermare: ${diffs
     .map((d) =>
-      d.campo === 'decesso'
-        ? `decesso il ${itDate(d.inAura)}`
-        : `${d.etichetta} «${d.inAura}»`,
+      d.campo === 'decesso' ? `decesso il ${itDate(d.inAura)}` : `${d.etichetta} «${d.inAura}»`,
     )
     .join('; ')}`;
 }

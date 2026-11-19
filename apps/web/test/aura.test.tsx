@@ -136,7 +136,8 @@ describe('AURA nell’interfaccia (D197)', () => {
     const posted = fetchMock.mock.calls.find(
       ([u, init]) => u === '/api/pazienti/p1/aura/differenze' && init?.method === 'POST',
     );
-    expect(JSON.parse(String(posted![1]!.body))).toEqual({
+    // Il client manda il corpo come testo JSON.
+    expect(JSON.parse(posted![1]!.body as string)).toEqual({
       scelte: [{ campo: 'asl', inAura: 'ASL TO5', usa: true }],
     });
     expect(onUpdated).toHaveBeenCalledTimes(1);
