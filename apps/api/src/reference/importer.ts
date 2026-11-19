@@ -230,6 +230,9 @@ async function importRecords(
   const noValue = Object.entries(out.noValue).map(
     ([field, n]) => `${field}: ${n} celle senza valore secondo la mappatura ${mapping.id}`,
   );
+  const padded = Object.entries(out.padded).map(
+    ([field, n]) => `${field}: ${n} valori con gli zeri davanti secondo la mappatura ${mapping.id}`,
+  );
   return {
     ...line,
     outcome: 'importato',
@@ -237,6 +240,7 @@ async function importRecords(
     notes: [
       ...line.notes,
       ...noValue,
+      ...padded,
       ...visits,
       ...(discarded ? [`${discarded} righe scartate e accettate`] : []),
     ],

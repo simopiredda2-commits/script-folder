@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  convertCell,
   extractRecords,
+  KINDS,
   loadMappings,
   mappingForSyncFile,
   mappingForTranscription,
@@ -53,9 +55,12 @@ describe('mappature del repository', () => {
     // ISTAT: «almeno ogni sei mesi» (sync/fonti.json) → 184 giorni più una notte.
     const soglie = Object.fromEntries(repo.mappings.map((m) => [m.id, m.vecchiaDopoGiorni]));
     expect(soglie['istat-comuni']).toBe(185);
+    // Lista di trasparenza AIFA: «ogni mese, il 15» (sync/fonti.json) → 31 giorni più una notte.
+    expect(soglie['aifa-trasparenza']).toBe(32);
     // Le altre no: vale il controllo di ogni notte.
     expect(repo.mappings.filter((m) => m.vecchiaDopoGiorni !== null).map((m) => m.id)).toEqual([
       'istat-comuni',
+      'aifa-trasparenza',
     ]);
   });
 });
@@ -133,6 +138,93 @@ describe('estrazione dei record', () => {
       ['025202096', 9.92],
       ['034330047', null],
       ['038901524', null],
+    ]);
+  });
+
+  it('lista di trasparenza (D202): zeri davanti all’AIC, prezzi con l’euro, annotazione vuota', () => {
+    const m = mappingForSyncFile(repo, 'aifa_liste', '825643_Lista_farmaci_equivalenti.csv')!;
+    const out = extractRecords(
+      m,
+      table('aifa', 'documents', '20142', '825643', 'Lista_farmaci_equivalenti.csv'),
+    );
+    expect(out.missingColumns).toEqual([]);
+    expect(out.problems).toEqual([]);
+    expect(out.padded).toEqual({ aic: 8 });
+    expect(out.records[0]).toEqual({
+      aic: '038092019',
+      activeIngredient: 'Amlodipina',
+      referencePack: "28 UNITA' 5 MG - USO ORALE",
+      atc: 'C08CA01',
+      name: 'AMLODIPINA DOC GENERICI',
+      pack: '"5 MG COMPRESSE" 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
+      holder: 'DOC GENERICI S.R.L.',
+      referencePrice: 3.74,
+      publicPrice: 3.74,
+      priceDifference: 0,
+      remark: null,
+      equivalenceGroup: 'DOB',
+    });
+    // Il medicinale di marca costa di più: la differenza la paga l'assistito.
+    expect(out.records.find((r) => r.aic === '027428010')).toMatchObject({
+      publicPrice: 5.53,
+      priceDifference: 1.79,
+    });
+  });
+
+  it('farmaci carenti (D202): intestazione alla terza riga, date, «Sì», testo che va a capo', () => {
+    const m = mappingForSyncFile(repo, 'aifa_liste', '847339_elenco_medicinali_carenti.csv')!;
+    const out = extractRecords(
+      m,
+      table('aifa', 'documents', '20142', '847339', 'elenco_medicinali_carenti.csv'),
+    );
+    expect(out.missingColumns).toEqual([]);
+    expect(out.problems).toEqual([]);
+    expect(out.headerLine).toBe(3);
+    expect(out.records).toHaveLength(1);
+    expect(out.records[0]).toMatchObject({
+      aic: '038548032',
+      name: 'AMLODIPINA TEVA ITALIA',
+      startOn: '2026-11-02',
+      expectedEndOn: null,
+      equivalentAvailable: true,
+      reason: 'Cessata commercializzazione definitiva',
+      reimbursementClass: 'A TOTALE CARICO DEL SSN.',
+      atc: 'C08CA01',
+    });
+    expect(String(out.records[0]!.aifaNote).split('\n')).toHaveLength(3);
+  });
+
+  it('date e prezzi: GG/MM/AAAA o AAAA-MM-GG, solo date vere; l’euro solo in fondo', () => {
+    const date = KINDS.farmaci_carenti.fields.startOn;
+    expect(convertCell(date, '02/11/2026')).toEqual({ value: '2026-11-02' });
+    expect(convertCell(date, '2/1/2027')).toEqual({ value: '2027-01-02' });
+    expect(convertCell(date, '2026-12-31')).toEqual({ value: '2026-12-31' });
+    expect(convertCell(date, ' ')).toEqual({ value: null });
+    for (const bad of ['31/02/2026', '2026-02-30', '13/13/2026', 'domani', '2026/11/02']) {
+      expect(convertCell(date, bad), bad).toEqual({
+        problem: `«${bad}» non è una data (GG/MM/AAAA)`,
+      });
+    }
+    const price = KINDS.farmaci_trasparenza.fields.referencePrice;
+    expect(convertCell(price, '5,63 €')).toEqual({ value: 5.63 });
+    expect(convertCell(price, '1.234,50€')).toEqual({ value: 1234.5 });
+    expect(convertCell(price, '€ 5,63')).toEqual({ problem: '«€ 5,63» non è un numero' });
+  });
+
+  it('zeri davanti: solo ai codici di sole cifre più corti, solo dove la mappatura li chiede', () => {
+    const m = mappingForSyncFile(repo, 'aifa_liste', '825643_Lista_farmaci_equivalenti.csv')!;
+    const header = Object.values(m.colonne) as string[];
+    const row = (aic: string) => header.map((h) => (h === 'AIC' ? aic : ''));
+    const out = extractRecords(m, [header, row('4592103'), row('038092019'), row('A123')]);
+    expect(out.records.map((r) => r.aic)).toEqual(['004592103', '038092019']);
+    expect(out.padded).toEqual({ aic: 1 });
+    expect(out.problems).toEqual([
+      { line: 4, field: 'aic', problem: '«A123» non ha la forma attesa (9 cifre)' },
+    ]);
+    // Senza la richiesta nella mappatura, l'AIC corto resta un errore.
+    const strict = extractRecords({ ...m, zeriDavanti: {} }, [header, row('4592103')]);
+    expect(strict.problems).toEqual([
+      { line: 2, field: 'aic', problem: '«4592103» non ha la forma attesa (9 cifre)' },
     ]);
   });
 
@@ -221,5 +313,14 @@ describe('controllo del file delle mappature', () => {
     expect(() => one({ colore: ['-'] })).toThrow(/non ha il campo colore/);
     expect(() => one({ istatCode: ['-'] })).toThrow(/obbligatorio/);
     expect(() => one({ region: ['('] })).toThrow(/espressione non valida/);
+  });
+
+  it('zeri davanti: solo per campi esistenti, con una lunghezza intera positiva', () => {
+    const one = (zeriDavanti: object) =>
+      parseMappings({ versione: '1', mappature: [{ ...base, zeriDavanti }] });
+    expect(() => one({ istatCode: 6 })).not.toThrow();
+    expect(() => one({ colore: 6 })).toThrow(/non ha il campo colore/);
+    expect(() => one({ istatCode: 0 })).toThrow();
+    expect(() => one({ istatCode: 2.5 })).toThrow();
   });
 });

@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 /**
  * Identificativi delle regole: R1–R17 dei requisiti; R18 chiesta da Simone (D154); R19 e R20 sullo
- * stato del paziente, per scelta di Simone (D199).
+ * stato del paziente, per scelta di Simone (D199); R21 sui farmaci carenti, dall'elenco AIFA (D202).
  */
 export const RULE_IDS = [
   'R1',
@@ -27,6 +27,7 @@ export const RULE_IDS = [
   'R18',
   'R19',
   'R20',
+  'R21',
 ] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 

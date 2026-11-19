@@ -22,6 +22,8 @@ import {
   refDpcDrug,
   refDrug,
   refDrugClass,
+  refDrugShortage,
+  refDrugTransparency,
   refExemption,
   refExemptionService,
   refMunicipality,
@@ -85,8 +87,28 @@ export interface DrugInfo {
   aifaNote: string | null;
   dpc: boolean;
   planRequired: boolean | null;
+  /**
+   * Lista di trasparenza AIFA (D202): prezzo di riferimento del SSN e differenza fra il prezzo al
+   * pubblico e quello di riferimento, che paga l'assistito se non accetta l'equivalente.
+   */
+  referencePrice: string | null;
+  priceDifference: string | null;
+  /** Annotazione della lista di trasparenza, in parole (non è la nota AIFA numerata). */
+  transparencyRemark: string | null;
+  /** Carenza secondo l'elenco AIFA in vigore (D202); null se il farmaco non c'è. */
+  shortage: DrugShortage | null;
   /** I fatti che le regole guardano; i campi senza una fonte restano assenti (= non noti). */
   facts: DrugFacts;
+}
+
+/** Una carenza come la dice l'elenco AIFA dei farmaci carenti (D202). */
+export interface DrugShortage {
+  since: string | null;
+  expectedEnd: string | null;
+  equivalentAvailable: boolean | null;
+  reason: string | null;
+  aifaAdvice: string | null;
+  aifaNote: string | null;
 }
 
 const SEARCH_LIMIT = 30;
@@ -129,6 +151,22 @@ function likeText(q: string): string {
 const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
 
 /** Ordine degli equivalenti: prima il prezzo; a parità, nome e AIC, lo stesso a ogni ricerca. */
+/**
+ * La carenza che vale alla data, fra quelle dell'elenco per lo stesso AIC (tre AIC compaiono due
+ * volte nell'elenco del 17/11/2026): quella cominciata più di recente; se nessuna è cominciata,
+ * la prima prevista (D202).
+ */
+export function shortageAt<T extends { startOn: string | null }>(
+  rows: readonly T[],
+  date: string,
+): T | null {
+  const started = rows
+    .filter((r) => r.startOn === null || r.startOn <= date)
+    .sort((a, b) => (b.startOn ?? '').localeCompare(a.startOn ?? ''));
+  if (started.length) return started[0]!;
+  return [...rows].sort((a, b) => (a.startOn ?? '').localeCompare(b.startOn ?? ''))[0] ?? null;
+}
+
 export function compareEquivalents(
   a: Pick<DrugInfo, 'aic' | 'name' | 'price'>,
   b: Pick<DrugInfo, 'aic' | 'name' | 'price'>,
@@ -256,10 +294,12 @@ export class ReferenceData {
     const out = new Map<string, DrugInfo>();
     const wanted = [...new Set(aics.filter(Boolean))];
     if (!wanted.length) return out;
-    const [drugIds, classIds, dpcIds] = await Promise.all([
+    const [drugIds, classIds, dpcIds, transparencyIds, shortageIds] = await Promise.all([
       this.ids('farmaci', date),
       this.ids('farmaci_classe', date),
       this.ids('farmaci_dpc', date),
+      this.ids('farmaci_trasparenza', date),
+      this.ids('farmaci_carenti', date),
     ]);
     const drugs = drugIds.length
       ? await this.db
@@ -276,17 +316,44 @@ export class ReferenceData {
     const dpc = dpcIds.length
       ? await this.db.select().from(refDpcDrug).where(inArray(refDpcDrug.datasetId, dpcIds))
       : [];
+    const transparency = transparencyIds.length
+      ? await this.db
+          .select()
+          .from(refDrugTransparency)
+          .where(
+            and(
+              inArray(refDrugTransparency.datasetId, transparencyIds),
+              inArray(refDrugTransparency.aic, wanted),
+            ),
+          )
+      : [];
+    const shortages = shortageIds.length
+      ? await this.db
+          .select()
+          .from(refDrugShortage)
+          .where(
+            and(
+              inArray(refDrugShortage.datasetId, shortageIds),
+              inArray(refDrugShortage.aic, wanted),
+            ),
+          )
+      : [];
     for (const aic of wanted) {
       const d = drugs.filter((x) => x.aic === aic);
       const c = classes.filter((x) => x.aic === aic);
-      if (!d.length && !c.length) continue;
+      const t = transparency.filter((x) => x.aic === aic);
+      const s = shortages.filter((x) => x.aic === aic);
+      if (!d.length && !c.length && !t.length && !s.length) continue;
+      const shortage = shortageAt(s, date);
       const pick = <T>(values: (T | null)[]) =>
         values.find((v) => v !== null && v !== undefined) ?? null;
       const activeIngredient = pick([
         ...d.map((x) => x.activeIngredient),
         ...c.map((x) => x.activeIngredient),
+        ...t.map((x) => x.activeIngredient),
+        ...s.map((x) => x.activeIngredient),
       ]);
-      const atc = pick(d.map((x) => x.atc));
+      const atc = pick([...d.map((x) => x.atc), ...t.map((x) => x.atc), ...s.map((x) => x.atc)]);
       const inDpc = dpc.find(
         (x) =>
           (atc !== null && x.atc !== null && x.atc === atc) ||
@@ -301,21 +368,53 @@ export class ReferenceData {
       if (aifaNote) facts.aifaNote = aifaNote;
       // L'elenco DPC dice quando il piano serve; quando non c'è, non dice che non serve.
       if (inDpc?.planRequired === true) facts.requiresPlan = true;
+      // L'elenco dei carenti dice che il farmaco è carente; quando non c'è, la R21 tace (D202).
+      if (shortage) {
+        facts.shortage = {
+          since: shortage.startOn,
+          expectedEnd: shortage.expectedEndOn,
+          equivalentAvailable: shortage.equivalentAvailable,
+          reason: shortage.reason,
+        };
+      }
       out.set(aic, {
         aic,
-        name: pick(d.map((x) => x.name)),
-        pack: pick(d.map((x) => x.pack)),
+        name: pick([...d.map((x) => x.name), ...t.map((x) => x.name), ...s.map((x) => x.name)]),
+        pack: pick([...d.map((x) => x.pack), ...t.map((x) => x.pack)]),
         activeIngredient,
         atc,
         form: pick(d.map((x) => x.form)),
         supplyRegime: pick(d.map((x) => x.supplyRegime)),
-        holder: pick(d.map((x) => x.holder)),
+        holder: pick([
+          ...d.map((x) => x.holder),
+          ...t.map((x) => x.holder),
+          ...s.map((x) => x.holder),
+        ]),
         drugClass: classA ? 'A' : pick(c.map((x) => x.drugClass)),
-        price: pick((classA ? [classA] : c).map((x) => x.price)),
-        equivalenceGroup: pick(c.map((x) => x.equivalenceGroup)),
+        price: pick([
+          ...(classA ? [classA] : c).map((x) => x.price),
+          ...t.map((x) => x.publicPrice),
+        ]),
+        equivalenceGroup: pick([
+          ...c.map((x) => x.equivalenceGroup),
+          ...t.map((x) => x.equivalenceGroup),
+        ]),
         aifaNote,
         dpc: !!inDpc,
         planRequired: inDpc?.planRequired ?? null,
+        referencePrice: pick(t.map((x) => x.referencePrice)),
+        priceDifference: pick(t.map((x) => x.priceDifference)),
+        transparencyRemark: pick(t.map((x) => x.remark)),
+        shortage: shortage
+          ? {
+              since: shortage.startOn,
+              expectedEnd: shortage.expectedEndOn,
+              equivalentAvailable: shortage.equivalentAvailable,
+              reason: shortage.reason,
+              aifaAdvice: shortage.aifaAdvice,
+              aifaNote: shortage.aifaNote,
+            }
+          : null,
         facts,
       });
     }
@@ -328,9 +427,10 @@ export class ReferenceData {
     if (!text) return [];
     const like = `%${likeText(text)}%`;
     const prefix = `${likeText(text)}%`;
-    const [drugIds, classIds] = await Promise.all([
+    const [drugIds, classIds, transparencyIds] = await Promise.all([
       this.ids('farmaci', date),
       this.ids('farmaci_classe', date),
+      this.ids('farmaci_trasparenza', date),
     ]);
     const aics = new Set<string>();
     if (drugIds.length) {
@@ -362,28 +462,67 @@ export class ReferenceData {
         .limit(limit))
         aics.add(r.aic);
     }
+    // La lista di trasparenza ha nome, AIC, ATC e principio attivo (D202).
+    if (transparencyIds.length && aics.size < limit) {
+      for (const r of await this.db
+        .selectDistinct({ aic: refDrugTransparency.aic, name: refDrugTransparency.name })
+        .from(refDrugTransparency)
+        .where(
+          and(
+            inArray(refDrugTransparency.datasetId, transparencyIds),
+            or(
+              ilike(refDrugTransparency.aic, prefix),
+              ilike(refDrugTransparency.atc, prefix),
+              ilike(refDrugTransparency.name, like),
+              ilike(refDrugTransparency.activeIngredient, like),
+            ),
+          ),
+        )
+        .orderBy(refDrugTransparency.name, refDrugTransparency.aic)
+        .limit(limit))
+        aics.add(r.aic);
+    }
     const found = await this.drugs([...aics].slice(0, limit), date);
     return [...found.values()].sort(
       (a, b) => lower(a.name).localeCompare(lower(b.name)) || a.aic.localeCompare(b.aic),
     );
   }
 
-  /** Farmaci dello stesso gruppo di equivalenza (liste AIFA), escluso quello di partenza. */
+  /**
+   * Farmaci dello stesso gruppo di equivalenza (liste AIFA), escluso quello di partenza: dalle
+   * liste di classe e dalla lista di trasparenza, che usano gli stessi codici di gruppo (D202).
+   */
   async equivalents(aic: string, date: string): Promise<DrugInfo[]> {
     const own = (await this.drugs([aic], date)).get(aic);
     if (!own?.equivalenceGroup) return [];
-    const classIds = await this.ids('farmaci_classe', date);
-    const rows = await this.db
-      .selectDistinct({ aic: refDrugClass.aic })
-      .from(refDrugClass)
-      .where(
-        and(
-          inArray(refDrugClass.datasetId, classIds),
-          eq(refDrugClass.equivalenceGroup, own.equivalenceGroup),
-        ),
-      );
+    const [classIds, transparencyIds] = await Promise.all([
+      this.ids('farmaci_classe', date),
+      this.ids('farmaci_trasparenza', date),
+    ]);
+    const inClass = classIds.length
+      ? await this.db
+          .selectDistinct({ aic: refDrugClass.aic })
+          .from(refDrugClass)
+          .where(
+            and(
+              inArray(refDrugClass.datasetId, classIds),
+              eq(refDrugClass.equivalenceGroup, own.equivalenceGroup),
+            ),
+          )
+      : [];
+    const inTransparency = transparencyIds.length
+      ? await this.db
+          .selectDistinct({ aic: refDrugTransparency.aic })
+          .from(refDrugTransparency)
+          .where(
+            and(
+              inArray(refDrugTransparency.datasetId, transparencyIds),
+              eq(refDrugTransparency.equivalenceGroup, own.equivalenceGroup),
+            ),
+          )
+      : [];
     const found = await this.drugs(
-      rows.map((r) => r.aic).filter((x) => x !== aic),
+      [...new Set([...inClass, ...inTransparency].map((r) => r.aic))].filter((x) => x !== aic),
       date,
     );
     return [...found.values()].sort(compareEquivalents);

@@ -27,6 +27,12 @@ const mappingSchema = z.object({
    */
   nessunValore: z.record(z.string(), z.array(z.string().min(1))).default({}),
   /**
+   * Campo → lunghezza: un valore di sole cifre più corto riceve gli zeri davanti fino a quella
+   * lunghezza. Solo dove il file vero toglie gli zeri (l'AIC della lista di trasparenza AIFA), con
+   * il motivo nella nota della mappatura (D202).
+   */
+  zeriDavanti: z.record(z.string(), z.number().int().positive()).default({}),
+  /**
    * Oltre quanti giorni dal download la versione in uso è più vecchia del previsto (A6). Solo
    * dove la fonte dichiara una cadenza regolare; null = nessuna soglia d'età, vale il controllo di
    * ogni notte (D156).
@@ -58,6 +64,7 @@ export function parseMappings(data: unknown): MappingSet {
       ...Object.keys(m.colonne),
       ...Object.keys(m.costanti),
       ...Object.keys(m.nessunValore),
+      ...Object.keys(m.zeriDavanti),
     ]) {
       if (!(f in fields))
         throw new Error(`Mappatura ${m.id}: il tipo ${m.tipo} non ha il campo ${f}`);
@@ -139,6 +146,8 @@ export interface Extraction {
   headerLine: number | null;
   /** Per campo, quante celle valevano «nessun valore» secondo la mappatura. */
   noValue: Record<string, number>;
+  /** Per campo, quante celle hanno ricevuto gli zeri davanti secondo la mappatura (D202). */
+  padded: Record<string, number>;
 }
 
 /** Quante righe guardare per trovare l'intestazione (titoli sopra la tabella). */
@@ -166,6 +175,7 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
       missingColumns: wanted.filter(([f]) => !best.found.has(f)).map(([, h]) => h),
       headerLine: best.line >= 0 ? best.line + 1 : null,
       noValue: {},
+      padded: {},
     };
   }
   const empty = Object.fromEntries(
@@ -175,6 +185,7 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
     ]),
   );
   const noValue: Record<string, number> = {};
+  const padded: Record<string, number> = {};
   const records: DataRecord[] = [];
   const problems: RowProblem[] = [];
   for (let i = best.line + 1; i < rows.length; i++) {
@@ -189,6 +200,11 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
         noValue[field] = (noValue[field] ?? 0) + 1;
         raw = '';
       }
+      const width = m.zeriDavanti[field];
+      if (width && /^\d+$/.test(raw.trim()) && raw.trim().length < width) {
+        raw = raw.trim().padStart(width, '0');
+        padded[field] = (padded[field] ?? 0) + 1;
+      }
       const converted = convertCell(spec, raw);
       if ('problem' in converted) {
         problems.push({ line: i + 1, field, problem: converted.problem });
@@ -197,5 +213,5 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
     }
     if (ok) records.push(record);
   }
-  return { records, problems, missingColumns: [], headerLine: best.line + 1, noValue };
+  return { records, problems, missingColumns: [], headerLine: best.line + 1, noValue, padded };
 }

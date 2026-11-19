@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-19.1",
+  "versione": "2026-11-19.2",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -78,6 +78,58 @@
       "nessunValore": {
         "price": ["-", "[0-9.]+,[0-9]+/m³"]
       }
+    },
+    {
+      "id": "aifa-trasparenza",
+      "titolo": "AIFA: lista di trasparenza (farmaci equivalenti)",
+      "tipo": "farmaci_trasparenza",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "*_Lista_farmaci_equivalenti.csv",
+      "colonne": {
+        "aic": "AIC",
+        "activeIngredient": "Principio attivo",
+        "referencePack": "Confezione di riferimento",
+        "atc": "ATC",
+        "name": "Farmaco",
+        "pack": "Confezione",
+        "holder": "Ditta",
+        "referencePrice": "Prezzo riferimento SSN",
+        "publicPrice": "Prezzo Pubblico 16 novembre 2026",
+        "priceDifference": "Differenza",
+        "remark": "Nota",
+        "equivalenceGroup": "Codice gruppo equivalenza"
+      },
+      "zeriDavanti": {
+        "aic": 9
+      },
+      "vecchiaDopoGiorni": 32,
+      "nota": "Intestazioni lette il 19/11/2026 dal file AIFA Lista_farmaci_equivalenti.csv (pagina «Liste dei farmaci», cp1252, prezzi del 16 novembre 2026): 8.598 righe, tutti gli ATC nella forma attesa, prezzi tutti nella forma «5,63 €». L'AIC è scritto senza gli zeri davanti: 8.594 righe con 8 cifre e 4 con 7 (FOLINA); con gli zeri davanti (zeriDavanti) le 4 sono le confezioni di FOLINA della lista di classe A del 30/6/2026, e 8.396 delle altre vi si ritrovano uguali. La colonna «Nota» è un'annotazione in parole (12 valori, per esempio «In distribuzione diretta da parte delle Regioni»), non il numero della nota AIFA. Soglia di vecchiaia (D156): AIFA aggiorna la lista ogni mese, il 15 (sync/fonti.json), quindi 31 giorni più una notte."
+    },
+    {
+      "id": "aifa-carenti",
+      "titolo": "AIFA: farmaci carenti",
+      "tipo": "farmaci_carenti",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "*_elenco_medicinali_carenti.csv",
+      "colonne": {
+        "aic": "Codice AIC",
+        "name": "Nome medicinale",
+        "activeIngredient": "Principio attivo",
+        "formStrength": "Forma farmaceutica e dosaggio",
+        "holder": "Titolare AIC",
+        "startOn": "Data inizio",
+        "expectedEndOn": "Fine presunta",
+        "equivalentAvailable": "Equivalente",
+        "reason": "Motivazioni",
+        "aifaAdvice": "Suggerimenti/Indicazioni AIFA",
+        "aifaNote": "Nota AIFA",
+        "reimbursementClass": "Classe di rimborsabilità",
+        "atc": "Codice ATC"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Intestazioni lette il 19/11/2026 dal file AIFA elenco_medicinali_carenti.csv (pagina «Liste dei farmaci», cp1252, aggiornato al 17/11/2026): l'intestazione è alla terza riga, sotto un'avvertenza e la data; 2.516 righe, tutti gli AIC di 9 cifre, tutte le date GG/MM/AAAA, «Equivalente» sempre «Sì» o «No», tutti gli ATC nella forma attesa; 3 AIC compaiono due volte. «Nota AIFA» qui è un testo in parole, che può andare a capo dentro le virgolette. Nessuna soglia di vecchiaia (D156): AIFA aggiorna l'elenco senza una cadenza dichiarata; vale il controllo di ogni notte."
     },
     {
       "id": "trascrizione-farmaci-dpc",

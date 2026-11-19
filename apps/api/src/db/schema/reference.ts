@@ -99,6 +99,54 @@ export const refDrugClass = pgTable(
   (t) => [index().on(t.datasetId, t.aic), index().on(t.datasetId, t.equivalenceGroup)],
 );
 
+/**
+ * Lista di trasparenza AIFA (D202): prezzo di riferimento del SSN, prezzo al pubblico e
+ * differenza per confezione. `remark` è la colonna «Nota» del file: un'annotazione in parole.
+ */
+export const refDrugTransparency = pgTable(
+  'ref_drug_transparency',
+  {
+    id: rowId(),
+    datasetId: datasetId(),
+    aic: text().notNull(),
+    activeIngredient: text(),
+    referencePack: text(),
+    atc: text(),
+    name: text(),
+    pack: text(),
+    holder: text(),
+    referencePrice: numeric({ precision: 12, scale: 2 }),
+    publicPrice: numeric({ precision: 12, scale: 2 }),
+    priceDifference: numeric({ precision: 12, scale: 2 }),
+    remark: text(),
+    equivalenceGroup: text(),
+  },
+  (t) => [index().on(t.datasetId, t.aic), index().on(t.datasetId, t.equivalenceGroup)],
+);
+
+/** Farmaci carenti (AIFA, D202): da quando, fine presunta, motivazione e indicazioni dell'AIFA. */
+export const refDrugShortage = pgTable(
+  'ref_drug_shortage',
+  {
+    id: rowId(),
+    datasetId: datasetId(),
+    aic: text().notNull(),
+    name: text(),
+    activeIngredient: text(),
+    formStrength: text(),
+    holder: text(),
+    startOn: date(),
+    expectedEndOn: date(),
+    equivalentAvailable: boolean(),
+    reason: text(),
+    aifaAdvice: text(),
+    aifaNote: text(),
+    reimbursementClass: text(),
+    atc: text(),
+  },
+  (t) => [index().on(t.datasetId, t.aic)],
+);
+
 export const refDpcDrug = pgTable(
   'ref_dpc_drug',
   {
@@ -188,6 +236,8 @@ export const REFERENCE_TABLES = {
   farmaci: refDrug,
   farmaci_classe: refDrugClass,
   farmaci_dpc: refDpcDrug,
+  farmaci_trasparenza: refDrugTransparency,
+  farmaci_carenti: refDrugShortage,
   comuni: refMunicipality,
   prestazioni: refService,
   esenzioni: refExemption,

@@ -17,6 +17,20 @@ export interface DrugFacts {
   injectableAntibioticOrInfusion?: boolean;
   /** Unità posologiche per confezione (R4, R11). */
   unitsPerPack?: number;
+  /** Carenza secondo l'elenco AIFA dei farmaci carenti in vigore (R21); assente se non c'è. */
+  shortage?: ShortageFacts;
+}
+
+/** Una carenza come la dice l'elenco AIFA dei farmaci carenti (D202). */
+export interface ShortageFacts {
+  /** Data di inizio della carenza; può essere dopo la data della ricetta (carenza prevista). */
+  since: string | null;
+  /** «Fine presunta» dell'elenco. */
+  expectedEnd: string | null;
+  /** Colonna «Equivalente» dell'elenco: sì, no, o non detto. */
+  equivalentAvailable: boolean | null;
+  /** «Motivazioni» dell'elenco. */
+  reason: string | null;
 }
 
 export interface TherapyContext {
