@@ -255,6 +255,12 @@ export function AuraSection({
                                 type="button"
                                 className="pulsante"
                                 disabled={busy}
+                                // Il nome comincia con il testo visibile, e dice di quale dato si tratta.
+                                aria-label={
+                                  d.campo === 'decesso'
+                                    ? undefined
+                                    : `Usa il dato di AURA: ${d.etichetta}`
+                                }
                                 onClick={() => void choose(d, true)}
                               >
                                 <Icon name="fatto" />{' '}
@@ -263,14 +269,16 @@ export function AuraSection({
                                     ? 'Conferma il decesso'
                                     : 'Usa il dato di AURA'}
                                 </span>
-                                {d.campo !== 'decesso' && (
-                                  <span className="visivamente-nascosto">: {d.etichetta}</span>
-                                )}
                               </button>
                               <button
                                 type="button"
                                 className="pulsante pulsante-piatto"
                                 disabled={busy}
+                                aria-label={
+                                  d.campo === 'decesso'
+                                    ? undefined
+                                    : `Tieni il dato della cartella: ${d.etichetta}`
+                                }
                                 onClick={() => void choose(d, false)}
                               >
                                 <Icon name="annulla" />{' '}
@@ -279,9 +287,6 @@ export function AuraSection({
                                     ? 'Non confermare il decesso'
                                     : 'Tieni il dato della cartella'}
                                 </span>
-                                {d.campo !== 'decesso' && (
-                                  <span className="visivamente-nascosto">: {d.etichetta}</span>
-                                )}
                               </button>
                             </div>
                           </td>

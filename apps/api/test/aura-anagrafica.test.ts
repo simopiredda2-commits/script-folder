@@ -114,6 +114,37 @@ describe('AURA: revoca e anagrafica da confermare (D198)', () => {
       ),
     );
     expect((await rich()).status).toBe('active');
+
+    // Un altro paziente dell'archivio, con in AURA solo la scelta cessata del collega: in carico.
+    const otherId = s.patients.titolare[1]!;
+    await t.db
+      .update(patient)
+      .set({ status: 'active', deceasedOn: null, deathCauseIcd: null })
+      .where(eq(patient.id, otherId));
+    const [other] = await t.db.select().from(patient).where(eq(patient.id, otherId));
+    aura.register({
+      fiscalCode: other!.fiscalCode,
+      lastName: other!.lastName,
+      firstName: other!.firstName,
+      birthDate: other!.birthDate,
+      exemptions: [],
+      choices: [
+        {
+          doctorFiscalCode: colleagueCf,
+          chosenOn: '2020-01-01',
+          expiresOn: null,
+          endedOn: daysAgo(30),
+          endReason: 'revoca',
+        },
+      ],
+    });
+    expect((await post(`/api/pazienti/${otherId}/aura`)).json()).toMatchObject({
+      esito: 'aggiornato',
+      variazioni: 1,
+    });
+    expect((await t.db.select().from(patient).where(eq(patient.id, otherId)))[0]!.status).toBe(
+      'active',
+    );
   });
 
   it('scelta del titolare cessata in AURA: il paziente è revocato da solo, e torna con una scelta nuova', async () => {

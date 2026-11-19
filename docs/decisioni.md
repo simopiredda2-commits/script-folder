@@ -970,3 +970,18 @@ Prove e quattro sabotaggi.
 - **Fuori, per ora: domanda per la fermata.** L'anagrafica (indirizzo, ASL, decesso) e lo stato del paziente quando AURA dice che la scelta è cessata. Il programma non scrive in AURA: scelte e revoche le registra l'ASL.
 
 Prove (servizio, interfaccia, browser con accessibilità) e diciannove sabotaggi.
+
+**D198 · AURA: revoca automatica, anagrafica da confermare, un controllo alla volta.** Alla fermata dopo l'unione della #11 Simone ha dato il via alla #12 e ha risposto alle due domande su AURA. Per la scelta cessata: «Revocato da solo». Per l'anagrafica: «Differenze da confermare, intendi gli aggiornamenti che arrivano da Aura? Allora ok»; la risposta è sì, sono gli aggiornamenti dell'anagrafica che arrivano da AURA. Scelte:
+
+- **Revoca automatica.** Quando AURA dice che la scelta del titolare dell'archivio è cessata, e non ce n'è un'altra in corso, il paziente passa a «revocato» da solo. Con una scelta nuova in corso torna «in carico», sempre da solo: AURA è la fonte delle scelte. Contano solo le scelte del titolare dell'archivio arrivate da AURA. Le scelte di altri medici e quelle scritte a mano non cambiano lo stato, e i pazienti deceduti o temporanei non si toccano. Ogni cambio di stato è una variazione in parole («Paziente revocato: …», «Paziente di nuovo in carico: …»). Il giro di notte comprende anche i revocati già collegati ad AURA, così un ritorno si vede anche senza notifica.
+- **Anagrafica da confermare.** AURA manda residenza (via, numero civico, CAP, comune, provincia), domicilio, ASL, distretto e decesso. Il programma li confronta con la cartella e mostra le differenze nel pannello di AURA, che non entrano da sole:
+  - **Che cosa conta come differenza.** Maiuscole, minuscole e spazi non contano. Un campo vuoto in AURA non propone di svuotare quello della cartella.
+  - **Chi decide.** Medico o segreteria, cioè chi scrive nell'archivio, usano il dato di AURA, con gli stessi controlli del pannello amministrativo e il registro con la fonte «AURA», oppure tengono quello della cartella.
+  - **Un dato tenuto non si ripropone**, finché AURA non ne manda un altro.
+  - **Risposte su dati superati.** Si risponde solo alle differenze di adesso, con il valore visto: se AURA nel frattempo ha cambiato, il programma chiede di ricaricare (409).
+  - **Il decesso** si segnala anche nella pagina Oggi, in evidenza, e si conferma dal pannello con i suoi controlli (per esempio una data nel futuro è rifiutata).
+- **Registro.** Quando AURA manda un'anagrafica nuova con differenze, la variazione si registra una volta, in parole. Dopo, va nel registro ogni scelta di usare o tenere un dato.
+- **Un controllo alla volta per paziente** (difetto trovato dalle prove nuove, presente dalla #12). Due notifiche vicine per lo stesso paziente si applicavano in parallelo e potevano registrare due volte la stessa variazione. Ora ogni controllo prende un blocco nel database (anche con più processi) e legge AURA dentro il blocco: chi arriva dopo aspetta e legge dopo.
+- **Fuori, per ora**: l'identità (cognome, nome, nascita), che si corregge con un motivo e non da AURA; la scadenza di una scelta a tempo determinato, da verificare con le specifiche (oggi conta solo la cessazione); i nuovi assistiti, cioè chi sceglie il medico e non è ancora nell'archivio (domanda per la fermata).
+
+Prove (servizio, interfaccia, browser con accessibilità) e sabotaggi.
