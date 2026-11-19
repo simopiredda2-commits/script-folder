@@ -20,7 +20,7 @@ import {
   type PatientAdminInput,
   type PatientIdentityInput,
 } from '@mmg/domain';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { z, type ZodError } from 'zod';
 import { entryIssues, insertEntry, newEntryBody, type NewEntry } from '../clinical/entries';
 import {
@@ -295,6 +295,7 @@ export function exemptionsHandler(
             eq(exemption.patientId, patientId),
             eq(exemption.code, b.codice),
             eq(exemption.validFrom, b.dal),
+            isNull(exemption.annulledAt),
           ),
         );
       return !!row;
@@ -347,7 +348,13 @@ export const choicesHandler: EntryHandler<DoctorChoicePeriodInput> = {
     const [row] = await tx
       .select({ id: patientChoice.id })
       .from(patientChoice)
-      .where(and(eq(patientChoice.patientId, patientId), eq(patientChoice.chosenOn, b.dal)));
+      .where(
+        and(
+          eq(patientChoice.patientId, patientId),
+          eq(patientChoice.chosenOn, b.dal),
+          isNull(patientChoice.annulledAt),
+        ),
+      );
     return !!row;
   },
   async conflict(tx, patientId, b) {
@@ -358,7 +365,7 @@ export const choicesHandler: EntryHandler<DoctorChoicePeriodInput> = {
         cessataIl: patientChoice.endedOn,
       })
       .from(patientChoice)
-      .where(eq(patientChoice.patientId, patientId));
+      .where(and(eq(patientChoice.patientId, patientId), isNull(patientChoice.annulledAt)));
     const period = choiceValidity(b);
     return rows.some((r) => periodsOverlap(choiceValidity(r), period)) ? CHOICE_OVERLAP : null;
   },

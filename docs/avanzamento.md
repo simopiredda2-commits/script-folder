@@ -19,14 +19,15 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #7 (19/11/2026)**: su `main` la prova nel browser con WebKit è caduta una volta (giro 170), in «la stessa prestazione già prescritta». È la prova, non il programma: corretta con la pull request #8, unita in `main` con il via di Simone («Subito, PR piccola») dopo le prove verdi con WebKit e Firefox (sezione «Windows, Mac e tablet»).
 - **Quinto blocco** (via del 19/11/2026, D182), nel branch `ccr-9780f0fd-iyj18e`: tappa 16 (le scelte della fermata, D181) e tappa 17 (diagnosi ICD-9-CM, allegati LEA) fatte. Fermata dopo la tappa 17 fatta (D191): via dato, pull request #9 unita. Le risposte sono in «Risposte della fermata dopo la tappa 17».
 - **Dopo l'unione della #9 (19/11/2026)**, nello stesso branch ripartito da `main`: le modifiche che seguono dalle risposte. Banche dati aggiornate da chi gestisce il servizio (D192), con il pulsante «Aggiorna adesso» che resta all'amministratore dello studio e vale per tutti gli studi (D194), soglie dei tentativi non più provvisorie (D191), motivo del ritorno da SPID o CIE scritto dal programma e non dall'indirizzo (D193). Pull request #10, unita con il via di Simone («Via, unisci»), con il pulsante rimesso come ha chiesto. Le verifiche di Simone e della Dr.ssa Rocca si fanno alla fine; l'allegato 7 e la D.D. 1167/2022 si trascrivono quando arrivano i file di Simone.
-- **Dopo l'unione della #10 (19/11/2026)**, nello stesso branch: regola nuova in `CLAUDE.md` (non chiedere a Simone ciò che si può fare da sé); PDF del manuale ICD-9-CM indicato da Simone, con l'impronta (`docs/provenienze.md`); allegato 7 trascritto (D195); elenco esenzioni–prestazioni del SAR analizzato e non importato (D196). Domande nella sezione «Domande per la prossima fermata».
+- **Dopo l'unione della #10 (19/11/2026)**, nello stesso branch: regola nuova in `CLAUDE.md` (non chiedere a Simone ciò che si può fare da sé); PDF del manuale ICD-9-CM indicato da Simone, con l'impronta (`docs/provenienze.md`); allegato 7 trascritto (D195); elenco esenzioni–prestazioni del SAR analizzato e non importato (D196). Fermata fatta: via, pull request #11 unita (risposte in «Risposte della fermata dopo l'unione della #10»).
+- **Dopo l'unione della #11 (19/11/2026)**, nello stesso branch ripartito da `main`: AURA con un simulatore (D197), sezione «Dopo l'unione della #11 – AURA con un simulatore». Simone ha mandato la PEC al CSI Piemonte, in copia alla Regione. Domande nella sezione «Domande per la prossima fermata».
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
 1. Primo giro di `sync/` dal computer dello studio e confermare le intestazioni ISTAT (D55, D56). Le mappature AIFA sono complete, controllate sui file interi del 18/11/2026 (D148).
 2. Specifiche e credenziali di collaudo di SAR, Sistema TS e AURA: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo della ricetta rossa e del promemoria. Insieme: registrazione del programma presso la Regione (codice del gestionale, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103).
 3. Decisione su Ready! e sulla versione «Full» (D78).
-4. Riepiloghi, agenda (dopo la decisione su Ready!), AURA e FSE, importazione dei dati dal software attuale (serve il formato dell'esportazione di Next² con un file d'esempio senza dati veri).
+4. Riepiloghi, agenda (dopo la decisione su Ready!), AURA vera (oggi con il simulatore, D197) e FSE, importazione dei dati dal software attuale (serve il formato dell'esportazione di Next² con un file d'esempio senza dati veri).
 5. A7 e le altre liste AIFA (trasparenza, carenze, registri); la lista di trasparenza porta la nota AIFA di ogni farmaco equivalente, con l'AIC a 8 cifre (D148). Soglie di vecchiaia: fatte (D156).
 6. Collegamento alla segnalazione di farmacovigilanza (D82); dicitura del tipo di accesso nella versione viva dei requisiti (D79).
 7. Prove con lettori di schermo e tablet veri, e una giornata di lavoro con la Dr.ssa Rocca.
@@ -536,6 +537,48 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
    - Prove: `packages/reference/test/lea.test.ts`, `apps/api/test/banche-dati.test.ts` (R9). Quattro sabotaggi.
    - Non provato: il catalogo vero nel database e R9 con le esenzioni vere dei pazienti (resta fuori finché non è controllato).
 
+### Dopo l'unione della #11 – AURA con un simulatore (D197)
+
+**Fatto**
+
+- **Interfaccia e simulatore di AURA** in `packages/integrations/src/aura.ts`, dal manuale pubblico dei servizi di cooperazione: ricerca per codice fiscale, profilo sanitario, notifiche delle variazioni, assenza di rete.
+- **Servizio** in `apps/api/src/aura/`. Quando si allinea:
+  - a ogni notifica;
+  - ogni notte all'ora di `AURA_AGGIORNAMENTO`;
+  - dal pannello, con «Aggiorna da AURA»;
+  - prima dei controlli di una ricetta con esenzione, se i dati hanno più di dieci minuti (al massimo tre secondi di attesa).
+
+  Che cosa allinea:
+  - esenzioni e scelte con la fonte «AURA», non modificabili dal pannello;
+  - le righe tolte in AURA restano annullate con il motivo;
+  - le righe a mano restano come sono;
+  - le scelte entrano solo per i medici dello studio.
+
+- **Migrazioni**:
+  - 0032: collegamento, variazioni immutabili, giri;
+  - 0033: giri per studio, annullamento di esenzioni e scelte con vincolo e righe annullate ferme, storico e divieto di cancellazione del collegamento.
+- **Registro degli accessi** per i controlli chiesti da una persona e per ogni variazione; nessuna riga per i controlli che non cambiano nulla.
+- **Spenta in produzione con il simulatore.**
+- **Interfaccia**:
+  - sezione «AURA, anagrafe regionale» nei dati amministrativi (stato con simbolo e parola, simulatore dichiarato, pulsante, ultime variazioni);
+  - «Variazioni da AURA» in Oggi;
+  - AURA nello stato del servizio, con i numeri dei soli pazienti dello studio.
+- **Esenzioni e scelte annullate** fuori da regole, pannello, testata della cartella e importazione; restano nell'esportazione.
+- **Una prova del registro ha trovato un buco**: il collegamento non aveva storico né divieto di cancellazione. Aggiunti.
+- **Prove**:
+  - `apps/api/test/aura.test.ts` (11);
+  - `apps/web/test/aura.test.tsx` (6);
+  - una prova nel browser con l'accessibilità (`apps/api/test/e2e/interfaccia.test.ts`);
+  - le prove del registro e dello studio aggiornate.
+
+  Diciannove sabotaggi, tutti rossi con il guasto e verdi dopo il ripristino.
+
+**Non fatto**: l'anagrafica da AURA e lo stato del paziente quando AURA dice che la scelta è cessata (domande per la fermata). Il programma non scrive in AURA.
+
+**Non provato**: il servizio vero (specifiche AURA--SER-01, RUPAR, firma delle notifiche: chieste al CSI con la PEC del 19/11/2026); i tempi di un giro di notte su migliaia di pazienti.
+
+**Prossimo passo**: fermata con il via all'unione; poi le specifiche del CSI, quando arrivano.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:
@@ -767,11 +810,30 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Annotate dopo l'unione della #10, da fare con il pulsante:
+Annotate dopo l'unione della #11, da fare con il pulsante:
 
-1. **Elenco esenzioni–prestazioni in uso nel SAR** (D196): l'ultimo pubblicato (allegato C della D.D. 1452/2023) è precedente al nuovo nomenclatore. Chiederlo alla Regione o al CSI Piemonte (lo può fare solo Simone), oppure lasciare R17 «non verificabile».
-2. **AURA** (domanda di Simone, 19/11/2026: esenzioni nuove aggiornate ogni giorno come negli altri programmi). Oggi esenzioni e scelte si inseriscono a mano, con la provenienza (AURA o a mano) già nel modello. Proposta: costruire adesso il collegamento con un simulatore, dal manuale pubblico dei servizi di cooperazione (ricerca del profilo sanitario, notifiche delle variazioni), mentre Simone avvia l'accreditamento come software house presso il CSI Piemonte (specifiche di dettaglio, ambiente di prova, notifiche sulla rete RUPAR).
-3. **Verifiche alla fine**: alla lista della Dr.ssa Rocca si aggiunge l'allegato 7 (`docs/banche-dati.md`, «Esenzioni del DPCM LEA»).
+1. **Via all'unione della pull request di AURA** (D197).
+2. **Anagrafica da AURA**: oggi AURA allinea solo esenzioni e scelte. Proposta: indirizzo, ASL e distretto mostrati come differenze nel pannello, da accettare con un clic da medico o segreteria; il decesso segnalato in Oggi, da confermare. Alternativa: tutto da solo, come le esenzioni.
+3. **Scelta cessata in AURA** (revoca, trasferimento): oggi la scelta si chiude, ma lo stato del paziente resta «attivo». Proposta: avviso in Oggi e stato cambiato da chi lo conferma. Alternativa: «revocato» da solo.
+4. **Verifiche alla fine**: restano quelle della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7).
+
+## Risposte della fermata dopo l'unione della #10 (19/11/2026)
+
+Simone ha risposto con il pulsante:
+
+- **Via**: «Via: unisci». Pull request #11 unita in `main`.
+- **AURA**: «Sì, costruiscilo ora». Fatto con un simulatore (D197), nello stesso branch ripartito da `main`.
+- **Elenco esenzioni–prestazioni del SAR** (D196): «Sì, lo chiedo al CSI». Simone ha mandato la PEC al CSI Piemonte il 19/11/2026, in copia alla Regione (settore dei sistemi informativi della Direzione Sanità).
+  - Chiede procedura e requisiti per le software house, specifiche di SAR/SIRPED e AURA, collaudo e RUPAR, l'elenco del SAR e il catalogo in formato strutturato.
+  - Per i documenti (specifiche, elenco, catalogo) vale anche come istanza di accesso civico generalizzato (d.lgs. 33/2013, art. 5, comma 2): risposta motivata entro 30 giorni, cioè entro il 19/12/2026. Poi c'è il riesame del responsabile della trasparenza, e se serve il TAR o il difensore civico.
+  - Il testo resta fuori dal repository: contiene i dati di Simone.
+- **Verifiche alla fine**: l'allegato 7 si aggiunge alla lista della Dr.ssa Rocca.
+
+## Domande della fermata dopo l'unione della #10 (chiuse)
+
+1. Elenco esenzioni–prestazioni in uso nel SAR (D196): chiederlo alla Regione o al CSI Piemonte, oppure lasciare R17 «non verificabile».
+2. AURA con un simulatore subito, mentre Simone avvia l'accreditamento come software house.
+3. Verifiche alla fine: l'allegato 7.
 
 ## Risposte della fermata dopo la tappa 17 (19/11/2026)
 
@@ -1829,3 +1891,22 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D195: il nome è quello del gruppo, non un esempio                                                             | trascrizione: RCG040 con il nome di un esempio                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D195: lettere spaziate ricomposte                                                                             | trascrizione: «D I S G E N E S I A …» come nel PDF                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D195: malattie del gruppo con un codice proprio                                                               | trascrizione: «(codice RN1200)» tolto                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: le righe a mano non si toccano                                                                          | aura/service.ts: allineamento anche delle righe a mano                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: scelte solo dei medici dello studio                                                                     | aura/service.ts: medici di tutti gli studi                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: ogni controllo di una persona nel registro                                                              | aura/service.ts: nessuna riga nel registro                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: nessuna riga per i controlli senza variazioni                                                           | aura/service.ts: una riga per paziente ogni notte                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: spenta in produzione con il simulatore                                                                  | aura/service.ts: AURA sempre disponibile                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: variazioni solo dei pazienti visibili                                                                   | aura/service.ts: variazioni di tutti gli archivi                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: le variazioni non si modificano                                                                         | migrazione 0032: modifica permessa                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: rilettura di AURA prima della ricetta                                                                   | app.ts: controllo senza rilettura                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: tolta in AURA, annullata e non cancellata                                                               | aura/service.ts: cancellazione della riga                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: le regole non contano le annullate                                                                      | rules-check.ts: anche le esenzioni annullate                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: il pannello non mostra le annullate                                                                     | admin.ts: anche le esenzioni annullate                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: lo studio vede solo i suoi numeri                                                                       | aura/service.ts: numeri di tutto il servizio                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: un altro codice fiscale non cambia nulla                                                                | aura/service.ts: codice fiscale non confrontato                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: il collegamento non si cancella                                                                         | migrazione 0033: cancellazione permessa                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: storico solo quando cambia lo stato                                                                     | migrazione 0033: storico a ogni controllo                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: annullamento con data e motivo insieme                                                                  | migrazione 0033: motivo non richiesto                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: una riga annullata non si modifica                                                                      | migrazione 0033: modifica permessa                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: il pulsante solo a chi scrive                                                                           | AuraSection.tsx: pulsante per chi legge                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D197: una risposta strana non fa cadere Oggi                                                                  | AuraSection.tsx: risposta usata senza controllo                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

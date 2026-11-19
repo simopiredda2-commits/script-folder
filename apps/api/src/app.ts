@@ -1,6 +1,7 @@
 import cookie from '@fastify/cookie';
 import { PRODUCT_NAME } from '@mmg/brand';
-import { sql } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import { prescription } from './db/schema';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { z, ZodError } from 'zod';
 import {
@@ -18,6 +19,9 @@ import { createCredentialService } from './credentials/service';
 import { isPoolTimeout, type Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerIdentityRoutes } from './http/identity-routes';
+import { registerAuraRoutes } from './http/aura-routes';
+import { createAuraService } from './aura/service';
+import { ReferenceUpdateScheduler } from './reference/scheduler';
 import { registerIdentitySimulatorRoutes } from './http/identity-simulator-routes';
 import { registerLockRoutes } from './http/lock-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
@@ -70,6 +74,8 @@ import {
   type RegionalAuthorizationGateway,
   type SecondFactorGateway,
   type SickLeaveGateway,
+  SimulatedAura,
+  type AuraGateway,
 } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
@@ -144,6 +150,12 @@ export interface AppDeps {
    * ripristino è spento.
    */
   identity?: { gateway: DigitalIdentityGateway; clientId: string };
+  /**
+   * AURA, l'anagrafe regionale degli assistiti (D197): esenzioni e scelte del medico. Per difetto il
+   * simulatore, senza assistiti; `time` («02:30») accende il controllo di ogni notte. Con il
+   * simulatore, in produzione, AURA è spenta.
+   */
+  aura?: { gateway?: AuraGateway; time?: string | null };
 }
 
 export function buildApp({
@@ -169,6 +181,7 @@ export function buildApp({
   referenceUpdates = new ReferenceUpdates(db, null, now ? { now } : {}),
   loginSources,
   identity = { gateway: new SimulatedDigitalIdentity({ now }), clientId: 'SIMULATORE_IDENTITA' },
+  aura = {},
 }: AppDeps): FastifyInstance {
   // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
   // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
@@ -296,6 +309,47 @@ export function buildApp({
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
   registerAftRoutes(app, createAftService({ db, now: now ?? (() => new Date()) }));
+  // AURA, l'anagrafe regionale (D197): variazioni ascoltate subito, controllo di ogni notte se c'è l'ora.
+  const auraService = createAuraService({
+    db,
+    gateway: aura.gateway ?? new SimulatedAura(now ? { now } : {}),
+    environment: config.environment ?? 'prova',
+    now: now ?? (() => new Date()),
+  });
+  const stopAuraListener = auraService.listen((err) =>
+    app.log.error({ err }, 'Variazione di AURA non applicata'),
+  );
+  const auraScheduler = aura.time
+    ? new ReferenceUpdateScheduler({
+        time: aura.time,
+        now: now ?? (() => new Date()),
+        run: () => auraService.syncAll('notte'),
+        lastStartedAt: async () => (await auraService.lastRun())?.startedAt ?? null,
+        log: (message, err) => app.log.error({ err }, message),
+      })
+    : null;
+  if (auraScheduler) app.addHook('onReady', async () => auraScheduler.start());
+  app.addHook('onClose', async () => {
+    stopAuraListener();
+    await auraScheduler?.stop();
+  });
+  registerAuraRoutes(app, { db, aura: auraService });
+  // Ricetta con esenzione: prima dei controlli, esenzioni rilette da AURA se non sono di adesso.
+  const withAuraRefresh =
+    (check: NonNullable<PrescriptionDeps['preSendChecks']>): PrescriptionDeps['preSendChecks'] =>
+    async (id, actor, input) => {
+      const [row] = await db
+        .select({ patientId: prescription.patientId, exemptionCode: prescription.exemptionCode })
+        .from(prescription)
+        .where(eq(prescription.id, id));
+      if (row?.exemptionCode)
+        await auraService
+          .refreshIfStale(row.patientId, actor.userId)
+          .catch((err: unknown) =>
+            app.log.error({ err }, 'Controllo su AURA prima della ricetta non riuscito'),
+          );
+      return check(id, actor, input);
+    };
   // Strumenti e amministrazione dello studio (tappa 14).
   const adminDeps = {
     db,
@@ -303,6 +357,8 @@ export function buildApp({
     sessionMaxHours: config.sessionMaxHours,
     referenceUpdates,
     environment: config.environment ?? 'prova',
+    aura: auraService,
+    auraNextRun: () => auraScheduler?.next ?? null,
   };
   registerStudioAdminRoutes(app, adminDeps);
   registerUserAdminRoutes(app, adminDeps);
@@ -330,7 +386,7 @@ export function buildApp({
       credentials,
       now,
       // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
-      preSendChecks: preSendChecks ?? createRulesCheck({ db, now, reference }),
+      preSendChecks: withAuraRefresh(preSendChecks ?? createRulesCheck({ db, now, reference })),
       sendTimeoutMs,
       serviceCatalog: (date) => reference.serviceLookup(date),
     }),

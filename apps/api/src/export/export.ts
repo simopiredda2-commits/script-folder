@@ -30,6 +30,8 @@ export const PATIENT_TABLES = [
   'template_certificate',
   'aft_activity',
   'historical_prescription',
+  'aura_link',
+  'aura_change',
 ] as const;
 
 export const ENTRY_TABLES = [

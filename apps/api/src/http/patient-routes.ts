@@ -1,6 +1,6 @@
 import { unseenLockCount } from '../auth/account-locks';
 import { can, ROLE_LABELS } from '@mmg/domain';
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
@@ -175,7 +175,7 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
           esenzioni: await db
             .select({ codice: exemption.code, dal: exemption.validFrom, al: exemption.validTo })
             .from(exemption)
-            .where(eq(exemption.patientId, id)),
+            .where(and(eq(exemption.patientId, id), isNull(exemption.annulledAt))),
           parametri: await latestMeasurements(db, id, reservedAllowed),
         }
       : null;

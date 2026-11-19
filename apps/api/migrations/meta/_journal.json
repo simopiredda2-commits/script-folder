@@ -225,6 +225,20 @@
       "when": 1795095925096,
       "tag": "0031_identita_digitale",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1795106916192,
+      "tag": "0032_aura",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1795108144574,
+      "tag": "0033_aura_annullamenti_e_giri",
+      "breakpoints": true
     }
   ]
 }

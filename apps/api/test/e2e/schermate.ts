@@ -18,6 +18,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { sql } from 'drizzle-orm';
 import { generatePatients } from '@mmg/fixtures';
+import { SimulatedAura } from '@mmg/integrations';
 import { chromium, type Browser, type Page } from 'playwright';
 import { buildApp } from '../../src/app';
 import { loadConfig } from '../../src/config';
@@ -45,7 +46,14 @@ const referenceUpdates = referenceUpdatesFromConfig(db, {
   sources: 'esempio',
   time: '03:30',
 });
-const app = buildApp({ db, config: { ...config, cookieSecure: false }, referenceUpdates });
+// AURA simulata (D197): l'anagrafe parte vuota; più sotto ci entra un paziente dimostrativo.
+const aura = new SimulatedAura();
+const app = buildApp({
+  db,
+  config: { ...config, cookieSecure: false },
+  referenceUpdates,
+  aura: { gateway: aura },
+});
 mkdirSync(OUT, { recursive: true });
 
 async function shot(page: Page, name: string, fullPage = false) {
@@ -696,6 +704,40 @@ try {
   await page.goto(`${base}/pazienti/${patientId}`);
   await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
   await shot(page, '11-cartella-tablet');
+
+  // In fondo, per non cambiare le schermate di prima: di nuovo lo schermo del computer.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  // AURA (D197): un paziente dimostrativo con il diabete riceve dal simulatore l'esenzione 013
+  // (diabete mellito, allegato 8 del DPCM LEA); «Aggiorna da AURA» la porta nella cartella.
+  const diabetic = (
+    await db.execute<{ id: string; cf: string; ln: string; fn: string; bd: string }>(sql`
+      select p.id, p.fiscal_code as cf, p.last_name as ln, p.first_name as fn,
+        p.birth_date::text as bd
+      from patient p
+      join clinical_entry e on e.patient_id = p.id
+      join problem_detail d on d.entry_id = e.id
+      where d.icd_code like '250%' and e.status = 'active'
+      order by p.last_name, p.first_name
+      limit 1`)
+  ).rows[0];
+  if (!diabetic) throw new Error('Serve un paziente dimostrativo con il diabete');
+  aura.register({
+    fiscalCode: diabetic.cf,
+    lastName: diabetic.ln,
+    firstName: diabetic.fn,
+    birthDate: diabetic.bd,
+    exemptions: [{ code: '013', prescriptionCode: null, validFrom: '2026-01-01', validTo: null }],
+    choices: [],
+  });
+  await page.goto(`${base}/pazienti/${diabetic.id}/amministrazione#aura`);
+  const auraSection = page.getByRole('region', { name: 'AURA, anagrafe regionale' });
+  await auraSection.getByRole('button', { name: 'Aggiorna da AURA' }).click();
+  await auraSection.getByText('Aggiornato da AURA: 1 variazione.').waitFor();
+  await auraSection.scrollIntoViewIfNeeded();
+  await shot(page, '60-aura-nei-dati-amministrativi');
+  await page.goto(base);
+  await page.getByRole('region', { name: 'Variazioni da AURA' }).waitFor();
+  await shot(page, '61-variazioni-da-aura-in-oggi', true);
 
   await browser.close();
   await new Promise((ok) => web.close(ok));

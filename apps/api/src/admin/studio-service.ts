@@ -461,6 +461,11 @@ const INTEGRATIONS = [
     uso: 'Secondo fattore del Sistema TS e della Regione',
   },
   { codice: 'email_sms', nome: 'Email e SMS', uso: 'Promemoria e copie dei certificati' },
+  {
+    codice: 'aura',
+    nome: 'AURA (anagrafe regionale)',
+    uso: 'Esenzioni e scelte del medico',
+  },
 ] as const;
 
 const workstationView = (w: WorkstationRow) => ({
@@ -843,6 +848,26 @@ export function createStudioAdminService(deps: AdminDeps) {
           ora: updates.time,
           prossimoGiro: updates.nextRun()?.toISOString() ?? null,
         },
+        // AURA (D197): spenta in produzione con il simulatore; l'ultimo controllo di ogni notte.
+        aura: deps.aura
+          ? await (async () => {
+              const run = await deps.aura!.lastRunForStudio(actor.studioId);
+              return {
+                disponibile: deps.aura!.available(),
+                prossimoGiro: deps.auraNextRun?.()?.toISOString() ?? null,
+                ultimoGiro: run
+                  ? {
+                      iniziato: run.startedAt.toISOString(),
+                      finito: run.finishedAt?.toISOString() ?? null,
+                      pazienti: run.patients,
+                      conVariazioni: run.changed,
+                      nonRiusciti: run.failed,
+                      messaggio: run.message,
+                    }
+                  : null,
+              };
+            })()
+          : null,
         salvataggi: { nelProgramma: false },
         ambiente: deps.environment,
       };

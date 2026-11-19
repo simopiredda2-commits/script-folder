@@ -18,7 +18,7 @@ import {
   type PatientAdminInput,
   type PatientIdentityInput,
 } from '@mmg/domain';
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
 import type { Actor } from '../auth/service';
@@ -513,13 +513,14 @@ export async function adminView(
   const exemptions = await db
     .select()
     .from(exemption)
-    .where(eq(exemption.patientId, p.id))
+    // Le righe annullate (D197) restano nello storico e nell'esportazione, non nel pannello.
+    .where(and(eq(exemption.patientId, p.id), isNull(exemption.annulledAt)))
     .orderBy(desc(exemption.validFrom), exemption.code);
   const choices = await db
     .select({ c: patientChoice, doctor: appUser.displayName })
     .from(patientChoice)
     .innerJoin(appUser, eq(appUser.id, patientChoice.doctorUserId))
-    .where(eq(patientChoice.patientId, p.id))
+    .where(and(eq(patientChoice.patientId, p.id), isNull(patientChoice.annulledAt)))
     .orderBy(desc(patientChoice.chosenOn));
   const corrections = await db
     .select({ at: accessLog.at, details: accessLog.details, user: appUser.displayName })
@@ -770,7 +771,13 @@ async function exemptionsOf(db: Db, patientId: string, code: string) {
   return db
     .select()
     .from(exemption)
-    .where(and(eq(exemption.patientId, patientId), eq(exemption.code, code)));
+    .where(
+      and(
+        eq(exemption.patientId, patientId),
+        eq(exemption.code, code),
+        isNull(exemption.annulledAt),
+      ),
+    );
 }
 
 function assertNoOverlap(
@@ -831,6 +838,7 @@ export async function updateExemption(
     .from(exemption)
     .where(and(eq(exemption.id, exemptionId), eq(exemption.patientId, p.id)));
   if (!row) throw new HttpError(404, 'Esenzione non trovata per questo paziente');
+  if (row.annulledAt) throw new HttpError(409, 'Esenzione annullata: non si modifica');
   if (row.source === 'aura')
     throw new HttpError(409, 'Esenzione arrivata da AURA: si aggiorna dall’anagrafe regionale');
   const to = input.al === undefined ? row.validTo : input.al;
@@ -894,7 +902,7 @@ export async function addChoice(
     .select({ c: patientChoice, doctor: appUser.displayName })
     .from(patientChoice)
     .innerJoin(appUser, eq(appUser.id, patientChoice.doctorUserId))
-    .where(eq(patientChoice.patientId, p.id));
+    .where(and(eq(patientChoice.patientId, p.id), isNull(patientChoice.annulledAt)));
   const period = choicePeriod({
     chosenOn: input.dal,
     expiresOn: input.scadenza ?? null,
@@ -951,6 +959,7 @@ export async function endChoice(
     .from(patientChoice)
     .where(and(eq(patientChoice.id, choiceId), eq(patientChoice.patientId, p.id)));
   if (!row) throw new HttpError(404, 'Scelta non trovata per questo paziente');
+  if (row.annulledAt) throw new HttpError(409, 'Scelta annullata: non si modifica');
   if (row.source === 'aura')
     throw new HttpError(
       409,

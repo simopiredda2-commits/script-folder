@@ -10,7 +10,14 @@ const db = createDatabase(pool);
 const referenceUpdates = referenceUpdatesFromConfig(db, config.referenceUpdate, {
   log: (message, err) => console.error(message, err),
 });
-const app = buildApp({ db, config, logger: true, referenceUpdates });
+// AURA (D197): il simulatore finché non ci sono le credenziali del CSI; AURA_AGGIORNAMENTO accende la notte.
+const app = buildApp({
+  db,
+  config,
+  logger: true,
+  referenceUpdates,
+  aura: { time: config.auraTime ?? null },
+});
 
 const shutdown = async () => {
   await app.close();
