@@ -87,9 +87,9 @@ Le pagine hanno il salto al contenuto, titoli in ordine, etichette per ogni camp
 - Stampa della prescrizione dei presidi nel modulo dell'ASL e codici del nomenclatore (D123).
 - Dettatura vocale del diario: non c'è, per le regole 7 e 8 (D119, domanda per la fermata finale).
 - Ricerca dei codici ICD-9-CM per descrizione: manca il catalogo (D114).
-- Cataloghi dello studio (posologie, pacchetti di esami, medici suggeritori, vaccini, ICD): richiesta del 18/11/2026, proposta per la fermata (`docs/avanzamento.md`, `docs/provenienze.md`).
-- Modelli dei certificati (sportivo non agonistico, porto d'armi, anamnestico per la patente): tappa 13 (D143).
-- Vaccinazioni, schede UVG regionali, percorsi (diabete, BPCO, scompenso): nel modello dei dati, non nell'interfaccia.
+- Elenco ufficiale dei vaccini e catalogo ICD per descrizione: i vaccini hanno un nome libero (D176), i codici ICD si scrivono (D114). Gli elenchi dello studio (posologie, pacchetti di prestazioni, medici suggeritori, contatti) ci sono (D175).
+- Schede UVG regionali, percorsi (diabete, BPCO, scompenso): nel modello dei dati, non nell'interfaccia.
+- Stampa senza la finestra del browser: domanda per la fermata (D180).
 - Collegamento alla segnalazione di farmacovigilanza: da completare (D82).
 - Stampa del promemoria e della ricetta rossa nel modulo conforme: da completare con le specifiche.
 - Tema scuro.
