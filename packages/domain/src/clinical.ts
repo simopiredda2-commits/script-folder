@@ -1,7 +1,8 @@
 /**
  * Voci cliniche scritte dall'interfaccia (tappa 9), dal paragrafo «Cartella del paziente» di
  * docs/requisiti.md: problemi e diagnosi, allergie e reazioni avverse, diario clinico, parametri,
- * anamnesi, stili di vita e fattori di rischio, esame obiettivo e valutazioni.
+ * anamnesi, stili di vita e fattori di rischio, esame obiettivo e valutazioni. Dalla tappa 15
+ * anche vaccinazioni ed esami di laboratorio, che si scrivono a mano e arrivano dall'importazione.
  *
  * Solo controlli formali (regola 3): nessun giudizio sui valori, nessun calcolo clinico (R12).
  * Le voci non si cancellano: si annullano con un motivo, e lo storico resta.
@@ -17,6 +18,8 @@ export const ENTRY_TYPES = [
   'stile_di_vita',
   'esame_obiettivo',
   'capacita_motoria',
+  'vaccinazione',
+  'esame_laboratorio',
 ] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
 
@@ -30,6 +33,8 @@ export const ENTRY_KIND = {
   stile_di_vita: 'risk_factor',
   esame_obiettivo: 'examination',
   capacita_motoria: 'functional_status',
+  vaccinazione: 'vaccination',
+  esame_laboratorio: 'lab_result',
 } as const satisfies Record<EntryType, string>;
 export type EntryKind = (typeof ENTRY_KIND)[EntryType];
 
@@ -47,6 +52,8 @@ export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
   stile_di_vita: 'Stile di vita o fattore di rischio',
   esame_obiettivo: 'Esame obiettivo o valutazione',
   capacita_motoria: 'Capacità motoria',
+  vaccinazione: 'Vaccinazione',
+  esame_laboratorio: 'Esame di laboratorio',
 };
 
 /** Tipo di contatto del diario: studio, domicilio, telefono, televisita. */
@@ -162,5 +169,61 @@ export function checkProblemDates(p: ProblemDates, today: string): string[] {
   if (p.resolvedOn && p.resolvedOn > today) out.push('Risoluzione: la data è nel futuro');
   if (p.onsetOn && p.resolvedOn && p.resolvedOn < p.onsetOn)
     out.push('La risoluzione non può venire prima dell’inizio');
+  return out;
+}
+
+/* Vaccinazioni (tappa 15) ------------------------------------------------------------------- */
+
+/**
+ * Numero della dose: limite tecnico a due cifre, non una regola clinica. Il vaccino si scrive con
+ * il suo nome: un elenco ufficiale dei vaccini non è ancora tra le banche dati (fonte da
+ * individuare), quindi il nome è libero e non si controlla.
+ */
+export const VACCINE_DOSE_MAX = 99;
+
+/* Esami di laboratorio (tappa 15) ----------------------------------------------------------- */
+
+/**
+ * Risultati di un referto scritti insieme: limite tecnico per una richiesta sola. Un referto
+ * completo ha qualche decina di esami; oltre, si registra in più volte.
+ */
+export const LAB_RESULTS_MAX = 100;
+
+/**
+ * Estremo dell'intervallo di riferimento come lo stampa il laboratorio: un numero, con il segno
+ * se serve (alcuni intervalli sono negativi), la virgola o il punto. Un intervallo scritto in
+ * altro modo («< 200», «negativo») va nel testo.
+ */
+const LAB_BOUND = /^[-+]?\d+(?:[.,]\d+)*$/;
+/** Con un separatore solo il numero si legge senza dubbi (la virgola o il punto come decimali). */
+const LAB_BOUND_SIMPLE = /^[-+]?\d+(?:[.,]\d+)?$/;
+
+/** Intervallo di riferimento di un esame: minimo e massimo, o il testo stampato sul referto. */
+export interface LabReference {
+  minimo?: string | null;
+  massimo?: string | null;
+}
+
+/**
+ * Controlli formali sull'intervallo di riferimento: minimo e massimo sono numeri e il minimo non
+ * supera il massimo. Il valore dell'esame non si confronta con l'intervallo (regola 3, D71): il
+ * confronto automatico va prima validato con il consulente regolatorio.
+ */
+export function checkLabReference(r: LabReference): string[] {
+  const out: string[] = [];
+  const min = r.minimo?.trim() || null;
+  const max = r.massimo?.trim() || null;
+  if (min && !LAB_BOUND.test(min))
+    out.push(
+      'Minimo dell’intervallo: scrivi un numero; un intervallo scritto in altro modo va nel testo',
+    );
+  if (max && !LAB_BOUND.test(max))
+    out.push(
+      'Massimo dell’intervallo: scrivi un numero; un intervallo scritto in altro modo va nel testo',
+    );
+  if (min && max && LAB_BOUND_SIMPLE.test(min) && LAB_BOUND_SIMPLE.test(max)) {
+    const n = (s: string) => Number(s.replace(',', '.'));
+    if (n(min) > n(max)) out.push('Intervallo: il minimo è più grande del massimo');
+  }
   return out;
 }

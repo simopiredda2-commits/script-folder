@@ -24,6 +24,8 @@ export interface Catalog {
   parenti: Named[];
   capacitaMotorie: Named[];
   vieSomministrazione: string[];
+  /** Limiti tecnici delle voci della tappa 15: dose del vaccino, esami di un referto. */
+  limiti: { doseVaccino: number; risultatiReferto: number };
 }
 
 /** Voce di un dizionario ufficiale: codice e descrizione. */
@@ -47,7 +49,9 @@ export type EntryType =
   | 'allergia'
   | 'stile_di_vita'
   | 'esame_obiettivo'
-  | 'capacita_motoria';
+  | 'capacita_motoria'
+  | 'vaccinazione'
+  | 'esame_laboratorio';
 
 export interface Entry {
   id: string;

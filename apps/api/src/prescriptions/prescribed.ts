@@ -5,17 +5,29 @@ import type { Database } from '../db/client';
 import { prescription, prescriptionLine, therapy } from '../db/schema';
 import { guardPatient } from '../patients/access';
 import {
+  activeHistorical,
+  historicalLine,
+  historicalViews,
+  pastCounts,
+  visibleHistorical,
+} from './historical';
+import {
   emptyTarget,
   isServiceLine,
   matchesTarget,
   therapyTarget,
   type HistoryTarget,
+  type LineFields,
 } from './history';
 
 /**
  * Tutti i farmaci e tutte le prestazioni prescritti al paziente (D152): restano nella cartella,
  * ognuno con il suo storico. Le righe si raggruppano con le regole dello storico (D65, D66), così
  * il numero di ricette di una voce è quello che il suo storico mostra.
+ *
+ * Le ricette fatte con un altro programma (tappa 15) si raggruppano con le stesse regole, ma si
+ * contano a parte («altroProgramma»): non sono ricette di questo programma, e i conti delle nostre
+ * (inviate, in preparazione, ultimi 12 mesi) restano quelli dello storico.
  */
 
 type Row = {
@@ -82,6 +94,51 @@ function sinceFor(now: () => Date) {
 const latest = (rows: Row[]) =>
   [...rows].sort((a, b) => when(b.p).getTime() - when(a.p).getTime())[0];
 
+/** La voce di un farmaco senza terapia: per AIC, per principio attivo o per nome (D152). */
+function drugGroup(l: LineFields): [string, { storico: HistoryQuery; target: HistoryTarget }] {
+  if (l.drugAic)
+    return [
+      `aic:${l.drugAic}`,
+      { storico: { aic: l.drugAic }, target: { ...emptyTarget(), aic: l.drugAic } },
+    ];
+  if (l.activeIngredient)
+    return [
+      `principio:${lower(l.activeIngredient)}`,
+      {
+        storico: { principio: l.activeIngredient },
+        target: { ...emptyTarget(), ingredient: l.activeIngredient },
+      },
+    ];
+  return [
+    `farmaco:${lower(l.drugName)}`,
+    {
+      storico: { farmaco: l.drugName ?? '' },
+      target: { ...emptyTarget(), name: l.drugName },
+    },
+  ];
+}
+
+/** La voce di una prestazione: per codice regionale, o per descrizione se il codice manca. */
+function serviceGroupKey(
+  l: LineFields,
+): [string, { storico: HistoryQuery; target: HistoryTarget }] {
+  return l.serviceCode
+    ? [
+        l.serviceCode,
+        {
+          storico: { prestazione: l.serviceCode },
+          target: { ...emptyTarget(), serviceCode: l.serviceCode },
+        },
+      ]
+    : [
+        `descrizione:${lower(l.serviceDescription)}`,
+        {
+          storico: { descrizione: l.serviceDescription ?? '' },
+          target: { ...emptyTarget(), serviceDescription: l.serviceDescription },
+        },
+      ];
+}
+
 export async function prescribedDrugs(
   db: Database,
   now: () => Date,
@@ -95,21 +152,32 @@ export async function prescribedDrugs(
     'therapy.read',
     'lettura_farmaci_prescritti',
   );
-  const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
+  const at = { ...context, now: now() };
+  const reservedAllowed = can(actor, 'reserved.read', at).allowed;
   const therapies = await db.select().from(therapy).where(eq(therapy.patientId, patientId));
   // Le terapie riservate, e le loro righe, le vede solo chi può: come nello storico.
   const hidden = new Set(therapies.filter((t) => t.reserved && !reservedAllowed).map((t) => t.id));
   const rows = (await loadRows(db, patientId)).filter(
     ({ line }) => !isServiceLine(line) && !(line.therapyId && hidden.has(line.therapyId)),
   );
+  // Ricette fatte con un altro programma: tutte nell'elenco a parte, le valide nei conti.
+  const pastAll = (await visibleHistorical(db, patientId, reservedAllowed)).filter(
+    (h) => h.kind === 'farmaco',
+  );
+  const past = activeHistorical(pastAll);
+  const pastOf = (target: HistoryTarget) =>
+    past.filter((h) => matchesTarget(target, historicalLine(h)));
   const since = sinceFor(now);
 
   const assigned = new Set<string>();
+  const assignedPast = new Set<string>();
   const fromTherapies = therapies
     .filter((t) => !hidden.has(t.id))
     .map((t) => {
       const mine = rows.filter(({ line }) => matchesTarget(therapyTarget(t), line));
       for (const r of mine) assigned.add(r.line.id);
+      const minePast = pastOf(therapyTarget(t));
+      for (const h of minePast) assignedPast.add(h.id);
       return {
         chiave: `terapia:${t.id}`,
         storico: { terapia: t.id },
@@ -128,53 +196,52 @@ export async function prescribedDrugs(
           motivoSospensione: t.suspendedReason,
         },
         ...counts(mine, since),
+        /** Ricette dello stesso farmaco fatte con un altro programma (tappa 15). */
+        altroProgramma: pastCounts(minePast),
       };
     });
 
-  // Righe senza una terapia che le prenda: una voce per AIC, o per principio, o per nome.
+  // Righe senza una terapia che le prenda: una voce per AIC, o per principio, o per nome. Le
+  // ricette fatte con un altro programma entrano con le stesse regole; un farmaco prescritto solo
+  // con il programma di prima ha la sua voce.
   const groups = new Map<string, { storico: HistoryQuery; target: HistoryTarget }>();
-  for (const { line } of rows) {
-    if (assigned.has(line.id)) continue;
-    const key = line.drugAic
-      ? `aic:${line.drugAic}`
-      : line.activeIngredient
-        ? `principio:${lower(line.activeIngredient)}`
-        : `farmaco:${lower(line.drugName)}`;
-    if (groups.has(key)) continue;
-    groups.set(
-      key,
-      line.drugAic
-        ? { storico: { aic: line.drugAic }, target: { ...emptyTarget(), aic: line.drugAic } }
-        : line.activeIngredient
-          ? {
-              storico: { principio: line.activeIngredient },
-              target: { ...emptyTarget(), ingredient: line.activeIngredient },
-            }
-          : {
-              storico: { farmaco: line.drugName ?? '' },
-              target: { ...emptyTarget(), name: line.drugName },
-            },
-    );
-  }
+  const addGroup = (l: LineFields) => {
+    const [key, g] = drugGroup(l);
+    if (!groups.has(key)) groups.set(key, g);
+  };
+  for (const { line } of rows) if (!assigned.has(line.id)) addGroup(line);
+  for (const h of past) if (!assignedPast.has(h.id)) addGroup(historicalLine(h));
   const occasional = [...groups].map(([key, g]) => {
     const mine = rows.filter(({ line }) => matchesTarget(g.target, line));
-    const l = latest(mine)!.line;
+    const minePast = pastOf(g.target);
+    // Il nome dell'elenco: quello della nostra riga più recente, altrimenti della ricetta passata
+    // più recente (le ricette passate sono già dalla più recente).
+    const l: LineFields & { aifaNote?: string | null } = mine.length
+      ? latest(mine)!.line
+      : historicalLine(minePast[0]!);
     return {
       chiave: key,
       storico: g.storico,
-      farmaco: l.drugName ?? l.activeIngredient ?? '',
+      farmaco: l.drugName ?? l.activeIngredient ?? (l.drugAic ? `AIC ${l.drugAic}` : ''),
       principioAttivo: l.activeIngredient,
       aic: l.drugAic,
-      notaAifa: l.aifaNote,
+      notaAifa: l.aifaNote ?? null,
       /** Prescritto senza una terapia in cartella. */
       terapia: null,
       ...counts(mine, since),
+      altroProgramma: pastCounts(minePast),
     };
   });
 
   const byName = (a: { farmaco: string }, b: { farmaco: string }) =>
     a.farmaco.localeCompare(b.farmaco, 'it', { sensitivity: 'base' });
-  return { farmaci: [...fromTherapies.sort(byName), ...occasional.sort(byName)] };
+  return {
+    farmaci: [...fromTherapies.sort(byName), ...occasional.sort(byName)],
+    /** Le ricette fatte con un altro programma, una per una, anche le annullate (tappa 15). */
+    ricettePassate: await historicalViews(db, pastAll),
+    /** Chi può registrarne o annullarne: il medico, come per le voci cliniche. */
+    puoRegistrare: can(actor, 'clinical.write', at).allowed,
+  };
 }
 
 export async function prescribedServices(
@@ -183,30 +250,35 @@ export async function prescribedServices(
   actor: Actor,
   patientId: string,
 ) {
-  await guardPatient(db, actor, patientId, 'therapy.read', 'lettura_prestazioni_prescritte');
+  const { context } = await guardPatient(
+    db,
+    actor,
+    patientId,
+    'therapy.read',
+    'lettura_prestazioni_prescritte',
+  );
+  const at = { ...context, now: now() };
+  const reservedAllowed = can(actor, 'reserved.read', at).allowed;
   const rows = (await loadRows(db, patientId)).filter(({ line }) => isServiceLine(line));
+  // Ricette fatte con un altro programma: tutte nell'elenco a parte, le valide nei conti.
+  const pastAll = (await visibleHistorical(db, patientId, reservedAllowed)).filter(
+    (h) => h.kind === 'prestazione',
+  );
+  const past = activeHistorical(pastAll);
   const since = sinceFor(now);
 
   const groups = new Map<string, { storico: HistoryQuery; target: HistoryTarget }>();
-  for (const { line } of rows) {
-    const key = line.serviceCode ?? `descrizione:${lower(line.serviceDescription)}`;
-    if (groups.has(key)) continue;
-    groups.set(
-      key,
-      line.serviceCode
-        ? {
-            storico: { prestazione: line.serviceCode },
-            target: { ...emptyTarget(), serviceCode: line.serviceCode },
-          }
-        : {
-            storico: { descrizione: line.serviceDescription ?? '' },
-            target: { ...emptyTarget(), serviceDescription: line.serviceDescription },
-          },
-    );
-  }
+  const addGroup = (l: LineFields) => {
+    const [key, g] = serviceGroupKey(l);
+    if (!groups.has(key)) groups.set(key, g);
+  };
+  for (const { line } of rows) addGroup(line);
+  for (const h of past) addGroup(historicalLine(h));
   const prestazioni = [...groups].map(([key, g]) => {
     const mine = rows.filter(({ line }) => matchesTarget(g.target, line));
-    const l = latest(mine)!.line;
+    const minePast = past.filter((h) => matchesTarget(g.target, historicalLine(h)));
+    // Codice e descrizione della nostra riga più recente, altrimenti della ricetta passata.
+    const l = mine.length ? latest(mine)!.line : historicalLine(minePast[0]!);
     const descrizione = l.serviceDescription ?? l.serviceCode ?? '';
     return {
       chiave: key,
@@ -216,8 +288,15 @@ export async function prescribedServices(
       /** Visita o esame e altre prestazioni, dalla descrizione del catalogo (D152). */
       gruppo: serviceGroup(l.serviceDescription),
       ...counts(mine, since),
+      /** Ricette della stessa prestazione fatte con un altro programma (tappa 15). */
+      altroProgramma: pastCounts(minePast),
     };
   });
   prestazioni.sort((a, b) => a.descrizione.localeCompare(b.descrizione, 'it'));
-  return { prestazioni };
+  return {
+    prestazioni,
+    /** Le ricette fatte con un altro programma, una per una, anche le annullate (tappa 15). */
+    ricettePassate: await historicalViews(db, pastAll),
+    puoRegistrare: can(actor, 'clinical.write', at).allowed,
+  };
 }

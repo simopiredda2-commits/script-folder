@@ -67,7 +67,7 @@ export function ColourLegend() {
         </li>
         <li>
           <span className="campione farmaco-non-in-corso" aria-hidden="true" /> Non in corso:
-          sospesa, terminata o prescritta senza terapia
+          sospesa, conclusa o prescritta senza terapia
         </li>
       </ul>
     </div>

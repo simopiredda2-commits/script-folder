@@ -16,7 +16,10 @@ import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
-/** I tipi di questa pagina; i parametri hanno la loro, con l'andamento nel tempo. */
+/**
+ * I tipi di questa pagina; i parametri hanno la loro, con l'andamento nel tempo. Gli esami di
+ * laboratorio hanno anche la pagina Esami, con il referto di più esami insieme.
+ */
 const TYPES: EntryType[] = [
   'problema',
   'allergia',
@@ -25,6 +28,8 @@ const TYPES: EntryType[] = [
   'stile_di_vita',
   'esame_obiettivo',
   'capacita_motoria',
+  'vaccinazione',
+  'esame_laboratorio',
 ];
 
 const PLURAL: Record<EntryType, string> = {
@@ -36,9 +41,29 @@ const PLURAL: Record<EntryType, string> = {
   stile_di_vita: 'Stili di vita',
   esame_obiettivo: 'Esame obiettivo',
   capacita_motoria: 'Capacità motoria',
+  vaccinazione: 'Vaccinazioni',
+  esame_laboratorio: 'Esami di laboratorio',
 };
 
 const text = (v: unknown) => (typeof v === 'string' ? v : '');
+
+/**
+ * L'intervallo di riferimento come lo stampa il laboratorio: il testo, o minimo e massimo.
+ * Nessun confronto con il valore (regola 3, D71).
+ */
+export function labRange(d: {
+  intervallo?: unknown;
+  minimo?: unknown;
+  massimo?: unknown;
+  unita?: unknown;
+}): string {
+  if (text(d.intervallo)) return text(d.intervallo);
+  const [min, max, unit] = [text(d.minimo), text(d.massimo), text(d.unita)];
+  if (min && max) return `${min}–${max} ${unit}`.trim();
+  if (min) return `minimo ${min} ${unit}`.trim();
+  if (max) return `massimo ${max} ${unit}`.trim();
+  return '';
+}
 
 /** Che cosa dice una voce, in una riga, con le parole dei requisiti. */
 export function entrySummary(e: Entry, catalog: Catalog | null): string {
@@ -91,6 +116,25 @@ export function entrySummary(e: Entry, catalog: Catalog | null): string {
       return `${text(d.parametro)}: ${text(d.valore)} ${text(d.unita)}`;
     case 'capacita_motoria':
       return nameOf(catalog?.capacitaMotorie, text(d.capacita));
+    case 'vaccinazione':
+      return [
+        text(d.vaccino),
+        typeof d.dose === 'number' ? `dose ${d.dose}` : '',
+        d.lotto ? `lotto ${text(d.lotto)}` : '',
+        text(d.campagna),
+      ]
+        .filter(Boolean)
+        .join(' · ');
+    case 'esame_laboratorio': {
+      const range = labRange(d);
+      return [
+        `${text(d.esame)}: ${text(d.valore)}${d.unita ? ` ${text(d.unita)}` : ''}`,
+        range ? `intervallo del laboratorio ${range}` : '',
+        d.codicePrestazione ? `codice ${text(d.codicePrestazione)}` : '',
+      ]
+        .filter(Boolean)
+        .join(' · ');
+    }
   }
 }
 
@@ -131,6 +175,9 @@ export function ClinicalEntriesPage() {
           <>
             <Link className="pulsante" to={`/pazienti/${id}/parametri`}>
               <Icon name="esami" /> <span>Parametri</span>
+            </Link>
+            <Link className="pulsante" to={`/pazienti/${id}/esami`}>
+              <Icon name="esami" /> <span>Referti di laboratorio</span>
             </Link>
             <Link className="pulsante" to={`/pazienti/${id}/privacy`}>
               <Icon name="lucchetto" /> <span>Privacy</span>
@@ -292,6 +339,27 @@ function NewEntryForm({
           testo: str('testo'),
           scala: value('scala'),
           punteggio: value('punteggio'),
+        };
+      case 'vaccinazione': {
+        const dose = value('dose');
+        return {
+          ...common,
+          vaccino: str('vaccino'),
+          lotto: value('lotto'),
+          dose: dose === undefined ? undefined : Number(dose),
+          campagna: value('campagna'),
+        };
+      }
+      case 'esame_laboratorio':
+        return {
+          ...common,
+          esame: str('esame'),
+          valore: str('valore'),
+          unita: value('unita'),
+          minimo: value('minimo'),
+          massimo: value('massimo'),
+          intervallo: value('intervallo'),
+          codicePrestazione: value('codicePrestazione'),
         };
       default:
         return common;
@@ -553,6 +621,77 @@ function NewEntryForm({
               {input('scala', 'Scheda o scala di valutazione', { maxLength: 100 })}
               {input('punteggio', 'Punteggio', { maxLength: 50, stretto: true })}
             </div>
+          </>
+        )}
+        {tipo === 'vaccinazione' && (
+          <>
+            <div className="campi-in-riga">
+              {input('vaccino', 'Vaccino', {
+                required: true,
+                maxLength: 200,
+                'aria-describedby': fid('vaccino-aiuto'),
+              })}
+              {input('lotto', 'Lotto', { className: 'codice', maxLength: 50, stretto: true })}
+              {input('dose', 'Numero della dose', {
+                type: 'number',
+                min: 1,
+                max: catalog.limiti.doseVaccino,
+                step: 1,
+                stretto: true,
+              })}
+            </div>
+            <p className="aiuto" id={fid('vaccino-aiuto')}>
+              Il nome come sul certificato vaccinale o sulla confezione: l’elenco dei vaccini non è
+              ancora tra le banche dati. La data è quella della somministrazione; con il promemoria
+              si ricorda la dose successiva.
+            </p>
+            <div className="campi-in-riga">
+              {input('campagna', 'Campagna vaccinale', { maxLength: 200 })}
+            </div>
+          </>
+        )}
+        {tipo === 'esame_laboratorio' && (
+          <>
+            <div className="campi-in-riga">
+              {input('esame', 'Esame', { required: true, maxLength: 200 })}
+              {input('valore', 'Valore', { required: true, maxLength: 100, stretto: true })}
+              {input('unita', 'Unità di misura', { maxLength: 30, stretto: true })}
+            </div>
+            <fieldset>
+              <legend>Intervallo di riferimento del laboratorio</legend>
+              <div className="campi-in-riga">
+                {input('minimo', 'Minimo', {
+                  inputMode: 'decimal',
+                  maxLength: 20,
+                  stretto: true,
+                  'aria-describedby': fid('intervallo-aiuto'),
+                })}
+                {input('massimo', 'Massimo', {
+                  inputMode: 'decimal',
+                  maxLength: 20,
+                  stretto: true,
+                  'aria-describedby': fid('intervallo-aiuto'),
+                })}
+                {input('intervallo', 'Oppure come è scritto sul referto', {
+                  maxLength: 200,
+                  'aria-describedby': fid('intervallo-aiuto'),
+                })}
+              </div>
+            </fieldset>
+            <p className="aiuto" id={fid('intervallo-aiuto')}>
+              Minimo e massimo sono numeri; un intervallo scritto in altro modo («&lt; 200»,
+              «negativo») va nel testo. Il valore non si confronta con l’intervallo.
+            </p>
+            <div className="campi-in-riga">
+              {input('codicePrestazione', 'Codice della prestazione (facoltativo)', {
+                className: 'codice',
+                maxLength: 40,
+              })}
+            </div>
+            <p className="aiuto">
+              Per un referto con più esami c’è la pagina{' '}
+              <Link to={`/pazienti/${patientId}/esami`}>Esami di laboratorio</Link>.
+            </p>
           </>
         )}
         <div className="campi-in-riga">

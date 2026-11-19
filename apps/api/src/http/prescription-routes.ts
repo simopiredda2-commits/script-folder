@@ -4,6 +4,7 @@ import type { Database } from '../db/client';
 import { prescriptionHistory } from '../prescriptions/history';
 import { prescribedDrugs, prescribedServices } from '../prescriptions/prescribed';
 import type { PrescriptionService } from '../prescriptions/service';
+import { registerHistoricalPrescriptionRoutes } from './historical-prescription-routes';
 
 const idParams = z.object({ id: z.uuid() });
 
@@ -15,6 +16,8 @@ export function registerPrescriptionRoutes(
   now: () => Date,
 ) {
   const scoped = { config: { patientScoped: true } };
+  // Ricette fatte con un altro programma (tappa 15): fuori dalla macchina degli stati delle ricette.
+  registerHistoricalPrescriptionRoutes(app, db, now);
 
   // Storico delle prescrizioni di un farmaco o di una prestazione (D65, D66).
   app.get('/api/pazienti/:id/storico-prescrizioni', scoped, async (req) => {
