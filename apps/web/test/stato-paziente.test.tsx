@@ -115,10 +115,10 @@ describe('stato del paziente nella ricetta (D199)', () => {
     );
     await screen.findByRole('heading', { name: 'Nuovo paziente' });
     // In carico per difetto: nessuna data da scrivere.
-    expect((screen.getByLabelText('In carico') as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByLabelText<HTMLInputElement>('In carico').checked).toBe(true);
     expect(screen.queryByLabelText('Scadenza della scelta')).toBeNull();
     fireEvent.click(screen.getByLabelText('Temporaneo, con la scadenza della scelta'));
-    expect((screen.getByLabelText('Scelta dal') as HTMLInputElement).value).toBe(studioToday());
+    expect(screen.getByLabelText<HTMLInputElement>('Scelta dal').value).toBe(studioToday());
     fireEvent.change(screen.getByLabelText('Scadenza della scelta'), {
       target: { value: '2027-02-28' },
     });
