@@ -1,7 +1,5 @@
 import { createHash } from 'node:crypto';
 import {
-  AIC_PATTERN,
-  ATC_PATTERN,
   birthCode,
   choiceValidity,
   doctorChoiceIssues,
@@ -30,25 +28,28 @@ import {
   clinicalEntry,
   exemption,
   family,
-  historicalPrescription,
   importOrigin,
-  labResultDetail,
   patient,
   patientChoice,
   therapy,
-  vaccinationDetail,
 } from '../db/schema';
 import type { Tx } from '../db/tx';
-import { therapyBody } from '../http/therapy-routes';
+import {
+  historicalIssues,
+  insertHistorical,
+  newHistoricalBody,
+  type NewHistorical,
+} from '../prescriptions/historical';
+import { concludedTherapyIssues, therapyBody } from '../http/therapy-routes';
 import type { FieldValue } from './transforms';
 
 /**
  * Destinazioni dell'importazione con GLI STESSI CONTROLLI dell'inserimento a mano (tappa 15):
  * voci cliniche con `newEntryBody` ed `entryIssues`, scritte da `insertEntry`; terapie con
  * `therapyBody` e la stessa normalizzazione della rotta; dati del paziente ed esenzioni con gli
- * schemi comuni di `@mmg/domain` (patient-registry). Vaccinazioni, esami di laboratorio e ricette
- * fatte con altri programmi non hanno ancora un inserimento a mano: i loro controlli sono qui, da
- * allineare quando arriverà (lo dice il rapporto della sezione).
+ * schemi comuni di `@mmg/domain` (patient-registry); vaccinazioni ed esami di laboratorio come
+ * le altre voci; ricette fatte con altri programmi con `newHistoricalBody` e `historicalIssues`,
+ * scritte da `insertHistorical`, come dalla rotta.
  *
  * Autore delle voci: il titolare che importa (come in ogni inserimento: authorUserId è l'utente
  * che scrive). La data clinica è quella del file: una voce senza data non entra.
@@ -113,8 +114,11 @@ const fieldLabel = (dest: ImportDestinationKey, rename: Record<string, string> =
   return (key: string) => d.fields.find((f) => f.key === (back[key] ?? key))?.label ?? key;
 };
 
-const naturalKeyOf = (dest: ImportDestinationKey, body: Record<string, unknown>) =>
-  importDestination(dest)!.naturalKey.map((k) => body[k] ?? null);
+const naturalKeyOf = (
+  dest: ImportDestinationKey,
+  body: Record<string, unknown>,
+  rename: Record<string, string> = {},
+) => importDestination(dest)!.naturalKey.map((k) => body[rename[k] ?? k] ?? null);
 
 /* Voci cliniche ------------------------------------------------------------------------------ */
 
@@ -143,8 +147,19 @@ const ENTRY_FIELDS = {
   stili_di_vita: { tipo: 'stile_di_vita', keys: ['fattore', 'valore'] },
   esame_obiettivo: { tipo: 'esame_obiettivo', keys: ['testo', 'scala', 'punteggio'] },
   capacita_motoria: { tipo: 'capacita_motoria', keys: ['capacita'] },
+  vaccinazioni: { tipo: 'vaccinazione', keys: ['vaccino', 'lotto', 'dose', 'campagna'] },
+  esami_laboratorio: {
+    tipo: 'esame_laboratorio',
+    keys: ['analita', 'valore', 'unita', 'minimo', 'massimo', 'riferimento', 'codicePrestazione'],
+    // Nomi del catalogo dell'importazione → nomi del corpo della voce scritta a mano.
+    rename: { analita: 'esame', riferimento: 'intervallo' },
+  },
 } as const;
 type EntryDestination = keyof typeof ENTRY_FIELDS;
+const renameOf = (dest: EntryDestination): Record<string, string> => {
+  const def = ENTRY_FIELDS[dest];
+  return 'rename' in def ? def.rename : {};
+};
 
 interface EntryBody {
   entry: NewEntry;
@@ -157,11 +172,22 @@ function validateEntry(
   dest: ImportDestinationKey,
   raw: Record<string, unknown>,
   today: string,
+  rename: Record<string, string> = {},
 ): { ok: true; entry: NewEntry } | { ok: false; errors: string[] } {
   const parsed = newEntryBody.safeParse(raw);
-  if (!parsed.success) return { ok: false, errors: zodMessages(parsed.error, fieldLabel(dest)) };
+  if (!parsed.success)
+    return { ok: false, errors: zodMessages(parsed.error, fieldLabel(dest, rename)) };
   const issues = entryIssues(parsed.data, today);
-  if (issues.length) return { ok: false, errors: issues };
+  if (issues.length) {
+    // Il modulo del referto mette davanti il nome dell'esame; nel rapporto dell'importazione
+    // nessun valore del file (D173): resta solo il motivo.
+    const e = parsed.data;
+    const prefix = e.tipo === 'esame_laboratorio' ? `${e.esame}: ` : null;
+    return {
+      ok: false,
+      errors: issues.map((m) => (prefix && m.startsWith(prefix) ? m.slice(prefix.length) : m)),
+    };
+  }
   return { ok: true, entry: parsed.data };
 }
 
@@ -170,8 +196,9 @@ function entryHandler(dest: EntryDestination): EntryHandler<EntryBody> {
   return {
     table: 'clinical_entry',
     prepare(v, today) {
-      const raw = { tipo: def.tipo, ...pick(v, [...COMMON_KEYS, ...def.keys]) };
-      const r = validateEntry(dest, raw, today);
+      const rename = renameOf(dest);
+      const raw = { tipo: def.tipo, ...pick(v, [...COMMON_KEYS, ...def.keys], rename) };
+      const r = validateEntry(dest, raw, today, rename);
       if (!r.ok) return r;
       const inactive = dest === 'allergie' && v.attiva === false;
       return {
@@ -179,7 +206,7 @@ function entryHandler(dest: EntryDestination): EntryHandler<EntryBody> {
         items: [
           {
             body: { entry: r.entry, ...(inactive ? { inactiveAllergy: true } : {}) },
-            naturalKey: naturalKeyOf(dest, r.entry),
+            naturalKey: naturalKeyOf(dest, r.entry, rename),
           },
         ],
         warnings: [],
@@ -238,146 +265,6 @@ const measurementsHandler: EntryHandler<EntryBody> = {
   },
   write: (ctx, patientId, body) => insertEntry(ctx.tx, patientId, ctx.userId, body.entry),
 };
-
-/* Vaccinazioni ed esami di laboratorio ---------------------------------------------------------- */
-
-const isoDate = z.iso.date();
-const text = (max: number) => z.string().trim().min(1).max(max);
-const optionalText = (max: number) => z.string().trim().max(max).optional();
-
-/**
- * Vaccinazione: oggi nessun inserimento a mano. Controlli scelti qui, sullo stile delle altre voci
- * (data non nel futuro, testi con un limite): vaccino fino a 200 caratteri come la sostanza di
- * un'allergia, lotto fino a 50, dose da 1 a 99. Da allineare con l'inserimento a mano.
- */
-export const vaccinationImportBody = z
-  .object({
-    data: isoDate,
-    vaccino: text(200),
-    lotto: optionalText(50),
-    dose: z.number().int().min(1).max(99).optional(),
-    campagna: optionalText(100),
-    note: optionalText(2000),
-    riservata: z.boolean().optional(),
-    oscurata: z.boolean().optional(),
-  })
-  .strict();
-
-/** Esame di laboratorio: come sopra, con i campi di lab_result_detail. */
-export const labResultImportBody = z
-  .object({
-    data: isoDate,
-    analita: text(200),
-    valore: text(50),
-    unita: optionalText(30),
-    minimo: optionalText(20),
-    massimo: optionalText(20),
-    riferimento: optionalText(200),
-    codicePrestazione: z.string().trim().toUpperCase().max(20).optional(),
-    note: optionalText(2000),
-    riservata: z.boolean().optional(),
-    oscurata: z.boolean().optional(),
-  })
-  .strict();
-
-function simpleHandler<S extends z.ZodTypeAny>(
-  dest: ImportDestinationKey,
-  schema: S,
-  keys: readonly string[],
-  write: (ctx: WriteContext, patientId: string, body: z.infer<S>) => Promise<string>,
-): EntryHandler<z.infer<S>> {
-  return {
-    table: 'clinical_entry',
-    prepare(v, today) {
-      const parsed = schema.safeParse(pick(v, keys));
-      if (!parsed.success)
-        return { ok: false, errors: zodMessages(parsed.error, fieldLabel(dest)) };
-      const body = parsed.data as z.infer<S> & { data: string };
-      if (body.data > today) return { ok: false, errors: ['Data della voce: è nel futuro'] };
-      return {
-        ok: true,
-        items: [{ body, naturalKey: naturalKeyOf(dest, body) }],
-        warnings: [],
-      };
-    },
-    write,
-  };
-}
-
-async function insertClinical(
-  ctx: WriteContext,
-  patientId: string,
-  kind: 'vaccination' | 'lab_result',
-  b: {
-    data: string;
-    note?: string | undefined;
-    riservata?: boolean | undefined;
-    oscurata?: boolean | undefined;
-  },
-): Promise<string> {
-  const [row] = await ctx.tx
-    .insert(clinicalEntry)
-    .values({
-      patientId,
-      kind,
-      occurredOn: b.data,
-      authorUserId: ctx.userId,
-      notes: b.note || null,
-      reserved: b.riservata ?? false,
-      obscured: b.oscurata ?? false,
-    })
-    .returning({ id: clinicalEntry.id });
-  return row!.id;
-}
-
-const vaccinationsHandler = simpleHandler(
-  'vaccinazioni',
-  vaccinationImportBody,
-  ['data', 'vaccino', 'lotto', 'dose', 'campagna', 'note', 'riservata', 'oscurata'],
-  async (ctx, patientId, b) => {
-    const id = await insertClinical(ctx, patientId, 'vaccination', b);
-    await ctx.tx.insert(vaccinationDetail).values({
-      entryId: id,
-      vaccine: b.vaccino,
-      lot: b.lotto || null,
-      doseNumber: b.dose ?? null,
-      campaign: b.campagna || null,
-    });
-    return id;
-  },
-);
-
-const labResultsHandler = simpleHandler(
-  'esami_laboratorio',
-  labResultImportBody,
-  [
-    'data',
-    'analita',
-    'valore',
-    'unita',
-    'minimo',
-    'massimo',
-    'riferimento',
-    'codicePrestazione',
-    'note',
-    'riservata',
-    'oscurata',
-  ],
-  async (ctx, patientId, b) => {
-    const id = await insertClinical(ctx, patientId, 'lab_result', b);
-    await ctx.tx.insert(labResultDetail).values({
-      entryId: id,
-      analyte: b.analita,
-      value: b.valore,
-      unit: b.unita || null,
-      referenceLow: b.minimo || null,
-      referenceHigh: b.massimo || null,
-      referenceText: b.riferimento || null,
-      serviceCode: b.codicePrestazione || null,
-    });
-    return id;
-  },
-);
 
 /* Esenzioni ------------------------------------------------------------------------------------ */
 
@@ -495,6 +382,9 @@ export const choicesHandler: EntryHandler<DoctorChoicePeriodInput> = {
 };
 
 /* Nucleo familiare ----------------------------------------------------------------------------- */
+
+const text = (max: number) => z.string().trim().min(1).max(max);
+const optionalText = (max: number) => z.string().trim().max(max).optional();
 
 const familyImportBody = z.object({ nucleo: text(100), nomeNucleo: optionalText(100) }).strict();
 type FamilyImport = z.infer<typeof familyImportBody>;
@@ -643,10 +533,8 @@ const therapiesHandler: EntryHandler<TherapyImport> = {
     ) as keyof typeof THERAPY_STATUS;
     const errors: string[] = [];
     const warnings: string[] = [];
-    if (state === 'conclusa') {
-      if (!body.endOn) errors.push('Terapia conclusa: manca la data di fine');
-      else if (body.endOn > today) errors.push('Terapia conclusa: la data di fine è nel futuro');
-    }
+    // Gli stessi controlli della terapia registrata già conclusa dalla scheda.
+    if (state === 'conclusa') errors.push(...concludedTherapyIssues(body, today));
     const reason = typeof v.motivoSospensione === 'string' ? v.motivoSospensione : null;
     if (state === 'sospesa' && !reason)
       errors.push('Terapia sospesa: serve il motivo della sospensione, come nella cartella');
@@ -685,71 +573,50 @@ const therapiesHandler: EntryHandler<TherapyImport> = {
 
 /* Ricette fatte con altri programmi ----------------------------------------------------------- */
 
+/** Campi del catalogo per tipo di riga, e il loro nome nel corpo della rotta. */
+const HISTORICAL_FIELDS = {
+  farmaco: {
+    aic: 'aic',
+    farmaco: 'farmaco',
+    principioAttivo: 'principioAttivo',
+    atc: 'atc',
+    posologia: 'posologia',
+  },
+  prestazione: { codicePrestazione: 'codice', descrizionePrestazione: 'descrizione' },
+} as const;
+const HISTORICAL_COMMON = ['data', 'quantita', 'nre', 'prescrittore', 'note'] as const;
+
 /**
- * Ricetta passata (historical_prescription): nessun inserimento a mano oggi. Controlli scelti
- * qui: data non nel futuro; un farmaco ha nome, AIC o principio attivo; una prestazione ha codice
- * o descrizione; AIC di 9 cifre e ATC nel formato delle banche dati; quantità da 1 a 99 come le
- * righe delle nostre ricette. L'NRE non ha un controllo di formato: il formato ufficiale non è
- * ancora stato letto (D70).
+ * Ricette fatte con altri programmi: lo stesso corpo e gli stessi controlli della rotta
+ * (`newHistoricalBody`, `historicalIssues`), scritte da `insertHistorical` con l'importazione. Una
+ * riga con i campi dell'altro tipo (una prestazione su una riga di farmaco) si scarta: è un errore
+ * di smistamento, non un valore da indovinare.
  */
-export const historicalImportBody = z
-  .object({
-    data: isoDate,
-    tipo: z.enum(['farmaco', 'prestazione']),
-    farmaco: optionalText(300),
-    aic: z.string().regex(AIC_PATTERN, 'l’AIC ha 9 cifre').optional(),
-    principioAttivo: optionalText(300),
-    atc: z.string().regex(ATC_PATTERN, 'l’ATC non ha la forma attesa (es. C08CA01)').optional(),
-    quantita: z.number().int().min(1).max(99).optional(),
-    posologia: optionalText(500),
-    codicePrestazione: z.string().trim().max(20).optional(),
-    descrizionePrestazione: optionalText(300),
-    nre: z.string().trim().max(30).optional(),
-    prescrittore: optionalText(200),
-    note: optionalText(2000),
-  })
-  .strict();
-type HistoricalInput = z.infer<typeof historicalImportBody>;
-
-export function historicalIssues(h: HistoricalInput, today: string): string[] {
-  const out: string[] = [];
-  if (h.data > today) out.push('Data della ricetta: è nel futuro');
-  if (h.tipo === 'farmaco') {
-    if (!h.farmaco && !h.aic && !h.principioAttivo)
-      out.push('Farmaco: serve il nome, l’AIC o il principio attivo');
-    if (h.codicePrestazione || h.descrizionePrestazione)
-      out.push('Una riga di farmaco non ha codice o descrizione di una prestazione');
-  } else {
-    if (!h.codicePrestazione && !h.descrizionePrestazione)
-      out.push('Prestazione: serve il codice o la descrizione');
-    if (h.farmaco || h.aic || h.principioAttivo || h.atc || h.posologia)
-      out.push('Una riga di prestazione non ha i dati di un farmaco');
-  }
-  return out;
-}
-
-const historicalHandler: EntryHandler<HistoricalInput> = {
+const historicalHandler: EntryHandler<NewHistorical> = {
   table: 'historical_prescription',
   prepare(v, today) {
-    const parsed = historicalImportBody.safeParse(
-      pick(v, [
-        'data',
-        'tipo',
-        'farmaco',
-        'aic',
-        'principioAttivo',
-        'atc',
-        'quantita',
-        'posologia',
-        'codicePrestazione',
-        'descrizionePrestazione',
-        'nre',
-        'prescrittore',
-        'note',
-      ]),
-    );
+    const tipo = v.tipo;
+    if (tipo !== 'farmaco' && tipo !== 'prestazione')
+      return { ok: false, errors: ['«Tipo»: serve «farmaco» o «prestazione»'] };
+    const other = HISTORICAL_FIELDS[tipo === 'farmaco' ? 'prestazione' : 'farmaco'];
+    const wrong = Object.keys(other).filter((k) => v[k] !== null && v[k] !== undefined);
+    if (wrong.length)
+      return {
+        ok: false,
+        errors: [
+          tipo === 'farmaco'
+            ? 'Una riga di farmaco non ha codice o descrizione di una prestazione'
+            : 'Una riga di prestazione non ha i dati di un farmaco',
+        ],
+      };
+    const own: Record<string, string> = HISTORICAL_FIELDS[tipo];
+    const raw = { tipo, ...pick(v, [...HISTORICAL_COMMON, ...Object.keys(own)], own) };
+    const parsed = newHistoricalBody.safeParse(raw);
     if (!parsed.success)
-      return { ok: false, errors: zodMessages(parsed.error, fieldLabel('ricette_passate')) };
+      return {
+        ok: false,
+        errors: zodMessages(parsed.error, fieldLabel('ricette_passate', own)),
+      };
     const issues = historicalIssues(parsed.data, today);
     if (issues.length) return { ok: false, errors: issues };
     return {
@@ -757,38 +624,18 @@ const historicalHandler: EntryHandler<HistoricalInput> = {
       items: [
         {
           body: parsed.data,
-          naturalKey: naturalKeyOf('ricette_passate', parsed.data),
+          naturalKey: naturalKeyOf('ricette_passate', { ...v, ...parsed.data }),
         },
       ],
       warnings: [],
     };
   },
-  async write(ctx, patientId, h) {
-    const [row] = await ctx.tx
-      .insert(historicalPrescription)
-      .values({
-        patientId,
-        archiveId: ctx.archiveId,
-        kind: h.tipo,
-        prescribedOn: h.data,
-        drugAic: h.aic ?? null,
-        drugName: h.farmaco ?? null,
-        activeIngredient: h.principioAttivo ?? null,
-        atcCode: h.atc ?? null,
-        quantity: h.quantita ?? null,
-        posologyText: h.posologia ?? null,
-        serviceCode: h.codicePrestazione ?? null,
-        serviceDescription: h.descrizionePrestazione ?? null,
-        nre: h.nre ?? null,
-        prescriberName: h.prescrittore ?? null,
-        notes: h.note ?? null,
-        sourceProgram: ctx.sourceProgram,
-        importBatchId: ctx.batchId,
-        recordedBy: ctx.userId,
-      })
-      .returning({ id: historicalPrescription.id });
-    return row!.id;
-  },
+  write: (ctx, patientId, h) =>
+    insertHistorical(
+      ctx.tx,
+      { patientId, archiveId: ctx.archiveId, recordedBy: ctx.userId, importBatchId: ctx.batchId },
+      ctx.sourceProgram ? { ...h, programma: ctx.sourceProgram } : h,
+    ),
 };
 
 /** Gestori delle destinazioni diverse dai pazienti. */
@@ -807,8 +654,8 @@ export function entryHandlers(
     esame_obiettivo: entryHandler('esame_obiettivo'),
     capacita_motoria: entryHandler('capacita_motoria'),
     parametri: measurementsHandler,
-    vaccinazioni: vaccinationsHandler,
-    esami_laboratorio: labResultsHandler,
+    vaccinazioni: entryHandler('vaccinazioni'),
+    esami_laboratorio: entryHandler('esami_laboratorio'),
     terapie: therapiesHandler,
     ricette_passate: historicalHandler,
   };

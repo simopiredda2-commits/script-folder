@@ -800,7 +800,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
   {
     key: 'vaccinazioni',
     label: 'Vaccinazioni',
-    menu: 'Storia clinica › Vaccinazioni (in cronologia)',
+    menu: 'Storia clinica › Vaccinazioni',
     order: 13,
     naturalKey: ['data', 'vaccino', 'lotto'],
     notes: 'Data di somministrazione, vaccino, lotto e dose.',
