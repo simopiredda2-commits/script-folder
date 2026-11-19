@@ -29,6 +29,7 @@ export const PATIENT_TABLES = [
   'pss_document',
   'template_certificate',
   'aft_activity',
+  'historical_prescription',
 ] as const;
 
 export const ENTRY_TABLES = [

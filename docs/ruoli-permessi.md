@@ -38,6 +38,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Stampare i promemoria | Sì | Sì | Sì | Sì | No | No |
 | Leggere il registro degli accessi | Sì | No | No | No | No | No |
 | Esportare tutti i dati dell’archivio | Sì | No | No | No | No | No |
+| Importare dati da altri programmi nell’archivio | Sì | No | No | No | No | No |
 | Decidere che cosa vede la segreteria dell’archivio | Sì | No | No | No | No | No |
 | Autorizzare un sostituto o un collega di gruppo sull’archivio | Sì | No | No | No | No | No |
 | Modificare i dati e le impostazioni dello studio | No | No | No | No | No | Sì |

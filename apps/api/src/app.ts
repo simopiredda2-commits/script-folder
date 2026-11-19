@@ -34,6 +34,8 @@ import { registerStudioListRoutes } from './admin/list-routes';
 import { registerPrintRoutes } from './admin/print-routes';
 import { registerStudioAdminRoutes } from './admin/studio-routes';
 import { registerUserAdminRoutes } from './admin/user-routes';
+import { registerPatientAdminRoutes } from './http/patient-admin-routes';
+import { registerImportRoutes } from './import/routes';
 import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
@@ -234,6 +236,9 @@ export function buildApp({
   registerPrintRoutes(app, adminDeps);
   registerArchiveAdminRoutes(app, adminDeps);
   registerStudioListRoutes(app, adminDeps);
+  // Pannello amministrativo del paziente e importazione da altri programmi (tappa 15).
+  registerPatientAdminRoutes(app, adminDeps);
+  registerImportRoutes(app, adminDeps);
   registerFollowUpRoutes(app, db, now ?? (() => new Date()));
   // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
   const reference = new ReferenceData(db, loadMappings(), {

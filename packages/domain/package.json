@@ -9,5 +9,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
     "docs:permessi": "tsx scripts/matrice-permessi.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
   }
 }

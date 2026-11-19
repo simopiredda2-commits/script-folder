@@ -162,6 +162,13 @@
       "when": 1795049977121,
       "tag": "0022_amministrazione",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1795050701658,
+      "tag": "0023_importazione",
+      "breakpoints": true
     }
   ]
 }

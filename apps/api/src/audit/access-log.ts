@@ -95,7 +95,21 @@ export type AccessAction =
   | 'autorizzazione_archivio'
   | 'revoca_autorizzazione'
   | 'lettura_registro_amministrazione'
-  | 'lettura_avvisi_accessi';
+  | 'lettura_avvisi_accessi'
+  /** Tappa 15: pannello amministrativo del paziente, ricette passate, importazione. */
+  | 'nuovo_paziente'
+  | 'modifica_dati_amministrativi'
+  | 'correzione_identita'
+  | 'lettura_dati_amministrativi'
+  | 'nuova_esenzione'
+  | 'modifica_esenzione'
+  | 'nuova_scelta'
+  | 'modifica_scelta'
+  | 'nuova_ricetta_passata'
+  | 'annullamento_ricetta_passata'
+  | 'prova_importazione'
+  | 'importazione'
+  | 'lettura_importazioni';
 
 export interface AccessEntry {
   studioId?: string | null;

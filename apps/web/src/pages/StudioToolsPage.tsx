@@ -6,6 +6,7 @@ import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 import { AdminLogSection } from './admin/AdminLogSection';
+import { ImportSection } from './admin/ImportSection';
 import { ListsSection } from './admin/ListsSection';
 import { PrintSection } from './admin/PrintSection';
 import { ServiceSection } from './admin/ServiceSection';
@@ -94,6 +95,7 @@ const SECTIONS: { key: string; label: string; roles: RoleCode[] }[] = [
   { key: 'fascicolo', label: 'Fascicolo sanitario', roles: ALL },
   { key: 'banche-dati', label: 'Banche dati', roles: ALL },
   { key: 'aft', label: 'AFT', roles: ['owner_doctor'] },
+  { key: 'importazione', label: 'Importazione', roles: ['owner_doctor'] },
   {
     key: 'registro',
     label: 'Registro di amministrazione',
@@ -137,6 +139,7 @@ export function StudioToolsPage() {
       {current.key === 'elenchi' && <ListsSection />}
       {current.key === 'registro' && <AdminLogSection />}
       {current.key === 'servizio' && <ServiceSection />}
+      {current.key === 'importazione' && <ImportSection />}
       {current.key === 'modelli' && <TemplatesSection />}
       {current.key === 'aft' && <AftSection />}
       {current.key === 'impaginazione' && <LayoutSection />}

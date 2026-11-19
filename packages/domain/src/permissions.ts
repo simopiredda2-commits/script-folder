@@ -49,6 +49,8 @@ export const ACTIONS = [
   'access_log.read',
   /** Esportazione completa dei dati dell'archivio. */
   'data.export',
+  /** Importazione da altri programmi nell'archivio, con lo smistamento verso i menu (tappa 15). */
+  'data.import',
   /** Impostazioni dell'archivio: che cosa vede la segreteria. */
   'archive.settings',
   /** Autorizzazioni sull'archivio: sostituto e colleghi di medicina di gruppo (tappa 14). */
@@ -91,6 +93,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'reminder.print': 'Stampare i promemoria',
   'access_log.read': 'Leggere il registro degli accessi',
   'data.export': 'Esportare tutti i dati dell’archivio',
+  'data.import': 'Importare dati da altri programmi nell’archivio',
   'archive.settings': 'Decidere che cosa vede la segreteria dell’archivio',
   'archive.grants': 'Autorizzare un sostituto o un collega di gruppo sull’archivio',
   'admin.studio': 'Modificare i dati e le impostazioni dello studio',
@@ -123,6 +126,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'reminder.print',
   'access_log.read',
   'data.export',
+  'data.import',
   'archive.settings',
   'archive.grants',
 ];
@@ -135,6 +139,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
 const DOCTOR_ON_GRANTED_ARCHIVE: Action[] = DOCTOR_ON_OWN_ARCHIVE.filter(
   (a) =>
     a !== 'data.export' &&
+    a !== 'data.import' &&
     a !== 'access_log.read' &&
     a !== 'archive.settings' &&
     a !== 'archive.grants',

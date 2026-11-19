@@ -28,6 +28,8 @@ import { HealthProfilePage } from './pages/HealthProfilePage';
 import { TemplateCertificatesPage } from './pages/TemplateCertificatesPage';
 import { TherapyForm } from './pages/TherapyForm';
 import { TodayPage } from './pages/TodayPage';
+import { NewPatientPage } from './pages/NewPatientPage';
+import { PatientAdminPage } from './pages/PatientAdminPage';
 
 /** Le schermate dopo l'accesso. */
 function Screens() {
@@ -41,6 +43,8 @@ function Screens() {
         <Routes>
           <Route path="/" element={<TodayPage />} />
           <Route path="/pazienti" element={<PatientsPage />} />
+          <Route path="/pazienti/nuovo" element={<NewPatientPage />} />
+          <Route path="/pazienti/:id/amministrazione" element={<PatientAdminPage />} />
           <Route path="/pazienti/:id" element={<RecordPage />} />
           <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
           <Route

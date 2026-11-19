@@ -13,3 +13,4 @@ export * from './prescribed';
 export * from './aft';
 export * from './printing';
 export * from './studio-lists';
+export * from './patient-registry';
