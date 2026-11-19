@@ -35,13 +35,18 @@ pnpm studio:crea -- --nome "Studio medico …" --tipo singolo --regione PIEMONTE
 
 Il comando applica le migrazioni, crea lo studio e il primo amministratore (senza accesso clinico) e mostra una sola volta la password temporanea. Al primo accesso si attiva il secondo fattore e si cambia la password; poi l'amministratore crea gli altri utenti da Strumenti. In produzione (`APP_AMBIENTE=produzione`, D170) i dati dimostrativi non si possono creare.
 
-Il primo medico titolare lo crea l'amministratore, ma resta in attesa: nello studio non c'è ancora un titolare che possa confermarlo. Lo conferma chi gestisce il servizio, sul server, e la password temporanea si vede solo lì, una volta, da consegnare al medico (D179):
+Il primo medico titolare lo crea l'amministratore, ma resta in attesa: nello studio non c'è ancora un titolare che possa confermarlo. Lo conferma chi gestisce il servizio, sul server, in due passi, dopo aver controllato con il medico che nome, ruoli e dati siano i suoi; la password temporanea si vede solo lì, una volta, da consegnare al medico (D179):
 
 ```sh
-pnpm utente:ripristina -- --utente nome.cognome --conferma
+pnpm utente:ripristina -- --utente nome.cognome --mostra
+pnpm utente:ripristina -- --utente nome.cognome --conferma --richiesta-il DATA
 ```
 
-Da lì in poi medici e segreteria li conferma un titolare, dal programma. Con un titolare attivo e confermato il comando rifiuta e rimanda alla conferma dal programma.
+Il primo comando stampa la richiesta senza cambiare nulla: ruoli (anche con i codici), dati del medico, chi l'ha fatta e la data esatta, che il secondo vuole uguale; se nel frattempo l'amministratore ha cambiato l'utente, il secondo rifiuta e rimanda al primo. Per non confermare: `--rifiuta`. Da lì in poi medici e segreteria li conferma un titolare, dal programma; con un titolare attivo e confermato il comando rifiuta e rimanda alla conferma dal programma.
+
+In uno studio con un solo medico servono due utenti, l'amministratore e il medico: nessuno cambia i propri ruoli. Al medico confermato l'amministratore può poi aggiungere il ruolo di amministratore.
+
+All'installazione, se davanti al servizio c'è un proxy inverso, il suo indirizzo va in `APP_PROXY_FIDATI` (indirizzi o reti separati da virgole): altrimenti nel registro dei tentativi falliti l'indirizzo sarebbe sempre quello del proxy. Vuota, l'intestazione X-Forwarded-For si ignora.
 
 ## Utenti e ruoli (D164) e password (D165)
 
@@ -52,14 +57,16 @@ Da lì in poi medici e segreteria li conferma un titolare, dal programma. Con un
 
 ### L'amministratore non si prende l'accesso clinico (D179)
 
-Requisiti, «Utenti e ruoli»: l'amministratore non ha accesso clinico, a meno che non sia anche medico. Chi crea gli utenti e ne gestisce le credenziali, però, potrebbe creare un medico o una segreteria, o ripristinarne la password, ed entrare al suo posto. Per questo, con le correzioni di una revisione avversaria:
+Requisiti, «Utenti e ruoli»: l'amministratore non ha accesso clinico, a meno che non sia anche medico. Chi crea gli utenti e ne gestisce le credenziali, però, potrebbe creare un medico o una segreteria, o ripristinarne la password, ed entrare al suo posto. Per questo, con le correzioni di tre revisioni avversarie (dettagli in D179):
 
 - **Conferma di un titolare.** Chi ha un ruolo con i dati dei pazienti (medico titolare, medico sostituto, segreteria), creato dall'amministratore o con uno di quei ruoli aggiunto da lui, resta «in attesa di conferma» e non entra. Lo conferma o lo rifiuta un medico titolare attivo dello studio, in **Strumenti › Utenti da confermare**, dopo aver visto ruoli e dati; si conferma solo la richiesta letta. La password temporanea la riceve il titolare, una volta sola, e la consegna di persona: l'amministratore non la vede mai. Il rifiuto sospende l'utente.
-- **Senza un titolare che possa confermare** (studio nuovo, titolari tutti sospesi o in attesa) conferma chi gestisce il servizio, sul server: `pnpm utente:ripristina -- --utente NOME --conferma`. Nessuna eccezione per il primo titolare.
-- **Credenziali di medici e segreteria solo dal server:** password temporanea, azzeramento del secondo fattore, sblocco dopo i tentativi falliti, con `pnpm utente:ripristina` (`--secondo-fattore`, `--sblocca`, `--sospendi`, `--riattiva`); ogni azione va nel registro con «tramite: comando del server». Per gli amministratori si fa da Strumenti.
-- **Titolari protetti:** l'amministratore non sospende e non toglie il ruolo a un titolare con pazienti, né all'ultimo titolare attivo e confermato, e non aggiunge segreteria o sostituto a un titolare con pazienti; un titolare con pazienti sospeso dal server si riattiva solo dal server.
+- **Senza un titolare che possa confermare** (studio nuovo, titolari tutti sospesi o in attesa) decide chi gestisce il servizio, sul server, in due passi: `--mostra`, poi `--conferma --richiesta-il DATA` oppure `--rifiuta` (sopra, «Primo avvio»). Nessuna eccezione per il primo titolare.
+- **Nomi e dati senza caratteri nascosti:** nei nomi, nei dati del medico e nei testi dello studio non entrano caratteri di controllo, a capo o invisibili, che sul terminale del server potrebbero far leggere una richiesta diversa da quella vera.
+- **Credenziali di medici e segreteria solo dal server:** password temporanea, azzeramento del secondo fattore, sblocco dopo i tentativi falliti, con `pnpm utente:ripristina` (`--secondo-fattore`, `--sblocca`, `--sospendi`, `--riattiva`); ogni azione va nel registro con «tramite: comando del server». Per gli amministratori si fa da Strumenti. Chi è sospeso o rifiutato dal server si riattiva solo dal server.
+- **Titolari protetti:** l'amministratore non sospende e non toglie il ruolo a un titolare con pazienti, né all'ultimo titolare attivo e confermato, e non aggiunge segreteria o sostituto a un titolare con pazienti; un titolare con pazienti sospeso si riattiva solo dal server, e un titolare in attesa con pazienti non si rifiuta dal programma. Se nell'archivio del medico è in corso una scrittura (per esempio un'importazione), la sospensione risponde dopo al più 2 secondi «riprova tra qualche minuto».
+- **Pazienti nuovi solo negli archivi aperti:** nell'archivio di un titolare sospeso, non più titolare o in attesa di conferma non entrano pazienti, né a mano né con l'importazione; quegli archivi non si propongono nel nuovo paziente, e un titolare in attesa non si sceglie come medico di famiglia.
 - **Codici del medico corretti:** se l'amministratore corregge il codice fiscale o il codice regionale di un medico, le sessioni dei servizi legate a quel codice si chiudono e la risposta lo dice.
-- **Accesso:** il codice del secondo fattore non vale per un utente bloccato; il passaggio fra password e codice si chiude dopo tanti codici sbagliati quanti i tentativi dello studio; il blocco dura al più 60 minuti; ogni tentativo fallito registra anche l'indirizzo della richiesta.
+- **Accesso:** il passaggio fra password e codice guarda al più tanti codici quanti i tentativi dello studio, giusti o sbagliati, anche con molte richieste insieme, e non vale per un utente bloccato; un passaggio di attivazione aperto prima non vale dopo l'attivazione; il blocco dura al più 60 minuti; ogni tentativo fallito registra anche l'indirizzo della richiesta (con il proxy in `APP_PROXY_FIDATI`). Con il servizio sovraccarico la risposta è «servizio occupato, riprova» invece di un'attesa senza fine.
 
 ## Dati e impostazioni dello studio (D166)
 
@@ -125,11 +132,14 @@ Regole di prescrizione (si cambiano con una versione nuova e la sua fonte: D41, 
 - **Stampa diretta**, senza la finestra di stampa (requisiti, «stampa diretta in studio»): consigliata un'impostazione del browser sulla postazione (modalità chiosco), da provare su un computer dello studio; l'alternativa è un programma da installare, contro «nessuna installazione».
 - **Formato del promemoria:** oggi A4; le «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non sono state trovate (D97).
 - **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?
-- **Poteri dell'amministratore** (D179, dalla revisione avversaria):
-  - in medicina di gruppo una segreteria confermata da un solo titolare legge gli archivi di tutti: consigliata la conferma di ogni titolare il cui archivio diventa visibile (problema 3);
-  - ripristino delle credenziali di medici e segreteria: dal server, come oggi (consigliata), o anche in autonomia con SPID o CIE (D109);
+- **Poteri dell'amministratore** (D179, dalle revisioni avversarie):
+  - in medicina di gruppo una segreteria confermata da un solo titolare legge gli archivi di tutti: consigliata la conferma per archivio, cioè ogni titolare per il suo (problema 3);
+  - chi conosce il nome utente di un medico lo tiene fuori un'ora alla volta, ripetendo i tentativi sbagliati: consigliati ritardi crescenti per indirizzo e postazione, con il blocco del conto solo oltre una soglia alta, e un avviso di ogni blocco al medico e ai titolari (problema 4, la parte rimasta);
   - codice fiscale del medico corretto dall'amministratore: oggi si chiudono le sessioni dei servizi; consigliata anche la conferma del medico stesso, perché un codice sbagliato gli impedisce di prescrivere (problema 12);
-  - utenti con i dati dei pazienti creati prima di questa versione, solo negli ambienti di prova: nessuno è in attesa (problema 10); consigliato lasciarli come sono;
+  - conferma dal server: come chi gestisce il servizio riconosce il medico. Consigliato di persona, con un documento e il codice regionale, annotato fuori dal programma; l'alternativa è il primo accesso con SPID o CIE, dove c'è l'accesso regionale;
+  - `--rifiuta` anche per un utente già confermato (torna in attesa, sospeso dal server, con credenziali nuove alla conferma successiva): consigliato sì;
+  - ripristino delle credenziali di medici e segreteria: dal server, come oggi (consigliata), o anche in autonomia con SPID o CIE (D109);
+  - utenti con i dati dei pazienti creati, o sospesi dal server, prima di questa versione, solo negli ambienti di prova: nessuno è in attesa né segnato (problema 10); consigliato lasciarli come sono;
   - un avviso al titolare quando c'è un utente da confermare, per esempio in «Oggi».
 - **Password:** 12 caratteri, nessuna scadenza, nessuna regola di composizione: c'è una regola da seguire (Garante, AgID, consulente privacy)? La password temporanea deve scadere?
 - **Salvataggi:** i requisiti mettono i backup cifrati giornalieri nella versione 1; oggi il programma non li fa.
@@ -139,6 +149,10 @@ Regole di prescrizione (si cambiano con una versione nuova e la sua fonte: D41, 
 
 ## Che cosa non è stato provato
 
-- Stampa su stampanti vere.
+- Stampa su stampanti vere, carta A5 vera, stampa senza finestra.
 - Lettori di schermo e tablet veri.
 - Due amministratori che salvano insieme i dati dello studio.
+- Il comando del server (`utente:ripristina`) in un ambiente vero: provato come funzione e come processo, su database temporanei.
+- Un proxy inverso vero e più istanze del servizio: le richieste insieme sono provate nello stesso processo, anche su connessioni diverse.
+- La catena del registro alla fine di un'importazione di decine di migliaia di pazienti: le righe ora si scrivono in un comando solo, ma il tempo non è misurato.
+- La revoca presso i servizi delle sessioni chiuse quando cambiano i codici del medico: si chiudono solo nel programma.
