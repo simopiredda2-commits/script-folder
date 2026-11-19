@@ -223,7 +223,12 @@ export function buildApp({
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
   registerAftRoutes(app, createAftService({ db, now: now ?? (() => new Date()) }));
   // Strumenti e amministrazione dello studio (tappa 14).
-  const adminDeps = { db, now: now ?? (() => new Date()) };
+  const adminDeps = {
+    db,
+    now: now ?? (() => new Date()),
+    sessionMaxHours: config.sessionMaxHours,
+    referenceUpdates,
+  };
   registerStudioAdminRoutes(app, adminDeps);
   registerUserAdminRoutes(app, adminDeps);
   registerPrintRoutes(app, adminDeps);
