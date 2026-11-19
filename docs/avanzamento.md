@@ -593,6 +593,12 @@ Durante la tappa 11 (terzo giro):
   - menu «Visite ed esami prescritti», in due gruppi. La regola delle visite è verificata su tre elenchi interi: i cataloghi regionali delle D.D. 868/2024 e 990/2024 e il nomenclatore nazionale (allegato 4 del DPCM LEA, scaricato da Simone). A ogni catalogo nuovo il rapporto d'importazione rifà la prova;
   - non provati: le schermate nuove e la regola sul catalogo in vigore dal 30/10/2026, che non è pubblicato con l'atto.
 
+- **Richieste del 19/11/2026** (Simone):
+  - «"Folder by script" in basso non è allineato»: corretto, nome e «by SCRIPT» sulla stessa riga, centrati (commit 11f26cb).
+  - «nel pannello admin o strumenti ci devono essere tutte le varie opzioni di configurazione e impostazioni del programma: dati editabili …, impostazioni stampanti, e tutto ciò che ritieni possa rientrare tra le impostazioni»: diventa la **tappa 14**, dopo la fermata della tappa 12. Stima data: 4–5 ore.
+  - «Nel caso di import, devi poter direzionare i dati che riceverai dal file importato (che potrà essere proveniente da altri applicativi in vari formati) ai vari menu (storia clinica, patologie, farmaci prescritti e/o in terapia, pannello amministrazione del paziente …)»: diventa la **tappa 15**. L'esportazione completa c'è già; l'importazione di cartelle da altri programmi no. Stima data: 5–6 ore.
+  - Le schermate iniziali con l'anagrafica non sono tra i file di questa sessione: per i campi si usano i requisiti; alla fermata si chiede se rimandarle.
+
 - **Tappa 12: condivisione tra i medici dell'AFT** (D161). Fatto:
   - l'AFT nel programma: un titolare la crea, i colleghi entrano su invito con il codice regionale e solo accettando; uscita con la data, niente si cancella;
   - il titolare attiva la condivisione dei suoi pazienti; il paziente dà un consenso a parte, revocabile;
