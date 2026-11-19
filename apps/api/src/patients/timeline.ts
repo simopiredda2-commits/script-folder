@@ -18,6 +18,7 @@ import {
   problemDetail,
   reportDetail,
   riskFactorDetail,
+  therapy,
   vaccinationDetail,
 } from '../db/schema';
 import { historicalSummary, visibleHistorical } from '../prescriptions/historical';
@@ -107,18 +108,33 @@ async function details(db: Database, ids: string[]) {
   return out;
 }
 
-/** Cronologia unica della cartella: voci cliniche e ricette in ordine di data. */
-export async function timeline(db: Database, actor: Actor, patientId: string, rawQuery: unknown) {
-  const { context } = await guardPatient(
-    db,
-    actor,
-    patientId,
-    'clinical.diary.read',
-    'lettura_cronologia',
-  );
-  const { tipo } = timelineQuery.parse(rawQuery ?? {});
-  const now = new Date();
-  const reservedAllowed = can(actor, 'reserved.read', { ...context, now }).allowed;
+/** Che cosa entra nella cronologia: per chi la legge, e per la scheda condivisa nell'AFT. */
+export interface ChronologyScope {
+  tipo: z.infer<typeof timelineQuery>['tipo'];
+  /** Le voci e le terapie riservate: solo per chi le può leggere. */
+  reservedAllowed: boolean;
+  /** Le ricette: solo per chi legge le terapie. */
+  therapyAllowed: boolean;
+  /**
+   * La scheda per un collega dell'AFT (D187): niente voci oscurate dal paziente né voci
+   * annullate, niente ricette con i dati oscurati, e solo dal giorno del consenso se il paziente
+   * non ha consentito di condividere i dati precedenti.
+   */
+  shared?: { since: string | null };
+}
+
+const isoDay = (at: Date) =>
+  new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(at);
+
+/** Le voci della cronologia di un paziente, in ordine di data, dalla più recente. */
+export async function chronology(
+  db: Database,
+  patientId: string,
+  scope: ChronologyScope,
+): Promise<TimelineItem[]> {
+  const { tipo, reservedAllowed, therapyAllowed, shared } = scope;
+  const since = shared?.since ?? null;
+  const recent = (day: string) => !since || day >= since;
   const items: TimelineItem[] = [];
 
   if (tipo !== 'ricette') {
@@ -136,6 +152,9 @@ export async function timeline(db: Database, actor: Actor, patientId: string, ra
         and(
           eq(clinicalEntry.patientId, patientId),
           reservedAllowed ? undefined : eq(clinicalEntry.reserved, false),
+          shared ? eq(clinicalEntry.obscured, false) : undefined,
+          shared ? eq(clinicalEntry.status, 'active') : undefined,
+          since ? gte(clinicalEntry.occurredOn, since) : undefined,
           kinds,
         ),
       );
@@ -157,51 +176,56 @@ export async function timeline(db: Database, actor: Actor, patientId: string, ra
     }
   }
 
-  if (tipo === 'tutto' || tipo === 'ricette') {
-    const therapyAllowed = can(actor, 'therapy.read', { ...context, now }).allowed;
-    if (therapyAllowed) {
-      const rows = await db
-        .select({ p: prescription, line: prescriptionLine })
-        .from(prescription)
-        .innerJoin(prescriptionLine, eq(prescriptionLine.prescriptionId, prescription.id))
-        .where(
-          and(
-            eq(prescription.patientId, patientId),
-            inArray(prescription.status, ['sent', 'paper']),
-          ),
-        );
-      const byId = new Map<string, { p: (typeof rows)[number]['p']; lines: string[] }>();
-      for (const { p, line } of rows) {
-        const g = byId.get(p.id) ?? { p, lines: [] };
-        g.lines.push(
-          `${line.drugName ?? line.serviceDescription ?? line.serviceCode ?? ''} × ${line.quantity}`,
-        );
-        byId.set(p.id, g);
-      }
-      for (const { p, lines } of byId.values()) {
-        const at = p.sentAt ?? p.paperPrintedAt ?? p.preparedAt;
-        items.push({
-          id: p.id,
-          data: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(at),
-          tipo: 'prescription',
-          titolo: PRESCRIPTION_LABELS[p.kind] ?? p.kind,
-          testo: lines.join('; '),
-          annullata: false,
-          autore: null,
-        });
-      }
-      // Ricette fatte con un altro programma (tappa 15): un tipo a sé, mai confuse con le nostre.
-      for (const h of await visibleHistorical(db, patientId, reservedAllowed)) {
-        items.push({
-          id: h.id,
-          data: h.prescribedOn,
-          tipo: 'historical_prescription',
-          titolo: HISTORICAL_LABELS[h.kind] ?? 'Ricetta fatta con un altro programma',
-          testo: historicalSummary(h) || h.notes,
-          annullata: !!h.annulledAt,
-          autore: null,
-        });
-      }
+  if ((tipo === 'tutto' || tipo === 'ricette') && therapyAllowed) {
+    const rows = await db
+      .select({ p: prescription, line: prescriptionLine, reservedTherapy: therapy.reserved })
+      .from(prescription)
+      .innerJoin(prescriptionLine, eq(prescriptionLine.prescriptionId, prescription.id))
+      .leftJoin(therapy, eq(therapy.id, prescriptionLine.therapyId))
+      .where(
+        and(
+          eq(prescription.patientId, patientId),
+          inArray(prescription.status, ['sent', 'paper']),
+          // Il paziente ha chiesto di oscurare i suoi dati su quella ricetta: non si condivide.
+          shared ? eq(prescription.obscured, false) : undefined,
+        ),
+      );
+    const byId = new Map<string, { p: (typeof rows)[number]['p']; lines: string[] }>();
+    for (const { p, line, reservedTherapy } of rows) {
+      // Le righe di una terapia riservata solo per chi legge le riservate.
+      if (reservedTherapy && !reservedAllowed) continue;
+      const g = byId.get(p.id) ?? { p, lines: [] };
+      g.lines.push(
+        `${line.drugName ?? line.serviceDescription ?? line.serviceCode ?? ''} × ${line.quantity}`,
+      );
+      byId.set(p.id, g);
+    }
+    for (const { p, lines } of byId.values()) {
+      const day = isoDay(p.sentAt ?? p.paperPrintedAt ?? p.preparedAt);
+      if (!recent(day)) continue;
+      items.push({
+        id: p.id,
+        data: day,
+        tipo: 'prescription',
+        titolo: PRESCRIPTION_LABELS[p.kind] ?? p.kind,
+        testo: lines.join('; '),
+        annullata: false,
+        autore: null,
+      });
+    }
+    // Ricette fatte con un altro programma (tappa 15): un tipo a sé, mai confuse con le nostre.
+    for (const h of await visibleHistorical(db, patientId, reservedAllowed)) {
+      if (shared && h.annulledAt) continue;
+      if (!recent(h.prescribedOn)) continue;
+      items.push({
+        id: h.id,
+        data: h.prescribedOn,
+        tipo: 'historical_prescription',
+        titolo: HISTORICAL_LABELS[h.kind] ?? 'Ricetta fatta con un altro programma',
+        testo: historicalSummary(h) || h.notes,
+        annullata: !!h.annulledAt,
+        autore: null,
+      });
     }
   }
   // Attività dei colleghi dell'AFT per questo paziente (registro di AFT, D161).
@@ -212,10 +236,12 @@ export async function timeline(db: Database, actor: Actor, patientId: string, ra
       .innerJoin(appUser, eq(appUser.id, aftActivity.doctorUserId))
       .where(eq(aftActivity.patientId, patientId));
     for (const { a, doctor } of rows) {
+      const day = isoDay(a.performedAt);
+      if (!recent(day)) continue;
       const kind = AFT_ACTIVITY_KINDS.find((k) => k.key === a.kind)?.label ?? a.kind;
       items.push({
         id: a.id,
-        data: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(a.performedAt),
+        data: day,
         tipo: 'aft_activity',
         titolo: `Collega dell’AFT: ${kind}`,
         testo: [a.outcome, a.notes].filter(Boolean).join('. '),
@@ -225,7 +251,27 @@ export async function timeline(db: Database, actor: Actor, patientId: string, ra
     }
   }
   items.sort((a, b) => b.data.localeCompare(a.data));
-  return { cronologia: items };
+  return items;
+}
+
+/** Cronologia unica della cartella: voci cliniche e ricette in ordine di data. */
+export async function timeline(db: Database, actor: Actor, patientId: string, rawQuery: unknown) {
+  const { context } = await guardPatient(
+    db,
+    actor,
+    patientId,
+    'clinical.diary.read',
+    'lettura_cronologia',
+  );
+  const { tipo } = timelineQuery.parse(rawQuery ?? {});
+  const at = { ...context, now: new Date() };
+  return {
+    cronologia: await chronology(db, patientId, {
+      tipo,
+      reservedAllowed: can(actor, 'reserved.read', at).allowed,
+      therapyAllowed: can(actor, 'therapy.read', at).allowed,
+    }),
+  };
 }
 
 /** Risultati di laboratorio: valore e intervallo stampato sul referto, senza giudizio (regola 3). */

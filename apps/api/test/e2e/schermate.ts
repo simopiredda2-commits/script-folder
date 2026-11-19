@@ -517,7 +517,7 @@ try {
   }
   await page.getByRole('table', { name: 'Medici dell’AFT nel programma' }).waitFor();
   const sharing = page.getByLabel(
-    'Condivido con i medici dell’AFT il riepilogo dei miei pazienti che hanno dato il consenso',
+    'Condivido con i medici dell’AFT la scheda dei miei pazienti che hanno dato il consenso',
   );
   if (!(await sharing.isChecked())) await sharing.check();
   await shot(page, '39-aft', true);

@@ -31,6 +31,7 @@ import { withActor } from '../db/tx';
 import { composePss } from '../fse/compose';
 import { HttpError } from '../http/errors';
 import { guardPatient } from '../patients/access';
+import { chronology } from '../patients/timeline';
 import { studioDate } from '../prescriptions/rules-check';
 
 /**
@@ -389,7 +390,7 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
   }
 
   const NOT_SHARED =
-    'Nessun riepilogo condiviso con questo codice fiscale: il paziente non è di un collega dell’AFT che condivide, oppure non ha dato il consenso.';
+    'Nessuna scheda condivisa con questo codice fiscale: il paziente non è di un collega dell’AFT che condivide, oppure non ha dato il consenso.';
 
   /**
    * Trova il paziente di un collega con il codice fiscale e decide l'accesso. Chi consulta non sa
@@ -474,7 +475,11 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
     throw new HttpError(404, NOT_SHARED);
   }
 
-  /** Consultazione del riepilogo di un paziente di un collega (D161). */
+  /**
+   * Consultazione di un paziente di un collega (D161): il riepilogo e la scheda intera non
+   * riservata, cioè la cronologia della cartella senza le voci riservate, oscurate o annullate
+   * (D181, D187).
+   */
   async function consult(actor: Actor, body: z.infer<typeof consultBody>) {
     const { p, ownerUserId, consents, at } = await locate(
       actor,
@@ -533,6 +538,13 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
           ),
         parametri: s.parametri.filter((i) => recent(i.dati.measuredOn)).map((i) => i.etichetta),
       },
+      // La scheda intera non riservata: diario, esami, ricette, attività dell'AFT (D187).
+      scheda: await chronology(db, p.id, {
+        tipo: 'tutto',
+        reservedAllowed: false,
+        therapyAllowed: true,
+        shared: { since },
+      }),
       // Niente conteggi delle voci escluse: chi consulta non deve sapere che il paziente ha
       // oscurato qualcosa (D161; Garante, par. 5.1, «oscuramento dell'oscuramento»).
     };

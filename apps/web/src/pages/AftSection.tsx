@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { ErrorMessage, Loading, Notice } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
-import { date, dateTime } from '../lib/format';
+import { date, dateTime, TIMELINE_KIND } from '../lib/format';
 import { useApi } from '../lib/useApi';
 
 interface Member {
@@ -35,6 +35,15 @@ interface Summary {
   /** Solo i dati da questa data: il paziente non ha consentito di condividere quelli precedenti. */
   soloDal: string | null;
   riepilogo: { allergie: string[]; problemi: string[]; terapie: string[]; parametri: string[] };
+  /** La scheda intera non riservata: la cronologia della cartella (D181, D187). */
+  scheda: {
+    id: string;
+    data: string;
+    tipo: string;
+    titolo: string;
+    testo: string | null;
+    autore: string | null;
+  }[];
 }
 interface Consultation {
   quando: string;
@@ -58,7 +67,7 @@ const SECTION_LABELS: [keyof Summary['riepilogo'], string][] = [
 
 /**
  * AFT (tappa 12, D161): i medici dell'aggregazione che usano il programma. Ognuno decide se
- * condividere il riepilogo dei suoi pazienti che hanno dato il consenso; chi consulta scrive il
+ * condividere la scheda dei suoi pazienti che hanno dato il consenso; chi consulta scrive il
  * motivo, e la consultazione va nel registro del medico curante.
  */
 export function AftSection() {
@@ -91,11 +100,12 @@ export function AftSection() {
           <Icon name="pazienti" /> Aggregazione funzionale territoriale
         </h2>
         <p>
-          I medici dell’AFT che usano il programma possono vedere il riepilogo di un paziente di un
+          I medici dell’AFT che usano il programma possono vedere la scheda di un paziente di un
           collega, per esempio nell’ambulatorio dell’AFT. Solo se il medico curante condivide i suoi
-          pazienti e solo per i pazienti che hanno dato il consenso. Si vedono allergie, problemi,
-          terapie in corso e parametri, senza le voci oscurate o riservate. Ogni consultazione va
-          nel registro del medico curante, con il motivo.
+          pazienti e solo per i pazienti che hanno dato il consenso. Si vedono il riepilogo
+          (allergie, problemi, terapie in corso, parametri) e la scheda: note di visita, esami,
+          ricette e le altre voci, senza le voci oscurate, riservate o annullate. Ogni consultazione
+          va nel registro del medico curante, con il motivo.
         </p>
         {error && <ErrorMessage error={error} />}
         {o.inviti.map((i) => (
@@ -252,13 +262,12 @@ function Membership({
             onChange={(e) => void toggle(e.target.checked)}
           />
           <label htmlFor="aft-condivido">
-            Condivido con i medici dell’AFT il riepilogo dei miei pazienti che hanno dato il
-            consenso
+            Condivido con i medici dell’AFT la scheda dei miei pazienti che hanno dato il consenso
           </label>
         </div>
         <p className="tenue">
-          Il consenso del paziente si registra nella sua cartella, in «Privacy»: «Condivisione del
-          riepilogo con i medici dell’AFT».
+          Il consenso del paziente si registra nella sua cartella, in «Privacy»: «Condivisione della
+          scheda sanitaria con i medici dell’AFT».
         </p>
       </fieldset>
       <form onSubmit={(e) => void invite(e)} className="modulo">
@@ -425,7 +434,7 @@ function ConsultForm({
   return (
     <section className="riquadro" aria-labelledby="titolo-consulta-aft">
       <h2 id="titolo-consulta-aft">
-        <Icon name="cerca" /> Riepilogo di un paziente di un collega
+        <Icon name="cerca" /> Scheda di un paziente di un collega
       </h2>
       <form onSubmit={(e) => void submit(e)} className="modulo">
         <div className="campo">
@@ -460,7 +469,7 @@ function ConsultForm({
           </datalist>
         </div>
         <button type="submit" className="pulsante" disabled={busy}>
-          Mostra il riepilogo
+          Mostra la scheda
         </button>
       </form>
       {error && <ErrorMessage error={error} />}
@@ -475,12 +484,12 @@ function ConsultForm({
           </p>
           <Notice kind="info">
             <p>
-              Riepilogo condiviso con il consenso del paziente. La consultazione del{' '}
+              Scheda condivisa con il consenso del paziente. La consultazione del{' '}
               {dateTime(summary.consultatoIl)} è nel registro del medico curante, con il motivo; il
               paziente può sapere chi ha consultato i suoi dati, quando e da quale studio.
             </p>
             <p>
-              Il riepilogo può non essere completo: il paziente può aver chiesto di non condividere
+              La scheda può non essere completa: il paziente può aver chiesto di non condividere
               alcune informazioni, e contiene solo quanto il medico curante ha registrato nel
               programma. Non certifica lo stato di salute.
             </p>
@@ -508,6 +517,26 @@ function ConsultForm({
               </section>
             );
           })}
+          <section aria-labelledby="titolo-scheda-aft">
+            <h4 id="titolo-scheda-aft">Scheda: note di visita, esami, ricette e altre voci</h4>
+            {summary.scheda.length === 0 ? (
+              <p className="tenue">Nessuna voce.</p>
+            ) : (
+              <ol className="cronologia">
+                {summary.scheda.map((v) => (
+                  <li key={`${v.tipo}-${v.id}`}>
+                    <span className="cronologia-data">{date(v.data)}</span>
+                    <span className="etichetta">{TIMELINE_KIND[v.tipo] ?? v.tipo}</span>
+                    <span>
+                      <strong>{v.titolo}</strong>
+                      {v.testo && <span> · {v.testo}</span>}
+                      {v.autore && <span className="tenue"> · {v.autore}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
           <ActivityForm fiscalCode={summary.paziente.codiceFiscale} kinds={kinds} />
         </article>
       )}

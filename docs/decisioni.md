@@ -863,3 +863,12 @@ Le altre domande annotate nei documenti (stampa diretta, campi facoltativi non v
 - **Simulazione del controllo.** Chiesta da Simone («puoi fare una simulazione anche tu»): confronto dei codici con l'elenco della CMS e controlli sui titoli; il confronto titolo per titolo con molti agenti è stato avviato e poi fermato, perché il controllo vero lo fa Chiara. Le procedure (interventi) non entrano: il medico di famiglia non le codifica.
 
 Prove (pacchetto, servizio, interfaccia) e otto sabotaggi.
+
+**D187 · AFT: la scheda intera non riservata (tappa 16, D181).** Il collega dell'AFT, con il consenso del paziente e il motivo dell'accesso, vede oltre al riepilogo la scheda: la cronologia della cartella con le note di visita, gli esami, le ricette, le ricette fatte con altri programmi e le attività dei colleghi. Scelte:
+
+- **Filtri.** Fuori le voci riservate e quelle oscurate dal paziente, come prima; in più le voci annullate (sono errori corretti), le ricette su cui il paziente ha chiesto di oscurare i suoi dati e le righe delle terapie riservate. Senza il consenso per i dati precedenti, la scheda parte dal giorno del consenso, come il riepilogo.
+- **Una sola cronologia.** La scheda e la cronologia del medico vengono dalla stessa funzione (`chronology`), con i filtri della condivisione. Trovato in passaggio: nella cronologia la segreteria (quando il titolare le fa leggere il diario) vedeva anche le righe delle ricette di terapie riservate; ora no, come per le terapie.
+- **Consenso.** Il testo diventa «Condivisione della scheda sanitaria con i medici dell'AFT (senza le voci riservate)». Nessun consenso vero è stato raccolto con il testo di prima: il programma non è ancora in uso.
+- **Niente altro cambia.** Le condizioni dell'accesso, il registro, la risposta uguale quando non c'è nulla da vedere e il divieto di indizi su ciò che è oscurato restano come in D161.
+
+Prove (servizio, browser con accessibilità) e sei sabotaggi.

@@ -1348,7 +1348,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     );
   });
 
-  it('AFT: il titolare crea l’AFT e condivide, il collega accetta l’invito e consulta il riepilogo (tappa 12)', async () => {
+  it('AFT: il titolare crea l’AFT e condivide, il collega accetta l’invito e consulta la scheda (tappa 12, D187)', async () => {
     await page.goto(`${base}/strumenti?sezione=aft`);
     await page
       .getByRole('heading', { level: 2, name: 'Aggregazione funzionale territoriale' })
@@ -1358,7 +1358,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('table', { name: 'Medici dell’AFT nel programma' }).waitFor();
     await page
       .getByLabel(
-        'Condivido con i medici dell’AFT il riepilogo dei miei pazienti che hanno dato il consenso',
+        'Condivido con i medici dell’AFT la scheda dei miei pazienti che hanno dato il consenso',
       )
       .check();
     await page.getByLabel('Invita un medico titolare: codice regionale').fill('MMG-PROVA-2');
@@ -1384,21 +1384,28 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await colleague.goto(`${base}/strumenti?sezione=aft`);
       await colleague.getByRole('button', { name: 'Accetta l’invito' }).click();
       await colleague
-        .getByRole('heading', { level: 2, name: 'Riepilogo di un paziente di un collega' })
+        .getByRole('heading', { level: 2, name: 'Scheda di un paziente di un collega' })
         .waitFor();
       await colleague.getByLabel('Codice fiscale del paziente').fill(rich!.fiscalCode);
       await colleague
         .getByLabel('Motivo dell’accesso')
         .fill('Visita nell’ambulatorio serale dell’AFT');
-      await colleague.getByRole('button', { name: 'Mostra il riepilogo' }).click();
+      await colleague.getByRole('button', { name: 'Mostra la scheda' }).click();
       await colleague
-        .getByText('Riepilogo condiviso con il consenso del paziente.', { exact: false })
+        .getByText('Scheda condivisa con il consenso del paziente.', { exact: false })
         .waitFor();
       await colleague.getByText('Sostanza di prova', { exact: false }).first().waitFor();
       await expect(colleague.getByText('Farmaco riservato di prova').count()).resolves.toBe(0);
-      // Si dice che il riepilogo può non essere completo (Garante, par. 5.1).
-      await colleague.getByText('Il riepilogo può non essere completo', { exact: false }).waitFor();
-      await check(colleague, 'AFT del collega, riepilogo', true);
+      // Si dice che la scheda può non essere completa (Garante, par. 5.1).
+      await colleague.getByText('La scheda può non essere completa', { exact: false }).waitFor();
+      // La scheda intera non riservata, sotto il riepilogo (D187).
+      await colleague
+        .getByRole('heading', {
+          level: 4,
+          name: 'Scheda: note di visita, esami, ricette e altre voci',
+        })
+        .waitFor();
+      await check(colleague, 'AFT del collega, scheda', true);
       // L'attività svolta va nel registro di AFT e nella cronologia del medico curante.
       await colleague.getByLabel('Tipologia').selectOption('ambulatorio');
       await colleague.getByLabel('Esito', { exact: true }).fill('Controllo pressorio di prova');
