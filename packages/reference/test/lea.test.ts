@@ -91,6 +91,65 @@ describe('allegato 8 del DPCM LEA: codici di esenzione delle malattie croniche (
   });
 });
 
+/**
+ * Allegato 7 del DPCM LEA: malattie rare (D195). Letto dal PDF cella per cella: una riga per
+ * codice, con il nome della malattia o del gruppo, esempi, sinonimi e malattie del gruppo con un
+ * codice proprio. Da controllare prima dell'uso (A8).
+ */
+describe('allegato 7 del DPCM LEA: codici di esenzione delle malattie rare (D195)', () => {
+  const rare = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+    (f) => f.path === 'lea/allegato-7-malattie-rare.json',
+  )!;
+  const rareTable = readTable(readFileSync(rare.csvPath), 'allegato-7-malattie-rare.csv');
+  const rareRead = extractRecords(mappingForTranscription(loadMappings(), 'esenzioni')!, rareTable);
+  const col = (name: string) => rareTable[0]!.indexOf(name);
+  const row = (code: string) => rareTable.slice(1).find((r) => r[0] === code)!;
+
+  it('una scheda intera, da controllare, dal 30/10/2026, in una serie sua', () => {
+    expect(rare.sheet).toMatchObject({
+      tipo: 'esenzioni',
+      serie: 'lea-esenzioni-malattie-rare',
+      in_vigore_dal: '2026-10-30',
+      controllato_da: null,
+    });
+    expect(rare.sheet.solo_modifiche ?? false).toBe(false);
+  });
+
+  it('370 codici, ognuno una volta: 116 gruppi e 254 malattie, tutti della famiglia delle rare', () => {
+    expect(rareRead.missingColumns).toEqual([]);
+    expect(rareRead.problems).toEqual([]);
+    const codes = rareRead.records.map((r) => String(r.code));
+    expect(codes).toHaveLength(370);
+    expect(new Set(codes).size).toBe(370);
+    for (const c of codes) {
+      expect(c, c).toMatch(/^R[A-Z][A-Z0-9]\d{3}$/);
+      expect(exemptionFamily(c), c).toBe('rare');
+    }
+    expect(codes.filter((c) => c[2] === 'G')).toHaveLength(116);
+    // Nessun codice è anche delle malattie croniche (allegato 8).
+    expect(codes.filter((c) => byCode.has(c))).toEqual([]);
+    expect(new Set(rareTable.slice(1).map((r) => r[col('sezione')]))).toHaveProperty('size', 16);
+  });
+
+  it('il nome è quello della malattia o del gruppo, non un esempio', () => {
+    const name = (code: string) => row(code)[col('descrizione')];
+    expect(name('RA0010')).toBe('HANSEN, MALATTIA DI');
+    expect(name('RB0020')).toBe('RETINOBLASTOMA (ATTESTATO DI ESENZIONE RINNOVABILE DOPO 5 ANNI)');
+    expect(name('RBG021')).toBe('CANCRO NON POLIPOSICO EREDITARIO DEL COLON');
+    expect(name('RCG040')).toBe(
+      'DIFETTI CONGENITI DEL METABOLISMO E DEL TRASPORTO DEGLI AMINOACIDI',
+    );
+    expect(row('RA0020')[col('sinonimi')]).toBe('LIPODISTROFIA INTESTINALE');
+  });
+
+  it('le malattie del gruppo con un codice proprio, e le lettere spaziate ricomposte', () => {
+    expect(row('RCG071')[col('comprende_con_codice_proprio')]).toContain(
+      'SMITH-LEMLI-OPITZ, SINDROME DI (codice RN1200)',
+    );
+    expect(row('RNG262')[col('esempi')]?.split(' | ')[0]).toBe('DISGENESIA GONADICA');
+  });
+});
+
 describe('famiglie dei codici di esenzione (D190)', () => {
   it('cronici con le cifre, rari con R e una lettera, gli altri per le lettere iniziali', () => {
     expect(

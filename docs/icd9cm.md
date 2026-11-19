@@ -7,11 +7,11 @@
 - Ricerca delle diagnosi per descrizione o per codice, con o senza punto: nei problemi, nell'anamnesi familiare, nel certificato di malattia e nella causa del decesso. Le parole valgono in qualunque ordine; i titoli dei padri valgono per la ricerca e danno il senso ai titoli brevi («Altro», «Linfonodi»).
 - Il titolo del codice scritto a mano, con un avviso se il codice non è nel catalogo (il Sistema TS rifiuta i codici che non conosce) o se è una categoria con sottocodici, che per la codifica non si usa (nota del DM 28/10/2020 a V07.0).
 - Non suggerisce diagnosi: cerca nella classificazione (regola 3).
-- Il certificato INPS vuole la «Codifica ICD9_CM - 2007» (DM 18/4/2012, disciplinare tecnico). Dal 1/1/2027 ICD-10-IM sostituisce ICD-9-CM nei sistemi informativi sanitari (DM 23/10/2025); per il certificato non risultano ancora specifiche nuove.
+- Il certificato INPS vuole la «Codifica ICD9_CM - 2007» (DM 18/4/2012, disciplinare tecnico). Dal 1/1/2027 ICD-10-IM sostituisce ICD-9-CM nei sistemi informativi sanitari (DM 23/10/2025), dopo una sperimentazione che nel 2026 coinvolge via via tutte le strutture; il Ministero renderà disponibili le tabelle di transcodifica nei due sensi (articolo di OpenSSN del 15/12/2025, segnalato da Simone il 19/11/2026). Per il certificato non risultano ancora specifiche nuove.
 
 ## Da dove viene
 
-- **Classificazione**: versione italiana 2007 della ICD-9-CM, elenco sistematico delle malattie e dei traumatismi, adottata con il DM 18/12/2008 (GU n. 56 del 9/3/2009) dal 1° gennaio 2009. Manuale del Ministero della salute in PDF; l'elenco delle diagnosi è alle pagine 419–884.
+- **Classificazione**: versione italiana 2007 della ICD-9-CM, elenco sistematico delle malattie e dei traumatismi, adottata con il DM 18/12/2008 (GU n. 56 del 9/3/2009) dal 1° gennaio 2009. Manuale del Ministero della salute in PDF (IPZS, Roma 2008, 1120 pagine; la copia da cui è stata fatta l'estrazione, con l'impronta, è in `docs/provenienze.md`); l'elenco delle diagnosi è alle pagine 419–884.
 - **Estrazione** di Simone, 19/11/2026, rivista con un controllo esterno: CSV delle diagnosi (15.895 righe), foglio delle anomalie con le correzioni proposte (non applicate), note dei capitoli e delle sezioni, con le legende. Impronte in `docs/provenienze.md`. Né il PDF né i file dell'estrazione sono nel repository.
 - **Aggiunte COVID-19**: DM 28/10/2020, allegato 1 (GU n. 26 dell'1/2/2021, pagine 31–35), in vigore dal 2/2/2021 (art. 3: il giorno dopo la pubblicazione). Trascritte dalle pagine della Gazzetta trasformate in immagine, perché il testo del PDF ha una codifica sbagliata.
 - Le procedure non entrano: il medico di famiglia non le codifica.

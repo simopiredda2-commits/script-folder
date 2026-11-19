@@ -19,6 +19,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #7 (19/11/2026)**: su `main` la prova nel browser con WebKit è caduta una volta (giro 170), in «la stessa prestazione già prescritta». È la prova, non il programma: corretta con la pull request #8, unita in `main` con il via di Simone («Subito, PR piccola») dopo le prove verdi con WebKit e Firefox (sezione «Windows, Mac e tablet»).
 - **Quinto blocco** (via del 19/11/2026, D182), nel branch `ccr-9780f0fd-iyj18e`: tappa 16 (le scelte della fermata, D181) e tappa 17 (diagnosi ICD-9-CM, allegati LEA) fatte. Fermata dopo la tappa 17 fatta (D191): via dato, pull request #9 unita. Le risposte sono in «Risposte della fermata dopo la tappa 17».
 - **Dopo l'unione della #9 (19/11/2026)**, nello stesso branch ripartito da `main`: le modifiche che seguono dalle risposte. Banche dati aggiornate da chi gestisce il servizio (D192), con il pulsante «Aggiorna adesso» che resta all'amministratore dello studio e vale per tutti gli studi (D194), soglie dei tentativi non più provvisorie (D191), motivo del ritorno da SPID o CIE scritto dal programma e non dall'indirizzo (D193). Pull request #10, unita con il via di Simone («Via, unisci»), con il pulsante rimesso come ha chiesto. Le verifiche di Simone e della Dr.ssa Rocca si fanno alla fine; l'allegato 7 e la D.D. 1167/2022 si trascrivono quando arrivano i file di Simone.
+- **Dopo l'unione della #10 (19/11/2026)**, nello stesso branch: regola nuova in `CLAUDE.md` (non chiedere a Simone ciò che si può fare da sé); PDF del manuale ICD-9-CM indicato da Simone, con l'impronta (`docs/provenienze.md`); allegato 7 trascritto (D195); elenco esenzioni–prestazioni del SAR analizzato e non importato (D196). Domande nella sezione «Domande per la prossima fermata».
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -524,12 +525,14 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
    - Simulazione del controllo: codici confrontati con l'elenco ufficiale statunitense del 2007 (dopo le correzioni coincidono tutti, tranne E978); titoli in contraddizione, tagliati, fratelli con lo stesso titolo, figli in contraddizione con il padre. Il confronto titolo per titolo con molti agenti è stato fermato.
    - Programma: tipo `diagnosi`, tabella `ref_diagnosis` (migrazione 0029), controlli sull'elenco intero all'importazione, ricerca per parole o codice con i titoli dei padri, rotte `/api/diagnosi`, campi di ricerca nei problemi, nell'anamnesi familiare, nel certificato e nella causa del decesso, titolo del codice scritto a mano con gli avvisi. Catalogo d'esempio con righe vere per le prove e i dati dimostrativi. Fonte `salute_icd9cm` controllata ogni notte da `sync/`.
    - Prove: `packages/reference/test/diagnosi.test.ts`, `icd9cm.test.ts`, `apps/api/test/banche-dati.test.ts`, `apps/web/test/diagnosi.test.tsx`. Otto sabotaggi.
-   - Non provato: il catalogo vero nel database (resta fuori finché non è controllato); la fonte del Ministero da `sync/` (il sito blocca l'ambiente in cloud). Da annotare: nome e impronta del PDF del manuale.
+   - Non provato: il catalogo vero nel database (resta fuori finché non è controllato); la fonte del Ministero da `sync/` (il sito blocca l'ambiente in cloud). Nome e impronta del PDF del manuale (indicato da Simone): in `docs/provenienze.md`.
 
-2. **Allegati del DPCM LEA** (D190): fatto in parte.
+2. **Allegati del DPCM LEA** (D190, D195, D196): allegati 8 e 7 trascritti; l'elenco esenzioni–prestazioni del SAR non si importa.
    - Allegato 8 trascritto come catalogo delle esenzioni, **da controllare**: 247 codici (66 condizioni e 181 malattie della tabella di corrispondenza), dal 30/10/2026. In `packages/reference/data/trascrizioni/lea/`, impronta del PDF in `docs/provenienze.md`.
    - R9: un codice assente dal catalogo è «inesistente» solo nelle famiglie che il catalogo contiene; le esenzioni per reddito, gravidanza e le altre restano non note e non si bloccano per questo.
-   - Non trascritti, con il motivo in `docs/banche-dati.md` («Esenzioni del DPCM LEA»): le prestazioni di ogni esenzione (R17 usa l'elenco regionale della D.D. 1167/2022), l'allegato 7 (nomi non leggibili in automatico), l'allegato 10 (senza codici di esenzione) e l'allegato 4D (serve con l'allegato 4).
+   - Allegato 7 trascritto dopo l'unione della #10 (D195), **da controllare**: 370 codici di malattie rare (116 gruppi e 254 malattie), letti dal PDF cella per cella, con esempi, sinonimi e malattie del gruppo con un codice proprio. Quattro sabotaggi.
+   - Elenco esenzioni–prestazioni per R17 (D196): l'ultimo pubblicato è l'allegato C della D.D. 1452/2023 (sostituisce quello della D.D. 1167/2022), precedente al nuovo nomenclatore: solo il 37% dei suoi codici distinti è nel catalogo 2026. Non si importa; R17 resta «non verificabile».
+   - Non trascritti, con il motivo in `docs/banche-dati.md` («Esenzioni del DPCM LEA»): l'allegato 10 (senza codici di esenzione) e l'allegato 4D (serve con l'allegato 4).
    - Prove: `packages/reference/test/lea.test.ts`, `apps/api/test/banche-dati.test.ts` (R9). Quattro sabotaggi.
    - Non provato: il catalogo vero nel database e R9 con le esenzioni vere dei pazienti (resta fuori finché non è controllato).
 
@@ -590,7 +593,7 @@ Durante la tappa 11 (terzo giro):
   | Posologie                                      | Sì (posologia della terapia, contatore R11)                            | In parte: elenchi fissi della scheda e unità al giorno (D80); manca l'elenco dello studio                |
   | Patologie ICD                                  | Sì: catalogo ICD-9-CM, poi ICD-10-IM (prima versione)                  | Non fatto: solo il controllo del formato del codice; il catalogo non è importato (`docs/banche-dati.md`) |
   | Vaccini                                        | Sì: vaccinazioni con lotto, campagne, richiami, catalogo dei vaccini   | Non fatto: c'è il modello dei dati, mancano pagina e catalogo                                            |
-  | Pacchetti di esami                             | Sì: gruppi di prestazioni salvati dallo studio, prescritti con un clic | Non fatto; quelli delle esenzioni si possono fare dalla D.D. 1167/2022, già importata                    |
+  | Pacchetti di esami                             | Sì: gruppi di prestazioni salvati dallo studio, prescritti con un clic | Non fatto; quelli delle esenzioni aspettano l'elenco del SAR in uso (D196)                               |
   | Monitoraggi                                    | Come percorsi (diabete, BPCO, scompenso)                               | Non fatto                                                                                                |
   | Onorari                                        | Fase 2                                                                 | Non fatto                                                                                                |
   | Problemi ICPC, sintomi e segni, altri contatti | No                                                                     | —                                                                                                        |
@@ -762,6 +765,14 @@ Durante la tappa 11 (terzo giro):
 
 - **Net Medica Italia** (domanda della Dr.ssa Rocca): far comunicare medici con programmi diversi senza comprare quel servizio. Raccolte le informazioni pubbliche, fatta una proposta (D104). È una domanda della terza fermata; non è costruito nulla.
 
+## Domande per la prossima fermata
+
+Annotate dopo l'unione della #10, da fare con il pulsante:
+
+1. **Elenco esenzioni–prestazioni in uso nel SAR** (D196): l'ultimo pubblicato (allegato C della D.D. 1452/2023) è precedente al nuovo nomenclatore. Chiederlo alla Regione o al CSI Piemonte (lo può fare solo Simone), oppure lasciare R17 «non verificabile».
+2. **AURA** (domanda di Simone, 19/11/2026: esenzioni nuove aggiornate ogni giorno come negli altri programmi). Oggi esenzioni e scelte si inseriscono a mano, con la provenienza (AURA o a mano) già nel modello. Proposta: costruire adesso il collegamento con un simulatore, dal manuale pubblico dei servizi di cooperazione (ricerca del profilo sanitario, notifiche delle variazioni), mentre Simone avvia l'accreditamento come software house presso il CSI Piemonte (specifiche di dettaglio, ambiente di prova, notifiche sulla rete RUPAR).
+3. **Verifiche alla fine**: alla lista della Dr.ssa Rocca si aggiunge l'allegato 7 (`docs/banche-dati.md`, «Esenzioni del DPCM LEA»).
+
 ## Risposte della fermata dopo la tappa 17 (19/11/2026)
 
 Dettagli in D191. Simone ha risposto con il pulsante:
@@ -771,7 +782,7 @@ Dettagli in D191. Simone ha risposto con il pulsante:
 - **Soglie dei tentativi**: «Vanno bene così». Non più segnate come provvisorie.
 - **Esenzioni**: «Li scarico io». Simone manda il PDF della D.D. 1167/2022 e un'estrazione dell'allegato 7; poi la trascrizione, che controlla la Dr.ssa Rocca.
 
-Restano annotati: nome e impronta del PDF del manuale ICD-9-CM; l'accreditamento del programma per SPID e CIE.
+Resta annotato l'accreditamento del programma per SPID e CIE. Il PDF del manuale ICD-9-CM l'ha indicato Simone (copia sul sito dell'Università di Padova): nome e impronta sono in `docs/provenienze.md`.
 
 ## Domande della fermata dopo la tappa 17 (chiuse)
 
@@ -1814,3 +1825,7 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D193: simulatore dell'identità, solo i ritorni registrati                                                     | identity-simulator-routes.ts: ogni indirizzo con «/»                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D193: pagina regionale simulata, solo i ritorni registrati                                                    | regional-simulator-routes.ts: ogni indirizzo con «/»                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D194: solo l'amministratore avvia un aggiornamento                                                            | reference-update-routes.ts: avvio per tutti                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D195: 370 codici dell'allegato 7                                                                              | trascrizione: una riga tolta                                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D195: il nome è quello del gruppo, non un esempio                                                             | trascrizione: RCG040 con il nome di un esempio                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D195: lettere spaziate ricomposte                                                                             | trascrizione: «D I S G E N E S I A …» come nel PDF                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D195: malattie del gruppo con un codice proprio                                                               | trascrizione: «(codice RN1200)» tolto                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

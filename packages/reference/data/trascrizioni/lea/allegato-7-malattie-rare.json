@@ -1,0 +1,13 @@
+{
+  "tipo": "esenzioni",
+  "serie": "lea-esenzioni-malattie-rare",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "DPCM 12 gennaio 2017 (livelli essenziali di assistenza), allegato 7: elenco delle malattie rare esentate dalla partecipazione al costo (versione della pagina del Ministero della salute del 29/9/2026)",
+  "in_vigore_dal": "2026-10-30",
+  "trascritto_da": "Claude Code, estrazione automatica dal PDF, cella per cella",
+  "trascritto_il": "2026-11-19",
+  "controllato_da": null,
+  "nota": "PDF mandato da Simone, SHA-256 in docs/provenienze.md. Una riga per codice (370: 116 gruppi e 254 malattie), con il nome della malattia o del gruppo, gli esempi di malattie afferenti al gruppo, i sinonimi e le malattie del gruppo che hanno un codice proprio (scritte nel PDF «… (codice RN1200)»), la sezione e la sottosezione. Le righe senza codice del PDF continuano il codice sopra, anche sulla pagina dopo. Le lettere spaziate di RNG262 («D I S G E N E S I A …») sono ricomposte con il testo della stessa pagina («DISGENESIA GONADICA»). Data di inizio da verificare, come per l'allegato 8: gli aggiornamenti delle malattie rare del 2026 valgono in Piemonte dal 30/10/2026 (D.D. 710/2026, punto 7). Che cosa controllare: docs/banche-dati.md, «Esenzioni del DPCM LEA»."
+}
