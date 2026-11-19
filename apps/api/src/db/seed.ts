@@ -37,6 +37,7 @@ import {
   problemDetail,
   studio,
   therapy,
+  workstation,
 } from './schema';
 import {
   DEMO_PATIENTS,
@@ -86,10 +87,29 @@ try {
     process.exit(0);
   }
 
+  // Dati dello studio inventati (D12): telefono con prefisso 000, email su example.org, CAP 00000.
   const [st] = await db
     .insert(studio)
-    .values({ name: 'Studio medico dimostrativo', kind: 'single', regionName: 'PIEMONTE' })
+    .values({
+      name: 'Studio medico dimostrativo',
+      kind: 'single',
+      regionName: 'PIEMONTE',
+      address: 'Via dell’Esempio 1',
+      postalCode: '00000',
+      municipality: 'Comune di prova',
+      province: 'TO',
+      phone: '000 0000001',
+      email: 'studio@example.org',
+      pec: 'studio.pec@example.org',
+      headerText:
+        'Studio medico dimostrativo\nVia dell’Esempio 1 – 00000 Comune di prova (TO)\nTel. 000 0000001',
+    })
     .returning();
+  // Postazioni dello studio (tappa 14): servono alle preferenze di stampa.
+  await db.insert(workstation).values([
+    { studioId: st!.id, name: 'Ambulatorio', shared: true, notes: 'Scrivania del medico' },
+    { studioId: st!.id, name: 'Segreteria', shared: true, notes: 'Banco dell’accoglienza' },
+  ]);
   const passwords = new Map<string, string>();
   const users = new Map<string, string>();
   for (const u of DEMO_USERS) {
