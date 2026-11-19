@@ -10,6 +10,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { studio } from './studio';
 
@@ -52,6 +53,27 @@ export const appUser = pgTable(
      */
     mustChangePassword: boolean().notNull().default(false),
     passwordChangedAt: timestamp({ withTimezone: true }),
+    /**
+     * Conferma di un medico titolare (tappa 14): un utente con un ruolo che apre dati dei
+     * pazienti, creato dall'amministratore o a cui l'amministratore aggiunge quel ruolo, non entra
+     * finché un titolare attivo dello studio non lo conferma. Colonna esplicita: gli utenti di
+     * prima, dei dati dimostrativi e delle prove non sono in attesa. Conferme e rifiuti vanno nel
+     * registro delle azioni di amministrazione (qui niente storico: la riga ha l'impronta della
+     * password e il segreto del secondo fattore).
+     */
+    awaitingConfirmation: boolean().notNull().default(false),
+    /** Chi ha chiesto la conferma (l'amministratore che ha creato o cambiato l'utente) e quando. */
+    confirmationRequestedBy: uuid().references((): AnyPgColumn => appUser.id),
+    confirmationRequestedAt: timestamp({ withTimezone: true }),
+    /**
+     * Alla conferma il titolare riceve una password temporanea nuova, da consegnare di persona, e
+     * il secondo fattore si riattiva: per gli utenti nuovi e per chi prima non aveva ruoli con i
+     * dati dei pazienti, di cui l'amministratore può conoscere le credenziali.
+     */
+    confirmationIssuesPassword: boolean().notNull().default(false),
+    /** Il titolare che ha confermato l'ultima richiesta, e quando. */
+    confirmedBy: uuid().references((): AnyPgColumn => appUser.id),
+    confirmedAt: timestamp({ withTimezone: true }),
   },
   (t) => [uniqueIndex('app_user_username_key').on(t.username)],
 );

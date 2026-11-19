@@ -70,6 +70,11 @@ export const ACTIONS = [
   'studio.lists',
   /** Registro delle azioni di amministrazione (utenti, ruoli, impostazioni), in sola lettura. */
   'studio.admin_log',
+  /**
+   * Confermare (o rifiutare) gli utenti con un ruolo che apre dati dei pazienti, creati
+   * dall'amministratore o a cui l'amministratore ha dato quel ruolo (tappa 14).
+   */
+  'studio.confirm_users',
 ] as const;
 export type Action = (typeof ACTIONS)[number];
 
@@ -105,7 +110,23 @@ export const ACTION_LABELS: Record<Action, string> = {
   'studio.lists':
     'Modificare gli elenchi dello studio (suggeritori, posologie, pacchetti, contatti)',
   'studio.admin_log': 'Leggere il registro delle azioni di amministrazione',
+  'studio.confirm_users':
+    'Confermare gli utenti con i dati dei pazienti creati o cambiati dall’amministratore',
 };
+
+/**
+ * Ruoli che aprono dati dei pazienti (tappa 14). Se li dà l'amministratore, l'utente aspetta la
+ * conferma di un medico titolare; password e secondo fattore di chi li ha non li ripristina
+ * l'amministratore, che altrimenti entrerebbe al suo posto.
+ */
+export const PATIENT_DATA_ROLES: readonly Role[] = [
+  'owner_doctor',
+  'secretary',
+  'substitute_doctor',
+];
+
+export const opensPatientData = (roles: readonly Role[]): boolean =>
+  roles.some((r) => PATIENT_DATA_ROLES.includes(r));
 
 const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'registry.read',
@@ -171,11 +192,14 @@ export const ADMIN_ACTIONS: readonly Action[] = ADMINISTRATOR;
  * Azioni sullo studio, non su un archivio, che non sono solo dell'amministratore: chi le fa dipende
  * dal ruolo (tappa 14). Gli elenchi dello studio li curano i medici e l'amministratore, e la
  * segreteria li usa; il registro delle azioni di amministrazione lo leggono l'amministratore e i
- * titolari, perché un ruolo dato da un amministratore apre le cartelle (D163).
+ * titolari, perché un ruolo dato da un amministratore apre le cartelle (D163). Per la stessa
+ * ragione gli utenti con i dati dei pazienti creati o cambiati dall'amministratore li conferma un
+ * titolare, mai l'amministratore, la segreteria o il sostituto.
  */
 export const STUDIO_ACTION_ROLES: Partial<Record<Action, readonly Role[]>> = {
   'studio.lists': ['owner_doctor', 'substitute_doctor', 'administrator'],
   'studio.admin_log': ['owner_doctor', 'administrator'],
+  'studio.confirm_users': ['owner_doctor'],
 };
 
 export type GrantKind = 'substitution' | 'group_colleague';

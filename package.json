@@ -17,6 +17,7 @@
     "fixtures": "pnpm --filter @mmg/fixtures generate",
     "db:seed": "pnpm --filter @mmg/api db:seed",
     "studio:crea": "pnpm --filter @mmg/api studio:crea",
+    "utente:ripristina": "pnpm --filter @mmg/api utente:ripristina",
     "banche-dati:importa": "pnpm --filter @mmg/api banche-dati:importa",
     "banche-dati:aggiorna": "pnpm --filter @mmg/api banche-dati:aggiorna"
   },

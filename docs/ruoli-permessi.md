@@ -49,6 +49,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Avviare subito l’aggiornamento delle banche dati | No | No | No | No | No | Sì |
 | Modificare gli elenchi dello studio (suggeritori, posologie, pacchetti, contatti) | Sì | No | Sì | Sì | Sì | Sì |
 | Leggere il registro delle azioni di amministrazione | Sì | No | No | Sì | Sì | Sì |
+| Confermare gli utenti con i dati dei pazienti creati o cambiati dall’amministratore | Sì | No | No | Sì | Sì | No |
 
 <!-- matrice:fine -->
 

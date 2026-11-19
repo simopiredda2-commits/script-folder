@@ -11,6 +11,8 @@ const ALL: ToolsRole[] = ['owner_doctor', 'substitute_doctor', 'administrator'];
 export const TOOLS_SECTIONS: readonly { key: string; label: string; roles: ToolsRole[] }[] = [
   { key: 'studio', label: 'Dati dello studio', roles: ALL },
   { key: 'utenti', label: 'Utenti e ruoli', roles: ['administrator'] },
+  // Chi l'amministratore crea con i dati dei pazienti lo conferma un titolare (D179).
+  { key: 'conferme', label: 'Utenti da confermare', roles: ['owner_doctor'] },
   { key: 'stampa', label: 'Postazioni e stampa', roles: ALL },
   // La segreteria legge gli elenchi (contatti, pacchetti, posologie) per preparare (D175).
   { key: 'elenchi', label: 'Elenchi dello studio', roles: [...ALL, 'secretary'] },

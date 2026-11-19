@@ -22,10 +22,11 @@ import {
   type ServiceAuth,
 } from '@mmg/integrations';
 import { createHash, randomBytes } from 'node:crypto';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
+import type { Tx } from '../db/tx';
 import {
   doctorProfile,
   regionalAuthorizationRequest,
@@ -170,6 +171,57 @@ export async function storeSession(
     .insert(serviceSession)
     .values(values)
     .onConflictDoUpdate({ target: [serviceSession.userId, serviceSession.service], set: values });
+}
+
+/**
+ * Chiude le sessioni dei servizi di un medico (Id-Sessione del secondo fattore, accesso regionale
+ * con SPID o CIE) e le sue richieste di accesso regionale ancora aperte. Serve quando
+ * l'amministratore corregge il codice fiscale o il codice regionale del medico, a cui le sessioni
+ * sono legate (D102, D111): il medico le riattiva da «Credenziali dei servizi». Le credenziali
+ * (utente, password, PIN) restano. Solo nel programma: la revoca presso il servizio non parte da
+ * qui. Ogni sessione chiusa resta tra gli eventi delle credenziali, senza valori segreti.
+ */
+export async function closeServiceSessions(
+  q: Database | Tx,
+  input: {
+    userId: string;
+    services: readonly CredentialService[];
+    at: Date;
+    workstation: string | null;
+    detail: string;
+  },
+): Promise<CredentialService[]> {
+  if (input.services.length === 0) return [];
+  const gone = await q
+    .delete(serviceSession)
+    .where(
+      and(
+        eq(serviceSession.userId, input.userId),
+        inArray(serviceSession.service, [...input.services]),
+      ),
+    )
+    .returning({ service: serviceSession.service });
+  if (input.services.includes('rupar_piemonte'))
+    await q
+      .update(regionalAuthorizationRequest)
+      .set({ usedAt: input.at })
+      .where(
+        and(
+          eq(regionalAuthorizationRequest.userId, input.userId),
+          isNull(regionalAuthorizationRequest.usedAt),
+        ),
+      );
+  const closed = CREDENTIAL_SERVICES.filter((s) => gone.some((g) => g.service === s));
+  for (const service of closed)
+    await q.insert(serviceCredentialEvent).values({
+      userId: input.userId,
+      service,
+      event: 'sessione_chiusa',
+      at: input.at,
+      workstation: input.workstation,
+      detail: input.detail,
+    });
+  return closed;
 }
 
 const saveBody = z

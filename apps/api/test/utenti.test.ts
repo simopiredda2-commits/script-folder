@@ -79,13 +79,39 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     const res = await admin('POST', '/api/studio/utenti', payload);
     expect(res.statusCode, res.body).toBe(201);
     const b = res.json();
-    passwordsSeen.push(b.passwordTemporanea);
+    if (b.passwordTemporanea) passwordsSeen.push(b.passwordTemporanea);
     return {
       id: b.utente.id as string,
       username: b.utente.nomeUtente as string,
-      password: b.passwordTemporanea as string,
+      password: b.passwordTemporanea as string | undefined,
       body: b,
     };
+  }
+
+  /**
+   * Conferma del titolare per la richiesta che legge nel suo elenco: la password temporanea dei
+   * nuovi utenti con i dati dei pazienti la riceve lui, non l'amministratore.
+   */
+  async function confirmByOwner(id: string): Promise<string> {
+    const list = await req(cookies.titolare, 'GET', '/api/studio/utenti/da-confermare');
+    expect(list.statusCode, list.body).toBe(200);
+    const pending = list.json().utenti.find((x: { id: string }) => x.id === id);
+    expect(pending, 'utente nell’elenco da confermare').toBeTruthy();
+    const r = await req(cookies.titolare, 'POST', `/api/studio/utenti/${id}/conferma`, {
+      richiestaIl: pending.richiesta.il,
+    });
+    expect(r.statusCode, r.body).toBe(200);
+    const password = r.json().passwordTemporanea as string;
+    expect(password).toMatch(/^[A-Za-z0-9_-]{16}$/);
+    passwordsSeen.push(password);
+    return password;
+  }
+
+  /** Utente con i dati dei pazienti: creato dall'amministratore, confermato dal titolare. */
+  async function createConfirmed(payload: object) {
+    const u = await createUser(payload);
+    expect(u.password).toBeUndefined();
+    return { ...u, password: await confirmByOwner(u.id) };
   }
 
   /** Primo accesso con la password temporanea e cambio subito: la sessione resta aperta. */
@@ -188,24 +214,37 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     );
   });
 
-  it('crea un utente con una password temporanea: al primo accesso, prima di tutto, va cambiata', async () => {
-    const u = await createUser({
+  it('crea un utente: la password temporanea la riceve il titolare che conferma; al primo accesso va cambiata', async () => {
+    const created = await createUser({
       nomeUtente: '  Carla.Neri ',
       nome: 'Carla Neri',
       email: 'carla.neri@esempio.invalid',
       ruoli: ['secretary'],
     });
-    expect(u.username).toBe('carla.neri');
-    expect(u.password).toMatch(/^[A-Za-z0-9_-]{16}$/);
-    expect(u.body.utente).toMatchObject({
+    expect(created.username).toBe('carla.neri');
+    // Segreteria: l'amministratore non riceve la password, l'utente aspetta il titolare.
+    expect(created.password).toBeUndefined();
+    expect(created.body.avvisi[0]).toMatch(/^In attesa della conferma di un medico titolare/);
+    expect(created.body.utente).toMatchObject({
       stato: 'attivo',
+      inAttesaDiConferma: true,
+      richiestaDiConferma: { da: 'Andrea Conti' },
+      ripristinoDalServizio: true,
       passwordDaCambiare: true,
       secondoFattoreAttivo: false,
       email: 'carla.neri@esempio.invalid',
       medico: null,
       archivio: null,
     });
-    expect(JSON.stringify(u.body.utente)).not.toContain(u.password);
+    const u = { ...created, password: await confirmByOwner(created.id) };
+    const listed = (await admin('GET', '/api/studio/utenti'))
+      .json()
+      .utenti.find((x: { id: string }) => x.id === u.id);
+    expect(listed).toMatchObject({
+      inAttesaDiConferma: false,
+      confermato: { da: 'Dott.ssa Elena Marchi' },
+    });
+    expect(JSON.stringify(listed)).not.toContain(u.password);
 
     // Primo accesso: password temporanea e secondo fattore, come sempre.
     const first = await access(u.username, u.password);
@@ -278,7 +317,7 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
   });
 
   it('con la password temporanea si può sempre uscire', async () => {
-    const u = await createUser({
+    const u = await createConfirmed({
       nomeUtente: 'uscita.prova',
       nome: 'Uscita Prova',
       ruoli: ['secretary'],
@@ -357,7 +396,7 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
   });
 
   it('un titolare nuovo ha la riga del medico e il suo archivio', async () => {
-    const u = await createUser({
+    const u = await createConfirmed({
       nomeUtente: 'luca.verdi',
       nome: 'Dott. Luca Verdi',
       ruoli: ['owner_doctor'],
@@ -400,8 +439,13 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
 
     const add = await patch({ ruoli: ['substitute_doctor', 'owner_doctor'] });
     expect(add.statusCode, add.body).toBe(200);
-    expect(add.json().avvisi).toEqual(['Creato l’archivio «Archivio di Giulia Rossi», vuoto.']);
+    // L'archivio prima; poi l'attesa, che continua con una richiesta nuova (utente non confermato).
+    expect(add.json().avvisi).toEqual([
+      'Creato l’archivio «Archivio di Giulia Rossi», vuoto.',
+      'L’utente resta in attesa della conferma di un medico titolare: la richiesta ha la data di adesso.',
+    ]);
     expect(add.json().utente.archivio.nome).toBe('Archivio di Giulia Rossi');
+    expect(add.json().utente.inAttesaDiConferma).toBe(true);
 
     const remove = await patch({ ruoli: ['substitute_doctor'] });
     expect(remove.statusCode).toBe(200);
@@ -409,9 +453,9 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     expect(remove.json().utente.archivio.nome).toBe('Archivio di Giulia Rossi');
 
     const back = await patch({ ruoli: ['owner_doctor', 'substitute_doctor'] });
-    expect(back.json().avvisi).toEqual([
+    expect(back.json().avvisi[0]).toBe(
       'L’archivio «Archivio di Giulia Rossi» torna al suo titolare.',
-    ]);
+    );
     expect(await t.db.select().from(archive).where(eq(archive.ownerUserId, u.id))).toHaveLength(1);
 
     const noDoctor = await patch({ ruoli: ['secretary'] });
@@ -498,7 +542,9 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
       nome: 'Secondo Amministratore',
       ruoli: ['administrator'],
     });
-    passwordsSeen.push(created.passwordTemporanea);
+    // Solo amministratore: nessuna conferma, la password la riceve l'amministratore.
+    expect(created.passwordTemporanea).toBeDefined();
+    passwordsSeen.push(created.passwordTemporanea!);
     // B ha superato il controllo del ruolo quando era ancora amministratore.
     const b = actor(created.utente.id, ['administrator']);
     await service.update(a, b.userId, { ruoli: ['secretary'] });
@@ -556,7 +602,7 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
   });
 
   it('la sospensione chiude le sessioni e impedisce l’accesso; la riattivazione non le riapre', async () => {
-    const u = await createUser({
+    const u = await createConfirmed({
       nomeUtente: 'da.sospendere',
       nome: 'Da Sospendere',
       ruoli: ['secretary'],
@@ -586,66 +632,100 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     expect((await req(again, 'GET', '/api/io')).statusCode).toBe(200);
     expect((await adminLog()).filter((e) => e.utente === u.username).map((e) => e.azione)).toEqual([
       'creazione',
+      'conferma',
       'sospensione',
       'riattivazione',
     ]);
   });
 
-  it('password temporanea nuova: quella di prima non vale, le sessioni si chiudono, va cambiata', async () => {
-    const target = s.users.segreteria;
+  it('password temporanea nuova: no per la segreteria; per un amministratore la vecchia non vale, le sessioni si chiudono', async () => {
+    // Segreteria: l'amministratore non le dà una password, che gli farebbe vedere i pazienti.
+    const secretary = s.users.segreteria;
+    const [before] = await t.db.select().from(appUser).where(eq(appUser.id, secretary.id));
+    const refused = await admin('POST', `/api/studio/utenti/${secretary.id}/password-temporanea`);
+    expect(refused.statusCode).toBe(403);
+    expect(refused.json().errore).toMatch(/li ripristina chi gestisce il servizio, sul server/);
     expect((await req(cookies.segreteria, 'GET', '/api/io')).statusCode).toBe(200);
+    const [after] = await t.db.select().from(appUser).where(eq(appUser.id, secretary.id));
+    expect(after!.passwordHash).toBe(before!.passwordHash);
+    expect((await adminLog()).at(-1)).toMatchObject({
+      outcome: 'negato',
+      azione: 'password_temporanea',
+      utente: secretary.username,
+    });
+
     const own = await admin(
       'POST',
       `/api/studio/utenti/${s.users.amministratore.id}/password-temporanea`,
     );
     expect(own.statusCode).toBe(403);
 
-    const r = await admin('POST', `/api/studio/utenti/${target.id}/password-temporanea`);
+    // Un altro amministratore, senza dati dei pazienti: la password temporanea si dà.
+    const other = await createUser({
+      nomeUtente: 'terzo.amministratore',
+      nome: 'Terzo Amministratore',
+      ruoli: ['administrator'],
+    });
+    const otherCookie = await firstAccess(other.username, other.password!, 'amministrazione mia');
+    const r = await admin('POST', `/api/studio/utenti/${other.id}/password-temporanea`);
     expect(r.statusCode, r.body).toBe(200);
     const temporary = r.json().passwordTemporanea as string;
     passwordsSeen.push(temporary);
     expect(r.json()).toMatchObject({ sessioniChiuse: 1, utente: { passwordDaCambiare: true } });
-    expect((await req(cookies.segreteria, 'GET', '/api/io')).statusCode).toBe(401);
-    expect((await access(target.username, PASSWORD)).statusCode).toBe(401);
+    expect((await req(otherCookie, 'GET', '/api/io')).statusCode).toBe(401);
+    expect((await access(other.username, 'amministrazione mia')).statusCode).toBe(401);
     // Secondo fattore già attivo: chiede il codice, poi solo il cambio della password.
-    expect((await access(target.username, temporary)).json().passo).toBe('secondo-fattore');
-    secrets.set(target.username, s.secrets.get(target.id)!);
-    const cookie = await loginAs(target.username, temporary);
-    expect((await req(cookie, 'GET', '/api/pazienti')).json().errore).toBe(MUST_CHANGE);
+    expect((await access(other.username, temporary)).json().passo).toBe('secondo-fattore');
+    const cookie = await loginAs(other.username, temporary);
+    expect((await req(cookie, 'GET', '/api/studio/utenti')).json().errore).toBe(MUST_CHANGE);
     expect(
       (
         await req(cookie, 'POST', '/api/profilo/password', {
           passwordAttuale: temporary,
-          nuovaPassword: 'segreteria di nuovo al lavoro',
+          nuovaPassword: 'amministrazione di nuovo al lavoro',
         })
       ).statusCode,
     ).toBe(200);
-    passwordsSeen.push('segreteria di nuovo al lavoro');
-    expect((await req(cookie, 'GET', '/api/pazienti')).statusCode).toBe(200);
+    passwordsSeen.push('amministrazione di nuovo al lavoro');
+    expect((await req(cookie, 'GET', '/api/studio/utenti')).statusCode).toBe(200);
   });
 
-  it('azzeramento del secondo fattore: sessioni chiuse, al prossimo accesso si riattiva', async () => {
-    const target = s.users.titolare;
+  it('azzeramento del secondo fattore: no per il medico; per un amministratore sessioni chiuse e si riattiva', async () => {
+    // Medico titolare: l'amministratore non lo azzera (attiverebbe il codice sul suo telefono).
+    const doctor = s.users.titolare;
+    const refused = await admin('POST', `/api/studio/utenti/${doctor.id}/azzera-secondo-fattore`);
+    expect(refused.statusCode).toBe(403);
+    expect(refused.json().errore).toMatch(/li ripristina chi gestisce il servizio, sul server/);
+    expect((await req(cookies.titolare, 'GET', '/api/io')).statusCode).toBe(200);
+    const [row] = await t.db.select().from(appUser).where(eq(appUser.id, doctor.id));
+    expect(row!.totpEnabledAt).not.toBeNull();
+
     const own = await admin(
       'POST',
       `/api/studio/utenti/${s.users.amministratore.id}/azzera-secondo-fattore`,
     );
     expect(own.statusCode).toBe(403);
-    const r = await admin('POST', `/api/studio/utenti/${target.id}/azzera-secondo-fattore`);
+    const other = await createUser({
+      nomeUtente: 'quarto.amministratore',
+      nome: 'Quarto Amministratore',
+      ruoli: ['administrator'],
+    });
+    const cookie = await firstAccess(other.username, other.password!, 'il secondo fattore mio');
+    const r = await admin('POST', `/api/studio/utenti/${other.id}/azzera-secondo-fattore`);
     expect(r.statusCode, r.body).toBe(200);
     expect(r.json()).toMatchObject({ sessioniChiuse: 1, utente: { secondoFattoreAttivo: false } });
-    expect((await req(cookies.titolare, 'GET', '/api/io')).statusCode).toBe(401);
-    const [row] = await t.db.select().from(appUser).where(eq(appUser.id, target.id));
-    expect(row!.totpSecretEnc).toBeNull();
-    expect(row!.totpEnabledAt).toBeNull();
+    expect((await req(cookie, 'GET', '/api/io')).statusCode).toBe(401);
+    const [reset] = await t.db.select().from(appUser).where(eq(appUser.id, other.id));
+    expect(reset!.totpSecretEnc).toBeNull();
+    expect(reset!.totpEnabledAt).toBeNull();
     expect(
-      (await admin('POST', `/api/studio/utenti/${target.id}/azzera-secondo-fattore`)).statusCode,
+      (await admin('POST', `/api/studio/utenti/${other.id}/azzera-secondo-fattore`)).statusCode,
     ).toBe(409);
     // La password resta quella: al prossimo accesso si attiva un segreto nuovo.
-    const next = await access(target.username, PASSWORD);
+    const next = await access(other.username, 'il secondo fattore mio');
     expect(next.json().passo).toBe('attiva-secondo-fattore');
-    cookies.titolare = await login(s, 'titolare');
-    expect((await req(cookies.titolare, 'GET', '/api/io')).statusCode).toBe(200);
+    const again = await loginAs(other.username, 'il secondo fattore mio');
+    expect((await req(again, 'GET', '/api/io')).statusCode).toBe(200);
   });
 
   it('sblocco: tentativi a zero, blocco tolto', async () => {
@@ -668,7 +748,7 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
   });
 
   it('cambio volontario: le altre sessioni si chiudono, quella in uso resta; gli errori bloccano', async () => {
-    const u = await createUser({
+    const u = await createConfirmed({
       nomeUtente: 'due.sessioni',
       nome: 'Due Sessioni',
       ruoli: ['secretary'],
