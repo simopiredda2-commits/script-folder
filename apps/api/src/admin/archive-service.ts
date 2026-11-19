@@ -371,7 +371,13 @@ export function describeAdminEntry(
       break;
     case 'impostazioni_archivio':
       area = 'Impostazioni dell’archivio';
-      azione = 'Che cosa vede la segreteria: consultazione o modifica';
+      azione =
+        text(d.fase) === 'modifica'
+          ? 'Che cosa vede la segreteria: modifica'
+          : text(d.fase) === 'lettura'
+            ? 'Che cosa vede la segreteria: consultazione'
+            : // Righe scritte prima che le due fasi fossero distinte.
+              'Che cosa vede la segreteria: consultazione o modifica';
       break;
     case 'impostazioni_aft': {
       area = 'AFT';

@@ -757,6 +757,24 @@ describe('archivio del titolare: autorizzazioni, registro di amministrazione, av
       expect(righe.some((r) => r.azione.includes('registro'))).toBe(false);
     });
 
+    it('le impostazioni dell’archivio: consultazione e modifica distinte, con i campi e senza i valori', async () => {
+      const url = `/api/archivi/${s.archives.titolare}/impostazioni`;
+      expect((await call(s, c.titolare, 'GET', url)).statusCode).toBe(200);
+      const patch = await call(s, c.titolare, 'PATCH', url, { segreteriaLeggeDiario: false });
+      expect(patch.statusCode, patch.body).toBe(200);
+      const righe = (await page(c.titolare, '?limite=10')).righe.filter(
+        (r) => r.area === 'Impostazioni dell’archivio',
+      );
+      expect(righe.slice(0, 2).map((r) => [r.azione, r.dettaglio])).toEqual([
+        [
+          'Che cosa vede la segreteria: modifica',
+          'Archivio «Archivio Marchi» · campi cambiati: segreteria legge diario',
+        ],
+        ['Che cosa vede la segreteria: consultazione', 'Archivio «Archivio Marchi»'],
+      ]);
+      expect(JSON.stringify(righe)).not.toMatch(/false|true/);
+    });
+
     it('a pagine, dalle più recenti, solo le righe dello studio', async () => {
       // Un'azione nell'altro studio: non deve comparire.
       expect(

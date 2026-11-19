@@ -68,6 +68,17 @@ Quattro elenchi comuni dello studio, in **Strumenti › Elenchi dello studio**: 
 - **Registro:** ogni scrittura, con i campi cambiati, prima e dopo; i tentativi negati anche.
 - **Esportazione completa:** gli elenchi ci sono, anche le voci archiviate (regola 4).
 
+## Archivio del titolare: autorizzazioni e avvisi (D177)
+
+Nella pagina **Archivio**, solo per il titolare:
+
+- **Autorizzazioni sull'archivio:** elenco con medico, tipo, periodo, motivo, chi l'ha data e lo stato (attiva, futura, scaduta, revocata); «Nuova autorizzazione» con tipo, medico, dal e al (giorni interi), motivo; «Revoca», con conferma, chiude subito. Sostituzione ai sostituti; medicina di gruppo agli altri titolari, solo in uno studio di gruppo.
+- **Avvisi sugli accessi anomali** degli ultimi 7, 30 o 90 giorni: cartelle diverse aperte da un utente in un giorno, accessi nella fascia oraria, consultazioni dell'AFT di un collega in un giorno. Con le soglie vuote la pagina dice quali completare e la fonte (Garante, linee guida sul dossier sanitario, par. 7, lett. c).
+
+## Registro di amministrazione (D177)
+
+In **Strumenti › Registro di amministrazione**, per i titolari e l'amministratore: quando, chi, postazione, area, azione con il dettaglio (nomi dei campi cambiati, mai i valori), esito a parole; a pagine, dalle più recenti. Ogni lettura è registrata.
+
 ## Postazioni
 
 Il nome che ognuno scrive all'accesso, per ogni computer dello studio, condivisa o personale. Servono alle preferenze di stampa. Si archiviano, non si cancellano.

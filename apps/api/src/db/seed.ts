@@ -17,6 +17,7 @@ import {
 } from '@mmg/domain';
 import { ageAt, generatePatients, Random } from '@mmg/fixtures';
 import { inArray } from 'drizzle-orm';
+import { grantPeriod } from '../admin/archive-service';
 import { loadConfig } from '../config';
 import { storeCredentials } from '../credentials/service';
 import { startOfStudioDay } from '../http/today-routes';
@@ -216,16 +217,36 @@ try {
     .insert(archive)
     .values({ studioId: st!.id, ownerUserId: doctorId, name: 'Archivio della Dott.ssa Marchi' })
     .returning();
-  const now = Date.now();
-  await db.insert(archiveGrant).values({
-    archiveId: arc!.id,
-    granteeUserId: users.get('sostituto')!,
-    kind: 'substitution',
-    validFrom: new Date(now),
-    validTo: new Date(now + 14 * 86_400_000),
-    reason: 'Sostituzione dimostrativa di due settimane',
-    grantedBy: doctorId,
-  });
+  // Autorizzazioni dimostrative a giorni interi, come le dà il titolare (tappa 14): una in corso,
+  // una scaduta e una revocata, per vedere i tre stati.
+  const dayFrom = (n: number) => studioDate(new Date(Date.now() + n * 86_400_000));
+  await db.insert(archiveGrant).values([
+    {
+      archiveId: arc!.id,
+      granteeUserId: users.get('sostituto')!,
+      kind: 'substitution',
+      ...grantPeriod(dayFrom(0), dayFrom(13)),
+      reason: 'Sostituzione dimostrativa di due settimane',
+      grantedBy: doctorId,
+    },
+    {
+      archiveId: arc!.id,
+      granteeUserId: users.get('sostituto')!,
+      kind: 'substitution',
+      ...grantPeriod(dayFrom(-60), dayFrom(-46)),
+      reason: 'Ferie estive dimostrative',
+      grantedBy: doctorId,
+    },
+    {
+      archiveId: arc!.id,
+      granteeUserId: users.get('sostituto')!,
+      kind: 'substitution',
+      ...grantPeriod(dayFrom(20), dayFrom(27)),
+      reason: 'Congresso dimostrativo, poi annullato',
+      grantedBy: doctorId,
+      revokedAt: new Date(),
+    },
+  ]);
 
   // Elenchi dello studio (tappa 14), inventati: controllati come quelli scritti a mano. Il
   // pacchetto di prestazioni no: si compone dal catalogo in vigore, che il seed non importa.

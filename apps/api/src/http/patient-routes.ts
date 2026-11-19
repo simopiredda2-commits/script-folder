@@ -268,8 +268,16 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
     .partial()
     .strict();
 
-  /** Che cosa vede la segreteria di questo archivio: lo decide il titolare (D30). */
-  const guardArchiveSettings = async (actor: Actor, archiveId: string) => {
+  /**
+   * Che cosa vede la segreteria di questo archivio: lo decide il titolare (D30). Nel registro la
+   * consultazione e la modifica restano distinte, la modifica con i nomi dei campi (mai i valori).
+   */
+  const guardArchiveSettings = async (
+    actor: Actor,
+    archiveId: string,
+    fase: 'lettura' | 'modifica',
+    campi: string[] = [],
+  ) => {
     const ctx = await loadArchiveContext(db, archiveId);
     const decision = can(actor, 'archive.settings', { ...ctx, now: new Date() });
     await logAccess(db, {
@@ -278,7 +286,12 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
       action: 'impostazioni_archivio',
       outcome: decision.allowed ? 'consentito' : 'negato',
       workstation: actor.workstation,
-      details: { archivio: archiveId, motivo: decision.reason },
+      details: {
+        archivio: archiveId,
+        fase,
+        ...(campi.length ? { campi } : {}),
+        motivo: decision.reason,
+      },
     });
     if (!decision.allowed) throw new HttpError(403, decision.reason);
     return ctx;
@@ -286,7 +299,7 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
 
   app.get('/api/archivi/:id/impostazioni', async (req) => {
     const { id } = archiveParams.parse(req.params);
-    const ctx = await guardArchiveSettings(req.actor!, id);
+    const ctx = await guardArchiveSettings(req.actor!, id, 'lettura');
     return {
       segreteriaLeggeDiario: ctx.settings.secretaryCanReadDiary,
       segreteriaLeggeRiepilogo: ctx.settings.secretaryCanReadSummary,
@@ -295,7 +308,13 @@ export function registerPatientRoutes(app: FastifyInstance, db: Database) {
 
   app.patch('/api/archivi/:id/impostazioni', async (req) => {
     const { id } = archiveParams.parse(req.params);
-    await guardArchiveSettings(req.actor!, id);
+    const parsed = settingsBody.safeParse(req.body);
+    await guardArchiveSettings(
+      req.actor!,
+      id,
+      'modifica',
+      parsed.success ? Object.keys(parsed.data) : [],
+    );
     const body = settingsBody.parse(req.body);
     const [row] = await withActor(db, req.actor!.userId, (tx) =>
       tx

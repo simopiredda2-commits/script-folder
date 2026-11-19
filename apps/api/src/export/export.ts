@@ -154,6 +154,12 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     db,
     sql`select * from studio_template where studio_id = ${a.studio.id} order by id`,
   );
+  // Autorizzazioni sull'archivio (tappa 14): chi ha potuto lavorarci, quando e perché, anche le
+  // scadute e le revocate (regola 5: ogni accesso è tracciato, e il titolare lo porta con sé).
+  tables.archive_grant = await rows(
+    db,
+    sql`select * from archive_grant where archive_id = ${archiveId} order by valid_from, id`,
+  );
   // Elenchi dello studio (tappa 14): suggeritori, posologie, pacchetti e contatti, anche archiviati.
   tables.studio_list_item = await rows(
     db,

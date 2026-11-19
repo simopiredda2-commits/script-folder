@@ -842,11 +842,8 @@ export const choiceEndSchema = z
   })
   .strict();
 
-const choicePeriod = (c: {
-  chosenOn: string;
-  expiresOn: string | null;
-  endedOn: string | null;
-}) => choiceValidity({ dal: c.chosenOn, scadenza: c.expiresOn, cessataIl: c.endedOn });
+const choicePeriod = (c: { chosenOn: string; expiresOn: string | null; endedOn: string | null }) =>
+  choiceValidity({ dal: c.chosenOn, scadenza: c.expiresOn, cessataIl: c.endedOn });
 
 /** Scelta del medico registrata a mano, in attesa di AURA: un medico titolare dello studio. */
 export async function addChoice(
