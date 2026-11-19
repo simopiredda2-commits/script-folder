@@ -40,6 +40,9 @@ Date come AAAA-MM-GG; istanti come li scrive il database, in UTC.
 allegati.csv elenca i referti e i documenti allegati; i file sono nella cartella allegati/,
 così come sono arrivati (PDF o immagini), con l'impronta SHA-256 di ciascuno.
 
+profilo-sanitario.csv elenca i PDF del Profilo Sanitario Sintetico (con il documento CDA2
+dentro, da firmare e firmati); i file sono nella cartella profilo-sanitario/.
+
 manifest.json elenca i file con il numero di righe e l'impronta SHA-256 di ciascuno.
 Il significato delle tabelle e delle colonne è in docs/modello-dati.md e docs/esportazione.md.
 `;
@@ -79,6 +82,22 @@ export function buildCsvZip(doc: ExportDocument): Uint8Array {
     file: 'allegati.csv',
     righe: index.length,
     sha256: createHash('sha256').update(indexBytes).digest('hex'),
+  });
+  // I PDF del Profilo Sanitario Sintetico (con il CDA dentro e firmati); indice in un CSV.
+  const pssIndex: Row[] = [];
+  for (const d of doc.documenti_profilo) {
+    const bytes = Buffer.from(d.contenuto_base64, 'base64');
+    const file = `profilo-sanitario/${d.documento}-${d.tipo === 'signed_pdf' ? 'firmato' : 'da-firmare'}.pdf`;
+    files[file] = new Uint8Array(bytes);
+    pssIndex.push({ id: d.id, documento: d.documento, tipo: d.tipo, sha256: d.sha256, file });
+    manifest.push({ file, righe: 0, sha256: createHash('sha256').update(bytes).digest('hex') });
+  }
+  const pssIndexBytes = strToU8(toCsv(['id', 'documento', 'tipo', 'sha256', 'file'], pssIndex));
+  files['profilo-sanitario.csv'] = pssIndexBytes;
+  manifest.push({
+    file: 'profilo-sanitario.csv',
+    righe: pssIndex.length,
+    sha256: createHash('sha256').update(pssIndexBytes).digest('hex'),
   });
   files['LEGGIMI.txt'] = strToU8(README);
   files['manifest.json'] = strToU8(

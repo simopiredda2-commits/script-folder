@@ -79,9 +79,9 @@ describe('scheda della terapia: calcoli proposti (D80)', () => {
 
 const saved: TherapyFull = {
   id: 't1',
-  drugName: 'Farmaco di prova 5 mg',
-  drugAic: '900000011',
-  activeIngredient: 'principio di prova',
+  drugName: 'AMLODIPINA DOC GENERICI 5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
+  drugAic: '038092019',
+  activeIngredient: 'AMLODIPINA BESILATO',
   kind: 'chronic',
   status: 'active',
   dose: '1',
@@ -91,7 +91,7 @@ const saved: TherapyFull = {
   aifaNote: null,
   reserved: false,
   important: false,
-  atc: 'Z99ZZ01',
+  atc: 'C08CA01',
   drugClass: 'A',
   equivalenceGroup: null,
   dpc: false,
@@ -150,7 +150,7 @@ describe('scheda della terapia: controlli formali e corpo per il servizio', () =
       notSubstitutableReason: 'resta fuori',
     });
     expect(body).toMatchObject({
-      drugName: 'Farmaco di prova 5 mg',
+      drugName: 'AMLODIPINA DOC GENERICI 5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC',
       aifaNote: null,
       packsPerPrescription: 1,
       suggestedS: false,

@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-18.1",
+  "versione": "2026-11-18.4",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -15,8 +15,8 @@
         "provinceAbbr": "Sigla automobilistica",
         "cadastralCode": "Codice Catastale del Comune"
       },
-      "vecchiaDopoGiorni": null,
-      "nota": "Intestazioni lette il 18/11/2026 dal file ISTAT aggiornato al 21/02/2026, con un'estrazione testuale del foglio: da confermare sul file che sync scarica al primo giro. Soglia di vecchiaia da completare."
+      "vecchiaDopoGiorni": 185,
+      "nota": "Intestazioni lette il 18/11/2026 dal file ISTAT aggiornato al 21/02/2026, con un'estrazione testuale del foglio: da confermare sul file che sync scarica al primo giro. Soglia di vecchiaia (D156): ISTAT aggiorna l'elenco «almeno ogni sei mesi» (sync/fonti.json, letta il 17/11/2026), quindi 184 giorni più una notte."
     },
     {
       "id": "aifa-anagrafica",
@@ -26,16 +26,17 @@
       "fonte": "aifa_liste",
       "chiave": "confezioni_fornitura.csv",
       "colonne": {
-        "aic": null,
-        "name": null,
-        "pack": null,
-        "activeIngredient": null,
-        "atc": null,
-        "form": null,
-        "supplyRegime": null
+        "aic": "CODICE_AIC",
+        "name": "DENOMINAZIONE",
+        "pack": "DESCRIZIONE",
+        "activeIngredient": "PA_ASSOCIATI",
+        "atc": "CODICE_ATC",
+        "form": "FORMA",
+        "supplyRegime": "FORNITURA",
+        "holder": "RAGIONE_SOCIALE"
       },
       "vecchiaDopoGiorni": null,
-      "nota": "Da completare: dal cloud i file AIFA non si leggono. Dopo il primo giro di sync le intestazioni vere sono in stato.json (campo intestazione); l'importazione le mostra finché la mappatura non è completa."
+      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA confezioni_fornitura.csv (drive.aifa.gov.it/farmaci/, collegato dalla pagina «Liste dei farmaci»): 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Nessuna soglia di vecchiaia (D156): AIFA pubblica ogni giorno, ma il contenuto può restare uguale e una soglia d'età darebbe avvisi falsi; vale il controllo di ogni notte."
     },
     {
       "id": "aifa-classe-a",
@@ -45,15 +46,16 @@
       "fonte": "aifa_liste",
       "chiave": "*_Classe-A_per_principio-attivo.csv",
       "colonne": {
-        "aic": null,
-        "activeIngredient": null,
-        "price": null,
-        "equivalenceGroup": null,
-        "aifaNote": null
+        "aic": "AIC",
+        "activeIngredient": "Principio attivo",
+        "price": "Prezzo al pubblico €",
+        "equivalenceGroup": "Codice Gruppo Equivalenza"
       },
-      "costanti": { "drugClass": "A" },
+      "costanti": {
+        "drugClass": "A"
+      },
       "vecchiaDopoGiorni": null,
-      "nota": "Da completare come l'anagrafica. Il numero davanti alla chiave è la cartella AIFA di pubblicazione e può cambiare: per questo la chiave ha «*»."
+      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA del 30/6/2026 (cp1252): 10.766 righe, tutti gli AIC di 9 cifre e tutti i prezzi numeri. Il file non ha una colonna per la nota AIFA: le note vengono dall'elenco DPC. Il numero davanti alla chiave è la cartella AIFA di pubblicazione e può cambiare: per questo la chiave ha «*»."
     },
     {
       "id": "aifa-classe-h",
@@ -63,15 +65,19 @@
       "fonte": "aifa_liste",
       "chiave": "*_Classe-H_per_principio-attivo.csv",
       "colonne": {
-        "aic": null,
-        "activeIngredient": null,
-        "price": null,
-        "equivalenceGroup": null,
-        "aifaNote": null
+        "aic": "Codice AIC",
+        "activeIngredient": "Principio attivo",
+        "price": "Prezzo al pubblico €",
+        "equivalenceGroup": "Codice Gruppo Equivalenza"
       },
-      "costanti": { "drugClass": "H" },
+      "costanti": {
+        "drugClass": "H"
+      },
       "vecchiaDopoGiorni": null,
-      "nota": "Da completare come l'anagrafica."
+      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA del 30/6/2026 (cp1252): 2.487 righe; l'intestazione «Codice AIC» va a capo dentro le virgolette. Nessun valore: 31 prezzi «-» (c'è solo il prezzo massimo di cessione) e 86 prezzi dell'ossigeno a metro cubo («6,55/m³»), che non sono prezzi di una confezione.",
+      "nessunValore": {
+        "price": ["-", "[0-9.]+,[0-9]+/m³"]
+      }
     },
     {
       "id": "trascrizione-farmaci-dpc",
@@ -108,7 +114,10 @@
       "titolo": "Catalogo delle esenzioni (trascrizione)",
       "tipo": "esenzioni",
       "origine": "trascrizione",
-      "colonne": { "code": "codice", "description": "descrizione" },
+      "colonne": {
+        "code": "codice",
+        "description": "descrizione"
+      },
       "vecchiaDopoGiorni": null,
       "nota": "Formato della trascrizione definito in docs/banche-dati.md."
     },
@@ -117,7 +126,10 @@
       "titolo": "Esenzioni e prestazioni associate (trascrizione)",
       "tipo": "esenzioni_prestazioni",
       "origine": "trascrizione",
-      "colonne": { "exemptionCode": "esenzione", "serviceCode": "prestazione" },
+      "colonne": {
+        "exemptionCode": "esenzione",
+        "serviceCode": "prestazione"
+      },
       "vecchiaDopoGiorni": null,
       "nota": "Formato della trascrizione definito in docs/banche-dati.md."
     }

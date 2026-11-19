@@ -24,6 +24,7 @@ const TYPES: EntryType[] = [
   'anamnesi',
   'stile_di_vita',
   'esame_obiettivo',
+  'capacita_motoria',
 ];
 
 const PLURAL: Record<EntryType, string> = {
@@ -34,6 +35,7 @@ const PLURAL: Record<EntryType, string> = {
   anamnesi: 'Anamnesi',
   stile_di_vita: 'Stili di vita',
   esame_obiettivo: 'Esame obiettivo',
+  capacita_motoria: 'Capacità motoria',
 };
 
 const text = (v: unknown) => (typeof v === 'string' ? v : '');
@@ -44,6 +46,9 @@ export function entrySummary(e: Entry, catalog: Catalog | null): string {
   switch (e.tipo) {
     case 'problema':
       return [
+        d.categoria && d.categoria !== 'diagnosi'
+          ? `${nameOf(catalog?.categorieProblema, text(d.categoria))}:`
+          : '',
         text(d.descrizione),
         d.codice ? `(${text(d.codice)})` : '',
         d.dal ? `dal ${date(text(d.dal))}` : '',
@@ -53,10 +58,25 @@ export function entrySummary(e: Entry, catalog: Catalog | null): string {
         .join(' ');
     case 'diario':
       return `${nameOf(catalog?.contatti, text(d.contatto))}: ${text(d.testo)}`;
-    case 'anamnesi':
-      return `${nameOf(catalog?.sezioniAnamnesi, text(d.sezione))}: ${text(d.testo)}`;
+    case 'anamnesi': {
+      const family = [
+        d.parente ? nameOf(catalog?.parenti, text(d.parente)) : '',
+        text(d.codice),
+        typeof d.etaEsordio === 'number' ? `esordio a ${d.etaEsordio} anni` : '',
+      ].filter(Boolean);
+      return `${nameOf(catalog?.sezioniAnamnesi, text(d.sezione))}: ${text(d.testo)}${
+        family.length ? ` (${family.join(', ')})` : ''
+      }`;
+    }
     case 'allergia':
-      return `${text(d.sostanza)}${d.reazione ? ` — ${text(d.reazione)}` : ''}`;
+      return [
+        d.natura === 'intolleranza' ? 'Intolleranza:' : '',
+        text(d.sostanza),
+        d.codiceAgente ? `(${text(d.codiceAgente)})` : '',
+        d.reazione ? `— ${text(d.reazione)}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
     case 'stile_di_vita':
       return `${text(d.fattore)}: ${text(d.valore)}`;
     case 'esame_obiettivo':
@@ -69,6 +89,8 @@ export function entrySummary(e: Entry, catalog: Catalog | null): string {
         .join(' · ');
     case 'misura':
       return `${text(d.parametro)}: ${text(d.valore)} ${text(d.unita)}`;
+    case 'capacita_motoria':
+      return nameOf(catalog?.capacitaMotorie, text(d.capacita));
   }
 }
 
@@ -188,6 +210,9 @@ function NewEntryForm({
       contatto: 'studio',
       sezione: 'familiare',
       fattore: catalog.fattori[0] ?? '',
+      categoria: 'diagnosi',
+      natura: 'allergia',
+      capacita: catalog.capacitaMotorie[0]?.chiave ?? '',
     },
   );
   const [busy, setBusy] = useState(false);
@@ -215,23 +240,46 @@ function NewEntryForm({
         return {
           ...common,
           descrizione: str('descrizione'),
-          codice: value('codice'),
+          categoria: str('categoria') || undefined,
+          // L'organo mancante ha il codice del dizionario ufficiale; il resto l'ICD-9-CM.
+          codice: str('categoria') === 'organo_mancante' ? value('organo') : value('codice'),
           stato: str('stato'),
           dal: value('dal'),
           risoltoIl: str('stato') === 'risolto' ? value('risoltoIl') : undefined,
           quesitoAperto: f.quesitoAperto === true || undefined,
+          cronico: f.cronico === true || undefined,
         };
       case 'diario':
         return { ...common, contatto: str('contatto'), testo: str('testo') };
-      case 'anamnesi':
-        return { ...common, sezione: str('sezione'), testo: str('testo') };
+      case 'anamnesi': {
+        const family = str('sezione') === 'familiare';
+        const age = family ? value('etaEsordio') : undefined;
+        return {
+          ...common,
+          sezione: str('sezione'),
+          testo: str('testo'),
+          parente: family ? value('parente') : undefined,
+          codice: family ? value('codiceFamiliare') : undefined,
+          etaEsordio: age === undefined ? undefined : Number(age),
+        };
+      }
       case 'allergia':
         return {
           ...common,
           sostanza: str('sostanza'),
           reazione: value('reazione'),
           daFarmaco: f.daFarmaco === true || undefined,
+          natura: str('natura') || undefined,
+          agente: value('agente'),
+          // Il codice vale solo con l'agente (o con la reazione da farmaco).
+          codiceAgente:
+            value('agente') !== undefined || f.daFarmaco === true
+              ? value('codiceAgente')
+              : undefined,
+          criticita: value('criticita'),
         };
+      case 'capacita_motoria':
+        return { ...common, capacita: str('capacita') };
       case 'stile_di_vita':
         return {
           ...common,
@@ -301,10 +349,24 @@ function NewEntryForm({
       <label htmlFor={fid(k)}>{label}</label>
     </div>
   );
-  const select = (k: string, label: string, options: { chiave: string; nome: string }[]) => (
+  const select = (
+    k: string,
+    label: string,
+    options: { chiave: string; nome: string }[],
+    props: { empty?: string; required?: boolean; onPick?: (value: string) => void } = {},
+  ) => (
     <div className="campo">
       <label htmlFor={fid(k)}>{label}</label>
-      <select id={fid(k)} value={str(k)} onChange={(e) => set(k, e.target.value)}>
+      <select
+        id={fid(k)}
+        value={str(k)}
+        required={props.required}
+        onChange={(e) => {
+          set(k, e.target.value);
+          props.onPick?.(e.target.value);
+        }}
+      >
+        {props.empty !== undefined && <option value="">{props.empty}</option>}
         {options.map((o) => (
           <option key={o.chiave} value={o.chiave}>
             {o.nome}
@@ -329,17 +391,41 @@ function NewEntryForm({
         {tipo === 'problema' && (
           <>
             <div className="campi-in-riga">
-              {input('descrizione', 'Descrizione', { required: true, maxLength: 300 })}
-              {input('codice', 'Codice ICD-9-CM', {
-                className: 'codice',
-                maxLength: 10,
-                stretto: true,
-                'aria-describedby': fid('codice-aiuto'),
-              })}
+              {select('categoria', 'Che cosa', catalog.categorieProblema)}
+              {str('categoria') === 'organo_mancante' &&
+                select(
+                  'organo',
+                  'Organo mancante',
+                  catalog.organiMancanti.map((o) => ({
+                    chiave: o.codice,
+                    nome: `${o.nome} (${o.codice})`,
+                  })),
+                  {
+                    empty: 'Scegli dall’elenco ufficiale',
+                    required: true,
+                    // La descrizione, se è ancora vuota, è il nome dell'organo.
+                    onPick: (code) => {
+                      const organ = catalog.organiMancanti.find((o) => o.codice === code);
+                      if (organ && !str('descrizione')) set('descrizione', organ.nome);
+                    },
+                  },
+                )}
             </div>
-            <p className="aiuto" id={fid('codice-aiuto')}>
-              Facoltativo; nel formato ICD-9-CM, per esempio 401.9 o V17.3.
-            </p>
+            <div className="campi-in-riga">
+              {input('descrizione', 'Descrizione', { required: true, maxLength: 300 })}
+              {str('categoria') !== 'organo_mancante' &&
+                input('codice', 'Codice ICD-9-CM', {
+                  className: 'codice',
+                  maxLength: 10,
+                  stretto: true,
+                  'aria-describedby': fid('codice-aiuto'),
+                })}
+            </div>
+            {str('categoria') !== 'organo_mancante' && (
+              <p className="aiuto" id={fid('codice-aiuto')}>
+                Facoltativo; nel formato ICD-9-CM, per esempio 401.9 o V17.3.
+              </p>
+            )}
             <fieldset className="scelta-in-riga">
               <legend>Stato</legend>
               {(['attivo', 'risolto'] as const).map((s) => (
@@ -366,17 +452,88 @@ function NewEntryForm({
                 })}
             </div>
             {check('quesitoAperto', 'Quesito diagnostico aperto')}
+            {check('cronico', 'Patologia cronica: va nel Profilo sanitario sintetico')}
           </>
         )}
         {(tipo === 'diario' || tipo === 'anamnesi') && area('testo', 'Testo')}
+        {tipo === 'anamnesi' && str('sezione') === 'familiare' && (
+          <>
+            <div className="campi-in-riga">
+              {select('parente', 'Parente', catalog.parenti, { empty: 'Non indicato' })}
+              {input('codiceFamiliare', 'Patologia in ICD-9-CM', {
+                className: 'codice',
+                maxLength: 10,
+                stretto: true,
+              })}
+              {input('etaEsordio', 'Età all’esordio', {
+                type: 'number',
+                min: 0,
+                max: 130,
+                stretto: true,
+              })}
+            </div>
+            <p className="aiuto">
+              Per il Profilo sanitario sintetico servono il parente e il codice della patologia.
+            </p>
+          </>
+        )}
         {tipo === 'allergia' && (
           <>
+            <fieldset className="scelta-in-riga">
+              <legend>Allergia o intolleranza</legend>
+              {catalog.nature.map((n) => (
+                <div className="casella" key={n.chiave}>
+                  <input
+                    id={fid(`natura-${n.chiave}`)}
+                    type="radio"
+                    name="natura"
+                    checked={str('natura') === n.chiave}
+                    onChange={() => set('natura', n.chiave)}
+                  />
+                  <label htmlFor={fid(`natura-${n.chiave}`)}>{n.nome}</label>
+                </div>
+              ))}
+            </fieldset>
             <div className="campi-in-riga">
               {input('sostanza', 'Sostanza o farmaco', { required: true, maxLength: 200 })}
               {input('reazione', 'Reazione', { maxLength: 500 })}
             </div>
             {check('daFarmaco', 'Reazione avversa a un farmaco')}
+            <div className="campi-in-riga">
+              {select('agente', 'Agente', catalog.agenti, {
+                empty: f.daFarmaco === true ? 'Farmaco' : 'Non indicato',
+                onPick: () => set('codiceAgente', ''),
+              })}
+              {(str('agente') === 'farmaco' || (f.daFarmaco === true && !str('agente'))) &&
+                input('codiceAgente', 'AIC o ATC del farmaco', {
+                  className: 'codice',
+                  maxLength: 20,
+                  stretto: true,
+                  'aria-describedby': fid('agente-aiuto'),
+                })}
+              {str('agente') !== '' &&
+                str('agente') !== 'farmaco' &&
+                select(
+                  'codiceAgente',
+                  'Allergene',
+                  catalog.allergeni.map((a) => ({
+                    chiave: a.codice,
+                    nome: `${a.nome} (${a.codice})`,
+                  })),
+                  { empty: 'Non nell’elenco ufficiale' },
+                )}
+              {select('criticita', 'Criticità', catalog.criticita, { empty: 'Non indicata' })}
+            </div>
+            <p className="aiuto" id={fid('agente-aiuto')}>
+              Il codice serve al Profilo sanitario sintetico: per un farmaco l’AIC (9 cifre) o l’ATC
+              (per esempio J01CA04); per gli altri agenti, l’elenco ufficiale degli allergeni.
+            </p>
           </>
+        )}
+        {tipo === 'capacita_motoria' && (
+          <div className="campi-in-riga">
+            {select('capacita', 'Capacità motoria', catalog.capacitaMotorie)}
+          </div>
         )}
         {tipo === 'stile_di_vita' && (
           <div className="campi-in-riga">
@@ -440,6 +597,7 @@ function EntryItem({
   const when = `del ${date(e.data)}`;
   const annulled = e.stato === 'annullata';
   const problem = e.tipo === 'problema';
+  const allergy = e.tipo === 'allergia';
   const resolved = problem && e.dettaglio?.stato === 'risolto';
 
   async function run(fn: () => Promise<unknown>) {
@@ -467,8 +625,17 @@ function EntryItem({
         {problem && e.dettaglio?.quesitoAperto === true && (
           <span className="etichetta">Quesito aperto</span>
         )}
+        {problem && e.dettaglio?.cronico === true && <span className="etichetta">Cronico</span>}
         {e.tipo === 'allergia' && e.dettaglio?.daFarmaco === true && (
           <span className="etichetta">Da farmaco</span>
+        )}
+        {allergy && e.dettaglio?.criticita && (
+          <span className="etichetta">
+            Criticità {nameOf(catalog?.criticita, text(e.dettaglio.criticita)).toLowerCase()}
+          </span>
+        )}
+        {allergy && e.dettaglio?.attiva === false && (
+          <span className="etichetta">Non più attiva</span>
         )}
         {e.riservata && <span className="etichetta">Riservata</span>}
         {e.oscurata && <span className="etichetta">Oscurata</span>}
@@ -502,6 +669,28 @@ function EntryItem({
                 <span className="visivamente-nascosto"> il problema {when}</span>
               </button>
             ))}
+          {problem && (
+            <button
+              type="button"
+              className="pulsante pulsante-piatto"
+              aria-pressed={e.dettaglio?.cronico === true}
+              onClick={() => void patch({ cronico: e.dettaglio?.cronico !== true })}
+            >
+              <Icon name="storico" /> <span>Cronico</span>
+              <span className="visivamente-nascosto"> il problema {when}</span>
+            </button>
+          )}
+          {allergy && (
+            <button
+              type="button"
+              className="pulsante pulsante-piatto"
+              onClick={() => void patch({ allergiaAttiva: e.dettaglio?.attiva === false })}
+            >
+              <Icon name={e.dettaglio?.attiva === false ? 'ripeti' : 'fatto'} />{' '}
+              <span>{e.dettaglio?.attiva === false ? 'Di nuovo attiva' : 'Non più attiva'}</span>
+              <span className="visivamente-nascosto"> l’allergia {when}</span>
+            </button>
+          )}
           <button
             type="button"
             className="pulsante pulsante-piatto"

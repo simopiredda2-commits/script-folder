@@ -4,6 +4,7 @@ import {
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -77,6 +78,8 @@ export const refDrug = pgTable(
     atc: text(),
     form: text(),
     supplyRegime: text(),
+    /** Ditta titolare dell'AIC (D151). */
+    holder: text(),
   },
   (t) => [index().on(t.datasetId, t.aic)],
 );
@@ -170,3 +173,36 @@ export const REFERENCE_TABLES = {
   esenzioni: refExemption,
   esenzioni_prestazioni: refExemptionService,
 } as const;
+
+/**
+ * Ogni aggiornamento delle banche dati (D156): sync, poi l'importazione con i suoi controlli. Il
+ * registro dice quando, chi l'ha avviato, com'è andata e che cosa va controllato a mano; le
+ * schermate ne ricavano se una versione in uso è più vecchia del previsto (A6).
+ */
+export const referenceUpdateRun = pgTable(
+  'reference_update_run',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** «comando» (riga di comando), «automatico» (ogni notte) o «pulsante» (dagli strumenti). */
+    trigger: text().notNull(),
+    requestedBy: text().notNull(),
+    startedAt: timestamp({ withTimezone: true }).notNull(),
+    finishedAt: timestamp({ withTimezone: true }),
+    /** Vero finché l'aggiornamento è in corso, poi vuoto: ne gira uno solo alla volta. */
+    running: boolean(),
+    /** «ok», «da_verificare», «errore» o «interrotto». */
+    outcome: text(),
+    syncExitCode: integer(),
+    /** Il rapporto di sync in JSON (ultimo-rapporto.json di quel giro). */
+    syncReport: jsonb(),
+    /** Il rapporto dell'importazione, file per file. */
+    importReport: jsonb(),
+    /** Stato di ogni serie in uso alla fine del giro: controllata, in attesa, da trascrivere. */
+    seriesStatus: jsonb(),
+    /** Che cosa è andato storto prima o fuori dai rapporti (sync che non parte, lucchetto). */
+    message: text(),
+    /** Ultima parte dell'output di sync, per chi deve capire un errore. */
+    output: text(),
+  },
+  (t) => [unique().on(t.running), index().on(t.startedAt)],
+);

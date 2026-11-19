@@ -64,6 +64,23 @@ export const doctorProfile = pgTable('doctor_profile', {
   asl: text(),
   headerText: text(),
   stampText: text(),
+  /** Nome e cognome separati, come li vuole il Profilo Sanitario Sintetico (tappa 11). */
+  firstName: text(),
+  lastName: text(),
+  /** Recapiti di studio: il Profilo Sanitario Sintetico ne vuole almeno uno (tappa 11). */
+  phone: text(),
+  email: text(),
+  pec: text(),
+  /**
+   * Impaginazione dei certificati dai modelli, scelta dal medico (tappa 13): carattere standard
+   * del PDF, dimensione, allineamento dell'intestazione (`headerText`, una riga per riga), margini,
+   * luogo proposto per «luogo e data». Il timbro è `stampText`.
+   */
+  printFont: text().notNull().default('sans'),
+  printFontSize: integer().notNull().default(11),
+  printHeaderAlign: text().notNull().default('left'),
+  printMarginMm: integer().notNull().default(20),
+  printPlace: text(),
 });
 
 /** Archivio dei pazienti di un medico titolare. In medicina di gruppo ce n'è uno per titolare. */

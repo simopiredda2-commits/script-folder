@@ -1,0 +1,1 @@
+ALTER TABLE "prescription_line" ADD COLUMN "service_national_code" text;

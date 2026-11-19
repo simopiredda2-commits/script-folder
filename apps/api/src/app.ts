@@ -12,25 +12,38 @@ import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
 import { registerFollowUpRoutes } from './http/followup-routes';
+import { registerFseRoutes } from './http/fse-routes';
+import { createPssService } from './fse/service';
 import { registerPrivacyRoutes } from './http/privacy-routes';
+import { registerAftRoutes } from './http/aft-routes';
+import { createAftService } from './aft/service';
 import { registerCredentialRoutes } from './http/credentials-routes';
+import { registerDoctorProfileRoutes } from './http/doctor-profile-routes';
 import { registerRegionalSimulatorRoutes } from './http/regional-simulator-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
 import { registerReferenceRoutes } from './http/reference-routes';
+import { registerReferenceUpdateRoutes } from './http/reference-update-routes';
 import { registerReminderRoutes } from './http/reminder-routes';
 import { registerTherapyRoutes } from './http/therapy-routes';
 import { registerTodayRoutes } from './http/today-routes';
+import { registerTemplateRoutes } from './http/template-routes';
+import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import type { CredentialService } from '@mmg/domain';
 import {
+  FseGatewayClient,
+  SIMULATED_FSE_AUDIENCE,
+  SimulatedDocumentSigner,
+  SimulatedFseGateway,
   SimulatedGateway,
   SimulatedReminderSender,
   SimulatedRegionalAuthorization,
   SimulatedSecondFactor,
   SimulatedSickLeaveGateway,
+  type DocumentSigner,
   type GatewaySystem,
   type PrescriptionGateway,
   type ReminderSender,
@@ -40,6 +53,7 @@ import {
 } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
+import { ReferenceUpdates } from './reference/updates-service';
 import { createReminderService } from './reminders/service';
 
 // I messaggi di validazione arrivano all'interfaccia: in italiano, come il resto (D85).
@@ -87,6 +101,16 @@ export interface AppDeps {
   reminderSender?: ReminderSender;
   /** Tempo massimo di attesa dell'invio delle ricette, in millisecondi (D94). */
   sendTimeoutMs?: number;
+  /**
+   * Gateway del Fascicolo e firma PAdES del medico (tappa 11). Per difetto i simulatori: il
+   * simulatore rilascia i certificati del programma all'avvio, solo in memoria (regola 7).
+   */
+  fse?: { gateway: FseGatewayClient; audience: string; signer: DocumentSigner };
+  /**
+   * Aggiornamento delle banche dati (D156). Per difetto nessuno: in sviluppo e nelle prove il
+   * servizio non scarica nulla (regola 7); in produzione lo prepara server.ts dalla configurazione.
+   */
+  referenceUpdates?: ReferenceUpdates;
 }
 
 export function buildApp({
@@ -108,6 +132,8 @@ export function buildApp({
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
   sendTimeoutMs,
+  fse = defaultFse(now),
+  referenceUpdates = new ReferenceUpdates(db, null, now ? { now } : {}),
 }: AppDeps): FastifyInstance {
   const app = Fastify({ logger });
   const auth = createAuthService({
@@ -185,14 +211,22 @@ export function buildApp({
   if (regional.gateway instanceof SimulatedRegionalAuthorization)
     registerRegionalSimulatorRoutes(app, regional.gateway);
   registerPatientRoutes(app, db);
+  registerDoctorProfileRoutes(app, db);
   registerTodayRoutes(app, db, now ?? (() => new Date()));
   registerTherapyRoutes(app, db, now ?? (() => new Date()));
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
+  registerAftRoutes(app, createAftService({ db, now: now ?? (() => new Date()) }));
   registerFollowUpRoutes(app, db, now ?? (() => new Date()));
   // Banche dati pubbliche importate da sync/ (tappa 5), consultate alla data (A5).
-  const reference = new ReferenceData(db, loadMappings());
+  const reference = new ReferenceData(db, loadMappings(), {
+    now: now ?? (() => new Date()),
+    expectedSince: (at) => referenceUpdates.expectedSince(at),
+  });
   registerReferenceRoutes(app, reference, now ?? (() => new Date()));
+  registerReferenceUpdateRoutes(app, db, referenceUpdates);
+  // Alla chiusura si ferma l'orologio e il download in corso (il giro resta «interrotto»).
+  app.addHook('onClose', async () => referenceUpdates.stop());
   registerPrescriptionRoutes(
     app,
     createPrescriptionService({
@@ -203,11 +237,14 @@ export function buildApp({
       // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
       preSendChecks: preSendChecks ?? createRulesCheck({ db, now, reference }),
       sendTimeoutMs,
+      serviceCatalog: (date) => reference.serviceLookup(date),
     }),
     db,
     now ?? (() => new Date()),
   );
   registerReminderRoutes(app, createReminderService({ db, sender: reminderSender, now }));
+  // Modelli dei certificati (tappa 13): modelli ufficiali dagli atti, modelli dello studio.
+  registerTemplateRoutes(app, createTemplateService({ db, now }));
   registerCertificateRoutes(
     app,
     createCertificateService({
@@ -219,7 +256,29 @@ export function buildApp({
       now,
     }),
   );
+  registerFseRoutes(
+    app,
+    db,
+    createPssService({
+      db,
+      gateway: fse.gateway,
+      gatewayAudience: fse.audience,
+      signer: fse.signer,
+      reference,
+      now,
+    }),
+  );
   return app;
+}
+
+/** Simulatori del Gateway del Fascicolo e della firma, con i certificati di prova in memoria. */
+function defaultFse(now?: () => Date): NonNullable<AppDeps['fse']> {
+  const simulator = new SimulatedFseGateway({ now });
+  return {
+    gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Programma'), now),
+    audience: SIMULATED_FSE_AUDIENCE,
+    signer: new SimulatedDocumentSigner({ now }),
+  };
 }
 
 /** Simulatori del SAR e del Sistema TS che vogliono l'Id-Sessione dei rispettivi simulatori. */

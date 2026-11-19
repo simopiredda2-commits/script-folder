@@ -1,0 +1,36 @@
+{
+  "key": "sportivo-non-agonistico",
+  "title": "Certificato di idoneità alla pratica di attività sportiva di tipo non agonistico",
+  "version": "2014-08-08",
+  "official": true,
+  "source": {
+    "act": "DM Salute 8 agosto 2014, allegato 2",
+    "publication": "GU Serie generale n. 243 del 18/10/2014",
+    "url": "https://www.gazzettaufficiale.it/atto/serie_generale/caricaDettaglioAtto/originario?atto.dataPubblicazioneGazzetta=2014-10-18&atto.codiceRedazionale=14A08029",
+    "checkedOn": "2026-11-18",
+    "note": "Nella Gazzetta la pagina del modello è un'immagine (pagina 26 del PDF): il testo è trascritto a mano e confrontato con l'immagine. L'allegato 2 conferma l'allegato C del DM 24/4/2013, senza la riga «D.M. … data» sotto il titolo."
+  },
+  "validityMonths": 12,
+  "forDoctor": [
+    "Prima del rilascio l'allegato 1 chiede l'anamnesi e l'esame obiettivo, completo di misurazione della pressione arteriosa, e un elettrocardiogramma a riposo, debitamente refertato, effettuato almeno una volta nella vita.",
+    "Elettrocardiogramma basale refertato ogni anno per chi ha superato i 60 anni e associa altri fattori di rischio cardiovascolare, e per chi, a prescindere dall'età, ha patologie croniche conclamate con un aumentato rischio cardiovascolare (allegato 1).",
+    "Il medico di medicina generale lo rilascia ai propri assistiti. Nei casi dubbi si avvale del medico specialista in medicina dello sport o, secondo il giudizio clinico, dello specialista di branca (allegato 1).",
+    "Copia dei referti conservata per la validità del certificato: per il medico di medicina generale basta la registrazione nella scheda sanitaria individuale informatizzata (allegato 1)."
+  ],
+  "fields": [
+    {
+      "key": "data_ecg",
+      "label": "Data del tracciato ECG",
+      "type": "data",
+      "required": true,
+      "help": "La data dell'elettrocardiogramma refertato citato nel certificato."
+    }
+  ],
+  "body": [
+    "Sig.ra/Sig. {{paziente.cognome}} {{paziente.nome}}\nNata/o a {{paziente.nato_a}} il {{paziente.nato_il}}\nresidente a {{paziente.residenza}}",
+    "Il soggetto, sulla base della visita medica da me effettuata, dei valori di pressione arteriosa rilevati, nonché del referto del tracciato ECG eseguito in data {{campo.data_ecg}}, non presenta controindicazioni in atto alla pratica di attività sportiva non agonistica.",
+    "Il presente certificato ha validità annuale dalla data del rilascio."
+  ],
+  "placeDateLabel": "",
+  "signature": "Luogo, data, timbro e firma del medico certificatore."
+}

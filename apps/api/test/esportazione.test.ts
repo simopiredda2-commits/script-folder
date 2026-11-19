@@ -8,6 +8,7 @@ import {
   HANDLED_SEPARATELY,
   PATIENT_TABLES,
   PRESCRIPTION_TABLES,
+  PSS_TABLES,
   type ExportDocument,
 } from '../src/export/export';
 import { createScenario, login, type Scenario } from './helpers/scenario';
@@ -66,12 +67,13 @@ describe('esportazione completa dei dati del medico', () => {
     const res = await s.db.execute<{ table_name: string }>(sql`
       select distinct table_name from information_schema.columns
       where table_schema = 'public'
-        and column_name in ('patient_id', 'entry_id', 'prescription_id', 'certificate_id')`);
+        and column_name in ('patient_id', 'entry_id', 'prescription_id', 'certificate_id', 'document_id')`);
     const known = new Set<string>([
       ...PATIENT_TABLES,
       ...ENTRY_TABLES,
       ...PRESCRIPTION_TABLES,
       ...CERTIFICATE_TABLES,
+      ...PSS_TABLES,
       ...Object.keys(HANDLED_SEPARATELY),
     ]);
     for (const { table_name } of res.rows) expect(known, table_name).toContain(table_name);
@@ -80,6 +82,7 @@ describe('esportazione completa dei dati del medico', () => {
       ...ENTRY_TABLES,
       ...PRESCRIPTION_TABLES,
       ...CERTIFICATE_TABLES,
+      ...PSS_TABLES,
       'patient',
       'family',
     ]) {

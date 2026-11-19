@@ -2,9 +2,10 @@
   "tipo": "farmaci_dpc",
   "fonte": "piemonte_dpc",
   "chiave": "farmaci_pht_dpc.pdf",
-  "sha256_origine": "cd74fb08853481b46a5c86cd1b5a8843868acc7c6561ac8f89b4d2130dd940c2",
-  "atto": "Elenco di prova dei farmaci PHT in DPC",
+  "sha256_origine": "10c555848b3c3fa2ae109d53304c6902645fc56c5c8861ec72ac021705b03150",
+  "atto": "Farmaci PHT - oggetto di DPC, aggiornamento del 9/7/2026, estratto di prova",
   "in_vigore_dal": "2026-07-09",
+  "nota": "Riga dell'elenco della Regione Piemonte letto il 18/11/2026 (PDF di 13 pagine, SHA-256 8c7d006876a2b953cf09dd4738a1f7198cdc87d7b392eb55a05512c60d9e1fed): «DULAGLUTIDE (14)», A10BJ05, nota 100, «PT elettronico - Sistema TS», qui «sì». La nota (14) dell'elenco riguarda le associazioni con gli SGLT2i.",
   "trascritto_da": "Persona di prova",
   "trascritto_il": "2026-11-18",
   "controllato_da": "Seconda persona di prova"

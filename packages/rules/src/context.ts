@@ -35,7 +35,10 @@ export interface LineContext {
   drugAic: string | null;
   drugName: string | null;
   activeIngredient: string | null;
+  /** Codice del catalogo regionale (codCatalogoPrescr). */
   serviceCode: string | null;
+  /** Codice del nomenclatore («codice DM», codProdPrest), se scritto sulla riga. */
+  serviceNationalCode?: string | null;
   quantity: number;
   aifaNote: string | null;
   notSubstitutable: boolean;
@@ -99,6 +102,11 @@ export interface RuleContext {
   exemptionExists?: (code: string) => boolean | undefined;
   /** Elenco regionale esenzione → prestazioni (R17); undefined se non noto. */
   exemptionServices?: (code: string) => ReadonlySet<string> | undefined;
+  /**
+   * Catalogo regionale delle prestazioni in uso alla data (R10, R18): la voce del codice, o null se
+   * il codice non c'è. Assente se nessun catalogo è importato.
+   */
+  serviceCatalog?: (code: string) => { nationalCode: string | null } | null;
   /** Righe per cui il medico conferma che il paziente rientra nella nota AIFA (R7). */
   confirmedAifaNotes: ReadonlySet<string>;
   /** Motivi dati dal medico per procedere nonostante un avviso, per regola. */

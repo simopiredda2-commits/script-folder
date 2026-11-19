@@ -13,7 +13,6 @@ import { join, normalize, resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '..', '..', '..', '..');
 export const EXAMPLES_DIR = join(ROOT, 'fixtures', 'banche-dati');
 export const EXAMPLE_TRANSCRIPTIONS = join(EXAMPLES_DIR, 'trascrizioni');
-export const EXAMPLE_MAPPINGS = join(EXAMPLES_DIR, 'mappature-prova.json');
 const SYNC_SCRIPT = join(ROOT, 'sync', 'banche_dati.py');
 
 const TYPES: Record<string, string> = {
@@ -69,6 +68,7 @@ export async function runSyncOnExample(
   site: ExampleSite,
   dest: string,
   extraArgs: string[] = [],
+  signal?: AbortSignal,
 ): Promise<{ code: number; output: string }> {
   const fonti = join(dest, '..', `fonti-prova-${Date.now()}.json`);
   writeFileSync(
@@ -92,11 +92,31 @@ export async function runSyncOnExample(
         ...extraArgs,
       ],
       // Il server è in locale: nessun proxy.
-      { env: { ...process.env, NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost' } },
+      {
+        env: { ...process.env, NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost' },
+        ...(signal ? { signal } : {}),
+      },
       (err, stdout, stderr) => {
         const code = err ? (typeof err.code === 'number' ? err.code : 1) : 0;
         ok({ code, output: `${stdout}${stderr}` });
       },
     );
   });
+}
+
+/**
+ * sync sul sito d'esempio, servito solo per la durata del giro: per le prove e per i dati
+ * dimostrativi dell'aggiornamento (D156). Nessuna chiamata a siti reali.
+ */
+export function exampleSourcesSync(
+  root?: string,
+): (dest: string, signal?: AbortSignal) => Promise<{ code: number; output: string }> {
+  return async (dest, signal) => {
+    const site = await serveExampleSite(root);
+    try {
+      return await runSyncOnExample(site, dest, [], signal);
+    } finally {
+      await site.close();
+    }
+  };
 }

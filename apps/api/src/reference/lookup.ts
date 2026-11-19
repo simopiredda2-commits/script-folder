@@ -1,6 +1,15 @@
-import { type DatasetKind, KINDS, type MappingSet } from '@mmg/reference';
+import {
+  type DatasetKind,
+  indexServices,
+  KINDS,
+  loadServiceSearchData,
+  type MappingSet,
+  SERVICE_SEARCH_DATA,
+  searchServices,
+  type ServiceIndex,
+} from '@mmg/reference';
 import type { DrugFacts } from '@mmg/rules';
-import { and, desc, eq, ilike, inArray, lte, or, type SQL } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, lte, or, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
   refDpcDrug,
@@ -11,7 +20,9 @@ import {
   refMunicipality,
   refService,
   referenceDataset,
+  referenceUpdateRun,
 } from '../db/schema';
+import type { SeriesStatus } from './update';
 
 /** Versione di una banca dati, come la vedono le schermate (A6). */
 export interface DatasetVersion {
@@ -26,11 +37,30 @@ export interface DatasetVersion {
   rows: number;
   act: string | null;
   origin: string;
-  /** Oltre quanti giorni la versione è più vecchia del previsto; null = soglia da completare. */
+  /** Oltre quanti giorni la versione è più vecchia del previsto; null = nessuna soglia d'età. */
   staleAfterDays: number | null;
-  /** Vero se più vecchia del previsto; null se la soglia non c'è. Non blocca nulla (A6). */
+  /**
+   * Vero se più vecchia del previsto (A6, D156): la sua fonte non è stata controllata nell'ultimo
+   * aggiornamento, l'aggiornamento di stanotte manca, una versione più nuova aspetta qualcuno, o è
+   * oltre la soglia d'età. Null se non si sa nulla (nessun aggiornamento registrato e nessuna
+   * soglia). Non blocca nulla: il controllo finale resta del SAC.
+   */
   stale: boolean | null;
+  /** Perché è più vecchia del previsto, in parole. */
+  staleReasons: string[];
+  /** Ultimo controllo riuscito della sua fonte, se si sa. */
+  checkedAt: string | null;
 }
+
+/** Da dove la consultazione sa se le versioni sono aggiornate (D156). */
+export interface Freshness {
+  now: () => Date;
+  /** Da quando dovrebbe esserci un aggiornamento nuovo; null senza aggiornamento automatico. */
+  expectedSince: (at: Date) => Date | null;
+}
+
+const dayIt = (d: Date | string) =>
+  new Intl.DateTimeFormat('it-IT', { timeZone: 'Europe/Rome' }).format(new Date(d));
 
 export interface DrugInfo {
   aic: string;
@@ -40,6 +70,8 @@ export interface DrugInfo {
   atc: string | null;
   form: string | null;
   supplyRegime: string | null;
+  /** Ditta titolare dell'AIC: per i generici, il fornitore (D151). */
+  holder: string | null;
   drugClass: string | null;
   price: string | null;
   equivalenceGroup: string | null;
@@ -51,6 +83,25 @@ export interface DrugInfo {
 }
 
 const SEARCH_LIMIT = 30;
+
+/** Sinonimi e sigle dei materiali (D153), letti una volta. */
+const SERVICE_SEARCH = loadServiceSearchData(SERVICE_SEARCH_DATA);
+
+interface ServiceRow {
+  regionalCode: string;
+  nationalCode: string | null;
+  description: string;
+  branch: string | null;
+  fee: string | null;
+  notes: string | null;
+}
+
+/**
+ * Indici della ricerca delle prestazioni, per versione del catalogo. Una versione importata non
+ * cambia più (A2): l'indice non va mai rifatto, e una versione nuova ha il suo.
+ */
+const SERVICE_INDEXES = new Map<string, ServiceIndex<ServiceRow>>();
+const MAX_SERVICE_INDEXES = 8;
 const MS_PER_DAY = 86_400_000;
 
 function daysBetween(from: string, to: string): number {
@@ -64,6 +115,18 @@ function likeText(q: string): string {
 
 const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
 
+/** Ordine degli equivalenti: prima il prezzo; a parità, nome e AIC, lo stesso a ogni ricerca. */
+export function compareEquivalents(
+  a: Pick<DrugInfo, 'aic' | 'name' | 'price'>,
+  b: Pick<DrugInfo, 'aic' | 'name' | 'price'>,
+): number {
+  return (
+    (a.price ?? '').localeCompare(b.price ?? '', 'it', { numeric: true }) ||
+    lower(a.name).localeCompare(lower(b.name)) ||
+    a.aic.localeCompare(b.aic)
+  );
+}
+
 /**
  * Banche dati alla data: per ogni serie vale la versione con la data di inizio più recente non
  * successiva alla data chiesta; a parità di data, l'ultima importata (A5).
@@ -72,7 +135,35 @@ export class ReferenceData {
   constructor(
     private readonly db: Database,
     private readonly mappings?: MappingSet,
+    private readonly freshness?: Freshness,
   ) {}
+
+  /** Stato delle serie dopo l'ultimo aggiornamento finito, e se quello di stanotte manca. */
+  private async updateState() {
+    const [last] = await this.db
+      .select({
+        startedAt: referenceUpdateRun.startedAt,
+        seriesStatus: referenceUpdateRun.seriesStatus,
+      })
+      .from(referenceUpdateRun)
+      .where(isNotNull(referenceUpdateRun.finishedAt))
+      .orderBy(desc(referenceUpdateRun.startedAt))
+      .limit(1);
+    const [started] = await this.db
+      .select({ startedAt: referenceUpdateRun.startedAt })
+      .from(referenceUpdateRun)
+      .orderBy(desc(referenceUpdateRun.startedAt))
+      .limit(1);
+    const series = new Map(
+      ((last?.seriesStatus as SeriesStatus[] | null) ?? []).map((x) => [x.series, x]),
+    );
+    const expected = this.freshness ? this.freshness.expectedSince(this.freshness.now()) : null;
+    const late =
+      expected && (!started || started.startedAt.getTime() < expected.getTime())
+        ? `l’aggiornamento di ogni notte manca dal ${dayIt(expected)}`
+        : null;
+    return { series, last: last ?? null, late, scheduled: expected !== null };
+  }
 
   async inEffect(kind: DatasetKind, date: string) {
     return this.db
@@ -104,12 +195,27 @@ export class ReferenceData {
     kinds: readonly DatasetKind[] = Object.keys(KINDS) as DatasetKind[],
   ) {
     const out: DatasetVersion[] = [];
+    const state = await this.updateState();
     for (const kind of kinds) {
       for (const d of await this.inEffect(kind, date)) {
         const staleAfterDays = this.staleAfter(d.series, kind);
         const reference = d.downloadedAt
           ? new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(d.downloadedAt)
           : d.validFrom;
+        const status = state.series.get(d.series);
+        // Una versione che sync non aggiorna (trascrizione senza PDF scaricato) non dipende dalla notte.
+        const updatable = d.origin === 'sync' || !!d.source;
+        const reasons: string[] = [...(status?.pending ?? [])];
+        if (status?.checkFailed && state.last) {
+          reasons.push(
+            `l’aggiornamento del ${dayIt(state.last.startedAt)} non è riuscito a controllare la fonte`,
+          );
+        }
+        if (state.late && updatable) reasons.push(state.late);
+        const tooOld = staleAfterDays !== null && daysBetween(reference, date) > staleAfterDays;
+        if (tooOld) reasons.push(`scaricata da più di ${staleAfterDays} giorni`);
+        const known =
+          status !== undefined || staleAfterDays !== null || (state.scheduled && updatable);
         out.push({
           kind,
           kindLabel: KINDS[kind].label,
@@ -123,7 +229,9 @@ export class ReferenceData {
           act: d.act,
           origin: d.origin,
           staleAfterDays,
-          stale: staleAfterDays === null ? null : daysBetween(reference, date) > staleAfterDays,
+          stale: reasons.length > 0 ? true : known ? false : null,
+          staleReasons: reasons,
+          checkedAt: status?.checkedAt ?? null,
         });
       }
     }
@@ -188,6 +296,7 @@ export class ReferenceData {
         atc,
         form: pick(d.map((x) => x.form)),
         supplyRegime: pick(d.map((x) => x.supplyRegime)),
+        holder: pick(d.map((x) => x.holder)),
         drugClass: classA ? 'A' : pick(c.map((x) => x.drugClass)),
         price: pick((classA ? [classA] : c).map((x) => x.price)),
         equivalenceGroup: pick(c.map((x) => x.equivalenceGroup)),
@@ -264,19 +373,49 @@ export class ReferenceData {
       rows.map((r) => r.aic).filter((x) => x !== aic),
       date,
     );
-    return [...found.values()].sort((a, b) =>
-      (a.price ?? '').localeCompare(b.price ?? '', 'it', { numeric: true }),
-    );
+    return [...found.values()].sort(compareEquivalents);
   }
 
-  /** Catalogo regionale: descrizione, branca, codice regionale o del nomenclatore. */
+  /**
+   * Catalogo regionale per parole chiave (D153): parole in qualunque ordine, sinonimi, sigle dei
+   * materiali per esteso, codice del catalogo o del nomenclatore. Le varianti dello stesso codice
+   * del nomenclatore restano vicine.
+   */
   async searchServices(q: string, date: string, limit = SEARCH_LIMIT) {
-    const text = q.trim();
     const ids = await this.ids('prestazioni', date);
-    if (!text || !ids.length) return [];
-    const like = `%${likeText(text)}%`;
-    const prefix = `${likeText(text)}%`;
-    return this.db
+    if (!q.trim() || !ids.length) return [];
+    const index = await this.serviceIndex(ids);
+    return searchServices(index, q, limit).map((h) => ({
+      ...h.item,
+      /** Il materiale tra quadre, per esteso se la sigla è nota. */
+      material: h.material,
+    }));
+  }
+
+  /**
+   * Il catalogo delle prestazioni in uso alla data, per le regole e per la ricetta (D154): la voce
+   * del codice del catalogo, o null se il codice non c'è; undefined se nessun catalogo è importato.
+   */
+  async serviceLookup(
+    date: string,
+  ): Promise<((code: string) => { nationalCode: string | null } | null) | undefined> {
+    const ids = await this.ids('prestazioni', date);
+    if (!ids.length) return undefined;
+    const index = await this.serviceIndex(ids);
+    const byCode = new Map(
+      index.entries.map((e) => [e.item.regionalCode.trim().toUpperCase(), e.item.nationalCode]),
+    );
+    return (code) => {
+      const key = code.trim().toUpperCase();
+      return byCode.has(key) ? { nationalCode: byCode.get(key) ?? null } : null;
+    };
+  }
+
+  private async serviceIndex(ids: string[]) {
+    const key = [...ids].sort().join(',');
+    const cached = SERVICE_INDEXES.get(key);
+    if (cached) return cached;
+    const rows = await this.db
       .select({
         regionalCode: refService.regionalCode,
         nationalCode: refService.nationalCode,
@@ -286,19 +425,13 @@ export class ReferenceData {
         notes: refService.notes,
       })
       .from(refService)
-      .where(
-        and(
-          inArray(refService.datasetId, ids),
-          or(
-            ilike(refService.regionalCode, prefix),
-            ilike(refService.nationalCode, prefix),
-            ilike(refService.description, like),
-            ilike(refService.branch, like),
-          ),
-        ),
-      )
-      .orderBy(refService.description)
-      .limit(limit);
+      .where(inArray(refService.datasetId, ids));
+    const index = indexServices(rows, SERVICE_SEARCH);
+    if (SERVICE_INDEXES.size >= MAX_SERVICE_INDEXES) {
+      SERVICE_INDEXES.delete(SERVICE_INDEXES.keys().next().value!);
+    }
+    SERVICE_INDEXES.set(key, index);
+    return index;
   }
 
   async searchExemptions(q: string, date: string, limit = SEARCH_LIMIT) {

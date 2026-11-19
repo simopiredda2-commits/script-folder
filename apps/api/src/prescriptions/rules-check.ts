@@ -24,6 +24,8 @@ export interface RulesCheckDeps {
   exemptionExists?: (code: string) => boolean | undefined;
   /** Sostituisce l'elenco regionale esenzione → prestazioni (R17, prove). */
   exemptionServices?: (code: string) => ReadonlySet<string> | undefined;
+  /** Sostituisce il catalogo regionale delle prestazioni (R10, R18, prove). */
+  serviceCatalog?: (code: string) => { nationalCode: string | null } | null;
 }
 
 /** Data di oggi nello studio (Europe/Rome), AAAA-MM-GG. */
@@ -71,6 +73,7 @@ export async function buildRuleContext(
       drugName: l.drugName,
       activeIngredient: l.activeIngredient,
       serviceCode: l.serviceCode,
+      serviceNationalCode: l.serviceNationalCode,
       quantity: l.quantity,
       aifaNote: l.aifaNote,
       notSubstitutable: l.notSubstitutable,
@@ -90,8 +93,11 @@ export async function buildRuleContext(
 
   const date = studioDate((deps.now ?? (() => new Date()))());
   let drugFacts = deps.drugFacts;
-  let { exemptionExists, exemptionServices } = deps;
+  let { exemptionExists, exemptionServices, serviceCatalog } = deps;
   if (deps.reference) {
+    if (!serviceCatalog && p.kind === 'specialist_ssn') {
+      serviceCatalog = await deps.reference.serviceLookup(date);
+    }
     if (!drugFacts) {
       const known = await deps.reference.drugs(
         lines.map((l) => l.drugAic).filter((x): x is string => !!x),
@@ -127,6 +133,7 @@ export async function buildRuleContext(
       reminderContact: pt!.reminderContact,
       reminderChannelChosenOn: pt!.reminderChannelChosenOn,
     },
+    ...(serviceCatalog ? { serviceCatalog } : {}),
     exemptions: await db
       .select({ code: exemption.code, validFrom: exemption.validFrom, validTo: exemption.validTo })
       .from(exemption)

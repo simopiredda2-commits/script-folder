@@ -16,6 +16,7 @@ import {
   diaryDetail,
   doctorProfile,
   exemption,
+  fseSetting,
   patient,
   prescription,
   sickLeaveCertificate,
@@ -87,7 +88,11 @@ export async function createScenario(
     | 'secondFactor'
     | 'sickLeaveGateway'
     | 'regional'
-  > = {},
+    | 'fse'
+  > & {
+    /** Aggiornamento delle banche dati (D156), costruito con l'orologio della prova. */
+    referenceUpdates?: (now: () => Date) => NonNullable<AppDeps['referenceUpdates']>;
+  } = {},
 ): Promise<Scenario> {
   const clock = new Clock();
   const encryptionKey = randomBytes(32);
@@ -105,6 +110,23 @@ export async function createScenario(
     })
     .returning();
   const studioId = st!.id;
+  // Impostazioni del Fascicolo di prova: OID dell'arco 2.999, riservato agli esempi (tappa 11).
+  await db.insert(fseSetting).values({
+    studioId,
+    documentIdRoot: '2.999.10.1',
+    repositoryId: '2.999.10.2',
+    submissionIdRoot: '2.999.10.3',
+    custodianIdRoot: '2.999.10.4',
+    custodianIdExtension: 'CUSTODE-PROVA',
+    custodianName: 'Custode di prova',
+    custodianStreet: 'Via del Custode 1',
+    custodianCity: 'Comune di prova',
+    custodianIstatCode: '999999',
+    custodianProvince: 'XX',
+    locality: 'STUDIO DI PROVA^^^^^&2.999.10.5&ISO^^^^000001',
+    clinicalActivity: 'OBS',
+    administrativeRequest: 'SSN',
+  });
   const passwordHash = await hashPassword(PASSWORD);
   const suffix = randomBytes(3).toString('hex');
 
@@ -132,6 +154,11 @@ export async function createScenario(
       regionalCode: 'MMG-PROVA-1',
       asl: 'ASL di prova',
       fiscalCode: doctorCf('Marchi', 'Elena', 'F'),
+      // Nome, cognome e recapiti per il Profilo Sanitario Sintetico (tappa 11); domini .invalid.
+      firstName: 'Elena',
+      lastName: 'Marchi',
+      phone: '000 0000001',
+      email: 'studio.marchi@esempio.invalid',
     },
     {
       userId: users.collega.id,
@@ -144,6 +171,9 @@ export async function createScenario(
       regionalCode: 'MMG-PROVA-3',
       asl: 'ASL di prova',
       fiscalCode: doctorCf('Fiore', 'Marco', 'M'),
+      firstName: 'Marco',
+      lastName: 'Fiore',
+      pec: 'marco.fiore@pec.esempio.invalid',
     },
   ]);
   // Credenziali inventate e un codice di sessione lungo, per le prove che non riguardano le
@@ -332,11 +362,13 @@ export async function createScenario(
       .returning({ id: sickLeaveCertificate.id }),
   );
 
+  const { referenceUpdates, ...deps } = appOptions;
   const app = buildApp({
     db,
     config: { encryptionKey, sessionMaxHours: 12, cookieSecure: false },
     now: clock.now,
-    ...appOptions,
+    ...deps,
+    ...(referenceUpdates ? { referenceUpdates: referenceUpdates(clock.now) } : {}),
     secondFactor,
   });
   return {

@@ -210,6 +210,13 @@ legend {
   border-bottom: 1px solid var(--color-divider);
 }
 
+/* Nel piede il nome e «by SCRIPT» stanno sulla stessa riga, centrati in verticale. */
+.firma-piede {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
 .app-footer {
   justify-content: space-between;
   border-top: 1px solid var(--color-divider);
@@ -721,6 +728,45 @@ legend {
   color: var(--color-warning);
 }
 
+.versioni-motivi {
+  color: var(--color-text);
+}
+
+/* Il collegamento all'aggiornamento: bersaglio di almeno 44 px. */
+.versioni-aggiornamento {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+/* Aggiornamento delle banche dati (D156): esito con simbolo e parola. */
+.esito-aggiornamento {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.esito-fatto {
+  color: var(--color-success);
+}
+
+.esito-avviso {
+  color: var(--color-warning);
+}
+
+.esito-errore {
+  color: var(--color-danger);
+}
+
+.esito-info {
+  color: var(--color-info);
+}
+
+.da-controllare > li {
+  margin-bottom: 0.5rem;
+}
+
 /* Oggi ------------------------------------------------------------------------------------ */
 
 .agenda {
@@ -910,6 +956,128 @@ a.coda:hover {
   align-items: center;
   min-height: var(--size-min-target);
   font-weight: 600;
+}
+
+/* Farmaci nella cartella (D152): lo sfondo tenue dice come si prende il farmaco e la barra a
+   sinistra lo ripete in colore pieno; la parola c'è sempre. Senza colore: non in corso. */
+.farmaco {
+  --farmaco-sfondo: var(--color-surface);
+  --farmaco-barra: var(--color-border);
+  background: var(--farmaco-sfondo);
+  border-left: 6px solid var(--farmaco-barra);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.farmaco-cronica {
+  --farmaco-sfondo: var(--color-therapy-chronic-surface);
+  --farmaco-barra: var(--color-therapy-chronic-edge);
+}
+
+.farmaco-ciclo {
+  --farmaco-sfondo: var(--color-therapy-cycle-surface);
+  --farmaco-barra: var(--color-therapy-cycle-edge);
+}
+
+.farmaco-al-bisogno {
+  --farmaco-sfondo: var(--color-therapy-as-needed-surface);
+  --farmaco-barra: var(--color-therapy-as-needed-edge);
+}
+
+.farmaco-non-in-corso {
+  border-top: 1px solid var(--color-divider);
+  border-right: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.terapia-riga.farmaco,
+.elenco-farmaci .farmaco {
+  margin-bottom: 0.375rem;
+  padding: 0.375rem 0.75rem 0.375rem 0.25rem;
+}
+
+.terapia-riga.farmaco:not(.farmaco-non-in-corso) {
+  border-bottom: none;
+}
+
+/* Sulle tinte le etichette grigie sparirebbero: fondo bianco e bordo. */
+.farmaco .etichetta {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.etichetta-tipologia,
+.farmaco .etichetta-tipologia {
+  background: var(--color-therapy-origin-surface);
+  border: 1px solid var(--color-therapy-origin-edge);
+  color: var(--color-therapy-origin);
+  font-weight: 600;
+}
+
+.legenda-colori {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.75rem;
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+}
+
+.legenda-titolo {
+  margin: 0;
+  font-weight: 600;
+}
+
+.legenda-colori ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legenda-colori li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.legenda-colori .etichetta {
+  margin-right: 0;
+}
+
+/* I campioni della legenda prendono i colori dalle stesse classi delle righe. */
+.campione {
+  display: inline-block;
+  width: 1.75rem;
+  height: 1.125rem;
+  background: var(--farmaco-sfondo, var(--color-surface));
+  border-left: 4px solid var(--farmaco-barra, var(--color-border));
+  border-radius: 0 3px 3px 0;
+}
+
+.elenco-farmaci {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.elenco-farmaci .farmaco {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 1rem;
+  align-items: center;
+}
+
+.farmaco-conti {
+  display: block;
+}
+
+/* Collegamenti nelle tabelle delle prestazioni prescritte: bersaglio alto 44 px. */
+.tabella-prescritte a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-min-target);
 }
 
 .parametri {
@@ -1659,4 +1827,94 @@ textarea[aria-invalid='true'] {
 
 .tabella .pulsante {
   white-space: nowrap;
+}
+
+/* Profilo sanitario sintetico (tappa 11) --------------------------------------------------- */
+
+.sezione-profilo {
+  border-top: 1px solid var(--color-divider);
+  padding-top: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.sezione-profilo > legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.sezione-profilo > legend + * {
+  clear: left;
+}
+
+.manca-voce {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem 2.25rem;
+  color: var(--color-warning);
+}
+
+.azioni-profilo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  border-top: 1px solid var(--color-divider);
+  padding-top: 1rem;
+}
+
+.azioni-profilo > p {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+/* Dati fissi delle impostazioni dello studio: etichetta sopra, valore sotto. */
+.dati-fissi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2rem;
+  margin: 0 0 1rem;
+}
+
+.dati-fissi dt {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.dati-fissi dd {
+  margin: 0;
+}
+
+/* Modelli dei certificati (tappa 13) ------------------------------------------------------- */
+
+.segnaposto {
+  margin: 0 0 1rem;
+}
+
+.segnaposto summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-min-target);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.segnaposto dl {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 0;
+}
+
+.segnaposto dl > div {
+  display: contents;
+}
+
+.segnaposto dt {
+  overflow-wrap: anywhere;
+}
+
+.segnaposto dd {
+  margin: 0;
 }

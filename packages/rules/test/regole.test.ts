@@ -82,10 +82,14 @@ const blocks = (c: RuleContext, id: string) =>
 describe('dati delle regole', () => {
   const [ruleset] = loadRulesets();
 
-  it('ogni versione è valida e contiene R1–R17 una volta ciascuna', () => {
+  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3', () => {
     const all = loadRulesets();
-    expect(all.map((r) => r.version)).toEqual(['2026-11-18.1', '2026-11-18.2']);
-    for (const rs of all) expect(rs.rules.map((r) => r.id).sort()).toEqual([...RULE_IDS].sort());
+    expect(all.map((r) => r.version)).toEqual(['2026-11-18.1', '2026-11-18.2', '2026-11-18.3']);
+    const upTo17 = RULE_IDS.filter((id) => id !== 'R18');
+    for (const rs of all.slice(0, 2)) {
+      expect(rs.rules.map((r) => r.id).sort()).toEqual([...upTo17].sort());
+    }
+    expect(all[2]!.rules.map((r) => r.id).sort()).toEqual([...RULE_IDS].sort());
   });
 
   it('la versione .2 rende R11 solo informativo (seconda fermata); la .1 resta com’era', () => {
@@ -117,7 +121,7 @@ describe('dati delle regole', () => {
 
   it('si usa la versione in vigore alla data della ricetta', () => {
     // A parità di data vale la versione con il numero più alto.
-    expect(rulesetAt('2026-11-18').version).toBe('2026-11-18.2');
+    expect(rulesetAt('2026-11-18').version).toBe('2026-11-18.3');
     expect(() => rulesetAt('2026-11-17')).toThrow(/Nessuna versione/);
     const later = { ...ruleset!, version: '2027-01-01.1', effectiveFrom: '2027-01-01' };
     expect(rulesetAt('2026-12-31', [ruleset!, later]).version).toBe('2026-11-18.1');
@@ -125,7 +129,7 @@ describe('dati delle regole', () => {
   });
 
   it('la versione usata resta nel risultato', () => {
-    expect(run(ctx()).rulesVersion).toBe('2026-11-18.2');
+    expect(run(ctx()).rulesVersion).toBe('2026-11-18.3');
   });
 });
 
@@ -355,6 +359,75 @@ describe('R10 · controlli formali', () => {
       },
     });
     expect(blocks(spec, 'R10')).toBe(true);
+  });
+});
+
+describe('R10 e R18 · i due codici della specialistica (D154)', () => {
+  // Sistema TS, prescrizione (5/12/2024): codProdPrest (nomenclatore) e codCatalogoPrescr
+  // (catalogo regionale) obbligatori; il Sistema TS controlla la coppia sul catalogo della Regione.
+  const catalog = new Map([['90271.0', { nationalCode: '90.27.1' }]]);
+  const spec = (extra: Partial<LineContext>, over: Partial<RuleContext> = {}) =>
+    ctx({
+      prescription: {
+        kind: 'specialist_ssn',
+        accessType: 'subsequent',
+        diagnosticQuestion: 'Controllo',
+        lines: [line({ drugAic: null, drugName: null, activeIngredient: null, ...extra })],
+      },
+      serviceCatalog: (code) => catalog.get(code) ?? null,
+      ...over,
+    });
+
+  it('dal catalogo in uso il codice del nomenclatore si ricava: niente blocco', () => {
+    expect(blocks(spec({ serviceCode: '90271.0' }), 'R10')).toBe(false);
+    expect(of(spec({ serviceCode: '90271.0' }), 'R18')).toEqual([]);
+  });
+
+  it('codice del nomenclatore diverso da quello del catalogo: blocca', () => {
+    const c = spec({ serviceCode: '90271.0', serviceNationalCode: '90.27.2' });
+    expect(blocks(c, 'R10')).toBe(true);
+    expect(of(c, 'R10')[0]!.message).toMatch(
+      /non corrisponde a quello del catalogo in uso \(90\.27\.1\)/,
+    );
+    // Punti e spazi non contano.
+    expect(blocks(spec({ serviceCode: '90271.0', serviceNationalCode: '90271' }), 'R10')).toBe(
+      false,
+    );
+  });
+
+  it('codice scritto a mano, fuori dal catalogo in uso: R10 vuole il codice del nomenclatore', () => {
+    expect(blocks(spec({ serviceCode: '99999.9' }), 'R10')).toBe(true);
+    expect(blocks(spec({ serviceCode: '99999.9', serviceNationalCode: '99.99.9' }), 'R10')).toBe(
+      false,
+    );
+  });
+
+  it('R18: fuori dal catalogo in uso avvisa e chiede un motivo; con il motivo lo registra', () => {
+    const manual = { serviceCode: '99999.9', serviceNationalCode: '99.99.9' };
+    const warn = of(spec(manual), 'R18');
+    expect(warn).toHaveLength(1);
+    expect(warn[0]).toMatchObject({ severity: 'warn', needs: 'reason' });
+    expect(blocks(spec(manual), 'R18')).toBe(true);
+    const ok = spec(manual, {
+      reasons: { R18: 'Codice nuovo, catalogo del programma non ancora aggiornato' },
+    });
+    expect(blocks(ok, 'R18')).toBe(false);
+    expect(of(ok, 'R18')[0]!.message).toMatch(/motivo registrato: Codice nuovo/);
+  });
+
+  it('senza un catalogo importato R18 tace e R10 vuole il codice sulla riga', () => {
+    const none = spec({ serviceCode: '90271.0' }, { serviceCatalog: undefined });
+    expect(of(none, 'R18')).toEqual([]);
+    expect(blocks(none, 'R10')).toBe(true);
+  });
+
+  it('le ricette controllate con la versione precedente restano com’erano', () => {
+    const before = rulesetAt(
+      '2026-11-18',
+      loadRulesets().filter((r) => r.version !== '2026-11-18.3'),
+    );
+    expect(before.rules.some((r) => r.id === 'R18')).toBe(false);
+    expect(before.rules.find((r) => r.id === 'R10')!.values).toEqual({});
   });
 });
 

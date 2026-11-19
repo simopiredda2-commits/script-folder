@@ -1,19 +1,36 @@
 import {
+  ALLERGY_AGENT_DB,
+  ALLERGY_AGENTS,
+  ALLERGY_CRITICALITIES,
+  ALLERGY_CRITICALITY_DB,
+  ALLERGY_KIND_DB,
+  ALLERGY_KINDS,
   ANAMNESIS_KIND,
   ANAMNESIS_SECTIONS,
+  AIC_PATTERN,
+  ATC_PATTERN,
   CONTACT_KIND,
   CONTACT_TYPES,
   ENTRY_KIND,
   ENTRY_TYPES,
   ICD9_DIAGNOSIS_PATTERN,
   MEASURE_KEYS,
+  MOTOR_CAPACITIES,
+  MOTOR_CAPACITY_KEYS,
+  PROBLEM_CATEGORIES,
+  PROBLEM_CATEGORY_KIND,
+  RELATIVE_KEYS,
   checkProblemDates,
   entryTypeOf,
   keyOf,
   measureByKey,
+  motorCapacityByKey,
   parseMeasureValue,
+  relativeByCode,
+  relativeByKey,
   type EntryType,
 } from '@mmg/domain';
+import { FSE_DICTIONARIES, fseDictionaryEntry } from '@mmg/integrations';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from '../db/client';
@@ -24,6 +41,7 @@ import {
   clinicalEntry,
   diaryDetail,
   examinationDetail,
+  functionalStatusDetail,
   measurementDetail,
   problemDetail,
   riskFactorDetail,
@@ -58,6 +76,10 @@ const problem = z
     dal: isoDate.optional(),
     risoltoIl: isoDate.optional(),
     quesitoAperto: z.boolean().optional(),
+    /** Patologia cronica: entra nel Profilo Sanitario Sintetico. */
+    cronico: z.boolean().optional(),
+    /** Organo mancante, trapianto, malformazione: dati obbligatori del Profilo. */
+    categoria: z.enum(PROBLEM_CATEGORIES).default('diagnosi'),
   })
   .strict();
 
@@ -85,6 +107,10 @@ const anamnesis = z
     ...common,
     sezione: z.enum(ANAMNESIS_SECTIONS),
     testo: longText(5000),
+    /** Solo per l'anamnesi familiare: parente, patologia in ICD-9-CM, età all'esordio. */
+    parente: z.enum(RELATIVE_KEYS).optional(),
+    codice: z.string().trim().toUpperCase().max(10).optional(),
+    etaEsordio: z.number().int().min(0).max(130).optional(),
   })
   .strict();
 
@@ -95,6 +121,19 @@ const allergy = z
     sostanza: longText(200),
     reazione: optionalText(500),
     daFarmaco: z.boolean().optional(),
+    /** Per il Profilo: allergia o intolleranza, agente, codice dell'agente, criticità. */
+    natura: z.enum(ALLERGY_KINDS).default('allergia'),
+    agente: z.enum(ALLERGY_AGENTS).optional(),
+    codiceAgente: z.string().trim().toUpperCase().max(20).optional(),
+    criticita: z.enum(ALLERGY_CRITICALITIES).optional(),
+  })
+  .strict();
+
+const motorCapacity = z
+  .object({
+    tipo: z.literal('capacita_motoria'),
+    ...common,
+    capacita: z.enum(MOTOR_CAPACITY_KEYS),
   })
   .strict();
 
@@ -126,6 +165,7 @@ export const newEntryBody = z.discriminatedUnion('tipo', [
   allergy,
   lifestyle,
   examination,
+  motorCapacity,
 ]);
 export type NewEntry = z.infer<typeof newEntryBody>;
 
@@ -153,6 +193,10 @@ export const entryPatchBody = z
     stato: z.enum(['attivo', 'risolto']).optional(),
     risoltoIl: isoDate.nullable().optional(),
     quesitoAperto: z.boolean().optional(),
+    /** Problema cronico o no (per il Profilo Sanitario Sintetico). */
+    cronico: z.boolean().optional(),
+    /** Allergia ancora attiva o no. */
+    allergiaAttiva: z.boolean().optional(),
   })
   .strict()
   .refine((p) => Object.keys(p).length > 0, { message: 'Nessun campo da modificare' });
@@ -174,11 +218,35 @@ export function entryIssues(e: NewEntry, today: string): string[] {
   if (e.promemoria && e.promemoria < e.data)
     out.push('Promemoria: la data viene prima di quella della voce');
   if (e.tipo === 'problema') {
-    if (e.codice && !ICD9_DIAGNOSIS_PATTERN.test(e.codice))
+    if (e.categoria === 'organo_mancante') {
+      if (!e.codice) out.push('Organo mancante: scegli il codice dall’elenco ufficiale');
+      else if (!fseDictionaryEntry(FSE_DICTIONARIES.missingOrgans, e.codice))
+        out.push('Organo mancante: il codice non è nell’elenco ufficiale «Organi mancanti»');
+    } else if (e.codice && !ICD9_DIAGNOSIS_PATTERN.test(e.codice))
       out.push('Codice: non è nel formato ICD-9-CM (es. 401.9, 250.00, V17.3)');
     out.push(
       ...checkProblemDates({ state: e.stato, onsetOn: e.dal, resolvedOn: e.risoltoIl }, today),
     );
+  }
+  if (e.tipo === 'anamnesi') {
+    const family = e.parente !== undefined || e.codice !== undefined || e.etaEsordio !== undefined;
+    if (family && e.sezione !== 'familiare')
+      out.push('Parente, codice ed età all’esordio valgono solo per l’anamnesi familiare');
+    if (e.codice && !ICD9_DIAGNOSIS_PATTERN.test(e.codice))
+      out.push('Codice: non è nel formato ICD-9-CM (es. 401.9, 250.00, V17.3)');
+  }
+  if (e.tipo === 'allergia') {
+    if (e.daFarmaco && e.agente && e.agente !== 'farmaco')
+      out.push('Allergia da farmaco: l’agente dev’essere un farmaco');
+    const agent = e.agente ?? (e.daFarmaco ? 'farmaco' : undefined);
+    if (e.codiceAgente) {
+      if (!agent) out.push('Codice dell’agente: indica prima di che agente si tratta');
+      else if (agent === 'farmaco') {
+        if (!AIC_PATTERN.test(e.codiceAgente) && !ATC_PATTERN.test(e.codiceAgente))
+          out.push('Codice del farmaco: scrivi l’AIC (9 cifre) o l’ATC (per esempio J01CA04)');
+      } else if (!fseDictionaryEntry(FSE_DICTIONARIES.allergens, e.codiceAgente))
+        out.push('Codice dell’agente: non è nell’elenco ufficiale degli allergeni');
+    }
   }
   if (e.tipo === 'misura') {
     const r = parseMeasureValue(e.valore, measureByKey(e.parametro)!);
@@ -217,11 +285,14 @@ export async function insertEntry(
       await tx.insert(problemDetail).values({
         entryId,
         icdCode: e.codice || null,
+        icdSystem: e.categoria === 'organo_mancante' ? MISSING_ORGANS_SYSTEM : 'ICD-9-CM',
         description: e.descrizione,
         state: e.stato === 'risolto' ? 'resolved' : 'active',
         onsetOn: e.dal ?? null,
         resolvedOn: e.risoltoIl ?? null,
         openQuestion: e.quesitoAperto ?? false,
+        chronic: e.cronico ?? false,
+        category: PROBLEM_CATEGORY_KIND[e.categoria],
       });
       break;
     case 'diario':
@@ -239,17 +310,40 @@ export async function insertEntry(
       break;
     }
     case 'anamnesi':
-      await tx
-        .insert(anamnesisDetail)
-        .values({ entryId, section: ANAMNESIS_KIND[e.sezione], text: e.testo });
+      await tx.insert(anamnesisDetail).values({
+        entryId,
+        section: ANAMNESIS_KIND[e.sezione],
+        text: e.testo,
+        relativeCode: e.parente ? relativeByKey(e.parente)!.code : null,
+        icdCode: e.codice || null,
+        onsetAge: e.etaEsordio ?? null,
+      });
       break;
-    case 'allergia':
+    case 'allergia': {
+      const agent = e.agente ?? (e.daFarmaco ? 'farmaco' : undefined);
       await tx.insert(allergyDetail).values({
         entryId,
         substance: e.sostanza,
         reaction: e.reazione || null,
-        drugRelated: e.daFarmaco ?? false,
+        drugRelated: e.daFarmaco ?? agent === 'farmaco',
+        kind: ALLERGY_KIND_DB[e.natura],
+        agentCategory: agent ? ALLERGY_AGENT_DB[agent] : null,
+        agentCode: e.codiceAgente || null,
+        agentSystem: e.codiceAgente
+          ? agent === 'farmaco'
+            ? AIC_PATTERN.test(e.codiceAgente)
+              ? 'AIC'
+              : 'ATC'
+            : 'ALLERGENI'
+          : null,
+        criticality: e.criticita ? ALLERGY_CRITICALITY_DB[e.criticita] : null,
       });
+      break;
+    }
+    case 'capacita_motoria':
+      await tx
+        .insert(functionalStatusDetail)
+        .values({ entryId, motorCapacity: motorCapacityByKey(e.capacita)!.code });
       break;
     case 'stile_di_vita':
       await tx.insert(riskFactorDetail).values({ entryId, factor: e.fattore, value: e.valore });
@@ -266,6 +360,9 @@ export async function insertEntry(
   return entryId;
 }
 
+/** Sistema dei codici degli organi mancanti nel dettaglio del problema. */
+export const MISSING_ORGANS_SYSTEM = 'Organi mancanti (ICD-10)';
+
 /** Dettaglio di una voce nell'interfaccia, con le parole dei requisiti. */
 export type EntryDetail =
   | {
@@ -276,13 +373,32 @@ export type EntryDetail =
       dal: string | null;
       risoltoIl: string | null;
       quesitoAperto: boolean;
+      cronico: boolean;
+      categoria: string | undefined;
     }
   | { contatto: string | undefined; testo: string }
   | { parametro: string; valore: string; unita: string }
-  | { sezione: string | undefined; testo: string }
-  | { sostanza: string; reazione: string | null; daFarmaco: boolean }
+  | {
+      sezione: string | undefined;
+      testo: string;
+      parente: string | null;
+      codice: string | null;
+      etaEsordio: number | null;
+    }
+  | {
+      sostanza: string;
+      reazione: string | null;
+      daFarmaco: boolean;
+      natura: string | undefined;
+      agente: string | null;
+      codiceAgente: string | null;
+      sistemaAgente: string | null;
+      criticita: string | null;
+      attiva: boolean;
+    }
   | { fattore: string; valore: string }
-  | { testo: string; scala: string | null; punteggio: string | null };
+  | { testo: string; scala: string | null; punteggio: string | null }
+  | { capacita: string | null; codice: string };
 
 /** I dettagli delle voci, per id. */
 async function loadDetails(db: Database | Tx, ids: string[]) {
@@ -297,6 +413,8 @@ async function loadDetails(db: Database | Tx, ids: string[]) {
       dal: r.onsetOn,
       risoltoIl: r.resolvedOn,
       quesitoAperto: r.openQuestion,
+      cronico: r.chronic,
+      categoria: keyOf(PROBLEM_CATEGORY_KIND, r.category),
     });
   for (const r of await db.select().from(diaryDetail).where(inArray(diaryDetail.entryId, ids)))
     out.set(r.entryId, { contatto: keyOf(CONTACT_KIND, r.contactType), testo: r.text });
@@ -309,12 +427,32 @@ async function loadDetails(db: Database | Tx, ids: string[]) {
     .select()
     .from(anamnesisDetail)
     .where(inArray(anamnesisDetail.entryId, ids)))
-    out.set(r.entryId, { sezione: keyOf(ANAMNESIS_KIND, r.section), testo: r.text });
+    out.set(r.entryId, {
+      sezione: keyOf(ANAMNESIS_KIND, r.section),
+      testo: r.text,
+      parente: r.relativeCode ? (relativeByCode(r.relativeCode)?.key ?? null) : null,
+      codice: r.icdCode,
+      etaEsordio: r.onsetAge,
+    });
   for (const r of await db.select().from(allergyDetail).where(inArray(allergyDetail.entryId, ids)))
     out.set(r.entryId, {
       sostanza: r.substance,
       reazione: r.reaction,
       daFarmaco: r.drugRelated,
+      natura: keyOf(ALLERGY_KIND_DB, r.kind),
+      agente: r.agentCategory ? (keyOf(ALLERGY_AGENT_DB, r.agentCategory) ?? null) : null,
+      codiceAgente: r.agentCode,
+      sistemaAgente: r.agentSystem,
+      criticita: r.criticality ? (keyOf(ALLERGY_CRITICALITY_DB, r.criticality) ?? null) : null,
+      attiva: r.active,
+    });
+  for (const r of await db
+    .select()
+    .from(functionalStatusDetail)
+    .where(inArray(functionalStatusDetail.entryId, ids)))
+    out.set(r.entryId, {
+      capacita: MOTOR_CAPACITIES.find((m) => m.code === r.motorCapacity)?.key ?? null,
+      codice: r.motorCapacity,
     });
   for (const r of await db
     .select()
@@ -442,9 +580,23 @@ export async function patchEntry(
 ): Promise<void> {
   if (entry.status === 'annulled') throw new HttpError(409, 'La voce è annullata: non si modifica');
   const problemFields =
-    patch.stato !== undefined || patch.risoltoIl !== undefined || patch.quesitoAperto !== undefined;
+    patch.stato !== undefined ||
+    patch.risoltoIl !== undefined ||
+    patch.quesitoAperto !== undefined ||
+    patch.cronico !== undefined;
   if (problemFields && entry.kind !== 'problem')
-    throw new HttpError(400, 'Stato, risoluzione e quesito aperto valgono solo per i problemi');
+    throw new HttpError(
+      400,
+      'Stato, risoluzione, quesito aperto e cronicità valgono solo per i problemi',
+    );
+  if (patch.allergiaAttiva !== undefined) {
+    if (entry.kind !== 'allergy')
+      throw new HttpError(400, 'Attiva o non più attiva vale solo per le allergie');
+    await tx
+      .update(allergyDetail)
+      .set({ active: patch.allergiaAttiva })
+      .where(eq(allergyDetail.entryId, entry.id));
+  }
   if (patch.promemoria && patch.promemoria < entry.occurredOn)
     throw new HttpError(400, 'Promemoria: la data viene prima di quella della voce');
   const common: Partial<typeof clinicalEntry.$inferInsert> = {};
@@ -474,6 +626,7 @@ export async function patchEntry(
       state: state === 'risolto' ? 'resolved' : 'active',
       resolvedOn,
       ...(patch.quesitoAperto !== undefined ? { openQuestion: patch.quesitoAperto } : {}),
+      ...(patch.cronico !== undefined ? { chronic: patch.cronico } : {}),
     })
     .where(eq(problemDetail.entryId, entry.id));
 }

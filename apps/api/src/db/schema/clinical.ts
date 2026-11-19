@@ -24,6 +24,7 @@ export const clinicalEntryKind = pgEnum('clinical_entry_kind', [
   'vaccination',
   'lab_result',
   'report',
+  'functional_status',
 ]);
 export const entryStatus = pgEnum('entry_status', ['active', 'annulled']);
 
@@ -65,8 +66,18 @@ const entryRef = () =>
     .references(() => clinicalEntry.id);
 
 export const problemState = pgEnum('problem_state', ['active', 'resolved']);
+/** Che cosa è il problema per il Profilo Sanitario Sintetico (DM 27/6/2025, allegato 1). */
+export const problemCategory = pgEnum('problem_category', [
+  'diagnosis',
+  'missing_organ',
+  'transplant',
+  'malformation',
+]);
 
-/** Problema o diagnosi, in ICD-9-CM (dal 2027 ICD-10-IM). */
+/**
+ * Problema o diagnosi, in ICD-9-CM (dal 2027 ICD-10-IM). Gli organi mancanti hanno il codice
+ * del dizionario ufficiale «Organi mancanti» (ICD-10), come vuole il Profilo (tappa 11).
+ */
 export const problemDetail = pgTable('problem_detail', {
   entryId: entryRef(),
   icdCode: text(),
@@ -77,6 +88,9 @@ export const problemDetail = pgTable('problem_detail', {
   resolvedOn: date(),
   /** Quesito diagnostico ancora aperto. */
   openQuestion: boolean().notNull().default(false),
+  /** Patologia cronica: entra nel Profilo Sanitario Sintetico (dato obbligatorio). */
+  chronic: boolean().notNull().default(false),
+  category: problemCategory().notNull().default('diagnosis'),
 });
 
 export const contactType = pgEnum('contact_type', ['office', 'home', 'phone', 'televisit']);
@@ -107,7 +121,21 @@ export const anamnesisDetail = pgTable('anamnesis_detail', {
   entryId: entryRef(),
   section: anamnesisSection().notNull(),
   text: text().notNull(),
+  /** Anamnesi familiare: parente (codice RoleCode HL7), patologia in ICD-9-CM, età all'esordio. */
+  relativeCode: text(),
+  icdCode: text(),
+  onsetAge: integer(),
 });
+
+export const allergyKind = pgEnum('allergy_kind', ['allergy', 'intolerance']);
+export const allergyAgent = pgEnum('allergy_agent', [
+  'drug',
+  'food',
+  'hymenoptera_venom',
+  'environment',
+  'other',
+]);
+export const allergyCriticality = pgEnum('allergy_criticality', ['low', 'moderate', 'high']);
 
 /** Allergia o reazione avversa: sempre visibile in testata. */
 export const allergyDetail = pgTable('allergy_detail', {
@@ -115,6 +143,15 @@ export const allergyDetail = pgTable('allergy_detail', {
   substance: text().notNull(),
   reaction: text(),
   drugRelated: boolean().notNull().default(false),
+  // Per il Profilo Sanitario Sintetico (tappa 11)
+  kind: allergyKind().notNull().default('allergy'),
+  agentCategory: allergyAgent(),
+  /** Codice dell'agente: AIC o ATC per i farmaci, dizionario ufficiale degli allergeni. */
+  agentCode: text(),
+  agentSystem: text(),
+  criticality: allergyCriticality(),
+  /** Allergia ancora attiva; una non più attiva resta nello storico. */
+  active: boolean().notNull().default(true),
 });
 
 /** Stili di vita e fattori di rischio: fumo, alcol, attività fisica. */
@@ -122,6 +159,12 @@ export const riskFactorDetail = pgTable('risk_factor_detail', {
   entryId: entryRef(),
   factor: text().notNull(),
   value: text().notNull(),
+});
+
+/** Capacità motoria (Profilo Sanitario Sintetico): codice del dizionario ufficiale. */
+export const functionalStatusDetail = pgTable('functional_status_detail', {
+  entryId: entryRef(),
+  motorCapacity: text().notNull(),
 });
 
 /** Esame obiettivo e valutazioni, comprese le schede UVG. */

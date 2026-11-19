@@ -29,6 +29,15 @@
   --color-info-surface: #E8ECFF;
   --color-chart-series1: #4D6BFE;
   --color-chart-series2: #D55181;
+  --color-therapy-chronic-surface: #D3E8FA;
+  --color-therapy-chronic-edge: #1F6FB2;
+  --color-therapy-cycle-surface: #D8EFCC;
+  --color-therapy-cycle-edge: #3B7D28;
+  --color-therapy-as-needed-surface: #FFEDA8;
+  --color-therapy-as-needed-edge: #866A00;
+  --color-therapy-origin: #5B2C91;
+  --color-therapy-origin-surface: #E8DCFA;
+  --color-therapy-origin-edge: #7445B3;
   --font-display: 'Special Gothic Expanded One', 'IBM Plex Sans', system-ui, sans-serif;
   --font-text: 'IBM Plex Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;

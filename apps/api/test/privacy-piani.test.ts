@@ -2,11 +2,9 @@ import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { therapy } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
-import { studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
-
-const DAY = 86_400_000;
+import { studioDayFrom } from './helpers/dates';
 
 interface PrivacyView {
   consensi: {
@@ -58,7 +56,7 @@ describe('privacy: consensi del Fascicolo e deleghe (tappa 9)', () => {
     await t?.drop();
   });
 
-  const day = (offset: number) => studioDate(new Date(s.clock.now().getTime() + offset * DAY));
+  const day = (offset: number) => studioDayFrom(s.clock.now(), offset);
   const req = (method: 'GET' | 'POST', url: string, cookie: string, payload?: object) =>
     s.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
   const base = () => `/api/pazienti/${s.richPatient}`;
@@ -213,7 +211,7 @@ describe('piani terapeutici dalla cartella (tappa 9)', () => {
     await t?.drop();
   });
 
-  const day = (offset: number) => studioDate(new Date(s.clock.now().getTime() + offset * DAY));
+  const day = (offset: number) => studioDayFrom(s.clock.now(), offset);
   const req = (method: 'GET' | 'POST' | 'PUT', url: string, cookie: string, payload?: object) =>
     s.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
   const url = () => `/api/pazienti/${s.richPatient}/piani`;

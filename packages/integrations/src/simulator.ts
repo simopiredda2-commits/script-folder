@@ -25,6 +25,12 @@ export interface SimulatorOptions {
   decideStatus?: (nre: string) => DispensingState | 'unreachable' | 'timeout';
   /** Ricetta SSN accettata ma senza codice di autenticazione: per provare che il promemoria non esce. */
   omitAuthCode?: (message: PrescriptionMessage) => boolean;
+  /**
+   * Catalogo regionale che la Regione ha trasmesso al Sistema TS (D154): il SAR controlla la coppia
+   * «codice del nomenclatore – codice del catalogo» di ogni prestazione e rifiuta quelle che non
+   * conosce. Senza, il simulatore accetta ogni coppia.
+   */
+  regionalCatalog?: (nationalCode: string | null, catalogCode: string | null) => boolean;
   /** Attesa prima della risposta, per provare il tempo massimo di attesa. */
   delayMs?: number;
   /**
@@ -97,6 +103,21 @@ export class SimulatedGateway implements PrescriptionGateway {
     if (this.options.delayMs) await new Promise((ok) => setTimeout(ok, this.options.delayMs));
     const refused = this.authRefusal(auth);
     if (refused) return refused;
+    const unknown =
+      message.kind === 'specialist_ssn' && this.options.regionalCatalog
+        ? message.lines.find(
+            (l) =>
+              !this.options.regionalCatalog!(l.serviceNationalCode ?? null, l.serviceCode ?? null),
+          )
+        : undefined;
+    if (unknown) {
+      return {
+        outcome: 'rejected',
+        code: 'SIM-CAT',
+        message: `Prestazione ${unknown.serviceCode ?? ''}: la coppia di codici nomenclatore ${unknown.serviceNationalCode ?? '—'} e catalogo ${unknown.serviceCode ?? '—'} non è nel catalogo regionale (simulato)`,
+        raw: { simulatore: this.system, esito: 'codice non in catalogo' },
+      };
+    }
     const outcome = this.options.decide?.(message) ?? 'accepted';
     switch (outcome) {
       case 'accepted': {

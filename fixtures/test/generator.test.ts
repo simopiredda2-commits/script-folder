@@ -1,6 +1,6 @@
 import { checkFiscalCode } from '@mmg/domain';
 import { describe, expect, it } from 'vitest';
-import { FICTITIOUS_PLACE_LETTER, generatePatients } from '../src/generator';
+import { ageAt, FICTITIOUS_PLACE_LETTER, generatePatients } from '../src/generator';
 
 describe('pazienti inventati', () => {
   const a = generatePatients({ seed: 'prova', count: 200 });
@@ -40,6 +40,21 @@ describe('pazienti inventati', () => {
     for (const p of a) {
       expect(new Date(`${p.birthDate}T00:00:00Z`).toISOString().slice(0, 10)).toBe(p.birthDate);
     }
+  });
+
+  it('età minima: nessun paziente più giovane; gli adulti restano gli stessi, in ordine (D149)', () => {
+    expect(a.some((p) => ageAt(p.birthDate, '2026-11-18') < 18)).toBe(true);
+    const adults = generatePatients({ seed: 'prova', count: 60, minAge: 18 });
+    expect(adults).toHaveLength(60);
+    for (const p of adults)
+      expect(ageAt(p.birthDate, '2026-11-18'), p.birthDate).toBeGreaterThanOrEqual(18);
+    expect(adults).toEqual(a.filter((p) => ageAt(p.birthDate, '2026-11-18') >= 18).slice(0, 60));
+  });
+
+  it('età in anni compiuti, il giorno del compleanno compreso', () => {
+    expect(ageAt('2008-11-18', '2026-11-18')).toBe(18);
+    expect(ageAt('2008-11-19', '2026-11-18')).toBe(17);
+    expect(ageAt('2008-02-29', '2026-03-01')).toBe(18);
   });
 
   it('copre tutti gli stati del paziente', () => {

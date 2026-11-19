@@ -747,3 +747,73 @@ export function ServiceHistoryPage() {
     </>
   );
 }
+
+/**
+ * Storico di un farmaco prescritto senza terapia in cartella (D152): per AIC, per principio
+ * attivo o, se la riga è scritta a mano, per nome. Con le stesse regole dello storico (D65).
+ */
+export function DrugHistoryPage() {
+  const { id } = useParams<{ id: string }>();
+  const [params] = useSearchParams();
+  const aic = params.get('aic');
+  const ingredient = params.get('principio');
+  const name = params.get('farmaco');
+  const record = useApi<{ paziente: Patient }>(`/api/pazienti/${id}`);
+  const history = useApi<History>(
+    `/api/pazienti/${id}/storico-prescrizioni${query({ aic, principio: ingredient, farmaco: name })}`,
+  );
+  const first = history.data?.voci[0]?.riga;
+  const title = first?.farmaco ?? ingredient ?? name ?? (aic ? `AIC ${aic}` : 'Farmaco');
+  if (record.loading && !record.data) return <Loading what="dati della cartella" />;
+  if (!record.data) return <ErrorMessage error={record.error} />;
+  const p = record.data.paziente;
+  return (
+    <>
+      <PageHeader
+        title={title}
+        trail={
+          <>
+            <Link to={`/pazienti/${id}`}>
+              {p.firstName} {p.lastName}
+            </Link>{' '}
+            <span aria-hidden="true">/</span>{' '}
+            <Link to={`/pazienti/${id}/farmaci`}>Farmaci prescritti</Link>{' '}
+            <span aria-hidden="true">/</span> <span>Storico del farmaco</span>
+          </>
+        }
+      />
+      <PatientBanner patient={p} />
+      <section className="riquadro" aria-labelledby="titolo-storico-farmaco">
+        <h2 id="titolo-storico-farmaco">
+          <Icon name="storico" /> Storico delle prescrizioni
+        </h2>
+        <p className="tenue">
+          Prescritto senza una terapia in cartella.{' '}
+          {aic
+            ? `Ricette con l’AIC ${aic}.`
+            : ingredient
+              ? `Ricette con il principio attivo ${ingredient}.`
+              : 'Ricette con questo nome, scritto a mano.'}
+        </p>
+        <ErrorMessage error={history.error} />
+        {history.data && (
+          <>
+            <p>
+              Confezioni prescritte negli ultimi 12 mesi:{' '}
+              <strong>{history.data.ultimi12Mesi}</strong>
+              {history.data.annullateUltimi12Mesi > 0 && (
+                <> · inviate e poi annullate: {history.data.annullateUltimi12Mesi}</>
+              )}
+            </p>
+            <HistoryTable
+              history={history.data}
+              kind="farmaco"
+              onChange={history.reload}
+              patientId={id!}
+            />
+          </>
+        )}
+      </section>
+    </>
+  );
+}

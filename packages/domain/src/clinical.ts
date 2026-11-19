@@ -16,6 +16,7 @@ export const ENTRY_TYPES = [
   'allergia',
   'stile_di_vita',
   'esame_obiettivo',
+  'capacita_motoria',
 ] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
 
@@ -28,6 +29,7 @@ export const ENTRY_KIND = {
   allergia: 'allergy',
   stile_di_vita: 'risk_factor',
   esame_obiettivo: 'examination',
+  capacita_motoria: 'functional_status',
 } as const satisfies Record<EntryType, string>;
 export type EntryKind = (typeof ENTRY_KIND)[EntryType];
 
@@ -44,6 +46,7 @@ export const ENTRY_TYPE_LABELS: Record<EntryType, string> = {
   allergia: 'Allergia o reazione avversa',
   stile_di_vita: 'Stile di vita o fattore di rischio',
   esame_obiettivo: 'Esame obiettivo o valutazione',
+  capacita_motoria: 'Capacità motoria',
 };
 
 /** Tipo di contatto del diario: studio, domicilio, telefono, televisita. */

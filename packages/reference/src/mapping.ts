@@ -20,7 +20,17 @@ const mappingSchema = z.object({
   colonne: z.record(z.string(), z.string().nullable()),
   /** Campo → valore uguale per tutto il file (per esempio la classe di un elenco). */
   costanti: z.record(z.string(), z.string()).default({}),
-  /** Oltre quanti giorni la versione in uso è più vecchia del previsto (A6); null = da completare. */
+  /**
+   * Campo → espressioni regolari (su tutta la cella) dei valori che nel file vogliono dire
+   * «nessun valore»: per esempio «-» al posto di un prezzo. Solo quelli visti nei file veri,
+   * con il motivo nella nota della mappatura.
+   */
+  nessunValore: z.record(z.string(), z.array(z.string().min(1))).default({}),
+  /**
+   * Oltre quanti giorni dal download la versione in uso è più vecchia del previsto (A6). Solo
+   * dove la fonte dichiara una cadenza regolare; null = nessuna soglia d'età, vale il controllo di
+   * ogni notte (D156).
+   */
   vecchiaDopoGiorni: z.number().int().positive().nullable(),
   nota: z.string().optional(),
 });
@@ -44,9 +54,24 @@ export function parseMappings(data: unknown): MappingSet {
     if (ids.has(m.id)) throw new Error(`Mappatura ripetuta: ${m.id}`);
     ids.add(m.id);
     const fields = KINDS[m.tipo].fields as Record<string, FieldSpec>;
-    for (const f of [...Object.keys(m.colonne), ...Object.keys(m.costanti)]) {
+    for (const f of [
+      ...Object.keys(m.colonne),
+      ...Object.keys(m.costanti),
+      ...Object.keys(m.nessunValore),
+    ]) {
       if (!(f in fields))
         throw new Error(`Mappatura ${m.id}: il tipo ${m.tipo} non ha il campo ${f}`);
+    }
+    for (const [f, patterns] of Object.entries(m.nessunValore)) {
+      if (fields[f]!.required)
+        throw new Error(`Mappatura ${m.id}: il campo ${f} è obbligatorio, non può mancare`);
+      for (const p of patterns) {
+        try {
+          new RegExp(p, 'u');
+        } catch {
+          throw new Error(`Mappatura ${m.id}: espressione non valida per ${f}: ${p}`);
+        }
+      }
     }
     if (m.origine === 'sync' && (!m.fonte || !m.chiave)) {
       throw new Error(`Mappatura ${m.id}: per un file di sync servono fonte e chiave`);
@@ -112,6 +137,8 @@ export interface Extraction {
   missingColumns: string[];
   /** Riga dell'intestazione nel file, da 1. */
   headerLine: number | null;
+  /** Per campo, quante celle valevano «nessun valore» secondo la mappatura. */
+  noValue: Record<string, number>;
 }
 
 /** Quante righe guardare per trovare l'intestazione (titoli sopra la tabella). */
@@ -138,8 +165,16 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
       problems: [],
       missingColumns: wanted.filter(([f]) => !best.found.has(f)).map(([, h]) => h),
       headerLine: best.line >= 0 ? best.line + 1 : null,
+      noValue: {},
     };
   }
+  const empty = Object.fromEntries(
+    Object.entries(m.nessunValore).map(([f, ps]) => [
+      f,
+      ps.map((p) => new RegExp(`^(?:${p})$`, 'u')),
+    ]),
+  );
+  const noValue: Record<string, number> = {};
   const records: DataRecord[] = [];
   const problems: RowProblem[] = [];
   for (let i = best.line + 1; i < rows.length; i++) {
@@ -149,7 +184,11 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
     let ok = true;
     for (const [field, spec] of Object.entries(fields)) {
       const idx = best.found.get(field);
-      const raw = idx !== undefined ? (row[idx] ?? '') : (m.costanti[field] ?? '');
+      let raw = idx !== undefined ? (row[idx] ?? '') : (m.costanti[field] ?? '');
+      if (empty[field]?.some((re) => re.test(raw.trim()))) {
+        noValue[field] = (noValue[field] ?? 0) + 1;
+        raw = '';
+      }
       const converted = convertCell(spec, raw);
       if ('problem' in converted) {
         problems.push({ line: i + 1, field, problem: converted.problem });
@@ -158,5 +197,5 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
     }
     if (ok) records.push(record);
   }
-  return { records, problems, missingColumns: [], headerLine: best.line + 1 };
+  return { records, problems, missingColumns: [], headerLine: best.line + 1, noValue };
 }

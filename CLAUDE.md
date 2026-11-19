@@ -35,7 +35,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 ## Regole che non si discutono
 
 1. **Nessun dato reale**: test, demo, fixture e log usano solo pazienti inventati.
-2. **Sviluppo indipendente**: niente copie di schermate, documentazione o dati di altri software (in particolare Evolus Next²). Si parte dai requisiti, dalle specifiche pubbliche e da come lavora la dottoressa. Le schermate di Next² mandate da Simone o dalla Dr.ssa Rocca, che lo usano, possono suggerire campi e funzioni che loro chiedono perché servono (D89). I campi obbligatori si verificano sulle specifiche pubbliche. Non si copiano impaginazione, testi, codice, documentazione o dati di Next², e le schermate non entrano nel repository.
+2. **Sviluppo indipendente**: niente copie di schermate, documentazione o dati di altri software (in particolare Evolus Next²). Si parte dai requisiti, dalle specifiche pubbliche e da come lavora la dottoressa. Le schermate di Next² mandate da Simone o dalla Dr.ssa Rocca, che lo usano, possono suggerire campi e funzioni che loro chiedono perché servono (D89). I campi obbligatori si verificano sulle specifiche pubbliche. Non si copiano impaginazione, testi, codice, documentazione o dati di Next², e le schermate non entrano nel repository. Una prova controlla la provenienza di immagini, documenti e archivi e le licenze delle dipendenze; il registro è `docs/provenienze.md` (D142).
 3. **Non diventare un dispositivo medico**: niente suggerimenti diagnostici o terapeutici. Le regole di prescrizione sono solo controlli formali.
 4. **I dati sono del medico**: esportazione completa in formato aperto, sempre possibile.
 5. **Ruoli e tracciamento**: la segreteria prepara, il medico firma e invia; ogni accesso a una cartella viene registrato.
@@ -45,7 +45,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Come si lavora con Simone
 
-- In italiano: documenti, commit e PR. Codice in inglese, tranne i termini normativi senza equivalente (impegnativa, esenzione, DPC); interfaccia in italiano.
+- **Regola: con Simone si scrive sempre e solo in italiano.** Vale per ogni messaggio, compresi gli aggiornamenti intermedi, le domande e le descrizioni dei comandi, e per documenti, commit e PR. Codice in inglese, tranne i termini normativi senza equivalente (impegnativa, esenzione, DPC); interfaccia in italiano.
 - Alle fermate le domande si fanno con il pulsante (AskUserQuestion): poche, ognuna con le opzioni e quella consigliata, mai «dimmi tu» in prosa. **Tra le fermate nessuna domanda**: si annotano in `docs/avanzamento.md`.
 - Se un dettaglio non è deciso: scegli, scrivi scelta e motivo in `docs/decisioni.md`, vai avanti.
 - Se qualcosa è irreversibile: non farlo, annotalo in `docs/avanzamento.md` e prosegui con il resto.
@@ -73,7 +73,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 | `packages/domain`       | Modello del dominio                                                                           |
 | `packages/rules`        | Regole di prescrizione: valori e fonti versionati come dati, mai scritti nel codice           |
 | `packages/integrations` | Interfacce e simulatori (SAR/SIRPED, Sistema TS, AURA, INPS, FSE)                             |
-| `packages/reference`    | Lettura dei file di `sync/` (CSV, XLSX), tipi di banca dati, mappature come dati              |
+| `packages/reference`    | Lettura dei file di `sync/` (CSV, XLSX), tipi di banca dati, mappature e trascrizioni (D159)  |
 | `sync/`                 | Banche dati pubbliche (Python)                                                                |
 | `fixtures/`             | Pazienti inventati (generatore deterministico); `banche-dati/`: sito e trascrizioni d'esempio |
 | `docs/`                 | Requisiti, prototipi, decisioni, avanzamento, logo                                            |
@@ -87,29 +87,30 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 
 - `scripts/avvio-sessione.sh` è l'hook SessionStart (`.claude/settings.json`). Solo se `CLAUDE_CODE_REMOTE=true`: avvia Postgres 16, crea se mancano l'utente `mmg` (password locale `mmg`, con CREATEDB) e il database `mmg_dev`, scrive `DATABASE_URL` e `TZ=Europe/Rome` in `$CLAUDE_ENV_FILE`, installa le dipendenze solo se è cambiato un file che le decide (impronte in `node_modules/.avvio-sessione.sha256`).
 - `DATABASE_URL=postgres://mmg:mmg@localhost:5432/mmg_dev` (valore locale, non un segreto; vedi `.env.example`).
-- La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e sette siti pubblici, solo per leggere specifiche e decreti (Sistema TS, Gazzetta Ufficiale, INPS, AIFA, Regione Piemonte, Ministero della Salute; D92). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7).
+- La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e alcuni siti pubblici, solo per leggere specifiche, decreti e dati aperti (Sistema TS, Gazzetta Ufficiale, Normattiva, INPS, AIFA anche `drive.aifa.gov.it`, Regione Piemonte, Ministero della Salute, due ASL; D92, D148). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7).
 
 ## Comandi
 
-| Comando                                                     | Cosa fa                                                                         |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `pnpm install`                                              | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                            |
-| `pnpm dev`                                                  | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)  |
-| `pnpm test`                                                 | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python) |
-| `pnpm lint`                                                 | ESLint, Prettier in controllo, tipi di ogni pacchetto                           |
-| `pnpm format`                                               | Prettier in scrittura                                                           |
-| `pnpm db:migrate`                                           | Applica le migrazioni a `DATABASE_URL`                                          |
-| `pnpm db:seed`                                              | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)  |
-| `pnpm banche-dati:importa -- --dati DIR --trascrizioni DIR` | Importa l'output di `sync/` e le trascrizioni dei PDF                           |
-| `pnpm banche-dati:importa -- --esempio`                     | Lancia `sync/` sul sito d'esempio e importa (banche dati dimostrative)          |
-| `pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts`     | Fotografa le schermate per `docs/interfaccia.md` (istruzioni nel file)          |
-| `pnpm --filter @mmg/domain docs:permessi`                   | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                      |
-| `pnpm --filter @mmg/rules docs:regole`                      | Rigenera la tabella di `docs/regole.md` dai dati delle regole                   |
-| `pnpm --filter @mmg/api db:generate`                        | Genera una migrazione dallo schema Drizzle                                      |
-| `pnpm fixtures -- --seed 1 --count 20`                      | Pazienti inventati in JSON (stesso seme, stessi pazienti)                       |
-| `pnpm --filter @mmg/brand tokens:css`                       | Rigenera `tokens.css` da `tokens.ts`                                            |
-| `pnpm --filter @mmg/brand logo:proposte`                    | Rigenera le proposte di logo e le tavole di `docs/logo.md`                      |
-| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'`      | Prova un controllo: rosso col guasto, verde dopo il ripristino                  |
+| Comando                                                      | Cosa fa                                                                         |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| `pnpm install`                                               | Dipendenze (in cloud lo fa l'hook, solo se cambiate)                            |
+| `pnpm dev`                                                   | Applica le migrazioni e avvia servizio (porta 3001) e interfaccia (porta 5173)  |
+| `pnpm test`                                                  | Tutte le prove: TypeScript (Vitest, con database temporanei) e `sync/` (Python) |
+| `pnpm lint`                                                  | ESLint, Prettier in controllo, tipi di ogni pacchetto                           |
+| `pnpm format`                                                | Prettier in scrittura                                                           |
+| `pnpm db:migrate`                                            | Applica le migrazioni a `DATABASE_URL`                                          |
+| `pnpm db:seed`                                               | Dati dimostrativi inventati (idempotente; password casuali mostrate una volta)  |
+| `pnpm banche-dati:importa -- --dati DIR --trascrizioni DIR`  | Importa l'output di `sync/` e le trascrizioni dei PDF                           |
+| `pnpm banche-dati:importa -- --esempio`                      | Lancia `sync/` sul sito d'esempio e importa (banche dati dimostrative)          |
+| `pnpm banche-dati:aggiorna -- --dati DIR --trascrizioni DIR` | Aggiornamento completo: `sync/`, importazione, registro del giro (D156)         |
+| `pnpm --filter @mmg/api exec tsx test/e2e/schermate.ts`      | Fotografa le schermate per `docs/interfaccia.md` (istruzioni nel file)          |
+| `pnpm --filter @mmg/domain docs:permessi`                    | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                      |
+| `pnpm --filter @mmg/rules docs:regole`                       | Rigenera la tabella di `docs/regole.md` dai dati delle regole                   |
+| `pnpm --filter @mmg/api db:generate`                         | Genera una migrazione dallo schema Drizzle                                      |
+| `pnpm fixtures -- --seed 1 --count 20`                       | Pazienti inventati in JSON (stesso seme, stessi pazienti)                       |
+| `pnpm --filter @mmg/brand tokens:css`                        | Rigenera `tokens.css` da `tokens.ts`                                            |
+| `pnpm --filter @mmg/brand logo:proposte`                     | Rigenera le proposte di logo e le tavole di `docs/logo.md`                      |
+| `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'`       | Prova un controllo: rosso col guasto, verde dopo il ripristino                  |
 
 Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano). Il servizio vuole anche `APP_ENCRYPTION_KEY` (in cloud la imposta l'hook).
 
@@ -122,10 +123,13 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/regole.md`: regole di prescrizione, generate dai dati.
 - `docs/logo.md`: proposte di logo.
 - `docs/banche-dati.md`: importazione delle banche dati, mappature, trascrizioni, versioni.
+- `docs/catalogo-regionale.md`: catalogo regionale in vigore, trascritto dai PDF, e che cosa controllare (D159).
 - `docs/interfaccia.md`: schermate (in `docs/schermate/`), accessibilità, che cosa manca.
 - `docs/credenziali.md`: credenziali dei servizi (Sistema TS, RUPAR) e secondo fattore.
 - `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.
 - `docs/fse.md`: Fascicolo Sanitario Elettronico 2.0 e Profilo Sanitario Sintetico, con le fonti (D110).
+- `docs/provenienze.md`: da dove viene ogni contenuto, a quali condizioni, chi lo controlla (D142).
+- `docs/aft.md`: condivisione del riepilogo tra i medici dell'AFT, con il consenso del paziente (D161).
 
 ## Le tappe
 
@@ -150,6 +154,7 @@ Terzo giro (via del 18/11/2026, D128), branch `tappe-11-12`, stesso metodo:
 
 11. Profilo Sanitario Sintetico per il Fascicolo con un simulatore del Gateway, dalle fonti di `docs/fse.md` (prima quelle ancora da leggere).
 12. Condivisione tra i medici dell'AFT che usano il programma. **Fermata dopo la tappa 12**, con lo stesso giro (domande con il pulsante, via, unione), poi fermarsi.
+13. Modelli dei certificati (richiesta diretta di Simone, D143): sportivo non agonistico, porto d'armi, anamnestico per la patente e altri; testi solo dagli atti ufficiali; si compilano i dati del paziente; menu «Modelli» negli strumenti; caratteri, intestazione e dimensioni scelti dal medico. Si fa dopo la 11 e prima della 12; la fermata della 12 copre anche questa.
 
 ## Come si chiude
 

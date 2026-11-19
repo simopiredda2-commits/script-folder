@@ -16,6 +16,7 @@ import { sql } from 'drizzle-orm';
 import { chromium, type Page } from 'playwright';
 import { buildApp } from '../../src/app';
 import { loadConfig } from '../../src/config';
+import { referenceUpdatesFromConfig } from '../../src/reference/updates-service';
 import { createDatabase, createPool } from '../../src/db/client';
 import { studioDate } from '../../src/prescriptions/rules-check';
 import { base32Decode } from '../../src/security/base32';
@@ -30,8 +31,14 @@ if (!user || !password) throw new Error('Servono SCHERMATE_UTENTE e SCHERMATE_PA
 const config = loadConfig();
 const pool = createPool(config.databaseUrl);
 const db = createDatabase(pool);
-const app = buildApp({ db, config: { ...config, cookieSecure: false } });
 const work = mkdtempSync(join(tmpdir(), 'mmg-schermate-'));
+// Aggiornamento delle banche dati sul sito d'esempio (D156), per la schermata degli strumenti.
+const referenceUpdates = referenceUpdatesFromConfig(db, {
+  dataDir: join(work, 'dati-pubblici'),
+  sources: 'esempio',
+  time: '03:30',
+});
+const app = buildApp({ db, config: { ...config, cookieSecure: false }, referenceUpdates });
 mkdirSync(OUT, { recursive: true });
 
 async function shot(page: Page, name: string, fullPage = false) {
@@ -123,12 +130,26 @@ try {
   await page.locator('table').getByText(/NRE/).first().waitFor();
   await shot(page, '06-scheda-terapia-e-storico');
 
-  await page.goto(`${base}/pazienti/${patientId}/ricetta`);
-  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('esempina');
+  // Pazienti con un quadro adatto al farmaco della schermata (D150): dulaglutide a chi ha il
+  // diabete tipo 2, l'amlodipina a un iperteso; il paziente principale ha il diabete tipo 1.
+  const withProblem = async (code: string) => {
+    const rows = await db.execute<{ id: string }>(sql`
+      select p.id, p.last_name from patient p
+      join clinical_entry c on c.patient_id = p.id and c.kind = 'problem'
+      join problem_detail d on d.entry_id = c.id and d.icd_code = ${code}
+      where p.id <> ${patientId} group by p.id, p.last_name order by p.last_name limit 1`);
+    return rows.rows[0]!.id;
+  };
+  const diabetes2PatientId = await withProblem('250.00');
+  const hypertensionPatientId = await withProblem('401.9');
+
+  await page.goto(`${base}/pazienti/${diabetes2PatientId}/ricetta`);
+  // Dulaglutide: in DPC con nota AIFA 100 e piano terapeutico (elenco della Regione Piemonte).
+  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('dulaglutide');
   // Si aspetta il risultato della ricerca, non la terapia in corso (anche lei è un risultato).
-  const esempina = page.locator('.risultato').filter({ hasText: 'ESEMPINA' });
-  await esempina.waitFor();
-  await esempina.getByRole('button', { name: 'Aggiungi' }).click();
+  const withPlan = page.locator('.risultato').filter({ hasText: 'TRULICITY' });
+  await withPlan.waitFor();
+  await withPlan.getByRole('button', { name: 'Aggiungi' }).click();
   await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
   await page.getByText(/Regole di prescrizione, versione/).waitFor();
   // I controlli in alto nella schermata, con un po' di spazio sopra.
@@ -152,7 +173,7 @@ try {
   await shot(page, '09-esami');
 
   await page.goto(`${base}/banche-dati`);
-  await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('provalina');
+  await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('amlodipina');
   await page.locator('.risultato').first().waitFor();
   await page
     .locator('.risultato')
@@ -162,23 +183,27 @@ try {
   await page.getByRole('table').waitFor();
   await shot(page, '10-farmaci-ed-equivalenti');
 
-  // Terapia completa (D80–D83), recapiti (D86) e archivio (D84).
-  await page.goto(`${base}/pazienti/${patientId}/terapie/nuova`);
+  // Terapia completa (D80–D83), recapiti (D86) e archivio (D84). La terapia nuova, scelta dalla
+  // banca dati con il nome della confezione, va a un paziente iperteso: le schermate della
+  // cartella del paziente principale restano senza nomi di ditte, per il sito (D149, D150).
+  const otherPatientId = hypertensionPatientId;
+  await page.goto(`${base}/pazienti/${otherPatientId}/terapie/nuova`);
   await page.getByRole('heading', { level: 1, name: 'Nuova terapia' }).waitFor();
   const restart = page.getByRole('button', { name: 'Annulla le modifiche' });
   if (await page.getByRole('button', { name: 'Cambia farmaco' }).count()) {
     await restart.click();
-    await page.goto(`${base}/pazienti/${patientId}/terapie/nuova`);
+    await page.goto(`${base}/pazienti/${otherPatientId}/terapie/nuova`);
   }
-  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('provalina');
-  const provalina = page.locator('.risultato').filter({ hasText: '28 compresse' });
-  await provalina.waitFor();
-  await provalina.getByRole('button', { name: 'Scegli' }).click();
+  await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
+  // Un generico che nessun paziente dimostrativo ha già in terapia.
+  const chosen = page.locator('.risultato').filter({ hasText: 'AMLODIPINA EG' });
+  await chosen.waitFor();
+  await chosen.getByRole('button', { name: 'Scegli' }).click();
   await page.getByLabel('Dose', { exact: true }).fill('1');
   await page.getByLabel('Unità', { exact: true }).selectOption('compressa');
   await page.getByLabel('Frequenza').selectOption('1 volta al giorno');
   await page.getByLabel('Momento').selectOption('la sera');
-  await page.getByLabel('Via').selectOption('per bocca');
+  await page.getByLabel('Via', { exact: true }).selectOption('per bocca');
   await page.getByLabel('Istruzioni per il paziente').fill('Dopo cena.');
   await page.getByText('1 compressa una volta al giorno, la sera, per bocca').waitFor();
   await page
@@ -210,8 +235,10 @@ try {
   // Tappa 9: voci cliniche, parametri con l'andamento, privacy, piani terapeutici (dati inventati).
   await page.goto(`${base}/pazienti/${patientId}/voci?tipo=problema`);
   await page.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
-  await page.getByLabel('Descrizione').fill('Ipertensione essenziale');
-  await page.getByLabel('Codice ICD-9-CM').fill('401.9');
+  // Una voce credibile per un trentenne con il diabete tipo 1 (D150).
+  await page.getByLabel('Descrizione').fill('Ipotiroidismo');
+  await page.getByLabel('Codice ICD-9-CM').fill('244.9');
+  await page.getByLabel(/Patologia cronica/).check();
   await page
     .getByLabel('Inizio', { exact: true })
     .fill(studioDate(new Date(Date.now() - 400 * 86_400_000)));
@@ -224,10 +251,10 @@ try {
   await page.goto(`${base}/pazienti/${patientId}/parametri`);
   await page.getByRole('heading', { level: 1, name: 'Parametri' }).waitFor();
   for (const [days, pas, pad, weight] of [
-    [270, '152', '96', '81,5'],
-    [180, '146', '92', '80'],
-    [90, '138', '88', '78,4'],
-    [7, '132', '84', '77'],
+    [270, '126', '82', '74,8'],
+    [180, '124', '80', '75,2'],
+    [90, '120', '78', '75,6'],
+    [7, '118', '76', '76'],
   ] as const) {
     await page
       .getByLabel('Data', { exact: true })
@@ -263,14 +290,17 @@ try {
   await page.evaluate(() => window.scrollTo(0, 0));
   await shot(page, '26-privacy');
 
-  await page.goto(`${base}/pazienti/${patientId}/piani`);
+  await page.goto(`${base}/pazienti/${diabetes2PatientId}/piani`);
   await page.getByRole('heading', { level: 1, name: 'Piani terapeutici' }).waitFor();
-  await page.getByLabel('Farmaco', { exact: true }).fill('Farmaco dimostrativo con piano');
-  await page.getByLabel('Principio attivo').fill('principio dimostrativo');
+  // Per principio attivo, con la descrizione AIFA del gruppo: nessun marchio a schermo (D149).
+  await page
+    .getByLabel('Farmaco', { exact: true })
+    .fill("DULAGLUTIDE 1,5MG 4 UNITA' USO PARENTERALE");
+  await page.getByLabel('Principio attivo').fill('DULAGLUTIDE');
   await page.getByLabel('Rilasciato il').fill(studioDate(new Date(Date.now() - 60 * 86_400_000)));
   await page.getByLabel('Scade il').fill(studioDate(new Date(Date.now() + 20 * 86_400_000)));
   await page.getByLabel('Confezioni autorizzate').fill('6');
-  await page.getByLabel('Centro che l’ha rilasciato').fill('Centro dimostrativo');
+  await page.getByLabel('Centro che l’ha rilasciato').fill('Diabetologia, centro dimostrativo');
   await page.getByRole('button', { name: 'Registra il piano' }).click();
   await page.getByText('Piano registrato.').waitFor();
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -279,9 +309,12 @@ try {
   // Tappa 10: una ricetta specialistica inviata (dal catalogo d'esempio), poi il suo seguito con
   // un referto inventato; presidi per diabetici.
   const found = await page.request.get(`${base}/api/prestazioni?q=prova`);
+  // Con il codice del nomenclatore: la riga della specialistica lo vuole (R10, D154).
   const service = (
-    (await found.json()) as { prestazioni: { regionalCode: string; description: string }[] }
-  ).prestazioni[0]!;
+    (await found.json()) as {
+      prestazioni: { regionalCode: string; nationalCode: string | null; description: string }[];
+    }
+  ).prestazioni.find((p) => p.nationalCode)!;
   const draft = await page.request.post(`${base}/api/pazienti/${patientId}/ricette`, {
     data: {
       kind: 'specialist_ssn',
@@ -291,6 +324,7 @@ try {
       lines: [
         {
           serviceCode: service.regionalCode,
+          serviceNationalCode: service.nationalCode,
           serviceDescription: service.description,
           quantity: 1,
         },
@@ -341,7 +375,7 @@ try {
   const worker = adult.rows[0]!.id;
   // Dalla cartella, come fa il medico: così il paziente è tra le cartelle aperte.
   await page.goto(`${base}/pazienti/${worker}`);
-  await page.getByRole('link', { name: 'Certificati' }).click();
+  await page.getByRole('link', { name: 'Certificati', exact: true }).click();
   await page.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
   await page.getByRole('button', { name: 'Nuovo certificato' }).click();
   await page
@@ -372,11 +406,104 @@ try {
     console.log(`  ${file}.png`);
   }
 
+  // Tappa 11: Profilo Sanitario Sintetico, dalla cartella al Fascicolo (simulatore del Gateway).
+  await page.goto(`${base}/pazienti/${patientId}`);
+  await page
+    .getByRole('navigation', { name: 'Sezioni della cartella' })
+    .getByRole('link', { name: 'Profilo sanitario sintetico' })
+    .click();
+  await page.getByRole('heading', { level: 1, name: 'Profilo sanitario sintetico' }).waitFor();
+  await page.getByRole('button', { name: 'Prepara il Profilo dalla cartella' }).click();
+  await page.getByText('Bozza preparata dalla cartella.').waitFor();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '30-profilo-sanitario-bozza', true);
+  await page.getByLabel('Ho controllato il contenuto del Profilo, voce per voce').check();
+  await page.getByRole('button', { name: 'Valida con il Gateway' }).click();
+  await page.getByText('Validato dal Gateway. Ora puoi firmarlo e pubblicarlo.').waitFor();
+  await page.getByRole('button', { name: 'Firma e pubblica' }).click();
+  await page.getByText('Profilo firmato e pubblicato nel Fascicolo.').waitFor();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '31-profilo-sanitario-pubblicato');
+  const pssHref = await page
+    .getByRole('link', { name: 'PDF firmato della versione 1' })
+    .getAttribute('href');
+  const pssPath = join(work, 'profilo-sanitario.pdf');
+  writeFileSync(pssPath, await (await page.request.get(`${base}${pssHref}`)).body());
+  execFileSync('pdftoppm', [
+    '-png',
+    '-r',
+    '96',
+    '-singlefile',
+    pssPath,
+    join(OUT, '32-profilo-sanitario-pdf'),
+  ]);
+  console.log('  32-profilo-sanitario-pdf.png');
+  await page.goto(`${base}/profilo/recapiti`);
+  await page.getByRole('heading', { level: 1, name: 'Recapiti di studio' }).waitFor();
+  await shot(page, '33-recapiti-di-studio');
+  await page.goto(`${base}/strumenti`);
+  await page.getByRole('heading', { level: 1, name: 'Strumenti dello studio' }).waitFor();
+  await shot(page, '34-strumenti', true);
+
+  // Tappa 13: modelli ufficiali e proposti (D158, D160), e il certificato della patente.
+  await page.goto(`${base}/strumenti?sezione=modelli`);
+  await page.getByRole('heading', { level: 2, name: 'Modelli ufficiali e proposti' }).waitFor();
+  await shot(page, '36-modelli', true);
+  await page.goto(`${base}/pazienti/${patientId}/certificati-modelli`);
+  await page.getByRole('heading', { level: 1, name: 'Altri certificati' }).waitFor();
+  await page.getByLabel('Modello').selectOption('patente-anamnestico');
+  for (const g of await page.locator('form fieldset.scelta-in-riga').all())
+    await g.getByRole('radio').first().check();
+  await page
+    .getByRole('group', { name: 'In cura presso il medico' })
+    .getByLabel('da un anno o più')
+    .check();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await shot(page, '37-certificato-patente', true);
+
+  // D156: aggiornamento delle banche dati, avviato dall'amministratore dello studio.
+  await page.goto(`${base}/strumenti?sezione=banche-dati`);
+  await page.getByRole('button', { name: 'Aggiorna adesso' }).click();
+  await page.getByText(/Pulsante «Aggiorna adesso» \(/).waitFor({ timeout: 120_000 });
+  await shot(page, '38-banche-dati', true);
+
+  // Tappa 12: AFT. La prima volta il medico la crea; poi condivide i pazienti con il consenso.
+  await page.goto(`${base}/strumenti?sezione=aft`);
+  await page
+    .getByRole('heading', { level: 2, name: 'Aggregazione funzionale territoriale' })
+    .waitFor();
+  if (await page.getByRole('button', { name: 'Crea l’AFT' }).count()) {
+    await page.getByLabel('Nome dell’AFT').fill('AFT dimostrativa');
+    await page.getByLabel('Azienda sanitaria (facoltativo)').fill('ASL dimostrativa');
+    await page.getByRole('button', { name: 'Crea l’AFT' }).click();
+  }
+  await page.getByRole('table', { name: 'Medici dell’AFT nel programma' }).waitFor();
+  const sharing = page.getByLabel(
+    'Condivido con i medici dell’AFT il riepilogo dei miei pazienti che hanno dato il consenso',
+  );
+  if (!(await sharing.isChecked())) await sharing.check();
+  await shot(page, '39-aft', true);
+
   await page.goto(`${base}/archivio`);
   await page.getByRole('heading', { level: 1, name: 'Archivio' }).waitFor();
   await page.getByLabel(/La segreteria legge il riepilogo clinico/).waitFor();
   await shot(page, '16-archivio');
 
+  // Più cartelle aperte insieme (D68, D129): una scheda per paziente nella barra sotto il menu,
+  // quella attiva in giallo; ogni scheda riporta all'ultima pagina vista di quel paziente.
+  const others = await db.execute<{ id: string }>(sql`
+    select id from patient where id <> ${patientId} order by last_name, first_name limit 4`);
+  for (const { id } of others.rows) {
+    await page.goto(`${base}/pazienti/${id}`);
+    await page.getByRole('heading', { name: 'Problemi attivi' }).waitFor();
+  }
+  await page.goto(`${base}/pazienti/${patientId}`);
+  await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+  const tabs = page.getByRole('navigation', { name: 'Cartelle aperte' }).getByRole('link');
+  if ((await tabs.count()) < 5) throw new Error('Servono almeno cinque cartelle aperte');
+  await shot(page, '35-cartelle-aperte');
+
+  // Su tablet la barra delle cartelle scorre e tiene in vista quella attiva.
   await page.setViewportSize({ width: 768, height: 1024 });
   await page.goto(`${base}/pazienti/${patientId}`);
   await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();

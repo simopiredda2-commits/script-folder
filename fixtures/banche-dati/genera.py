@@ -7,8 +7,15 @@ Si lancia a mano dalla radice del repository, solo quando gli esempi vanno cambi
 Serve openpyxl, solo per scrivere l'XLSX: è un produttore di file Excel diverso dal lettore del
 servizio, così la prova non legge file scritti dallo stesso codice che li legge.
 
-Tutto è inventato, tranne le intestazioni del file ISTAT dei comuni e le due righe di Agliè e
-Airasca, lette il 18/11/2026 dal file ISTAT aggiornato al 21/02/2026.
+Che cosa è vero e che cosa è inventato (docs/provenienze.md):
+- AIFA: intestazioni e righe copiate senza cambiare un byte dai file AIFA letti il 18/11/2026
+  (anagrafica delle confezioni e liste di classe A e H del 30/6/2026). Fonte: AIFA, dati aperti
+  con licenza CC BY 4.0 (https://www.aifa.gov.it/open-data). Le pagine HTML sono nostre.
+- Regione Piemonte, DPC: la riga di DULAGLUTIDE è quella dell'elenco «Farmaci PHT - oggetto di
+  DPC» aggiornato al 9/7/2026; il PDF del sito d'esempio è un estratto di prova scritto qui.
+- ISTAT: le intestazioni e le due righe di Agliè e Airasca, lette il 18/11/2026 dal file ISTAT
+  aggiornato al 21/02/2026.
+- Tutto il resto (catalogo delle prestazioni, esenzioni) è inventato.
 """
 
 import hashlib
@@ -27,9 +34,11 @@ def scrivi(percorso: Path, dati: bytes) -> None:
     percorso.write_bytes(dati)
 
 
-def pdf_di_prova(titolo: str) -> bytes:
-    """Un PDF di una pagina con una riga di testo; i riferimenti incrociati sono calcolati."""
-    testo = f"BT /F1 14 Tf 72 760 Td ({titolo}) Tj ET".encode("latin-1")
+def pdf_di_prova(titolo: str, *righe: str) -> bytes:
+    """Un PDF di una pagina con un titolo e qualche riga; i riferimenti incrociati sono calcolati."""
+    comandi = [f"BT /F1 14 Tf 72 760 Td ({titolo}) Tj ET"]
+    comandi += [f"BT /F1 10 Tf 72 {730 - 16 * i} Td ({r}) Tj ET" for i, r in enumerate(righe)]
+    testo = "\n".join(comandi).encode("latin-1")
     oggetti = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -104,40 +113,63 @@ def genera_istat() -> None:
     wb.save(percorso)
 
 
-# --------------------------------------------------------------------------- AIFA (intestazioni di prova)
+# --------------------------------------------------------------------------- AIFA (estratti veri)
 
-INTESTAZIONE_CLASSE = "AIC di prova;Principio attivo di prova;Prezzo di prova al 15/6/2026;Gruppo di equivalenza di prova;Nota di prova"
+# Righe copiate dai file AIFA letti il 18/11/2026, nell'ordine e con la codifica dei file veri:
+# anagrafica in utf-8 (tutta ASCII) con fine riga \n; liste di classe in cp1252 con \r\n, e
+# nella classe H l'intestazione «Codice AIC» va a capo dentro le virgolette. Scelte: amlodipina,
+# metformina e atorvastatina con un equivalente di marca; dulaglutide (in DPC, nota 100, piano);
+# ceftriaxone in classe H; paracetamolo, che non è nelle liste di classe A e H; nella classe H due
+# prezzi che non sono numeri («-» e il prezzo dell'ossigeno a metro cubo).
+ANAGRAFICA = [
+    '"CODICE_AIC";"COD_FARMACO";"COD_CONFEZIONE";"DENOMINAZIONE";"DESCRIZIONE";"CODICE_DITTA";"RAGIONE_SOCIALE";"STATO_AMMINISTRATIVO";"TIPO_PROCEDURA";"FORMA";"CODICE_ATC";"PA_ASSOCIATI";"FORNITURA";"LINK_FI";"LINK_RCP"',
+    '"038092019";"038092";"019";"AMLODIPINA DOC GENERICI";"5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC";898;"DOC GENERICI SRL";"Autorizzata";"Procedura Mutuo riconoscimento o Decentrata";"Compressa";"C08CA01";"AMLODIPINA BESILATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/38092/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/38092/stampati?ts=RCP"',
+    '"037479060";"037479";"060";"AMLODIPINA EG";"5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PE/PVDC";1561;"EG S.P.A.";"Autorizzata";"Procedura Mutuo riconoscimento o Decentrata";"Compressa";"C08CA01";"AMLODIPINA BESILATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/1561/farmaci/37479/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/1561/farmaci/37479/stampati?ts=RCP"',
+    '"038548032";"038548";"032";"AMLODIPINA TEVA ITALIA";"5 MG COMPRESSE- 28 COMPRESSE IN BLISTER PVC/PVDC/AL";813;"TEVA ITALIA S.R.L.";"Autorizzata";"Procedura Mutuo riconoscimento o Decentrata";"Compressa";"C08CA01";"AMLODIPINA BESILATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/813/farmaci/38548/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/813/farmaci/38548/stampati?ts=RCP"',
+    '"027428010";"027428";"010";"NORVASC";"5 MG COMPRESSE- 28 COMPRESSE";4995;"VIATRIS PHARMA S.R.L.";"Autorizzata";"Procedura Nazionale";"Compressa";"C08CA01";"AMLODIPINA";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/4995/farmaci/27428/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/4995/farmaci/27428/stampati?ts=RCP"',
+    '"040592103";"040592";"103";"METFORMINA AUROBINDO";"500 MG COMPRESSE RIVESTITE CON FILM- 30 COMPRESSE IN BLISTER PVC/AL";3199;"AUROBINDO PHARMA (ITALIA) S.R.L.";"Autorizzata";"Procedura Mutuo riconoscimento o Decentrata";"Compressa rivestita con film";"A10BA02";"METFORMINA CLORIDRATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/3199/farmaci/40592/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/3199/farmaci/40592/stampati?ts=RCP"',
+    '"017758018";"017758";"018";"GLUCOPHAGE";"500 MG COMPRESSE RIVESTITE- 30 COMPRESSE";794;"BRUNO FARMACEUTICI S.P.A.";"Autorizzata";"Procedura Mutuo riconoscimento o Decentrata";"Compressa rivestita";"A10BA02";"METFORMINA CLORIDRATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/794/farmaci/17758/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/794/farmaci/17758/stampati?ts=RCP"',
+    '"048247023";"048247";"023";"ATORVASTATINA DOC GENERICS";"20 MG COMPRESSE RIVESTITE CON FILM- 30 COMPRESSE IN BLISTER PVC-PE-PVDC/AL";898;"DOC GENERICI SRL";"Autorizzata";"Procedura Mutuo riconoscimento o Decentrata";"Compressa rivestita con film";"C10AA05";"ATORVASTATINA";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/48247/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/48247/stampati?ts=RCP"',
+    '"033007042";"033007";"042";"TORVAST";"20- 30 COMPRESSE 20 MG";4995;"VIATRIS PHARMA S.R.L.";"Autorizzata";"Procedura Nazionale";"Compressa";"C10AA05";"ATORVASTATINA CALCIO TRIIDRATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/4995/farmaci/33007/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/4995/farmaci/33007/stampati?ts=RCP"',
+    '"043783075";"043783";"075";"TRULICITY";"1,5 MG  SOLUZIONE INIETTABILE - USO SOTTOCUTANEO - SIRINGA DI VETRO IN PENNA PRERIEMPITA - 4 PENNE";1230;"ELI LILLY NEDERLAND B.V.";"Autorizzata";"Procedura Centralizzata";"Soluzione iniettabile";"A10BJ05";"DULAGLUTIDE";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/1230/farmaci/43783/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/1230/farmaci/43783/stampati?ts=RCP"',
+    '"025202096";"025202";"096";"ROCEFIN";"1 G/10 ML POLVERE E SOLVENTE PER SOLUZIONE INIETTABILE PER USO ENDOVENOSO- 1 FLACONCINO POLVERE + 1 FIALA SOLVENTE DA 10 ML";108;"ROCHE S.P.A.";"Autorizzata";"Procedura Nazionale";"Polvere e solvente per soluzione iniettabile";"J01DD04";"CEFTRIAXONE SODICO";"Medicinali soggetti a prescrizione medica limitativa, da rinnovare volta per volta, vendibili al pubblico su prescrizione di centri ospedalieri o di specialisti";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/108/farmaci/25202/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/108/farmaci/25202/stampati?ts=RCP"',
+    '"012745093";"012745";"093";"TACHIPIRINA";"500 MG COMPRESSE-20 COMPRESSE";219;"AZIENDE CHIMICHE RIUNITE ANGELINI FRANCESCO A.C.R.A.F. S.P.A.";"Autorizzata";"Procedura Nazionale";"Compressa";"N02BE01";"PARACETAMOLO";"Medicinali non soggetti a prescrizione medica ma non da banco";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/219/farmaci/12745/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/219/farmaci/12745/stampati?ts=RCP"',
+]
+
+CLASSE_A = [
+    'Principio attivo;Descrizione gruppo;Denominazione e Confezione;Prezzo al pubblico €;Titolare AIC;AIC;Codice Gruppo Equivalenza;X=in lista di trasparenza Aifa 15/6/2026 ;Solo in lista di Regione:;Metri cubi ossigeno ',
+    "Amlodipina;AMLODIPINA 5MG 28 UNITA' USO ORALE;AMLODIPINA*28 cpr 5 mg;3,74;DOC GENERICI Srl;038092019;DOB;X;;",
+    "Amlodipina;AMLODIPINA 5MG 28 UNITA' USO ORALE;AMLODIPINA*28 cpr 5 mg;3,74;EG SpA;037479060;DOB;X;;",
+    "Amlodipina;AMLODIPINA 5MG 28 UNITA' USO ORALE;AMLODIPINA*28 cpr 5 mg;3,74;TEVA ITALIA Srl;038548032;DOB;X;;",
+    "Amlodipina;AMLODIPINA 5MG 28 UNITA' USO ORALE;NORVASC*28 cpr 5 mg;5,53;VIATRIS PHARMA Srl;027428010;DOB;X;;",
+    "Metformina;METFORMINA 500MG 30 UNITA' USO ORALE;METFORMINA*30 cpr rivestite 500 mg;1,27;AUROBINDO PHARMA ITALIA Srl;040592103;A1A;X;;",
+    "Metformina;METFORMINA 500MG 30 UNITA' USO ORALE;GLUCOPHAGE*30 cpr rivestite 500 mg;1,81;BRUNO FARMACEUTICI SpA;017758018;A1A;X;;",
+    "Atorvastatina;ATORVASTATINA 20MG 30 UNITA' USO ORALE;ATORVASTATINA*30 cpr rivestite 20 mg;7,96;DOC GENERICI Srl;048247023;FTB;X;;",
+    "Atorvastatina;ATORVASTATINA 20MG 30 UNITA' USO ORALE;TORVAST*30 cpr rivestite 20 mg;10,51;VIATRIS PHARMA Srl;033007042;FTB;X;;",
+    "Dulaglutide;DULAGLUTIDE 1,5MG 4 UNITA' USO PARENTERALE;TRULICITY*4 penne preriempite SC 1,5 mg 0,5 ml;153,48;ELI LILLY NEDERLAND BV;043783075;BYO;;;",
+]
+
+CLASSE_H = [
+    'Principio attivo;Descrizione gruppo;Denominazione e Confezione;Prezzo al pubblico €;Prezzo Ex-factory €;Prezzo massimo di cessione €;Titolare AIC;"Codice \nAIC";Codice Gruppo Equivalenza;Metri cubi ossigeno ',
+    "Ceftriaxone;CEFTRIAXONE 1.000MG 1 UNITA' USO PARENTERALE EV;ROCEFIN*1 flaconcino EV 1 g + 1 fiala solv 10 ml;9,92;4,51;-;ROCHE SpA;025202096;AHU;",
+    'Antitrombina III Umana;ANTITROMBINA III UMANA 1.000UI 20ML USO PARENTERALE;ANBINEX*1 flacone 1.000 UI + 1 siringa;-;-;330,00;INSTITUTO GRIFOLS S.A.;034330047;AEK;',
+    'Ossigeno;OSSIGENO GAS CRIOGENICO 1.000 LT METRI CUBI SVOLTI 855,54;OSSIGENO*gas med criogenico contenitore fisso 1.000 litri;6,55/m³;4,20/m³;-;SAPIO PRODUZ.IDROGENO OSSIGENO;038901524;051;855,54',
+]
 
 
 def genera_aifa() -> None:
-    pagina = """<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Liste di prova</title></head>
-<body><h1>Liste dei farmaci (pagina di prova)</h1><ul>
-<li><a href="/aifa/farmaci/confezioni_fornitura.csv">Anagrafica di prova</a></li>
-<li><a href="/aifa/documents/20142/3815901/Classe-A_per_principio-attivo_30-6-2026.csv">Classe A di prova</a></li>
-<li><a href="/aifa/documents/20142/3815901/Classe-H_per_principio-attivo_30-6-2026.csv">Classe H di prova</a></li>
+    pagina = """<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Liste dei farmaci (esempio)</title></head>
+<body><h1>Liste dei farmaci (pagina d'esempio)</h1><ul>
+<li><a href="/aifa/farmaci/confezioni_fornitura.csv">Anagrafica delle confezioni (estratto)</a></li>
+<li><a href="/aifa/documents/20142/3815901/Classe-A_per_principio-attivo_30-6-2026.csv">Classe A (estratto)</a></li>
+<li><a href="/aifa/documents/20142/3815901/Classe-H_per_principio-attivo_30-6-2026.csv">Classe H (estratto)</a></li>
 </ul></body></html>
 """
     scrivi(SITO / "aifa" / "liste-dei-farmaci.html", pagina.encode("utf-8"))
-    # Anagrafica in cp1252, come i file che sync deve saper leggere; «più» non è utf-8 valido.
-    anagrafica = "\r\n".join([
-        "AIC di prova;Denominazione di prova;Confezione di prova;Principio attivo di prova;ATC di prova;Forma di prova;Fornitura di prova",
-        "900000011;PROVALINA;28 compresse 5 mg;principio di prova;Z99ZZ01;compressa;regime di prova",
-        "900000023;PROVALINA;14 compresse 5 mg;principio di prova;Z99ZZ01;compressa;regime di prova",
-        "900000035;TESTAMICINA;1 flaconcino;sostanza di prova;Z98ZZ02;polvere per soluzione iniettabile;regime di prova",
-        "900000047;ESEMPINA;20 compresse (più forti);esempio attivo;Z97ZZ03;compressa;regime di prova",
-        '900000059;"PROVALINA ""FORTE""";10 bustine;principio di prova;Z99ZZ01;granulato;regime di prova',
-    ]) + "\r\n"
-    scrivi(SITO / "aifa" / "farmaci" / "confezioni_fornitura.csv", anagrafica.encode("cp1252"))
-    classe_a = "\n".join([
-        INTESTAZIONE_CLASSE,
-        "900000011;principio di prova;5,20;GP-01;",
-        "900000023;principio di prova;3,10;GP-01;",
-        "900000059;principio di prova;4,00;GP-01;",
-    ]) + "\n"
+    scrivi(SITO / "aifa" / "farmaci" / "confezioni_fornitura.csv", ("\n".join(ANAGRAFICA) + "\n").encode("utf-8"))
     cartella = SITO / "aifa" / "documents" / "20142" / "3815901"
-    scrivi(cartella / "Classe-A_per_principio-attivo_30-6-2026.csv", b"\xef\xbb\xbf" + classe_a.encode("utf-8"))
-    classe_h = "\n".join([INTESTAZIONE_CLASSE, "900000035;sostanza di prova;120,00;;"]) + "\n"
-    scrivi(cartella / "Classe-H_per_principio-attivo_30-6-2026.csv", classe_h.encode("utf-8"))
+    scrivi(cartella / "Classe-A_per_principio-attivo_30-6-2026.csv", ("\r\n".join(CLASSE_A) + "\r\n").encode("cp1252"))
+    scrivi(cartella / "Classe-H_per_principio-attivo_30-6-2026.csv", ("\r\n".join(CLASSE_H) + "\r\n").encode("cp1252"))
 
 
 # --------------------------------------------------------------------------- Regione Piemonte (PDF di prova)
@@ -149,7 +181,12 @@ def pagina_con_link(titolo: str, href: str) -> bytes:
 
 def genera_piemonte() -> dict[str, str]:
     pdf = {
-        "farmaci_pht_dpc.pdf": pdf_di_prova("Elenco di prova dei farmaci PHT in DPC"),
+        "farmaci_pht_dpc.pdf": pdf_di_prova(
+            "Farmaci PHT - oggetto di DPC (estratto di prova)",
+            "Regione Piemonte, ultimo aggiornamento 9 luglio 2026",
+            "PRINCIPIO ATTIVO | ATC | NOTA AIFA | PRESCRIZIONE CON PT/SCHEDA",
+            "DULAGLUTIDE (14) | A10BJ05 | 100 | PT elettronico - Sistema TS",
+        ),
         "catalogo_prova_allegato_c.pdf": pdf_di_prova("Catalogo di prova delle prestazioni"),
         "esenzioni_prestazioni_prova.pdf": pdf_di_prova("Esenzioni e prestazioni di prova"),
     }
@@ -174,10 +211,15 @@ def trascrizione(nome: str, righe: list[str], scheda: dict) -> None:
 def genera_trascrizioni(impronte: dict[str, str]) -> None:
     trascrizione("piemonte_dpc/farmaci_pht_dpc", [
         "principio_attivo;atc;nota_aifa;piano_terapeutico",
-        "esempio attivo;Z97ZZ03;13;sì",
+        "DULAGLUTIDE;A10BJ05;100;sì",
     ], {"tipo": "farmaci_dpc", "fonte": "piemonte_dpc", "chiave": "farmaci_pht_dpc.pdf",
-        "sha256_origine": impronte["farmaci_pht_dpc.pdf"], "atto": "Elenco di prova dei farmaci PHT in DPC",
-        "in_vigore_dal": "2026-07-09"})
+        "sha256_origine": impronte["farmaci_pht_dpc.pdf"],
+        "atto": "Farmaci PHT - oggetto di DPC, aggiornamento del 9/7/2026, estratto di prova",
+        "in_vigore_dal": "2026-07-09",
+        "nota": ("Riga dell'elenco della Regione Piemonte letto il 18/11/2026 (PDF di 13 pagine, SHA-256 "
+                 "8c7d006876a2b953cf09dd4738a1f7198cdc87d7b392eb55a05512c60d9e1fed): «DULAGLUTIDE (14)», "
+                 "A10BJ05, nota 100, «PT elettronico - Sistema TS», qui «sì». La nota (14) dell'elenco "
+                 "riguarda le associazioni con gli SGLT2i.")})
     trascrizione("piemonte_catalogo/catalogo-precedente", [
         "codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note",
         "89.7;89.7;Visita di prova (catalogo precedente);Branca di prova;;",

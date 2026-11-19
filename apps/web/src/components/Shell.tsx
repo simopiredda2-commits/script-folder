@@ -127,6 +127,12 @@ export function Shell({ children }: { children: ReactNode }) {
             ...(me?.archivio
               ? [{ to: '/archivio', label: 'Archivio', icon: 'archivio' as const, end: false }]
               : []),
+            // Strumenti: modelli e impaginazione per i medici, impostazioni per l'amministratore.
+            ...(me?.ruoli.some((r) =>
+              ['administrator', 'owner_doctor', 'substitute_doctor'].includes(r.codice),
+            )
+              ? [{ to: '/strumenti', label: 'Strumenti', icon: 'strumenti' as const, end: false }]
+              : []),
           ].map((n) => (
             <NavLink key={n.to} to={n.to} end={n.end} className="menu-voce">
               <Icon name={n.icon} />
@@ -170,8 +176,9 @@ export function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <footer className="app-footer">
-        <span>
-          {PRODUCT_NAME} <Signature />
+        <span className="firma-piede">
+          <span>{PRODUCT_NAME}</span>
+          <Signature />
         </span>
         <span>Solo pazienti inventati in questo ambiente</span>
       </footer>

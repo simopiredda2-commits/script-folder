@@ -9,6 +9,7 @@ import {
   type DatasetVersion,
 } from '../components/common';
 import { Icon } from '../components/Icon';
+import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
@@ -28,16 +29,11 @@ export interface Drug {
   aifaNote: string | null;
   dpc: boolean;
   planRequired: boolean | null;
+  /** Ditta titolare dell'AIC: per i generici, il fornitore (D151). */
+  holder: string | null;
 }
 
-export interface Service {
-  regionalCode: string;
-  nationalCode: string | null;
-  description: string;
-  branch: string | null;
-  fee: string | null;
-  notes: string | null;
-}
+export type Service = ServiceResultData;
 
 interface Line {
   key: string;
@@ -45,7 +41,10 @@ interface Line {
   drugAic?: string | null;
   drugName?: string | null;
   activeIngredient?: string | null;
+  /** Codice del catalogo regionale. */
   serviceCode?: string | null;
+  /** Codice del nomenclatore, «codice DM» (D154). */
+  serviceNationalCode?: string | null;
   serviceDescription?: string | null;
   quantity: number;
   aifaNote?: string | null;
@@ -124,10 +123,11 @@ function AlreadyPrescribed({
   );
 }
 
-/** Descrizione breve di un farmaco della banca dati: confezione, classe, nota, DPC, piano. */
+/** Descrizione breve di un farmaco della banca dati: confezione, ditta, classe, nota, DPC, piano. */
 export function drugFacts(d: Drug): string[] {
   return [
     d.pack,
+    d.holder && `ditta ${d.holder}`,
     d.drugClass && `classe ${d.drugClass}`,
     d.aifaNote && `Nota ${d.aifaNote}`,
     d.dpc && 'in DPC',
@@ -342,18 +342,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             ))}
             {search.data?.prestazioni?.map((s) => (
               <li key={s.regionalCode} className="risultato">
-                <div>
-                  <strong>{s.description}</strong>
-                  <div className="tenue">
-                    {[s.branch, s.fee && money(s.fee), s.notes].filter(Boolean).join(' · ')}
-                  </div>
-                  <div className="codice tenue">
-                    {s.regionalCode}
-                    {s.nationalCode && s.nationalCode !== s.regionalCode
-                      ? ` · nomenclatore ${s.nationalCode}`
-                      : ''}
-                  </div>
-                </div>
+                <ServiceResultText s={s} />
                 <button
                   type="button"
                   className="pulsante"
@@ -361,6 +350,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   onClick={() =>
                     add({
                       serviceCode: s.regionalCode,
+                      serviceNationalCode: s.nationalCode,
                       serviceDescription: s.description,
                       quantity: 1,
                     })
@@ -376,6 +366,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 <li className="tenue">Nessun risultato per «{q}».</li>
               )}
           </ul>
+          {mode === 'specialistica' && (
+            <ManualServiceForm disabled={locked} onAdd={(l) => add({ ...l, quantity: 1 })} />
+          )}
           {mode === 'farmaci' && (therapies.data?.terapie ?? []).length > 0 && (
             <>
               <h3>Dalla terapia in corso</h3>
@@ -428,6 +421,14 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                     {n + 1}. {l.drugName ?? l.serviceDescription}
                     {l.aifaNote && <span className="etichetta">Nota {l.aifaNote}</span>}
                   </legend>
+                  {mode === 'specialistica' && l.serviceCode && (
+                    <p className="codice tenue">
+                      Catalogo {l.serviceCode}
+                      {l.serviceNationalCode
+                        ? ` · nomenclatore (DM) ${l.serviceNationalCode}`
+                        : ' · nomenclatore (DM) dal catalogo in uso'}
+                    </p>
+                  )}
                   {mode === 'specialistica' && (l.serviceCode || l.serviceDescription) && (
                     <AlreadyPrescribed
                       patientId={id!}
@@ -696,5 +697,100 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         </section>
       </div>
     </>
+  );
+}
+
+/**
+ * Prestazione scritta a mano (D154): solo se il catalogo del programma non ha ancora un codice
+ * nuovo. Il SAR controlla i due codici sul catalogo che la Regione ha trasmesso; all'invio il
+ * programma avvisa (R18) e chiede un motivo, che resta registrato.
+ */
+function ManualServiceForm({
+  disabled,
+  onAdd,
+}: {
+  disabled: boolean;
+  onAdd: (l: {
+    serviceCode: string;
+    serviceNationalCode: string;
+    serviceDescription: string;
+  }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState('');
+  const [national, setNational] = useState('');
+  const [description, setDescription] = useState('');
+  const ready = code.trim() && national.trim() && description.trim();
+  if (!open) {
+    return (
+      <p>
+        <button
+          type="button"
+          className="pulsante pulsante-piatto"
+          disabled={disabled}
+          onClick={() => setOpen(true)}
+        >
+          <Icon name="aggiungi" /> <span>Prestazione non ancora nel catalogo: scrivila a mano</span>
+        </button>
+      </p>
+    );
+  }
+  return (
+    <fieldset className="modulo-a-mano" disabled={disabled}>
+      <legend>Prestazione scritta a mano</legend>
+      <p className="aiuto">
+        Solo se il catalogo del programma non è ancora aggiornato. Il SAR controlla i due codici sul
+        catalogo della Regione e rifiuta la ricetta se non li trova; all’invio serve un motivo.
+      </p>
+      <div className="campo">
+        <label htmlFor="a-mano-catalogo">Codice del catalogo regionale</label>
+        <input
+          id="a-mano-catalogo"
+          className="codice"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
+      </div>
+      <div className="campo">
+        <label htmlFor="a-mano-nomenclatore">Codice del nomenclatore (DM)</label>
+        <input
+          id="a-mano-nomenclatore"
+          className="codice"
+          value={national}
+          onChange={(e) => setNational(e.target.value)}
+        />
+      </div>
+      <div className="campo">
+        <label htmlFor="a-mano-descrizione">Descrizione, come nel catalogo della Regione</label>
+        <input
+          id="a-mano-descrizione"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+      <div className="azioni">
+        <button
+          type="button"
+          className="pulsante"
+          disabled={!ready}
+          onClick={() => {
+            onAdd({
+              serviceCode: code.trim(),
+              serviceNationalCode: national.trim(),
+              serviceDescription: description.trim(),
+            });
+            setCode('');
+            setNational('');
+            setDescription('');
+            setOpen(false);
+          }}
+        >
+          <Icon name="aggiungi" /> <span>Aggiungi in ricetta</span>
+        </button>
+        <button type="button" className="pulsante pulsante-piatto" onClick={() => setOpen(false)}>
+          <span>Chiudi</span>
+        </button>
+      </div>
+    </fieldset>
   );
 }

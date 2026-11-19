@@ -7,6 +7,7 @@ import {
   type DatasetVersion,
 } from '../components/common';
 import { Icon } from '../components/Icon';
+import { ServiceResultText } from '../components/ServiceResult';
 import { query } from '../lib/api';
 import { money } from '../lib/format';
 import { useApi } from '../lib/useApi';
@@ -41,6 +42,7 @@ function Equivalents({ aic }: { aic: string }) {
       <thead>
         <tr>
           <th scope="col">Medicinale</th>
+          <th scope="col">Ditta</th>
           <th scope="col">AIC</th>
           <th scope="col">Prezzo</th>
         </tr>
@@ -49,6 +51,7 @@ function Equivalents({ aic }: { aic: string }) {
         {r.data.equivalenti.map((e) => (
           <tr key={e.aic}>
             <td>{[e.name, e.pack].filter(Boolean).join(' ')}</td>
+            <td>{e.holder ?? '—'}</td>
             <td className="codice">{e.aic}</td>
             <td className="numero">{money(e.price)}</td>
           </tr>
@@ -178,16 +181,7 @@ export function DataSearchPage() {
             )}
             {services.data.prestazioni.map((s) => (
               <li key={s.regionalCode} className="risultato">
-                <div>
-                  <strong>{s.description}</strong>
-                  <div className="tenue">
-                    {[s.branch, s.fee && money(s.fee), s.notes].filter(Boolean).join(' · ')}
-                  </div>
-                  <div className="codice tenue">
-                    {s.regionalCode}
-                    {s.nationalCode ? ` · nomenclatore ${s.nationalCode}` : ''}
-                  </div>
-                </div>
+                <ServiceResultText s={s} />
               </li>
             ))}
           </ul>

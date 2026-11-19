@@ -2,6 +2,7 @@
 import js from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
@@ -26,6 +27,13 @@ export default defineConfig(
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',
     },
+  },
+  {
+    // Hook di React solo in cima al componente, mai dopo un'uscita anticipata: altrimenti la
+    // pagina cade al secondo disegno («Rendered more hooks than during the previous render»).
+    files: ['apps/web/src/**/*.ts', 'apps/web/src/**/*.tsx'],
+    plugins: { 'react-hooks': reactHooks },
+    rules: { 'react-hooks/rules-of-hooks': 'error' },
   },
   {
     // Regole di prescrizione: i valori stanno nei dati (packages/rules/data), mai nel codice.

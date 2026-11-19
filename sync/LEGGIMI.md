@@ -44,11 +44,16 @@ Sul Mac, se compare un errore di certificato con il Python scaricato da python.o
 dati-pubblici/
   correnti/<fonte>/<file>             la versione in uso, che ha passato i controlli
   archivio/<fonte>/<data>/<file>      ogni versione diversa, mai sovrascritta
-  stato.json                          per ogni file: origine, impronta SHA-256, righe, colonne
+  stato.json                          per ogni file: origine, impronta SHA-256, righe, colonne,
+                                      ultimo controllo riuscito alla fonte (controllato_il)
   registro.jsonl                      una riga per ogni download: da dove, quando, impronta, esito
   rapporti/<data_ora>.md              il rapporto di ogni giro
+  rapporti/<data_ora>.json            lo stesso rapporto per il programma che importa
   ultimo-rapporto.md                  copia dell'ultimo rapporto
+  ultimo-rapporto.json                copia dell'ultimo rapporto in JSON
 ```
+
+Il rapporto in JSON ha l'identificativo del giro (`giro`), l'inizio e la fine, le fonti elaborate e una riga per ogni file con il suo esito: `invariato`, `nuovo`, `aggiornato`, `da_verificare`, `errore`, `registrato`. Le ore hanno i millisecondi, così due giri vicini restano distinguibili. Il programma lo legge dopo ogni giro (`pnpm banche-dati:aggiorna`, D156).
 
 I nomi in `correnti/` non hanno date: `Classe-A_per_principio-attivo_30-6-2026.csv` diventa `3815901_Classe-A_per_principio-attivo.csv`. Il numero davanti è la cartella AIFA di origine, e serve a distinguere file con lo stesso nome. Così l'applicazione legge sempre lo stesso percorso.
 

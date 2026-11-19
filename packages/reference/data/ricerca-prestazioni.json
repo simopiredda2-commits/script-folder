@@ -1,0 +1,190 @@
+{
+  "versione": "2026-11-18.1",
+  "nota": "Ricerca delle prestazioni per parole chiave (D153). Le sigle dei materiali si mostrano per esteso e si possono cercare; i sinonimi allargano la ricerca a parole che il catalogo scrive in un altro modo. Ogni parola d'arrivo è verificata sul catalogo regionale della D.D. 990/2024 (codice d'esempio in «nelCatalogo»). La fonte resta qui e in docs/provenienze.md: l'interfaccia non la mostra. Le «sigle» (simboli chimici) valgono solo quando il medico le scrive: chi scrive «potassio» non cerca anche ogni parola «K».",
+  "materiali": [
+    {
+      "sigla": "S",
+      "significato": "siero/sangue",
+      "fonte": "Simone Piredda, 18/11/2026"
+    },
+    {
+      "sigla": "P",
+      "significato": "plasma",
+      "fonte": "Simone Piredda, 18/11/2026"
+    },
+    {
+      "sigla": "U",
+      "significato": "urine",
+      "fonte": "Simone Piredda, 18/11/2026"
+    },
+    {
+      "sigla": "DU",
+      "significato": "urine 24 ore",
+      "fonte": "Simone Piredda, 18/11/2026"
+    },
+    {
+      "sigla": "(SG)ER",
+      "significato": "eritrociti (sangue)",
+      "fonte": "Regione Campania, prestazioni di laboratorio per settore di erogazione, letto negli estratti di ricerca il 18/11/2026: «FERRITINA [Sangue/Eritrociti]», «MAGNESIO TOTALE [(Sangue)ER]»"
+    },
+    {
+      "sigla": "SG",
+      "significato": "sangue",
+      "fonte": "Stesso elenco campano, dove «(Sg)» è scritto «(Sangue)»"
+    },
+    {
+      "sigla": "(SG)",
+      "significato": "sangue",
+      "fonte": "Stesso elenco campano, dove «(Sg)» è scritto «(Sangue)»"
+    },
+    {
+      "sigla": "SA",
+      "significato": "saliva",
+      "fonte": "Stesso elenco campano: «IgA SECRETORIE [Saliva]»"
+    },
+    {
+      "sigla": "LA",
+      "significato": "liquido amniotico",
+      "fonte": "Stesso elenco campano: «CREATININA [Liquido Amniotico]»"
+    }
+  ],
+  "sinonimi": [
+    {
+      "termini": ["potassio", "potassiemia", "kaliemia"],
+      "sigle": ["k"],
+      "nelCatalogo": "90374.0 POTASSIO [S]",
+      "fonte": "Simbolo chimico (tavola periodica); -emia: concentrazione nel sangue"
+    },
+    {
+      "termini": ["sodio", "sodiemia", "natremia"],
+      "sigle": ["na"],
+      "nelCatalogo": "90404.0 SODIO [S]",
+      "fonte": "Simbolo chimico; natrium, nome latino del sodio"
+    },
+    {
+      "termini": ["cloro", "cloruro", "cloremia"],
+      "sigle": ["cl"],
+      "nelCatalogo": "90133.0 CLORURO [S]",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["calcio", "calcemia"],
+      "sigle": ["ca"],
+      "nelCatalogo": "90114.2 CALCIO TOTALE [DU]",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["magnesio", "magnesemia"],
+      "sigle": ["mg"],
+      "nelCatalogo": "90325.0 MAGNESIO TOTALE [S]",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["ferro", "sideremia"],
+      "sigle": ["fe"],
+      "nelCatalogo": "90225N.1 FERRO [DU]",
+      "fonte": "Simbolo chimico; sider-: ferro"
+    },
+    {
+      "termini": ["litio"],
+      "sigle": ["li"],
+      "nelCatalogo": "9017C.28 FARMACI CON TECNICHE NON CROMATOGRAFICHE- PSICOLETTICI/ANTIDEPRESSIVI LITIO",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["nichel"],
+      "sigle": ["ni"],
+      "nelCatalogo": "90342.0 NICHEL",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["rame"],
+      "sigle": ["cu"],
+      "nelCatalogo": "90394.0 RAME [S]",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["zinco"],
+      "sigle": ["zn"],
+      "nelCatalogo": "90454.0 ZINCO [S]",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["cadmio"],
+      "sigle": ["cd"],
+      "nelCatalogo": "90113.1 CADMIO [DU]",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["piombo"],
+      "sigle": ["pb"],
+      "nelCatalogo": "90363.0 PIOMBO [S]",
+      "fonte": "Simbolo chimico"
+    },
+    {
+      "termini": ["glicemia", "glicosuria", "glucosio"],
+      "nelCatalogo": "90271.0 GLUCOSIO [S]",
+      "fonte": "Nome d'uso: glic- (zucchero) con -emia (nel sangue) e -uria (nelle urine)"
+    },
+    {
+      "termini": ["azotemia", "urea"],
+      "nelCatalogo": "90441.0 UREA [S]",
+      "fonte": "Nome d'uso: azoto ureico nel sangue"
+    },
+    {
+      "termini": ["uricemia", "uricuria", "acido urico", "urato"],
+      "nelCatalogo": "90435.0 URATO [S]",
+      "fonte": "Nome d'uso dell'urato"
+    },
+    {
+      "termini": ["transaminasi", "aminotransferasi"],
+      "nelCatalogo": "90045.0 ALANINA AMINOTRANSFERASI (ALT) (GPT) [S]",
+      "fonte": "Nome d'uso delle aminotransferasi"
+    },
+    {
+      "termini": ["hba1c", "glicosilata", "glicata"],
+      "nelCatalogo": "90.28.1 HB - EMOGLOBINA GLICATA",
+      "fonte": "Sigla d'uso dell'emoglobina glicata"
+    },
+    {
+      "termini": ["inr", "tempo di protrombina"],
+      "nelCatalogo": "90.75.4 TEMPO DI PROTROMBINA (PT)",
+      "fonte": "Sigla d'uso con cui si riferisce il tempo di protrombina"
+    },
+    {
+      "termini": ["ptt", "aptt", "tromboplastina"],
+      "nelCatalogo": "90761N.0 TEMPO DI TROMBOPLASTINA PARZIALE ATTIVATA (APTT)",
+      "fonte": "Sigla d'uso"
+    },
+    {
+      "termini": ["ggt", "gamma gt", "gamma glutamil"],
+      "nelCatalogo": "90255.0 GAMMA GLUTAMIL TRANSPEPTIDASI (GAMMA GT) [S]",
+      "fonte": "Sigla d'uso"
+    },
+    {
+      "termini": ["pcr", "proteina c reattiva"],
+      "nelCatalogo": "90.72.3 PROTEINA C REATTIVA (QUANTITATIVA)",
+      "fonte": "Sigla d'uso"
+    },
+    {
+      "termini": ["tac", "tc", "tomografia computerizzata"],
+      "nelCatalogo": "87.03.5 TOMOGRAFIA COMPUTERIZZATA (TC) ORECCHIE",
+      "fonte": "Nome d'uso: tomografia assiale computerizzata"
+    },
+    {
+      "termini": ["rmn", "rm", "risonanza magnetica"],
+      "nelCatalogo": "88.91.6 RISONANZA MAGNETICA (RM) DEL COLLO",
+      "fonte": "Nome d'uso: risonanza magnetica nucleare"
+    },
+    {
+      "termini": ["eeg", "elettroencefalogramma"],
+      "nelCatalogo": "89.14 ELETTROENCEFALOGRAMMA",
+      "fonte": "Sigla d'uso"
+    },
+    {
+      "termini": ["moc", "dexa", "densitometria"],
+      "nelCatalogo": "88.99.4 DENSITOMETRIA OSSEA. TC MONODISTRETTUALE",
+      "fonte": "Nomi d'uso della densitometria ossea (mineralometria ossea computerizzata)"
+    }
+  ]
+}

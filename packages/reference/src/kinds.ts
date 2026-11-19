@@ -34,6 +34,8 @@ export const KINDS = {
       atc: ATC,
       form: { type: 'text' },
       supplyRegime: { type: 'text' },
+      /** Ditta titolare dell'AIC: per i generici, il nome del fornitore (D151). */
+      holder: { type: 'text' },
     },
   },
   /** Elenchi AIFA dei farmaci di classe A e H, con prezzo e gruppo di equivalenza. */
@@ -51,6 +53,8 @@ export const KINDS = {
   /** Farmaci PHT in distribuzione per conto (Regione Piemonte), da una trascrizione controllata. */
   farmaci_dpc: {
     label: 'Farmaci in distribuzione per conto (DPC)',
+    /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */
+    changeKey: ['activeIngredient', 'atc'],
     fields: {
       activeIngredient: { type: 'text', required: true },
       atc: ATC,
@@ -77,6 +81,8 @@ export const KINDS = {
   /** Catalogo regionale delle prestazioni di specialistica, da una trascrizione controllata. */
   prestazioni: {
     label: 'Catalogo regionale delle prestazioni',
+    /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */
+    changeKey: ['regionalCode', 'branch'],
     fields: {
       regionalCode: { type: 'text', required: true },
       nationalCode: { type: 'text' },
@@ -89,6 +95,8 @@ export const KINDS = {
   /** Catalogo delle esenzioni, da una trascrizione controllata. */
   esenzioni: {
     label: 'Catalogo delle esenzioni',
+    /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */
+    changeKey: ['code'],
     fields: {
       code: { type: 'text', required: true },
       description: { type: 'text', required: true },
@@ -97,12 +105,17 @@ export const KINDS = {
   /** Esenzioni e prestazioni associate per il controllo del SAR (R17), da una trascrizione. */
   esenzioni_prestazioni: {
     label: 'Esenzioni e prestazioni associate',
+    /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */
+    changeKey: ['exemptionCode', 'serviceCode'],
     fields: {
       exemptionCode: { type: 'text', required: true },
       serviceCode: { type: 'text', required: true },
     },
   },
-} as const satisfies Record<string, { label: string; fields: Record<string, FieldSpec> }>;
+} as const satisfies Record<
+  string,
+  { label: string; changeKey?: readonly string[]; fields: Record<string, FieldSpec> }
+>;
 
 export type DatasetKind = keyof typeof KINDS;
 export const DATASET_KINDS = Object.keys(KINDS) as DatasetKind[];

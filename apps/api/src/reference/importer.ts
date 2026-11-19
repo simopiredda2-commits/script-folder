@@ -1,11 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { extname, join } from 'node:path';
+import { serviceGroup } from '@mmg/domain';
 import { FICTITIOUS_PLACE_LETTER } from '@mmg/fixtures';
 import {
+  applyChanges,
   type DataRecord,
+  KINDS,
   type Mapping,
   type MappingSet,
   extractRecords,
+  parseChanges,
   findTranscriptions,
   mappingForSyncFile,
   mappingForTranscription,
@@ -14,7 +18,7 @@ import {
   readTable,
   sha256,
 } from '@mmg/reference';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, lt } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { REFERENCE_TABLES, referenceDataset } from '../db/schema';
 
@@ -31,7 +35,9 @@ export type ImportOutcome =
   | 'righe_non_valide'
   | 'trascrizione_superata'
   | 'trascrizione_non_valida'
-  | 'origine_non_trovata';
+  | 'origine_non_trovata'
+  | 'base_mancante'
+  | 'trascrizione_da_controllare';
 
 export interface ImportLine {
   /** fonte/chiave per i file di sync; percorso della scheda per le trascrizioni. */
@@ -63,6 +69,8 @@ export const NEEDS_ATTENTION: ReadonlySet<ImportOutcome> = new Set([
   'righe_non_valide',
   'colonne_mancanti',
   'trascrizione_superata',
+  'base_mancante',
+  'trascrizione_da_controllare',
 ]);
 /** Esiti che sono errori veri e propri. */
 export const ERRORS: ReadonlySet<ImportOutcome> = new Set([
@@ -147,6 +155,26 @@ async function store(
   });
 }
 
+/**
+ * D152: a ogni catalogo nuovo si ripete la prova della regola delle visite sull'elenco intero.
+ * Il rapporto dice quante voci sono visite e quali nominano la visita senza esserlo (interventi
+ * che la comprendono, note), perché una persona le controlli.
+ */
+function visitNotes(records: DataRecord[]): string[] {
+  const text = (r: DataRecord) => (typeof r.description === 'string' ? r.description : '');
+  const visits = records.filter((r) => serviceGroup(text(r)) === 'visita').length;
+  const named = records.filter((r) => /VISIT/i.test(text(r)) && serviceGroup(text(r)) !== 'visita');
+  const listed = named.slice(0, MAX_LISTED_PROBLEMS).map((r) => String(r.regionalCode));
+  return [
+    `visite secondo la regola di D152: ${visits} su ${records.length} voci`,
+    ...(named.length
+      ? [
+          `${named.length} voci nominano la visita senza essere visite, da controllare: ${listed.join(', ')}${named.length > listed.length ? ', …' : ''}`,
+        ]
+      : []),
+  ];
+}
+
 /** Estrae, controlla e salva: la parte comune a file di sync e trascrizioni. */
 async function importRecords(
   opts: ImportOptions,
@@ -191,12 +219,112 @@ async function importRecords(
   const discarded = new Set(out.problems.map((p) => p.line)).size;
   await store(opts, meta, out.records, discarded);
   const warnings = warningsFor(meta.kind, out.records);
+  const visits = meta.kind === 'prestazioni' ? visitNotes(out.records) : [];
+  const noValue = Object.entries(out.noValue).map(
+    ([field, n]) => `${field}: ${n} celle senza valore secondo la mappatura ${mapping.id}`,
+  );
   return {
     ...line,
     outcome: 'importato',
     rows: out.records.length,
-    notes: [...line.notes, ...(discarded ? [`${discarded} righe scartate e accettate`] : [])],
+    notes: [
+      ...line.notes,
+      ...noValue,
+      ...visits,
+      ...(discarded ? [`${discarded} righe scartate e accettate`] : []),
+    ],
     ...(warnings.length ? { warnings } : {}),
+  };
+}
+
+/**
+ * Un atto che modifica una tabella (D157): dalla versione della serie in vigore il giorno prima
+ * si tolgono le voci tolte e si aggiungono quelle nuove; il risultato è una versione intera,
+ * immutabile come le altre, che vale dalla data dell'atto.
+ */
+async function importChanges(
+  opts: ImportOptions,
+  line: ImportLine,
+  mapping: Mapping,
+  bytes: Uint8Array,
+  fileName: string,
+  meta: DatasetMeta,
+): Promise<ImportLine> {
+  const previous = await alreadyImported(opts.db, meta.series, meta.sha256);
+  if (previous) {
+    return {
+      ...line,
+      outcome: 'gia_importato',
+      notes: [
+        ...line.notes,
+        `stessa impronta già importata il ${previous.importedAt.toISOString()}`,
+      ],
+    };
+  }
+  const parsed = parseChanges(mapping, readTable(bytes, fileName));
+  if (parsed.missingColumns.length) {
+    return {
+      ...line,
+      outcome: 'colonne_mancanti',
+      notes: [...line.notes, `colonne non trovate: ${parsed.missingColumns.join('; ')}`],
+    };
+  }
+  const [base] = await opts.db
+    .select()
+    .from(referenceDataset)
+    .where(
+      and(eq(referenceDataset.series, meta.series), lt(referenceDataset.validFrom, meta.validFrom)),
+    )
+    .orderBy(
+      desc(referenceDataset.validFrom),
+      desc(referenceDataset.importedAt),
+      desc(referenceDataset.id),
+    )
+    .limit(1);
+  if (!base) {
+    return {
+      ...line,
+      outcome: 'base_mancante',
+      notes: [
+        ...line.notes,
+        `nessuna versione della serie ${meta.series} in vigore prima del ${meta.validFrom}: serve prima la versione intera su cui l'atto è scritto`,
+      ],
+    };
+  }
+  const table = REFERENCE_TABLES[meta.kind] as (typeof REFERENCE_TABLES)['prestazioni'];
+  const fields = Object.keys(KINDS[meta.kind].fields);
+  const baseRecords = (await opts.db.select().from(table).where(eq(table.datasetId, base.id))).map(
+    (r) =>
+      Object.fromEntries(
+        fields.map((f) => [f, (r as Record<string, unknown>)[f] ?? null]),
+      ) as DataRecord,
+  );
+  const applied = applyChanges(meta.kind, baseRecords, parsed.changes);
+  const problems = [...parsed.problems, ...applied.problems];
+  if (problems.length && !opts.acceptDiscarded) {
+    return {
+      ...line,
+      outcome: 'righe_non_valide',
+      notes: [
+        ...line.notes,
+        `${problems.length} problemi; l'atto non è stato applicato. Dopo il controllo si può applicare con --accetta-scarti`,
+        ...problems
+          .slice(0, MAX_LISTED_PROBLEMS)
+          .map((p) => `riga ${p.line}, ${p.field}: ${p.problem}`),
+      ],
+    };
+  }
+  await store(opts, meta, applied.records, new Set(problems.map((p) => p.line)).size);
+  const visits = meta.kind === 'prestazioni' ? visitNotes(applied.records) : [];
+  return {
+    ...line,
+    outcome: 'importato',
+    rows: applied.records.length,
+    notes: [
+      ...line.notes,
+      `modifiche alla versione del ${base.validFrom} (${base.act ?? base.title}): ${applied.added} voci aggiunte, ${applied.replaced} sostituite, ${applied.removed} tolte; ${applied.records.length} voci in tutto`,
+      ...visits,
+    ],
   };
 }
 
@@ -297,12 +425,34 @@ export async function importReferenceData(opts: ImportOptions): Promise<ImportLi
     report.push({ file: bad.path, outcome: 'trascrizione_non_valida', notes: [bad.problem] });
   }
   const bySync = new Map(entries.map((e) => [`${e.fonte}/${e.chiave}`, e]));
-  for (const t of transcriptions.found) {
+  // Prima le versioni intere, poi gli atti che le modificano, in ordine di data (D157).
+  const ordered = [
+    ...transcriptions.found.filter((t) => !t.sheet.solo_modifiche),
+    ...transcriptions.found
+      .filter((t) => t.sheet.solo_modifiche)
+      .sort(
+        (a, b) =>
+          a.sheet.in_vigore_dal.localeCompare(b.sheet.in_vigore_dal) ||
+          a.path.localeCompare(b.path),
+      ),
+  ];
+  for (const t of ordered) {
     const s = t.sheet;
     const line: ImportLine = { file: t.path, outcome: 'importato', notes: [] };
     const mapping = mappingForTranscription(opts.mappings, s.tipo);
     if (!mapping) {
       report.push({ ...line, outcome: 'senza_mappatura' });
+      continue;
+    }
+    // A8: una trascrizione entra in uso solo dopo il controllo di una persona (D159).
+    if (s.controllato_da === null) {
+      report.push({
+        ...line,
+        outcome: 'trascrizione_da_controllare',
+        notes: [
+          `${s.atto}: nessuno l'ha ancora controllata. Entra in uso quando la scheda dice chi l'ha controllata (controllato_da)`,
+        ],
+      });
       continue;
     }
     let origin: string | null = null;
@@ -333,8 +483,9 @@ export async function importReferenceData(opts: ImportOptions): Promise<ImportLi
       );
     }
     const bytes = new Uint8Array(readFileSync(t.csvPath));
+    const load = s.solo_modifiche ? importChanges : importRecords;
     report.push(
-      await importRecords(opts, line, mapping, bytes, t.csvPath, {
+      await load(opts, line, mapping, bytes, t.csvPath, {
         kind: s.tipo,
         series: s.serie ?? mapping.id,
         title: mapping.titolo,

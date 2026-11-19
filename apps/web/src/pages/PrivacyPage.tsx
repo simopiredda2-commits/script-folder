@@ -12,7 +12,7 @@ import {
   type EntryList,
   type Privacy,
 } from '../lib/clinical';
-import { date, studioToday } from '../lib/format';
+import { date, dateTime, studioToday } from '../lib/format';
 import { useSession } from '../lib/session';
 import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
@@ -35,6 +35,10 @@ export function PrivacyPage() {
   const { isDoctor } = useSession();
   // Le voci oscurate le cerca solo il medico: la segreteria non legge il diario (registro pulito).
   const entries = useApi<EntryList>(isDoctor ? `/api/pazienti/${id}/voci?annullate=no` : null);
+  // Chi ha consultato i dati del paziente dall'AFT: lo legge il titolare (registro, D161).
+  const aftLog = useApi<{ consultazioni: AftConsultation[] }>(
+    isDoctor ? `/api/pazienti/${id}/consultazioni-aft` : null,
+  );
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
@@ -104,8 +108,58 @@ export function PrivacyPage() {
           )}
         </section>
       )}
+      {aftLog.data && (
+        <section className="riquadro" aria-labelledby="titolo-consultazioni-aft-paziente">
+          <h2 id="titolo-consultazioni-aft-paziente">
+            <Icon name="storico" /> Consultazioni dei colleghi dell’AFT
+          </h2>
+          <p className="aiuto">
+            Il paziente ha diritto di sapere chi ha consultato i suoi dati, quando e da quale
+            studio: la risposta va data entro 15 giorni (Garante privacy, Linee guida sul dossier
+            sanitario del 4/6/2015, par. 5.2).
+          </p>
+          {aftLog.data.consultazioni.length === 0 ? (
+            <p className="tenue">Nessuna consultazione.</p>
+          ) : (
+            <table className="tabella">
+              <thead>
+                <tr>
+                  <th scope="col">Data e ora</th>
+                  <th scope="col">Che cosa</th>
+                  <th scope="col">Medico e studio</th>
+                  <th scope="col">Motivo</th>
+                  <th scope="col">Esito</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aftLog.data.consultazioni.map((c, i) => (
+                  <tr key={i}>
+                    <td>{dateTime(c.quando)}</td>
+                    <td>{c.azione}</td>
+                    <td>
+                      {c.medico ?? '—'}
+                      {c.studio ? `, ${c.studio}` : ''}
+                    </td>
+                    <td>{c.motivo ?? '—'}</td>
+                    <td>{c.esito === 'consentito' ? 'Consentito' : 'Negato'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
     </>
   );
+}
+
+interface AftConsultation {
+  quando: string;
+  azione: string;
+  esito: 'consentito' | 'negato';
+  medico: string | null;
+  studio: string | null;
+  motivo: string | null;
 }
 
 function ConsentsSection({

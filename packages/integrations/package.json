@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@mmg/domain": "workspace:*",
-    "pdf-lib": "1.17.1"
+    "@xmldom/xmldom": "0.9.12",
+    "pdf-lib": "1.17.1",
+    "xpath": "0.0.34"
   }
 }

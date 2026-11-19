@@ -44,6 +44,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
+import uuid
 
 VERSIONE = "0.1.0"
 
@@ -392,7 +393,8 @@ def confronta(prec: dict | None, nuovo: dict, soglia: float, est: str) -> tuple[
 # --------------------------------------------------------------------------- stato su disco
 
 def ora() -> str:
-    return dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    # Millisecondi: due giri vicini (e il controllo di un file nello stesso giro) restano distinguibili.
+    return dt.datetime.now().astimezone().isoformat(timespec="milliseconds")
 
 
 def leggi_json(p: Path, predefinito):
@@ -418,6 +420,8 @@ class Contesto:
     def __init__(self, dest: Path, rete: Rete | None, max_byte: int, forza: bool):
         self.dest, self.rete, self.max_byte, self.forza = dest, rete, max_byte, forza
         self.oggi = dt.date.today().isoformat()
+        self.iniziato_il = ora()
+        self.giro = uuid.uuid4().hex
         self.stato = leggi_json(dest / "stato.json", {"versione": 1, "file": {}})
         self.osservati = leggi_json(dest / "osservati.json", {})
         self.tmp = dest / ".tmp"
@@ -469,6 +473,7 @@ def elabora_file(ctx: Contesto, fonte: dict, url: str, visti: set[str]) -> None:
             return
         k = indice[url]
         visti.add(k)
+        ctx.stato["file"][k]["controllato_il"] = ora()
         ctx.esito(fonte, ctx.stato["file"][k]["chiave"], "invariato")
         return
 
@@ -492,6 +497,7 @@ def elabora_file(ctx: Contesto, fonte: dict, url: str, visti: set[str]) -> None:
     attesa = (prec or {}).get("in_attesa")
     if attesa and attesa.get("sha256") == meta["sha256"]:
         tmp.unlink()
+        prec["controllato_il"] = ora()
         ctx.esito(fonte, chiave, "da_verificare", ["ancora in attesa di verifica"] + attesa.get("note", []))
         return
 
@@ -517,16 +523,20 @@ def elabora_file(ctx: Contesto, fonte: dict, url: str, visti: set[str]) -> None:
     note, verificare = confronta(prec, {**controllo, "byte": meta["byte"]}, fonte.get("soglia_righe", 0.2), est)
     if est == ".pdf":
         note.append("PDF: i dati vanno estratti e controllati prima dell'uso")
+    adesso = ora()
     dati = {
         "fonte": fonte["id"], "chiave": chiave, "url": url, "nome_originale": nome_orig,
         "sha256": meta["sha256"], "byte": meta["byte"], "etag": meta["etag"],
-        "last_modified": meta["last_modified"], "scaricato_il": ora(), "archivio": voce["archivio"],
+        "last_modified": meta["last_modified"], "scaricato_il": adesso, "controllato_il": adesso,
+        "archivio": voce["archivio"],
         "righe": controllo.get("righe"), "colonne": controllo.get("colonne"),
         "intestazione": controllo.get("intestazione"),
     }
     if verificare:
         voce_stato = ctx.stato["file"].setdefault(k, {"fonte": fonte["id"], "chiave": chiave})
         voce_stato["in_attesa"] = {**dati, "note": note}
+        # La fonte è stata controllata ora, anche se la versione nuova aspetta la verifica.
+        voce_stato["controllato_il"] = dati["controllato_il"]
         ctx.registra({**voce, "esito": "da_verificare", "note": note})
         ctx.esito(fonte, chiave, "da_verificare", note, controllo.get("righe"))
         return
@@ -644,6 +654,18 @@ def scrivi_rapporto(ctx: Contesto, fonti: list[dict]) -> Path:
     p = cartella / f"{dt.datetime.now().strftime('%Y-%m-%d_%H%M%S')}.md"
     p.write_text("\n".join(righe), "utf-8")
     shutil.copy2(p, ctx.dest / "ultimo-rapporto.md")
+    # Lo stesso rapporto per il programma che importa: le stesse righe, in JSON.
+    dati = {
+        "versione": 1,
+        "banche_dati": VERSIONE,
+        "giro": ctx.giro,
+        "iniziato_il": ctx.iniziato_il,
+        "finito_il": ora(),
+        "fonti": [f["id"] for f in fonti],
+        "righe": ctx.righe_rapporto,
+    }
+    scrivi_json(p.with_suffix(".json"), dati)
+    scrivi_json(ctx.dest / "ultimo-rapporto.json", dati)
     return p
 
 

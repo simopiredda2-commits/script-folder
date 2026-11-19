@@ -21,8 +21,12 @@ export const RULE_IDS = [
   'R15',
   'R16',
   'R17',
+  'R18',
 ] as const;
 export type RuleId = (typeof RULE_IDS)[number];
+
+/** Le regole dei requisiti: ci sono in ogni versione. Quelle dopo la R17 dalla loro versione in poi. */
+const REQUIRED_RULE_IDS = RULE_IDS.slice(0, RULE_IDS.indexOf('R17') + 1);
 
 const sourceSchema = z
   .object({ title: z.string().trim().min(1), url: z.url().optional() })
@@ -53,9 +57,12 @@ export const rulesetSchema = z
     rules: z.array(ruleSchema),
   })
   .strict()
-  .refine((r) => RULE_IDS.every((id) => r.rules.filter((x) => x.id === id).length === 1), {
-    message: 'Ogni regola da R1 a R17 compare una e una sola volta',
-  });
+  .refine(
+    (r) =>
+      REQUIRED_RULE_IDS.every((id) => r.rules.filter((x) => x.id === id).length === 1) &&
+      RULE_IDS.every((id) => r.rules.filter((x) => x.id === id).length <= 1),
+    { message: 'Ogni regola da R1 a R17 compare una e una sola volta; le altre al più una volta' },
+  );
 
 export type Ruleset = z.infer<typeof rulesetSchema>;
 export type Rule = Ruleset['rules'][number];

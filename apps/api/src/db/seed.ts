@@ -9,7 +9,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { buildFiscalCode, type Role } from '@mmg/domain';
-import { generatePatients, Random } from '@mmg/fixtures';
+import { ageAt, generatePatients, Random } from '@mmg/fixtures';
 import { inArray } from 'drizzle-orm';
 import { loadConfig } from '../config';
 import { storeCredentials } from '../credentials/service';
@@ -27,6 +27,7 @@ import {
   clinicalEntry,
   diaryDetail,
   doctorProfile,
+  fseSetting,
   exemption,
   labResultDetail,
   measurementDetail,
@@ -37,6 +38,14 @@ import {
   studio,
   therapy,
 } from './schema';
+import {
+  DEMO_PATIENTS,
+  DEMO_REFERENCE_DATE,
+  posologyText,
+  profilesFor,
+  systolicRange,
+  type DemoTherapy,
+} from './demo';
 import { withActor } from './tx';
 
 const DEMO_USERS: { username: string; displayName: string; roles: Role[] }[] = [
@@ -50,31 +59,6 @@ const DEMO_USERS: { username: string; displayName: string; roles: Role[] }[] = [
   { username: 'amministratore', displayName: 'Andrea Conti', roles: ['administrator'] },
 ];
 
-/** Dati clinici inventati, scelti dal generatore deterministico. */
-const PROBLEMS = [
-  { code: '401.9', description: 'Ipertensione essenziale, non specificata' },
-  { code: '250.00', description: 'Diabete mellito tipo 2 senza complicanze' },
-  { code: '272.0', description: 'Ipercolesterolemia pura' },
-];
-// Con principio attivo: la ricetta lo riporta sempre (R13). Il primo è un farmaco della banca dati
-// d'esempio (pnpm banche-dati:importa -- --esempio), con il suo AIC.
-const DRUGS = [
-  {
-    drugName: 'PROVALINA 28 compresse 5 mg',
-    drugAic: '900000011',
-    activeIngredient: 'principio di prova',
-  },
-  {
-    drugName: 'Farmaco dimostrativo B 10 mg',
-    drugAic: null,
-    activeIngredient: 'principio dimostrativo B',
-  },
-  {
-    drugName: 'Farmaco dimostrativo C 20 mg',
-    drugAic: null,
-    activeIngredient: 'principio dimostrativo C',
-  },
-];
 /** Primi pazienti con un appuntamento oggi, ogni quarto d'ora dalle 8:30. */
 const APPOINTMENTS_TODAY = 8;
 const QUARTER_MS = 15 * 60_000;
@@ -118,10 +102,37 @@ try {
     users.set(u.username, row!.id);
   }
   const doctorId = users.get('medico')!;
+  // Impostazioni del Fascicolo dimostrative: OID dell'arco 2.999, riservato agli esempi; i
+  // valori veri li danno la Regione e l'accreditamento (D133).
+  await db
+    .insert(fseSetting)
+    .values({
+      studioId: st!.id,
+      documentIdRoot: '2.999.10.1',
+      repositoryId: '2.999.10.2',
+      submissionIdRoot: '2.999.10.3',
+      custodianIdRoot: '2.999.10.4',
+      custodianIdExtension: 'CUSTODE-DEMO',
+      custodianName: 'Custode dimostrativo',
+      custodianStreet: 'Via del Custode 1',
+      custodianCity: 'Comune dimostrativo',
+      custodianIstatCode: '999999',
+      custodianProvince: 'XX',
+      locality: 'STUDIO DIMOSTRATIVO^^^^^&2.999.10.5&ISO^^^^000001',
+      clinicalActivity: 'OBS',
+      administrativeRequest: 'SSN',
+    })
+    .onConflictDoNothing();
   await db.insert(doctorProfile).values({
     userId: doctorId,
     regionalCode: 'DEMO-0001',
     asl: 'ASL dimostrativa',
+    // Recapiti inventati, su domini riservati agli esempi (.invalid).
+    firstName: 'Elena',
+    lastName: 'Marchi',
+    phone: '000 0000001',
+    email: 'studio.marchi@esempio.invalid',
+    pec: 'elena.marchi@pec.esempio.invalid',
     // Inventato: luogo di nascita con la X, che nessun comune ha (D12).
     fiscalCode: buildFiscalCode({
       surname: 'Marchi',
@@ -136,6 +147,9 @@ try {
     userId: users.get('sostituto')!,
     regionalCode: 'DEMO-0002',
     asl: 'ASL dimostrativa',
+    firstName: 'Marco',
+    lastName: 'Fiore',
+    phone: '000 0000002',
     fiscalCode: buildFiscalCode({
       surname: 'Fiore',
       name: 'Marco',
@@ -179,11 +193,11 @@ try {
     grantedBy: doctorId,
   });
 
-  const people = generatePatients({ seed: 'demo', count: 40 });
+  const people = generatePatients(DEMO_PATIENTS);
   const rnd = new Random('demo-clinica');
   const midnight = startOfStudioDay(studioDate(new Date())).getTime();
   const secretaryId = users.get('segreteria')!;
-  const toSign: { patientId: string; therapyId: string; drug: (typeof DRUGS)[number] }[] = [];
+  const toSign: { patientId: string; therapyId: string; drug: DemoTherapy }[] = [];
   await withActor(db, doctorId, async (tx) => {
     for (const [index, p] of people.entries()) {
       const [row] = await tx
@@ -235,11 +249,22 @@ try {
           .returning();
         return e!.id;
       };
-      const problem = rnd.pick(PROBLEMS);
-      const problemId = await entry('problem');
-      await tx
-        .insert(problemDetail)
-        .values({ entryId: problemId, icdCode: problem.code, description: problem.description });
+      // Un quadro clinico credibile per età e sesso (D150). Una sola estrazione, come prima: le
+      // estrazioni che seguono restano le stesse e i pazienti delle schermate non cambiano.
+      const age = ageAt(p.birthDate, DEMO_REFERENCE_DATE);
+      const profile = rnd.pick(profilesFor(age, p.sex));
+      const problemIds: string[] = [];
+      for (const problem of profile.problems) {
+        const problemId = await entry('problem');
+        await tx.insert(problemDetail).values({
+          entryId: problemId,
+          icdCode: problem.code,
+          description: problem.description,
+          // Tutti i quadri dimostrativi sono patologie croniche (Profilo, D134).
+          chronic: true,
+        });
+        problemIds.push(problemId);
+      }
       await tx.insert(diaryDetail).values({
         entryId: await entry('diary'),
         contactType: 'office',
@@ -248,13 +273,14 @@ try {
       await tx.insert(measurementDetail).values({
         entryId: await entry('measurement'),
         measure: 'Pressione sistolica',
-        value: String(rnd.int(115, 160)),
+        value: String(rnd.int(...systolicRange(age))),
         unit: 'mmHg',
       });
       if (rnd.chance(0.3)) {
         await tx.insert(allergyDetail).values({
           entryId: await entry('allergy'),
-          substance: 'Sostanza dimostrativa',
+          // Un principio attivo vero, che nessun farmaco dimostrativo contiene.
+          substance: 'AMOXICILLINA',
           drugRelated: true,
         });
       }
@@ -286,24 +312,31 @@ try {
           });
         }
       }
-      const drug = rnd.pick(DRUGS);
-      const [ther] = await tx
-        .insert(therapy)
-        .values({
+      // Riservata o no: un'estrazione sola, per la prima terapia, come prima.
+      const reserved = rnd.chance(0.1);
+      const therapyIds: string[] = [];
+      for (const [i, { therapy: t, problem }] of profile.therapies.entries()) {
+        const [ther] = await tx
+          .insert(therapy)
+          .values({
+            patientId: pid,
+            ...t,
+            byActiveIngredient: true,
+            kind: 'chronic',
+            startOn: '2026-01-01',
+            indicationEntryId: problemIds[problem]!,
+            reserved: i === 0 && reserved,
+            createdBy: doctorId,
+          })
+          .returning();
+        therapyIds.push(ther!.id);
+      }
+      if (toSign.length < TO_SIGN && !reserved) {
+        toSign.push({
           patientId: pid,
-          ...drug,
-          kind: 'chronic',
-          startOn: '2026-01-01',
-          dose: '1',
-          doseUnit: 'compressa',
-          frequency: 'una volta al giorno',
-          indicationEntryId: problemId,
-          reserved: rnd.chance(0.1),
-          createdBy: doctorId,
-        })
-        .returning();
-      if (toSign.length < TO_SIGN && !ther!.reserved) {
-        toSign.push({ patientId: pid, therapyId: ther!.id, drug });
+          therapyId: therapyIds[0]!,
+          drug: profile.therapies[0]!.therapy,
+        });
       }
     }
   });
@@ -325,11 +358,11 @@ try {
         prescriptionId: rx!.id,
         position: 1,
         therapyId: r.therapyId,
-        drugAic: r.drug.drugAic,
         drugName: r.drug.drugName,
         activeIngredient: r.drug.activeIngredient,
+        byActiveIngredient: true,
         quantity: 1,
-        posologyText: '1 compressa una volta al giorno',
+        posologyText: posologyText(r.drug),
       });
     }
   });

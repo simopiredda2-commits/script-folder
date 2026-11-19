@@ -1,0 +1,234 @@
+{
+  "key": "porto-armi-anamnestico",
+  "title": "CERTIFICATO ANAMNESTICO PRELIMINARE PER IL SUCCESSIVO ACCERTAMENTO DELLE CONDIZIONI PSICOFISICHE PER IL RILASCIO DELL'AUTORIZZAZIONE AL PORTO DI FUCILE PER USO DI CACCIA ED ESERCIZIO DELLO SPORT DEL TIRO AL VOLO O AL PORTO D'ARMI PER USO DIFESA PERSONALE",
+  "version": "1998-04-28",
+  "official": true,
+  "source": {
+    "act": "DM Sanità 28 aprile 1998, allegato 1",
+    "publication": "GU Serie generale n. 143 del 22/6/1998",
+    "url": "https://www.gazzettaufficiale.it/atto/serie_generale/caricaDettaglioAtto/originario?atto.dataPubblicazioneGazzetta=1998-06-22&atto.codiceRedazionale=098A5324",
+    "checkedOn": "2026-11-18",
+    "note": "Testo della pagina della Gazzetta confrontato con la scansione del fascicolo (pagina 16): accenti e «Post-operatorie» come nella scansione. «sostenze» è un refuso dell'atto, in tutte e due le versioni, e resta com'è. Le colonne «No», «Pregressa», «In atto» si stampano come caselle, con la X su quella scelta (nota 1)."
+  },
+  "validityMonths": 3,
+  "forDoctor": [
+    "Lo presenta il richiedente quando si sottopone agli accertamenti del medico accertatore (uffici medico-legali o distretti sanitari dell'ASL, strutture sanitarie militari e della Polizia di Stato); la data non deve essere anteriore a tre mesi (art. 3).",
+    "Gli ulteriori accertamenti li prescrive il medico accertatore (art. 3): il certificato anamnestico non ne richiede.",
+    "Il dichiarante firma la dichiarazione di veridicità: il certificato si stampa con lo spazio per la sua firma accanto a quella del medico.",
+    "Le ASL usano ancora questo modello: per esempio il modulo dell'ASL CN1, letto il 18/11/2026."
+  ],
+  "fields": [
+    {
+      "key": "professione",
+      "label": "Professione",
+      "type": "testo",
+      "required": true,
+      "max": 100
+    },
+    {
+      "key": "usl",
+      "label": "Unità sanitaria locale n.",
+      "type": "testo",
+      "required": true,
+      "max": 60,
+      "help": "L'atto è del 1998: oggi l'azienda sanitaria locale dell'assistito."
+    },
+    {
+      "key": "regione",
+      "label": "Regione",
+      "type": "testo",
+      "required": true,
+      "max": 60
+    },
+    {
+      "key": "tesserino",
+      "label": "Numero tesserino assistito",
+      "type": "testo",
+      "required": false,
+      "max": 40,
+      "help": "L'atto è del 1998: quale numero scrivere oggi (per esempio quello della tessera sanitaria) è da confermare con l'ASL."
+    },
+    {
+      "key": "a_centrale",
+      "label": "Malattie del sistema nervoso: centrale",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "a_periferico",
+      "label": "Malattie del sistema nervoso: periferico",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "a_postumi",
+      "label": "Malattie del sistema nervoso: postumi invalidanti",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "a_epilessia",
+      "label": "Malattie del sistema nervoso: epilessia",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "a_epilessia_ultima_crisi",
+      "label": "Epilessia: data dell'ultima crisi (nota 2)",
+      "type": "data",
+      "required": false
+    },
+    {
+      "key": "a_altre",
+      "label": "Malattie del sistema nervoso: altre",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "b_malattie",
+      "label": "Turbe psichiche: da malattie",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "b_traumatismi",
+      "label": "Turbe psichiche: da traumatismi",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "b_postoperatorie",
+      "label": "Turbe psichiche: post-operatorie",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "b_ritardo",
+      "label": "Turbe psichiche: da ritardo mentale grave",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "b_psicosi",
+      "label": "Turbe psichiche: da psicosi",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "b_personalita",
+      "label": "Turbe psichiche: dalla personalità",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "c_alcool",
+      "label": "Sostanze psicoattive: abuso di alcool",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "c_stupefacenti",
+      "label": "Sostanze psicoattive: uso di stupefacenti",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "c_stupefacenti_modalita",
+      "label": "Uso di stupefacenti: modalità d'uso (nota 3)",
+      "type": "testo",
+      "required": false,
+      "max": 200
+    },
+    {
+      "key": "c_psicotrope",
+      "label": "Sostanze psicoattive: uso di sostanze psicotrope",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "c_psicotrope_modalita",
+      "label": "Uso di sostanze psicotrope: modalità d'uso (nota 3)",
+      "type": "testo",
+      "required": false,
+      "max": 200
+    },
+    {
+      "key": "c_dip_alcool",
+      "label": "Sostanze psicoattive: dipendenza da alcool",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "c_dip_stupefacenti",
+      "label": "Sostanze psicoattive: dipendenza da stupefacenti",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "c_dip_psicotrope",
+      "label": "Sostanze psicoattive: dipendenza da sostanze psicotrope",
+      "type": "scelta",
+      "required": true,
+      "options": ["No", "Pregressa", "In atto"],
+      "boxes": true
+    },
+    {
+      "key": "c_dip_psicotrope_modalita",
+      "label": "Dipendenza da sostanze psicotrope: modalità d'uso (nota 3)",
+      "type": "testo",
+      "required": false,
+      "max": 200
+    }
+  ],
+  "body": [
+    "(da redigere da parte del medico di fiducia di cui all'art. 25 della legge 23 dicembre 1978, n. 833 - Istituzione del Servizio sanitario nazionale).",
+    "Si certificano i seguenti dati anamnestici relativi a:",
+    "Cognome {{paziente.cognome}}\nNome {{paziente.nome}}\nData e luogo di nascita {{paziente.nato_il}} {{paziente.nato_a}}\nProfessione {{campo.professione}}\nUnità sanitaria locale n. {{campo.usl}}\nRegione {{campo.regione}}\nNumero tesserino assistito {{campo.tesserino}}",
+    "A) Malattie del sistema nervoso: (1)\nCentrale {{campo.a_centrale}}\nPeriferico {{campo.a_periferico}}\nPostumi invalidanti {{campo.a_postumi}}\nEpilessia (2) {{campo.a_epilessia}} {{campo.a_epilessia_ultima_crisi}}\nAltre {{campo.a_altre}}",
+    "B) Turbe psichiche: (1)\nDa malattie {{campo.b_malattie}}\nDa traumatismi {{campo.b_traumatismi}}\nPost-operatorie {{campo.b_postoperatorie}}\nDa ritardo mentale grave {{campo.b_ritardo}}\nDa psicosi {{campo.b_psicosi}}\nDalla personalità {{campo.b_personalita}}",
+    "C) Sostanze psicoattive: (1)\nAbuso di alcool {{campo.c_alcool}}\nUso di stupefacenti (3) {{campo.c_stupefacenti}} {{campo.c_stupefacenti_modalita}}\nUso di sostenze psicotrope (3) {{campo.c_psicotrope}} {{campo.c_psicotrope_modalita}}\nDipendenza da alcool {{campo.c_dip_alcool}}\nDipendenza da stupefacenti {{campo.c_dip_stupefacenti}}\nDipendenza da sostanze psicotrope (3) {{campo.c_dip_psicotrope}} {{campo.c_dip_psicotrope_modalita}}",
+    "Il sottoscritto afferma di aver fornito al proprio medico dichiarazione veritiera in merito ai dati anamnestici di cui sopra, conscio delle sanzioni a cui va incontro in caso di infedele dichiarazione."
+  ],
+  "notes": [
+    "Note per la corretta compilazione del certificato anamnestico:",
+    "(1) Barrare con una X le caselle interessate.",
+    "(2) Indicare la data dell'ultima crisi avuta da soggetti epilettici.",
+    "(3) Specificare le modalità d'uso.",
+    "N.B. - Il presente certificato anamnestico è valido unicamente ai fini dell'accertamento dei requisiti psicofisici minimi per il rilascio dell'autorizzazione al porto di fucile per uso di caccia ed esercizio dello sport del tiro al volo o al porto d'armi per uso difesa personale."
+  ],
+  "placeDateLabel": "(Luogo e data del rilascio)",
+  "otherSignatures": ["In fede, il dichiarante"],
+  "signature": "In fede, il medico"
+}

@@ -1,11 +1,9 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { accessLog, changeHistory, clinicalEntry } from '../src/db/schema';
-import { studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
-
-const DAY = 86_400_000;
+import { studioDayFrom } from './helpers/dates';
 
 interface EntryList {
   voci: {
@@ -45,7 +43,7 @@ describe('voci cliniche dalla cartella (tappa 9)', () => {
     await t?.drop();
   });
 
-  const day = (offset: number) => studioDate(new Date(s.clock.now().getTime() + offset * DAY));
+  const day = (offset: number) => studioDayFrom(s.clock.now(), offset);
   const req = (method: 'GET' | 'POST' | 'PATCH', url: string, cookie: string, payload?: object) =>
     s.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
   const voci = (patient = s.richPatient) => `/api/pazienti/${patient}/voci`;
@@ -121,6 +119,8 @@ describe('voci cliniche dalla cartella (tappa 9)', () => {
       dal: day(-30),
       risoltoIl: null,
       quesitoAperto: true,
+      cronico: false,
+      categoria: 'diagnosi',
     });
     expect(byId.get(ids.diario)!.dettaglio).toEqual({
       contatto: 'domicilio',
@@ -137,6 +137,12 @@ describe('voci cliniche dalla cartella (tappa 9)', () => {
       sostanza: 'Principio di prova',
       reazione: 'Orticaria di prova',
       daFarmaco: true,
+      natura: 'allergia',
+      agente: 'farmaco',
+      codiceAgente: null,
+      sistemaAgente: null,
+      criticita: null,
+      attiva: true,
     });
     expect(byId.get(ids.esame_obiettivo)!.promemoria).toBe(day(90));
 

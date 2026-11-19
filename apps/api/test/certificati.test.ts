@@ -20,6 +20,7 @@ import { studioDate } from '../src/prescriptions/rules-check';
 import { pdfText } from './helpers/pdf-text';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { studioDayFrom } from './helpers/dates';
 
 const DAY = 86_400_000;
 const norm = (text: string) => text.replace(/\s+/g, ' ');
@@ -46,7 +47,7 @@ describe('certificati di malattia INPS (tappa 8)', () => {
   const inps = new SimulatedSickLeaveGateway({ decide: () => outcome, now: () => s.clock.now() });
   const sender = new SimulatedReminderSender();
   const today = () => studioDate(s.clock.now());
-  const plus = (n: number) => studioDate(new Date(s.clock.now().getTime() + n * DAY));
+  const plus = (n: number) => studioDayFrom(s.clock.now(), n);
 
   beforeAll(async () => {
     t = await createTestDatabase();
@@ -451,7 +452,7 @@ describe('certificati di malattia INPS (tappa 8)', () => {
     s.clock.advance(3 * DAY);
     c.titolare = await login(s, 'titolare');
     const res = await req('POST', `/api/certificati/${cert.id}/rettifica`, 'titolare', {
-      dataFine: studioDate(new Date(s.clock.now().getTime() - 2 * DAY)),
+      dataFine: studioDayFrom(s.clock.now(), -2),
     });
     expect(res.statusCode).toBe(409);
     expect(res.json<{ errore: string }>().errore).toMatch(/entro la fine della prognosi/);

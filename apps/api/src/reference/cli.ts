@@ -5,7 +5,8 @@
  *   pnpm banche-dati:importa -- --esempio
  *
  * --dati           cartella di sync (quella del suo --dest)
- * --trascrizioni   cartella delle trascrizioni dei PDF (schede .json con il CSV accanto)
+ * --trascrizioni   cartella delle trascrizioni dei PDF (schede .json con il CSV accanto); per
+ *                  difetto quelle del programma (packages/reference/data/trascrizioni, D159)
  * --mappature      file di mappature in più: sostituisce quelle con lo stesso id (ripetibile)
  * --accetta-scarti importa le righe valide anche se alcune sono state scartate
  * --esempio        lancia sync sul sito d'esempio (fixtures/banche-dati) e importa quello
@@ -17,15 +18,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { loadMappings, overrideMappings } from '@mmg/reference';
+import { loadMappings, overrideMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
 import { createDatabase, createPool } from '../db/client';
 import { runMigrations } from '../db/migrate';
-import {
-  EXAMPLE_MAPPINGS,
-  EXAMPLE_TRANSCRIPTIONS,
-  runSyncOnExample,
-  serveExampleSite,
-} from './example-site';
+import { EXAMPLE_TRANSCRIPTIONS, runSyncOnExample, serveExampleSite } from './example-site';
 import { ERRORS, importReferenceData, NEEDS_ATTENTION, type ImportLine } from './importer';
 
 const LABELS: Record<ImportLine['outcome'], string> = {
@@ -41,6 +37,8 @@ const LABELS: Record<ImportLine['outcome'], string> = {
   trascrizione_superata: 'trascrizione superata',
   trascrizione_non_valida: 'ERRORE: trascrizione non valida',
   origine_non_trovata: 'ERRORE: PDF d’origine non trovato',
+  base_mancante: 'manca la versione su cui l’atto è scritto',
+  trascrizione_da_controllare: 'trascrizione da controllare: non ancora in uso',
 };
 
 const { values } = parseArgs({
@@ -73,9 +71,10 @@ if (values.esempio) {
   } finally {
     await site.close();
   }
+  // Il sito d'esempio ha le intestazioni vere AIFA: valgono le mappature del repository.
   transcriptionsDir ??= EXAMPLE_TRANSCRIPTIONS;
-  mappings = overrideMappings(mappings, loadMappings(EXAMPLE_MAPPINGS));
 }
+transcriptionsDir ??= REGIONAL_TRANSCRIPTIONS;
 
 const pool = createPool(databaseUrl);
 try {

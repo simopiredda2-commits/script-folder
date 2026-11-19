@@ -120,7 +120,13 @@ export const prescriptionLine = pgTable(
     drugAic: text(),
     drugName: text(),
     activeIngredient: text(),
+    /** Codice del catalogo regionale della prestazione (codCatalogoPrescr). */
     serviceCode: text(),
+    /**
+     * Codice del nomenclatore, il «codice DM» (codProdPrest): obbligatorio per la specialistica
+     * insieme a quello del catalogo (specifiche del Sistema TS, prescrizione, 5/12/2024; D154).
+     */
+    serviceNationalCode: text(),
     serviceDescription: text(),
     /** Confezioni (farmaci) o quantità (prestazioni). */
     quantity: integer().notNull(),

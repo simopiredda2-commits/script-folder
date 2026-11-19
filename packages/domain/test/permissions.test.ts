@@ -214,3 +214,22 @@ describe('regole generali', () => {
     expect(can(segreteria, 'prescription.sign_send', ctx()).reason).toMatch(/medico/);
   });
 });
+
+describe('Profilo Sanitario Sintetico: lo firma il medico di famiglia del paziente (tappa 11)', () => {
+  it('il titolare e il sostituto nel periodo sì; il collega di gruppo, la segreteria e l’amministratore no', () => {
+    expect(ok(titolare, 'fse.publish')).toBe(true);
+    expect(ok(sostituto, 'fse.publish')).toBe(true);
+    expect(can(collega, 'fse.publish', ctx())).toEqual({
+      allowed: false,
+      reason: 'Il Profilo lo firma il medico di famiglia del paziente o il suo sostituto',
+    });
+    // Il collega di gruppo autorizzato lavora comunque sulla cartella.
+    expect(ok(collega, 'clinical.write')).toBe(true);
+    expect(ok(segreteria, 'fse.publish')).toBe(false);
+    expect(ok(amministratore, 'fse.publish')).toBe(false);
+    // Il sostituto fuori dal periodo no.
+    expect(ok(sostituto, 'fse.publish', ctx({ now: new Date('2026-11-25T10:00:00+01:00') }))).toBe(
+      false,
+    );
+  });
+});

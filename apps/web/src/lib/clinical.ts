@@ -14,6 +14,22 @@ export interface Catalog {
   parametri: (Named & { unita: string; massimo: number | null })[];
   fattori: string[];
   consensi: (Named & { fonte: string | null })[];
+  /** Per il Profilo Sanitario Sintetico (tappa 11), dai dizionari ufficiali. */
+  categorieProblema: Named[];
+  organiMancanti: Coded[];
+  nature: Named[];
+  agenti: Named[];
+  criticita: Named[];
+  allergeni: Coded[];
+  parenti: Named[];
+  capacitaMotorie: Named[];
+  vieSomministrazione: string[];
+}
+
+/** Voce di un dizionario ufficiale: codice e descrizione. */
+export interface Coded {
+  codice: string;
+  nome: string;
 }
 
 export function useCatalog() {
@@ -24,7 +40,14 @@ export const nameOf = (list: Named[] | undefined, key: string | null | undefined
   list?.find((x) => x.chiave === key)?.nome ?? key ?? '';
 
 export type EntryType =
-  'problema' | 'diario' | 'misura' | 'anamnesi' | 'allergia' | 'stile_di_vita' | 'esame_obiettivo';
+  | 'problema'
+  | 'diario'
+  | 'misura'
+  | 'anamnesi'
+  | 'allergia'
+  | 'stile_di_vita'
+  | 'esame_obiettivo'
+  | 'capacita_motoria';
 
 export interface Entry {
   id: string;
@@ -38,7 +61,7 @@ export interface Entry {
   stato: 'attiva' | 'annullata';
   annullataIl: string | null;
   motivoAnnullamento: string | null;
-  dettaglio: Record<string, string | boolean | null> | null;
+  dettaglio: Record<string, string | number | boolean | null> | null;
 }
 
 export interface EntryList {

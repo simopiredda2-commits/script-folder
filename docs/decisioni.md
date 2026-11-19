@@ -422,3 +422,328 @@ Simone ha risposto con il pulsante.
 
 - **Scheda attiva fuori vista**: con molte schede la barra scorre, e la scheda del paziente attivo poteva restare fuori dalla parte visibile, soprattutto su tablet. Ora la barra scorre da sola fino alla scheda attiva, anche quando cambia la larghezza dello schermo; la pagina non si sposta.
 - **Scritti persi cambiando paziente**: nelle pagine nuove, e nel certificato di malattia, quello che si stava scrivendo si perdeva passando a un altro paziente e tornando. Ora resta ricordato per paziente come la ricetta e la terapia (D68, D80), nella memoria della scheda del browser, che si svuota all'uscita. Vale per voci cliniche, parametri, piani terapeutici, presidi, consensi, deleghe, seguito delle prestazioni e certificato. Si cancella quando si registra; il file del referto no, perché il browser non lo conserva e va scelto di nuovo.
+
+## Tappa 11 – Profilo Sanitario Sintetico (18/11/2026)
+
+**D130 · Fonti della tappa 11.** Prima di costruire ho letto le fonti che `docs/fse.md` dava ancora da leggere:
+
+- le specifiche di integrazione del Gateway (versione 2.26 del 30/10/2026), con i servizi, i due token JWT, gli errori e le tabelle dei valori;
+- il modello del nodo regionale e le domande frequenti del Ministero;
+- l'esempio di PSS che passa la validazione;
+- lo schematron del PSS (versione 4.0) e i dizionari ufficiali;
+- la DGR piemontese 19-1912 del 2025: il Piemonte usa il Gateway nazionale centralizzato;
+- l'art. 20 del DM 2023 (accesso in emergenza).
+
+Non si raggiungono da qui la guida HL7 Italia e il portale del Fascicolo; al loro posto valgono le regole dello schematron, che sono quelle che il Gateway applica. Che cosa ne è venuto è in `docs/fse.md`.
+
+**D131 · Copie dei file ufficiali nel repository.** Lo schematron del PSS, sedici dizionari e un estratto LOINC sono in `packages/integrations/fse-ufficiale/`. Ogni file ha la sua provenienza (repository e commit del Ministero) e l'impronta SHA-256, e una prova controlla che nessuno li cambi a mano. Motivo: le prove e il simulatore devono girare senza rete, e il documento del programma va controllato con le regole vere. Il repository del Ministero non indica una licenza: è una domanda per la fermata. Per LOINC c'è l'avviso di licenza.
+
+**D132 · Il simulatore del Gateway applica lo schematron ufficiale.** Come il Gateway vero, la validazione del simulatore controlla il documento con lo schematron e risponde con gli stessi tipi di errore (RFC 7807). Lo schematron usa XPath 1.0 più una funzione di XPath 2 (`matches`). Lo esegue un piccolo motore nostro su due librerie con licenza MIT, `@xmldom/xmldom` e `xpath`. Non provato: i controlli sui dizionari (errore «vocabolario») che il Gateway fa oltre allo schematron. Il simulatore controlla solo i codici dei dizionari copiati.
+
+**D133 · Impostazioni del Fascicolo dello studio.** Servono i valori che lo studio riceve con l'accreditamento: radice OID dei documenti, identificativo del repository, radice OID degli invii, custode del documento, struttura del medico nel formato XON. Restano «da completare» finché la Regione non li assegna. Tre valori sono fissi:
+
+- organizzazione 010, Regione Piemonte, che usa il Gateway nazionale (D130);
+- tipologia della struttura «Territorio»: la tabella 58 la indica per i documenti di «uno specialista territoriale (ad es. MMG, PLS)»;
+- assetto organizzativo AD_PSC130, «Medicina di Base».
+
+Tipo di attività clinica e regime si scelgono tra i valori delle tabelle 57 e 63 della specifica del Gateway; codici e nomi stanno in un solo posto (`FSE_CLINICAL_ACTIVITIES`, `FSE_ADMINISTRATIVE_REQUESTS`), usato dal simulatore, dal servizio e dall'interfaccia. Nelle prove e nei dati dimostrativi si usano OBS («Documento stato di salute») e SSN («Regime SSN»): sono una proposta da confermare alla fermata. Le impostazioni le cambia l'amministratore nella pagina «Strumenti dello studio», che compare solo nel suo menu; chi lavora nello studio le legge.
+
+**D134 · Il programma propone, il medico sceglie e conferma.** Dalla cartella si propongono:
+
+- le patologie croniche, gli organi mancanti, i trapianti e le malformazioni;
+- le allergie attive;
+- le terapie croniche in corso, se hanno l'AIC o l'ATC e la via (le altre terapie in corso il medico le può aggiungere);
+- l'anamnesi familiare, se ha il parente e il codice della patologia;
+- gli ultimi parametri, gli stili di vita e la capacità motoria.
+
+Le voci oscurate non entrano mai (art. 4, c. 3). Le riservate non si propongono: la pagina dice quante sono, e per farle entrare si toglie la riservatezza nella cartella. Una voce a cui manca un dato non si può spuntare, e la pagina dice che cosa manca.
+
+Una sezione obbligatoria senza voci dice l'assenza con i codici ufficiali: per difetto «nessuna informazione»; «nessuna allergia nota» e simili solo se li sceglie il medico. Prima della validazione il medico conferma di aver controllato il contenuto voce per voce. Se cambia una scelta, la conferma si ripete. Motivo: il programma prepara, ma il documento è del medico che lo firma (regola 3: nessuna scelta clinica automatica).
+
+**D135 · Campi nuovi nelle voci cliniche, dai dizionari ufficiali.**
+
+- Problema: «patologia cronica»; categoria (diagnosi, organo mancante, trapianto, malformazione). L'organo mancante ha solo il codice del dizionario ICD-10 «Organi mancanti».
+- Allergia: allergia o intolleranza; l'agente; il codice, cioè AIC o ATC per i farmaci, oppure l'elenco «Allergeni (No Farmaci)»; la criticità; «non più attiva».
+- Anamnesi familiare: parente, patologia in ICD-9-CM, età all'esordio.
+- Capacità motoria: un tipo di voce nuovo.
+
+La scheda della terapia offre le dodici vie con il codice HL7. Le prende dal dominio attraverso il catalogo, così una terapia nuova ha sempre una via che il Profilo sa codificare.
+
+**D136 · Validare, firmare, pubblicare, controllare lo stato.** Il medico valida: prima lo schematron nel programma, poi la validazione del Gateway. Poi firma (PAdES) e pubblica, oppure sostituisce la versione precedente. Infine il programma chiede lo stato della transazione.
+
+Il Profilo è «pubblicato» solo quando lo stato dice che i dati sono arrivati a INI (SEND_TO_INI riuscito). Prima è «preso in carico», e la pagina ha «Controlla lo stato»; il simulatore può rispondere in due tempi per provarlo. Il servizio che valida e crea con una sola chiamata non si usa: il medico firma solo quello che il Gateway ha già validato. La specifica fa rifiutare i documenti più vecchi di 5 giorni (errore `max-day-limit-exceed`): la pagina lo ricorda dopo la validazione.
+
+**D137 · Firma del Profilo simulata.** Il PDF si firma PAdES con un certificato di prova per ogni medico (`SimulatedDocumentSigner`). La firma digitale vera ha bisogno di un fornitore di firma qualificata (remota o con dispositivo) da scegliere: è una domanda per la fermata. L'interfaccia `DocumentSigner` è già quella che il fornitore vero dovrà rispettare.
+
+**D138 · Certificati del Gateway.** Il Gateway vuole due certificati che Sogei rilascia con l'accreditamento: uno per il collegamento e uno per firmare i token. Il simulatore ne rilascia di prova e rifiuta quelli che non ha rilasciato. Quelli veri non entrano nel repository (regola 7): andranno tra i segreti del servizio.
+
+**D139 · Versioni del Profilo.** Ogni versione nuova tiene lo stesso `setId`, ha il numero successivo e dichiara che sostituisce la precedente (RPLC). Il Gateway la riceve come sostituzione. La precedente resta consultabile con il suo PDF firmato e resta «pubblicata» finché INI non conferma la nuova. Il codice P81 («Versioni precedenti Profilo Sanitario Sintetico») non si usa ancora: il suo uso va chiarito con la Regione (`docs/fse.md`).
+
+**D140 · Recapiti di studio del medico.** Il Profilo vuole nome e cognome del medico separati e almeno un recapito (schematron, ERRORE-38 ed ERRORE-40). Si inseriscono nella pagina «Recapiti di studio», raggiungibile da «Credenziali dei servizi» e dall'avviso del Profilo quando manca qualcosa. Li cambia solo il medico stesso. Il codice fiscale del medico resta quello del profilo creato con l'account: qui non si cambia.
+
+**D141 · Indirizzo del paziente fuori dal Profilo.** Lo schematron non lo chiede. Se c'è, però, deve avere anche il codice ISTAT del comune (ERRORE-11), che l'anagrafica non ha. Per ora non entra; il programma lo scrive solo se è completo. Da rivedere quando l'anagrafica avrà il codice ISTAT del comune di residenza.
+
+## Provenienza dimostrabile (18/11/2026)
+
+**D142 · Nessun appiglio per pretese di copyright o di reverse engineering.** Richiesta di Simone: «fai in modo che nessuno possa rivendicare violazione del copyright o reverse engineering». La regola c'era dall'inizio: requisiti («Sviluppo indipendente» e licenza di Next²), regola 2, D87 e D89. Ora è anche documentata e controllata:
+
+- `docs/provenienze.md` dice da dove viene ogni contenuto, a quali condizioni e chi lo controlla.
+- Una prova su tutto il repository (`packages/brand/test/provenienza.test.ts`) accetta immagini, documenti e archivi solo con una provenienza dichiarata: le schermate fotografate dal programma, i file inventati di `genera.py`, i marchi. Una schermata o un manuale di un altro programma la fa diventare rossa. La stessa prova ammette nelle dipendenze di produzione solo licenze permissive.
+- I cataloghi dello studio vengono dalle fonti pubbliche o li inserisce lo studio; nessun elenco si prende da altri programmi.
+
+Nessuno può impedire a un terzo di avanzare una pretesa. Si può fare in modo che sia infondata e che lo si possa dimostrare. Per questo restano due cose:
+
+- la revisione di un avvocato prima del lancio (requisiti);
+- una proposta per la fermata: da ora le richieste arrivano a parole vostre, senza schermate di Next². Così la traccia resta pulita anche rispetto all'art. 7 della sua licenza, che vieta ogni analisi finalizzata a riprodurne i contenuti.
+
+## Modelli dei certificati (18/11/2026)
+
+**D143 · I modelli dei certificati entrano nel terzo giro.** Simone li chiede direttamente: certificato per l'attività sportiva non agonistica, porto d'armi, anamnestico per la patente «e via dicendo». Sono modelli fissi in cui cambiano solo i dati del paziente, in un menu «Modelli» degli strumenti, con caratteri, intestazione e dimensioni scelti dal medico, strutturati secondo le linee guida dove ci sono. Sono già nei requisiti («Altri certificati e moduli»).
+
+Ordine: prima si chiude la tappa 11, poi la tappa 13 (modelli), poi la 12 (condivisione nell'AFT). La fermata resta dopo la tappa 12 e copre tutte e tre. Motivo: i modelli poggiano su due pagine appena fatte, «Strumenti dello studio» e i recapiti del medico; e Simone li ha chiesti due volte.
+
+I testi dei modelli vengono solo dagli atti ufficiali (D142): dove un modello ufficiale non c'è, il testo lo scriviamo noi dai requisiti di legge, e lo segniamo da far verificare. Prima di costruire si leggono le fonti.
+
+**D144 · Come sono fatti i modelli.** Ci sono due tipi di modello.
+
+- **Modelli ufficiali.** Il testo è quello dell'atto, copiato parola per parola. Stanno in `apps/api/modelli/`, un file per modello, con fonte e versione; il servizio li controlla all'avvio, e un file sbagliato lo ferma (`apps/api/modelli/LEGGIMI.md`).
+- **Modelli dello studio.** Per i certificati che non hanno un modello ufficiale. Li scrivono i medici o l'amministratore (requisiti: «modelli» tra i compiti dell'amministratore). I segnaposto sono controllati.
+
+Al rilascio il programma mette i dati del paziente (dalla cartella) e del medico (dal profilo). Il medico compila i campi che il modello prevede e il luogo; la data è quella del giorno. Il programma non decide niente di clinico: ogni dichiarazione è del medico (regola 3). Rilascia solo il medico, con il permesso «firmare i certificati», come per i certificati INPS; la segreteria no.
+
+Il certificato rilasciato si conserva com'era: testo, campi, fonte e versione del modello, impaginazione. Non si modifica: si annulla una volta, con un motivo (protezione nel database). Il PDF si rifà identico dal certificato conservato.
+
+Se il modello fissa una validità in mesi, «valido fino al» è il giorno prima della stessa data, tanti mesi dopo. È un'interpretazione, da confermare con la Dr.ssa Rocca.
+
+**D145 · Impaginazione scelta dal medico.** Simone: il professionista imposta caratteri, intestazione e dimensione. Si sceglie:
+
+- il carattere, fra quelli standard del PDF: Helvetica, Times o Courier. Non vanno incorporati e non hanno licenze da rispettare (D142);
+- la dimensione, da 9 a 14 punti;
+- l'intestazione, fino a 6 righe (la prima in neretto), a sinistra o al centro;
+- i margini, da 10 a 40 mm;
+- il luogo proposto per «luogo e data»;
+- il timbro, sotto lo spazio della firma.
+
+C'è la prova di stampa prima di salvare. Vale per i certificati dai modelli; il testo dei modelli non cambia. Un certificato già rilasciato tiene l'impaginazione che aveva.
+
+**D146 · «Strumenti» anche per i medici.** La pagina degli strumenti ha tre schede: modelli dei certificati, impaginazione (solo per i medici) e Fascicolo sanitario. La vedono i medici e l'amministratore, la segreteria no. Le impostazioni del Fascicolo le cambia solo l'amministratore.
+
+**D147 · Il programma usato oggi dallo studio non si nomina nel codice.** Domanda di Simone: «confermi con assoluta certezza che nel codice non c'è traccia né alcun riferimento» a quel programma? Verificato il 18/11/2026:
+
+- **Codice:** nessun riferimento in `apps/`, `packages/`, `sync/`, `fixtures/`, `scripts/` e `.github/`, né oggi né in tutta la storia (66 commit), né nei nomi dei file.
+- **Immagini e documenti:** nella storia sono entrati solo le nostre schermate e i file inventati delle prove.
+- **Testi:** il nome compare solo nei documenti che fissano la regola e ne tengono traccia (requisiti, `CLAUDE.md`, decisioni D87, D89 e D104, avanzamento, `docs/provenienze.md`), in un messaggio di commit e nella descrizione della pull request #3. Restano, perché sono la traccia del processo pulito: dicono che cosa non si è preso e perché.
+
+Da ora una prova su tutto il codice (`packages/brand/test/provenienza.test.ts`) diventa rossa se il nome o l'indirizzo del programma compaiono nel codice. L'espressione è scritta in modo che il file della prova non li contenga.
+
+**D148 · Farmaci dimostrativi veri, dalle liste AIFA.** Simone, sulle schermate: «"provalina" è davvero orrendo, trova il modo di poter mettere anche solo un principio attivo». Scelte del 18/11/2026:
+
+- **Estratti veri invece di farmaci inventati.** Nel sito d'esempio (`fixtures/banche-dati/`) i file AIFA sono estratti dei file veri: intestazioni e righe copiate senza cambiare un byte dall'anagrafica delle confezioni e dalle liste di classe A e H del 30/6/2026, letti il 18/11/2026. AIFA pubblica i dati aperti con licenza CC BY 4.0 e chiede di citare la fonte (pagina «Open Data», letta lo stesso giorno). La citazione è nel generatore, nel `LEGGIMI.md` degli esempi e in `docs/provenienze.md`; nel programma, l'elenco «Banche dati dei farmaci in uso» dice da dove viene ogni dato.
+- **Quali farmaci.** Uno per ogni problema dei pazienti dimostrativi, ognuno con un equivalente di marca: amlodipina per l'ipertensione, metformina per il diabete, atorvastatina per l'ipercolesterolemia. Poi:
+  - dulaglutide, per l'esempio di nota AIFA e piano terapeutico. È la riga dell'elenco DPC della Regione Piemonte aggiornato al 9/7/2026: nota 100, «PT elettronico - Sistema TS»;
+  - ceftriaxone, in classe H;
+  - paracetamolo, che non è nelle liste di classe.
+- **Prezzi e classi.** Sono quelli dei file del 30/6/2026. Servono a provare il programma, non a prescrivere, e non si aggiornano. Le prove interne che non producono schermate restano con i loro dati di prova («Farmaco di prova»).
+- **Mappature AIFA complete.** Prima erano «da completare», perché dal cloud i file non si leggevano. Ora www.aifa.gov.it si raggiunge (D92), e drive.aifa.gov.it è stato aggiunto il 18/11/2026 con l'approvazione di Simone. Le intestazioni vere sono nelle mappature del repository; quelle di prova sono state tolte.
+- **Controllo sui file interi.** Anagrafica: 160.101 righe. Classe A: 10.766. Classe H: 2.487. Tutti gli AIC hanno 9 cifre e tutti gli ATC sono nella forma attesa.
+- **Prezzi che non sono numeri.** Nella classe H, 117 prezzi non sono numeri: 31 «-», perché c'è solo il prezzo massimo di cessione, e 86 prezzi dell'ossigeno a metro cubo («6,55/m³»). Senza una regola, l'intero file sarebbe stato rifiutato. Una mappatura ora può dichiarare quali valori, in un campo facoltativo, valgono «nessun valore» (`nessunValore`). Vale solo per i valori visti nei file veri, con il motivo nella nota. Il rapporto d'importazione dice quante celle ha letto così.
+- **Nota AIFA.** Le liste di classe non hanno la colonna della nota: le note vengono dall'elenco DPC. La lista di trasparenza (`Lista_farmaci_equivalenti.csv`) ha nota e ATC per ogni AIC, ma scrive l'AIC senza lo zero iniziale, a 8 cifre. Va mappata in un passo dedicato: finché non lo è, il programma non conosce, per esempio, la nota 13 delle statine.
+- **Equivalenti.** Si ordinano per prezzo e, a parità di prezzo, per nome e AIC: lo stesso ordine a ogni ricerca.
+
+**D149 · Dati dimostrativi: solo adulti, terapie per principio attivo.** Due richieste del 18/11/2026:
+
+- **Nessun paziente in età pediatrica.** Simone: «non mettere pazienti pediatrici!!». La schermata delle cartelle aperte mostrava pazienti di 4 e di 14 anni, che non hanno senso nello studio di un medico di medicina generale.
+  - Il generatore ora ha un'età minima (`minAge`): i pazienti più giovani si saltano, gli altri restano gli stessi e nello stesso ordine.
+  - Il seed chiede solo maggiorenni (`apps/api/src/db/demo.ts`). Una prova lo controlla.
+  - Le prove interne restano con le età di prima, perché alcune hanno bisogno di minori.
+- **Nessun nome di ditta o marchio nelle schermate per il sito di SCRIPT.** La richiesta è arrivata dalla sessione che fa il sito. Riporta le parole di Simone: «se ci sono dubbi, scegli un principio attivo in cui sia indicato "generico"». Il dubbio riguarda la pubblicità al pubblico di medicinali con obbligo di ricetta (d.lgs. 219/2006) e l'uso di marchi altrui.
+  - I generici AIFA portano sempre il nome della ditta (per esempio «METFORMINA MYLAN GENERICS»): una confezione senza ditta non c'è.
+  - Le terapie dimostrative sono quindi **per principio attivo**, come il programma già consente. Il nome è la descrizione AIFA del gruppo di equivalenza, letta dalla lista di classe A del 30/6/2026, per esempio «METFORMINA 500MG 30 UNITA' USO ORALE».
+  - Anche il piano terapeutico dimostrativo è per principio attivo (dulaglutide).
+  - La terapia nuova scelta dalla banca dati (schermate 12 e 13) va a un altro paziente, così la cartella del paziente principale resta senza ditte.
+  - I nomi delle confezioni restano dove sono il punto della schermata: ricerca ed equivalenti (10), controlli della ricetta (07), terapia dalla banca dati (12 e 13). Quelle schermate servono alla documentazione, non al sito.
+- **Difetto messo in luce.** Nel promemoria, una riga per principio attivo stampa solo il principio attivo, senza dosaggio né confezione (schermata 18). La descrizione giusta è quella AIFA del gruppo di equivalenza. È nelle liste di classe (colonna «Descrizione gruppo») ma non è ancora importata: da correggere, con le specifiche del promemoria alla mano.
+
+**D150 · Quadri clinici dimostrativi credibili per l'età.** La Dr.ssa Rocca: un paziente nato nel 1995 difficilmente prende la metformina, è più credibile l'insulina. Simone: «nelle screenshot tieni conto delle condizioni che effettivamente un paziente sia probabile possa avere».
+
+- **Quadri per età e sesso** (`apps/api/src/db/demo.ts`). Il seed sceglie il quadro clinico così:
+  - sotto i 40 anni: diabete tipo 1 con insulina glargine e insulina aspart per gli uomini, ipotiroidismo con levotiroxina per le donne;
+  - fra 40 e 64 anni: ipertensione con amlodipina, ipercolesterolemia con atorvastatina, oppure diabete tipo 2 con metformina;
+  - dai 65 anni: ipertensione insieme al diabete tipo 2 o all'ipercolesterolemia.
+- **Prove.** Anche la pressione dimostrativa dipende dall'età. Una prova controlla due cose: sotto i 40 anni non ci sono diabete tipo 2, ipertensione o ipercolesterolemia, e dai 40 anni non c'è il diabete tipo 1.
+- **Codici e farmaci.** I codici ICD-9-CM (250.01, 244.9, 401.9, 250.00, 272.0) sono verificati il 18/11/2026 sulle edizioni inglesi dell'ICD-9-CM, che hanno gli stessi codici della versione italiana 2007. Le descrizioni sono quelle che scriverebbe il medico. I farmaci sono per principio attivo, con la descrizione AIFA del gruppo (D149).
+- **Schermate.**
+  - Dulaglutide, nella ricetta con i controlli e nel piano terapeutico, va a un paziente con diabete tipo 2.
+  - L'amlodipina scelta dalla banca dati va a un iperteso.
+  - Al paziente principale (30 anni, diabete tipo 1) si aggiunge l'ipotiroidismo, con pressione e peso da trentenne.
+  - Le estrazioni casuali sono le stesse di prima, quindi i pazienti delle schermate non cambiano.
+- **Che cosa non vale.** Le dosi (per esempio 14 unità di glargine la sera) sono dati inventati di pazienti inventati: non sono indicazioni terapeutiche (regola 3).
+
+**D151 · La ditta dei generici si vede.** Simone: «l'importante è che il nome dei fornitori possa essere mostrato sui farmaci generici». I generici si distinguono per la ditta, e il medico deve poterla vedere quando sceglie una confezione.
+
+- L'anagrafica AIFA ha la ditta titolare dell'AIC nella colonna `RAGIONE_SOCIALE`: la mappatura la importa nel campo `holder` (migrazione 0016).
+- La ditta si vede nei risultati della ricerca dei farmaci (pagina «Farmaci e prestazioni», ricetta, terapia) e in una colonna della tabella degli equivalenti.
+- Nelle schermate per il sito di SCRIPT le terapie restano per principio attivo, senza ditte (D149). Il programma la ditta la mostra, dove serve al medico.
+- Nella scheda di una terapia già salvata la ditta non è un dato a parte: per i generici è già nel nome della confezione (per esempio «AMLODIPINA EG»). Si può aggiungere se servirà.
+
+**D152 · Tutti i farmaci e tutte le prestazioni restano nella cartella, ognuno con il suo storico; i farmaci hanno un colore per tipo.** Richiesta di Simone del 18/11/2026, sopra D65 e D66: ogni farmaco prescritto con il suo storico, i cronici e i suggeriti distinti dal colore, «visite o esami» nei loro menu. Simone: niente formattazione elementare del testo, meglio lo sfondo, con una piccola legenda sempre nello stesso punto, e colori scelti secondo il significato.
+
+- **Farmaci prescritti** (menu della cartella e pagina propria): le terapie in corso, quelle sospese o terminate e i farmaci prescritti senza una terapia in cartella. Le righe senza terapia si raggruppano per AIC; senza AIC, per principio attivo; senza nessuno dei due (scritte a mano), per nome. Ogni voce apre il suo storico: quello della terapia (D65) o uno nuovo per AIC, principio o nome. La regola di corrispondenza è una sola, per lo storico e per l'elenco: il numero di ricette di una voce è quello che il suo storico mostra, e una prova lo controlla voce per voce. Le terapie riservate, e le loro righe, le vede solo chi può (come nello storico).
+- **Colori**, sempre con la parola accanto e mai al suo posto. Lo sfondo tenue della riga, con una barra a sinistra nello stesso colore pieno, dice come si prende il farmaco:
+  - **cronica: azzurro**, la continuità; è il blu di SCRIPT, il colore della struttura;
+  - **ciclo con data di fine: verde**, un percorso che si chiude;
+  - **al bisogno: giallo**, il più leggero, per l'uso saltuario. È più chiaro dell'evidenziatore e non ha mai il bordo scuro delle selezioni (D69).
+
+  La tipologia sulla ricetta ha un'etichetta **viola**: «S · suggerita dallo specialista» o «H · da ricovero». Il viola vuol dire «proposta da un altro medico». Sfondo ed etichetta stanno insieme, senza regole di precedenza: una terapia cronica suggerita dallo specialista ha lo sfondo azzurro e l'etichetta S. **Senza colore**: non in corso (sospesa, terminata, o prescritta senza terapia). Contrasti provati sui token (testo ≥ 4,5:1 su ogni tinta, barre ≥ 3:1).
+
+- **Legenda**: piccola, uguale per ogni paziente, sempre in testa all'elenco dei farmaci (nella cartella subito sotto «Terapia in corso», nella pagina dei farmaci sotto la testata).
+- **Visite ed esami prescritti** (menu della cartella e pagina propria): due gruppi, «Visite» ed «Esami e altre prestazioni». È una visita la prestazione la cui descrizione comincia con «VISITA», «PRIMA VISITA» o «TELEVISITA», oppure nomina la visita dopo un trattino. La regola è verificata il 18/11/2026 su tre elenchi interi, senza eccezioni:
+  - catalogo regionale della D.D. 868/2024: 349 visite;
+  - catalogo regionale della D.D. 990/2024: 356 visite. Le uniche due che non cominciano con «VISITA» sono le rivalutazioni al centro demenze, 8901.85 e 9412.85;
+  - nomenclatore nazionale, allegato 4 del DPCM LEA, PDF del Ministero in 5 parti scaricato da Simone: 61 visite su 2113 prestazioni.
+
+  Cercare la parola in qualunque punto della descrizione non basta: il nomenclatore la usa nelle note. Esempi: «ELETTROCARDIOGRAMMA. Non associabile a Prima visita cardiologica», «Incluso: Visita anestesiologica» negli interventi, e la spiegazione della consulenza genetica. Consulti, colloqui e valutazioni non sono chiamati visite dalle fonti e stanno tra gli esami e le altre prestazioni. A ogni catalogo nuovo il rapporto d'importazione ripete la prova: conta le visite ed elenca le voci che nominano la visita senza esserlo, perché una persona le controlli.
+
+- Il catalogo in vigore dal 30/10/2026 (allegato C della D.D. 710/2026) non è pubblicato con l'atto: la pagina del Bollettino collega solo il testo. Va chiesto o scaricato da Simone (vedi `docs/avanzamento.md`); quando entrerà, il rapporto rifarà la prova.
+
+**D153 · Ricerca delle prestazioni per parole chiave, per tutti gli esami.** Simone: scrivendo «rachide» si devono trovare tutte le prestazioni che lo coinvolgono; lo stesso per gli esami, «potassio, oppure K», «glicemia o glucosio»; le varianti con codici regionali diversi devono comparire; si cerca anche iniziando a scrivere il codice. Regole generali, non un elenco di casi:
+
+- **Parole**: tutte le parole della domanda, in qualunque ordine, ognuna all'inizio di una parola della descrizione. Non contano maiuscole, accenti e segni. Le parole di una o due lettere (K, RX, TC) valgono solo intere. «rachide» non trova «ARACHIDE». «lombo sacrale», «lombo-sacrale» e «lombosacrale» si trovano a vicenda. La branca trova la prestazione, ma conta meno.
+- **Codici**: l'inizio del codice del catalogo o del nomenclatore («codice DM»), con o senza punti, anche quando comincia con una lettera (G9.01). Il codice vale più delle parole.
+- **Varianti**: le voci con lo stesso codice del nomenclatore restano vicine, per esempio le sei del glucosio, 90.27.1. Prima viene la voce che comincia con la parola cercata («glicemia» dà il glucosio prima delle dialisi «con soluzioni di glucosio»); a parità di punti, il gruppo con la descrizione più corta.
+- **Materiali**: la sigla tra quadre in fondo alla descrizione si mostra per esteso e si può cercare («glucosio urine» trova [U] e [DU]):
+  - S siero/sangue, P plasma, U urine e DU urine 24 ore vengono da Simone;
+  - (SG)ER eritrociti, SG e (SG) sangue, SA saliva e LA liquido amniotico vengono da un elenco regionale campano, letto negli estratti di una ricerca. Simone ha chiesto di non scriverlo nell'interfaccia: la fonte resta nei dati e in `docs/provenienze.md`;
+  - [ALB] e [F] restano come sono scritte, senza fonte.
+
+  Il DM 22/7/1996, da cui vengono le sigle, dice solo che la parentesi quadra indica «il materiale nel quale si dosa l'analita» (S.O. n. 150, p. 7).
+
+- **Sinonimi** come dati, in `packages/reference/data/ricerca-prestazioni.json`. Ogni gruppo ha un codice d'esempio verificato sul catalogo intero della D.D. 990/2024 e la fonte.
+  - **Simboli chimici** degli elementi che compaiono nel catalogo: K, Na, Cl, Ca, Mg, Fe, Li, Ni, Cu, Zn, Cd, Pb. Sono «sigle»: valgono quando il medico le scrive, ma «potassio» non si allarga a ogni parola «K» (le catene K delle immunoglobuline). Esclusi Cr (per molti è la creatinina), Se e Al (sono parole italiane) e Co.
+  - **Nomi d'uso**: glicemia e glicosuria per glucosio, azotemia per urea, uricemia e acido urico per urato, sideremia per ferro, natremia, kaliemia, transaminasi.
+  - **Sigle che il catalogo non scrive**: HbA1c, INR, PTT, GGT, PCR, TAC, RMN, EEG, MOC e DEXA.
+  - **Regola generale per i nomi in «-emia» e «-uria»**: si cerca anche la radice (colesterolemia → colesterolo, proteinuria → proteine), se ha almeno 5 lettere.
+- **Provata sul catalogo intero** (4739 voci della D.D. 990/2024): l'indice si costruisce in circa 60 millisecondi e una ricerca dura da 1 a 25. L'indice sta in memoria per ogni versione del catalogo, che dopo l'importazione non cambia (A2).
+
+**D154 · I due codici della specialistica e il codice scritto a mano.** Simone: i codici regionali vanno aggiornati ogni giorno, perché se un codice cambia alcune strutture rifiutano la ricetta; quando l'aggiornamento non c'è ancora, il medico deve poter scrivere il codice a mano, se è consentito. Le specifiche del Sistema TS (prescrizione, 5/12/2024, pp. 28 e 40–42) dicono quattro cose:
+
+- per la specialistica sono obbligatori il codice del nomenclatore (`codProdPrest`, il «codice DM») e quello del catalogo regionale (`codCatalogoPrescr`), coerenti tra loro, più la descrizione del catalogo, che è ciò che vede la struttura;
+- il Sistema TS, e prima di lui il SAR, controlla la coppia sul catalogo che la Regione gli ha trasmesso, non sulla copia del programma;
+- un codice nuovo scritto a mano viene quindi accettato, se la Regione lo ha già trasmesso;
+- la nota libera (`descrTestoLiberoNote`) non sostituisce il codice.
+
+Scelte:
+
+- **La riga conserva entrambi i codici** (migrazione 0017). Scegliendo dal catalogo, il codice del nomenclatore viene dalla voce del catalogo; se la riga non lo porta, il programma lo ricava dal catalogo in uso, quando la prepara e quando la invia. Al SAR arrivano entrambi.
+- **R10**, nella versione 2026-11-18.3 delle regole: blocca se manca il codice del nomenclatore, e se quello scritto non è quello del catalogo in uso. Punti e spazi non contano. Le ricette controllate con le versioni precedenti restano com'erano: la regola lo legge da un valore della versione.
+- **R18**, regola nuova: avvisa se il codice non è nel catalogo regionale in uso e chiede un motivo, che resta registrato con il controllo. Il controllo finale è del SAR. Tace se nessun catalogo è importato. La numerazione dei requisiti finisce a R17: R18 c'è dalla versione .3.
+- **Modulo «scritta a mano»** nella ricetta specialistica: codice del catalogo, codice del nomenclatore (DM) e descrizione come nel catalogo della Regione, con la spiegazione di quando usarlo.
+- **Simulatore del SAR**: può avere il «catalogo della Regione» e allora rifiuta le coppie che non conosce, dicendo quale prestazione.
+
+L'aggiornamento quotidiano del catalogo è nell'aggiornamento automatico (attività a parte). In produzione la fonte giusta è il catalogo strutturato del CSI Piemonte, se esiste per le software house: è una domanda per la fermata.
+
+**D155 · L'interfaccia si prova con i tre motori dei browser.** Domanda di Simone: «sarà dunque un programma indipendente in cloud compatibile sia per windows che per apple, giusto?». I requisiti chiedono «browser su PC e tablet, nessuna installazione». Fino a qui la prova nel browser girava solo con Chromium, il motore di Chrome e di Edge (D74). Ora la stessa prova gira anche con WebKit, il motore di Safari su Mac e iPad, e con Firefox: due lavori di CI in più, che scelgono il motore con `E2E_BROWSER` e scrivono la versione del browser. La prova controlla che il motore avviato sia quello chiesto, e un nome sconosciuto la ferma subito. In locale resta Chromium, l'unico installato nella macchina di sviluppo. Non provato: WebKit in CI gira su Linux, quindi non è Safari su un Mac o su un iPad veri; quella prova va fatta sui dispositivi dello studio.
+
+**D156 · Le banche dati si aggiornano da sole ogni notte, con un comando e con un pulsante; la vecchiaia di una versione si misura sul controllo della notte.** Simone: elenchi, moduli e banche dati devono poter essere aggiornati di continuo, «o con un comando o in automatico secondo una cadenza appropriata e/o prevista»; i codici regionali «ogni giorno». I requisiti dicono già «ogni notte, senza interventi manuali» (A1) e chiedono di avvisare quando una versione è «più vecchia del previsto per quella fonte» (A6). Scelte:
+
+- **Un solo giro per tutto**: `sync/`, poi l'importazione con i suoi controlli, poi il registro (`reference_update_run`, migrazione 0018). Lo stesso giro parte dall'orologio di ogni notte, dal comando `pnpm banche-dati:aggiorna` e dal pulsante «Aggiorna adesso». Il pulsante è solo per l'amministratore dello studio: azione nuova `admin.reference_data`, nella matrice dei permessi.
+- **Ogni notte tutte le fonti**, all'ora scelta in configurazione (proposta: 03:30). È fuori dall'intervallo che il cambio dell'ora salta o ripete, e l'orologio regge comunque qualunque ora: un'ora ripetuta vale la prima volta, un'ora saltata si sposta dopo il salto. Nessuna cadenza diversa per fonte: A1 vuole tutte le fonti ogni notte, e le richieste condizionate rendono leggero il controllo di una fonte ferma. La cadenza di pubblicazione di ogni fonte resta scritta in `sync/fonti.json` e serve alla soglia d'età.
+- **Giro perso**: se il servizio era spento all'ora prevista, il giro parte un minuto dopo l'avvio. **Uno alla volta**: un vincolo del database sul giro «in corso», che vale anche con più istanze. Un giro fermo da più di 6 ore si chiude come interrotto, la stessa durata del lucchetto di `sync/`.
+- **`sync/` scrive anche un rapporto JSON** (`ultimo-rapporto.json`, con l'identificativo del giro) e l'ora di ogni controllo riuscito, anche per i file fermi (`controllato_il`). Le ore hanno ora i millisecondi: con i secondi due giri vicini non si distinguevano, e il sabotaggio lo ha mostrato.
+- **«Più vecchia del previsto» (A6)** non si misura più solo sull'età del download. Una fonte ferma è aggiornata se stanotte è stata controllata. L'avviso c'è quando:
+  - il controllo dell'ultimo giro è fallito;
+  - il giro di stanotte manca;
+  - una versione più nuova aspetta: trattenuta dai controlli, non importabile, o un PDF da trascrivere. È il caso del catalogo regionale quando esce una determina nuova.
+
+  Accanto alla data, il motivo in parole e l'ora del controllo della fonte.
+
+- **Soglia d'età (`vecchiaDopoGiorni`)**: solo dove la fonte dichiara una cadenza regolare, cioè l'intervallo più lungo dichiarato più una notte. ISTAT dichiara «almeno ogni sei mesi», quindi 185 giorni. Per l'anagrafica AIFA, pubblicata ogni giorno ma a volte uguale, una soglia d'età darebbe avvisi falsi: vale il controllo di ogni notte. Le altre fonti non hanno una cadenza regolare. Sostituisce il «da completare» di D62.
+- **Regola 7**: senza `BANCHE_DATI_DIR` il servizio non aggiorna nulla, ed è il caso dello sviluppo e delle prove. Le prove usano il sito d'esempio in locale. In produzione le fonti sono quelle pubbliche di `sync/fonti.json`, scaricate per leggere dati aperti, come chiedono i requisiti.
+
+Non provato: il giro sulle fonti vere (il primo va fatto da un computer dello studio, come dicono i requisiti) e due istanze del servizio insieme. I moduli dei certificati entreranno tra le fonti controllate con i loro atti, alla tappa 13.
+
+**D157 · Gli atti che modificano il catalogo si trascrivono come modifiche.** Simone ha mandato il PDF della D.D. 710/A1400B/2026 (BUR n. 44 del 5/11/2026): testo e allegati A, B, C e D. L'allegato C non è il catalogo intero, sono 69 righe di 3 pagine. Gli allegati sono tre elenchi di voci:
+
+- A: 27 voci prescrivibili fino al 29/10/2026;
+- B: 56 voci di radioterapia prescrivibili fino al 12/01/2027;
+- C: 69 voci dal 30/10/2026, nuove o al posto di voci di A.
+
+Il catalogo in vigore è quindi il precedente più queste modifiche. Alcuni codici del catalogo cambiano a parità di prestazione: 45.30.1 diventa 45.30.1A, 42.33.1 diventa 42.33.1A, 90324.1 e 90324.2 diventano 90324. È il caso di cui parlava Simone, delle strutture che rifiutano un codice cambiato. Scelte:
+
+- **Trascrizione «solo modifiche»** (`solo_modifiche` nella scheda, colonna `operazione` con `aggiunge` o `toglie`). La versione intera si ricostruisce dalla versione della serie in vigore il giorno prima e si salva come le altre: immutabile, dalla data dell'atto. La consultazione alla data (A5) non cambia. Trascrivere 69 righe invece di più di 3000 rende possibile tenere il catalogo al passo con ogni atto, anche senza il catalogo strutturato.
+- **Un atto per data**: per la D.D. 710, A e C dal 30/10/2026, B dal 13/01/2027. Gli atti si applicano per data, dopo le versioni intere.
+- **Chiave**: codice del catalogo e branca. Senza branca valgono tutte le righe del codice, e l'allegato A le elenca tutte. Maiuscole, accenti e spazi non contano: nel PDF le branche vanno a capo dentro le celle.
+- **Controlli**: senza una versione prima dell'atto non si applica nulla. Una voce da togliere che la base non ha ferma l'atto, perché la base non è quella su cui l'atto è scritto.
+- Il PDF resta fuori dal repository. Nelle prove ci sono righe copiate parola per parola dagli allegati A e C, con le pagine; la provenienza è in `docs/provenienze.md`.
+
+Il catalogo vero non è ancora nel programma. L'ultimo catalogo intero letto è quello della D.D. 990/2024, e mancano gli aggiornamenti della D.D. 444/2025 e della D.D. 590/2026. Applicata alla D.D. 990/2024, la D.D. 710 darebbe un catalogo senza le modifiche del 2025 e del 2026. Serve il catalogo strutturato del CSI Piemonte, già domanda della fermata, oppure i PDF delle due determine. La trascrizione della D.D. 710 si prepara appena c'è la base, e una persona la controlla prima dell'uso (A8).
+
+Nel testo dell'atto c'è un'incoerenza: le premesse dicono che l'allegato B vale «sino al 12 gennaio 2026», la parte che determina «sino al 12 gennaio 2027». Vale la parte che determina, ed è coerente con il resto dell'atto.
+
+**D158 · Struttura comune dei modelli e i primi due modelli ufficiali.** Simone: «la struttura e i font dei modelli deve essere standardizzato. Poi modificabile, ma comunque con una formattazione iniziale standard fra tutti». Scelte:
+
+- **Una struttura per tutti i modelli**, ufficiali e dello studio:
+  - intestazione del medico;
+  - titolo;
+  - riferimento normativo, sotto il titolo. Per i modelli ufficiali, per difetto, è l'atto della fonte con la pubblicazione;
+  - testo;
+  - luogo e data;
+  - firme: il medico a destra con il timbro, le altre firme a sinistra;
+  - note in fondo, in corpo più piccolo, come nei moduli cartacei.
+
+  Caratteri e dimensioni restano quelli dell'impaginazione del medico (D145). La riga di luogo e data non si ripete se il testo li scrive già.
+
+- **Pagine**: un paragrafo che sta in una pagina non si spezza. L'ultimo paragrafo, la dichiarazione finale, resta sulla pagina di luogo, data e firme. Le note restano insieme. Una prova stampa testi da 15 a 45 righe e controlla ogni volta che la dichiarazione finale sia con le firme.
+- **Caselle**: una scelta con `boxes` si stampa come nel modello cartaceo, «[X] No [ ] Pregressa [ ] In atto». Sullo schermo è una riga di pulsanti. Il testo del modello resta quello dell'atto; cambia solo come si segna la scelta.
+- **Le parti restano con il certificato** (migrazione 0019): riferimento, note, luogo e data e altre firme si conservano al rilascio come il testo. La ristampa è identica anche se il modello cambia.
+- **Modelli ufficiali**, dal testo degli atti confrontato con le immagini della Gazzetta:
+  - sportivo non agonistico: allegato 2 del DM 8/8/2014, valido un anno. La frase dell'atto «Luogo, data, timbro e firma del medico certificatore.» sta sotto la firma;
+  - porto d'armi: allegato 1 del DM 28/4/1998, con le firme del dichiarante e del medico e con le note dell'atto. È valido tre mesi, perché l'atto lo vuole «di data non anteriore a tre mesi». Accenti e «Post-operatorie» come nella scansione; il refuso «sostenze» dell'atto resta.
+
+  «Unità sanitaria locale n.», «Regione» e «Numero tesserino assistito» sono voci del 1998. Restano come nell'atto, compilate dal medico; il tesserino è facoltativo, finché non si conferma con l'ASL che cosa scrivere oggi.
+
+- **Anamnestico per la patente**: nessun modello nazionale. L'art. 119, comma 3, del Codice della strada chiede solo che la certificazione tenga conto dei «precedenti morbosi del richiedente dichiarati da un certificato medico rilasciato da un medico di fiducia». Il modello proposto seguirà la struttura dei PDF mandati da Simone, con un testo nostro da far controllare a Chiara. Quei PDF però non sono più in questa sessione: servono di nuovo, oppure il modulo che usa Chiara.
+
+**D159 · Il catalogo regionale in vigore, trascritto dai PDF e da controllare.** Simone ha mandato il PDF della D.D. 590/A1400B/2026 del 20/9/2026 (BU n. 38 del 24/09/2026) in tre parti: testo, allegato A intero (il catalogo, 194 pagine) e allegato B. Il catalogo vale per le ricette prescritte dal 21/09/2026. Scelte:
+
+- **Base e modifiche.** L'allegato A della D.D. 590 è la versione intera dal 21/09/2026. Sopra, la D.D. 710/2026 come modifiche (D157): allegati A e C dal 30/10/2026, allegato B dal 13/01/2027. Il programma ricostruisce le tre versioni: 5107, 5149 e 5093 voci. La D.D. 444/2025 non serve più, perché la D.D. 590 ripubblica il catalogo intero.
+- **Estratto in automatico, entra in uso solo dopo il controllo di una persona (A8).** Una scheda con `controllato_da: null` è «da controllare»: non si importa e ogni importazione la segnala tra le cose da guardare a mano. Così il lavoro fatto resta nel programma e si vede, ma non si usa prima del controllo.
+- **Le trascrizioni stanno nel programma**, in `packages/reference/data/trascrizioni/`: è la cartella per difetto dell'importazione e dell'aggiornamento di ogni notte. `BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` la sostituiscono.
+- **Differenze dal PDF**, tutte elencate in `docs/catalogo-regionale.md`:
+  - le 2 voci non prescrivibili restano fuori (90418.1 e 90418.2, test reflex del TSH);
+  - 7 righe ripetute identiche nell'atto, anche nella D.D. 990/2024, ci sono una volta sola;
+  - 26 descrizioni e 16 note sono tagliate nel PDF, al bordo della cella. Sono completate con il testo della stessa voce, per codice e branca, nella D.D. 990/2024. È il testo di un altro atto ufficiale, non un testo ricostruito: in tutte le altre voci in comune le descrizioni dei due atti sono uguali;
+  - una parola che va a capo dopo il trattino si riunisce come la stessa parola dentro una riga, nei tre atti. Senza nessuna prova, si riunisce senza spazio, come quasi tutti i trattini dentro le righe;
+  - nella D.D. 710 le branche spezzate nella cella si scrivono come nel catalogo.
+- **Controlli all'importazione.** Il rapporto rifà la prova della regola delle visite (D152): 348 visite su 5107 voci. La voce 11.99.2 nomina le visite di controllo senza essere una visita, e resta da guardare.
+- **Fonte strutturata.** Il PDF dell'allegato A è stampato da un file Excel della Regione («Allegato A_Catalogo Ambulatoriale_092026_ALL.xlsx», scritto in testa a ogni pagina). Con quel file, o con il catalogo strutturato del CSI Piemonte, il confronto si fa da programma, riga per riga. È una domanda per la fermata, insieme a chi controlla la trascrizione.
+
+Non provato: il catalogo vero nelle schermate e nelle ricette, perché non è ancora controllato. Le prove usano copie delle schede con un nome di prova in `controllato_da`.
+
+**D160 · Modelli proposti: il certificato anamnestico per la patente.** Per la patente non c'è un modello ufficiale, né nazionale né della Regione Piemonte (art. 119, comma 3, del Codice della strada: il certificato del medico di fiducia, senza modello). Simone: «per l'anamnestico patente prendi comunque spunto dai pdf allegati». Come previsto in D143, il testo lo scriviamo noi dai requisiti di legge e lo segniamo da verificare. Scelte:
+
+- **Un terzo tipo di modello, «proposto».** Sta con gli ufficiali in `apps/api/modelli/`, con `"official": false` e `proposal`, cioè che cosa resta da verificare. Ha la base di legge come fonte. Il catalogo vuole o l'uno o l'altro; il dominio controlla fonte e nota. Nell'interfaccia si vede come «modello proposto, da verificare»; il certificato rilasciato è un «modello proposto».
+- **Gruppi di malattie dalla legge**: allegato III del D.Lgs. 59/2011 (vista, cardiovascolari, diabete, epilessia, alcol, sostanze e medicinali, turbe psichiche, malattie neurologiche e apnee nel sonno), artt. 321–323 del DPR 495/1992 (arti, vista, udito). Le «altre malattie» dell'appendice II all'art. 320 (per esempio endocrine, del sangue, renali) sono una voce sola: l'appendice non è stata letta.
+- **Struttura dai moduli in uso**: un gruppo per riga con «No/Sì» e le note, da quanto tempo il medico ha in cura la persona, la dichiarazione dell'interessato, le due firme. Il testo è nostro; dei moduli non si copia nulla.
+- **Niente giudizio di idoneità.** Uno dei moduli chiede al medico «compatibile/incompatibile con la guida». Il certificato riporta l'anamnesi; il giudizio spetta al medico accertatore o alla Commissione medica locale, e la nota stampata lo dice.
+- **Validità tre mesi**, dalla scheda del Ministero della Salute («in data non anteriore ai tre mesi precedenti»), che dice anche che serve solo per il primo rilascio e il primo rinnovo.
+
+Da verificare con la Dr.ssa Rocca prima dell'uso: il testo, i gruppi e le «altre malattie». È una domanda per la fermata, insieme ai moduli che usa oggi.
+
+**D161 · Condivisione del riepilogo tra i medici dell'AFT che usano il programma (tappa 12).** Tra chi usa il nostro programma, la condivisione della medicina di gruppo si estende all'AFT (D104, D110), con le regole del dossier sanitario: il medico curante decide, il paziente consente, si vede il minimo, ogni accesso resta registrato. Scelte:
+
+- **AFT nel programma.** Un medico titolare la crea; i colleghi entrano su invito, con il loro codice regionale, e solo accettando. Un medico sta in una sola AFT alla volta. Chi esce resta nella storia con la data d'uscita: AFT e membri non si cancellano e ogni modifica va nello storico (migrazione 0020).
+- **Il titolare decide.** Per difetto non condivide. Attiva la condivisione dei suoi pazienti nell'AFT, e la spegne quando vuole; uscendo dall'AFT la spegne subito.
+- **Il paziente decide.** Consenso a parte, specifico, «Condivisione del riepilogo con i medici dell'AFT», registrato in cartella come gli altri; revocabile, con effetto immediato.
+- **Il minimo.** Il collega vede solo il riepilogo: allergie e reazioni, problemi, terapie in corso, ultimi parametri, ognuno con il suo stato clinico. Viene dalla composizione del Profilo sanitario (tappa 11), che lascia fuori le voci oscurate e riservate. Nessun conteggio delle voci escluse: chi consulta non deve capire che il paziente ha oscurato qualcosa. Un avviso fisso dice che il riepilogo può non essere completo e non certifica lo stato di salute (Garante, linee guida sul dossier sanitario del 4/6/2015, par. 5.1).
+- **Come si consulta.** Con il codice fiscale e il motivo dell'accesso, almeno 10 caratteri; nessun elenco dei pazienti dei colleghi. Se il riepilogo non c'è, la risposta è la stessa in ogni caso; il motivo preciso va nel registro del medico curante.
+- **Registro.** Ogni consultazione, consentita o negata, va nel registro degli accessi del medico curante, con il medico, lo studio, il motivo e l'esito. Il titolare la vede in Strumenti › AFT; è anche nell'esportazione completa.
+- **Chi consulta.** Solo i medici titolari. Il sostituto no, per ora: è una domanda per la fermata, come chi può creare un'AFT e se il paziente va avvisato di ogni consultazione.
+- **Fonti (lette il 19/11/2026).** D.Lgs. 502/1992, art. 8; D.L. 158/2012, art. 1; ACN 2022-2024, artt. 29 e 43; accordo integrativo del Piemonte (D.G.R. 31-8647/2024), art. 22; Garante, linee guida sul dossier sanitario del 4/6/2015, par. 3, 5.1, 5.2, 6 e 7. Che cosa dice ognuna e come la segue il programma: `docs/aft.md`, «Fonti». Hanno confermato le scelte sopra e ne hanno aggiunte quattro, qui sotto.
+- **Dati precedenti al consenso.** Si condividono solo con un secondo consenso, «anche dei dati precedenti al consenso» (Garante, par. 3, «consenso per il pregresso»). Senza, il riepilogo contiene solo le voci dal giorno del consenso, e lo dice. La data di una voce è quella in cartella; per le terapie l'inizio, per i parametri la misura.
+- **Attività svolta e registro di AFT.** Il collega che visita il paziente registra tipologia (ambulatorio, domicilio, telefono, televisita, altro), esito, note e ora, alle stesse condizioni della consultazione e mai nel futuro. L'attività va nella tabella `aft_activity` (migrazione 0021: storico, nessuna modifica né cancellazione) e nella cronologia del medico curante, «Collega dell'AFT: …» (accordo integrativo, art. 22, c. 2, 3 e 5; ACN, art. 43, c. 7, lett. b). Il collega non scrive nella cartella del collega.
+- **Consultazioni per paziente.** Nella cartella, in «Privacy», il titolare vede chi ha consultato o annotato i dati del paziente, quando e da quale studio, per rispondere alla sua richiesta entro 15 giorni (Garante, par. 5.2). La segreteria no.
+- **Motivi comuni.** L'interfaccia propone quattro motivi d'accesso; se ne può sempre scrivere un altro.
+- **Non fatto.** Avvisi sugli accessi anomali (Garante, par. 7, lett. c): nella tappa 14, con la soglia «da completare». Scambio con programmi diversi (accordo integrativo, art. 22, c. 1): condividono solo i medici che usano questo programma. Scheda intera invece del riepilogo (ACN, art. 43, c. 5, lett. h) e prescrizione e certificazione del collega (accordo integrativo, art. 22, c. 2): domande per la fermata.
+
+**D162 · Regola degli hook di React in ESLint.** Nella pagina Privacy un hook chiamato dopo un'uscita anticipata faceva cadere la pagina; l'ha trovato solo la prova nel browser. ESLint ora applica `react-hooks/rules-of-hooks` a `apps/web/src` (pacchetto `eslint-plugin-react-hooks` 7.1.1, MIT, solo per lo sviluppo). Solo questa regola: le altre del pacchetto riguardano il compilatore di React, che il programma non usa. Provata con un sabotaggio.

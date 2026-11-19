@@ -29,6 +29,8 @@ export type AccessAction =
   | 'ricetta_controllo'
   | 'lettura_registro'
   | 'lettura_storico_prescrizioni'
+  | 'lettura_farmaci_prescritti'
+  | 'lettura_prestazioni_prescritte'
   | 'lettura_cronologia'
   | 'lettura_esami'
   | 'ricetta_stato'
@@ -71,7 +73,22 @@ export type AccessAction =
   | 'lettura_presidi'
   | 'nuovo_presidio'
   | 'rinnovo_presidio'
-  | 'annullamento_presidio';
+  | 'annullamento_presidio'
+  | 'lettura_profilo_sanitario'
+  | 'bozza_profilo_sanitario'
+  | 'validazione_profilo_sanitario'
+  | 'pubblicazione_profilo_sanitario'
+  | 'stato_profilo_sanitario'
+  | 'lettura_certificati_modelli'
+  | 'anteprima_certificato_modello'
+  | 'rilascio_certificato_modello'
+  | 'stampa_certificato_modello'
+  | 'annullamento_certificato_modello'
+  | 'scarto_profilo_sanitario'
+  | 'pdf_profilo_sanitario'
+  | 'impostazioni_aft'
+  | 'consultazione_aft'
+  | 'attivita_aft';
 
 export interface AccessEntry {
   studioId?: string | null;

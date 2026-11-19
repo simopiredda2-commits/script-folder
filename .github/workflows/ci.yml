@@ -45,6 +45,51 @@ jobs:
       - name: Prove
         run: pnpm exec vitest run
 
+  # La stessa prova dell'interfaccia con gli altri motori (D155): WebKit è il motore di Safari su
+  # Mac e iPad. Chromium (Chrome, Edge) è già nel lavoro sopra.
+  interfaccia:
+    name: Interfaccia con ${{ matrix.browser }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [webkit, firefox]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: mmg
+          POSTGRES_PASSWORD: mmg
+          POSTGRES_DB: mmg_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mmg -d mmg_dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://mmg:mmg@localhost:5432/mmg_dev
+      TZ: Europe/Rome
+      E2E_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Browser per la prova
+        run: pnpm --filter @mmg/api exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Versione del browser
+        working-directory: apps/api
+        run: >-
+          node -e "require('playwright')[process.env.E2E_BROWSER].launch()
+          .then(async (b) => { console.log(process.env.E2E_BROWSER, b.version()); await b.close(); })"
+      - name: Prova dell'interfaccia
+        run: pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts
+
   sync:
     name: Prove di sync/ (Python)
     runs-on: ubuntu-24.04

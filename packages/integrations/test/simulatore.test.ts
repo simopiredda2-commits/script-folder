@@ -71,10 +71,20 @@ describe('simulatore del SAR e del Sistema TS', () => {
 describe('nessuna chiamata a servizi reali (regola 7)', () => {
   it('il codice delle integrazioni non contiene indirizzi di rete né richieste HTTP', () => {
     const dir = join(import.meta.dirname, '..', 'src');
-    for (const f of readdirSync(dir)) {
-      const text = readFileSync(join(dir, f), 'utf8');
-      expect(text, f).not.toMatch(/https?:\/\//);
-      expect(text, f).not.toMatch(/\bfetch\(|node:https?|from 'undici'|axios/);
+    /** Nomi di spazi XML: sono identificatori, non indirizzi da chiamare. */
+    const XML_NAMESPACES = [
+      'http://purl.oclc.org/dsdl/schematron',
+      'http://www.w3.org/2001/XMLSchema-instance',
+    ];
+    const files = readdirSync(dir, { recursive: true, withFileTypes: true }).filter((e) =>
+      e.isFile(),
+    );
+    expect(files.map((e) => e.name)).toContain('schematron.ts');
+    for (const e of files) {
+      let text = readFileSync(join(e.parentPath, e.name), 'utf8');
+      for (const ns of XML_NAMESPACES) text = text.replaceAll(ns, '');
+      expect(text, e.name).not.toMatch(/https?:\/\//);
+      expect(text, e.name).not.toMatch(/\bfetch\(|node:https?|from 'undici'|axios/);
     }
   });
 });

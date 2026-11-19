@@ -17,7 +17,10 @@ export interface PrescriptionLineMessage {
   drugAic?: string | null;
   drugName?: string | null;
   activeIngredient?: string | null;
+  /** Codice del catalogo regionale (codCatalogoPrescr). */
   serviceCode?: string | null;
+  /** Codice del nomenclatore, «codice DM» (codProdPrest; D154). */
+  serviceNationalCode?: string | null;
   serviceDescription?: string | null;
   quantity: number;
   aifaNote?: string | null;

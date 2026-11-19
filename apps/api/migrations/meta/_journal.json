@@ -99,6 +99,62 @@
       "when": 1795011735386,
       "tag": "0013_seguito_e_presidi",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795016536744,
+      "tag": "0014_profilo_sanitario_sintetico",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795022252186,
+      "tag": "0015_modelli_dei_certificati",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795030219357,
+      "tag": "0016_ditta_titolare",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795035043138,
+      "tag": "0017_codice_nomenclatore",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1795036688054,
+      "tag": "0018_aggiornamenti_banche_dati",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795041405591,
+      "tag": "0019_parti_dei_certificati",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795044710445,
+      "tag": "0020_aft",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795048284424,
+      "tag": "0021_registro_aft",
+      "breakpoints": true
     }
   ]
 }
