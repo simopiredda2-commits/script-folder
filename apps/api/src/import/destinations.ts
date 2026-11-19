@@ -1,16 +1,22 @@
+import { createHash } from 'node:crypto';
 import {
   AIC_PATTERN,
   ATC_PATTERN,
   birthCode,
+  choiceValidity,
+  doctorChoiceIssues,
+  doctorChoicePeriodSchema,
   exemptionSchema,
   importDestination,
   nameCode,
   PATIENT_STATUSES,
   patientAdminIssues,
+  periodsOverlap,
   patientAdminSchema,
   patientIdentitySchema,
   REMINDER_CHANNELS,
   surnameCode,
+  type DoctorChoicePeriodInput,
   type ExemptionInput,
   type ImportDestinationKey,
   type PatientAdminInput,
@@ -23,9 +29,12 @@ import {
   allergyDetail,
   clinicalEntry,
   exemption,
+  family,
   historicalPrescription,
+  importOrigin,
   labResultDetail,
   patient,
+  patientChoice,
   therapy,
   vaccinationDetail,
 } from '../db/schema';
@@ -72,6 +81,11 @@ export interface EntryHandler<B> {
   prepare(v: Values, today: string): Prepared<B>;
   /** La stessa voce scritta a mano (o in altro modo) c'è già? */
   existing?(tx: Tx, patientId: string, body: B): Promise<boolean>;
+  /**
+   * Motivo per scartare la voce per quello che c'è già in cartella (per esempio un periodo già
+   * coperto da un'altra scelta del medico), senza valori del paziente; null se si può scrivere.
+   */
+  conflict?(tx: Tx, patientId: string, body: B): Promise<string | null>;
   write(ctx: WriteContext, patientId: string, body: B): Promise<string>;
 }
 
@@ -417,6 +431,157 @@ export function exemptionsHandler(
   };
 }
 
+/* Scelta del medico ---------------------------------------------------------------------------- */
+
+const CHOICE_OVERLAP =
+  'C’è già una scelta del medico che vale nello stesso periodo: registra prima la sua cessazione';
+
+/**
+ * Scelta del medico, con gli stessi controlli del pannello amministrativo (`addChoice`): il medico
+ * è il titolare che importa, perché il programma conosce solo i medici dello studio e
+ * l'importazione è sua, sul suo archivio.
+ */
+export const choicesHandler: EntryHandler<DoctorChoicePeriodInput> = {
+  table: 'patient_choice',
+  prepare(v, today) {
+    const parsed = doctorChoicePeriodSchema.safeParse(
+      pick(v, ['dal', 'scadenza', 'cessataIl', 'motivoCessazione']),
+    );
+    if (!parsed.success)
+      return { ok: false, errors: zodMessages(parsed.error, fieldLabel('scelte')) };
+    const issues = doctorChoiceIssues(parsed.data, today);
+    if (issues.length) return { ok: false, errors: issues };
+    return {
+      ok: true,
+      items: [{ body: parsed.data, naturalKey: [parsed.data.dal] }],
+      warnings: [],
+    };
+  },
+  async existing(tx, patientId, b) {
+    const [row] = await tx
+      .select({ id: patientChoice.id })
+      .from(patientChoice)
+      .where(and(eq(patientChoice.patientId, patientId), eq(patientChoice.chosenOn, b.dal)));
+    return !!row;
+  },
+  async conflict(tx, patientId, b) {
+    const rows = await tx
+      .select({
+        dal: patientChoice.chosenOn,
+        scadenza: patientChoice.expiresOn,
+        cessataIl: patientChoice.endedOn,
+      })
+      .from(patientChoice)
+      .where(eq(patientChoice.patientId, patientId));
+    const period = choiceValidity(b);
+    return rows.some((r) => periodsOverlap(choiceValidity(r), period)) ? CHOICE_OVERLAP : null;
+  },
+  async write(ctx, patientId, b) {
+    const [row] = await ctx.tx
+      .insert(patientChoice)
+      .values({
+        patientId,
+        doctorUserId: ctx.userId,
+        chosenOn: b.dal,
+        expiresOn: b.scadenza ?? null,
+        endedOn: b.cessataIl ?? null,
+        endReason: b.motivoCessazione ?? null,
+        // data_source non ha un valore «importato»: «manual» (inserita nello studio, non da AURA).
+        source: 'manual',
+      })
+      .returning({ id: patientChoice.id });
+    return row!.id;
+  },
+};
+
+/* Nucleo familiare ----------------------------------------------------------------------------- */
+
+const familyImportBody = z.object({ nucleo: text(100), nomeNucleo: optionalText(100) }).strict();
+type FamilyImport = z.infer<typeof familyImportBody>;
+
+/**
+ * Chiave del nucleo del file, la stessa in importazioni diverse dello stesso archivio: un'impronta
+ * del valore, mai il valore in chiaro (come ogni chiave d'origine).
+ */
+export const familySourceKey = (nucleo: string) =>
+  `nucleo:famiglia:${createHash('sha256')
+    .update(JSON.stringify([comparable(nucleo)]))
+    .digest('hex')}`;
+
+/** Il nucleo che un'importazione precedente (o questa) ha creato per quel valore del file. */
+async function importedFamily(tx: Tx, archiveId: string, key: string) {
+  const [row] = await tx
+    .select({ id: importOrigin.rowId })
+    .from(importOrigin)
+    .where(
+      and(
+        eq(importOrigin.archiveId, archiveId),
+        eq(importOrigin.tableName, 'family'),
+        eq(importOrigin.sourceKey, key),
+      ),
+    );
+  return row?.id ?? null;
+}
+
+const patientFamily = async (tx: Tx, patientId: string) =>
+  (
+    await tx
+      .select({ familyId: patient.familyId, archiveId: patient.archiveId })
+      .from(patient)
+      .where(eq(patient.id, patientId))
+  )[0];
+
+/**
+ * Nucleo familiare: le righe con lo stesso valore vanno nello stesso nucleo, anche in
+ * importazioni diverse (la provenienza del nucleo lo ritrova). L'etichetta è quella del file, o
+ * il valore stesso. Un paziente che è già in un altro nucleo resta nel suo: niente si sovrascrive.
+ */
+export const familyHandler: EntryHandler<FamilyImport> = {
+  table: 'family',
+  prepare(v) {
+    const parsed = familyImportBody.safeParse(pick(v, ['nucleo', 'nomeNucleo']));
+    if (!parsed.success)
+      return { ok: false, errors: zodMessages(parsed.error, fieldLabel('nucleo')) };
+    return {
+      ok: true,
+      items: [{ body: parsed.data, naturalKey: [parsed.data.nucleo] }],
+      warnings: [],
+    };
+  },
+  async existing(tx, patientId, b) {
+    const p = await patientFamily(tx, patientId);
+    if (!p?.familyId) return false;
+    return (await importedFamily(tx, p.archiveId, familySourceKey(b.nucleo))) === p.familyId;
+  },
+  async conflict(tx, patientId) {
+    const p = await patientFamily(tx, patientId);
+    return p?.familyId ? 'Il paziente è già in un altro nucleo familiare: resta nel suo' : null;
+  },
+  async write(ctx, patientId, b) {
+    const key = familySourceKey(b.nucleo);
+    let familyId = await importedFamily(ctx.tx, ctx.archiveId, key);
+    if (!familyId) {
+      const [row] = await ctx.tx
+        .insert(family)
+        .values({ studioId: ctx.studioId, label: b.nomeNucleo ?? b.nucleo })
+        .returning({ id: family.id });
+      familyId = row!.id;
+      await ctx.tx.insert(importOrigin).values({
+        batchId: ctx.batchId,
+        archiveId: ctx.archiveId,
+        tableName: 'family',
+        rowId: familyId,
+        sourceKey: key,
+      });
+    }
+    await ctx.tx
+      .update(patient)
+      .set({ familyId, updatedAt: ctx.now })
+      .where(eq(patient.id, patientId));
+    return familyId;
+  },
+};
+
 /* Terapie -------------------------------------------------------------------------------------- */
 
 const THERAPY_RENAME: Record<string, string> = {
@@ -632,6 +797,8 @@ export function entryHandlers(
 ): Record<Exclude<ImportDestinationKey, 'pazienti'>, EntryHandler<unknown>> {
   return {
     esenzioni: exemptionsHandler(exemptionExists),
+    scelte: choicesHandler,
+    nucleo: familyHandler,
     problemi: entryHandler('problemi'),
     allergie: entryHandler('allergie'),
     diario: entryHandler('diario'),

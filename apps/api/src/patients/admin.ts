@@ -1,5 +1,6 @@
 import {
   can,
+  choiceValidity,
   doctorChoiceIssues,
   doctorChoiceSchema,
   exemptionSchema,
@@ -845,10 +846,7 @@ const choicePeriod = (c: {
   chosenOn: string;
   expiresOn: string | null;
   endedOn: string | null;
-}) => ({
-  from: c.chosenOn,
-  to: [c.endedOn, c.expiresOn].filter((d): d is string => !!d).sort()[0] ?? null,
-});
+}) => choiceValidity({ dal: c.chosenOn, scadenza: c.expiresOn, cessataIl: c.endedOn });
 
 /** Scelta del medico registrata a mano, in attesa di AURA: un medico titolare dello studio. */
 export async function addChoice(
@@ -936,7 +934,6 @@ export async function endChoice(
   assertNoIssues(
     doctorChoiceIssues(
       {
-        medicoId: row.doctorUserId,
         dal: row.chosenOn,
         scadenza: row.expiresOn,
         cessataIl: input.cessataIl,

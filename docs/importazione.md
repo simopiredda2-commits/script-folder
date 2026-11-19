@@ -37,6 +37,8 @@ Ogni riga passa dagli **stessi controlli dell'inserimento a mano**. Il paziente 
 | ---------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | Pazienti: anagrafica e dati amministrativi           | Pannello amministrativo del paziente                                    | Codice fiscale, cognome, nome, sesso, data di nascita                    |
 | Esenzioni                                            | Pannello amministrativo › Esenzioni                                     | Codice fiscale, codice dell'esenzione, valida dal                        |
+| Scelta del medico                                    | Pannello amministrativo › Scelta del medico                             | Codice fiscale, data della scelta                                        |
+| Nucleo familiare                                     | Pannello amministrativo › Nucleo familiare                              | Codice fiscale, nucleo (codice o nome nel file)                          |
 | Problemi e diagnosi                                  | Patologie › Problemi e diagnosi                                         | Codice fiscale, data della voce, descrizione                             |
 | Allergie e reazioni avverse                          | Cartella › Allergie (anche in testata)                                  | Codice fiscale, data della voce, sostanza o agente                       |
 | Diario clinico                                       | Storia clinica › Diario                                                 | Codice fiscale, data della voce, tipo di contatto, testo                 |
@@ -54,12 +56,14 @@ Ogni riga passa dagli **stessi controlli dell'inserimento a mano**. Il paziente 
 - **Paziente di un altro archivio dello studio:** la riga si scarta con un messaggio senza dati, e nel registro di quel paziente resta un accesso negato.
 - **Voce senza data:** non entra. Non prende la data dell'importazione, perché la condivisione nell'AFT usa la data clinica (D161).
 - **Ricette fatte con altri programmi:** finiscono in uno storico a sola lettura. Non si firmano, non si inviano e non si annullano verso il SAR.
-- **Non ancora destinazioni** (scritte nel rapporto se servono): piani terapeutici, consensi, deleghe, scelta del medico, nucleo familiare, referti con allegati, presidi.
+- **Scelta del medico** (D174): è sempre del titolare che importa, perché il programma conosce solo i medici dello studio. Una scelta che vale in un periodo già coperto da un'altra scelta in cartella si scarta, con il motivo e senza date; la cessazione vuole il motivo, come nel pannello.
+- **Nucleo familiare** (D174): le righe con lo stesso valore nella colonna del nucleo vanno nello stesso nucleo, anche in importazioni diverse (maiuscole e minuscole non contano). L'etichetta è quella del file, se c'è, altrimenti il valore stesso; si cambia poi dal pannello. Un paziente che è già in un altro nucleo resta nel suo e la riga si scarta.
+- **Non ancora destinazioni** (scritte nel rapporto se servono): piani terapeutici, consensi, deleghe, referti con allegati, presidi.
 
 ## Doppioni, provenienza, annullamento
 
 - Ogni riga scritta ha la sua **provenienza** (`import_origin`): la chiave d'origine è un'impronta SHA-256 del codice fiscale e dei campi naturali, o dell'identificativo d'origine, mai dati in chiaro. Alla seconda importazione dello stesso file le righe risultano «già presenti».
-- Un'importazione si **annulla** con un motivo: le voci cliniche e le ricette passate si annullano come quelle scritte a mano, nulla si cancella. Non si annulla se una voce è stata modificata dopo, o se l'importazione ha scritto pazienti, esenzioni o terapie (manca ancora il loro stato «annullato»).
+- Un'importazione si **annulla** con un motivo: le voci cliniche e le ricette passate si annullano come quelle scritte a mano, nulla si cancella. Non si annulla se una voce è stata modificata dopo, o se l'importazione ha scritto pazienti, esenzioni, scelte del medico, nuclei familiari o terapie (manca ancora il loro stato «annullato»).
 
 ## Sicurezza
 
@@ -70,7 +74,7 @@ Ogni riga passa dagli **stessi controlli dell'inserimento a mano**. Il paziente 
 
 ## Come provarlo
 
-`apps/api/test/importazione.test.ts`, `importazione-lettori.test.ts`, `importazione-esportazione.test.ts`, `packages/domain/test/import-destinations.test.ts`; in Strumenti › Importazione, come titolare, con un CSV di pazienti inventati.
+`apps/api/test/importazione.test.ts`, `importazione-lettori.test.ts`, `importazione-esportazione.test.ts`, `importazione-pannello.test.ts`, `packages/domain/test/import-destinations.test.ts`; la prova nel browser «importazione a passi»; in Strumenti › Importazione, come titolare, con un CSV di pazienti inventati.
 
 ## Domande per la fermata
 

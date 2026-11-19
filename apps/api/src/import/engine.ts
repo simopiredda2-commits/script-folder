@@ -393,6 +393,9 @@ export async function runImport(ctx: RunContext, parts: ResolvedPart[]): Promise
       let present = 0;
       let duplicates = 0;
       const firstSeen: number[] = [];
+      // Motivi delle voci scartate per quello che c'è già in cartella (senza valori).
+      const conflicts = new Set<string>();
+      let conflicting = 0;
       for (const [i, item] of items.entries()) {
         const key = sourceKey(dest, cf, originId, item.naturalKey, i);
         const seenKey = `${handler.table}|${key}`;
@@ -410,6 +413,12 @@ export async function runImport(ctx: RunContext, parts: ResolvedPart[]): Promise
           present++;
           continue;
         }
+        const clash = handler.conflict ? await handler.conflict(tx, found.id, item.body) : null;
+        if (clash) {
+          conflicts.add(clash);
+          conflicting++;
+          continue;
+        }
         const id = await handler.write(ctx, found.id, item.body);
         await recordOrigin(handler.table, id, key);
         written++;
@@ -423,10 +432,13 @@ export async function runImport(ctx: RunContext, parts: ResolvedPart[]): Promise
             items.length > 1 ? `${written} voci su ${items.length}` : 'Voce nuova',
             ...(present ? [`${present} già presenti`] : []),
             ...(duplicates ? [`${duplicates} già in righe precedenti del file`] : []),
+            ...(conflicting ? [`${conflicting} scartate: ${[...conflicts].join('; ')}`] : []),
           ],
           avvisi: prep.warnings,
           voci: written,
         });
+      else if (conflicting)
+        push({ ...base, esito: 'scartata', motivi: [...conflicts], avvisi: prep.warnings });
       else if (present)
         push({
           ...base,

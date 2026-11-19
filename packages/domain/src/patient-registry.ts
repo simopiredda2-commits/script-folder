@@ -314,21 +314,53 @@ export const exemptionSchema = z
   .refine((e) => !e.al || e.al >= e.dal, 'La fine della validità viene dopo l’inizio');
 export type ExemptionInput = z.infer<typeof exemptionSchema>;
 
+/** Periodo di una scelta del medico: data della scelta, scadenza, cessazione con il motivo. */
+const doctorChoicePeriod = {
+  dal: isoDate,
+  scadenza: isoDate.nullable().optional(),
+  cessataIl: isoDate.nullable().optional(),
+  motivoCessazione: optionalText(300),
+};
+const ceasedAfterChoice = (c: { dal: string; cessataIl?: string | null }) =>
+  !c.cessataIl || c.cessataIl >= c.dal;
+
 /** Scelta del medico registrata a mano (in attesa di AURA). */
 export const doctorChoiceSchema = z
-  .object({
-    medicoId: z.uuid(),
-    dal: isoDate,
-    scadenza: isoDate.nullable().optional(),
-    cessataIl: isoDate.nullable().optional(),
-    motivoCessazione: optionalText(300),
-  })
+  .object({ medicoId: z.uuid(), ...doctorChoicePeriod })
   .strict()
-  .refine((c) => !c.cessataIl || c.cessataIl >= c.dal, 'La cessazione viene dopo la scelta');
+  .refine(ceasedAfterChoice, 'La cessazione viene dopo la scelta');
 export type DoctorChoiceInput = z.infer<typeof doctorChoiceSchema>;
 
-/** Problemi di coerenza di una scelta del medico, in chiaro; vuoto se tutto torna. */
-export function doctorChoiceIssues(c: DoctorChoiceInput, today: string): string[] {
+/**
+ * La stessa scelta senza il medico, per l'importazione: lì il medico è sempre il titolare che
+ * importa (il programma conosce solo i medici dello studio). Stessi campi e stessi controlli.
+ */
+export const doctorChoicePeriodSchema = z
+  .object(doctorChoicePeriod)
+  .strict()
+  .refine(ceasedAfterChoice, 'La cessazione viene dopo la scelta');
+export type DoctorChoicePeriodInput = z.infer<typeof doctorChoicePeriodSchema>;
+
+/** Periodo in cui vale una scelta: dalla scelta alla prima fra cessazione e scadenza. */
+export function choiceValidity(c: {
+  dal: string;
+  scadenza?: string | null;
+  cessataIl?: string | null;
+}): { from: string; to: string | null } {
+  return {
+    from: c.dal,
+    to: [c.cessataIl, c.scadenza].filter((d): d is string => !!d).sort()[0] ?? null,
+  };
+}
+
+/**
+ * Problemi di coerenza di una scelta del medico, in chiaro; vuoto se tutto torna. Il medico non
+ * conta: vale per la scelta scritta a mano e per quella importata.
+ */
+export function doctorChoiceIssues(
+  c: DoctorChoicePeriodInput & { medicoId?: string },
+  today: string,
+): string[] {
   const issues: string[] = [];
   if (c.scadenza && c.scadenza < c.dal) issues.push('La scadenza viene dopo la scelta');
   if (c.cessataIl && c.cessataIl > today) issues.push('La data della cessazione è nel futuro');

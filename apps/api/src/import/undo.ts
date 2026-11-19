@@ -11,8 +11,9 @@ import { HttpError } from '../http/errors';
  * e le ricette passate scritte dall'importazione si annullano come quelle scritte a mano, e lo
  * storico resta. Si può solo finché nessuna di esse è stata modificata dopo l'importazione.
  *
- * Pazienti creati o completati, esenzioni e terapie non hanno ancora uno stato «annullato» (serve
- * una migrazione): un'importazione che li ha scritti non si annulla da qui, e il messaggio lo dice.
+ * Pazienti creati o completati, esenzioni, scelte del medico, nuclei familiari e terapie non hanno
+ * ancora uno stato «annullato» (serve una migrazione): un'importazione che li ha scritti non si
+ * annulla da qui, e il messaggio lo dice.
  */
 
 /** Tabelle che si annullano con un motivo. */
@@ -21,6 +22,8 @@ const UNDOABLE = new Set(['clinical_entry', 'historical_prescription']);
 const TABLE_LABELS: Record<string, string> = {
   patient: 'pazienti creati o completati',
   exemption: 'esenzioni',
+  patient_choice: 'scelte del medico',
+  family: 'nuclei familiari',
   therapy: 'terapie',
 };
 

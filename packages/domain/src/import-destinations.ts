@@ -57,6 +57,8 @@ export interface ImportField {
 export const IMPORT_DESTINATION_KEYS = [
   'pazienti',
   'esenzioni',
+  'scelte',
+  'nucleo',
   'problemi',
   'allergie',
   'diario',
@@ -389,10 +391,85 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     ],
   },
   {
+    key: 'scelte',
+    label: 'Scelta del medico',
+    menu: 'Pannello amministrativo del paziente › Scelta del medico',
+    order: 3,
+    naturalKey: ['dal'],
+    notes:
+      'La scelta importata è del titolare che importa: il programma conosce solo i medici dello studio. Una scelta che vale in un periodo già coperto da un’altra scelta in cartella si scarta.',
+    fields: [
+      patientKey,
+      {
+        key: 'dal',
+        label: 'Data della scelta',
+        kind: 'date',
+        required: true,
+        synonyms: ['datascelta', 'scelta', 'sceltadal', 'dal', 'datainizio', 'inizio'],
+      },
+      {
+        key: 'scadenza',
+        label: 'Scadenza della scelta',
+        kind: 'date',
+        synonyms: ['scadenza', 'datascadenza', 'scadenzascelta', 'sceltafinoal'],
+      },
+      {
+        key: 'cessataIl',
+        label: 'Cessata il (revoca)',
+        kind: 'date',
+        synonyms: ['revoca', 'datarevoca', 'cessazione', 'datacessazione', 'cessatail'],
+      },
+      {
+        key: 'motivoCessazione',
+        label: 'Motivo della cessazione',
+        kind: 'text',
+        max: 300,
+        synonyms: ['motivorevoca', 'motivocessazione', 'causarevoca'],
+      },
+      sourceId,
+    ],
+  },
+  {
+    key: 'nucleo',
+    label: 'Nucleo familiare',
+    menu: 'Pannello amministrativo del paziente › Nucleo familiare',
+    order: 4,
+    naturalKey: ['nucleo'],
+    notes:
+      'Le righe con lo stesso valore nella colonna del nucleo vanno nello stesso nucleo, anche in importazioni diverse. Un paziente che è già in un nucleo resta nel suo.',
+    fields: [
+      patientKey,
+      {
+        key: 'nucleo',
+        label: 'Nucleo (codice o nome nel file)',
+        kind: 'text',
+        required: true,
+        max: 100,
+        synonyms: [
+          'nucleo',
+          'nucleofamiliare',
+          'codicenucleo',
+          'famiglia',
+          'codicefamiglia',
+          'idfamiglia',
+        ],
+        hint: 'Lo stesso valore in più righe mette quei pazienti nello stesso nucleo.',
+      },
+      {
+        key: 'nomeNucleo',
+        label: 'Etichetta del nucleo',
+        kind: 'text',
+        max: 100,
+        synonyms: ['nomenucleo', 'etichettanucleo', 'nomefamiglia', 'descrizionenucleo'],
+        hint: 'Se manca, l’etichetta è il valore della colonna del nucleo.',
+      },
+    ],
+  },
+  {
     key: 'problemi',
     label: 'Problemi e diagnosi',
     menu: 'Patologie › Problemi e diagnosi',
-    order: 3,
+    order: 5,
     naturalKey: ['data', 'descrizione', 'codice'],
     notes:
       'Il codice si controlla nel formato ICD-9-CM (es. 401.9, 250.00, V17.3): codici senza punto o di altre classificazioni non passano.',
@@ -456,7 +533,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'allergie',
     label: 'Allergie e reazioni avverse',
     menu: 'Cartella › Allergie e reazioni avverse (anche in testata)',
-    order: 4,
+    order: 6,
     naturalKey: ['sostanza', 'codiceAgente'],
     notes:
       'Le allergie compaiono subito nella testata della cartella. Un’allergia non più attiva si importa come tale.',
@@ -522,7 +599,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'diario',
     label: 'Diario clinico',
     menu: 'Storia clinica › Diario clinico',
-    order: 5,
+    order: 7,
     naturalKey: ['data', 'contatto', 'testo'],
     notes:
       'Ogni nota ha il suo tipo di contatto: se il file non lo dice, scegline uno valido per tutte le righe.',
@@ -553,7 +630,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'anamnesi',
     label: 'Anamnesi',
     menu: 'Storia clinica › Anamnesi',
-    order: 6,
+    order: 8,
     naturalKey: ['data', 'sezione', 'testo'],
     notes: 'Parente, codice ed età all’esordio valgono solo per l’anamnesi familiare.',
     fields: [
@@ -602,7 +679,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'stili_di_vita',
     label: 'Stili di vita e fattori di rischio',
     menu: 'Storia clinica › Stili di vita',
-    order: 7,
+    order: 9,
     naturalKey: ['data', 'fattore', 'valore'],
     notes: 'Il Profilo sanitario riconosce fumo, alcol e attività fisica.',
     fields: [
@@ -632,7 +709,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'esame_obiettivo',
     label: 'Esame obiettivo e valutazioni',
     menu: 'Storia clinica › Esame obiettivo',
-    order: 8,
+    order: 10,
     naturalKey: ['data', 'testo'],
     notes: 'Una scheda di valutazione entra come testo, con il nome della scala e il punteggio.',
     fields: [
@@ -668,7 +745,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'capacita_motoria',
     label: 'Capacità motoria',
     menu: 'Storia clinica › Capacità motoria',
-    order: 9,
+    order: 11,
     naturalKey: ['data', 'capacita'],
     notes: 'Valori del dizionario ufficiale del Profilo sanitario.',
     fields: [
@@ -690,7 +767,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'parametri',
     label: 'Parametri e misure',
     menu: 'Cartella › Parametri',
-    order: 10,
+    order: 12,
     naturalKey: ['data', 'parametro', 'valore'],
     notes:
       'Due modi: una colonna «parametro» e una «valore», oppure una colonna per ogni parametro (una voce per cella piena). Le unità sono quelle della cartella.',
@@ -724,7 +801,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'vaccinazioni',
     label: 'Vaccinazioni',
     menu: 'Storia clinica › Vaccinazioni (in cronologia)',
-    order: 11,
+    order: 13,
     naturalKey: ['data', 'vaccino', 'lotto'],
     notes: 'Data di somministrazione, vaccino, lotto e dose.',
     fields: [
@@ -760,7 +837,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'esami_laboratorio',
     label: 'Esami di laboratorio',
     menu: 'Cartella › Esami',
-    order: 12,
+    order: 14,
     naturalKey: ['data', 'analita', 'valore'],
     notes: 'Un risultato per riga: analita, valore e unità come nel referto.',
     fields: [
@@ -818,7 +895,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'terapie',
     label: 'Farmaci in terapia',
     menu: 'Farmaci › Terapie (in corso, concluse o sospese)',
-    order: 13,
+    order: 15,
     naturalKey: ['farmaco', 'aic', 'inizio'],
     notes:
       'La scheda della terapia con gli stessi controlli dell’inserimento a mano. Le terapie concluse entrano come concluse, con la data di fine.',
@@ -954,7 +1031,7 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
     key: 'ricette_passate',
     label: 'Farmaci e prestazioni prescritti con altri programmi',
     menu: 'Farmaci prescritti · Visite ed esami prescritti (storico, sola lettura)',
-    order: 14,
+    order: 16,
     naturalKey: [
       'data',
       'tipo',
