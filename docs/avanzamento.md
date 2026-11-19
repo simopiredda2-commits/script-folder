@@ -14,7 +14,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
   3. tappa 10 (presidi e seguito delle prestazioni): fatta (D121–D124);
   4. `docs/fse.md` (D110): fatto, con le fonti ufficiali sul Profilo Sanitario Sintetico;
   5. fermata finale fatta (D125–D128): via all'unione della pull request #5; dettatura fuori; BMI scritto a mano; via alle tappe 11 e 12.
-- **Terzo giro** (D128), nel branch `tappe-11-12`: tappa 11 fatta (Profilo Sanitario Sintetico con un simulatore del Gateway, D130–D141). Poi la tappa 13 (modelli dei certificati, chiesti direttamente da Simone, D143) e la tappa 12 (condivisione nell'AFT). La fermata è dopo la tappa 12 e le copre tutte e tre.
+- **Terzo giro** (D128), nel branch `tappe-11-12`: tappe 11, 13 e 12 fatte (D130–D162). **Via dato in anticipo** da Simone il 19/11/2026 («Do già adesso l'autorizzazione al via»): pull request #6 unita in `main` (commit 033c6ed). Le domande di merito della fermata restano aperte con le scelte di oggi e si fanno alla prossima fermata, dopo la tappa 15.
+- **Richieste del 19/11/2026**, nel branch `tappe-14-15`: tappa 14 (strumenti e amministrazione completi) e tappa 15 (importazione da altri programmi con lo smistamento verso i menu), in corso. Fermata dopo la tappa 15.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 

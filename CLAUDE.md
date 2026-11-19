@@ -57,7 +57,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Come si procede
 
-- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`.
+- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`, unita (#6, via del 19/11/2026). Quarto blocco (richieste del 19/11/2026): `tappe-14-15`.
 - Dopo ogni tappa: test e lint verdi, commit e push (la macchina in cloud può essere riciclata), poi aggiornare `docs/avanzamento.md` con fatto, non fatto, non provato e prossimo passo.
 - **Fermate**: dopo la tappa 2 e dopo la tappa 4. Domande con il pulsante a Simone; spiegare in parole semplici cosa devono verificare lui e la Dr.ssa Rocca (dopo la 2: struttura, modello dei dati, ruoli e permessi; dopo la 4: ciclo della ricetta e regole di prescrizione con le loro fonti) e chiedere il via. Alla prima fermata chiedere anche quale proposta di logo preferisce, con il collegamento a `docs/logo.md` su GitHub, indicando quella consigliata. Se chiede modifiche: farle, aggiornare la PR, richiedere il via. Con il via: unire la PR e continuare. Simone non interviene su GitHub: le PR le unisce Claude.
 - Dopo la tappa 6: stesso giro per l'ultima PR (fatto).
@@ -155,6 +155,13 @@ Terzo giro (via del 18/11/2026, D128), branch `tappe-11-12`, stesso metodo:
 11. Profilo Sanitario Sintetico per il Fascicolo con un simulatore del Gateway, dalle fonti di `docs/fse.md` (prima quelle ancora da leggere).
 12. Condivisione tra i medici dell'AFT che usano il programma. **Fermata dopo la tappa 12**, con lo stesso giro (domande con il pulsante, via, unione), poi fermarsi.
 13. Modelli dei certificati (richiesta diretta di Simone, D143): sportivo non agonistico, porto d'armi, anamnestico per la patente e altri; testi solo dagli atti ufficiali; si compilano i dati del paziente; menu «Modelli» negli strumenti; caratteri, intestazione e dimensioni scelti dal medico. Si fa dopo la 11 e prima della 12; la fermata della 12 copre anche questa.
+
+Terzo giro chiuso: via dato in anticipo da Simone il 19/11/2026 («Do già adesso l'autorizzazione al via»), pull request #6 unita. Le domande di merito di quella fermata (catalogo, AFT, patente) si fanno alla fermata dopo la tappa 15, insieme alle nuove.
+
+Richieste di Simone del 19/11/2026, branch `tappe-14-15`, stesso metodo:
+
+14. Strumenti e amministrazione completi: tutte le impostazioni e i dati modificabili (dati dello studio, utenti e ruoli, password, postazioni e stampa, intestazioni, elenchi dello studio, autorizzazioni sull'archivio, registro delle azioni di amministrazione, avvisi sugli accessi anomali, stato del servizio).
+15. Importazione da altri programmi in vari formati, con lo smistamento dei dati verso i menu (anagrafica e pannello amministrativo del paziente, storia clinica, patologie, farmaci in terapia e prescritti); i menu che mancavano si costruiscono. **Fermata dopo la tappa 15**, con lo stesso giro (domande con il pulsante, via, unione).
 
 ## Come si chiude
 
