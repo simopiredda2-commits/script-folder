@@ -86,13 +86,23 @@ L'elenco della CMS è un dato pubblico del governo degli Stati Uniti, raccolto n
 
 ### Esenzioni del DPCM LEA (D190)
 
-La trascrizione in `packages/reference/data/trascrizioni/lea/` viene dal PDF qui sotto, scaricato da Simone dalla pagina del Ministero della salute sui LEA (versione del 29/9/2026). È un allegato di un decreto: testo di un atto ufficiale (art. 5 della legge 633/1941, come per gli atti regionali). Il PDF resta fuori dal repository. Che cosa è diverso dal PDF: `docs/banche-dati.md`, «Esenzioni del DPCM LEA».
+Le trascrizioni in `packages/reference/data/trascrizioni/lea/` vengono dai PDF qui sotto, scaricati da Simone dalla pagina del Ministero della salute sui LEA (versione del 29/9/2026). Sono allegati di un decreto: testo di un atto ufficiale (art. 5 della legge 633/1941, come per gli atti regionali). I PDF restano fuori dal repository. Che cosa è diverso dal PDF: `docs/banche-dati.md`, «Esenzioni del DPCM LEA».
 
-| Documento                                                                       | Indirizzo                                                                                                    | Byte    | SHA-256                                                            |
-| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------ |
-| DPCM 12/1/2017, allegato 8: elenco malattie e condizioni croniche e invalidanti | Mandato da Simone il 18/11/2026 (file `Allegato_8_Elenco_malattie_e_condizioni_croniche_ed_invalidanti.pdf`) | 295.226 | `39c3434e4ed7aa11e15f0bdf673cfd49c678d83b450ccf3c10cbb6048c6065a7` |
+| Documento                                                                       | Indirizzo                                                                                                           | Byte    | SHA-256                                                            |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------ |
+| DPCM 12/1/2017, allegato 8: elenco malattie e condizioni croniche e invalidanti | Mandato da Simone il 18/11/2026 (file `Allegato_8_Elenco_malattie_e_condizioni_croniche_ed_invalidanti.pdf`)        | 295.226 | `39c3434e4ed7aa11e15f0bdf673cfd49c678d83b450ccf3c10cbb6048c6065a7` |
+| DPCM 12/1/2017, allegato 7: elenco delle malattie rare esentate                 | Mandato da Simone il 18/11/2026 (file `Allegato_7_Elenco_malattie_rare_esentate_dalla_partecipazione_al_costo.pdf`) | 455.682 | `7e622a1be4aae41739c5619bc77187ce34cd204f09fce9d8e1d65957b4694387` |
 
-Gli altri allegati mandati da Simone (7, 10, 4D) sono stati letti ma non trascritti (motivi in `docs/banche-dati.md`).
+Gli altri allegati mandati da Simone (10, 4D) sono stati letti ma non trascritti (motivi in `docs/banche-dati.md`).
+
+### Esenzioni e prestazioni del SAR (D196)
+
+Letti, non trascritti: l'elenco è precedente al nuovo nomenclatore (`docs/banche-dati.md`). Atti ufficiali dal Bollettino della Regione Piemonte, scaricati il 19/11/2026.
+
+| Documento                                                                                   | Indirizzo                                                                                            | Byte      | SHA-256                                                            |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
+| D.D. 30/6/2022, n. 1167 (BU 28 del 14/7/2022), con l'allegato 1                             | `https://www.regione.piemonte.it/governo/bollettino/abbonati/2022/28/attach/dda1410001167_10100.pdf` | 536.690   | `85edd72aa9a2400c82d2e49e79c562538087eb6e6c4a7eb90c88bbdf1390c7a2` |
+| D.D. 6/7/2023, n. 1452 (BU 28 del 13/7/2023), con l'allegato C che sostituisce l'allegato 1 | `https://www.regione.piemonte.it/governo/bollettino/abbonati/2023/28/attach/dda1410001452_11200.pdf` | 1.365.280 | `817ae8f927c0d15c902ff57a013ab4e9b0d85796617e813018a7af0716c119b0` |
 
 ### Modelli ufficiali dei certificati (D158)
 
@@ -128,7 +138,7 @@ Richiesta di Simone del 18/11/2026; non ancora costruiti (`docs/avanzamento.md`)
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Diagnosi ICD-9-CM e ICD-10-IM                               | Ministero della Salute, DM 23/10/2025 (requisiti)                                           |
 | Prestazioni                                                 | Catalogo regionale, già importato; ricerca per parole chiave con sinonimi verificati (D153) |
-| Esami associati alle esenzioni                              | Regione Piemonte, D.D. 1167/2022, già importata (R17)                                       |
+| Esami associati alle esenzioni                              | Regione Piemonte, D.D. 1167/2022 e allegato C della D.D. 1452/2023: non importato (D196)    |
 | Vaccini                                                     | Fonte pubblica da individuare                                                               |
 | Problemi ICPC                                               | Classificazione della WONCA: si usa solo con la licenza verificata                          |
 | Posologie, pacchetti di esami, medici suggeritori, contatti | Li inserisce lo studio; il programma parte vuoto o con gli elenchi delle fonti pubbliche    |

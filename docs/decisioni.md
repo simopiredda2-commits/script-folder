@@ -938,3 +938,19 @@ Prove (servizio, simulatori, interfaccia) e sette sabotaggi.
 - **Prove.** Tornano le prove di D156: solo l'amministratore avvia un giro, poi tutti vedono com'è andato. Le due prove e i due sabotaggi di D192 si tolgono con il controllo che provavano.
 
 Prove (servizio, browser con accessibilità) e un sabotaggio.
+
+**D195 · Allegato 7 del DPCM LEA trascritto: malattie rare, da controllare.** Simone doveva mandare un'estrazione dell'allegato 7 (D191); poi ha chiesto di non chiedergli ciò che si può fare da sé (19/11/2026). Il PDF che aveva già mandato si legge cella per cella: la tabella ha quattro colonne (codice, malattia o gruppo, esempi di malattie afferenti al gruppo, sinonimi) e le righe senza codice continuano quella sopra, anche sulla pagina dopo. Dal testo impaginato, invece, nomi ed esempi si mescolavano: 98 nomi su 370 erano sbagliati (per esempio RCG040 prendeva il nome dell'esempio «fenilchetonuria»). Scelte:
+
+- **Una riga per codice**, 370 (116 gruppi e 254 malattie), nella serie `lea-esenzioni-malattie-rare`, dal 30/10/2026 come l'allegato 8 (gli aggiornamenti delle malattie rare del 2026 valgono in Piemonte da quella data, D.D. 710/2026, punto 7; data da verificare).
+- **Che cosa entra nelle colonne**: nome della malattia o del gruppo; esempi e sinonimi, separati da « | »; le malattie del gruppo che il PDF elenca con il loro codice («… (codice RN1200)»), in una colonna a parte; sezione e sottosezione; pagina del PDF.
+- **Una correzione**: in RNG262 il PDF distanzia le lettere («D I S G E N E S I A G O N A D I C A»); il testo vero si prende dalla stessa pagina letta con pdftotext («DISGENESIA GONADICA»).
+- **Da controllare** prima di entrare nel catalogo (A8), come l'allegato 8: lo controlla la Dr.ssa Rocca alla fine (D191).
+
+Prove e quattro sabotaggi.
+
+**D196 · Elenco esenzioni–prestazioni per R17: l'ultimo pubblicato non si importa.** Il PDF della D.D. 1167/2022 si scarica da qui; Simone non doveva farlo. Il suo allegato 1 (le prestazioni di ogni esenzione che il SAR accetta, con il controllo bloccante dal 28/06/2022) è stato sostituito dall'allegato C della D.D. 1452/2023, in vigore dal 20/07/2023: 9871 righe, 48 esenzioni, letto cella per cella. È però precedente al nuovo nomenclatore (dal 30/12/2024: D.D. 868/2024, il diritto all'esenzione segue l'allegato 8 del DPCM e non più l'8-bis). Dei 1170 codici di prestazione distinti, solo 437 (37%) esistono nel catalogo regionale 2026 (78% delle righe, perché restano soprattutto le visite). Gli atti letti dopo il 2023 (D.D. 868/2024, 990/2024, 444/2025, 590/2026, 710/2026) aggiornano il catalogo e le esenzioni nazionali, non l'elenco del SAR; altri non se ne sono trovati. Scelte:
+
+- **Non si importa.** Con questo elenco R17 bloccherebbe ricette giuste fatte con i codici di oggi. R17 resta «non verificabile», come prima; il SAR controlla comunque all'invio.
+- **Domanda per la fermata**: chiedere alla Regione o al CSI Piemonte l'elenco in uso nel SAR, cosa che solo Simone può fare.
+- **Correzioni**: dove i documenti dicevano che l'elenco della D.D. 1167/2022 era «già importato» c'era solo l'esempio delle prove. La fonte di R17 nei dati delle regole cita ancora la D.D. 1167/2022: si aggiorna con la prossima versione delle regole.
+- Nell'estrazione, le lettere «A» ed «E» prima di alcuni codici di prestazione (esenzioni 027 e 057) sono la fine del nome dell'esenzione, tagliato nella cella del PDF: non fanno parte del codice.
