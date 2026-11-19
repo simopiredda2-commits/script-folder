@@ -35,15 +35,15 @@ export function PrivacyPage() {
   const { isDoctor } = useSession();
   // Le voci oscurate le cerca solo il medico: la segreteria non legge il diario (registro pulito).
   const entries = useApi<EntryList>(isDoctor ? `/api/pazienti/${id}/voci?annullate=no` : null);
+  // Chi ha consultato i dati del paziente dall'AFT: lo legge il titolare (registro, D161).
+  const aftLog = useApi<{ consultazioni: AftConsultation[] }>(
+    isDoctor ? `/api/pazienti/${id}/consultazioni-aft` : null,
+  );
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
   const canWrite = privacy.data?.puoScrivere ?? false;
   const obscured = (entries.data?.voci ?? []).filter((v) => v.oscurata);
-  // Chi ha consultato i dati del paziente dall'AFT: lo legge il titolare (registro, D161).
-  const aftLog = useApi<{ consultazioni: AftConsultation[] }>(
-    isDoctor ? `/api/pazienti/${id}/consultazioni-aft` : null,
-  );
 
   return (
     <>

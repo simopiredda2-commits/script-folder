@@ -229,6 +229,7 @@ describe('storico delle modifiche e dati mai cancellati', () => {
       'reminder_delivery',
       'certificate_submission',
       'certificate_delivery',
+      'aft_activity',
     ];
     for (const { table_name } of res.rows) {
       if (appendOnly.includes(table_name)) continue;

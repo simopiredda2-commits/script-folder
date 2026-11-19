@@ -21,7 +21,7 @@ CREATE INDEX "aft_activity_owner_user_id_performed_at_index" ON "aft_activity" U
 CREATE TRIGGER aft_activity_history AFTER INSERT ON aft_activity
   FOR EACH ROW EXECUTE FUNCTION mmg_record_change();
 --> statement-breakpoint
-CREATE TRIGGER aft_activity_no_update BEFORE UPDATE OR DELETE ON aft_activity
+CREATE TRIGGER aft_activity_immutable BEFORE UPDATE OR DELETE ON aft_activity
   FOR EACH ROW EXECUTE FUNCTION mmg_forbid_change('Il registro di AFT non si modifica: una correzione è una riga nuova');
 --> statement-breakpoint
 CREATE TRIGGER aft_activity_no_truncate BEFORE TRUNCATE ON aft_activity
