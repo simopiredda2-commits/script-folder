@@ -22,7 +22,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #10 (19/11/2026)**, nello stesso branch: regola nuova in `CLAUDE.md` (non chiedere a Simone ciò che si può fare da sé); PDF del manuale ICD-9-CM indicato da Simone, con l'impronta (`docs/provenienze.md`); allegato 7 trascritto (D195); elenco esenzioni–prestazioni del SAR analizzato e non importato (D196). Fermata fatta: via, pull request #11 unita (risposte in «Risposte della fermata dopo l'unione della #10»).
 - **Dopo l'unione della #11 (19/11/2026)**, nello stesso branch ripartito da `main`: AURA con un simulatore (D197), sezione «Dopo l'unione della #11 – AURA con un simulatore». Simone ha mandato la PEC al CSI Piemonte, in copia alla Regione. Fermata fatta: via, pull request #12 unita (risposte in «Risposte della fermata dopo l'unione della #11»).
 - **Dopo l'unione della #12 (19/11/2026)**, nello stesso branch: revoca automatica e anagrafica da AURA da confermare (D198), con la correzione dei controlli in parallelo; sezione «Dopo l'unione della #12 – Revoca e anagrafica da AURA». Fermata fatta: via, pull request #13 unita (risposte in «Risposte della fermata dopo l'unione della #12»).
-- **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199).
+- **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199). Fermata fatta: via, pull request #14 unita (risposte in «Risposte della fermata dopo l'unione della #13»).
+- **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200).
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -874,11 +875,21 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Annotate dopo l'unione della #13, da fare con il pulsante:
+Da scrivere alla fine del blocco di D200. Restano le verifiche alla fine della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7), più R19 e R20.
 
-1. **Via all'unione della pull request di D199** (nuovi assistiti da AURA, paziente temporaneo, stato del paziente alla ricetta).
-2. **Paziente che cambia medico dentro lo studio**: in medicina di gruppo, se un paziente sceglie in AURA un altro medico dello studio, oggi resta nell'archivio di prima e si allinea soltanto. Proposta: un avviso nella pagina Oggi ai due medici, e lo spostamento lo decide il titolare di prima. Alternative: lo sposta il programma da solo; resta com'è.
-3. **Verifiche alla fine**: restano quelle della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7), più R19 e R20.
+## Risposte della fermata dopo l'unione della #13 (19/11/2026)
+
+Le domande con il pulsante si sono chiuse due volte da sole, perché la sessione si è riavviata. Simone ha scritto «ok, procedi così», ha chiesto di rifare le domande e ha risposto con il pulsante:
+
+- **Via**: «A. Via: unisci». Pull request #14 unita in `main`, con le prove verdi sul push e sulla pull request (WebKit, Firefox, TypeScript e `sync/`).
+- **Paziente che cambia medico dentro lo studio**: «A. Avviso, decide il titolare». Da fare (D200): un avviso nella pagina Oggi ai due medici, e lo spostamento nell'archivio del nuovo medico lo conferma il titolare di prima, con un clic.
+
+Dopo l'unione Simone ha chiesto se il caso del deceduto fosse stato simulato: sì, nelle prove del servizio, delle regole e dell'interfaccia, e nel browser con lo script delle schermate (schermata 65). Mancava la prova nel browser che la CI fa con WebKit e Firefox: «Fai anche la simulazione con un deceduto». Da fare.
+
+## Domande della fermata dopo l'unione della #13 (chiuse)
+
+1. Via all'unione della pull request di D199.
+2. Paziente che cambia medico dentro lo studio: avviso in Oggi e decide il titolare (consigliata), lo sposta il programma, o resta com'è.
 
 ## Risposte della fermata dopo l'unione della #12 (19/11/2026)
 
