@@ -25,6 +25,7 @@ import { buildApp } from '../../src/app';
 import { loadConfig } from '../../src/config';
 import { referenceUpdatesFromConfig } from '../../src/reference/updates-service';
 import { createDatabase, createPool } from '../../src/db/client';
+import { withActor } from '../../src/db/tx';
 import { DEMO_REFERENCE_DATE } from '../../src/db/demo';
 import { studioDate } from '../../src/prescriptions/rules-check';
 import { base32Decode } from '../../src/security/base32';
@@ -940,6 +941,53 @@ try {
   await changesRegion.getByRole('table', { name: 'Pazienti da spostare' }).waitFor();
   await changesRegion.scrollIntoViewIfNeeded();
   await shot(page, '66-cambio-di-medico-in-oggi');
+
+  // D201: i riepiloghi dell'archivio, dall'inizio dell'anno a oggi.
+  const thisDay = studioDate(new Date());
+  await page.goto(`${base}/archivio/riepiloghi?dal=${thisDay.slice(0, 4)}-01-01&al=${thisDay}`);
+  await page.getByRole('table', { name: 'Ricette fatte nell’archivio, per tipo' }).waitFor();
+  await shot(page, '67-riepiloghi', true);
+
+  // D202: la ricerca con la carenza e gli equivalenti. Per la documentazione, non per il sito: la
+  // carenza è di una confezione, che porta il nome della ditta (D149).
+  await page.goto(`${base}/banche-dati`);
+  await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('amlodipina');
+  const tevaResult = page.locator('.risultato').filter({ hasText: 'AMLODIPINA TEVA ITALIA' });
+  await tevaResult.getByText(/^Farmaco carente:/).waitFor();
+  const docResult = page.locator('.risultato').filter({ hasText: 'AMLODIPINA DOC GENERICI' });
+  await docResult.getByRole('button', { name: 'Mostra gli equivalenti' }).click();
+  await docResult
+    .getByRole('table', { name: 'Medicinali dello stesso gruppo di equivalenza' })
+    .waitFor();
+  await shot(page, '68-farmaco-carente-ed-equivalenti', true);
+
+  // D202: un iperteso dimostrativo prende l'amlodipina in quella confezione; in Oggi il farmaco
+  // carente è fra le cose da fare, con il paziente.
+  const amlodipine = (
+    await db.execute<{ id: string }>(sql`
+      select t.id from therapy t join patient p on p.id = t.patient_id
+      where t.active_ingredient = 'AMLODIPINA' and t.status = 'active' and t.drug_aic is null
+      order by p.last_name, p.first_name limit 1`)
+  ).rows[0];
+  if (!amlodipine) throw new Error('Serve una terapia dimostrativa con l’amlodipina');
+  const me = (
+    await db.execute<{ id: string }>(sql`select id from app_user where username = ${user}`)
+  ).rows[0]!;
+  await withActor(db, me.id, (tx) =>
+    tx.execute(sql`
+      update therapy set drug_aic = '038548032', by_active_ingredient = false,
+        drug_name = 'AMLODIPINA TEVA ITALIA 5 MG COMPRESSE- 28 COMPRESSE IN BLISTER PVC/PVDC/AL'
+      where id = ${amlodipine.id}`),
+  );
+  await page.goto(base);
+  const shortHeading = page.getByRole('heading', { name: 'Farmaci in terapia carenti' });
+  await shortHeading.waitFor();
+  // La sezione è in fondo a «Da fare»: in alto nella schermata, con un po' di quello che c'è sopra.
+  await shortHeading.evaluate((el) => {
+    el.scrollIntoView({ block: 'start' });
+    window.scrollBy(0, -320);
+  });
+  await shot(page, '69-farmaci-carenti-in-oggi');
 
   await browser.close();
   await new Promise((ok) => web.close(ok));

@@ -80,6 +80,9 @@ All'accesso si sceglie un utente del seed (`medico`, `segreteria`, `sostituto`);
 | ![](schermate/64-nuovo-paziente-temporaneo.png)                 | Nuovo paziente temporaneo in un passo solo: lo stato e le date della scelta del titolare, con la spiegazione dell'avviso alla ricetta quando la scelta è scaduta (D199)                                                                                                                                                 |
 | ![](schermate/65-ricetta-paziente-deceduto.png)                 | Ricetta per un paziente deceduto: non si fa, la pagina lo dice subito con il rimedio, e la testata porta la data del decesso (R19, D199)                                                                                                                                                                                |
 | ![](schermate/66-cambio-di-medico-in-oggi.png)                  | Oggi: il paziente ha scelto in AURA un altro medico dello studio; lo spostamento nel suo archivio lo decide il titolare di prima, con «Sposta» o «Non spostare». Il medico scelto vede chi l'ha scelto e chi decide (D200)                                                                                              |
+| ![](schermate/67-riepiloghi.png)                                | Riepiloghi dell'archivio per periodo: visite e contatti, ricette inviate, cartacee e annullate, vaccinazioni, per medico, con il CSV dello stesso periodo (D201)                                                                                                                                                        |
+| ![](schermate/68-farmaco-carente-ed-equivalenti.png)            | Ricerca dei farmaci: la confezione nell'elenco AIFA dei carenti, con le indicazioni e l'annotazione dell'elenco; gli equivalenti con la differenza dal prezzo di riferimento e la carenza. Per la documentazione: ha i nomi delle ditte (D149, D202)                                                                    |
+| ![](schermate/69-farmaci-carenti-in-oggi.png)                   | Oggi, fra le cose da fare: i farmaci in terapia che sono nell'elenco AIFA dei carenti, con i pazienti che li prendono (A7, D202). Per la documentazione: ha il nome della ditta                                                                                                                                         |
 
 Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al file), su un database appena preparato con il seed.
 
@@ -112,14 +115,13 @@ Negli avvisi il collegamento sta in una frase: lo controlla `apps/web/test/avvis
 
 ## Che cosa non c'è ancora
 
-- Agenda e prenotazione (proposta: da Ready!), riepiloghi.
+- Agenda e prenotazione (proposta: da Ready!). Nei riepiloghi, PPIP e fatture (D201).
 - Stampa della prescrizione dei presidi nel modulo dell'ASL e codici del nomenclatore (D123).
 - Dettatura vocale del diario: non c'è, per le regole 7 e 8 (D119, domanda per la fermata finale).
-- Ricerca dei codici ICD-9-CM per descrizione: manca il catalogo (D114).
-- Elenco ufficiale dei vaccini e catalogo ICD per descrizione: i vaccini hanno un nome libero (D176), i codici ICD si scrivono (D114). Gli elenchi dello studio (posologie, pacchetti di prestazioni, medici suggeritori, contatti) ci sono (D175).
+- Elenco ufficiale dei vaccini: i vaccini hanno un nome libero (D176). Le diagnosi ICD-9-CM si cercano per descrizione dalla tappa 17 (D186). Gli elenchi dello studio (posologie, pacchetti di prestazioni, medici suggeritori, contatti) ci sono (D175).
 - Schede UVG regionali, percorsi (diabete, BPCO, scompenso): nel modello dei dati, non nell'interfaccia.
 - Stampa senza la finestra del browser: domanda per la fermata (D180).
-- Collegamento alla segnalazione di farmacovigilanza: da completare (D82).
+- Il modulo della segnalazione online di AIFA non è stato aperto da qui: l'indirizzo è quello della pagina AIFA, letta il 19/11/2026 (D202).
 - Stampa del promemoria e della ricetta rossa nel modulo conforme: da completare con le specifiche.
 - Tema scuro.
 

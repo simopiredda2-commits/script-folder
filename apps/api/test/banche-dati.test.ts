@@ -675,7 +675,20 @@ describe('banche dati via HTTP e nelle regole', () => {
     const res = await get('/api/farmaci?q=amlodipina');
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json().farmaci).toHaveLength(4);
-    expect(res.json().versioni.map((v: { kind: string }) => v.kind)).toContain('farmaci');
+    // Tutte le banche dati che i dati del farmaco usano, anche le liste di trasparenza e dei carenti.
+    expect(
+      res
+        .json()
+        .versioni.map((v: { kind: string }) => v.kind)
+        .sort(),
+    ).toEqual([
+      'farmaci',
+      'farmaci_carenti',
+      'farmaci_classe',
+      'farmaci_classe',
+      'farmaci_dpc',
+      'farmaci_trasparenza',
+    ]);
     const one = (await get('/api/farmaci/038092019')).json();
     expect(one.farmaco.name).toBe('AMLODIPINA DOC GENERICI');
     expect(one.equivalenti).toHaveLength(3);
