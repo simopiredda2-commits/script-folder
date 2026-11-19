@@ -8,7 +8,13 @@
  * si attiva al primo accesso.
  */
 import { randomBytes } from 'node:crypto';
-import { buildFiscalCode, type Role } from '@mmg/domain';
+import {
+  buildFiscalCode,
+  parseStudioListData,
+  studioListLabel,
+  type Role,
+  type StudioListKind,
+} from '@mmg/domain';
 import { ageAt, generatePatients, Random } from '@mmg/fixtures';
 import { inArray } from 'drizzle-orm';
 import { loadConfig } from '../config';
@@ -39,6 +45,7 @@ import {
   problemDetail,
   studio,
   therapy,
+  studioListItem,
   workstation,
 } from './schema';
 import {
@@ -218,6 +225,62 @@ try {
     validTo: new Date(now + 14 * 86_400_000),
     reason: 'Sostituzione dimostrativa di due settimane',
     grantedBy: doctorId,
+  });
+
+  // Elenchi dello studio (tappa 14), inventati: controllati come quelli scritti a mano. Il
+  // pacchetto di prestazioni no: si compone dal catalogo in vigore, che il seed non importa.
+  const listItems: [StudioListKind, Record<string, unknown>][] = [
+    [
+      'suggeritore',
+      {
+        nome: 'Dott.ssa Carla Esempio',
+        struttura: 'Ospedale di prova, Cardiologia',
+        specialita: 'Cardiologia',
+        telefono: '000 0000021',
+      },
+    ],
+    [
+      'suggeritore',
+      { nome: 'Dott. Luca Prova', struttura: 'Ambulatorio di diabetologia di prova' },
+    ],
+    [
+      'posologia',
+      {
+        testo: '1 compressa una volta al giorno, la sera, per bocca',
+        dose: '1',
+        unita: 'compressa',
+        frequenza: '1 volta al giorno',
+        momento: 'la sera',
+        via: 'per bocca',
+      },
+    ],
+    ['posologia', { testo: '2 inalazioni al bisogno, al massimo 4 volte al giorno' }],
+    [
+      'contatto',
+      {
+        nome: 'Laboratorio analisi di prova',
+        tipo: 'laboratorio',
+        telefono: '000 0000022',
+        email: 'laboratorio@esempio.invalid',
+        note: 'Prelievi dal lunedì al venerdì, 7.30–9.30',
+      },
+    ],
+    ['contatto', { nome: 'CUP di prova', tipo: 'struttura', telefono: '000 0000023' }],
+  ];
+  await withActor(db, doctorId, async (tx) => {
+    for (const [kind, raw] of listItems) {
+      const parsed = parseStudioListData(kind, raw);
+      if (!parsed.ok)
+        throw new Error(`Voce dimostrativa non valida: ${parsed.problems.join('; ')}`);
+      const data = parsed.data as unknown as Record<string, unknown>;
+      await tx.insert(studioListItem).values({
+        studioId: st!.id,
+        kind,
+        label: studioListLabel(kind, data),
+        data,
+        createdBy: doctorId,
+      });
+    }
   });
 
   const people = generatePatients(DEMO_PATIENTS);

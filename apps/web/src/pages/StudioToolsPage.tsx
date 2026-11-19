@@ -4,6 +4,7 @@ import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common'
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
+import { toolsSectionsFor } from '../lib/tools-sections';
 import { useApi } from '../lib/useApi';
 import { AdminLogSection } from './admin/AdminLogSection';
 import { ImportSection } from './admin/ImportSection';
@@ -80,30 +81,6 @@ function initial(s: Settings | null): Record<FieldKey, string> {
   };
 }
 
-type RoleCode = 'owner_doctor' | 'substitute_doctor' | 'secretary' | 'administrator';
-const DOCTORS: RoleCode[] = ['owner_doctor', 'substitute_doctor'];
-const ALL: RoleCode[] = ['owner_doctor', 'substitute_doctor', 'administrator'];
-
-/** Sezioni di Strumenti e chi le vede (tappa 14); chi può modificare lo decide il servizio. */
-const SECTIONS: { key: string; label: string; roles: RoleCode[] }[] = [
-  { key: 'studio', label: 'Dati dello studio', roles: ALL },
-  { key: 'utenti', label: 'Utenti e ruoli', roles: ['administrator'] },
-  { key: 'stampa', label: 'Postazioni e stampa', roles: ALL },
-  { key: 'elenchi', label: 'Elenchi dello studio', roles: ALL },
-  { key: 'modelli', label: 'Modelli dei certificati', roles: ALL },
-  { key: 'impaginazione', label: 'Impaginazione', roles: DOCTORS },
-  { key: 'fascicolo', label: 'Fascicolo sanitario', roles: ALL },
-  { key: 'banche-dati', label: 'Banche dati', roles: ALL },
-  { key: 'aft', label: 'AFT', roles: ['owner_doctor'] },
-  { key: 'importazione', label: 'Importazione', roles: ['owner_doctor'] },
-  {
-    key: 'registro',
-    label: 'Registro di amministrazione',
-    roles: ['owner_doctor', 'administrator'],
-  },
-  { key: 'servizio', label: 'Stato del servizio', roles: ['administrator'] },
-];
-
 /**
  * Strumenti dello studio: modelli dei certificati e impaginazione del medico (tappa 13),
  * impostazioni del Fascicolo Sanitario Elettronico (tappa 11), aggiornamento delle banche dati
@@ -114,7 +91,7 @@ export function StudioToolsPage() {
   const { state } = useSession();
   const [params, setParams] = useSearchParams();
   const roles = state.status === 'ready' ? state.me.ruoli.map((r) => r.codice) : [];
-  const sections = SECTIONS.filter((x) => x.roles.some((r) => roles.includes(r)));
+  const sections = toolsSectionsFor(roles);
   const current = sections.find((x) => x.key === params.get('sezione')) ?? sections[0];
   if (!current) return <PageHeader title="Strumenti dello studio" />;
   return (

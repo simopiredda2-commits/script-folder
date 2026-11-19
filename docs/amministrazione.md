@@ -11,7 +11,7 @@ Tutto sta in **Strumenti**, una scheda per area. Ognuno vede le schede del suo r
 | Dati dello studio           | Modifica          | Legge            | Legge     | —          |
 | Utenti e ruoli              | Modifica          | —                | —         | —          |
 | Postazioni e stampa         | Modifica          | Legge            | Legge     | —          |
-| Elenchi dello studio        | Modifica          | Modifica         | Modifica  | —          |
+| Elenchi dello studio        | Modifica          | Modifica         | Modifica  | Legge      |
 | Modelli dei certificati     | Modifica          | Modifica         | Modifica  | —          |
 | Impaginazione               | —                 | La sua           | La sua    | —          |
 | Fascicolo sanitario         | Modifica          | Legge            | Legge     | —          |
@@ -21,7 +21,7 @@ Tutto sta in **Strumenti**, una scheda per area. Ognuno vede le schede del suo r
 | Registro di amministrazione | Legge             | Legge            | —         | —          |
 | Stato del servizio          | Legge             | —                | —         | —          |
 
-La segreteria non vede Strumenti (D146). La pagina della password è per tutti, dal menu dell'utente.
+La segreteria vede in Strumenti solo gli elenchi dello studio, in sola lettura: le servono per preparare (D175, che aggiorna D146). La pagina della password è per tutti, dal menu dell'utente.
 
 ## Primo avvio (D167)
 
@@ -51,6 +51,22 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 - **Sicurezza:** 5 minuti di inattività, 5 tentativi, 15 minuti di blocco (D29); si cambiano qui, entro limiti di buon senso.
 - **Tempo di attesa degli invii:** 8 secondi per difetto; la Regione indica 6–8 (D94). Si legge a ogni invio di ricette e certificati.
 - **Soglie degli avvisi sugli accessi anomali** (Garante, linee guida sul dossier sanitario, par. 7, lett. c): vuote, quindi avvisi spenti, finché qualcuno non dà i valori (da completare).
+
+## Elenchi dello studio (D175)
+
+Quattro elenchi comuni dello studio, in **Strumenti › Elenchi dello studio**: li scrivono titolare, sostituto e amministratore, li leggono tutti, segreteria compresa. Non contengono dati dei pazienti. Una voce non si cancella: si archivia, perché una terapia o una ricetta può averla usata.
+
+| Elenco                   | Campi                                                                                        | Dove si usa                                                                         |
+| ------------------------ | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Medici suggeritori       | Nome (obbligatorio), struttura, specialità, telefono                                         | Scheda della terapia › Medico suggeritore: riempie nome e struttura                 |
+| Posologie                | Testo (obbligatorio); dose, unità, frequenza, momento, via (facoltativi)                     | Scheda della terapia › Come si prende (solo le parti); righe dei farmaci in ricetta |
+| Pacchetti di prestazioni | Nome e da 1 a 30 prestazioni, scelte dal catalogo regionale in vigore (codice e descrizione) | Ricetta specialistica › «Aggiungi un pacchetto»                                     |
+| Contatti utili           | Nome e tipo (struttura, specialista, laboratorio, altro); telefono, email, indirizzo, note   | Consultazione                                                                       |
+
+- **Pacchetti dal catalogo.** Ogni codice si cerca nel catalogo in vigore alla data dello studio, con la descrizione del catalogo: un pacchetto non si inventa. Una prestazione uscita dal catalogo resta nel pacchetto finché non la si toglie, l'elenco la segnala e la ricetta non la aggiunge, e lo dice.
+- **Doppioni** fra le voci attive dello stesso tipo: stesso medico nella stessa struttura, stesso testo di posologia, stesso nome di pacchetto, stesso contatto dello stesso tipo.
+- **Registro:** ogni scrittura, con i campi cambiati, prima e dopo; i tentativi negati anche.
+- **Esportazione completa:** gli elenchi ci sono, anche le voci archiviate (regola 4).
 
 ## Postazioni
 

@@ -5,6 +5,7 @@ import { age } from '../lib/format';
 import { patientIdOf, recordLabel, useOpenRecords, MAX_OPEN_RECORDS } from '../lib/openRecords';
 import { useApi } from '../lib/useApi';
 import { useSession } from '../lib/session';
+import { toolsSectionsFor } from '../lib/tools-sections';
 import { Icon, type IconName } from './Icon';
 import { Logo } from './Logo';
 import { Signature } from './Signature';
@@ -127,10 +128,8 @@ export function Shell({ children }: { children: ReactNode }) {
             ...(me?.archivio
               ? [{ to: '/archivio', label: 'Archivio', icon: 'archivio' as const, end: false }]
               : []),
-            // Strumenti: modelli e impaginazione per i medici, impostazioni per l'amministratore.
-            ...(me?.ruoli.some((r) =>
-              ['administrator', 'owner_doctor', 'substitute_doctor'].includes(r.codice),
-            )
+            // Strumenti, se c'è almeno una sezione per i ruoli di chi entra (D175).
+            ...(me && toolsSectionsFor(me.ruoli.map((r) => r.codice)).length > 0
               ? [{ to: '/strumenti', label: 'Strumenti', icon: 'strumenti' as const, end: false }]
               : []),
           ].map((n) => (

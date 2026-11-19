@@ -154,6 +154,11 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     db,
     sql`select * from studio_template where studio_id = ${a.studio.id} order by id`,
   );
+  // Elenchi dello studio (tappa 14): suggeritori, posologie, pacchetti e contatti, anche archiviati.
+  tables.studio_list_item = await rows(
+    db,
+    sql`select * from studio_list_item where studio_id = ${a.studio.id} order by id`,
+  );
   // PDF del Profilo, con il CDA dentro e firmati: come gli allegati, nel JSON in base64.
   const pssFiles = pssIds.length
     ? (

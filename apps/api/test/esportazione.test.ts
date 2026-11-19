@@ -28,6 +28,14 @@ describe('esportazione completa dei dati del medico', () => {
       url: `/api/pazienti/${s.richPatient}`,
       headers: { cookie },
     });
+    // Una voce degli elenchi dello studio (tappa 14): anche questi sono dati dello studio.
+    const voce = await s.app.inject({
+      method: 'POST',
+      url: '/api/studio/elenchi',
+      headers: { cookie },
+      payload: { tipo: 'contatto', dati: { nome: 'Laboratorio di prova', tipo: 'laboratorio' } },
+    });
+    expect(voce.statusCode, voce.body).toBe(201);
     const res = await s.app.inject({
       method: 'GET',
       url: '/api/esportazione',
@@ -61,6 +69,11 @@ describe('esportazione completa dei dati del medico', () => {
     expect(doc.tabelle.exemption!.length).toBe(1);
     expect(doc.storico_modifiche.length).toBeGreaterThan(0);
     expect(doc.registro_accessi.some((r) => r.action === 'apertura_cartella')).toBe(true);
+  });
+
+  it('contiene gli elenchi dello studio (tappa 14)', () => {
+    expect(doc.tabelle.studio_list_item).toHaveLength(1);
+    expect(JSON.stringify(doc.tabelle.studio_list_item)).toContain('Laboratorio di prova');
   });
 
   it('ogni tabella del database con dati dei pazienti è esportata', async () => {
