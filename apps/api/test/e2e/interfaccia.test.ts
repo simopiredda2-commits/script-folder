@@ -197,6 +197,40 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     if (tablet) await expectTabletLayout(p, where);
   };
 
+  /**
+   * page.goto che aspetta la pagina nuova. Con WebKit, tornando all'indirizzo dove la prova
+   * precedente era finita, «la stessa prestazione già prescritta» è caduta una volta (CI su main,
+   * giro 170): il campo di ricerca restava bloccato dalla ricetta ricordata, come se «Nuova ricetta
+   * da capo» fosse stato cercato nella pagina di prima o in quella nuova ancora vuota. Causa
+   * probabile, non provata (qui WebKit non c'è): page.goto che risponde prima che la pagina nuova
+   * prenda il posto di quella di prima, come in un difetto segnalato a Playwright per WebKit. La
+   * pagina di prima porta un segno; si va avanti quando il segno non c'è più.
+   */
+  async function gotoNewPage(p: Page, url: string) {
+    await p.evaluate(() => {
+      (window as Window & { paginaDiPrima?: boolean }).paginaDiPrima = true;
+    });
+    await p.goto(url);
+    await p.waitForFunction(() => !(window as Window & { paginaDiPrima?: boolean }).paginaDiPrima);
+  }
+
+  /**
+   * L'editor della ricetta da capo. La ricetta inviata in una prova precedente è ricordata (D68):
+   * si apre la pagina nuova, si ricomincia se serve e si aspetta che il campo di ricerca sia libero.
+   */
+  async function freshPrescription(p: Page, url: string, title: string, search: string) {
+    await gotoNewPage(p, url);
+    await p.getByRole('heading', { level: 1, name: title }).waitFor();
+    const restart = p.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    await expect
+      .poll(() => p.getByLabel(search).isEnabled(), {
+        timeout: 5000,
+        message: `${title}: il campo di ricerca resta bloccato dalla ricetta ricordata`,
+      })
+      .toBe(true);
+  }
+
   beforeAll(async () => {
     t = await createTestDatabase();
     work = mkdtempSync(join(tmpdir(), 'mmg-e2e-'));
@@ -383,7 +417,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('promemoria dopo l’invio: PDF del modello, solo NRE, email al paziente (tappa 7)', async () => {
-    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
+    // Lo stesso indirizzo dove la prova di prima ha appena inviato la ricetta.
+    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}/ricetta`);
     const panel = page.getByRole('region', { name: 'Promemoria della ricetta' });
     await panel.waitFor();
     const href = await panel.getByRole('link', { name: 'Promemoria (PDF)' }).getAttribute('href');
@@ -400,7 +435,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('nell’editor: oscuramento per le SSN, ripetibilità per la ricetta bianca (tappa 7)', async () => {
-    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
+    // Di nuovo lo stesso indirizzo: la ricetta inviata è ancora ricordata.
+    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}/ricetta`);
     await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
     await page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ }).click();
     await page.getByLabel(/Oscura nome e indirizzo/).waitFor();
@@ -519,11 +555,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('prestazione non ancora nel catalogo, scritta a mano: avviso R18 con il motivo, poi inviata (D154)', async () => {
-    await page.goto(`${base}/pazienti/${s.richPatient}/specialistica`);
-    await page.getByRole('heading', { level: 1, name: 'Ricetta specialistica' }).waitFor();
     // L'editor ricorda la ricetta appena inviata: se ne comincia una nuova.
-    const restart = page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
-    if (await restart.count()) await restart.click();
+    await freshPrescription(
+      page,
+      `${base}/pazienti/${s.richPatient}/specialistica`,
+      'Ricetta specialistica',
+      'Prestazione, branca o codice',
+    );
     await page
       .getByRole('button', { name: 'Prestazione non ancora nel catalogo: scrivila a mano' })
       .click();
@@ -549,10 +587,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('la stessa prestazione già prescritta: l’editor lo dice subito, con data e NRE', async () => {
-    await page.goto(`${base}/pazienti/${s.richPatient}/specialistica`);
-    await page.getByRole('heading', { level: 1, name: 'Ricetta specialistica' }).waitFor();
-    const restart = page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
-    if (await restart.count()) await restart.click();
+    // Lo stesso indirizzo dove la prova di prima ha appena inviato la ricetta.
+    await freshPrescription(
+      page,
+      `${base}/pazienti/${s.richPatient}/specialistica`,
+      'Ricetta specialistica',
+      'Prestazione, branca o codice',
+    );
     await page.getByLabel('Prestazione, branca o codice').fill('visita');
     const item = page.locator('.risultato').filter({ hasText: 'Visita di prova' });
     await item.waitFor();
@@ -646,11 +687,12 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     const otherId = s.patients.titolare.find((x) => x !== s.richPatient)!;
     const [other] = await t.db.select().from(patient).where(eq(patient.id, otherId));
     // Ricetta in corso per il primo paziente, non ancora preparata.
-    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
-    await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
-    // La ricetta inviata in una prova precedente è ricordata: si ricomincia da capo.
-    const restart = page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
-    if (await restart.count()) await restart.click();
+    await freshPrescription(
+      page,
+      `${base}/pazienti/${s.richPatient}/ricetta`,
+      'Nuova ricetta',
+      'Farmaco, principio attivo, codice AIC o ATC',
+    );
     await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
     const item = page.locator('.risultato').filter({ hasText: 'NORVASC' });
     await item.waitFor();
