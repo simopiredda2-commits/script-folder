@@ -139,7 +139,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/aft.md`: condivisione del riepilogo tra i medici dell'AFT, con il consenso del paziente (D161).
 - `docs/amministrazione.md`: Strumenti e amministrazione per ruolo, primo avvio, utenti, studio, postazioni, stampa, elenchi (tappa 14, D163).
 - `docs/importazione.md`: importazione da altri programmi con lo smistamento verso i menu, formati, destinazioni, sicurezza (tappa 15, D173).
-- `docs/aura.md`: collegamento con AURA, oggi simulato: quando si controlla, che cosa si allinea, registro, che cosa non è provato (D197).
+- `docs/aura.md`: collegamento con AURA, oggi simulato: quando si controlla, che cosa si allinea, nuovi assistiti, registro, che cosa non è provato (D197–D199).
 
 ## Le tappe
 

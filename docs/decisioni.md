@@ -996,7 +996,7 @@ Prove (servizio, interfaccia, browser con accessibilità) e sabotaggi.
     - Residenza, domicilio, ASL e distretto di AURA, solo i valori che passano i controlli del pannello: gli altri si vedono dopo come differenze da confermare (D198).
     - Stato «temporaneo» se la scelta ha una scadenza.
     - Poi il collegamento con AURA porta esenzioni e scelte, con la fonte «AURA».
-    - Due clic insieme fanno un paziente solo. Un paziente registrato a mano nel frattempo si dice, con il collegamento alla sua cartella, e l'assistito esce dall'elenco.
+    - Due clic insieme fanno un paziente solo: il primo prende il blocco dell'assistito, il secondo non lo aspetta (terrebbe occupata una connessione al database) e riceve «Registrazione già in corso». Un paziente registrato a mano nel frattempo si dice, con il collegamento alla sua cartella, e l'assistito esce dall'elenco.
   - **«Non registrare».** Esce dall'elenco, e la scelta resta nel registro. Non si ripropone finché AURA non manda una scelta nuova (altro medico o altra data).
   - **Esce dall'elenco da solo** quando la scelta non vale più, o AURA dice il decesso.
   - **Dati.** Tabella `aura_new_patient` (migrazione 0035), con lo storico di ogni modifica e il divieto di cancellazione, nell'esportazione dell'archivio (regola 4).
