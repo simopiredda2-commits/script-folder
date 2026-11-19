@@ -255,6 +255,25 @@ const saveBody = z
 
 const codeBody = z.object({ codice: z.string().trim().min(1).max(100) }).strict();
 
+/**
+ * Perché un ritorno dalla pagina regionale non va a buon fine, come codice (D193). Nell'indirizzo
+ * del ritorno va solo il codice e il testo lo scrive l'interfaccia: un testo nell'indirizzo lo
+ * potrebbe scrivere chiunque, in un collegamento al dominio vero. Il motivo vero va nel registro.
+ */
+export const REGIONAL_FAILURES = [
+  'non-riconosciuta',
+  'annullato',
+  'errore-regione',
+  'senza-codice',
+  'non-raggiungibile',
+  'token-negato',
+  'identita-diversa',
+  'senza-profilo',
+  /** Al ritorno la sessione del programma non c'è più. */
+  'sessione',
+] as const;
+export type RegionalFailure = (typeof REGIONAL_FAILURES)[number];
+
 export function createCredentialService(deps: CredentialDeps) {
   const { db, now } = deps;
   const key = credentialKey(deps.encryptionKey);
@@ -572,16 +591,16 @@ export function createCredentialService(deps: CredentialDeps) {
   async function completeRegionalAccess(
     actor: Actor,
     query: unknown,
-  ): Promise<{ esito: 'ok'; scadeIl: Date } | { esito: 'errore'; motivo: string }> {
+  ): Promise<{ esito: 'ok'; scadeIl: Date } | { esito: 'errore'; motivo: RegionalFailure }> {
     requireDoctor(actor);
     const regional = deps.regional;
     if (!regional) throw new HttpError(404, 'Accesso regionale non disponibile');
     const q = returnQuery.parse(query ?? {});
-    const fail = async (motivo: string, detail?: string) => {
-      await event(actor, 'rupar_piemonte', 'accesso_regionale_rifiutato', detail ?? motivo);
+    const fail = async (motivo: RegionalFailure, detail: string) => {
+      await event(actor, 'rupar_piemonte', 'accesso_regionale_rifiutato', detail);
       return { esito: 'errore' as const, motivo };
     };
-    if (!q.state) return fail('Ritorno senza state: riprova l’accesso');
+    if (!q.state) return fail('non-riconosciuta', 'ritorno senza state');
     const claimed = await db
       .update(regionalAuthorizationRequest)
       .set({ usedAt: now() })
@@ -595,15 +614,13 @@ export function createCredentialService(deps: CredentialDeps) {
       )
       .returning();
     const request = claimed[0];
-    if (!request) return fail('Richiesta di accesso non riconosciuta o scaduta: riprova');
+    if (!request) return fail('non-riconosciuta', 'state sconosciuto, usato o scaduto');
     if (q.error)
       return fail(
-        q.error === 'access_denied'
-          ? 'Accesso regionale annullato o negato'
-          : `La Regione ha risposto con un errore (${q.error})`,
+        q.error === 'access_denied' ? 'annullato' : 'errore-regione',
         `${q.error}: ${q.error_description ?? ''}`,
       );
-    if (!q.code) return fail('Ritorno senza codice di autorizzazione: riprova');
+    if (!q.code) return fail('senza-codice', 'ritorno senza codice di autorizzazione');
     const verifier = decryptSecret(key, request.verifierEnc, pkceAad(actor.userId)).toString();
     const r = await regional.gateway.exchange({
       code: q.code,
@@ -611,13 +628,8 @@ export function createCredentialService(deps: CredentialDeps) {
       clientId: regional.clientId,
       codeVerifier: verifier,
     });
-    if (r.outcome === 'unreachable')
-      return fail(`Servizio regionale non raggiungibile: ${r.message}`);
-    if (r.outcome === 'rejected')
-      return fail(
-        `La Regione non ha rilasciato il token (${r.error})`,
-        `${r.error}: ${r.description ?? ''}`,
-      );
+    if (r.outcome === 'unreachable') return fail('non-raggiungibile', r.message);
+    if (r.outcome === 'rejected') return fail('token-negato', `${r.error}: ${r.description ?? ''}`);
     const doctor = await fiscalCodeOf(actor.userId);
     if (r.fiscalCode.toUpperCase() !== doctor.toUpperCase()) {
       await regional.gateway.revoke({
@@ -625,14 +637,10 @@ export function createCredentialService(deps: CredentialDeps) {
         fiscalCode: r.fiscalCode,
         accessToken: r.accessToken,
       });
-      return fail(
-        'L’accesso regionale è stato fatto con un’identità diversa da quella del medico collegato',
-      );
+      return fail('identita-diversa', 'identità diversa da quella del medico collegato');
     }
     if (!r.scope.includes(PRESCRIBER_SCOPE))
-      return fail(
-        'La Regione non ha concesso il profilo di prescrizione: va abilitato nel configuratore regionale',
-      );
+      return fail('senza-profilo', 'profilo di prescrizione non concesso dalla Regione');
     const validUntil = new Date(now().getTime() + r.expiresIn * 1000);
     await storeSession(db, deps.encryptionKey, {
       userId: actor.userId,

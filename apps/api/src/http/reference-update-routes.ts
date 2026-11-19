@@ -39,7 +39,8 @@ function summary(run: UpdateRun) {
 
 /**
  * Aggiornamento delle banche dati (D156): tutti vedono com'è andato l'ultimo giro e quando parte il
- * prossimo; l'amministratore dello studio può avviarne uno subito.
+ * prossimo; l'amministratore dello studio può avviarne uno subito. Le banche dati sono comuni a tutti
+ * gli studi del servizio: il giro vale per tutti, come quello di ogni notte (D191, D194).
  */
 export function registerReferenceUpdateRoutes(
   app: FastifyInstance,

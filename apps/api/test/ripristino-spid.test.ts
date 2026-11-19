@@ -4,7 +4,7 @@ import { buildApp } from '../src/app';
 import {
   IDENTITY_UNAVAILABLE,
   RECOVERY_EXPIRED,
-  RECOVERY_REFUSAL,
+  type ReturnFailure,
 } from '../src/auth/identity-service';
 import { accessLog, appUser, doctorProfile } from '../src/db/schema';
 import { totp } from '../src/security/totp';
@@ -94,8 +94,11 @@ const doctorCf = async (userId: string) =>
   )[0]!.cf!;
 const userRow = async (id: string) =>
   (await t.db.select().from(appUser).where(eq(appUser.id, id)))[0]!;
+/** Il motivo del ritorno, nell'indirizzo: solo un codice, mai un testo (D193). */
 const refusalOf = (location: string) =>
   new URL(location, 'http://localhost').searchParams.get('motivo');
+/** Lo stesso codice per nome sconosciuto, utente escluso e identità diversa. */
+const REFUSED: ReturnFailure = 'non-possibile';
 
 describe('ripristino delle credenziali con SPID o CIE (D189)', () => {
   it('il medico bloccato entra con SPID e sceglie una password nuova: sbloccato, sessioni chiuse, secondo fattore tenuto', async () => {
@@ -161,12 +164,12 @@ describe('ripristino delle credenziali con SPID o CIE (D189)', () => {
     const other = await spid(s.users.collega.username, STRANGER_CF);
     // Nessun passaggio: il cookie del ripristino, se c'era, si svuota.
     expect(other.cookie).toBeFalsy();
-    expect(refusalOf(other.location)).toBe(RECOVERY_REFUSAL);
+    expect(refusalOf(other.location)).toBe(REFUSED);
     const unknown = await spid('nessuno.cosi', STRANGER_CF);
     // L'avvio risponde come per un nome vero: chi prova non sa se l'utente c'è.
     expect(unknown.start.statusCode).toBe(200);
     expect(Object.keys(unknown.start.json())).toEqual(['indirizzo']);
-    expect(refusalOf(unknown.location)).toBe(RECOVERY_REFUSAL);
+    expect(refusalOf(unknown.location)).toBe(REFUSED);
     const refused = await t.db
       .select()
       .from(accessLog)
@@ -180,9 +183,7 @@ describe('ripristino delle credenziali con SPID o CIE (D189)', () => {
 
   it('la segreteria ripristina solo dopo aver collegato la sua identità, a sessione aperta e con il codice', async () => {
     const secretary = s.users.segreteria;
-    expect(refusalOf((await spid(secretary.username, SECRETARY_CF)).location)).toBe(
-      RECOVERY_REFUSAL,
-    );
+    expect(refusalOf((await spid(secretary.username, SECRETARY_CF)).location)).toBe(REFUSED);
     const cookie = await login(s, 'segreteria');
     const get = () =>
       s.app.inject({ method: 'GET', url: '/api/profilo/identita', headers: { cookie } });
@@ -241,7 +242,7 @@ describe('ripristino delle credenziali con SPID o CIE (D189)', () => {
     const adminCookie = await login(s, 'amministratore');
     expect((await link(adminCookie)).statusCode).toBe(403);
     expect(refusalOf((await spid(s.users.amministratore.username, STRANGER_CF)).location)).toBe(
-      RECOVERY_REFUSAL,
+      REFUSED,
     );
     // Il sostituto in attesa di conferma: nemmeno con la sua identità.
     const substitute = s.users.sostituto;
@@ -252,7 +253,7 @@ describe('ripristino delle credenziali con SPID o CIE (D189)', () => {
     try {
       expect(
         refusalOf((await spid(substitute.username, await doctorCf(substitute.id))).location),
-      ).toBe(RECOVERY_REFUSAL);
+      ).toBe(REFUSED);
     } finally {
       await t.db
         .update(appUser)
@@ -282,13 +283,11 @@ describe('ripristino delle credenziali con SPID o CIE (D189)', () => {
     const late = await spid(doctor.username, cf, {
       afterStart: () => s.clock.advance(11 * 60_000),
     });
-    expect(refusalOf(late.location)).toBe('Richiesta non riconosciuta o scaduta: ricomincia');
+    expect(refusalOf(late.location)).toBe('non-riconosciuta');
     const r = await spid(doctor.username, cf);
     expect(r.cookie).toBeTruthy();
     const again = await s.app.inject({ method: 'GET', url: r.callback! });
-    expect(refusalOf(String(again.headers.location))).toBe(
-      'Richiesta non riconosciuta o scaduta: ricomincia',
-    );
+    expect(refusalOf(String(again.headers.location))).toBe('non-riconosciuta');
     s.clock.advance(11 * 60_000);
     expect((await state(r.cookie)).statusCode).toBe(401);
     expect((await choose(r.cookie, 'troppo tardi per questa')).statusCode).toBe(401);
@@ -308,6 +307,48 @@ describe('ripristino delle credenziali con SPID o CIE (D189)', () => {
     expect(waiting.json().errore).toBe(
       'Troppe password sbagliate da questa postazione: riprova tra 2 secondi',
     );
+  });
+
+  it('il simulatore rimanda solo agli indirizzi di ritorno del programma, mai fuori (D193)', async () => {
+    const common = { client_id: 'SIMULATORE', state: 'qualunque', code_challenge: 'a'.repeat(43) };
+    for (const redirect of [
+      '//esempio.invalid/raccolta',
+      '/\\esempio.invalid/raccolta',
+      'https://esempio.invalid/raccolta',
+      '/api/altro/ritorno',
+    ]) {
+      const page = await s.app.inject({
+        method: 'GET',
+        url: `/api/simulatore/identita-digitale?${new URLSearchParams({
+          ...common,
+          response_type: 'code',
+          code_challenge_method: 'S256',
+          redirect_uri: redirect,
+        }).toString()}`,
+      });
+      expect(page.statusCode, redirect).toBe(400);
+      const out = await s.app.inject({
+        method: 'GET',
+        url: `/api/simulatore/identita-digitale/esito?${new URLSearchParams({
+          ...common,
+          redirect_uri: redirect,
+          azione: 'annulla',
+        }).toString()}`,
+      });
+      expect(out.statusCode, redirect).toBe(400);
+      expect(out.headers.location, redirect).toBeUndefined();
+    }
+    // Il ritorno del programma va.
+    const ok = await s.app.inject({
+      method: 'GET',
+      url: `/api/simulatore/identita-digitale/esito?${new URLSearchParams({
+        ...common,
+        redirect_uri: '/api/ripristino/ritorno',
+        azione: 'annulla',
+      }).toString()}`,
+    });
+    expect(ok.statusCode).toBe(302);
+    expect(String(ok.headers.location)).toMatch(/^\/api\/ripristino\/ritorno\?/);
   });
 });
 
@@ -335,7 +376,7 @@ describe('ripristino in produzione con il simulatore (D189)', () => {
         method: 'GET',
         url: '/api/ripristino/ritorno?state=x&code=y',
       });
-      expect(refusalOf(String(back.headers.location))).toBe(IDENTITY_UNAVAILABLE);
+      expect(refusalOf(String(back.headers.location))).toBe('non-collegato');
     } finally {
       await app.close();
     }

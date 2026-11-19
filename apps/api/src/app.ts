@@ -263,15 +263,16 @@ export function buildApp({
     },
   });
   if (regional.gateway instanceof SimulatedRegionalAuthorization)
-    registerRegionalSimulatorRoutes(app, regional.gateway);
+    registerRegionalSimulatorRoutes(app, regional.gateway, [regional.redirectUri]);
   // Ripristino delle credenziali con SPID o CIE (D189).
+  const identityReturns = ['/api/ripristino/ritorno', '/api/profilo/identita/ritorno'] as const;
   const identityService = createIdentityService({
     db,
     encryptionKey: config.encryptionKey,
     gateway: identity.gateway,
     clientId: identity.clientId,
-    recoveryRedirectUri: '/api/ripristino/ritorno',
-    linkRedirectUri: '/api/profilo/identita/ritorno',
+    recoveryRedirectUri: identityReturns[0],
+    linkRedirectUri: identityReturns[1],
     environment: config.environment ?? 'prova',
     now: now ?? (() => new Date()),
     loginSources: loginSources === undefined ? LOGIN_SOURCE_LIMITS : loginSources,
@@ -287,7 +288,7 @@ export function buildApp({
     },
   });
   if (identity.gateway instanceof SimulatedDigitalIdentity)
-    registerIdentitySimulatorRoutes(app, identity.gateway);
+    registerIdentitySimulatorRoutes(app, identity.gateway, identityReturns);
   registerPatientRoutes(app, db);
   registerDoctorProfileRoutes(app, db, now ?? (() => new Date()));
   registerTodayRoutes(app, db, now ?? (() => new Date()));

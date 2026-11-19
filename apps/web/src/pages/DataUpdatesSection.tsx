@@ -88,7 +88,9 @@ function counts(r: RunSummary) {
 
 /**
  * Aggiornamento delle banche dati (D156): quando parte, com'è andato l'ultimo, che cosa va
- * controllato a mano. L'amministratore dello studio può avviarne uno subito.
+ * controllato a mano. Le banche dati sono comuni a tutti gli studi del servizio: le aggiorna chi
+ * gestisce il servizio, ogni notte e con il comando sul server (D191); l'amministratore dello
+ * studio può avviarne uno subito, che vale per tutti gli studi (D194).
  */
 export function DataUpdatesSection() {
   const status = useApi<UpdatesStatus>('/api/banche-dati/aggiornamenti');
@@ -132,6 +134,10 @@ export function DataUpdatesSection() {
         controlli; altrimenti resta in uso la precedente. I documenti in PDF si scaricano e si
         segnalano: i loro dati entrano solo dopo una trascrizione controllata.
       </p>
+      <p>
+        Le banche dati sono le stesse per tutti gli studi del servizio: le aggiorna chi gestisce il
+        servizio, e lo studio non deve fare nulla.
+      </p>
       {!s.configurato ? (
         <Notice kind="info">
           In questa installazione le banche dati non si aggiornano dal programma: le aggiorna chi
@@ -164,7 +170,10 @@ export function DataUpdatesSection() {
           >
             <Icon name="ripeti" /> Aggiorna adesso
           </button>
-          <p className="tenue">Controlla subito tutte le fonti, senza aspettare la notte.</p>
+          <p className="tenue">
+            Controlla subito tutte le fonti, senza aspettare la notte. L’aggiornamento vale per
+            tutti gli studi del servizio.
+          </p>
         </div>
       )}
       <ErrorMessage error={startError} />
@@ -184,6 +193,7 @@ export function DataUpdatesSection() {
           {s.ultimo.daControllare.length > 0 && (
             <>
               <h4>Da controllare</h4>
+              <p className="tenue">Questi controlli li segue chi gestisce il servizio.</p>
               <ul className="da-controllare">
                 {s.ultimo.daControllare.map((i, n) => (
                   <li key={n}>

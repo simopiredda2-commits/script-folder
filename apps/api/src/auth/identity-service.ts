@@ -60,11 +60,25 @@ export const IDENTITY_UNAVAILABLE =
   'Il ripristino con SPID o CIE non è ancora collegato al servizio vero: rivolgiti a chi gestisce il servizio';
 
 /**
- * Lo stesso messaggio per nome utente sconosciuto, utente che non può ripristinare da sé e
- * identità diversa: chi prova non sa quale dei tre. Il motivo vero va nel registro.
+ * Perché un ritorno da SPID o CIE non va a buon fine, come codice (D193). Nell'indirizzo del ritorno
+ * va solo il codice e il testo lo scrive l'interfaccia: un testo nell'indirizzo lo potrebbe scrivere
+ * chiunque, in un collegamento al dominio vero. Il motivo vero va nel registro. «non-possibile» è
+ * lo stesso per nome utente sconosciuto, utente che non può ripristinare da sé e identità diversa:
+ * chi prova non sa quale dei tre.
  */
-export const RECOVERY_REFUSAL =
-  'Con questa identità il ripristino non è possibile: controlla il nome utente, oppure rivolgiti a chi gestisce il servizio';
+export const RETURN_FAILURES = [
+  'non-collegato',
+  'non-possibile',
+  'non-riconosciuta',
+  'annullato',
+  'errore-gestore',
+  'senza-codice',
+  'non-raggiungibile',
+  'non-riconosciuto',
+  /** Collegamento: al ritorno la sessione del programma non c'è più. */
+  'sessione',
+] as const;
+export type ReturnFailure = (typeof RETURN_FAILURES)[number];
 
 export const RECOVERY_EXPIRED = 'Ripristino scaduto o già concluso: ricomincia dall’inizio';
 
@@ -181,19 +195,19 @@ export function createIdentityService(deps: IdentityDeps) {
       }
     | {
         ok: false;
-        reason: string;
+        reason: ReturnFailure;
         detail: string;
         request: typeof identityRequest.$inferSelect | null;
       }
   > {
     const q = returnQuery.parse(query ?? {});
-    const bad = (reason: string, detail: string, request = null) => ({
+    const bad = (reason: ReturnFailure, detail: string, request = null) => ({
       ok: false as const,
       reason,
       detail,
       request,
     });
-    if (!q.state) return bad('Ritorno senza state: ricomincia', 'ritorno senza state');
+    if (!q.state) return bad('non-riconosciuta', 'ritorno senza state');
     const [request] = await db
       .update(identityRequest)
       .set({ returnedAt: now() })
@@ -207,12 +221,8 @@ export function createIdentityService(deps: IdentityDeps) {
         ),
       )
       .returning();
-    if (!request)
-      return bad(
-        'Richiesta non riconosciuta o scaduta: ricomincia',
-        'state sconosciuto, usato o scaduto',
-      );
-    const fail = (reason: string, detail: string) => ({
+    if (!request) return bad('non-riconosciuta', 'state sconosciuto, usato o scaduto');
+    const fail = (reason: ReturnFailure, detail: string) => ({
       ok: false as const,
       reason,
       detail,
@@ -220,12 +230,10 @@ export function createIdentityService(deps: IdentityDeps) {
     });
     if (q.error)
       return fail(
-        q.error === 'access_denied'
-          ? 'Accesso con SPID o CIE annullato o negato'
-          : `Il gestore dell’identità ha risposto con un errore (${q.error})`,
+        q.error === 'access_denied' ? 'annullato' : 'errore-gestore',
         `${q.error}: ${q.error_description ?? ''}`,
       );
-    if (!q.code) return fail('Ritorno senza codice: ricomincia', 'ritorno senza codice');
+    if (!q.code) return fail('senza-codice', 'ritorno senza codice');
     const verifier = decryptSecret(
       deps.encryptionKey,
       request.verifierEnc,
@@ -237,13 +245,9 @@ export function createIdentityService(deps: IdentityDeps) {
       clientId: deps.clientId,
       codeVerifier: verifier,
     });
-    if (r.outcome === 'unreachable')
-      return fail(`Gestore dell’identità non raggiungibile: ${r.message}`, r.message);
+    if (r.outcome === 'unreachable') return fail('non-raggiungibile', r.message);
     if (r.outcome === 'rejected')
-      return fail(
-        `Il gestore dell’identità non ha riconosciuto l’accesso (${r.error})`,
-        `${r.error}: ${r.description ?? ''}`,
-      );
+      return fail('non-riconosciuto', `${r.error}: ${r.description ?? ''}`);
     return { ok: true, request, fiscalCode: r.fiscalCode.toUpperCase(), method: r.method };
   }
 
@@ -306,11 +310,11 @@ export function createIdentityService(deps: IdentityDeps) {
      */
     async completeRecovery(
       query: unknown,
-    ): Promise<{ esito: 'ok'; passaggio: string } | { esito: 'errore'; motivo: string }> {
-      if (!available()) return { esito: 'errore', motivo: IDENTITY_UNAVAILABLE };
+    ): Promise<{ esito: 'ok'; passaggio: string } | { esito: 'errore'; motivo: ReturnFailure }> {
+      if (!available()) return { esito: 'errore', motivo: 'non-collegato' };
       const id = await identify('recovery', query, null);
       const refuse = async (
-        motivo: string,
+        motivo: ReturnFailure,
         detail: string,
         request: typeof identityRequest.$inferSelect | null,
         user?: UserRow,
@@ -327,20 +331,20 @@ export function createIdentityService(deps: IdentityDeps) {
       };
       if (!id.ok) return refuse(id.reason, id.detail, id.request);
       const { request } = id;
-      if (!request.userId) return refuse(RECOVERY_REFUSAL, 'utente sconosciuto o escluso', request);
+      if (!request.userId) return refuse('non-possibile', 'utente sconosciuto o escluso', request);
       const [user] = await db.select().from(appUser).where(eq(appUser.id, request.userId));
       if (!mayRecover(user))
-        return refuse(RECOVERY_REFUSAL, 'utente che non ripristina più da sé', request, user);
+        return refuse('non-possibile', 'utente che non ripristina più da sé', request, user);
       const expected = await expectedFiscalCode(user);
       if (!expected)
         return refuse(
-          RECOVERY_REFUSAL,
+          'non-possibile',
           'nessun codice fiscale per il ripristino (identità non collegata)',
           request,
           user,
         );
       if (!sameCode(expected, id.fiscalCode))
-        return refuse(RECOVERY_REFUSAL, 'identità diversa da quella dell’utente', request, user);
+        return refuse('non-possibile', 'identità diversa da quella dell’utente', request, user);
       const { token, hash } = newToken();
       await db
         .update(identityRequest)
@@ -531,8 +535,8 @@ export function createIdentityService(deps: IdentityDeps) {
     async completeLink(
       actor: Actor,
       query: unknown,
-    ): Promise<{ esito: 'ok' } | { esito: 'errore'; motivo: string }> {
-      if (!available()) return { esito: 'errore', motivo: IDENTITY_UNAVAILABLE };
+    ): Promise<{ esito: 'ok' } | { esito: 'errore'; motivo: ReturnFailure }> {
+      if (!available()) return { esito: 'errore', motivo: 'non-collegato' };
       const id = await identify('link', query, actor.userId);
       if (!id.ok) return { esito: 'errore', motivo: id.reason };
       const t = now();

@@ -60,11 +60,12 @@ All'installazione, se davanti al servizio c'è un proxy inverso, il suo indirizz
 - Dalla pagina di accesso, «Ripristina con SPID o CIE»: nome utente e postazione, poi SPID o CIE. Se la persona riconosciuta ha il codice fiscale dell'utente, sceglie una password nuova e, se ha perso l'app, azzera il secondo fattore. Il conto si sblocca e tutte le sessioni si chiudono.
 - Vale per medici e segreteria attivi, confermati e non sospesi dal server. Per il medico conta il codice fiscale del suo profilo; la segreteria collega prima la sua identità dal suo profilo («Cambia la password» › «SPID o CIE per il ripristino»), con il codice a 6 cifre di adesso. Gli amministratori no.
 - Nel registro di amministrazione: «Ripristino delle credenziali, dall'utente stesso, con SPID o CIE», e i collegamenti dell'identità.
+- Se il ripristino non riesce, la pagina dice che cosa fare con un testo del programma: nell'indirizzo del ritorno c'è solo un codice, mai un testo che altri potrebbero scrivere (D193). Il motivo vero è nel registro degli accessi.
 - Oggi SPID e CIE sono simulati: in produzione il ripristino resta spento finché il programma non è accreditato come fornitore di servizi (da completare).
 
 ### Tentativi sbagliati e blocchi (D188)
 
-- **Attese per provenienza.** Dopo 5 password sbagliate di seguito dalla stessa postazione (a quello stesso indirizzo), o 20 dallo stesso indirizzo, ogni password aspetta: 2 secondi, poi il doppio, fino a 15 minuti. Intanto da lì nessuna password si guarda e chi accede legge «riprova tra …». Una password giusta, o un giorno senza errori, fanno ricominciare da capo. Chi prova da un altro computer non aspetta: il medico entra anche mentre qualcuno, altrove, prova il suo nome utente. Valori provvisori, da completare, nello stato del servizio.
+- **Attese per provenienza.** Dopo 5 password sbagliate di seguito dalla stessa postazione (a quello stesso indirizzo), o 20 dallo stesso indirizzo, ogni password aspetta: 2 secondi, poi il doppio, fino a 15 minuti. Intanto da lì nessuna password si guarda e chi accede legge «riprova tra …». Una password giusta, o un giorno senza errori, fanno ricominciare da capo. Chi prova da un altro computer non aspetta: il medico entra anche mentre qualcuno, altrove, prova il suo nome utente. I valori, confermati da Simone (D191), sono nello stato del servizio.
 - **Blocco del conto, due soglie dello studio.** Le password sbagliate bloccano il conto solo alla soglia alta (per difetto 50, da 20 a 100): le sbaglia anche chi conosce solo il nome utente. I codici a 6 cifre sbagliati, all'accesso e allo sblocco della sessione, e la password attuale sbagliata nel cambio bloccano alla soglia di prima (5, da 3 a 10): li sbaglia solo chi ha già la password o una sessione. Il blocco dura 15 minuti (al più 60).
 - **Avviso di ogni blocco** all'utente bloccato e ai medici titolari dello studio, nella cornice, finché ognuno non lo segna come visto nella pagina «Blocchi del conto»: chi, quando, fino a quando, quanti tentativi, da quali indirizzi e postazioni, e che cosa può voler dire. Ogni lettura degli avvisi va nel registro.
 
@@ -143,7 +144,7 @@ In sola lettura per l'amministratore:
 
 - collegamenti con i servizi esterni (oggi tutti simulati, regola 7), con l'ultimo uso;
 - durata massima della sessione;
-- aggiornamento notturno delle banche dati;
+- aggiornamento notturno delle banche dati, che fa chi gestisce il servizio per tutti gli studi; l'amministratore può avviarne uno subito, in Banche dati (D191, D194);
 - ambiente dell'installazione («prova» o «produzione»);
 - l'avviso che i salvataggi non li fa il programma.
 

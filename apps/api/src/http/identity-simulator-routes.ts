@@ -1,11 +1,13 @@
 import type { SimulatedDigitalIdentity } from '@mmg/integrations';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { HttpError } from './errors';
 
 /**
  * Pagina simulata dell'accesso con SPID o CIE al programma (D189). Esiste solo quando il gestore
  * dell'identità è il simulatore: chi la usa scrive il codice fiscale di chi «entra». Non imita le
- * pagine di SPID o di CIE; accetta solo indirizzi di ritorno interni al programma.
+ * pagine di SPID o di CIE. Come un gestore vero, rimanda solo agli indirizzi di ritorno registrati,
+ * quelli del programma: mai a un indirizzo scritto nella richiesta (D193).
  */
 const authorizeQuery = z.object({
   client_id: z.string().min(1).max(200),
@@ -64,14 +66,23 @@ ${hidden}
 </html>`;
 }
 
+/** Un indirizzo di ritorno non registrato non si usa: niente rimando fuori dal programma. */
+function registered(returns: readonly string[], redirectUri: string) {
+  if (!returns.includes(redirectUri))
+    throw new HttpError(400, 'Indirizzo di ritorno non registrato');
+}
+
 export function registerIdentitySimulatorRoutes(
   app: FastifyInstance,
   simulator: SimulatedDigitalIdentity,
+  /** Gli indirizzi di ritorno registrati: solo quelli del programma. */
+  returns: readonly string[],
 ) {
   const pub = { config: { public: true } };
 
   app.get('/api/simulatore/identita-digitale', pub, async (req, reply) => {
     const q = authorizeQuery.parse(req.query);
+    registered(returns, q.redirect_uri);
     reply.header('content-type', 'text/html; charset=utf-8');
     reply.header('cache-control', 'no-store');
     return reply.send(page(q));
@@ -85,6 +96,7 @@ export function registerIdentitySimulatorRoutes(
         codice_fiscale: z.string().max(16).optional(),
       })
       .parse(req.query);
+    registered(returns, q.redirect_uri);
     const back = new URLSearchParams({ state: q.state });
     if (q.azione === 'annulla' || !q.codice_fiscale?.trim()) {
       back.set('error', 'access_denied');

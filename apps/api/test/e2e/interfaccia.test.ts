@@ -1208,7 +1208,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     }
   });
 
-  it('aggiornamento delle banche dati: quando parte, com’è andato, «Aggiorna adesso» dell’amministratore (D156)', async () => {
+  it('aggiornamento delle banche dati: quando parte, com’è andato, «Aggiorna adesso» dell’amministratore per tutti gli studi (D156, D194)', async () => {
     // Chi usa le banche dati vede quando è stata controllata la fonte, e da lì l'aggiornamento.
     await page.goto(`${base}/banche-dati`);
     await page
@@ -1223,6 +1223,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page
       .getByText('Automatico, di notte (orologio del servizio)', { exact: false })
       .waitFor();
+    // Le aggiorna chi gestisce il servizio, per tutti gli studi (D191).
+    await page
+      .getByText(/le aggiorna chi gestisce il servizio, e lo studio non deve fare nulla/)
+      .waitFor();
     // Il medico non è amministratore: niente pulsante.
     await expect(page.getByRole('button', { name: 'Aggiorna adesso' }).count()).resolves.toBe(0);
     await check(page, 'aggiornamento delle banche dati', true);
@@ -1235,6 +1239,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin.goto(`${base}/strumenti?sezione=banche-dati`);
+      // Il pulsante resta all'amministratore dello studio, e dice che vale per tutti (D194).
+      await admin.getByText(/L’aggiornamento vale per tutti gli studi del servizio/).waitFor();
       await admin.getByRole('button', { name: 'Aggiorna adesso' }).click();
       // La pagina segue il giro da sola; alla fine l'ultimo è quello del pulsante.
       await admin.getByText(/Pulsante «Aggiorna adesso» \(/).waitFor({ timeout: 30_000 });

@@ -431,7 +431,7 @@ function StudioForm({
             type: 'number',
             required: true,
             range: l.maxFailedLogins,
-            help: `Le sbaglia anche chi conosce solo il nome utente: prima del blocco, dopo le prime password sbagliate, la postazione o l’indirizzo da cui arrivano aspettano. Soglia provvisoria, da completare. Da ${l.maxFailedLogins.min} a ${l.maxFailedLogins.max}.`,
+            help: `Le sbaglia anche chi conosce solo il nome utente: prima del blocco, dopo le prime password sbagliate, la postazione o l’indirizzo da cui arrivano aspettano. Da ${l.maxFailedLogins.min} a ${l.maxFailedLogins.max}.`,
           })}
           {input('codiciSbagliati', 'Codici sbagliati prima del blocco del conto', {
             type: 'number',

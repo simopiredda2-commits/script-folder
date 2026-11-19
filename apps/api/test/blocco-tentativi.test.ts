@@ -63,7 +63,7 @@ describe('attese dopo le password sbagliate, per postazione e indirizzo', () => 
     await s?.app.close();
   });
 
-  it('i valori provvisori: 5 dalla postazione, 20 dall’indirizzo, da 2 secondi a 15 minuti', () => {
+  it('i valori confermati (D191): 5 dalla postazione, 20 dall’indirizzo, da 2 secondi a 15 minuti', () => {
     expect(LOGIN_SOURCE_LIMITS).toEqual({
       workstationFree: 5,
       addressFree: 20,

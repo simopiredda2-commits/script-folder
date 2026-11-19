@@ -830,14 +830,13 @@ export function createStudioAdminService(deps: AdminDeps) {
           durataMassimaOre: deps.sessionMaxHours,
           minutiInattivita: s.idleLockMinutes,
         },
-        // Attese dopo le password sbagliate (D188): valori del servizio, provvisori, da completare.
+        // Attese dopo le password sbagliate (D188): valori del servizio, confermati (D191).
         attese: {
           postazione: LOGIN_SOURCE_LIMITS.workstationFree,
           indirizzo: LOGIN_SOURCE_LIMITS.addressFree,
           primaSecondi: LOGIN_SOURCE_LIMITS.firstWaitSeconds,
           massimaSecondi: LOGIN_SOURCE_LIMITS.maxWaitSeconds,
           dimenticaDopoOre: LOGIN_SOURCE_LIMITS.forgetAfterHours,
-          daCompletare: true,
         },
         bancheDati: {
           configurato: updates.configured,

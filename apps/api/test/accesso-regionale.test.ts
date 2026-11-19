@@ -156,7 +156,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     const forged = await approve(await start(), 'spid', (p) => p.set('state', 'inventato'));
     expect(await back(forged)).toMatchObject({
       accesso: 'errore',
-      motivo: expect.stringMatching(/non riconosciuta/),
+      motivo: 'non-riconosciuta',
     });
     // Il sostituto avvia, la titolare prova a usare il ritorno del sostituto.
     const other = await approve(await start('sostituto'));
@@ -177,7 +177,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     );
     expect(await back(location, 'titolare')).toMatchObject({
       accesso: 'errore',
-      motivo: expect.stringMatching(/non riconosciuta/),
+      motivo: 'non-riconosciuta',
     });
     expect((await rupar()).sessione.attiva).toBe(false);
   });
@@ -186,7 +186,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     const location = await approve(await start(), 'spid', (q) => q.set('scope', 'erogazione'));
     expect(await back(location)).toMatchObject({
       accesso: 'errore',
-      motivo: expect.stringMatching(/profilo di prescrizione/),
+      motivo: 'senza-profilo',
     });
     expect((await rupar()).sessione.attiva).toBe(false);
   });
@@ -198,7 +198,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     );
     expect(await back(location)).toMatchObject({
       accesso: 'errore',
-      motivo: expect.stringMatching(/identità diversa/),
+      motivo: 'identita-diversa',
     });
     expect((await rupar()).sessione.attiva).toBe(false);
   });
@@ -206,20 +206,20 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
   it('annullato dal medico; codice già usato; richiesta scaduta', async () => {
     expect(await back(await approve(await start(), 'annulla'))).toMatchObject({
       accesso: 'errore',
-      motivo: 'Accesso regionale annullato o negato',
+      motivo: 'annullato',
     });
     const location = await approve(await start());
     expect(await back(location)).toEqual({ accesso: 'ok' });
     expect(await back(location)).toMatchObject({
       accesso: 'errore',
-      motivo: expect.stringMatching(/non riconosciuta/),
+      motivo: 'non-riconosciuta',
     });
     const late = await start();
     s.clock.advance(11 * 60_000);
     c.titolare = await login(s, 'titolare');
     expect(await back(await approve(late))).toMatchObject({
       accesso: 'errore',
-      motivo: expect.stringMatching(/scaduta/),
+      motivo: 'non-riconosciuta',
     });
   });
 
@@ -227,7 +227,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     const location = await approve(await start());
     expect(await back(location, null)).toMatchObject({
       accesso: 'errore',
-      motivo: expect.stringMatching(/Accesso al programma scaduto/),
+      motivo: 'sessione',
     });
   });
 
@@ -278,5 +278,41 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       'sessione_revocata',
     ])
       expect(events, e).toContain(e);
+  });
+
+  it('la pagina regionale simulata rimanda solo al ritorno del programma, mai fuori (D193)', async () => {
+    const common = {
+      client_id: 'SIMULATORE_000',
+      scope: 'prescrizione',
+      state: 'qualunque',
+      code_challenge: 'a'.repeat(43),
+    };
+    for (const redirect of [
+      '//esempio.invalid/raccolta',
+      '/\\esempio.invalid/raccolta',
+      'https://esempio.invalid/raccolta',
+      '/api/altro/ritorno',
+    ]) {
+      const page = await s.app.inject({
+        method: 'GET',
+        url: `/api/simulatore/accesso-regionale?${new URLSearchParams({
+          ...common,
+          response_type: 'code',
+          code_challenge_method: 'S256',
+          redirect_uri: redirect,
+        }).toString()}`,
+      });
+      expect(page.statusCode, redirect).toBe(400);
+      const out = await s.app.inject({
+        method: 'GET',
+        url: `/api/simulatore/accesso-regionale/esito?${new URLSearchParams({
+          ...common,
+          redirect_uri: redirect,
+          azione: 'annulla',
+        }).toString()}`,
+      });
+      expect(out.statusCode, redirect).toBe(400);
+      expect(out.headers.location, redirect).toBeUndefined();
+    }
   });
 });
