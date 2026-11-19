@@ -69,6 +69,12 @@ export function trustedProxiesOf(raw: string | undefined): string[] {
     const maxPrefix = family === 6 ? 128 : 32;
     const prefixOk =
       prefix === undefined || (/^\d{1,3}$/.test(prefix) && Number(prefix) <= maxPrefix);
+    // Una rete /0 è tutti: fidarsi di tutti farebbe scegliere l'indirizzo a chi accede (terza
+    // revisione). Si rifiuta qui, in italiano, prima che lo rifiuti Fastify all'avvio.
+    if (family !== 0 && prefix !== undefined && prefixOk && Number(prefix) === 0)
+      throw new Error(
+        `APP_PROXY_FIDATI=${raw}: «${item}» vorrebbe dire fidarsi di qualunque mittente. Indica l'indirizzo del proxy, o la sua rete, per esempio 10.0.0.0/24.`,
+      );
     if (family === 0 || rest.length > 0 || !prefixOk)
       throw new Error(
         `APP_PROXY_FIDATI=${raw}: «${item}» non è un indirizzo IP né una rete CIDR. Valori ammessi: indirizzi o reti separati da virgole, per esempio 127.0.0.1 oppure 10.0.0.0/24; vuoto, nessun proxy fidato.`,

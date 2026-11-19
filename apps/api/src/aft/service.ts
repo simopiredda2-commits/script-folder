@@ -281,12 +281,20 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
     if (!(await activeMember(db, aftId, actor.userId)))
       throw new HttpError(403, 'Invita nell’AFT solo chi ne fa parte');
     const doctors = await db
-      .select({ id: appUser.id, roles: appUser.roles, status: appUser.status })
+      .select({
+        id: appUser.id,
+        roles: appUser.roles,
+        status: appUser.status,
+        awaiting: appUser.awaitingConfirmation,
+      })
       .from(doctorProfile)
       .innerJoin(appUser, eq(appUser.id, doctorProfile.userId))
       .where(eq(doctorProfile.regionalCode, body.codiceRegionale));
+    // Solo titolari attivi e confermati (D179): un titolare creato dall'amministratore di un altro
+    // studio, e mai confermato, con il codice regionale di un medico non ne blocca gli inviti e non
+    // li riceve al suo posto (terza revisione).
     const titolari = doctors.filter(
-      (d) => d.roles.includes('owner_doctor') && d.status === 'active',
+      (d) => d.roles.includes('owner_doctor') && d.status === 'active' && !d.awaiting,
     );
     if (titolari.length > 1)
       throw new HttpError(409, 'Più medici con questo codice regionale: invito non possibile');

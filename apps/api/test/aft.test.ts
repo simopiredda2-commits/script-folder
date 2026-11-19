@@ -1,3 +1,4 @@
+import { buildFiscalCode } from '@mmg/domain';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { accessLog, allergyDetail, clinicalEntry, doctorProfile, patient } from '../src/db/schema';
@@ -142,6 +143,55 @@ describe('condivisione tra i medici dell’AFT (D161)', () => {
       ['Studio A di prova', 'membro', false],
       ['Studio B di prova', 'membro', false],
     ]);
+  });
+
+  it('un titolare mai confermato di un altro studio, con lo stesso codice regionale, non blocca l’invito e non lo riceve (terza revisione)', async () => {
+    // L'amministratore dello studio A crea un titolare con il codice regionale della collega del
+    // secondo studio: resta in attesa di conferma (D179).
+    const admin = await login(a, 'amministratore');
+    // L'accesso fa avanzare l'orologio del primo studio: il secondo si rimette pari, perché le
+    // prove dopo confrontano gli istanti dei due studi (uscita dall'AFT).
+    const lag = a.clock.now().getTime() - b.clock.now().getTime();
+    if (lag > 0) b.clock.advance(lag);
+    const fake = await req(a, admin, 'POST', '/api/studio/utenti', {
+      nomeUtente: 'titolare.finto.aft',
+      nome: 'Dott. Finto',
+      ruoli: ['owner_doctor'],
+      medico: {
+        // Codice fiscale inventato: luogo di nascita con la X, che nessun comune ha (D12).
+        codiceFiscale: buildFiscalCode({
+          surname: 'Finto',
+          name: 'Marco',
+          birthDate: '1970-01-01',
+          sex: 'M',
+          placeCode: 'X001',
+        }),
+        nome: 'Marco',
+        cognome: 'Finto',
+        codiceRegionale: 'MMG-PROVA-B2',
+      },
+    });
+    expect(fake.statusCode, fake.body).toBe(201);
+    expect(fake.json<{ utente: { inAttesaDiConferma: boolean } }>().utente.inAttesaDiConferma).toBe(
+      true,
+    );
+    // L'invito va alla collega vera.
+    const invited = await req(a, cookies.aTitolare!, 'POST', `/api/aft/${aftId}/inviti`, {
+      codiceRegionale: 'MMG-PROVA-B2',
+    });
+    expect(invited.statusCode, invited.body).toBe(201);
+    const pending = (await req(b, cookies.bCollega!, 'GET', '/api/aft')).json<{
+      inviti: { id: string; aft: string }[];
+    }>();
+    expect(pending.inviti).toEqual([expect.objectContaining({ aft: 'AFT di prova' })]);
+    // La collega rifiuta: le prove dopo partono come prima.
+    const refused = await req(
+      b,
+      cookies.bCollega!,
+      'POST',
+      `/api/aft/inviti/${pending.inviti[0]!.id}/rifiuta`,
+    );
+    expect(refused.statusCode, refused.body).toBe(200);
   });
 
   it('senza condivisione o senza consenso non si vede nulla, e il tentativo va nel registro', async () => {

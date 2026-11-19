@@ -451,6 +451,56 @@ describe('codici e password mandati insieme (seconda revisione, punto 5)', () =>
     expect((await h.req(cookie, 'GET', '/api/io')).statusCode).toBe(423);
     await h.resetUser(victim.id);
   });
+
+  it('un passaggio di attivazione aperto prima non vale dopo l’attivazione: niente seconda sessione, il segreto resta (terza revisione)', async () => {
+    const victim = s.users.sostituto;
+    // Il secondo fattore da attivare, come dopo un azzeramento.
+    await t.db
+      .update(appUser)
+      .set({ totpEnabledAt: null, totpSecretEnc: null, totpLastStep: null })
+      .where(eq(appUser.id, victim.id));
+    await h.resetUser(victim.id);
+    s.clock.advance(60_000);
+    // Due accessi: due passaggi di attivazione, con due segreti diversi.
+    const first = (await h.access(victim.username, PASSWORD)).json<{
+      passaggio: string;
+      segreto: string;
+    }>();
+    const second = (await h.access(victim.username, PASSWORD)).json<{
+      passaggio: string;
+      segreto: string;
+    }>();
+    expect(first.segreto).toBeTruthy();
+    expect(second.segreto).toBeTruthy();
+    expect(second.segreto).not.toBe(first.segreto);
+    const at = () => s.clock.now().getTime();
+    const sessions = await h.sessionsOf(victim.id);
+    const ok = await h.codeOn(first.passaggio, totp(base32Decode(first.segreto), at()));
+    expect(ok.statusCode, ok.body).toBe(200);
+    // L'attivazione chiude l'altro passaggio.
+    expect((await h.challengeOf(second.passaggio)).usedAt).not.toBeNull();
+    const late = await h.codeOn(second.passaggio, totp(base32Decode(second.segreto), at()));
+    expect(late.statusCode).toBe(401);
+    // Anche riaperto a mano, il passaggio di attivazione non vale: il secondo fattore è attivo.
+    await t.db
+      .update(authChallenge)
+      .set({ usedAt: null })
+      .where(eq(authChallenge.tokenHash, hashToken(second.passaggio)));
+    s.clock.advance(30_000);
+    const reopened = await h.codeOn(second.passaggio, totp(base32Decode(second.segreto), at()));
+    expect(reopened.statusCode).toBe(401);
+    expect(reopened.json().errore).toBe(EXPIRED_CHALLENGE_ERROR);
+    expect(await h.sessionsOf(victim.id)).toBe(sessions + 1);
+    // Il segreto è quello attivato con il primo passaggio.
+    s.clock.advance(30_000);
+    const again = (await h.access(victim.username, PASSWORD)).json<{
+      passaggio: string;
+      segreto?: string;
+    }>();
+    expect(again.segreto).toBeUndefined();
+    const back = await h.codeOn(again.passaggio, totp(base32Decode(first.segreto), at()));
+    expect(back.statusCode, back.body).toBe(200);
+  });
 });
 
 describe('attese sui blocchi (seconda revisione, problema nuovo 2)', () => {

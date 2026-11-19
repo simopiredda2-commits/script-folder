@@ -467,11 +467,19 @@ export function createAuthService(deps: AuthDeps) {
             awaitingConfirmation: appUser.awaitingConfirmation,
             lockedUntil: appUser.lockedUntil,
             totpLastStep: appUser.totpLastStep,
+            totpEnabledAt: appUser.totpEnabledAt,
           })
           .from(appUser)
           .where(eq(appUser.id, user.id))
           .for('no key update');
         if (!fresh || fresh.status !== 'active' || fresh.awaitingConfirmation) {
+          await closeChallenge(tx, challenge.id);
+          return 'fermo' as const;
+        }
+        // Un passaggio di attivazione aperto prima che il secondo fattore fosse attivato (da un
+        // altro passaggio) non vale più: aprirebbe un'altra sessione e sostituirebbe il segreto
+        // appena attivato (terza revisione).
+        if (challenge.purpose === 'enroll' && fresh.totpEnabledAt != null) {
           await closeChallenge(tx, challenge.id);
           return 'fermo' as const;
         }
@@ -525,6 +533,17 @@ export function createAuthService(deps: AuthDeps) {
         expiresAt,
       });
       if (challenge.purpose === 'enroll') {
+        // Attivato: gli altri passaggi ancora aperti dell'utente si chiudono (stesso motivo).
+        await tx
+          .update(authChallenge)
+          .set({ usedAt: now() })
+          .where(
+            and(
+              eq(authChallenge.userId, user.id),
+              isNull(authChallenge.usedAt),
+              ne(authChallenge.id, challenge.id),
+            ),
+          );
         await logAccess(tx, {
           studioId: user.studioId,
           userId: user.id,
@@ -703,7 +722,12 @@ export function createAuthService(deps: AuthDeps) {
       current: input.current,
     });
     if (problem) return { ok: false, status: 400, message: problem };
-    if (!(await verifyPassword(input.current, user.passwordHash))) {
+    const currentOk = await verifyPassword(input.current, user.passwordHash);
+    // L'impronta della password nuova si calcola in tutte e due le strade: lo stesso lavoro, così
+    // il tempo della risposta non dice se la password attuale era giusta, anche quando un blocco
+    // arrivato a metà dà lo stesso 429 alle due (terza revisione dei poteri dell'amministratore).
+    const passwordHash = await hashPassword(input.next);
+    if (!currentOk) {
       const nowLocked = await onUserRow((tx) => registerFailure(tx, user.id, st));
       await failed('password attuale errata');
       // Bloccato adesso, da questo tentativo o da uno arrivato insieme: lo stesso 429 che riceve
@@ -712,7 +736,6 @@ export function createAuthService(deps: AuthDeps) {
         ? locked
         : { ok: false, status: 400, message: 'La password attuale non è corretta' };
     }
-    const passwordHash = await hashPassword(input.next);
     const closed = await onUserRow(async (tx) => {
       // L'utente riletto sotto il blocco della sua riga: bloccato nel frattempo dalle password
       // sbagliate mandate insieme, la password non cambia.

@@ -1,5 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { buildApp } from '../src/app';
 import { loadConfig } from '../src/config';
+import type { Database } from '../src/db/client';
 
 const base = {
   DATABASE_URL: 'postgres://u:p@localhost:5432/db',
@@ -37,5 +40,28 @@ describe('APP_PROXY_FIDATI', () => {
       expect(() => loadConfig({ ...base, APP_PROXY_FIDATI: bad }), bad).toThrow(
         /APP_PROXY_FIDATI=.*non è un indirizzo IP né una rete CIDR/,
       );
+  });
+  it('una rete /0 (tutti) ferma l’avvio con il motivo in italiano (terza revisione)', () => {
+    for (const bad of ['0.0.0.0/0', '::/0', '10.0.0.0/8,1.2.3.4/0'])
+      expect(() => loadConfig({ ...base, APP_PROXY_FIDATI: bad }), bad).toThrow(
+        /APP_PROXY_FIDATI=.*fidarsi di qualunque mittente/,
+      );
+  });
+  it('con i valori accettati il servizio si costruisce davvero', async () => {
+    for (const ok of ['127.0.0.1', '10.0.0.0/8,::1', 'fd00::/8', '1.2.3.4/024']) {
+      const config = loadConfig({ ...base, APP_PROXY_FIDATI: ok });
+      // Il database non serve: si costruisce il servizio e lo si chiude, senza richieste.
+      const app = buildApp({
+        db: {} as Database,
+        config: {
+          encryptionKey: randomBytes(32),
+          sessionMaxHours: 12,
+          cookieSecure: false,
+          trustedProxies: config.trustedProxies,
+        },
+      });
+      await app.ready();
+      await app.close();
+    }
   });
 });
