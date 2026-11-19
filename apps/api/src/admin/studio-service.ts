@@ -16,6 +16,7 @@ import {
 } from '../db/schema';
 import { withActor, type Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
+import { CONTROL_CHARACTERS_MESSAGE, hasControlCharacters } from '../security/plain-text';
 import type { AdminDeps } from './deps';
 
 /**
@@ -127,11 +128,16 @@ const typeError =
   (issue: { input?: unknown }): string =>
     issue.input === undefined ? `${label}: manca` : `${label}: ${what}`;
 
+/** Testo di una riga, senza caratteri di controllo o invisibili (D179: il server li stampa). */
 const text = (label: string, max: number) =>
   z
     .string({ error: typeError(label, 'un testo, oppure vuoto') })
     .trim()
     .max(max, `${label}: al massimo ${max} caratteri`)
+    .refine(
+      (v) => !hasControlCharacters(v),
+      `${label}: ${CONTROL_CHARACTERS_MESSAGE.toLowerCase()}`,
+    )
     .nullable();
 
 /** Un codice di forma fissa (CAP, sigla della provincia), oppure vuoto. */
@@ -160,7 +166,11 @@ const dataBody = z
       .string({ error: 'Nome dello studio: obbligatorio' })
       .trim()
       .min(1, 'Nome dello studio: obbligatorio')
-      .max(200, 'Nome dello studio: al massimo 200 caratteri'),
+      .max(200, 'Nome dello studio: al massimo 200 caratteri')
+      .refine(
+        (v) => !hasControlCharacters(v),
+        `Nome dello studio: ${CONTROL_CHARACTERS_MESSAGE.toLowerCase()}`,
+      ),
     tipo: z.enum(['single', 'group'], {
       error: 'Tipo di studio: medico singolo o medicina di gruppo',
     }),
@@ -235,7 +245,12 @@ const workstationName = z
   .trim()
   .min(1, 'Nome della postazione: obbligatorio')
   .max(100, 'Nome della postazione: al massimo 100 caratteri');
-const workstationNotes = text('Note', 500);
+/** Le note della postazione possono andare a capo (area di testo): non passano da text(). */
+const workstationNotes = z
+  .string({ error: typeError('Note', 'un testo, oppure vuoto') })
+  .trim()
+  .max(500, 'Note: al massimo 500 caratteri')
+  .nullable();
 
 const createWorkstationBody = z
   .object({

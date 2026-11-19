@@ -31,6 +31,7 @@ import {
 import { withActor, type Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { hashPassword } from '../security/password';
+import { CONTROL_CHARACTERS_MESSAGE, hasControlCharacters } from '../security/plain-text';
 
 /**
  * Utenti e ruoli dello studio (tappa 14): li gestisce l'amministratore (requisiti, «Utenti e
@@ -173,7 +174,16 @@ export const serverConfirmNotice = (username: string) =>
 const WITHDRAWN_NOTICE =
   'Senza ruoli con i dati dei pazienti la conferma non serve più: la richiesta è ritirata.';
 
-const text = (max: number) => z.string().trim().max(max);
+/**
+ * Testo scritto dall'amministratore: senza caratteri di controllo o invisibili, perché il server lo
+ * stampa sul terminale nella conferma (terza revisione, D179).
+ */
+const text = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .refine((v) => !hasControlCharacters(v), CONTROL_CHARACTERS_MESSAGE);
 const email = z.union([z.literal(''), z.email().max(200)]);
 
 /** Dati del medico: nome e cognome come nel codice fiscale; codice regionale e ASL se noti. */

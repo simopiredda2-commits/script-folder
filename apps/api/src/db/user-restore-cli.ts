@@ -33,6 +33,7 @@
 import { parseArgs } from 'node:util';
 import { z, ZodError } from 'zod';
 import { loadConfig } from '../config';
+import { visibleText } from '../security/plain-text';
 import { createDatabase, createPool } from './client';
 import {
   restoreInput,
@@ -84,20 +85,29 @@ const DONE: Record<RestoreAction, string> = {
 const orMissing = (v: string | null) => v ?? 'da completare';
 
 /** La richiesta di conferma come la legge chi gestisce il servizio, prima di confermare. */
+/**
+ * Stampa la richiesta da confermare. I testi li ha scritti l'amministratore: ogni carattere di
+ * controllo o invisibile si stampa come \u{…} (visibleText), così un nome non può riscrivere le
+ * righe dei ruoli o dei dati del medico sul terminale (terza revisione, D179). I ruoli anche con i
+ * loro codici, che nessuno sceglie.
+ */
 function printRequest(r: RequestView) {
   const line = (label: string, value: string) => console.log(`  ${label.padEnd(17)}${value}`);
-  console.log(`Utente ${r.username}, studio «${r.studioName}».`);
-  line('nome mostrato:', r.displayName);
-  line('ruoli:', r.roleNames.join(', ') || 'nessuno');
+  console.log(`Utente ${visibleText(r.username)}, studio «${visibleText(r.studioName)}».`);
+  line('nome mostrato:', visibleText(r.displayName));
+  line(
+    'ruoli:',
+    r.roles.length ? `${r.roleNames.join(', ')} (codici: ${r.roles.join(', ')})` : 'nessuno',
+  );
   line(
     'dati del medico:',
     r.doctor
       ? [
-          `nome ${orMissing(r.doctor.firstName)}`,
-          `cognome ${orMissing(r.doctor.lastName)}`,
-          `codice fiscale ${orMissing(r.doctor.fiscalCode)}`,
-          `codice regionale ${orMissing(r.doctor.regionalCode)}`,
-          `ASL ${orMissing(r.doctor.asl)}`,
+          `nome ${visibleText(orMissing(r.doctor.firstName))}`,
+          `cognome ${visibleText(orMissing(r.doctor.lastName))}`,
+          `codice fiscale ${visibleText(orMissing(r.doctor.fiscalCode))}`,
+          `codice regionale ${visibleText(orMissing(r.doctor.regionalCode))}`,
+          `ASL ${visibleText(orMissing(r.doctor.asl))}`,
         ].join(', ')
       : 'nessuno (non è un medico)',
   );
@@ -117,7 +127,7 @@ function printRequest(r: RequestView) {
   line(
     'richiesta di:',
     r.requestedBy
-      ? `${r.requestedBy.username} (${r.requestedBy.displayName})`
+      ? `${visibleText(r.requestedBy.username)} (${visibleText(r.requestedBy.displayName)})`
       : 'chi gestisce il servizio, sul server',
   );
   line('richiesta il:', r.requestedAt ?? 'data non registrata');

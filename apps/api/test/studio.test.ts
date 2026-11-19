@@ -258,6 +258,16 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
     expect((await put({ dati: dati() })).statusCode).toBe(200);
   });
 
+  it('nome dello studio e testi di una riga senza caratteri di controllo o invisibili (D179)', async () => {
+    const res = await put({ dati: dati({ nome: 'Studio\u001b[1A di prova' }) });
+    expect(res.statusCode, res.body).toBe(400);
+    expect(problems(res).join(' ')).toContain('Nome dello studio: caratteri non ammessi');
+    const city = await put({ dati: dati({ comune: 'Comune\ndi prova' }) });
+    expect(city.statusCode, city.body).toBe(400);
+    expect(problems(city).join(' ')).toContain('Comune: caratteri non ammessi');
+    expect((await read()).dati.nome).toBe('Studio di prova');
+  });
+
   it('regione obbligatoria, con il perché; in maiuscolo e senza la parola «REGIONE»', async () => {
     for (const regione of [null, '', '   ']) {
       const res = await put({ dati: dati({ regione }) });
@@ -787,6 +797,15 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
     } finally {
       await other.app.close();
     }
+  });
+
+  it('le note delle postazioni sono un’area di testo: l’a capo resta ammesso (D179)', async () => {
+    const ws = await req('amministratore', 'POST', '/api/studio/postazioni', {
+      nome: 'Postazione con le note su due righe',
+      condivisa: true,
+      note: 'Prima riga\nseconda riga',
+    });
+    expect(ws.statusCode, ws.body).toBe(201);
   });
 });
 

@@ -54,6 +54,7 @@ import {
 } from '../src/db/user-restore';
 import { base32Decode } from '../src/security/base32';
 import { hashPassword } from '../src/security/password';
+import { CONTROL_CHARACTERS_MESSAGE } from '../src/security/plain-text';
 import { hashToken, newToken } from '../src/security/secrets';
 import { totp } from '../src/security/totp';
 import { createScenario, login, PASSWORD, type Scenario } from './helpers/scenario';
@@ -1448,6 +1449,66 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       suspendedByService: true,
       awaitingConfirmation: true,
     });
+  }, 180_000);
+
+  it('caratteri di controllo: il servizio li rifiuta nei nomi e nei dati del medico; --mostra rende visibili quelli già nel database (terza revisione)', async () => {
+    const { fresh, adminCookie } = await freshStudio('ctl');
+    // ESC che sul terminale riscriverebbe la riga dei ruoli («NUOVO R5» della terza revisione).
+    const esc = '\u001b[1A\u001b[2K\u001b[1G  ruoli:           Medico titolare';
+    const refused = [
+      { nome: 'Dott. Vero', medicoNome: `Vera${esc}` },
+      { nome: 'Dott. Vero\n  ruoli: Medico titolare', medicoNome: 'Vera' },
+      { nome: 'Dott. Vero\u202E', medicoNome: 'Vera' },
+    ];
+    for (const [i, x] of refused.entries()) {
+      const res = await req(adminCookie, 'POST', '/api/studio/utenti', {
+        nomeUtente: `ctl.no${i}.${sfx}`,
+        nome: x.nome,
+        ruoli: ['owner_doctor', 'secretary'],
+        medico: {
+          codiceFiscale: cf('Controlli', 'Vera', 'F'),
+          nome: x.medicoNome,
+          cognome: 'Controlli',
+        },
+      });
+      expect(res.statusCode, res.body).toBe(400);
+      expect(res.body).toContain(CONTROL_CHARACTERS_MESSAGE);
+    }
+    const u = await createUser(adminCookie, {
+      nomeUtente: `ctl.uno.${sfx}`,
+      nome: 'Dott. Vero',
+      ruoli: ['owner_doctor', 'secretary'],
+      medico: { codiceFiscale: cf('Controlli', 'Vera', 'F'), nome: 'Vera', cognome: 'Controlli' },
+    });
+    // Anche in modifica, nei dati del medico.
+    const changed = await req(adminCookie, 'PATCH', `/api/studio/utenti/${u.utente.id}`, {
+      medico: {
+        codiceFiscale: cf('Controlli', 'Vera', 'F'),
+        nome: 'Vera',
+        cognome: `Controlli${esc}`,
+      },
+    });
+    expect(changed.statusCode, changed.body).toBe(400);
+    // Un nome così, già nel database (scritto prima o a mano): --mostra lo stampa visibile, e i
+    // ruoli restano quelli veri, anche con i codici.
+    await withActor(t.db, fresh.userId, async (tx) => {
+      await tx
+        .update(appUser)
+        .set({ displayName: `Dott. Vero${esc}` })
+        .where(eq(appUser.id, u.utente.id));
+      await tx
+        .update(doctorProfile)
+        .set({ firstName: `Vera${esc}` })
+        .where(eq(doctorProfile.userId, u.utente.id));
+    });
+    const shown = await runCli(['--utente', `ctl.uno.${sfx}`, '--mostra']);
+    expect(shown.code, shown.err).toBe(0);
+    expect(shown.out).not.toContain('\u001b');
+    expect(shown.out).toContain('nome mostrato:   Dott. Vero\\u{001B}[1A\\u{001B}[2K');
+    expect(shown.out).toContain('nome Vera\\u{001B}[1A');
+    expect(shown.out).toMatch(
+      /ruoli:\s+Medico titolare, Segreteria \(codici: owner_doctor, secretary\)/,
+    );
   }, 180_000);
 
   it('registro di amministrazione: ogni area e ogni azione ha la sua etichetta, e le azioni del server lo dicono', async () => {
