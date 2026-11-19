@@ -5,6 +5,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import {
+  FISCAL_CODE_PENDING_NOTICE,
   CLINICAL_CREDENTIALS_REFUSAL,
   CLINICAL_UNLOCK_REFUSAL,
   createUserAdminService,
@@ -905,9 +906,36 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       medico: medico(),
     });
     expect(r.statusCode, r.body).toBe(200);
-    expect(r.json().avvisi).toEqual([
+    // La correzione del codice fiscale aspetta il medico (D181): le sessioni restano.
+    expect(r.json().avvisi).toEqual([FISCAL_CODE_PENDING_NOTICE]);
+    expect((await sessions()).map((x) => x.service).sort()).toEqual([
+      'rupar_piemonte',
+      'sistema_ts',
+    ]);
+    expect((await adminLog()).at(-1)).toMatchObject({
+      azione: 'modifica',
+      utente: doctor.username,
+      campi: ['medico.nome', 'medico.cognome', 'medico.codiceFiscale'],
+      codiceFiscaleInAttesaDelMedico: true,
+    });
+    const mine = await req(cookies.collega, 'GET', '/api/profilo/recapiti');
+    expect(mine.json().correzioneCodiceFiscale).toMatchObject({ proposto: medico().codiceFiscale });
+    expect((await req(cookies.collega, 'GET', '/api/io')).json().codiceFiscaleDaConfermare).toBe(
+      true,
+    );
+    // Il medico la conferma: il codice cambia e le sessioni legate al codice di prima si chiudono.
+    const ok = await req(cookies.collega, 'POST', '/api/profilo/codice-fiscale/conferma', {
+      proposto: medico().codiceFiscale,
+    });
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.json().avvisi).toEqual([
+      'Codice fiscale aggiornato: da adesso è questo, anche per i servizi.',
       'Codice fiscale del medico cambiato: chiuse le sue sessioni Sistema TS e RUPAR Piemonte. Il medico le riattiva da «Credenziali dei servizi».',
     ]);
+    expect(ok.json()).toMatchObject({
+      codiceFiscale: medico().codiceFiscale,
+      correzioneCodiceFiscale: null,
+    });
     expect(await sessions()).toEqual([]);
     const [used] = await t.db
       .select()
@@ -923,15 +951,17 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
           eq(serviceCredentialEvent.event, 'sessione_chiusa'),
         ),
       );
-    const detail = 'codice fiscale del medico corretto dall’amministratore';
+    const detail = 'codice fiscale corretto dall’amministratore, confermato dal medico';
     expect(events.map((e) => [e.service, e.detail, e.workstation]).sort()).toEqual([
-      ['rupar_piemonte', detail, 'postazione-amministratore'],
-      ['sistema_ts', detail, 'postazione-amministratore'],
+      ['rupar_piemonte', detail, 'postazione-collega'],
+      ['sistema_ts', detail, 'postazione-collega'],
     ]);
     expect((await adminLog()).at(-1)).toMatchObject({
-      azione: 'modifica',
+      area: 'profilo',
+      azione: 'conferma_codice_fiscale',
       utente: doctor.username,
-      campi: ['medico.codiceFiscale', 'medico.nome', 'medico.cognome'],
+      campi: ['medico.codiceFiscale'],
+      propostaDa: s.users.amministratore.username,
       sessioniServiziChiuse: ['sistema_ts', 'rupar_piemonte'],
     });
     // Il medico le vede chiuse, e le riattiva lui.

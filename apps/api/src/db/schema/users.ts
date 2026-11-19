@@ -96,6 +96,13 @@ export const doctorProfile = pgTable('doctor_profile', {
   regionalCode: text(),
   /** Codice fiscale del medico: va sul promemoria (DM 2 novembre 2011, allegato 2, campo 20). */
   fiscalCode: text(),
+  /**
+   * Correzione del codice fiscale proposta dall'amministratore (D181): resta in sospeso, e vale
+   * quello di prima, finché il medico non la conferma dal programma.
+   */
+  pendingFiscalCode: text(),
+  pendingFiscalCodeBy: uuid().references(() => appUser.id),
+  pendingFiscalCodeAt: timestamp({ withTimezone: true }),
   asl: text(),
   headerText: text(),
   stampText: text(),

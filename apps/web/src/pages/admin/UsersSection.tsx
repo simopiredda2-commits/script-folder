@@ -16,6 +16,8 @@ interface Doctor {
   asl: string | null;
   nome: string | null;
   cognome: string | null;
+  /** Correzione del codice fiscale che aspetta il medico (D181): fino ad allora vale l'altro. */
+  correzioneCodiceFiscale?: { proposto: string; da: string | null; il: string | null } | null;
 }
 interface User {
   id: string;
@@ -63,7 +65,12 @@ interface Result {
 }
 
 type RowAction =
-  'sospendi' | 'riattiva' | 'password-temporanea' | 'azzera-secondo-fattore' | 'sblocca';
+  | 'sospendi'
+  | 'riattiva'
+  | 'password-temporanea'
+  | 'azzera-secondo-fattore'
+  | 'sblocca'
+  | 'codice-fiscale/ritira';
 
 const DOCTOR_ROLES: RoleCode[] = ['owner_doctor', 'substitute_doctor'];
 const isDoctor = (roles: RoleCode[]) => roles.some((r) => DOCTOR_ROLES.includes(r));
@@ -101,6 +108,12 @@ const ROW_ACTIONS: Record<
     confirm: ({ nome: n }) =>
       `Azzerare il secondo fattore di ${n}? Le sue sessioni si chiudono; al prossimo accesso lo attiverà di nuovo con l’app di autenticazione.`,
     done: (n, k) => `Secondo fattore azzerato per ${n}. Sessioni chiuse: ${k}.`,
+  },
+  'codice-fiscale/ritira': {
+    label: 'Ritira la correzione del codice fiscale',
+    confirm: ({ nome: n }) =>
+      `Ritirare la correzione del codice fiscale di ${n}? Resta il codice di adesso; il medico non avrà più niente da confermare.`,
+    done: (n) => `Correzione del codice fiscale ritirata: per ${n} resta il codice di prima.`,
   },
   sblocca: {
     label: 'Sblocca',
@@ -356,6 +369,17 @@ export function UsersSection() {
                         <li>
                           <span className="codice">{u.medico.codiceFiscale ?? '—'}</span>
                         </li>
+                        {u.medico.correzioneCodiceFiscale && (
+                          <li>
+                            <strong>
+                              <Icon name="avviso" /> Correzione in attesa del medico:
+                            </strong>{' '}
+                            <span className="codice">
+                              {u.medico.correzioneCodiceFiscale.proposto}
+                            </span>
+                            . Finché il medico non la conferma vale il codice di adesso.
+                          </li>
+                        )}
                         <li>Codice regionale: {u.medico.codiceRegionale ?? 'da completare'}</li>
                         {u.medico.asl && <li>{u.medico.asl}</li>}
                       </ul>
@@ -457,6 +481,7 @@ function rowActions(u: User): RowAction[] {
     if (u.secondoFattoreAttivo) out.push('azzera-secondo-fattore');
     if (u.bloccatoFinoA || u.tentativiFalliti > 0) out.push('sblocca');
   }
+  if (u.medico?.correzioneCodiceFiscale) out.push('codice-fiscale/ritira');
   return out;
 }
 

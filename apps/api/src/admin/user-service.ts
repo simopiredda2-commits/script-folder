@@ -79,6 +79,8 @@ export const USER_ACTIONS = [
   'elenco_da_confermare',
   'conferma',
   'rifiuto',
+  /** Ritiro di una correzione del codice fiscale di un medico, prima che lui la confermi (D181). */
+  'ritiro_codice_fiscale',
 ] as const;
 export type UserAction = (typeof USER_ACTIONS)[number];
 
@@ -266,6 +268,9 @@ const userColumns = {
 const profileColumns = {
   userId: doctorProfile.userId,
   fiscalCode: doctorProfile.fiscalCode,
+  pendingFiscalCode: doctorProfile.pendingFiscalCode,
+  pendingFiscalCodeBy: doctorProfile.pendingFiscalCodeBy,
+  pendingFiscalCodeAt: doctorProfile.pendingFiscalCodeAt,
   regionalCode: doctorProfile.regionalCode,
   asl: doctorProfile.asl,
   firstName: doctorProfile.firstName,
@@ -298,6 +303,10 @@ export interface UserRow {
 interface ProfileRow {
   userId: string;
   fiscalCode: string | null;
+  /** Correzione proposta dall'amministratore, in attesa del medico (D181). */
+  pendingFiscalCode: string | null;
+  pendingFiscalCodeBy: string | null;
+  pendingFiscalCodeAt: Date | null;
   regionalCode: string | null;
   asl: string | null;
   firstName: string | null;
@@ -404,6 +413,14 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
           asl: p.asl,
           nome: p.firstName,
           cognome: p.lastName,
+          /** La correzione del codice fiscale in attesa del medico: fino ad allora vale l'altro. */
+          correzioneCodiceFiscale: p.pendingFiscalCode
+            ? {
+                proposto: p.pendingFiscalCode,
+                da: who(p.pendingFiscalCodeBy),
+                il: p.pendingFiscalCodeAt?.toISOString() ?? null,
+              }
+            : null,
         }
       : null,
     archivio: a ? { id: a.id, nome: a.name } : null,
@@ -457,7 +474,14 @@ function pendingView(u: UserRow, p: ProfileRow | null, names: Map<string, string
     },
     /** Alla conferma il titolare riceve la password temporanea da consegnare di persona. */
     passwordAllaConferma: u.confirmationIssuesPassword,
-    medico: p ? { nome: p.firstName, cognome: p.lastName, codiceFiscale: p.fiscalCode } : null,
+    medico: p
+      ? {
+          nome: p.firstName,
+          cognome: p.lastName,
+          codiceFiscale: p.fiscalCode,
+          codiceFiscaleInAttesaDelMedico: p.pendingFiscalCode,
+        }
+      : null,
   };
 }
 
@@ -579,7 +603,7 @@ function ensureOtherActiveAdmin(users: readonly UserRow[], target: UserRow) {
 }
 
 /** Avviso sulle sessioni dei servizi chiuse dopo una correzione dei codici del medico. */
-function servicesNotice(what: string, closed: readonly CredentialService[]): string {
+export function servicesNotice(what: string, closed: readonly CredentialService[]): string {
   const list = closed.map((s) => CREDENTIAL_SERVICE_LABELS[s]).join(' e ');
   return closed.length === 1
     ? `${what} del medico cambiato: chiusa la sua sessione ${list}. Il medico la riattiva da «Credenziali dei servizi».`
@@ -600,10 +624,16 @@ interface DoneDetails {
   richiestaRitirata?: boolean;
   /** Sessioni dei servizi del medico chiuse dopo la correzione dei suoi codici (scelta 4). */
   sessioniServiziChiuse?: CredentialService[];
+  /** Il codice fiscale corretto aspetta la conferma del medico (D181). */
+  codiceFiscaleInAttesaDelMedico?: boolean;
   /** Per conferme e rifiuti: chi aveva chiesto la conferma, e quando. */
   richiestaDa?: string | null;
   richiestaIl?: string | null;
 }
+
+/** Correzione del codice fiscale di un medico fatta dall'amministratore (D181). */
+export const FISCAL_CODE_PENDING_NOTICE =
+  'La correzione del codice fiscale resta in sospeso finché il medico non la conferma dal programma: fino ad allora vale quello di prima, anche per i servizi.';
 
 export function createUserAdminService({ db, now }: { db: Database; now: () => Date }) {
   const logRefusal = (actor: Actor, azione: UserAction, utente: string | null, motivo: string) =>
@@ -739,6 +769,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       .select({
         userId: doctorProfile.userId,
         fiscalCode: doctorProfile.fiscalCode,
+        pendingFiscalCode: doctorProfile.pendingFiscalCode,
         regionalCode: doctorProfile.regionalCode,
       })
       .from(doctorProfile)
@@ -748,12 +779,15 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           eq(appUser.studioId, actor.studioId),
           or(
             eq(doctorProfile.fiscalCode, d.fiscalCode),
+            // Anche una correzione in attesa di un altro medico (D181): due medici con lo stesso
+            // codice, dopo le due conferme, non devono esserci.
+            eq(doctorProfile.pendingFiscalCode, d.fiscalCode),
             d.regionalCode ? eq(doctorProfile.regionalCode, d.regionalCode) : undefined,
           ),
         ),
       );
     const others = rows.filter((r) => r.userId !== exceptUserId);
-    if (others.some((r) => r.fiscalCode === d.fiscalCode))
+    if (others.some((r) => r.fiscalCode === d.fiscalCode || r.pendingFiscalCode === d.fiscalCode))
       throw new HttpError(409, 'Codice fiscale già di un altro utente dello studio');
     if (d.regionalCode && others.some((r) => r.regionalCode === d.regionalCode))
       throw new HttpError(409, 'Codice regionale già di un altro medico dello studio');
@@ -984,8 +1018,32 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           patch.roles = after;
           campi.push('ruoli');
         }
-        const doctorChanges = doctor ? changedDoctorFields(profile ?? undefined, doctor) : [];
+        // Correzione del codice fiscale di un medico confermato che ce l'ha già: resta in sospeso,
+        // e vale quello di prima, finché il medico non la conferma dal programma (D181). Chi è o
+        // va in attesa di conferma non ha ancora lavorato con il suo codice: la correzione vale
+        // subito, e chi conferma la vede nella richiesta. Lo stesso codice di adesso, o di nuovo
+        // quello proposto, non cambia nulla: la correzione si ritira a parte.
+        const willAwait =
+          added.length > 0 || (target.awaitingConfirmation && opensPatientData(after));
+        const cfProposal =
+          doctor &&
+          !willAwait &&
+          profile?.fiscalCode &&
+          doctor.fiscalCode !== profile.fiscalCode &&
+          doctor.fiscalCode !== profile.pendingFiscalCode
+            ? doctor.fiscalCode
+            : null;
+        const written = doctor
+          ? {
+              ...doctor,
+              fiscalCode: willAwait
+                ? doctor.fiscalCode
+                : (profile?.fiscalCode ?? doctor.fiscalCode),
+            }
+          : null;
+        const doctorChanges = written ? changedDoctorFields(profile ?? undefined, written) : [];
         campi.push(...doctorChanges);
+        if (cfProposal) campi.push('medico.codiceFiscale');
         const own = await ownArchive(tx, actor, id);
         // Un titolare senza archivio (dati di prima) lo riceve anche se nient'altro cambia.
         const needsArchive = after.includes('owner_doctor') && !own;
@@ -1017,11 +1075,29 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
 
         if (Object.keys(patch).length > 0)
           await tx.update(appUser).set(patch).where(eq(appUser.id, id));
-        if (doctor && doctorChanges.length > 0)
+        if (
+          written &&
+          (doctorChanges.length > 0 || cfProposal || (willAwait && profile?.pendingFiscalCode))
+        ) {
+          const set = {
+            ...written,
+            ...(cfProposal
+              ? {
+                  pendingFiscalCode: cfProposal,
+                  pendingFiscalCodeBy: actor.userId,
+                  pendingFiscalCodeAt: t,
+                }
+              : {}),
+            // In attesa di conferma il codice scritto vale subito: una correzione di prima decade.
+            ...(willAwait && profile?.pendingFiscalCode
+              ? { pendingFiscalCode: null, pendingFiscalCodeBy: null, pendingFiscalCodeAt: null }
+              : {}),
+          };
           await tx
             .insert(doctorProfile)
-            .values({ userId: id, ...doctor })
-            .onConflictDoUpdate({ target: doctorProfile.userId, set: doctor });
+            .values({ userId: id, ...set })
+            .onConflictDoUpdate({ target: doctorProfile.userId, set });
+        }
         const out: string[] = [];
         if (needsArchive) {
           const name = archiveName(
@@ -1040,6 +1116,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           out.push(`L’archivio «${own.name}» torna al suo titolare.`);
         if (profile && isDoctor(before) && !isDoctor(after))
           out.push('I dati del medico restano registrati: non si cancella nulla.');
+        if (cfProposal) out.push(FISCAL_CODE_PENDING_NOTICE);
 
         // Codici del medico corretti (scelta 4): le sessioni dei servizi legate a quei codici
         // si chiudono. Il codice fiscale vale per tutti e due i servizi (D102, D111), il codice
@@ -1093,6 +1170,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           ...(withdrawn ? { richiestaRitirata: true } : {}),
           ...(startsWaiting ? { sessioniChiuse: sessionsClosed } : {}),
           ...(servicesClosed.length > 0 ? { sessioniServiziChiuse: servicesClosed } : {}),
+          ...(cfProposal ? { codiceFiscaleInAttesaDelMedico: true } : {}),
         });
         return out;
       });
@@ -1492,10 +1570,43 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
     );
   }
 
+  /**
+   * L'amministratore ritira una correzione del codice fiscale che il medico non ha ancora
+   * confermato (D181). Resta il codice di adesso.
+   */
+  async function withdrawFiscalCode(actor: Actor, id: string) {
+    return guarded(actor, 'ritiro_codice_fiscale', async () => {
+      await withActor(db, actor.userId, async (tx) => {
+        const target = await targetOf(tx, actor, id);
+        const [p] = await tx
+          .select({ pending: doctorProfile.pendingFiscalCode })
+          .from(doctorProfile)
+          .where(eq(doctorProfile.userId, id))
+          .for('update');
+        if (!p?.pending)
+          throw new HttpError(409, 'Nessuna correzione del codice fiscale in attesa del medico');
+        await tx
+          .update(doctorProfile)
+          .set({ pendingFiscalCode: null, pendingFiscalCodeBy: null, pendingFiscalCodeAt: null })
+          .where(eq(doctorProfile.userId, id));
+        await logDone(tx, actor, {
+          azione: 'ritiro_codice_fiscale',
+          utente: target.username,
+          utenteId: id,
+          ruoliPrima: target.roles,
+          ruoliDopo: target.roles,
+          campi: ['medico.codiceFiscale'],
+        });
+      });
+      return { utente: await one(actor, id) };
+    });
+  }
+
   return {
     requireAdmin,
     requireConfirmer,
     list,
+    withdrawFiscalCode,
     create,
     update,
     setStatus,

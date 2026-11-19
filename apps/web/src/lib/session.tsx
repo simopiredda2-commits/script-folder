@@ -21,6 +21,8 @@ export interface Me {
   nomeUtente?: string | null;
   /** Password temporanea (tappa 14): finché non la cambia, l'utente vede solo il cambio. */
   devoCambiarePassword?: boolean;
+  /** L'amministratore ha corretto il codice fiscale del medico: aspetta la sua conferma (D181). */
+  codiceFiscaleDaConfermare?: boolean;
 }
 
 type State =

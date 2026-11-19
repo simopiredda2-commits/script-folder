@@ -65,6 +65,13 @@ export function registerUserAdminRoutes(app: FastifyInstance, deps: AdminDeps): 
     users.unlock(req.actor!, idOf(req)),
   );
 
+  // Correzione del codice fiscale di un medico non ancora confermata da lui (D181): si ritira.
+  app.post(
+    '/api/studio/utenti/:id/codice-fiscale/ritira',
+    admin('ritiro_codice_fiscale'),
+    async (req) => users.withdrawFiscalCode(req.actor!, idOf(req)),
+  );
+
   // Conferma dei medici titolari: utenti con i dati dei pazienti creati o cambiati
   // dall'amministratore.
   app.get('/api/studio/utenti/da-confermare', confirmer('elenco_da_confermare'), async (req) =>

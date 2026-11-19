@@ -415,6 +415,7 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
       asl: 'ASL di prova',
       nome: 'Luca',
       cognome: 'Verdi',
+      correzioneCodiceFiscale: null,
     });
     expect(u.body.utente.archivio.nome).toBe('Archivio di Luca Verdi');
     const arcs = await t.db.select().from(archive).where(eq(archive.ownerUserId, u.id));

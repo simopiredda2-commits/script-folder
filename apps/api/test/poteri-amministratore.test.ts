@@ -856,6 +856,14 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       },
     });
     expect(patch.statusCode, patch.body).toBe(200);
+    // La correzione vale quando il medico la conferma (D181).
+    const confirmed = await req(
+      await login(s, 'sostituto'),
+      'POST',
+      '/api/profilo/codice-fiscale/conferma',
+      { proposto: corrected },
+    );
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
     // La gara del problema 8: la sessione si salva dopo la chiusura, con il codice fiscale letto
     // prima della correzione. Non vale, e si chiude.
     const later = () => new Date(s.clock.now().getTime() + 3_600_000);

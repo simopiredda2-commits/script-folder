@@ -297,6 +297,9 @@ export const ACTION_LABELS: Record<string, string> = {
   conferma: 'Conferma',
   rifiuto: 'Rifiuto della conferma',
   consultazione_richiesta: 'Consultazione della richiesta di conferma',
+  ritiro_codice_fiscale: 'Ritiro della correzione del codice fiscale',
+  conferma_codice_fiscale: 'Conferma del codice fiscale corretto',
+  rifiuto_codice_fiscale: 'Rifiuto del codice fiscale corretto',
 };
 
 /** Da dove viene l'azione, quando non dal programma (`details.tramite`): solo valori noti. */
@@ -368,6 +371,11 @@ export function describeAdminEntry(
         const after = roleList(d.ruoliDopo);
         add(before !== after && `ruoli: ${before} → ${after}`);
       }
+      // Correzione del codice fiscale del medico (D181): aspetta la sua conferma.
+      add(
+        d.codiceFiscaleInAttesaDelMedico === true &&
+          'codice fiscale in attesa della conferma del medico',
+      );
       break;
     }
     case 'cambio_password':

@@ -242,7 +242,7 @@ export function buildApp({
   if (regional.gateway instanceof SimulatedRegionalAuthorization)
     registerRegionalSimulatorRoutes(app, regional.gateway);
   registerPatientRoutes(app, db);
-  registerDoctorProfileRoutes(app, db);
+  registerDoctorProfileRoutes(app, db, now ?? (() => new Date()));
   registerTodayRoutes(app, db, now ?? (() => new Date()));
   registerTherapyRoutes(app, db, now ?? (() => new Date()));
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
