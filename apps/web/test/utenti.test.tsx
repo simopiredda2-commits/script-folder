@@ -347,7 +347,7 @@ describe('utenti dello studio (tappa 14)', () => {
       expect(within(byName(n)).queryByRole('button', { name: /Sblocca/ }), n).toBeNull();
       expect(
         within(byName(n)).getByText(
-          /il blocco dopo i tentativi falliti lo toglie chi gestisce il servizio/,
+          /secondo fattore e sblocco: li ripristina chi gestisce il servizio, sul server/,
         ),
       ).toBeTruthy();
     }

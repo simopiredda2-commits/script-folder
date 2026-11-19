@@ -110,9 +110,12 @@ const ROW_ACTIONS: Record<
   },
 };
 
-/** Perché per medici e segreteria qui non ci sono password temporanea, azzeramento e sblocco. */
+/**
+ * Perché per medici e segreteria qui non ci sono password temporanea, azzeramento e sblocco: una
+ * riga breve per utente; il motivo è nell'introduzione della sezione, una volta sola.
+ */
 const RESTORE_BY_SERVICE =
-  'Password e secondo fattore: li ripristina chi gestisce il servizio, sul server, perché da qui l’amministratore entrerebbe al posto dell’utente. Anche il blocco dopo i tentativi falliti lo toglie chi gestisce il servizio; altrimenti finisce da solo, allo scadere del tempo.';
+  'Password, secondo fattore e sblocco: li ripristina chi gestisce il servizio, sul server.';
 const OWNER_WITH_PATIENTS =
   'Ha pazienti nel suo archivio: per sospenderlo, prima il medico esporta i suoi dati, poi lo fa chi gestisce il servizio.';
 const OWNER_WITH_PATIENTS_SUSPENDED =
@@ -298,7 +301,8 @@ export function UsersSection() {
           medico titolare. Quando nello studio non c’è un titolare attivo e confermato che possa
           farlo, la conferma la fa chi gestisce il servizio, sul server. Password, secondo fattore e
           sblocco dopo i tentativi falliti di medici e segreteria li fa chi gestisce il servizio,
-          sul server.
+          sul server: da qui l’amministratore potrebbe entrare al posto loro. Il blocco, altrimenti,
+          finisce da solo allo scadere del tempo.
         </p>
         {shown && <TemporaryPassword shown={shown} onClose={() => setShown(null)} />}
         {outcome && <Notice kind="fatto">{outcome.text}</Notice>}
