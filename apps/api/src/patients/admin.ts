@@ -532,7 +532,11 @@ export async function adminView(
         titolareId: arch?.ownerId ?? null,
       },
       identita: identityFields(p),
-      dati: adminFields(p),
+      // La causa del decesso è un dato clinico (ICD): la vede chi legge il riepilogo clinico (D171).
+      dati: canReadDeathCause(actor, ctx, now)
+        ? adminFields(p)
+        : { ...adminFields(p), causaDecesso: undefined },
+      causaDecessoRiservata: !canReadDeathCause(actor, ctx, now),
       nucleo: p.familyId ? await familyOf(db, p.familyId, p.id, visible) : null,
       importato: imported.patient.get(p.id) ?? null,
       creatoIl: p.createdAt.toISOString(),
@@ -604,16 +608,27 @@ async function logDone(
   });
 }
 
+/**
+ * La causa del decesso è un dato clinico (codice ICD), non anagrafico: la legge chi legge il
+ * riepilogo clinico dell'archivio e la scrive il medico (D171).
+ */
+function canReadDeathCause(actor: Actor, ctx: ArchiveContext, now: Date): boolean {
+  return can(actor, 'clinical.summary.read', { ...ctx, now }).allowed;
+}
+
 /** Modifica dei dati amministrativi: solo i campi mandati, controllati insieme a quelli che restano. */
 export async function updateAdmin(
   db: Database,
   actor: Actor,
   p: PatientRow,
+  ctx: ArchiveContext,
   body: unknown,
   now: Date,
 ): Promise<{ dati: AdminFields; campi: AdminKey[] }> {
   const input = normalized(patientAdminSchema.parse(body));
   if (Object.keys(input).length === 0) throw new HttpError(400, 'Nessun campo da modificare');
+  if (input.causaDecesso !== undefined && !can(actor, 'clinical.write', { ...ctx, now }).allowed)
+    throw new HttpError(403, 'La causa del decesso è un dato clinico: la scrive il medico');
   const today = studioDate(now);
   const before = adminFields(p);
   const merged = { ...before, ...input } as PatientAdminInput;

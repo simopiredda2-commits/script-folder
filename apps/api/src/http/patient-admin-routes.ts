@@ -85,14 +85,14 @@ export function registerPatientAdminRoutes(app: FastifyInstance, deps: AdminDeps
   app.patch('/api/pazienti/:id/amministrazione', scoped, async (req) => {
     const actor = req.actor!;
     const { id } = idParams.parse(req.params);
-    const { patient } = await guardPatient(
+    const { patient, context } = await guardPatient(
       db,
       actor,
       id,
       'registry.write',
       'modifica_dati_amministrativi',
     );
-    return updateAdmin(db, actor, patient, req.body, now());
+    return updateAdmin(db, actor, patient, context, req.body, now());
   });
 
   app.post('/api/pazienti/:id/identita', scoped, async (req) => {

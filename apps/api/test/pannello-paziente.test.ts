@@ -431,6 +431,19 @@ describe('pannello amministrativo del paziente (tappa 15)', () => {
       const ok = await patch({ stato: 'deceduto', decedutoIl: day(-1), causaDecesso: '410.9' });
       expect(ok.statusCode, ok.body).toBe(200);
       expect(ok.json().dati).toMatchObject({ stato: 'deceduto', causaDecesso: '410.9' });
+      // La causa del decesso è un dato clinico (D171): la segreteria non la vede e non la scrive.
+      const sec = await req('GET', `/api/pazienti/${pid}/amministrazione`, 'segreteria');
+      expect(sec.statusCode, sec.body).toBe(200);
+      expect(sec.json().paziente.dati.causaDecesso).toBeUndefined();
+      expect(sec.json().paziente.causaDecessoRiservata).toBe(true);
+      expect(sec.body).not.toContain('410.9');
+      const secWrite = await req('PATCH', `/api/pazienti/${pid}/amministrazione`, 'segreteria', {
+        causaDecesso: '427.5',
+      });
+      expect(secWrite.statusCode).toBe(403);
+      const doc = await req('GET', `/api/pazienti/${pid}/amministrazione`, 'titolare');
+      expect(doc.json().paziente.dati.causaDecesso).toBe('410.9');
+      expect(doc.json().paziente.causaDecessoRiservata).toBe(false);
       // Tornare «in carico» vuol dire togliere anche data e causa.
       expect(problems((await patch({ stato: 'attivo' })).body)).toEqual([
         'La data del decesso vale solo per un paziente deceduto',

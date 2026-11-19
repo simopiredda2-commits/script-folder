@@ -40,6 +40,10 @@ Separatore **punto e virgola** e codifica **UTF-8 con BOM**, perché un foglio d
 
 Password, segreti del secondo fattore, credenziali verso Sistema TS e Regione e codici di sessione (`service_credential`, `service_session`, D100): sono dello studio e del medico, non dati dei pazienti, e una prova controlla che non escano. Gli allegati ci sono, con il loro contenuto (dalla tappa 10, D121). Le banche dati pubbliche (farmaci, cataloghi, comuni) non sono dati del medico: non entrano nell'esportazione e si riscaricano dalle fonti.
 
+## Formule nel CSV
+
+Nel CSV un testo che comincia con `=`, `+`, `-` o `@` (o con una tabulazione o un ritorno a capo) ha un apostrofo davanti, perché il foglio di calcolo non lo prenda per una formula (D172). I numeri restano numeri. Nell'esportazione in JSON i testi sono come sono.
+
 ## Garanzie
 
 Una prova controlla che **ogni** tabella del database con dati dei pazienti sia esportata: una tabella nuova dimenticata fa fallire le prove. Altre controllano che non escano pazienti di altri archivi, che il CSV abbia le stesse righe del JSON e che le impronte del manifesto siano giuste.

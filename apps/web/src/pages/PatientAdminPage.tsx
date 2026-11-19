@@ -94,6 +94,8 @@ interface AdminView {
     importato: Imported | null;
     creatoIl: string;
     aggiornatoIl: string;
+    /** La causa del decesso è un dato clinico: chi non legge il riepilogo clinico non la vede (D171). */
+    causaDecessoRiservata?: boolean;
   };
   esenzioni: Exemption[];
   scelte: Choice[];
@@ -284,7 +286,8 @@ function FieldsSection({
   const optionsOf = (f: FieldDef) =>
     f.options === 'stati' ? view.stati : f.options === 'canali' ? view.canali : [];
   const shown = (f: FieldDef, v: Partial<Record<AdminKey, string | null>>) =>
-    !f.onlyIf || f.onlyIf(v);
+    !(f.key === 'causaDecesso' && view.paziente.causaDecessoRiservata) &&
+    (!f.onlyIf || f.onlyIf(v));
   const display = (f: FieldDef) => {
     const v = dati[f.key];
     if (!v) return f.emptyLabel ?? '—';
