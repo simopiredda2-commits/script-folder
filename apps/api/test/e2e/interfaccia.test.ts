@@ -1629,7 +1629,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'conclusione della terapia', true);
     await page.getByRole('button', { name: 'Concludi la terapia' }).click();
     await page.getByText(/Terapia conclusa il/).waitFor();
-    await expect(page.getByRole('button', { name: 'Sospendi…' }).count()).resolves.toBe(0);
+    // La pagina rilegge la terapia dopo l'avviso: si aspetta che «Sospendi…» sparisca.
+    await expect
+      .poll(() => page.getByRole('button', { name: 'Sospendi…' }).count(), { timeout: 5000 })
+      .toBe(0);
   });
 
   it('pagina della password: regole lette dal servizio, accessibile (tappa 14)', async () => {
