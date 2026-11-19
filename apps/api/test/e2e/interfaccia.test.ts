@@ -1704,7 +1704,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Conclusa il').fill(studioDate(new Date()));
     await check(page, 'conclusione della terapia', true);
     await page.getByRole('button', { name: 'Concludi la terapia' }).click();
-    await page.getByText(/Terapia conclusa il/).waitFor();
+    // L'avviso dell'azione, poi la testata della terapia riletta: «Terapia conclusa il …» compare in
+    // tutti e due, e un browser veloce (Firefox) li mostra insieme.
+    await page.getByText(/è tra le terapie sospese o concluse dei farmaci prescritti/).waitFor();
+    await page.locator('strong', { hasText: /^Terapia conclusa il / }).waitFor();
     // La pagina rilegge la terapia dopo l'avviso: si aspetta che «Sospendi…» sparisca.
     await expect
       .poll(() => page.getByRole('button', { name: 'Sospendi…' }).count(), { timeout: 5000 })
