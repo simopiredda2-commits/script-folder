@@ -13,6 +13,7 @@ import {
   patientAdminSchema,
   patientIdentitySchema,
   periodsOverlap,
+  temporaryChoiceSchema,
   REMINDER_CHANNELS,
   type Decision,
   type PatientAdminInput,
@@ -332,6 +333,11 @@ export const newPatientSchema = z
     archivioId: z.uuid().optional(),
     identita: patientIdentitySchema,
     dati: patientAdminSchema.optional(),
+    /**
+     * Per il paziente temporaneo (D199): la scelta del titolare dell'archivio con la scadenza, che
+     * si registra insieme al paziente. Solo con lo stato «temporaneo», e per lui serve.
+     */
+    sceltaTemporanea: temporaryChoiceSchema.optional(),
   })
   .strict();
 
@@ -349,6 +355,8 @@ export async function createPatient(
   actor: Actor,
   body: unknown,
   now: Date,
+  /** Altro da scrivere nel registro (per esempio la fonte «AURA», D199). */
+  extraDetails: Record<string, unknown> = {},
 ): Promise<{ id: string; avvisi: string[] }> {
   const { archivioId } = archiveOnly.parse(body ?? {});
   const writable = await writableArchives(db, actor, now);
@@ -386,9 +394,16 @@ export async function createPatient(
   const input = newPatientSchema.parse(body);
   const today = studioDate(now);
   const dati = normalized(input.dati ?? {});
+  const temporary = dati.stato === 'temporaneo';
   assertNoIssues([
     ...lifeDatesIssues(input.identita.nascita, dati.decedutoIl, today),
     ...patientAdminIssues(dati, today),
+    ...(temporary && !input.sceltaTemporanea
+      ? ['Per il paziente temporaneo serve la scadenza della scelta']
+      : []),
+    ...(!temporary && input.sceltaTemporanea
+      ? ['La scelta con la scadenza si registra qui solo per il paziente temporaneo']
+      : []),
   ]);
   await assertFiscalCodeFree(db, actor, input.identita.codiceFiscale, now, 'nuovo_paziente');
   let id: string;
@@ -410,6 +425,21 @@ export async function createPatient(
           ...adminColumns(dati),
         })
         .returning({ id: patient.id });
+      // Paziente temporaneo: la scelta del titolare dell'archivio, a mano, fino alla scadenza.
+      const choice = input.sceltaTemporanea;
+      if (choice) {
+        const [owner] = await tx
+          .select({ ownerUserId: archive.ownerUserId })
+          .from(archive)
+          .where(eq(archive.id, target));
+        await tx.insert(patientChoice).values({
+          patientId: row!.id,
+          doctorUserId: owner!.ownerUserId,
+          chosenOn: choice.dal,
+          expiresOn: choice.scadenza,
+          source: 'manual',
+        });
+      }
       await logAccess(tx, {
         studioId: actor.studioId,
         userId: actor.userId,
@@ -417,7 +447,13 @@ export async function createPatient(
         action: 'nuovo_paziente',
         outcome: 'consentito',
         workstation: actor.workstation,
-        details: { permesso: 'registry.write', motivo: decision.reason, archivio: target },
+        details: {
+          permesso: 'registry.write',
+          motivo: decision.reason,
+          archivio: target,
+          ...(choice ? { sceltaTemporanea: { dal: choice.dal, scadenza: choice.scadenza } } : {}),
+          ...extraDetails,
+        },
       });
       return row!.id;
     });

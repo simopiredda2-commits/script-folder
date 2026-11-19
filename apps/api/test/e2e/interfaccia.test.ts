@@ -1594,6 +1594,35 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await promemoria.getByText('Promemoria cartaceo').first().waitFor();
   });
 
+  it('nuovo paziente temporaneo: stato e scadenza della scelta in un passo solo (D199)', async () => {
+    const [nuovo] = generatePatients({ seed: `temporaneo-e2e-${s.studioId}`, count: 1 });
+    const scadenza = studioDate(new Date(Date.now() + 120 * 24 * 60 * 60 * 1000));
+    await page.goto(`${base}/pazienti`);
+    await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
+    await page.getByRole('link', { name: 'Nuovo paziente' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Nuovo paziente' }).waitFor();
+    await page.getByLabel('Cognome').fill(nuovo!.lastName);
+    await page.getByLabel('Nome', { exact: true }).fill(nuovo!.firstName);
+    await page.getByLabel(nuovo!.sex === 'M' ? 'Maschile' : 'Femminile').check();
+    await page.getByLabel('Data di nascita').fill(nuovo!.birthDate);
+    await page.getByLabel('Codice catastale del luogo di nascita').fill(nuovo!.birthPlace.code);
+    await page.getByLabel('Codice fiscale').fill(nuovo!.fiscalCode);
+    await page.getByLabel('Temporaneo, con la scadenza della scelta').check();
+    await page.getByLabel('Scadenza della scelta').fill(scadenza);
+    await check(page, 'nuovo paziente temporaneo', true);
+    await page.getByRole('button', { name: 'Registra il paziente' }).click();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    await page.locator('.testata-paziente').getByText('temporaneo', { exact: true }).waitFor();
+    // La scelta del titolare c'è, in corso, con la scadenza.
+    await page.getByRole('link', { name: 'Dati amministrativi' }).first().click();
+    const choices = page.getByRole('table', { name: 'Scelte del medico registrate' });
+    const row = choices
+      .getByRole('row')
+      .filter({ hasText: scadenza.split('-').reverse().join('/') });
+    await row.waitFor();
+    await row.getByText('In corso').waitFor();
+  });
+
   it('importazione a passi: file, destinazione proposta, colonne, anteprima, prova, importazione (tappa 15)', async () => {
     // Pazienti inventati (D12): in prova si importano solo codici fiscali con la X.
     const nuovi = generatePatients({ seed: `importazione-e2e-${s.studioId}`, count: 3 });

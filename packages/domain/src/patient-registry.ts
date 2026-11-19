@@ -341,6 +341,20 @@ export const doctorChoicePeriodSchema = z
   .refine(ceasedAfterChoice, 'La cessazione viene dopo la scelta');
 export type DoctorChoicePeriodInput = z.infer<typeof doctorChoicePeriodSchema>;
 
+/**
+ * Scelta del paziente temporaneo registrato con il paziente nuovo (D199): il titolare dell'archivio
+ * dal giorno della scelta fino alla scadenza, compresa. La scadenza serve sempre: la scelta
+ * temporanea ne ha una.
+ */
+export const temporaryChoiceSchema = z
+  .object({ dal: isoDate, scadenza: isoDate })
+  .strict()
+  .refine((c) => c.scadenza >= c.dal, {
+    message: 'La scadenza viene dopo la scelta',
+    path: ['scadenza'],
+  });
+export type TemporaryChoiceInput = z.infer<typeof temporaryChoiceSchema>;
+
 /** Periodo in cui vale una scelta: dalla scelta alla prima fra cessazione e scadenza. */
 export function choiceValidity(c: {
   dal: string;
