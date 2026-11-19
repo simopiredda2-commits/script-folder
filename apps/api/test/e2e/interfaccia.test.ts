@@ -1358,6 +1358,88 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'AFT del titolare, consultazioni e attività', true);
   });
 
+  it('Strumenti dell’amministratore: dati dello studio, postazioni e stato del servizio (tappa 14)', async () => {
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    const admin = await ctx.newPage();
+    try {
+      await loginInBrowser(admin, 'amministratore');
+      await admin.goto(`${base}/strumenti?sezione=studio`);
+      await admin
+        .getByRole('heading', { level: 2, name: 'Dati e impostazioni dello studio' })
+        .waitFor();
+      await admin.getByLabel('Regione').fill('PIEMONTE');
+      await admin.getByLabel('Telefono').fill('000 0000002');
+      await admin.getByRole('button', { name: 'Salva i dati dello studio' }).click();
+      await admin.getByText('Dati e impostazioni dello studio salvati.').waitFor();
+      await check(admin, 'dati dello studio, amministratore', true);
+
+      await admin.goto(`${base}/strumenti?sezione=stampa`);
+      await admin.getByRole('heading', { level: 2, name: 'Postazioni dello studio' }).waitFor();
+      await admin.getByLabel('Nome della postazione').fill('Ambulatorio di prova');
+      await admin.getByRole('button', { name: 'Aggiungi la postazione' }).click();
+      await admin
+        .getByRole('table', { name: 'Postazioni attive' })
+        .getByRole('cell', { name: 'Ambulatorio di prova', exact: true })
+        .first()
+        .waitFor();
+      await check(admin, 'postazioni e stampa, amministratore', true);
+
+      await admin.goto(`${base}/strumenti?sezione=servizio`);
+      await admin.getByRole('heading', { level: 2, name: 'Stato del servizio' }).waitFor();
+      await check(admin, 'stato del servizio', true);
+    } finally {
+      await ctx.close();
+    }
+    // Il medico legge i dati dello studio senza poterli cambiare.
+    await page.goto(`${base}/strumenti?sezione=studio`);
+    await page
+      .getByRole('heading', { level: 2, name: 'Dati e impostazioni dello studio' })
+      .waitFor();
+    await expect(
+      page.getByRole('button', { name: 'Salva i dati dello studio' }).count(),
+    ).resolves.toBe(0);
+  });
+
+  it('nuovo paziente e dati amministrativi: identità controllata, canale del promemoria (tappa 15)', async () => {
+    // Un paziente inventato (D12): codice fiscale con la X in dodicesima posizione.
+    const [nuovo] = generatePatients({ seed: `nuovo-paziente-e2e-${s.studioId}`, count: 1 });
+    await page.goto(`${base}/pazienti`);
+    await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
+    await page.getByRole('link', { name: 'Nuovo paziente' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Nuovo paziente' }).waitFor();
+    await page.getByLabel('Cognome').fill(nuovo!.lastName);
+    await page.getByLabel('Nome', { exact: true }).fill(nuovo!.firstName);
+    await page.getByLabel(nuovo!.sex === 'M' ? 'Maschile' : 'Femminile').check();
+    await page.getByLabel('Data di nascita').fill(nuovo!.birthDate);
+    await page.getByLabel('Comune o Stato estero di nascita').fill(nuovo!.birthPlace.name);
+    await page.getByLabel('Codice catastale del luogo di nascita').fill(nuovo!.birthPlace.code);
+    await page.getByLabel('Codice fiscale').fill(nuovo!.fiscalCode);
+    await check(page, 'nuovo paziente', true);
+    await page.getByRole('button', { name: 'Registra il paziente' }).click();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+
+    // Dati amministrativi: il canale del promemoria scelto dal paziente (R15).
+    await page.getByRole('link', { name: 'Dati amministrativi' }).first().click();
+    await page.getByRole('heading', { level: 2, name: 'Canale del promemoria' }).waitFor();
+    await check(page, 'dati amministrativi', true);
+    await page.getByRole('button', { name: 'Modifica canale del promemoria' }).click();
+    await page
+      .getByLabel('Canale scelto dal paziente')
+      .selectOption({ label: 'Promemoria cartaceo' });
+    const promemoria = page.getByRole('region', { name: 'Canale del promemoria' });
+    await promemoria.getByRole('button', { name: /^Salva/ }).click();
+    await promemoria.getByText('Promemoria cartaceo').first().waitFor();
+  });
+
+  it('pagina della password: regole lette dal servizio, accessibile (tappa 14)', async () => {
+    await page.goto(`${base}/profilo/password`);
+    await page.getByRole('heading', { level: 1, name: 'Cambia la password' }).waitFor();
+    await check(page, 'cambio della password', true);
+  });
+
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {
     // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20. Senza
     // omonimi: il seme cambia a ogni giro, e due «Neri Ada» farebbero cercare la scheda sbagliata.
