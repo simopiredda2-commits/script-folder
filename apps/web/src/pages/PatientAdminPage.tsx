@@ -15,6 +15,7 @@ import {
   type IdentityValues,
   type Option,
 } from './NewPatientPage';
+import { AuraSection } from './AuraSection';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
 type AdminKey =
@@ -850,7 +851,8 @@ function ExemptionsSection({ view, onSaved }: { view: AdminView; onSaved: () => 
         {view.catalogoEsenzioni
           ? 'Il codice si confronta con il catalogo delle esenzioni importato tra le banche dati.'
           : 'Il catalogo delle esenzioni non è tra le banche dati importate: il codice non si confronta con il catalogo.'}{' '}
-        Un’esenzione non si cancella: se non vale più, si chiude la sua validità.
+        Un’esenzione non si cancella: se non vale più, si chiude la sua validità. Quelle arrivate da
+        AURA si aggiornano dall’anagrafe regionale e qui non si modificano.
       </p>
       {view.esenzioni.length === 0 ? (
         <p className="tenue">Nessuna esenzione registrata.</p>
@@ -1083,7 +1085,7 @@ function ExemptionsSection({ view, onSaved }: { view: AdminView; onSaved: () => 
   );
 }
 
-/** Scelta del medico: registrata a mano finché non c'è AURA; si cessa con data e motivo. */
+/** Scelta del medico: da AURA (D197) o registrata a mano; si cessa con data e motivo. */
 function ChoicesSection({ view, onSaved }: { view: AdminView; onSaved: () => void }) {
   // Il medico proposto è il titolare dell'archivio del paziente, se è tra i medici dello studio.
   const owner = view.medici.find((m) => m.id === view.paziente.archivio.titolareId);
@@ -1123,8 +1125,8 @@ function ChoicesSection({ view, onSaved }: { view: AdminView; onSaved: () => voi
         <Icon name="firma" /> Scelta del medico
       </h2>
       <p className="aiuto">
-        Scelte e revoche arriveranno dall’anagrafe regionale (AURA); finché il collegamento non c’è
-        si registrano qui. Una scelta non si cancella: si registra la sua cessazione.
+        Scelte e revoche arrivano dall’anagrafe regionale (AURA) e qui non si modificano; quelle
+        registrate a mano restano. Una scelta non si cancella: si registra la sua cessazione.
       </p>
       {view.scelte.length === 0 ? (
         <p className="tenue">Nessuna scelta registrata.</p>
@@ -1336,6 +1338,7 @@ const SECTIONS: { id: string; title: string }[] = [
   { id: 'identita', title: 'Identità' },
   ...GROUPS.map((g) => ({ id: g.id, title: g.title })),
   { id: 'nucleo', title: 'Nucleo familiare' },
+  { id: 'aura', title: 'AURA' },
   { id: 'esenzioni', title: 'Esenzioni' },
   { id: 'scelta', title: 'Scelta del medico' },
 ];
@@ -1395,6 +1398,11 @@ export function PatientAdminPage() {
             />
           ))}
           <FamilySection view={admin.data} onSaved={admin.reload} />
+          <AuraSection
+            patientId={admin.data.paziente.id}
+            canWrite={admin.data.puoScrivere}
+            onUpdated={reload}
+          />
           <ExemptionsSection view={admin.data} onSaved={reload} />
           <ChoicesSection view={admin.data} onSaved={admin.reload} />
         </>

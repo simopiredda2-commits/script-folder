@@ -109,6 +109,13 @@ export const patientChoice = pgTable('patient_choice', {
   endedOn: date(),
   endReason: text(),
   source: dataSource().notNull(),
+  /**
+   * Annullamento (D197): i dati dei pazienti non si cancellano. Una scelta che non c'è più in AURA
+   * resta, annullata con il motivo; autore vuoto se l'ha annullata il controllo su AURA.
+   */
+  annulledAt: timestamp({ withTimezone: true }),
+  annulledBy: uuid().references(() => appUser.id),
+  annulReason: text(),
 });
 
 /** Esenzione: codice, validità e codice da riportare in ricetta. */
@@ -122,6 +129,10 @@ export const exemption = pgTable('exemption', {
   validTo: date(),
   prescriptionCode: text(),
   source: dataSource().notNull(),
+  /** Annullamento, come per le scelte (D197): l'esenzione resta, con data, autore e motivo. */
+  annulledAt: timestamp({ withTimezone: true }),
+  annulledBy: uuid().references(() => appUser.id),
+  annulReason: text(),
 });
 
 export const consentStatus = pgEnum('consent_status', ['given', 'refused', 'revoked']);

@@ -35,6 +35,8 @@ export interface Config {
   cookieSecure: boolean;
   /** Aggiornamento delle banche dati; null = il servizio non le aggiorna (sviluppo, prove). */
   referenceUpdate: ReferenceUpdateConfig | null;
+  /** Ora del controllo di ogni notte su AURA («02:30»); assente = nessun controllo notturno (D197). */
+  auraTime?: string | null;
   /** Ambiente dell'installazione, da APP_AMBIENTE (D170). */
   environment: AppEnvironment;
   /**
@@ -106,6 +108,14 @@ function referenceUpdateConfig(env: NodeJS.ProcessEnv): ReferenceUpdateConfig | 
   };
 }
 
+/** AURA_AGGIORNAMENTO («02:30»): l'ora del controllo di ogni notte su AURA (D197). */
+function auraTimeOf(value: string | undefined): string | null {
+  const time = value?.trim();
+  if (!time) return null;
+  parseTime(time);
+  return time;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) {
@@ -127,6 +137,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     sessionMaxHours: Number(env.SESSION_MAX_HOURS ?? 12),
     cookieSecure: env.COOKIE_SECURE !== 'false',
     referenceUpdate: referenceUpdateConfig(env),
+    auraTime: auraTimeOf(env.AURA_AGGIORNAMENTO),
     environment: environmentOf(env.APP_AMBIENTE),
     trustedProxies: trustedProxiesOf(env.APP_PROXY_FIDATI),
   };

@@ -10,6 +10,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { generatePatients } from '@mmg/fixtures';
+import { SimulatedAura } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import {
@@ -85,6 +86,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   let lastName: string;
   let firstName: string;
   let newTherapyUrl: string;
+  /** AURA simulata (D197): l'anagrafe con cui la prova allinea il paziente di esempio. */
+  const aura = new SimulatedAura();
 
   /** Codice a 6 cifre: ogni accesso usa l'intervallo di 30 secondi successivo. */
   const nextCode = (secret: string) => {
@@ -257,6 +260,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       t.db,
       {},
       {
+        aura: { gateway: aura },
         referenceUpdates: (now) => {
           updates = new ReferenceUpdates(
             t.db,
@@ -1936,6 +1940,36 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await tab(a).click();
     await page.waitForURL(`**/pazienti/${a}/voci?tipo=diario`);
     await expect(page.getByLabel('Testo', { exact: true }).inputValue()).resolves.toBe('');
+  });
+
+  it('AURA (D197): «Aggiorna da AURA» porta l’esenzione con la sua fonte; la variazione è in Oggi', async () => {
+    const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    // 013, diabete mellito (allegato 8 del DPCM LEA), su un assistito inventato del simulatore.
+    aura.register({
+      fiscalCode: rich!.fiscalCode,
+      lastName: rich!.lastName,
+      firstName: rich!.firstName,
+      birthDate: rich!.birthDate,
+      exemptions: [{ code: '013', prescriptionCode: null, validFrom: '2026-01-01', validTo: null }],
+      choices: [],
+    });
+    await page.goto(`${base}/pazienti/${s.richPatient}/amministrazione`);
+    const section = page.getByRole('region', { name: 'AURA, anagrafe regionale' });
+    await section.getByText('Collegamento simulato', { exact: false }).waitFor();
+    await section.getByRole('button', { name: 'Aggiorna da AURA' }).click();
+    await section.getByText('Aggiornato da AURA: 1 variazione.').waitFor();
+    await section.getByText('Allineato con AURA').waitFor();
+    await section.getByRole('rowheader', { name: /Esenzione 013 dal 01\/01\/2026/ }).waitFor();
+    await check(page, 'AURA nei dati amministrativi', true);
+    const exemptions = page.getByRole('region', { name: 'Esenzioni' });
+    const row = exemptions.getByRole('row', { name: /013/ });
+    await row.getByText('AURA').waitFor();
+    // L'esenzione arrivata da AURA non si modifica dal pannello.
+    await expect(row.getByRole('button', { name: /Modifica/ }).count()).resolves.toBe(0);
+    await page.goto(`${base}/`);
+    const today = page.getByRole('region', { name: 'Variazioni da AURA' });
+    await today.getByRole('link', { name: `${rich!.firstName} ${rich!.lastName}` }).waitFor();
+    await check(page, 'variazioni da AURA in Oggi');
   });
 
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice; le cartelle aperte restano', async () => {

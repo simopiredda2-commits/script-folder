@@ -230,6 +230,7 @@ describe('storico delle modifiche e dati mai cancellati', () => {
       'certificate_submission',
       'certificate_delivery',
       'aft_activity',
+      'aura_change',
     ];
     for (const { table_name } of res.rows) {
       if (appendOnly.includes(table_name)) continue;

@@ -5,6 +5,7 @@ import { credentialAlerts, CREDENTIALS_PATH, type CredentialsStatus } from '../l
 import { age, APPOINTMENT_KIND, date, longDate, plural, time } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { AuraChangesToday } from './AuraSection';
 
 interface Today {
   data: string;
@@ -122,6 +123,7 @@ export function TodayPage() {
           )}
         </section>
       </div>
+      <AuraChangesToday />
     </>
   );
 }

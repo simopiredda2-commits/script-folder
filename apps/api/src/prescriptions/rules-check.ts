@@ -150,7 +150,8 @@ export async function buildRuleContext(
     exemptions: await db
       .select({ code: exemption.code, validFrom: exemption.validFrom, validTo: exemption.validTo })
       .from(exemption)
-      .where(eq(exemption.patientId, p.patientId)),
+      // Un'esenzione annullata (per esempio tolta in AURA, D197) non vale più.
+      .where(and(eq(exemption.patientId, p.patientId), isNull(exemption.annulledAt))),
     delegations: await db
       .select({
         email: delegation.delegateEmail,

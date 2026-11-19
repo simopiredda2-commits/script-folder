@@ -15,3 +15,4 @@ export * from './fse/pdf';
 export * from './fse/x509';
 export * from './fse/jwt';
 export * from './fse/signer';
+export * from './aura';

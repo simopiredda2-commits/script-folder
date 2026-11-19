@@ -139,14 +139,22 @@ export function exportTables(doc: Record<string, unknown>): ExportRead {
     canaleSceltoIl: day(p.reminder_channel_chosen_on),
   }));
 
-  const exemptions = rows('exemption').map((e) => ({
-    codiceFiscale: cfOf.get(text(e.patient_id)) ?? '',
-    codice: text(e.code),
-    dal: day(e.valid_from),
-    al: day(e.valid_to),
-    codiceRicetta: text(e.prescription_code),
-    idOrigine: text(e.id),
-  }));
+  // Esenzioni: solo quelle in vigore; le annullate (D197) restano nell'esportazione.
+  const annulledExemptions = rows('exemption').filter((e) => text(e.annulled_at) !== '').length;
+  if (annulledExemptions)
+    notes.push(
+      `${annulledExemptions} esenzioni annullate nello studio d’origine: non si importano`,
+    );
+  const exemptions = rows('exemption')
+    .filter((e) => text(e.annulled_at) === '')
+    .map((e) => ({
+      codiceFiscale: cfOf.get(text(e.patient_id)) ?? '',
+      codice: text(e.code),
+      dal: day(e.valid_from),
+      al: day(e.valid_to),
+      codiceRicetta: text(e.prescription_code),
+      idOrigine: text(e.id),
+    }));
 
   // Voci cliniche: solo quelle in vigore; le annullate restano nell'esportazione.
   const entries = rows('clinical_entry');

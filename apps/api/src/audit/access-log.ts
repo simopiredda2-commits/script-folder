@@ -117,7 +117,10 @@ export type AccessAction =
   | 'ripristino_avviato'
   | 'ripristino_rifiutato'
   | 'ripristino_riconosciuto'
-  | 'ripristino_credenziali';
+  | 'ripristino_credenziali'
+  /** Esenzioni e scelte lette da AURA, e lettura delle variazioni (D197). */
+  | 'aggiornamento_aura'
+  | 'lettura_variazioni_aura';
 
 export interface AccessEntry {
   studioId?: string | null;

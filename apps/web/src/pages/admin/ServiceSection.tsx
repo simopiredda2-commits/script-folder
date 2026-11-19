@@ -22,6 +22,19 @@ interface ServiceStatus {
     dimenticaDopoOre: number;
   };
   bancheDati: { configurato: boolean; ora: string | null; prossimoGiro: string | null };
+  /** AURA (D197): i numeri dell'ultimo giro sono solo quelli dei pazienti di questo studio. */
+  aura: {
+    disponibile: boolean;
+    prossimoGiro: string | null;
+    ultimoGiro: {
+      iniziato: string;
+      finito: string | null;
+      pazienti: number;
+      conVariazioni: number;
+      nonRiusciti: number;
+      messaggio: string | null;
+    } | null;
+  } | null;
   salvataggi: { nelProgramma: boolean };
 }
 
@@ -134,6 +147,52 @@ export function ServiceSection() {
       <p>
         <Link to="/strumenti?sezione=banche-dati">Versioni in uso e ultimi giri</Link>
       </p>
+
+      {s.aura && (
+        <>
+          <h3>AURA, anagrafe regionale</h3>
+          {!s.aura.disponibile ? (
+            <Notice kind="info">
+              AURA non è ancora collegata al servizio vero: esenzioni e scelte si inseriscono a
+              mano.
+            </Notice>
+          ) : (
+            <p>
+              Esenzioni e scelte del medico si allineano a ogni variazione di AURA e prima di una
+              ricetta con esenzione.{' '}
+              {s.aura.prossimoGiro ? (
+                <>Controllo di tutti i pazienti: prossimo {dateTime(s.aura.prossimoGiro)}.</>
+              ) : (
+                <>Il controllo di ogni notte non è attivo in questa installazione.</>
+              )}
+            </p>
+          )}
+          {s.aura.ultimoGiro && (
+            <dl className="dati-fissi">
+              <div>
+                <dt>Ultimo controllo di tutti i pazienti</dt>
+                <dd>
+                  {dateTime(s.aura.ultimoGiro.iniziato)}
+                  {s.aura.ultimoGiro.finito ? '' : ', ancora in corso'}
+                </dd>
+              </div>
+              <div>
+                <dt>Pazienti dello studio controllati</dt>
+                <dd>
+                  {s.aura.ultimoGiro.pazienti}, di cui {s.aura.ultimoGiro.conVariazioni} con
+                  variazioni e {s.aura.ultimoGiro.nonRiusciti} non riusciti
+                </dd>
+              </div>
+              {s.aura.ultimoGiro.messaggio && (
+                <div>
+                  <dt>Nota</dt>
+                  <dd>{s.aura.ultimoGiro.messaggio}</dd>
+                </div>
+              )}
+            </dl>
+          )}
+        </>
+      )}
 
       <h3>Salvataggi</h3>
       {!s.salvataggi.nelProgramma && (

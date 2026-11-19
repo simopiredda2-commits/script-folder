@@ -803,6 +803,7 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
       'accesso_regionale',
       'secondo_fattore',
       'email_sms',
+      'aura',
     ]);
     expect(new Set(v.collegamenti.map((x) => x.ambiente))).toEqual(new Set(['simulatore']));
     // Le prove sopra hanno inviato ricette e certificati: l'ultimo invio è andato al simulatore.
