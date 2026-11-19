@@ -164,7 +164,10 @@ const FISCAL_CODE_PROBLEMS: Record<FiscalCodeProblem, string> = {
   controllo: 'l’ultimo carattere, di controllo, non torna',
 };
 
-/** Password temporanea casuale, come quelle dei dati dimostrativi: 16 caratteri. */
+/**
+ * Password temporanea casuale, come quelle dei dati dimostrativi: 16 caratteri. Per ora non
+ * scade: la durata è da completare (domanda per la fermata).
+ */
 export const temporaryPassword = () => randomBytes(12).toString('base64url');
 
 /** Colonne lette degli utenti: mai l'impronta della password né il segreto del secondo fattore. */

@@ -15,7 +15,10 @@ interface PendingUser {
   stato: 'attivo' | 'sospeso';
   inAttesaDiConferma: boolean;
   creatoIl: string;
-  /** Chi ha creato o cambiato l'utente, e quando: si conferma quella richiesta. */
+  /**
+   * Chi ha creato o cambiato l'utente, e quando: si conferma quella richiesta. Senza nome se
+   * l'utente l'ha riattivato chi gestisce il servizio, sul server.
+   */
   richiesta: { da: string | null; il: string | null };
   /** Alla conferma il titolare riceve la password temporanea da consegnare di persona. */
   passwordAllaConferma: boolean;
@@ -149,7 +152,8 @@ export function ConfirmUsersSection() {
                   </th>
                   <td>{roleNames(u)}</td>
                   <td>
-                    {u.richiesta.da ? `Di ${u.richiesta.da}` : 'Dell’amministratore'}
+                    {/* Senza nome: l'ha riattivato chi gestisce il servizio, sul server. */}
+                    {u.richiesta.da ? `Di ${u.richiesta.da}` : 'Da chi gestisce il servizio'}
                     {u.richiesta.il && <>, il {dateTime(u.richiesta.il)}</>}
                     <br />
                     <span className="tenue">Utente creato il {dateTime(u.creatoIl)}</span>

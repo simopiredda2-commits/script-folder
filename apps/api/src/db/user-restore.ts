@@ -114,6 +114,11 @@ export async function restoreUser(
     if (input.riattiva) {
       patch.status = 'active';
       actions.push('riattivazione');
+      // Chi era in attesa torna nell'elenco dei titolari con una richiesta nuova, del server.
+      if (target.awaitingConfirmation) {
+        patch.confirmationRequestedAt = t;
+        patch.confirmationRequestedBy = null;
+      }
     }
     await tx.update(appUser).set(patch).where(eq(appUser.id, target.id));
     const closed = await closeSessions(tx, target.id, t);

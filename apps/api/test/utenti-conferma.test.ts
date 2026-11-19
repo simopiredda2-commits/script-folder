@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { buildFiscalCode, type Role } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import {
@@ -23,6 +23,7 @@ import {
   regionalAuthorizationRequest,
   serviceCredentialEvent,
   serviceSession,
+  session,
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
 import { restoreUser } from '../src/db/user-restore';
@@ -225,6 +226,49 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     );
     expect(notWaiting.statusCode).toBe(409);
     expect(notWaiting.json().errore).toBe('L’utente non è in attesa di conferma');
+  });
+
+  it('chi è in attesa non usa nemmeno una sessione, un passaggio d’accesso o uno sblocco rimasti aperti', async () => {
+    // Quando un utente va in attesa le sue sessioni si chiudono; qui la prova le lascia aperte
+    // apposta, per vedere che l'accesso le rifiuta comunque.
+    const sec = s.users.segreteria;
+    expect((await req(cookies.segreteria, 'GET', '/api/io')).statusCode).toBe(200);
+    const started = await access(sec.username, PASSWORD);
+    expect(started.json().passo).toBe('secondo-fattore');
+    const [open] = await t.db
+      .select({ id: session.id })
+      .from(session)
+      .where(and(eq(session.userId, sec.id), isNull(session.revokedAt)));
+    await t.db.update(appUser).set({ awaitingConfirmation: true }).where(eq(appUser.id, sec.id));
+    try {
+      expect((await req(cookies.segreteria, 'GET', '/api/io')).statusCode).toBe(401);
+      s.clock.advance(30_000);
+      const code = await s.app.inject({
+        method: 'POST',
+        url: '/api/accesso/codice',
+        payload: {
+          passaggio: started.json().passaggio,
+          codice: totp(secrets.get(sec.username)!, s.clock.now().getTime()),
+        },
+      });
+      expect(code.statusCode).toBe(401);
+      expect(code.json().errore).toBe('Passaggio scaduto: ripeti l’accesso');
+      // Sessione bloccata per inattività: con il codice giusto non si sblocca.
+      await t.db.update(session).set({ lockedAt: s.clock.now() }).where(eq(session.id, open!.id));
+      s.clock.advance(30_000);
+      const unlock = await s.app.inject({
+        method: 'POST',
+        url: '/api/accesso/sblocca',
+        headers: { cookie: cookies.segreteria },
+        payload: { codice: totp(secrets.get(sec.username)!, s.clock.now().getTime()) },
+      });
+      expect(unlock.statusCode).toBe(401);
+    } finally {
+      await t.db.update(appUser).set({ awaitingConfirmation: false }).where(eq(appUser.id, sec.id));
+      await t.db.update(session).set({ lockedAt: null }).where(eq(session.id, open!.id));
+    }
+    // Tornata com'era, la sessione di prima vale di nuovo: non era stata chiusa.
+    expect((await req(cookies.segreteria, 'GET', '/api/io')).statusCode).toBe(200);
   });
 
   it('una segreteria creata dall’amministratore resta fuori finché un titolare non la conferma; la password la riceve il titolare', async () => {
@@ -632,9 +676,16 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     });
     expect(admin.statusCode, admin.body).toBe(200);
     expect(admin.json().utente.inAttesaDiConferma).toBe(false);
+    // Il ruolo di titolare non si toglie nemmeno senza darne altri con i dati dei pazienti.
+    const only = await req(cookies.amministratore, 'PATCH', `/api/studio/utenti/${doctor.id}`, {
+      ruoli: ['administrator'],
+    });
+    expect(only.statusCode).toBe(409);
+    expect(only.json().errore).toBe(OWNER_ROLE_REMOVAL_REFUSAL);
     await req(cookies.amministratore, 'PATCH', `/api/studio/utenti/${doctor.id}`, {
       ruoli: ['owner_doctor'],
     });
+    expect((await userRow(doctor.id)).roles).toEqual(['owner_doctor']);
     const refusals = (await adminLog()).filter(
       (e) => e.outcome === 'negato' && e.utente === doctor.username,
     );
@@ -642,6 +693,7 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
       ['sospensione', OWNER_SUSPEND_REFUSAL],
       ['modifica', OWNER_ROLE_REMOVAL_REFUSAL],
       ['modifica', OWNER_ROLE_ADD_REFUSAL],
+      ['modifica', OWNER_ROLE_REMOVAL_REFUSAL],
     ]);
     const listed = (await req(cookies.amministratore, 'GET', '/api/studio/utenti')).json().utenti;
     const flag = (id: string) =>
@@ -929,6 +981,25 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     expect((await access('attesa.server', w.temporaryPassword!)).json().errore).toBe(
       AWAITING_CONFIRMATION_ERROR,
     );
+    // Rifiutato, poi riattivato dal server: torna da confermare, con una richiesta del server.
+    const asked = (await pendingOf(cookies.titolare)).find((x) => x.id === waiting.utente.id)!;
+    expect(asked.richiesta.da).toBe('Andrea Conti');
+    const no = await req(
+      cookies.titolare,
+      'POST',
+      `/api/studio/utenti/${waiting.utente.id}/rifiuta`,
+    );
+    expect(no.statusCode, no.body).toBe(200);
+    const later = () => new Date(s.clock.now().getTime() + 60_000);
+    const back = await restoreUser(
+      t.db,
+      { utente: 'attesa.server', riattiva: true },
+      { now: later },
+    );
+    passwordsSeen.push(back.temporaryPassword!);
+    const again = (await pendingOf(cookies.titolare)).find((x) => x.id === waiting.utente.id)!;
+    expect(again.richiesta.da).toBeNull();
+    expect(Date.parse(again.richiesta.il)).toBeGreaterThan(Date.parse(asked.richiesta.il));
   });
 
   it('rifiuto: l’utente resta sospeso e in attesa; se l’amministratore lo riattiva torna da confermare', async () => {

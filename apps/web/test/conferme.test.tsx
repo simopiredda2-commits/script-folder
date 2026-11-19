@@ -62,6 +62,8 @@ describe('Strumenti › Utenti da confermare (tappa 14)', () => {
         ruoli: [{ codice: 'substitute_doctor', nome: 'Medico sostituto' }],
         passwordAllaConferma: false,
         medico: { nome: 'Giulia', cognome: 'Rossi', codiceFiscale: 'RSSGLI75E45X001P' },
+        // Riattivata da chi gestisce il servizio: la richiesta non ha il nome di un utente.
+        richiesta: { da: null, il: '2026-11-19T09:30:00.000Z' },
       }),
     ];
     const calls = fakeService({
@@ -95,6 +97,7 @@ describe('Strumenti › Utenti da confermare (tappa 14)', () => {
     const second = rowOf(table, 'Dott.ssa Giulia Rossi');
     expect(second.textContent).toMatch(/Rientra con la sua password e il suo secondo fattore/);
     expect(second.textContent).toContain('RSSGLI75E45X001P');
+    expect(second.textContent).toMatch(/Da chi gestisce il servizio, il/);
 
     await user.click(within(first).getByRole('button', { name: 'Conferma Nuova Segreteria' }));
     expect(confirm).toHaveBeenCalledOnce();
