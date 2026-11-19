@@ -33,6 +33,14 @@ interface User {
   medico: Doctor | null;
   archivio: { id: string; nome: string } | null;
   io: boolean;
+  /** Ruolo con i dati dei pazienti dato dall'amministratore: non entra finché un titolare non conferma. */
+  inAttesaDiConferma: boolean;
+  richiestaDiConferma: { da: string | null; il: string } | null;
+  confermato: { da: string | null; il: string } | null;
+  /** Medici e segreteria: password e secondo fattore li ripristina chi gestisce il servizio. */
+  ripristinoDalServizio: boolean;
+  /** Titolare con pazienti: non si sospende da qui. */
+  titolareConPazienti: boolean;
 }
 interface Users {
   utenti: User[];
@@ -57,38 +65,47 @@ const failure = (e: unknown) =>
 /** Che cosa chiede la conferma e che cosa dice l'esito, per ogni azione della riga. */
 const ROW_ACTIONS: Record<
   RowAction,
-  { label: string; confirm: (n: string) => string; done: (n: string, closed: number) => string }
+  { label: string; confirm: (u: User) => string; done: (n: string, closed: number) => string }
 > = {
   sospendi: {
     label: 'Sospendi',
-    confirm: (n) =>
+    confirm: ({ nome: n }) =>
       `Sospendere ${n}? Le sue sessioni si chiudono subito e non potrà accedere finché non viene riattivato. Non si cancella nulla.`,
     done: (n, k) => `Utente sospeso: ${n}. Sessioni chiuse: ${k}.`,
   },
   riattiva: {
     label: 'Riattiva',
-    confirm: (n) =>
-      `Riattivare ${n}? Potrà accedere di nuovo con la sua password e il secondo fattore.`,
+    confirm: (u) =>
+      u.inAttesaDiConferma
+        ? `Riattivare ${u.nome}? Resta in attesa della conferma di un medico titolare: entra solo dopo, e la richiesta torna nell’elenco dei titolari.`
+        : `Riattivare ${u.nome}? Potrà accedere di nuovo con la sua password e il secondo fattore.`,
     done: (n) => `Utente riattivato: ${n}.`,
   },
   'password-temporanea': {
     label: 'Password temporanea',
-    confirm: (n) =>
+    confirm: ({ nome: n }) =>
       `Dare a ${n} una password temporanea nuova? Quella di adesso smette di valere, le sue sessioni si chiudono e al prossimo accesso dovrà sceglierne una sua.`,
     done: (n, k) => `Password temporanea creata per ${n}. Sessioni chiuse: ${k}.`,
   },
   'azzera-secondo-fattore': {
     label: 'Azzera il secondo fattore',
-    confirm: (n) =>
+    confirm: ({ nome: n }) =>
       `Azzerare il secondo fattore di ${n}? Le sue sessioni si chiudono; al prossimo accesso lo attiverà di nuovo con l’app di autenticazione.`,
     done: (n, k) => `Secondo fattore azzerato per ${n}. Sessioni chiuse: ${k}.`,
   },
   sblocca: {
     label: 'Sblocca',
-    confirm: (n) => `Sbloccare ${n}? I tentativi falliti tornano a zero e può riprovare subito.`,
+    confirm: ({ nome: n }) =>
+      `Sbloccare ${n}? I tentativi falliti tornano a zero e può riprovare subito.`,
     done: (n) => `Utente sbloccato: ${n}.`,
   },
 };
+
+/** Perché per medici e segreteria qui non ci sono password temporanea e azzeramento. */
+const RESTORE_BY_SERVICE =
+  'Password e secondo fattore: li ripristina chi gestisce il servizio, sul server, perché da qui l’amministratore entrerebbe al posto dell’utente.';
+const OWNER_WITH_PATIENTS =
+  'Ha pazienti nel suo archivio: per sospenderlo, prima il medico esporta i suoi dati, poi lo fa chi gestisce il servizio.';
 
 interface FormValues {
   nomeUtente: string;
@@ -188,7 +205,7 @@ export function UsersSection() {
 
   async function act(u: User, kind: RowAction) {
     const a = ROW_ACTIONS[kind];
-    if (!window.confirm(a.confirm(u.nome))) return;
+    if (!window.confirm(a.confirm(u))) return;
     begin();
     try {
       const r = await api<Result>(`/api/studio/utenti/${u.id}/${kind}`, {
@@ -259,6 +276,11 @@ export function UsersSection() {
           Chi lavora nello studio e con quali ruoli. Un utente non si cancella: si sospende. Ogni
           azione va nel registro delle azioni di amministrazione, che leggono anche i medici
           titolari. I tuoi ruoli e le tue credenziali li cambia un altro amministratore.
+        </p>
+        <p>
+          Chi lavora con i dati dei pazienti (medici e segreteria), creato qui o con un ruolo nuovo,
+          entra solo dopo la conferma di un medico titolare dello studio. Le sue password e il suo
+          secondo fattore li ripristina chi gestisce il servizio, sul server.
         </p>
         {shown && <TemporaryPassword shown={shown} onClose={() => setShown(null)} />}
         {outcome && <Notice kind="fatto">{outcome.text}</Notice>}
@@ -349,6 +371,12 @@ export function UsersSection() {
                           </li>
                         ))}
                     </ul>
+                    {!u.io && u.ripristinoDalServizio && (
+                      <p className="aiuto">{RESTORE_BY_SERVICE}</p>
+                    )}
+                    {!u.io && u.titolareConPazienti && u.stato === 'attivo' && (
+                      <p className="aiuto">{OWNER_WITH_PATIENTS}</p>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -382,10 +410,19 @@ export function UsersSection() {
   );
 }
 
-/** Le azioni che hanno senso per l'utente della riga, nell'ordine in cui si mostrano. */
+/**
+ * Le azioni che hanno senso per l'utente della riga, nell'ordine in cui si mostrano. Per medici e
+ * segreteria niente password temporanea né azzeramento del secondo fattore; un titolare con
+ * pazienti non si sospende da qui. Il servizio lo controlla comunque.
+ */
 function rowActions(u: User): RowAction[] {
-  const out: RowAction[] = [u.stato === 'attivo' ? 'sospendi' : 'riattiva', 'password-temporanea'];
-  if (u.secondoFattoreAttivo) out.push('azzera-secondo-fattore');
+  const out: RowAction[] = [];
+  if (u.stato !== 'attivo') out.push('riattiva');
+  else if (!u.titolareConPazienti) out.push('sospendi');
+  if (!u.ripristinoDalServizio) {
+    out.push('password-temporanea');
+    if (u.secondoFattoreAttivo) out.push('azzera-secondo-fattore');
+  }
   if (u.bloccatoFinoA || u.tentativiFalliti > 0) out.push('sblocca');
   return out;
 }
@@ -402,6 +439,25 @@ function UserStatus({ u }: { u: User }) {
           </strong>
         )}
       </li>
+      {u.inAttesaDiConferma && (
+        <li>
+          <strong>
+            <Icon name="storico" /> In attesa di conferma di un titolare
+          </strong>
+          {u.richiestaDiConferma && (
+            <>
+              {' '}
+              (richiesta{u.richiestaDiConferma.da ? ` di ${u.richiestaDiConferma.da}` : ''} del{' '}
+              {dateTime(u.richiestaDiConferma.il)})
+            </>
+          )}
+        </li>
+      )}
+      {u.confermato && (
+        <li className="tenue">
+          Confermato{u.confermato.da ? ` da ${u.confermato.da}` : ''} il {dateTime(u.confermato.il)}
+        </li>
+      )}
       {u.bloccatoFinoA && (
         <li>
           <strong>
@@ -428,8 +484,11 @@ function UserStatus({ u }: { u: User }) {
   );
 }
 
-/** La password temporanea, una volta sola: si consegna di persona, poi si nasconde. */
-function TemporaryPassword({
+/**
+ * La password temporanea, una volta sola: si consegna di persona, poi si nasconde. La usano
+ * l'amministratore (utenti senza dati dei pazienti) e il titolare che conferma un utente.
+ */
+export function TemporaryPassword({
   shown,
   onClose,
 }: {
@@ -541,8 +600,10 @@ function UserForm({
       </h2>
       {mode === 'nuovo' && (
         <p>
-          La password temporanea si crea da sola e si vede una volta sola, appena creato l’utente.
-          Il secondo fattore si attiva al primo accesso.
+          La password temporanea si crea da sola. Per un amministratore si vede qui, una volta sola,
+          appena creato l’utente. Medici e segreteria aspettano la conferma di un medico titolare
+          dello studio, che riceve la password e la consegna di persona. Il secondo fattore si
+          attiva al primo accesso.
         </p>
       )}
       <fieldset disabled={busy}>

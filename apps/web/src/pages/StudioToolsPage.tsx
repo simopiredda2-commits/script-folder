@@ -6,6 +6,7 @@ import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 import { AdminLogSection } from './admin/AdminLogSection';
+import { ConfirmUsersSection } from './admin/ConfirmUsersSection';
 import { ImportSection } from './admin/ImportSection';
 import { ListsSection } from './admin/ListsSection';
 import { PrintSection } from './admin/PrintSection';
@@ -88,6 +89,7 @@ const ALL: RoleCode[] = ['owner_doctor', 'substitute_doctor', 'administrator'];
 const SECTIONS: { key: string; label: string; roles: RoleCode[] }[] = [
   { key: 'studio', label: 'Dati dello studio', roles: ALL },
   { key: 'utenti', label: 'Utenti e ruoli', roles: ['administrator'] },
+  { key: 'conferme', label: 'Utenti da confermare', roles: ['owner_doctor'] },
   { key: 'stampa', label: 'Postazioni e stampa', roles: ALL },
   { key: 'elenchi', label: 'Elenchi dello studio', roles: ALL },
   { key: 'modelli', label: 'Modelli dei certificati', roles: ALL },
@@ -135,6 +137,7 @@ export function StudioToolsPage() {
       </div>
       {current.key === 'studio' && <StudioSection />}
       {current.key === 'utenti' && <UsersSection />}
+      {current.key === 'conferme' && <ConfirmUsersSection />}
       {current.key === 'stampa' && <PrintSection />}
       {current.key === 'elenchi' && <ListsSection />}
       {current.key === 'registro' && <AdminLogSection />}

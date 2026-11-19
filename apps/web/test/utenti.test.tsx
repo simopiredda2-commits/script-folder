@@ -97,6 +97,28 @@ describe('password temporanea (tappa 14)', () => {
   });
 });
 
+/** Un utente dell'elenco, come lo dà il servizio; i campi che contano si cambiano nella prova. */
+const row = (over: Record<string, unknown>) => ({
+  email: null,
+  stato: 'attivo',
+  secondoFattoreAttivo: true,
+  bloccatoFinoA: null,
+  tentativiFalliti: 0,
+  passwordDaCambiare: false,
+  passwordCambiataIl: null,
+  creatoIl: '2026-11-01T08:00:00Z',
+  medico: null,
+  archivio: null,
+  io: false,
+  inAttesaDiConferma: false,
+  richiestaDiConferma: null,
+  confermato: null,
+  ripristinoDalServizio: false,
+  titolareConPazienti: false,
+  ...over,
+});
+
+const ADMIN_ROLE = [{ codice: 'administrator', nome: 'Amministratore dello studio' }];
 const USERS = {
   ruoli: [
     { codice: 'owner_doctor', nome: 'Medico titolare' },
@@ -105,40 +127,42 @@ const USERS = {
     { codice: 'administrator', nome: 'Amministratore dello studio' },
   ],
   utenti: [
-    {
+    row({
       id: 'a1',
       nomeUtente: 'amministratore',
       nome: 'Andrea Conti',
-      email: null,
-      ruoli: [{ codice: 'administrator', nome: 'Amministratore dello studio' }],
-      stato: 'attivo',
-      secondoFattoreAttivo: true,
-      bloccatoFinoA: null,
-      tentativiFalliti: 0,
-      passwordDaCambiare: false,
-      passwordCambiataIl: null,
-      creatoIl: '2026-11-01T08:00:00Z',
-      medico: null,
-      archivio: null,
+      ruoli: ADMIN_ROLE,
       io: true,
-    },
-    {
+    }),
+    row({ id: 'a2', nomeUtente: 'amministratore.due', nome: 'Bruna Galli', ruoli: ADMIN_ROLE }),
+    row({
       id: 's1',
       nomeUtente: 'segreteria',
       nome: 'Lucia Bassi',
-      email: null,
       ruoli: [{ codice: 'secretary', nome: 'Segreteria' }],
-      stato: 'attivo',
-      secondoFattoreAttivo: true,
-      bloccatoFinoA: null,
-      tentativiFalliti: 0,
-      passwordDaCambiare: false,
-      passwordCambiataIl: null,
-      creatoIl: '2026-11-01T08:00:00Z',
-      medico: null,
-      archivio: null,
-      io: false,
-    },
+      ripristinoDalServizio: true,
+      confermato: { da: 'Dott.ssa Elena Marchi', il: '2026-11-02T09:00:00Z' },
+    }),
+    row({
+      id: 't1',
+      nomeUtente: 'titolare',
+      nome: 'Dott.ssa Elena Marchi',
+      ruoli: [{ codice: 'owner_doctor', nome: 'Medico titolare' }],
+      ripristinoDalServizio: true,
+      titolareConPazienti: true,
+      archivio: { id: 'arc1', nome: 'Archivio Marchi' },
+    }),
+    row({
+      id: 'w1',
+      nomeUtente: 'nuova.segreteria',
+      nome: 'Nuova Segreteria',
+      ruoli: [{ codice: 'secretary', nome: 'Segreteria' }],
+      secondoFattoreAttivo: false,
+      passwordDaCambiare: true,
+      ripristinoDalServizio: true,
+      inAttesaDiConferma: true,
+      richiestaDiConferma: { da: 'Andrea Conti', il: '2026-11-19T10:00:00Z' },
+    }),
   ],
 };
 
@@ -146,7 +170,7 @@ describe('utenti dello studio (tappa 14)', () => {
   it('la password temporanea si vede una volta, con l’istruzione di consegnarla di persona', async () => {
     const calls = fakeService({
       '/api/studio/utenti': () => ({ status: 200, body: USERS }),
-      '/api/studio/utenti/s1/password-temporanea': () => ({
+      '/api/studio/utenti/a2/password-temporanea': () => ({
         status: 200,
         body: {
           utente: { ...USERS.utenti[1], passwordDaCambiare: true },
@@ -164,9 +188,9 @@ describe('utenti dello studio (tappa 14)', () => {
     // Sulla propria riga nessuna azione sulle credenziali: le fa un altro amministratore.
     const own = rows.find((r) => r.textContent?.includes('Andrea Conti'))!;
     expect(within(own).queryByRole('button', { name: /Password temporanea/ })).toBeNull();
-    const other = rows.find((r) => r.textContent?.includes('Lucia Bassi'))!;
+    const other = rows.find((r) => r.textContent?.includes('Bruna Galli'))!;
     await user.click(
-      within(other).getByRole('button', { name: 'Password temporanea per Lucia Bassi' }),
+      within(other).getByRole('button', { name: 'Password temporanea per Bruna Galli' }),
     );
     expect(confirm).toHaveBeenCalledOnce();
     expect(String((confirm.mock.calls[0] as unknown[])[0])).toMatch(/smette di valere/);
@@ -175,6 +199,72 @@ describe('utenti dello studio (tappa 14)', () => {
     expect(calls.some((c) => c.method === 'POST')).toBe(true);
     await user.click(screen.getByRole('button', { name: 'Consegnata: nascondi la password' }));
     expect(screen.queryByText('Prova-Temporanea')).toBeNull();
+  });
+
+  it('medici e segreteria: niente password temporanea né azzeramento, con il perché; titolare con pazienti non si sospende da qui', async () => {
+    fakeService({ '/api/studio/utenti': () => ({ status: 200, body: USERS }) });
+    render(<UsersSection />);
+    const table = await screen.findByRole('table', { name: 'Utenti dello studio' });
+    const rows = within(table).getAllByRole('row');
+    // La riga dell'utente: quella che comincia con il suo nome (altre righe possono citarlo).
+    const byName = (n: string) =>
+      rows.find((r) => r.querySelector('th')?.textContent?.startsWith(n))!;
+    for (const n of ['Lucia Bassi', 'Dott.ssa Elena Marchi', 'Nuova Segreteria']) {
+      const r = byName(n);
+      expect(within(r).queryByRole('button', { name: /Password temporanea/ }), n).toBeNull();
+      expect(within(r).queryByRole('button', { name: /Azzera il secondo fattore/ }), n).toBeNull();
+      expect(
+        within(r).getByText(/li ripristina chi gestisce il servizio, sul server/),
+      ).toBeTruthy();
+    }
+    // L'amministratore senza dati dei pazienti sì.
+    expect(
+      within(byName('Bruna Galli')).getByRole('button', {
+        name: 'Azzera il secondo fattore per Bruna Galli',
+      }),
+    ).toBeTruthy();
+    // Titolare con pazienti: niente «Sospendi», e si dice la strada.
+    const owner = byName('Dott.ssa Elena Marchi');
+    expect(within(owner).queryByRole('button', { name: /Sospendi/ })).toBeNull();
+    expect(within(owner).getByText(/prima il medico esporta i suoi dati/)).toBeTruthy();
+    expect(
+      within(byName('Lucia Bassi')).getByRole('button', { name: 'Sospendi per Lucia Bassi' }),
+    ).toBeTruthy();
+    // Lo stato dell'attesa e della conferma, a parole.
+    const waiting = byName('Nuova Segreteria');
+    expect(within(waiting).getByText('In attesa di conferma di un titolare')).toBeTruthy();
+    expect(waiting.textContent).toMatch(/richiesta di Andrea Conti del/);
+    expect(byName('Lucia Bassi').textContent).toMatch(/Confermato da Dott\.ssa Elena Marchi il/);
+  });
+
+  it('utente nuovo con i dati dei pazienti: nessuna password all’amministratore, e si dice chi la riceve', async () => {
+    const created = { ...USERS.utenti[4], id: 'w2', nomeUtente: 'carla.neri', nome: 'Carla Neri' };
+    const calls = fakeService({
+      '/api/studio/utenti': (method) =>
+        method === 'GET'
+          ? { status: 200, body: USERS }
+          : {
+              status: 201,
+              body: {
+                utente: created,
+                avvisi: [
+                  'In attesa della conferma di un medico titolare dello studio: finché non è confermato, l’utente non entra.',
+                  'La password temporanea la riceve il medico titolare che lo conferma, da consegnare di persona; il secondo fattore si attiva al primo accesso.',
+                ],
+              },
+            },
+    });
+    const user = userEvent.setup();
+    render(<UsersSection />);
+    const form = await screen.findByRole('form', { name: 'Nuovo utente' });
+    expect(within(form).getByText(/aspettano la conferma di un medico titolare/)).toBeTruthy();
+    await user.type(within(form).getByLabelText('Nome utente'), 'carla.neri');
+    await user.type(within(form).getByLabelText('Nome mostrato'), 'Carla Neri');
+    await user.click(within(form).getByLabelText('Segreteria'));
+    await user.click(within(form).getByRole('button', { name: 'Crea l’utente' }));
+    expect(await screen.findByText(/la riceve il medico titolare che lo conferma/)).toBeTruthy();
+    expect(screen.queryByText(/Consegnala di persona/)).toBeNull();
+    expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({ ruoli: ['secretary'] });
   });
 
   it('senza conferma non parte nulla', async () => {
