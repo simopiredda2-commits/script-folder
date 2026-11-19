@@ -25,7 +25,6 @@ import { z, type ZodError } from 'zod';
 import { entryIssues, insertEntry, newEntryBody, type NewEntry } from '../clinical/entries';
 import {
   allergyDetail,
-  clinicalEntry,
   exemption,
   family,
   importOrigin,
