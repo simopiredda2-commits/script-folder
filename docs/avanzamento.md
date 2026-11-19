@@ -23,7 +23,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #11 (19/11/2026)**, nello stesso branch ripartito da `main`: AURA con un simulatore (D197), sezione «Dopo l'unione della #11 – AURA con un simulatore». Simone ha mandato la PEC al CSI Piemonte, in copia alla Regione. Fermata fatta: via, pull request #12 unita (risposte in «Risposte della fermata dopo l'unione della #11»).
 - **Dopo l'unione della #12 (19/11/2026)**, nello stesso branch: revoca automatica e anagrafica da AURA da confermare (D198), con la correzione dei controlli in parallelo; sezione «Dopo l'unione della #12 – Revoca e anagrafica da AURA». Fermata fatta: via, pull request #13 unita (risposte in «Risposte della fermata dopo l'unione della #12»).
 - **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199). Fermata fatta: via, pull request #14 unita (risposte in «Risposte della fermata dopo l'unione della #13»).
-- **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Pull request #15, in attesa del via alla fermata.
+- **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
+- **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo e liste AIFA che mancano, con il collegamento alla farmacovigilanza, come ha scelto Simone alla fermata.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -677,9 +678,9 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
 
 **Non fatto**: niente di quanto chiesto.
 
-**Non provato**: WebKit e Firefox su questa macchina, li prova la CI; il servizio vero di AURA, come per D197. Senza il titolare (malattia, ferie) lo spostamento aspetta, perché il sostituto non può farlo: domanda per la fermata.
+**Non provato**: WebKit e Firefox su questa macchina, li prova la CI; il servizio vero di AURA, come per D197. Senza il titolare (malattia, ferie) lo spostamento aspetta, perché il sostituto non può farlo: per Simone non è un problema, perché intanto il sostituto lavora sui pazienti con la sua utenza (fermata dopo l'unione della #14).
 
-**Prossimo passo**: pull request e fermata.
+**Prossimo passo**: fatto. Pull request #15 unita con il via di Simone.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -912,11 +913,21 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-1. Via all'unione della pull request con la simulazione del deceduto e il cambio di medico dentro lo studio (D200).
-2. Cambio di medico quando il titolare di prima non c'è: lo decide solo il titolare (consigliata: i dati sono del titolare, regola 4), o anche il sostituto durante la sostituzione.
-3. Che cosa si fa dopo, fra le cose che si possono fare da qui: i riepiloghi per periodo dei requisiti (visite, prescrizioni, vaccinazioni, con l'esportazione; consigliata, perché non dipende da nessuno), le liste AIFA che mancano (trasparenza con le note, carenze) con il collegamento alla farmacovigilanza (D82), o fermarsi fino alle verifiche.
+Da scrivere alla fine del blocco dei riepiloghi e delle liste AIFA. Restano le verifiche alla fine della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7), più R19 e R20.
 
-Restano le verifiche alla fine della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7), più R19 e R20.
+## Risposte della fermata dopo l'unione della #14 (19/11/2026)
+
+Simone ha risposto con il pulsante:
+
+- **Via**: «A. Via: unisci». Pull request #15 unita in `main`, con le prove verdi sul push e sulla pull request (WebKit, Firefox, TypeScript e `sync/`). Una delle due prove con WebKit ha impiegato 22 minuti a scaricare il browser, poi è passata.
+- **Cambio di medico con il titolare assente**: «Non penso sia un problema grande da affrontare dal momento che il sostituto avrebbe accesso ai pazienti con l'utenza da sostituto». Resta com'è: lo spostamento lo decide il titolare (D200).
+- **Che cosa fare dopo**: «A e B». Da fare, nello stesso branch: i riepiloghi per periodo dei requisiti (visite, prescrizioni, vaccinazioni, con l'esportazione), e le liste AIFA che mancano (trasparenza con le note, carenze) con il collegamento alla segnalazione di farmacovigilanza (D82).
+
+## Domande della fermata dopo l'unione della #14 (chiuse)
+
+1. Via all'unione della pull request #15.
+2. Cambio di medico con il titolare assente: solo il titolare (consigliata), o anche il sostituto durante la sostituzione.
+3. Che cosa fare dopo: riepiloghi per periodo (consigliata), liste AIFA e farmacovigilanza, o fermarsi.
 
 ## Risposte della fermata dopo l'unione della #13 (19/11/2026)
 
