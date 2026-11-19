@@ -162,6 +162,8 @@ type Batch = typeof importBatch.$inferSelect;
 export function registerImportRoutes(app: FastifyInstance, deps: AdminDeps): void {
   const { db } = deps;
   const store = new UploadStore(deps.now);
+  // Regola 1: fuori dalla produzione solo pazienti inventati (D12, D170).
+  const onlyFictitious = deps.environment !== 'produzione';
   // Le esenzioni si controllano sul catalogo in vigore, se è importato (altrimenti nessun avviso).
   const reference = new ReferenceData(db, undefined, {
     now: deps.now,
@@ -388,7 +390,7 @@ export function registerImportRoutes(app: FastifyInstance, deps: AdminDeps): voi
           totale: matching.length,
           righe: matching.slice(0, PREVIEW_ROWS).map((r) => {
             const converted = convertRow(p, r.cells, r.kinds, { date1904: !!u.file.date1904 });
-            const prep = prepareRow(p, converted, today, handlers);
+            const prep = prepareRow(p, converted, today, onlyFictitious, handlers);
             return {
               riga: r.line,
               valori: converted.values,
@@ -452,6 +454,7 @@ export function registerImportRoutes(app: FastifyInstance, deps: AdminDeps): voi
             sourceProgram: mapping.programma ?? null,
             date1904: !!u.file.date1904,
             exemptionExists: lookups.exemptionExists,
+            onlyFictitious,
           },
           parts,
         );

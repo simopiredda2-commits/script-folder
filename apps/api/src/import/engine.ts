@@ -27,10 +27,8 @@ import { convertValue } from './transforms';
 
 /**
  * Fuori dalla produzione si importano solo pazienti inventati, con la X in dodicesima posizione
- * del codice fiscale (regola 1, D12). Il servizio non ha ancora un'impostazione «ambiente di
- * produzione»: la guardia resta sempre accesa finché non ci sarà.
+ * del codice fiscale (regola 1, D12). L'ambiente lo dice APP_AMBIENTE (D170): per difetto «prova».
  */
-export const ONLY_FICTITIOUS_PATIENTS = true;
 
 export type Outcome = 'scritta' | 'completata' | 'gia_presente' | 'doppione' | 'scartata';
 
@@ -114,9 +112,9 @@ export function sourceKey(
   return `${destination}:${sha256(JSON.stringify([fiscalCode, ...naturalKey.map(normalizeKeyValue)]))}`;
 }
 
-/** Fuori produzione: solo codici fiscali con la X in dodicesima posizione (D12). */
-export function fiscalCodeAllowed(cf: string): boolean {
-  return !ONLY_FICTITIOUS_PATIENTS || cf[11] === 'X';
+/** Fuori produzione: solo codici fiscali con la X in dodicesima posizione (D12, D170). */
+export function fiscalCodeAllowed(cf: string, onlyFictitious: boolean): boolean {
+  return !onlyFictitious || cf[11] === 'X';
 }
 
 export interface ConvertedRow {
@@ -158,6 +156,7 @@ export function prepareRow(
   part: ResolvedPart,
   converted: ConvertedRow,
   today: string,
+  onlyFictitious: boolean,
   handlers: ReturnType<typeof entryHandlers>,
 ):
   | {
@@ -184,7 +183,7 @@ export function prepareRow(
       );
   if (errors.length) return { ok: false, errors, warnings };
   const cf = typeof values.codiceFiscale === 'string' ? values.codiceFiscale : '';
-  if (cf && !fiscalCodeAllowed(cf))
+  if (cf && !fiscalCodeAllowed(cf, onlyFictitious))
     return {
       ok: false,
       errors: [
@@ -211,6 +210,8 @@ export function prepareRow(
 
 export interface RunContext extends WriteContext {
   date1904: boolean;
+  /** Solo pazienti inventati: fuori dalla produzione (D12, D170). */
+  onlyFictitious: boolean;
   exemptionExists?: (code: string) => boolean | undefined;
 }
 
@@ -290,7 +291,7 @@ export async function runImport(ctx: RunContext, parts: ResolvedPart[]): Promise
         destinazione: dest,
       };
       const converted = convertRow(part, record.cells, record.kinds, ctx);
-      const prep = prepareRow(part, converted, ctx.today, handlers);
+      const prep = prepareRow(part, converted, ctx.today, ctx.onlyFictitious, handlers);
       if (!prep.ok) {
         push({ ...base, esito: 'scartata', motivi: prep.errors, avvisi: prep.warnings });
         continue;

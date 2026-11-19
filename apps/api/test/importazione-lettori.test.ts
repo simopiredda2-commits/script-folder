@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { strToU8, zipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
 import { entryHandlers } from '../src/import/destinations';
-import { convertRow, prepareRow } from '../src/import/engine';
+import { convertRow, fiscalCodeAllowed, prepareRow } from '../src/import/engine';
 import { resolveMapping } from '../src/import/mapping';
 import { readImportFile } from '../src/import/read';
 import { Deadline, FileRejected, type ImportTable } from '../src/import/table';
@@ -477,6 +477,7 @@ describe('campi obbligatori del catalogo e controlli dell’inserimento a mano',
           p!,
           convertRow(p!, r.cells, r.kinds, { date1904: false }),
           '2026-11-19',
+          true,
           entryHandlers(),
         );
       };
@@ -488,4 +489,14 @@ describe('campi obbligatori del catalogo e controlli dell’inserimento a mano',
       });
     });
   }
+});
+
+describe('regola 1 secondo l’ambiente (D12, D170)', () => {
+  // Codici di comodo: la guardia guarda solo la dodicesima posizione. «Y001» non è di nessun
+  // comune né Stato, come nelle altre prove.
+  it('in prova solo codici con la X in dodicesima posizione; in produzione anche gli altri', () => {
+    expect(fiscalCodeAllowed('BNCLRA80A41X001A', true)).toBe(true);
+    expect(fiscalCodeAllowed('BNCLRA80A41Y001A', true)).toBe(false);
+    expect(fiscalCodeAllowed('BNCLRA80A41Y001A', false)).toBe(true);
+  });
 });

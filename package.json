@@ -11,7 +11,7 @@
     "db:migrate": "pnpm --filter @mmg/api db:migrate",
     "test": "vitest run && pnpm test:sync",
     "test:sync": "cd sync && python3 -m unittest -v test_banche_dati",
-    "lint": "eslint . && prettier --check . && pnpm typecheck",
+    "lint": "NODE_OPTIONS=--max-old-space-size=4096 eslint . && prettier --check . && pnpm typecheck",
     "typecheck": "pnpm -r --no-bail typecheck",
     "format": "prettier --write .",
     "fixtures": "pnpm --filter @mmg/fixtures generate",
