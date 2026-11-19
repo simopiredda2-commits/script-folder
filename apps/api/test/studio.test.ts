@@ -298,7 +298,7 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
     expect(problems(res)).toEqual([
       'Minuti di inattività prima del blocco: un numero intero da 1 a 30',
       'Tentativi falliti prima del blocco: un numero intero da 3 a 10',
-      'Durata del blocco: un numero intero da 5 a 1440 minuti',
+      'Durata del blocco: un numero intero da 5 a 60 minuti',
       'Tempo massimo di attesa degli invii: un numero intero da 1 a 60 secondi',
       'Cartelle diverse aperte da un utente in un giorno: un numero intero da 1 a 10000',
       'Fascia oraria, dalle ore: un numero intero da 0 a 23',
@@ -316,7 +316,7 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
     ]);
     // Ai limiti si salva; fuori dai 6–8 secondi della Regione resta un avviso.
     const edge = await put({
-      sicurezza: { minutiInattivita: 30, tentativiFalliti: 10, minutiBlocco: 1440 },
+      sicurezza: { minutiInattivita: 30, tentativiFalliti: 10, minutiBlocco: 60 },
       invii: { secondiAttesa: 60 },
     });
     expect(edge.statusCode, edge.body).toBe(200);

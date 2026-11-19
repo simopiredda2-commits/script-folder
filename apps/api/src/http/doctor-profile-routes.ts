@@ -2,8 +2,10 @@ import { doctorIssues } from '@mmg/domain';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { logAccess } from '../audit/access-log';
 import type { Database } from '../db/client';
 import { appUser, doctorProfile } from '../db/schema';
+import { withActor } from '../db/tx';
 import { HttpError } from './errors';
 
 const contactsBody = z
@@ -24,7 +26,10 @@ const contactsBody = z
 /**
  * Nome, cognome e recapiti di studio del medico collegato (tappa 11): vanno nel Profilo
  * Sanitario Sintetico, che vuole nome e cognome separati e almeno un recapito (schematron,
- * ERRORE-38, ERRORE-40). Li cambia solo il medico stesso.
+ * ERRORE-38, ERRORE-40). Li cambia solo il medico stesso. Nome e cognome sono anche quelli che il
+ * titolare ha visto alla conferma e che vanno sui documenti: ogni loro cambio va nel registro delle
+ * azioni di amministrazione, con i nomi dei campi e mai i valori (tappa 14, dopo la revisione dei
+ * poteri dell'amministratore).
  */
 export function registerDoctorProfileRoutes(app: FastifyInstance, db: Database) {
   const doctorOnly = (roles: readonly string[]) => {
@@ -79,10 +84,41 @@ export function registerDoctorProfileRoutes(app: FastifyInstance, db: Database) 
       email: b.email || null,
       pec: b.pec || null,
     };
-    await db
-      .insert(doctorProfile)
-      .values({ userId: actor.userId, ...values })
-      .onConflictDoUpdate({ target: doctorProfile.userId, set: values });
+    await withActor(db, actor.userId, async (tx) => {
+      const [before] = await tx
+        .select({ firstName: doctorProfile.firstName, lastName: doctorProfile.lastName })
+        .from(doctorProfile)
+        .where(eq(doctorProfile.userId, actor.userId))
+        .for('update');
+      await tx
+        .insert(doctorProfile)
+        .values({ userId: actor.userId, ...values })
+        .onConflictDoUpdate({ target: doctorProfile.userId, set: values });
+      const campi = [
+        ...((before?.firstName ?? null) !== values.firstName ? ['medico.nome'] : []),
+        ...((before?.lastName ?? null) !== values.lastName ? ['medico.cognome'] : []),
+      ];
+      if (campi.length === 0) return;
+      const [me] = await tx
+        .select({ username: appUser.username })
+        .from(appUser)
+        .where(eq(appUser.id, actor.userId));
+      await logAccess(tx, {
+        studioId: actor.studioId,
+        userId: actor.userId,
+        patientId: null,
+        action: 'amministrazione',
+        outcome: 'riuscito',
+        workstation: actor.workstation,
+        details: {
+          area: 'profilo',
+          azione: 'modifica',
+          utente: me?.username ?? null,
+          utenteId: actor.userId,
+          campi,
+        },
+      });
+    });
     return read(actor.userId);
   });
 }

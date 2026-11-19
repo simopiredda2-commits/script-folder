@@ -40,14 +40,18 @@ import { hashPassword } from '../security/password';
  *
  * Perché l'amministratore non diventi un medico o la segreteria:
  * 1. chi ha un ruolo che apre dati dei pazienti, creato dall'amministratore o a cui
- *    l'amministratore aggiunge quel ruolo, resta in attesa finché un medico titolare attivo dello
- *    studio non lo conferma (tranne il primo titolare di uno studio senza titolari né pazienti);
- *    per gli utenti nuovi e per chi prima non aveva ruoli con i dati dei pazienti, la password
- *    temporanea la riceve il titolare che conferma, non l'amministratore;
- * 2. password temporanea e azzeramento del secondo fattore di quegli utenti li fa chi gestisce il
- *    servizio, sul server (`pnpm utente:ripristina`), non l'amministratore;
- * 3. un titolare con pazienti nel suo archivio non si sospende e non perde il ruolo
- *    dall'amministratore (prima l'esportazione dei dati, regola 4);
+ *    l'amministratore aggiunge quel ruolo, resta in attesa finché un medico titolare attivo e
+ *    confermato dello studio non lo conferma, senza eccezioni, anche il primo titolare di uno studio
+ *    vuoto; quando nessun titolare può confermare, conferma chi gestisce il servizio, sul server
+ *    (`pnpm utente:ripristina -- --utente NOME --conferma`). L'amministratore non riceve mai la
+ *    password temporanea di questi utenti: la riceve chi conferma;
+ * 2. password temporanea, azzeramento del secondo fattore e sblocco dopo i tentativi falliti di
+ *    quegli utenti li fa chi gestisce il servizio, sul server (`pnpm utente:ripristina`), non
+ *    l'amministratore;
+ * 3. un titolare con pazienti nel suo archivio non si sospende, non perde il ruolo e, se è
+ *    sospeso, non si riattiva dall'amministratore (prima l'esportazione dei dati, regola 4); e
+ *    dal programma non si sospende e non perde il ruolo l'ultimo titolare attivo e confermato,
+ *    anche senza pazienti: senza di lui nessuno conferma;
  * 4. se l'amministratore corregge codice fiscale o codice regionale di un medico, le sessioni dei
  *    servizi legate a quei codici si chiudono (D111).
  */
@@ -84,6 +88,12 @@ const USERNAME_TAKEN = 'Nome utente già in uso: scegline un altro';
 /** Scelta 2: le credenziali di chi apre dati dei pazienti non le ripristina l'amministratore. */
 export const CLINICAL_CREDENTIALS_REFUSAL =
   'Password e secondo fattore di medici e segreteria li ripristina chi gestisce il servizio, sul server: l’amministratore dello studio non può, perché entrerebbe al loro posto e vedrebbe i dati dei pazienti';
+/**
+ * Nemmeno lo sblocco dopo i tentativi falliti: chi ha la password di un medico, o la cerca,
+ * riaprirebbe i tentativi quante volte vuole (revisione dei poteri dell'amministratore).
+ */
+export const CLINICAL_UNLOCK_REFUSAL =
+  'Il blocco di medici e segreteria dopo i tentativi falliti lo toglie chi gestisce il servizio, sul server, oppure finisce da solo allo scadere del tempo: l’amministratore dello studio non può, perché riaprirebbe i tentativi su credenziali che non sono sue';
 
 const OWNER_HAS_PATIENTS = 'Il medico titolare ha pazienti nel suo archivio';
 /** Scelta 3: titolari con pazienti protetti dalla sospensione e dalla perdita del ruolo. */
@@ -91,9 +101,19 @@ export const OWNER_SUSPEND_REFUSAL = `${OWNER_HAS_PATIENTS}: prima il medico esp
 export const OWNER_ROLE_REMOVAL_REFUSAL = `${OWNER_HAS_PATIENTS}: senza il ruolo non potrebbe più aprirlo né esportare i suoi dati. Prima il medico esporta i suoi dati, poi chi gestisce il servizio lo sospende, sul server`;
 /** Un ruolo in più lo metterebbe in attesa di conferma: fuori dal suo archivio, come sospeso. */
 export const OWNER_ROLE_ADD_REFUSAL = `${OWNER_HAS_PATIENTS}: con un altro ruolo con i dati dei pazienti resterebbe in attesa di conferma, fuori dal suo archivio e senza poter esportare i suoi dati`;
+/** Un titolare con pazienti sospeso (dal server) si riattiva solo dal server. */
+export const OWNER_REACTIVATE_REFUSAL = `${OWNER_HAS_PATIENTS}: sospeso, lo riattiva solo chi gestisce il servizio, sul server`;
+
+const LAST_OWNER =
+  'È l’ultimo medico titolare attivo e confermato dello studio: senza di lui, dal programma, nessuno conferma gli utenti con i dati dei pazienti';
+/** L'ultimo titolare attivo e confermato non si perde dal programma, anche senza pazienti. */
+export const LAST_OWNER_SUSPEND_REFUSAL = `${LAST_OWNER}. Prima va confermato un altro medico titolare; altrimenti la sospensione la fa chi gestisce il servizio, sul server`;
+export const LAST_OWNER_ROLE_REMOVAL_REFUSAL = `${LAST_OWNER}. Prima va confermato un altro medico titolare; altrimenti lo fa chi gestisce il servizio, sul server`;
+export const LAST_OWNER_ROLE_ADD_REFUSAL = `${LAST_OWNER}: con un altro ruolo con i dati dei pazienti resterebbe in attesa di conferma. Prima va confermato un altro medico titolare`;
 
 export const NOT_CONFIRMER = 'Gli utenti li conferma un medico titolare dello studio';
 const NOT_AWAITING = 'L’utente non è in attesa di conferma';
+const SUSPENDED_CONFIRM = 'L’utente è sospeso: prima lo riattiva l’amministratore';
 const STALE_REQUEST =
   'La richiesta è cambiata dopo che l’hai letta: controlla di nuovo i dati dell’utente e conferma';
 
@@ -107,8 +127,12 @@ const OWN_CREDENTIALS_NOTICE =
   'Dopo la conferma l’utente rientra con la sua password e il suo secondo fattore.';
 const STILL_AWAITING_NOTICE =
   'L’utente resta in attesa della conferma di un medico titolare: la richiesta ha la data di adesso.';
-const FIRST_OWNER_NOTICE =
-  'Primo medico titolare dello studio: non ci sono ancora titolari attivi né pazienti, quindi non serve la conferma.';
+/**
+ * Nessun titolare attivo e confermato che possa confermare (studio nuovo, titolari sospesi o in
+ * attesa): conferma chi gestisce il servizio, sul server, e consegna lui la password.
+ */
+const serverConfirmNotice = (username: string) =>
+  `Nello studio non c’è un medico titolare attivo e confermato che possa confermarlo: lo conferma chi gestisce il servizio, sul server (pnpm utente:ripristina -- --utente ${username} --conferma), con una password temporanea nuova da consegnare di persona; il secondo fattore si attiva al primo accesso.`;
 const WITHDRAWN_NOTICE =
   'Senza ruoli con i dati dei pazienti la conferma non serve più: la richiesta è ritirata.';
 
@@ -304,6 +328,8 @@ interface ViewContext {
   names: Map<string, string>;
   /** Utenti con pazienti negli archivi di cui sono titolari. */
   withPatients: Set<string>;
+  /** Titolari attivi e confermati dello studio: quelli che possono confermare. */
+  confirmers: Set<string>;
 }
 
 function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewContext) {
@@ -342,10 +368,20 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
       !u.awaitingConfirmation && u.confirmedAt
         ? { da: who(u.confirmedBy), il: u.confirmedAt.toISOString() }
         : null,
-    /** Password e secondo fattore li ripristina chi gestisce il servizio, sul server (scelta 2). */
+    /**
+     * Password, secondo fattore e sblocco dopo i tentativi falliti li fa chi gestisce il servizio,
+     * sul server (scelta 2).
+     */
     ripristinoDalServizio: opensPatientData(u.roles),
-    /** Titolare con pazienti: l'amministratore non lo sospende e non gli toglie il ruolo. */
+    /**
+     * Titolare con pazienti: l'amministratore non lo sospende, non gli toglie il ruolo e, se è
+     * sospeso, non lo riattiva.
+     */
     titolareConPazienti: u.roles.includes('owner_doctor') && c.withPatients.has(u.id),
+    /** L'ultimo titolare attivo e confermato: dal programma non si sospende e non perde il ruolo. */
+    ultimoTitolare: c.confirmers.size === 1 && c.confirmers.has(u.id),
+    /** In attesa e nessun titolare può confermarlo: lo conferma chi gestisce il servizio. */
+    confermaDalServizio: u.awaitingConfirmation && c.confirmers.size === 0,
   };
 }
 
@@ -427,40 +463,29 @@ async function ownersWithPatients(
   return new Set(rows.map((r) => r.ownerUserId));
 }
 
-async function studioHasPatients(q: Database | Tx, studioId: string): Promise<boolean> {
-  const [row] = await q
-    .select({ id: patient.id })
-    .from(patient)
-    .where(eq(patient.studioId, studioId))
-    .limit(1);
-  return !!row;
-}
+/** Medico titolare attivo e confermato: può confermare gli utenti in attesa. */
+export const isActiveConfirmedOwner = (
+  u: Pick<UserRow, 'status' | 'awaitingConfirmation' | 'roles'>,
+) => u.status === 'active' && !u.awaitingConfirmation && u.roles.includes('owner_doctor');
 
 /** Titolari attivi e già confermati dello studio, tranne `exceptId`. */
-const otherActiveOwners = (users: readonly UserRow[], exceptId: string | null) =>
-  users.filter(
-    (u) =>
-      u.id !== exceptId &&
-      u.status === 'active' &&
-      !u.awaitingConfirmation &&
-      u.roles.includes('owner_doctor'),
-  );
+export const otherActiveOwners = (users: readonly UserRow[], exceptId: string | null) =>
+  users.filter((u) => u.id !== exceptId && isActiveConfirmedOwner(u));
 
 /**
- * Eccezione di avvio: il primo titolare non aspetta la conferma se nello studio non c'è ancora un
- * titolare attivo e non c'è alcun paziente. Senza la seconda condizione, un titolare nuovo creato
- * mentre i titolari di prima sono sospesi potrebbe confermare utenti che leggono i loro pazienti.
+ * Il titolare ha pazienti nei suoi archivi? Prima si bloccano le righe dei suoi archivi (FOR
+ * UPDATE): un paziente che sta entrando tiene la chiave esterna sull'archivio (FOR KEY SHARE), che
+ * va in conflitto con questo blocco; così il conteggio aspetta la fine della sua transazione e lo
+ * vede, invece di sospendere un titolare che sta ricevendo il primo paziente (revisione dei poteri
+ * dell'amministratore, problema 6).
  */
-async function isFirstOwner(
-  tx: Tx,
-  users: readonly UserRow[],
-  studioId: string,
-  roles: readonly Role[],
-  exceptId: string | null,
-): Promise<boolean> {
-  if (!roles.includes('owner_doctor')) return false;
-  if (otherActiveOwners(users, exceptId).length > 0) return false;
-  return !(await studioHasPatients(tx, studioId));
+async function ownerHasPatients(tx: Tx, studioId: string, userId: string): Promise<boolean> {
+  await tx
+    .select({ id: archive.id })
+    .from(archive)
+    .where(and(eq(archive.studioId, studioId), eq(archive.ownerUserId, userId)))
+    .for('update');
+  return (await ownersWithPatients(tx, studioId, [userId])).has(userId);
 }
 
 function ensureOtherActiveAdmin(users: readonly UserRow[], target: UserRow) {
@@ -595,6 +620,20 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
     return p ?? null;
   }
 
+  /** I titolari attivi e confermati dello studio: chi può confermare gli utenti in attesa. */
+  async function confirmersOf(q: Database | Tx, studioId: string): Promise<Set<string>> {
+    const rows = await q
+      .select({
+        id: appUser.id,
+        status: appUser.status,
+        awaitingConfirmation: appUser.awaitingConfirmation,
+        roles: appUser.roles,
+      })
+      .from(appUser)
+      .where(eq(appUser.studioId, studioId));
+    return new Set(rows.filter(isActiveConfirmedOwner).map((r) => r.id));
+  }
+
   async function one(actor: Actor, id: string): Promise<UserView> {
     const u = await targetOf(db, actor, id);
     return view(u, await profileOf(db, id), await ownArchive(db, actor, id), {
@@ -602,6 +641,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       t: now(),
       names: await studioNames(db, actor.studioId),
       withPatients: await ownersWithPatients(db, actor.studioId, [id]),
+      confirmers: await confirmersOf(db, actor.studioId),
     });
   }
 
@@ -666,6 +706,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       t,
       names: new Map(users.map((u) => [u.id, u.displayName])),
       withPatients: await ownersWithPatients(db, actor.studioId),
+      confirmers: new Set(users.filter(isActiveConfirmedOwner).map((u) => u.id)),
     };
     return {
       utenti: users.map((u) =>
@@ -683,9 +724,10 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
   /**
    * Utente nuovo, con una password temporanea da cambiare al primo accesso (il secondo fattore si
    * attiva allo stesso accesso). Per un medico la riga del profilo; per un titolare il suo archivio.
-   * Con un ruolo che apre dati dei pazienti l'utente resta in attesa della conferma di un titolare,
-   * e la password temporanea non la riceve l'amministratore ma il titolare che conferma; fa
-   * eccezione il primo titolare di uno studio senza titolari né pazienti.
+   * Con un ruolo che apre dati dei pazienti l'utente resta in attesa della conferma, sempre, anche
+   * il primo titolare di uno studio vuoto (nessuna eccezione di avvio): la password temporanea non
+   * la riceve l'amministratore ma chi conferma, cioè un titolare attivo e confermato oppure, se non
+   * ce n'è uno, chi gestisce il servizio, sul server.
    */
   async function create(actor: Actor, body: z.infer<typeof createUserBody>) {
     await requireAdmin(actor, 'creazione');
@@ -703,12 +745,12 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
     if (doctor) await ensureDoctorCodesFree(db, actor, doctor, null);
     const password = temporaryPassword();
     const passwordHash = await hashPassword(password);
-    let created: { id: string; awaiting: boolean; firstOwner: boolean };
+    let created: { id: string; awaiting: boolean; noConfirmer: boolean };
     try {
       created = await withActor(db, actor.userId, async (tx) => {
         const users = await lockStudioUsers(tx, actor.studioId);
-        const firstOwner = await isFirstOwner(tx, users, actor.studioId, roles, null);
-        const awaiting = opensPatientData(roles) && !firstOwner;
+        const awaiting = opensPatientData(roles);
+        const noConfirmer = otherActiveOwners(users, null).length === 0;
         const t = now();
         const [u] = await tx
           .insert(appUser)
@@ -753,7 +795,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           campi,
           attesaConferma: awaiting,
         });
-        return { id: userId, awaiting, firstOwner };
+        return { id: userId, awaiting, noConfirmer };
       });
     } catch (e) {
       if (isUniqueViolation(e, 'app_user_username_key')) throw new HttpError(409, USERNAME_TAKEN);
@@ -761,13 +803,14 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
     }
     return {
       utente: await one(actor, created.id),
-      // In attesa: la password resta sconosciuta a tutti, la riceve il titolare alla conferma.
+      // In attesa: la password resta sconosciuta a tutti, la riceve chi conferma.
       ...(created.awaiting ? {} : { passwordTemporanea: password }),
       avvisi: created.awaiting
-        ? [AWAITING_NOTICE, PASSWORD_TO_OWNER]
-        : created.firstOwner
-          ? [FIRST_OWNER_NOTICE]
-          : [],
+        ? [
+            AWAITING_NOTICE,
+            created.noConfirmer ? serverConfirmNotice(body.nomeUtente) : PASSWORD_TO_OWNER,
+          ]
+        : [],
     };
   }
 
@@ -775,10 +818,10 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
    * Nome, email, ruoli e dati del medico. Nessuno cambia i propri ruoli; non si toglie l'ultimo
    * amministratore attivo; il ruolo di titolare porta il suo archivio, se manca. Togliere un ruolo
    * non cancella nulla: la risposta dice che cosa resta. Un ruolo nuovo con i dati dei pazienti
-   * mette l'utente in attesa della conferma di un titolare (le sue sessioni si chiudono); a un
-   * titolare con pazienti il ruolo non si toglie e non se ne aggiungono altri con i dati dei
-   * pazienti. Se cambiano codice fiscale o codice regionale del medico, le sessioni dei servizi
-   * legate a quei codici si chiudono.
+   * mette l'utente in attesa della conferma, sempre (le sue sessioni si chiudono); a un titolare
+   * con pazienti, e all'ultimo titolare attivo e confermato, il ruolo non si toglie e non se ne
+   * aggiungono altri con i dati dei pazienti. Se cambiano codice fiscale o codice regionale del
+   * medico, le sessioni dei servizi legate a quei codici si chiudono.
    */
   async function update(actor: Actor, id: string, body: z.infer<typeof updateUserBody>) {
     return guarded(actor, 'modifica', async () => {
@@ -805,17 +848,27 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           ensureOtherActiveAdmin(users, target);
         // Ruoli con i dati dei pazienti che l'utente non aveva.
         const added = after.filter((r) => PATIENT_DATA_ROLES.includes(r) && !before.includes(r));
+        // Un titolare che perde il ruolo, o che con un ruolo in più andrebbe in attesa.
+        const keepsRole = after.includes('owner_doctor');
         if (
           rolesChanged &&
           before.includes('owner_doctor') &&
-          (!after.includes('owner_doctor') || (added.length > 0 && !target.awaitingConfirmation)) &&
-          (await ownersWithPatients(tx, actor.studioId, [id])).has(id)
-        )
-          throw new Refusal(
-            409,
-            after.includes('owner_doctor') ? OWNER_ROLE_ADD_REFUSAL : OWNER_ROLE_REMOVAL_REFUSAL,
-            target.username,
-          );
+          (!keepsRole || (added.length > 0 && !target.awaitingConfirmation))
+        ) {
+          if (await ownerHasPatients(tx, actor.studioId, id))
+            throw new Refusal(
+              409,
+              keepsRole ? OWNER_ROLE_ADD_REFUSAL : OWNER_ROLE_REMOVAL_REFUSAL,
+              target.username,
+            );
+          // L'ultimo titolare attivo e confermato non si perde dal programma, anche senza pazienti.
+          if (isActiveConfirmedOwner(target) && otherActiveOwners(users, id).length === 0)
+            throw new Refusal(
+              409,
+              keepsRole ? LAST_OWNER_ROLE_ADD_REFUSAL : LAST_OWNER_ROLE_REMOVAL_REFUSAL,
+              target.username,
+            );
+        }
         if (doctor && !isDoctor(after))
           throw new HttpError(400, 'I dati del medico valgono solo per i ruoli di medico');
         const profile = await profileOf(tx, id);
@@ -846,16 +899,12 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
         if (needsArchive) campi.push('archivio');
         if (campi.length === 0) throw new HttpError(400, 'Niente da cambiare');
 
-        // Conferma di un titolare (scelta 1): chi riceve un ruolo nuovo con i dati dei pazienti
-        // aspetta; chi è già in attesa e cambia ancora aspetta con una richiesta nuova.
+        // Conferma (scelta 1, senza eccezione di avvio): chi riceve un ruolo nuovo con i dati dei
+        // pazienti aspetta sempre; chi è già in attesa e cambia ancora aspetta con una richiesta
+        // nuova.
         const t = now();
-        const firstOwner =
-          added.length > 0 &&
-          !target.awaitingConfirmation &&
-          (await isFirstOwner(tx, users, actor.studioId, after, id));
         const awaiting =
-          (added.length > 0 && !firstOwner) ||
-          (target.awaitingConfirmation && opensPatientData(after));
+          added.length > 0 || (target.awaitingConfirmation && opensPatientData(after));
         const withdrawn = target.awaitingConfirmation && !opensPatientData(after);
         const startsWaiting = awaiting && !target.awaitingConfirmation;
         if (awaiting) {
@@ -921,17 +970,24 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
             );
         }
 
-        // Chi va in attesa non lavora più finché un titolare non lo conferma.
+        // Chi va in attesa non lavora più finché non è confermato.
         const sessionsClosed = startsWaiting ? await closeSessions(tx, id, t) : 0;
+        const noConfirmer = awaiting && otherActiveOwners(users, id).length === 0;
         if (startsWaiting) {
           out.push(AWAITING_NOTICE);
           if (sessionsClosed > 0) out.push(`Sessioni aperte chiuse: ${sessionsClosed}.`);
           out.push(
-            patch.confirmationIssuesPassword ? FRESH_CREDENTIALS_NOTICE : OWN_CREDENTIALS_NOTICE,
+            noConfirmer
+              ? serverConfirmNotice(target.username)
+              : patch.confirmationIssuesPassword
+                ? FRESH_CREDENTIALS_NOTICE
+                : OWN_CREDENTIALS_NOTICE,
           );
-        } else if (awaiting) out.push(STILL_AWAITING_NOTICE);
+        } else if (awaiting) {
+          out.push(STILL_AWAITING_NOTICE);
+          if (noConfirmer) out.push(serverConfirmNotice(target.username));
+        }
         if (withdrawn) out.push(WITHDRAWN_NOTICE);
-        if (firstOwner) out.push(FIRST_OWNER_NOTICE);
 
         await logDone(tx, actor, {
           azione: 'modifica',
@@ -953,8 +1009,10 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
 
   /**
    * Sospensione (le sessioni si chiudono subito) e riattivazione. Mai sé stessi; mai un titolare
-   * con pazienti (scelta 3). Chi era in attesa di conferma, riattivato, resta in attesa con una
-   * richiesta nuova: torna nell'elenco dei titolari.
+   * con pazienti (scelta 3), né per sospenderlo né per riattivarlo: lo fa chi gestisce il servizio,
+   * sul server; mai l'ultimo titolare attivo e confermato, anche senza pazienti. Chi era in attesa
+   * di conferma, riattivato, resta in attesa con una richiesta nuova: torna nell'elenco dei
+   * titolari.
    */
   async function setStatus(actor: Actor, id: string, active: boolean) {
     const azione: UserAction = active ? 'riattivazione' : 'sospensione';
@@ -977,11 +1035,16 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
         if (!active && target.roles.includes('administrator'))
           ensureOtherActiveAdmin(users, target);
         if (
-          !active &&
           target.roles.includes('owner_doctor') &&
-          (await ownersWithPatients(tx, actor.studioId, [id])).has(id)
+          (await ownerHasPatients(tx, actor.studioId, id))
         )
-          throw new Refusal(409, OWNER_SUSPEND_REFUSAL, target.username);
+          throw new Refusal(
+            409,
+            active ? OWNER_REACTIVATE_REFUSAL : OWNER_SUSPEND_REFUSAL,
+            target.username,
+          );
+        if (!active && isActiveConfirmedOwner(target) && otherActiveOwners(users, id).length === 0)
+          throw new Refusal(409, LAST_OWNER_SUSPEND_REFUSAL, target.username);
         const t = now();
         const reRequest = active && target.awaitingConfirmation;
         await tx
@@ -1004,12 +1067,15 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
           ...(active ? {} : { sessioniChiuse: n }),
           ...(target.awaitingConfirmation ? { attesaConferma: true } : {}),
         });
-        return { closed: n, reRequest };
+        const noConfirmer = reRequest && otherActiveOwners(users, id).length === 0;
+        return { closed: n, reRequest, noConfirmer, username: target.username };
       });
       return {
         utente: await one(actor, id),
         sessioniChiuse: r.closed,
-        avvisi: r.reRequest ? [STILL_AWAITING_NOTICE] : [],
+        avvisi: r.reRequest
+          ? [STILL_AWAITING_NOTICE, ...(r.noConfirmer ? [serverConfirmNotice(r.username)] : [])]
+          : [],
       };
     });
   }
@@ -1099,19 +1165,25 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
   }
 
   /**
-   * Sblocco dopo troppi tentativi falliti: tentativi a zero, blocco tolto. Mai sé stessi. Vale per
-   * tutti: non cambia password né secondo fattore.
+   * Sblocco dopo troppi tentativi falliti: tentativi a zero, blocco tolto. Mai sé stessi. Solo per
+   * chi non apre dati dei pazienti: medici e segreteria aspettano la fine del blocco, oppure li
+   * sblocca chi gestisce il servizio, sul server (`pnpm utente:ripristina … --sblocca`). Non cambia
+   * password né secondo fattore.
    */
   async function unlock(actor: Actor, id: string) {
     return guarded(actor, 'sblocco', async () => {
       await withActor(db, actor.userId, async (tx) => {
-        const target = await targetOf(tx, actor, id);
+        // Ruoli letti sotto il blocco: un ruolo clinico dato nello stesso momento non sfugge.
+        const target = (await lockStudioUsers(tx, actor.studioId)).find((u) => u.id === id);
+        if (!target) throw new HttpError(404, 'Utente non trovato');
         if (target.id === actor.userId)
           throw new Refusal(
             403,
             'Il tuo utente lo sblocca un altro amministratore',
             target.username,
           );
+        if (opensPatientData(target.roles))
+          throw new Refusal(403, CLINICAL_UNLOCK_REFUSAL, target.username);
         const locked = target.lockedUntil !== null && target.lockedUntil > now();
         if (!locked && target.failedLogins === 0)
           throw new HttpError(409, 'L’utente non è bloccato e non ha tentativi falliti');
@@ -1189,11 +1261,12 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
               'Il tuo utente lo conferma un altro medico titolare',
               target.username,
             );
-          if (!target.awaitingConfirmation) throw new HttpError(409, NOT_AWAITING);
+          // I rifiuti vanno nel registro come gli altri (revisione dei poteri, problema 9).
+          if (!target.awaitingConfirmation) throw new Refusal(409, NOT_AWAITING, target.username);
           if (target.status !== 'active')
-            throw new HttpError(409, 'L’utente è sospeso: prima lo riattiva l’amministratore');
+            throw new Refusal(409, SUSPENDED_CONFIRM, target.username);
           if (target.confirmationRequestedAt?.getTime() !== new Date(body.richiestaIl).getTime())
-            throw new HttpError(409, STALE_REQUEST);
+            throw new Refusal(409, STALE_REQUEST, target.username);
           const t = now();
           const issues = target.confirmationIssuesPassword;
           await tx
@@ -1261,8 +1334,9 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
               'Il tuo utente lo conferma un altro medico titolare',
               target.username,
             );
-          if (!target.awaitingConfirmation) throw new HttpError(409, NOT_AWAITING);
-          if (target.status !== 'active') throw new HttpError(409, 'L’utente è già sospeso');
+          if (!target.awaitingConfirmation) throw new Refusal(409, NOT_AWAITING, target.username);
+          if (target.status !== 'active')
+            throw new Refusal(409, 'L’utente è già sospeso', target.username);
           const t = now();
           await tx.update(appUser).set({ status: 'suspended' }).where(eq(appUser.id, id));
           const n = await closeSessions(tx, id, t);

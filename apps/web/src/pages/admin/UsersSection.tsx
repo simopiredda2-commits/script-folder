@@ -37,10 +37,17 @@ interface User {
   inAttesaDiConferma: boolean;
   richiestaDiConferma: { da: string | null; il: string } | null;
   confermato: { da: string | null; il: string } | null;
-  /** Medici e segreteria: password e secondo fattore li ripristina chi gestisce il servizio. */
+  /**
+   * Medici e segreteria: password, secondo fattore e sblocco dopo i tentativi falliti li fa chi
+   * gestisce il servizio, sul server.
+   */
   ripristinoDalServizio: boolean;
-  /** Titolare con pazienti: non si sospende da qui. */
+  /** Titolare con pazienti: non si sospende e, se è sospeso, non si riattiva da qui. */
   titolareConPazienti: boolean;
+  /** L'ultimo titolare attivo e confermato: non si sospende da qui. */
+  ultimoTitolare: boolean;
+  /** In attesa, e nessun titolare può confermarlo: lo conferma chi gestisce il servizio. */
+  confermaDalServizio: boolean;
 }
 interface Users {
   utenti: User[];
@@ -101,11 +108,15 @@ const ROW_ACTIONS: Record<
   },
 };
 
-/** Perché per medici e segreteria qui non ci sono password temporanea e azzeramento. */
+/** Perché per medici e segreteria qui non ci sono password temporanea, azzeramento e sblocco. */
 const RESTORE_BY_SERVICE =
-  'Password e secondo fattore: li ripristina chi gestisce il servizio, sul server, perché da qui l’amministratore entrerebbe al posto dell’utente.';
+  'Password e secondo fattore: li ripristina chi gestisce il servizio, sul server, perché da qui l’amministratore entrerebbe al posto dell’utente. Anche il blocco dopo i tentativi falliti lo toglie chi gestisce il servizio; altrimenti finisce da solo, allo scadere del tempo.';
 const OWNER_WITH_PATIENTS =
   'Ha pazienti nel suo archivio: per sospenderlo, prima il medico esporta i suoi dati, poi lo fa chi gestisce il servizio.';
+const OWNER_WITH_PATIENTS_SUSPENDED =
+  'Ha pazienti nel suo archivio: lo riattiva chi gestisce il servizio, sul server.';
+const LAST_OWNER =
+  'È l’ultimo medico titolare attivo e confermato: senza di lui nessuno conferma gli utenti dal programma. Per sospenderlo prima va confermato un altro titolare, oppure lo fa chi gestisce il servizio, sul server.';
 
 interface FormValues {
   nomeUtente: string;
@@ -279,8 +290,11 @@ export function UsersSection() {
         </p>
         <p>
           Chi lavora con i dati dei pazienti (medici e segreteria), creato qui o con un ruolo nuovo,
-          entra solo dopo la conferma di un medico titolare dello studio. Le sue password e il suo
-          secondo fattore li ripristina chi gestisce il servizio, sul server.
+          entra solo dopo la conferma di un medico titolare dello studio, sempre: anche il primo
+          medico titolare. Quando nello studio non c’è un titolare attivo e confermato che possa
+          farlo, la conferma la fa chi gestisce il servizio, sul server. Password, secondo fattore e
+          sblocco dopo i tentativi falliti di medici e segreteria li fa chi gestisce il servizio,
+          sul server.
         </p>
         {shown && <TemporaryPassword shown={shown} onClose={() => setShown(null)} />}
         {outcome && <Notice kind="fatto">{outcome.text}</Notice>}
@@ -374,8 +388,13 @@ export function UsersSection() {
                     {!u.io && u.ripristinoDalServizio && (
                       <p className="aiuto">{RESTORE_BY_SERVICE}</p>
                     )}
-                    {!u.io && u.titolareConPazienti && u.stato === 'attivo' && (
-                      <p className="aiuto">{OWNER_WITH_PATIENTS}</p>
+                    {!u.io && u.titolareConPazienti && (
+                      <p className="aiuto">
+                        {u.stato === 'attivo' ? OWNER_WITH_PATIENTS : OWNER_WITH_PATIENTS_SUSPENDED}
+                      </p>
+                    )}
+                    {!u.io && u.ultimoTitolare && !u.titolareConPazienti && (
+                      <p className="aiuto">{LAST_OWNER}</p>
                     )}
                   </td>
                 </tr>
@@ -412,18 +431,20 @@ export function UsersSection() {
 
 /**
  * Le azioni che hanno senso per l'utente della riga, nell'ordine in cui si mostrano. Per medici e
- * segreteria niente password temporanea né azzeramento del secondo fattore; un titolare con
- * pazienti non si sospende da qui. Il servizio lo controlla comunque.
+ * segreteria niente password temporanea, azzeramento del secondo fattore né sblocco; un titolare
+ * con pazienti non si sospende e non si riattiva da qui, l'ultimo titolare attivo e confermato non
+ * si sospende. Il servizio lo controlla comunque.
  */
 function rowActions(u: User): RowAction[] {
   const out: RowAction[] = [];
-  if (u.stato !== 'attivo') out.push('riattiva');
-  else if (!u.titolareConPazienti) out.push('sospendi');
+  if (u.stato !== 'attivo') {
+    if (!u.titolareConPazienti) out.push('riattiva');
+  } else if (!u.titolareConPazienti && !u.ultimoTitolare) out.push('sospendi');
   if (!u.ripristinoDalServizio) {
     out.push('password-temporanea');
     if (u.secondoFattoreAttivo) out.push('azzera-secondo-fattore');
+    if (u.bloccatoFinoA || u.tentativiFalliti > 0) out.push('sblocca');
   }
-  if (u.bloccatoFinoA || u.tentativiFalliti > 0) out.push('sblocca');
   return out;
 }
 
@@ -453,9 +474,16 @@ function UserStatus({ u }: { u: User }) {
           )}
         </li>
       )}
+      {u.inAttesaDiConferma && u.confermaDalServizio && (
+        <li>
+          Nessun medico titolare attivo e confermato può confermarlo: lo conferma chi gestisce il
+          servizio, sul server.
+        </li>
+      )}
       {u.confermato && (
         <li className="tenue">
-          Confermato{u.confermato.da ? ` da ${u.confermato.da}` : ''} il {dateTime(u.confermato.il)}
+          Confermato {u.confermato.da ? `da ${u.confermato.da}` : 'da chi gestisce il servizio'} il{' '}
+          {dateTime(u.confermato.il)}
         </li>
       )}
       {u.bloccatoFinoA && (
@@ -602,8 +630,10 @@ function UserForm({
         <p>
           La password temporanea si crea da sola. Per un amministratore si vede qui, una volta sola,
           appena creato l’utente. Medici e segreteria aspettano la conferma di un medico titolare
-          dello studio, che riceve la password e la consegna di persona. Il secondo fattore si
-          attiva al primo accesso.
+          dello studio, che riceve la password e la consegna di persona; se nessun titolare attivo e
+          confermato può confermare (per esempio il primo titolare di uno studio nuovo), la conferma
+          e la password le dà chi gestisce il servizio, sul server. Il secondo fattore si attiva al
+          primo accesso.
         </p>
       )}
       <fieldset disabled={busy}>

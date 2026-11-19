@@ -36,10 +36,13 @@ export function registerAuthRoutes(
 
   app.post('/api/accesso', { config: { public: true } }, async (req) => {
     const body = loginBody.parse(req.body);
+    // L'indirizzo della richiesta va nel registro dei tentativi falliti: la postazione la scrive
+    // chi accede, l'indirizzo no (tappa 14).
     const r = await auth.login({
       username: body.username,
       password: body.password,
       workstation: body.postazione,
+      address: req.ip,
     });
     if (!r.ok) throw new HttpError(401, r.message);
     if (r.step === 'second_factor')
@@ -54,7 +57,11 @@ export function registerAuthRoutes(
 
   app.post('/api/accesso/codice', { config: { public: true } }, async (req, reply) => {
     const body = codeBody.parse(req.body);
-    const r = await auth.verifySecondFactor({ challengeToken: body.passaggio, code: body.codice });
+    const r = await auth.verifySecondFactor({
+      challengeToken: body.passaggio,
+      code: body.codice,
+      address: req.ip,
+    });
     if (!r.ok) throw new HttpError(401, r.message);
     setSession(reply, r.sessionToken, r.expiresAt);
     return { stato: 'ok', scadenza: r.expiresAt.toISOString() };
@@ -63,7 +70,7 @@ export function registerAuthRoutes(
   app.post('/api/accesso/sblocca', { config: { public: true } }, async (req) => {
     const token = req.cookies[SESSION_COOKIE];
     const body = unlockBody.parse(req.body);
-    if (!token || !(await auth.unlock(token, body.codice))) {
+    if (!token || !(await auth.unlock(token, body.codice, req.ip))) {
       throw new HttpError(401, 'Codice non valido');
     }
     return { stato: 'ok' };
@@ -88,6 +95,7 @@ export function registerAuthRoutes(
     const r = await auth.changePassword(req.actor!, {
       current: body.passwordAttuale,
       next: body.nuovaPassword,
+      address: req.ip,
     });
     // Mai 401: per l'interfaccia vorrebbe dire «sessione finita».
     if (!r.ok) throw new HttpError(r.status, r.message);

@@ -188,6 +188,11 @@ export const authChallenge = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     usedAt: timestamp({ withTimezone: true }),
+    /**
+     * Codici sbagliati su questo passaggio: arrivati ai tentativi dello studio, il passaggio si
+     * chiude (tappa 14, dopo la revisione dei poteri dell'amministratore).
+     */
+    failedCodes: integer().notNull().default(0),
   },
   (t) => [uniqueIndex('auth_challenge_token_hash_key').on(t.tokenHash)],
 );
