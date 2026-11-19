@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
+import { PrintHint } from '../components/PrintHint';
 import { api, ApiError, apiPdf, openPdf } from '../lib/api';
 import { date, studioToday } from '../lib/format';
 import { usePersistentState } from '../lib/storage';
@@ -162,6 +163,7 @@ export function TemplateCertificatesPage() {
             <h2 id="titolo-certificati-rilasciati">
               <Icon name="storico" /> Certificati rilasciati
             </h2>
+            <PrintHint kind="certificato_modello" />
             {overview.loading && !overview.data && <Loading what="certificati" />}
             <ErrorMessage error={overview.error} />
             {overview.data && overview.data.certificati.length === 0 && (
@@ -324,6 +326,8 @@ function IssueForm({
             <Icon name="stampa" /> <span>Anteprima (PDF)</span>
           </button>
         </div>
+        {/* La carta A5 della postazione vale già nell'anteprima (tappa 14). */}
+        <PrintHint kind="certificato_modello" />
       </fieldset>
     </form>
   );
