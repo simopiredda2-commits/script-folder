@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { ErrorMessage, Loading, Notice } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, type ApiError } from '../lib/api';
-import { dateTime, plural } from '../lib/format';
+import { date, dateTime, plural } from '../lib/format';
 import { useApi } from '../lib/useApi';
 import { failure } from './NewPatientPage';
 
@@ -13,7 +13,7 @@ export type AuraOutcome =
 
 export interface AuraChange {
   quando: string;
-  tipo: 'esenzione' | 'scelta';
+  tipo: 'esenzione' | 'scelta' | 'anagrafica' | 'stato';
   variazione: 'nuova' | 'cambiata' | 'tolta';
   descrizione: string;
   avvio?: 'notte' | 'notifica' | 'manuale' | 'ricetta';
@@ -27,7 +27,16 @@ interface AuraState {
   esito: AuraOutcome | null;
   messaggio: string | null;
   aggiornatoIl: string | null;
+  /** Anagrafica di AURA diversa dalla cartella, da confermare (D198). */
+  differenze: Difference[];
   variazioni: AuraChange[];
+}
+
+interface Difference {
+  campo: string;
+  etichetta: string;
+  nellaCartella: string | null;
+  inAura: string;
 }
 
 /** Ogni esito con un simbolo e una parola, non solo con il colore. */
@@ -50,7 +59,17 @@ export const CHANGE_LABEL: Record<AuraChange['variazione'], string> = {
 const KIND_LABEL: Record<AuraChange['tipo'], string> = {
   esenzione: 'Esenzione',
   scelta: 'Scelta del medico',
+  anagrafica: 'Anagrafica',
+  stato: 'Stato del paziente',
 };
+
+/** Il decesso si dice in parole; gli altri dati come sono. */
+const shown = (d: Difference, value: string | null) =>
+  d.campo === 'decesso'
+    ? value
+      ? `Deceduto il ${date(value)}`
+      : 'Non risulta deceduto'
+    : (value ?? '—');
 
 const TRIGGER_LABEL: Record<NonNullable<AuraChange['avvio']>, string> = {
   notte: 'controllo di ogni notte',
@@ -64,7 +83,8 @@ const UNAVAILABLE =
 
 /**
  * AURA, l'anagrafe regionale degli assistiti (D197): com'è andato l'ultimo controllo, il pulsante
- * «Aggiorna da AURA» per chi scrive nell'archivio, le ultime variazioni arrivate.
+ * «Aggiorna da AURA» per chi scrive nell'archivio, l'anagrafica di AURA da confermare (D198), le
+ * ultime variazioni arrivate.
  */
 export function AuraSection({
   patientId,
@@ -113,7 +133,39 @@ export function AuraSection({
     }
   }
 
+  /** Usa il dato di AURA, o tieni quello della cartella: una differenza alla volta. */
+  async function choose(d: Difference, usa: boolean) {
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    try {
+      await api(`/api/pazienti/${patientId}/aura/differenze`, {
+        method: 'POST',
+        body: { scelte: [{ campo: d.campo, inAura: d.inAura, usa }] },
+      });
+      setDone({
+        kind: 'fatto',
+        text:
+          d.campo === 'decesso'
+            ? usa
+              ? 'Decesso confermato.'
+              : 'Decesso non confermato: non si ripropone finché AURA non manda un’altra data.'
+            : usa
+              ? `${d.etichetta}: ora c’è il dato di AURA.`
+              : `${d.etichetta}: resta il dato della cartella.`,
+      });
+      st.reload();
+      if (usa) onUpdated();
+    } catch (err) {
+      setError(failure(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const s = st.data;
+  // Un servizio di prima, senza le differenze, non deve far cadere il pannello.
+  const diffs = s && Array.isArray(s.differenze) ? s.differenze : [];
   return (
     <section className="riquadro" id="aura" aria-labelledby="titolo-aura">
       <h2 id="titolo-aura">
@@ -122,7 +174,8 @@ export function AuraSection({
       <p className="aiuto">
         Esenzioni e scelte del medico arrivano da AURA: a ogni variazione, ogni notte e prima di una
         ricetta con esenzione. Quelle arrivate da AURA non si modificano qui; quelle inserite a mano
-        restano come sono.
+        restano come sono. Se AURA dice che la scelta del medico è cessata, il paziente passa a
+        «revocato» da solo. L’anagrafica di AURA entra nella cartella solo se la confermi.
       </p>
       {st.loading && !s && <Loading what="stato di AURA" />}
       <ErrorMessage error={st.error} />
@@ -171,6 +224,80 @@ export function AuraSection({
               <span>{busy ? 'Controllo in corso…' : 'Aggiorna da AURA'}</span>
             </button>
           )}
+          {diffs.length > 0 && (
+            <>
+              <h3 id="titolo-differenze-aura">Anagrafica diversa in AURA, da confermare</h3>
+              <p className="aiuto">
+                Un dato che non usi non si ripropone, finché AURA non ne manda un altro.
+              </p>
+              <div className="tabella-scorrevole">
+                <table className="tabella" aria-labelledby="titolo-differenze-aura">
+                  <thead>
+                    <tr>
+                      <th scope="col">Dato</th>
+                      <th scope="col">Nella cartella</th>
+                      <th scope="col">In AURA</th>
+                      {canWrite && <th scope="col">Azioni</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diffs.map((d) => (
+                      <tr key={d.campo}>
+                        <th scope="row">{d.etichetta}</th>
+                        <td>{shown(d, d.nellaCartella)}</td>
+                        <td>
+                          <strong>{shown(d, d.inAura)}</strong>
+                        </td>
+                        {canWrite && (
+                          <td>
+                            <div className="azioni">
+                              <button
+                                type="button"
+                                className="pulsante"
+                                disabled={busy}
+                                // Il nome comincia con il testo visibile, e dice di quale dato si tratta.
+                                aria-label={
+                                  d.campo === 'decesso'
+                                    ? undefined
+                                    : `Usa il dato di AURA: ${d.etichetta}`
+                                }
+                                onClick={() => void choose(d, true)}
+                              >
+                                <Icon name="fatto" />{' '}
+                                <span>
+                                  {d.campo === 'decesso'
+                                    ? 'Conferma il decesso'
+                                    : 'Usa il dato di AURA'}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                className="pulsante pulsante-piatto"
+                                disabled={busy}
+                                aria-label={
+                                  d.campo === 'decesso'
+                                    ? undefined
+                                    : `Tieni il dato della cartella: ${d.etichetta}`
+                                }
+                                onClick={() => void choose(d, false)}
+                              >
+                                <Icon name="annulla" />{' '}
+                                <span>
+                                  {d.campo === 'decesso'
+                                    ? 'Non confermare il decesso'
+                                    : 'Tieni il dato della cartella'}
+                                </span>
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
           {done && <Notice kind={done.kind}>{done.text}</Notice>}
           <ErrorMessage error={error} />
           <h3 id="titolo-variazioni-aura">Ultime variazioni da AURA</h3>
@@ -209,41 +336,81 @@ export function AuraSection({
   );
 }
 
+type Who = { id: string; cognome: string; nome: string };
+
 interface StudioChanges {
   disponibile: boolean;
   giorni: number;
-  variazioni: (AuraChange & { paziente: { id: string; cognome: string; nome: string } })[];
+  variazioni: (AuraChange & { paziente: Who })[];
+  /** Anagrafiche di AURA da confermare, il decesso per primo (D198). */
+  daConfermare?: { paziente: Who; campi: string[]; decesso: string | null }[];
 }
 
+const toPanel = (p: Who) => `/pazienti/${p.id}/amministrazione#aura`;
+
 /**
- * Pagina Oggi: le variazioni arrivate da AURA negli ultimi giorni, dei pazienti che l'utente vede.
- * Senza variazioni non si mostra.
+ * Pagina Oggi: le anagrafiche di AURA da confermare (il decesso in evidenza) e le variazioni
+ * arrivate negli ultimi giorni, dei pazienti che l'utente vede. Senza nulla da mostrare non c'è.
  */
 export function AuraChangesToday() {
   const r = useApi<StudioChanges>('/api/aura/variazioni?giorni=7');
   // Una risposta inattesa non deve far cadere la pagina Oggi.
   const list = Array.isArray(r.data?.variazioni) ? r.data.variazioni : [];
-  if (list.length === 0) return null;
+  const pending = Array.isArray(r.data?.daConfermare) ? r.data.daConfermare : [];
+  if (list.length === 0 && pending.length === 0) return null;
+  const deaths = pending.filter((p) => p.decesso);
+  const registry = pending.filter((p) => p.campi.length > 0);
   return (
     <section aria-labelledby="titolo-aura-oggi" className="riquadro">
       <h2 id="titolo-aura-oggi">
         <Icon name="ripeti" /> Variazioni da AURA
       </h2>
-      <p className="tenue">
-        Esenzioni e scelte cambiate nell’anagrafe regionale negli ultimi{' '}
-        {plural(r.data?.giorni ?? 7, 'giorno', 'giorni')}.
-      </p>
-      <ul className="elenco-semplice">
-        {list.map((v) => (
-          <li key={`${v.quando}-${v.paziente.id}-${v.descrizione}`}>
-            <Link to={`/pazienti/${v.paziente.id}/amministrazione#aura`}>
-              {v.paziente.nome} {v.paziente.cognome}
-            </Link>
-            : {CHANGE_LABEL[v.variazione].toLowerCase()} – {v.descrizione}
-            <span className="tenue"> ({dateTime(v.quando)})</span>
-          </li>
-        ))}
-      </ul>
+      {pending.length > 0 && (
+        <>
+          <h3>Da confermare</h3>
+          {deaths.map((p) => (
+            <Notice key={`decesso-${p.paziente.id}`} kind="avviso">
+              AURA segnala il decesso di{' '}
+              <Link to={toPanel(p.paziente)}>
+                {p.paziente.nome} {p.paziente.cognome}
+              </Link>{' '}
+              il {date(p.decesso)}: da confermare nei dati amministrativi.
+            </Notice>
+          ))}
+          {registry.length > 0 && (
+            <ul className="elenco-semplice">
+              {registry.map((p) => (
+                <li key={`anagrafica-${p.paziente.id}`}>
+                  <Link to={toPanel(p.paziente)}>
+                    {p.paziente.nome} {p.paziente.cognome}
+                  </Link>
+                  : anagrafica diversa in AURA ({p.campi.join(', ')})
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      {list.length === 0 ? null : (
+        <>
+          {pending.length > 0 && <h3>Ultime variazioni</h3>}
+          <p className="tenue">
+            Esenzioni, scelte e anagrafica cambiate nell’anagrafe regionale negli ultimi{' '}
+            {plural(r.data?.giorni ?? 7, 'giorno', 'giorni')}.
+          </p>
+          <ul className="elenco-semplice">
+            {list.map((v) => (
+              <li key={`${v.quando}-${v.paziente.id}-${v.descrizione}`}>
+                <Link to={toPanel(v.paziente)}>
+                  {v.paziente.nome} {v.paziente.cognome}
+                </Link>
+                : {CHANGE_LABEL[v.variazione].toLowerCase()} – {v.descrizione}
+                <span className="tenue"> ({dateTime(v.quando)})</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   );
 }

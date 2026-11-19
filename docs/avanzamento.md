@@ -20,7 +20,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Quinto blocco** (via del 19/11/2026, D182), nel branch `ccr-9780f0fd-iyj18e`: tappa 16 (le scelte della fermata, D181) e tappa 17 (diagnosi ICD-9-CM, allegati LEA) fatte. Fermata dopo la tappa 17 fatta (D191): via dato, pull request #9 unita. Le risposte sono in «Risposte della fermata dopo la tappa 17».
 - **Dopo l'unione della #9 (19/11/2026)**, nello stesso branch ripartito da `main`: le modifiche che seguono dalle risposte. Banche dati aggiornate da chi gestisce il servizio (D192), con il pulsante «Aggiorna adesso» che resta all'amministratore dello studio e vale per tutti gli studi (D194), soglie dei tentativi non più provvisorie (D191), motivo del ritorno da SPID o CIE scritto dal programma e non dall'indirizzo (D193). Pull request #10, unita con il via di Simone («Via, unisci»), con il pulsante rimesso come ha chiesto. Le verifiche di Simone e della Dr.ssa Rocca si fanno alla fine; l'allegato 7 e la D.D. 1167/2022 si trascrivono quando arrivano i file di Simone.
 - **Dopo l'unione della #10 (19/11/2026)**, nello stesso branch: regola nuova in `CLAUDE.md` (non chiedere a Simone ciò che si può fare da sé); PDF del manuale ICD-9-CM indicato da Simone, con l'impronta (`docs/provenienze.md`); allegato 7 trascritto (D195); elenco esenzioni–prestazioni del SAR analizzato e non importato (D196). Fermata fatta: via, pull request #11 unita (risposte in «Risposte della fermata dopo l'unione della #10»).
-- **Dopo l'unione della #11 (19/11/2026)**, nello stesso branch ripartito da `main`: AURA con un simulatore (D197), sezione «Dopo l'unione della #11 – AURA con un simulatore». Simone ha mandato la PEC al CSI Piemonte, in copia alla Regione. Domande nella sezione «Domande per la prossima fermata».
+- **Dopo l'unione della #11 (19/11/2026)**, nello stesso branch ripartito da `main`: AURA con un simulatore (D197), sezione «Dopo l'unione della #11 – AURA con un simulatore». Simone ha mandato la PEC al CSI Piemonte, in copia alla Regione. Fermata fatta: via, pull request #12 unita (risposte in «Risposte della fermata dopo l'unione della #11»).
+- **Dopo l'unione della #12 (19/11/2026)**, nello stesso branch: revoca automatica e anagrafica da AURA da confermare (D198), con la correzione dei controlli in parallelo; sezione «Dopo l'unione della #12 – Revoca e anagrafica da AURA». Domande nella sezione «Domande per la prossima fermata».
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -579,6 +580,31 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
 
 **Prossimo passo**: fermata con il via all'unione; poi le specifiche del CSI, quando arrivano.
 
+### Dopo l'unione della #12 – Revoca e anagrafica da AURA (D198)
+
+**Fatto**
+
+- **Revoca automatica.** Il paziente passa a «revocato» da solo quando AURA dice cessata la scelta del titolare dell'archivio, e torna «in carico» con una scelta nuova. Le scelte di altri medici non contano; deceduti e temporanei non si toccano. Il giro di notte comprende anche i revocati già collegati ad AURA.
+- **Anagrafica da confermare.** Residenza, domicilio, ASL, distretto e decesso di AURA si confrontano con la cartella (maiuscole e spazi non contano) e si mostrano come differenze nel pannello di AURA.
+  - Medico o segreteria usano il dato di AURA, con i controlli del pannello amministrativo e la fonte nel registro, o tengono quello della cartella.
+  - Un dato tenuto non si ripropone finché AURA non ne manda un altro.
+  - Una risposta su un dato superato chiede di ricaricare.
+  - Il decesso è in evidenza nella pagina Oggi. Migrazione 0034.
+- **Un controllo alla volta per paziente**: le prove nuove hanno trovato che due notifiche vicine potevano registrare due volte la stessa variazione (difetto della #12). Ora ogni controllo prende un blocco nel database e legge AURA dentro il blocco.
+- **Prove**:
+  - `apps/api/test/aura-anagrafica.test.ts` (10);
+  - `apps/web/test/aura.test.tsx` (9);
+  - nel browser, le differenze con il controllo di accessibilità;
+  - `apps/api/test/aura.test.ts` aggiornata per il paziente di esempio, che nello scenario può partire revocato.
+
+  Quattordici sabotaggi. Due all'inizio non diventavano rossi (blocco tolto, campo vuoto): le prove sono state rafforzate, con un simulatore lento perché i controlli si sovrappongano davvero e un campo di soli spazi.
+
+**Non fatto**: i nuovi assistiti da AURA (domanda per la fermata); la scadenza delle scelte a tempo determinato (da verificare con le specifiche); l'identità, che si corregge con un motivo e non da AURA.
+
+**Non provato**: il servizio vero, come per D197.
+
+**Prossimo passo**: fermata con il via all'unione.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:
@@ -810,12 +836,25 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Annotate dopo l'unione della #11, da fare con il pulsante:
+Annotate dopo l'unione della #12, da fare con il pulsante:
 
-1. **Via all'unione della pull request di AURA** (D197).
-2. **Anagrafica da AURA**: oggi AURA allinea solo esenzioni e scelte. Proposta: indirizzo, ASL e distretto mostrati come differenze nel pannello, da accettare con un clic da medico o segreteria; il decesso segnalato in Oggi, da confermare. Alternativa: tutto da solo, come le esenzioni.
-3. **Scelta cessata in AURA** (revoca, trasferimento): oggi la scelta si chiude, ma lo stato del paziente resta «attivo». Proposta: avviso in Oggi e stato cambiato da chi lo conferma. Alternativa: «revocato» da solo.
-4. **Verifiche alla fine**: restano quelle della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7).
+1. **Via all'unione della pull request di revoca e anagrafica da AURA** (D198).
+2. **Nuovi assistiti da AURA**: chi sceglie il medico e non è ancora nell'archivio oggi non entra. Proposta: un elenco «Nuovi assistiti in AURA» nella pagina Oggi, registrati con un clic dai dati di AURA da medico o segreteria. Alternative: registrati da soli; per ora no.
+3. **Verifiche alla fine**: restano quelle della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7).
+
+## Risposte della fermata dopo l'unione della #11 (19/11/2026)
+
+Dettagli in D198. Simone ha risposto con il pulsante:
+
+- **Via**: «Via: unisci». Pull request #12 unita in `main`.
+- **Anagrafica da AURA**: «Differenze da confermare, intendi gli aggiornamenti che arrivano da Aura? Allora ok». Sì, sono gli aggiornamenti dell'anagrafica che arrivano da AURA: fatto, nel pannello di AURA, con il decesso in Oggi.
+- **Scelta cessata in AURA**: «Revocato da solo». Fatto: il paziente passa a «revocato» da solo, e torna in carico da solo con una scelta nuova.
+
+## Domande della fermata dopo l'unione della #11 (chiuse)
+
+1. Via all'unione della pull request di AURA (D197).
+2. Anagrafica da AURA: differenze da confermare (consigliata), tutto da solo, o per ora no.
+3. Scelta cessata in AURA: avviso da confermare (consigliata), revocato da solo, o per ora no.
 
 ## Risposte della fermata dopo l'unione della #10 (19/11/2026)
 
@@ -1910,3 +1949,17 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D197: una riga annullata non si modifica                                                                      | migrazione 0033: modifica permessa                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D197: il pulsante solo a chi scrive                                                                           | AuraSection.tsx: pulsante per chi legge                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D197: una risposta strana non fa cadere Oggi                                                                  | AuraSection.tsx: risposta usata senza controllo                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: contano solo le scelte del titolare                                                                     | aura/service.ts: scelte di tutti i medici                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: scelta cessata, paziente revocato                                                                       | aura/service.ts: nessuna revoca                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: scelta nuova, di nuovo in carico                                                                        | aura/service.ts: nessun ritorno                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: di notte anche i revocati collegati                                                                     | aura/service.ts: solo i pazienti in carico                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: un controllo alla volta per paziente                                                                    | aura/service.ts: niente blocco nel database                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: maiuscole e spazi non fanno differenza                                                                  | registry.ts: confronto alla lettera                                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: un campo vuoto in AURA non svuota                                                                       | registry.ts: campi vuoti come differenze                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: un dato tenuto non si ripropone                                                                         | registry.ts: valori tenuti ignorati                                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: decesso confermato, differenza chiusa                                                                   | registry.ts: decesso sempre proposto                                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: niente risposte su dati superati                                                                        | aura-routes.ts: valore visto non controllato                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: la fonte AURA nel registro                                                                              | aura-routes.ts: fonte tolta                                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: in Oggi solo i pazienti visibili                                                                        | aura/service.ts: anagrafiche di tutti gli archivi                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: i pulsanti solo a chi scrive                                                                            | AuraSection.tsx: pulsanti per chi legge                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D198: il decesso in evidenza in Oggi                                                                          | AuraSection.tsx: primo decesso non mostrato                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

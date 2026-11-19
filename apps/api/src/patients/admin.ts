@@ -655,6 +655,8 @@ export async function updateAdmin(
   ctx: ArchiveContext,
   body: unknown,
   now: Date,
+  /** Altro da scrivere nel registro, per esempio la fonte quando i dati vengono da AURA (D198). */
+  details: Record<string, unknown> = {},
 ): Promise<{ dati: AdminFields; campi: AdminKey[] }> {
   const input = normalized(patientAdminSchema.parse(body));
   if (Object.keys(input).length === 0) throw new HttpError(400, 'Nessun campo da modificare');
@@ -675,7 +677,7 @@ export async function updateAdmin(
       .set({ ...adminColumns(pick(input, changed)), updatedAt: now })
       .where(eq(patient.id, p.id))
       .returning();
-    await logDone(tx, actor, p.id, 'modifica_dati_amministrativi', { campi: changed });
+    await logDone(tx, actor, p.id, 'modifica_dati_amministrativi', { campi: changed, ...details });
     return row!;
   });
   return { dati: adminFields(updated), campi: changed };

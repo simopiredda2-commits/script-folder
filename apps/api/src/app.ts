@@ -333,7 +333,7 @@ export function buildApp({
     stopAuraListener();
     await auraScheduler?.stop();
   });
-  registerAuraRoutes(app, { db, aura: auraService });
+  registerAuraRoutes(app, { db, aura: auraService, now: now ?? (() => new Date()) });
   // Ricetta con esenzione: prima dei controlli, esenzioni rilette da AURA se non sono di adesso.
   const withAuraRefresh =
     (check: NonNullable<PrescriptionDeps['preSendChecks']>): PrescriptionDeps['preSendChecks'] =>

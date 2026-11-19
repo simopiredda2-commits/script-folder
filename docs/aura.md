@@ -1,6 +1,6 @@
 # AURA, l'anagrafe regionale degli assistiti
 
-Collegamento del programma con AURA, l'anagrafe regionale degli assistiti del Piemonte (CSI Piemonte), per le esenzioni e le scelte del medico (D197). Oggi è un **simulatore**: il programma non chiama AURA (regola 7).
+Collegamento del programma con AURA, l'anagrafe regionale degli assistiti del Piemonte (CSI Piemonte), per le esenzioni, le scelte del medico (D197), lo stato del paziente e l'anagrafica (D198). Oggi è un **simulatore**: il programma non chiama AURA (regola 7).
 
 ## Fonti
 
@@ -21,9 +21,11 @@ Collegamento del programma con AURA, l'anagrafe regionale degli assistiti del Pi
 **Quando si controlla.**
 
 1. A ogni notifica di variazione da AURA.
-2. Ogni notte, all'ora di `AURA_AGGIORNAMENTO`, se c'è: tutti i pazienti attivi del servizio.
+2. Ogni notte, all'ora di `AURA_AGGIORNAMENTO`, se c'è: tutti i pazienti in carico del servizio, e i revocati già collegati ad AURA (così un ritorno si vede anche senza notifica).
 3. Dal pannello dei dati amministrativi, con «Aggiorna da AURA». Il pulsante lo ha chi scrive nell'archivio, cioè medico e segreteria.
 4. Prima dei controlli di una ricetta con esenzione, se l'ultimo allineamento ha più di dieci minuti. Si aspetta al massimo tre secondi: se AURA non risponde valgono i dati che ci sono, e il SAR controlla comunque all'invio.
+
+Un controllo alla volta per paziente (D198): ogni controllo prende un blocco nel database e legge AURA dentro il blocco. Due notifiche vicine non registrano due volte la stessa variazione, e un profilo letto prima non annulla uno letto dopo.
 
 **Allineamento.** AURA è la fonte delle sue righe:
 
@@ -40,18 +42,37 @@ Collegamento del programma con AURA, l'anagrafe regionale degli assistiti del Pi
 
 **Scelte del medico.** Entrano solo quelle dei medici dello studio, riconosciuti dal codice fiscale del profilo medico. Le scelte di altri medici, anche di altri studi dello stesso servizio, non entrano.
 
+**Stato del paziente** (D198), secondo le scelte del titolare dell'archivio arrivate da AURA:
+
+- scelta cessata e nessuna in corso: il paziente passa a «revocato», da solo;
+- di nuovo una scelta in corso: torna «in carico», da solo;
+- scelte di altri medici o scritte a mano: lo stato non cambia;
+- pazienti deceduti o temporanei: non si toccano.
+
+Ogni cambio di stato è una variazione in parole.
+
+**Anagrafica da confermare** (D198). AURA manda residenza (via, numero civico, CAP, comune, provincia), domicilio, ASL, distretto e decesso. Non entrano da soli nella cartella: il pannello di AURA mostra le differenze con la cartella.
+
+- **Che cosa conta come differenza.** Maiuscole, minuscole e spazi non contano. Un campo vuoto in AURA non propone di svuotare quello della cartella.
+- **Chi decide.** Medico o segreteria scelgono, per ogni differenza, se usare il dato di AURA o tenere quello della cartella. Il dato di AURA passa per gli stessi controlli del pannello amministrativo, e il registro scrive la fonte «AURA».
+- **Un dato tenuto non si ripropone**, finché AURA non ne manda un altro.
+- **Risposte su dati superati.** Si risponde solo alle differenze di adesso, con il valore visto: se AURA nel frattempo ha cambiato, il programma chiede di ricaricare.
+- **Decesso.** Si segnala anche nella pagina Oggi, in evidenza, e si conferma dal pannello: una data nel futuro è rifiutata.
+- **Identità.** Cognome, nome e nascita non arrivano da AURA: si correggono con un motivo, dal pannello.
+
 **Risposte che non tornano.** Se AURA risponde con un profilo che ha un altro codice fiscale, nulla cambia: il collegamento si azzera e al controllo dopo il paziente si cerca di nuovo. Senza rete i dati restano quelli di prima, con il motivo.
 
 **Variazioni.** Ogni variazione resta in parole, con quando e da dove è partito il controllo, e non si modifica né si cancella.
 
 - Nel pannello del paziente si vedono le ultime venti.
-- Nella pagina Oggi si vedono quelle degli ultimi sette giorni, dei pazienti che l'utente può vedere.
+- Nella pagina Oggi si vedono quelle degli ultimi sette giorni e le anagrafiche da confermare (il decesso per primo), dei pazienti che l'utente può vedere.
 
 **Registro degli accessi.**
 
 - Ci va ogni controllo chiesto da una persona, riuscito o negato.
 - Ci va ogni variazione arrivata da AURA, anche dalla notifica o dal giro di notte.
 - Ci va ogni lettura delle variazioni nella pagina Oggi, una riga per paziente mostrato.
+- Ci va ogni scelta su una differenza di anagrafica: dato di AURA usato (con la fonte) o tenuto quello della cartella.
 - Non ci vanno i controlli senza variazioni della notte e delle notifiche: non leggono e non cambiano nulla, e sarebbero una riga per paziente ogni notte.
 
 **Storico.** Il collegamento ha lo storico quando cambia lo stato (identificativo, esito, motivo), non a ogni controllo.
@@ -62,15 +83,15 @@ Collegamento del programma con AURA, l'anagrafe regionale degli assistiti del Pi
 
 ## Modello dei dati
 
-| Tabella                       | Contenuto                                                                                             |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `aura_link`                   | Una riga per paziente: identificativo AURA, ultimo controllo, esito e motivo, ultimo allineamento     |
-| `aura_change`                 | Variazioni arrivate: esenzione o scelta, nuova, cambiata o tolta, in parole; non si modificano        |
-| `aura_sync_run`               | Giri di controllo di tutti i pazienti: quando, quanti, con quale messaggio                            |
-| `aura_sync_run_studio`        | Gli stessi giri, studio per studio: lo stato del servizio di uno studio mostra solo i suoi numeri     |
-| `exemption`, `patient_choice` | In più: annullamento con data, autore e motivo (vincolo: data e motivo insieme), riga annullata ferma |
+| Tabella                       | Contenuto                                                                                                                                                    |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `aura_link`                   | Una riga per paziente: identificativo AURA, ultimo controllo, esito e motivo, ultimo allineamento; anagrafica ricevuta e valori tenuti dalla cartella (D198) |
+| `aura_change`                 | Variazioni arrivate: esenzione, scelta, anagrafica o stato; nuova, cambiata o tolta, in parole; non si modificano                                            |
+| `aura_sync_run`               | Giri di controllo di tutti i pazienti: quando, quanti, con quale messaggio                                                                                   |
+| `aura_sync_run_studio`        | Gli stessi giri, studio per studio: lo stato del servizio di uno studio mostra solo i suoi numeri                                                            |
+| `exemption`, `patient_choice` | In più: annullamento con data, autore e motivo (vincolo: data e motivo insieme), riga annullata ferma                                                        |
 
-Migrazioni 0032 e 0033. `aura_link` e `aura_change` entrano nell'esportazione dei dati del medico.
+Migrazioni 0032, 0033 e 0034. `aura_link` e `aura_change` entrano nell'esportazione dei dati del medico.
 
 ## Configurazione
 
@@ -86,7 +107,7 @@ Migrazioni 0032 e 0033. `aura_link` e `aura_change` entrano nell'esportazione de
 ## Come provarlo
 
 ```sh
-pnpm exec vitest run apps/api/test/aura.test.ts apps/web/test/aura.test.tsx
+pnpm exec vitest run apps/api/test/aura.test.ts apps/api/test/aura-anagrafica.test.ts apps/web/test/aura.test.tsx
 pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts   # nel browser, con l'accessibilità
 ```
 
@@ -94,5 +115,6 @@ pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts   # nel browser, con 
 
 - **Il servizio vero**: nomi dei campi, formati, codici degli eventi, firma delle notifiche e rete RUPAR vengono dalle specifiche AURA--SER-01, ancora da avere.
 - **Volumi**: un giro di notte su migliaia di pazienti, uno alla volta. I tempi vanno misurati con il servizio vero; il CSI potrebbe offrire una ricerca per molti assistiti insieme.
-- **Anagrafica**: AURA la manda (indirizzo, ASL, decesso), ma il programma oggi allinea solo esenzioni e scelte. È una domanda per la fermata, come lo stato del paziente quando AURA dice che la scelta è cessata.
+- **Scadenza delle scelte a tempo determinato**: oggi conta solo la cessazione; come AURA tratta la scadenza va letto nelle specifiche.
+- **Nuovi assistiti**: chi sceglie il medico e non è ancora nell'archivio non entra da solo. È una domanda per la fermata.
 - **Scrittura**: il programma non scrive in AURA, perché scelte e revoche le registra l'ASL.

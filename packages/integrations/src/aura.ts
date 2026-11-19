@@ -33,6 +33,34 @@ export interface AuraChoice {
   endReason: string | null;
 }
 
+/**
+ * Anagrafica come la registra AURA: residenza, domicilio, ASL e distretto, decesso. Nel servizio
+ * vero i nomi dei campi vengono dalle specifiche (AURA--SER-01); null quando AURA non lo dice.
+ */
+export interface AuraRegistry {
+  residenceStreet: string | null;
+  residenceNumber: string | null;
+  residencePostalCode: string | null;
+  residenceTown: string | null;
+  residenceProvince: string | null;
+  domicile: string | null;
+  asl: string | null;
+  district: string | null;
+  deceasedOn: string | null;
+}
+
+export const EMPTY_AURA_REGISTRY: AuraRegistry = {
+  residenceStreet: null,
+  residenceNumber: null,
+  residencePostalCode: null,
+  residenceTown: null,
+  residenceProvince: null,
+  domicile: null,
+  asl: null,
+  district: null,
+  deceasedOn: null,
+};
+
 /** Il profilo sanitario completo (GET): quello che il programma ne usa. */
 export interface AuraProfile {
   auraId: string;
@@ -42,6 +70,8 @@ export interface AuraProfile {
   birthDate: string;
   exemptions: AuraExemption[];
   choices: AuraChoice[];
+  /** Anagrafica; assente se AURA non la manda. */
+  registry?: AuraRegistry;
 }
 
 export type AuraSearch =
@@ -136,6 +166,13 @@ export class SimulatedAura implements AuraGateway {
       clone(c),
     ];
     this.notify(auraId, 'scelta');
+  }
+
+  /** Cambia l'anagrafica (per esempio una residenza nuova, o il decesso). */
+  setRegistry(auraId: string, r: Partial<AuraRegistry>): void {
+    const p = this.mustGet(auraId);
+    p.registry = { ...(p.registry ?? EMPTY_AURA_REGISTRY), ...clone(r) };
+    this.notify(auraId, 'anagrafica');
   }
 
   /** Senza rete: ogni richiesta risponde «non raggiungibile». */

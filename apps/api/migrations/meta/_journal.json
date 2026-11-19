@@ -239,6 +239,13 @@
       "when": 1795108144574,
       "tag": "0033_aura_annullamenti_e_giri",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1795111217368,
+      "tag": "0034_aura_anagrafica",
+      "breakpoints": true
     }
   ]
 }

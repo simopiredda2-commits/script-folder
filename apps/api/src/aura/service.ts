@@ -1,9 +1,10 @@
-import type { AuraExemption, AuraGateway, AuraProfile } from '@mmg/integrations';
-import { and, desc, eq, gte, inArray, isNotNull, isNull } from 'drizzle-orm';
+import type { AuraExemption, AuraGateway, AuraProfile, AuraRegistry } from '@mmg/integrations';
+import { and, desc, eq, gte, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { logAccess } from '../audit/access-log';
 import type { Database } from '../db/client';
 import {
   appUser,
+  archive,
   auraChange,
   auraLink,
   auraSyncRun,
@@ -14,6 +15,13 @@ import {
   patientChoice,
 } from '../db/schema';
 import { withActor, type Tx } from '../db/tx';
+import { studioDate } from '../prescriptions/rules-check';
+import {
+  registryDifferences,
+  registryText,
+  sameRegistry,
+  type RegistryDifference,
+} from './registry';
 
 /**
  * Esenzioni e scelte del medico dall'anagrafe regionale AURA (D197). AURA è la fonte: le righe che
@@ -80,7 +88,7 @@ function choiceText(
 }
 
 interface Change {
-  kind: 'esenzione' | 'scelta';
+  kind: 'esenzione' | 'scelta' | 'anagrafica' | 'stato';
   change: 'nuova' | 'cambiata' | 'tolta';
   subject: string;
   description: string;
@@ -237,13 +245,76 @@ async function reconcile(
   return changes;
 }
 
+/**
+ * Stato del paziente secondo la scelta del titolare dell'archivio in AURA (D198). Scelta cessata e
+ * nessuna in corso: «revocato», da solo; di nuovo una scelta in corso: «in carico». I pazienti
+ * deceduti o temporanei non si toccano, e senza scelte di AURA per il titolare nulla cambia.
+ */
+async function alignStatus(
+  tx: Tx,
+  patientId: string,
+  by: { at: Date; today: string },
+): Promise<Change | null> {
+  const [row] = await tx
+    .select({ status: patient.status, owner: archive.ownerUserId, ownerName: appUser.displayName })
+    .from(patient)
+    .innerJoin(archive, eq(archive.id, patient.archiveId))
+    .innerJoin(appUser, eq(appUser.id, archive.ownerUserId))
+    .where(eq(patient.id, patientId));
+  if (!row || (row.status !== 'active' && row.status !== 'revoked')) return null;
+  const choices = await tx
+    .select()
+    .from(patientChoice)
+    .where(
+      and(
+        eq(patientChoice.patientId, patientId),
+        eq(patientChoice.doctorUserId, row.owner),
+        eq(patientChoice.source, 'aura'),
+        isNull(patientChoice.annulledAt),
+      ),
+    );
+  const inForce = choices.find(
+    (c) => c.chosenOn <= by.today && (!c.endedOn || c.endedOn > by.today),
+  );
+  const ended = choices
+    .filter((c) => c.endedOn && c.endedOn <= by.today)
+    .sort((a, b) => (a.endedOn! < b.endedOn! ? 1 : -1))[0];
+  const set = async (status: 'active' | 'revoked') =>
+    tx.update(patient).set({ status, updatedAt: by.at }).where(eq(patient.id, patientId));
+  if (row.status === 'active' && !inForce && ended) {
+    await set('revoked');
+    return {
+      kind: 'stato',
+      change: 'cambiata',
+      subject: 'Stato del paziente',
+      description: `Paziente revocato: ${choiceText(row.ownerName, ended)}`,
+    };
+  }
+  if (row.status === 'revoked' && inForce) {
+    await set('active');
+    return {
+      kind: 'stato',
+      change: 'cambiata',
+      subject: 'Stato del paziente',
+      description: `Paziente di nuovo in carico: ${choiceText(row.ownerName, inForce)}`,
+    };
+  }
+  return null;
+}
+
 export function createAuraService(deps: AuraDeps) {
   const { db, gateway } = deps;
 
   async function record(
+    tx: Tx,
     p: { id: string; studioId: string },
     outcome: AuraOutcome,
-    fields: { auraId?: string | null; message?: string | null; updated?: boolean },
+    fields: {
+      auraId?: string | null;
+      message?: string | null;
+      updated?: boolean;
+      registry?: AuraRegistry | null;
+    },
   ) {
     const at = deps.now();
     const values = {
@@ -253,8 +324,9 @@ export function createAuraService(deps: AuraDeps) {
       message: fields.message ?? null,
       ...(fields.auraId !== undefined ? { auraId: fields.auraId } : {}),
       ...(fields.updated ? { updatedAt: at } : {}),
+      ...(fields.registry !== undefined ? { registry: fields.registry } : {}),
     };
-    await db
+    await tx
       .insert(auraLink)
       .values(values)
       .onConflictDoUpdate({ target: auraLink.patientId, set: values });
@@ -286,6 +358,10 @@ export function createAuraService(deps: AuraDeps) {
   /**
    * Controlla un paziente su AURA e allinea esenzioni e scelte. Senza rete, o se AURA non trova la
    * persona, i dati restano quelli di prima e il motivo resta nel collegamento.
+   *
+   * Un controllo alla volta per paziente, anche con più processi (D198): chi arriva dopo aspetta il
+   * blocco e legge AURA dopo, così due notifiche vicine non registrano due volte la stessa
+   * variazione e un profilo letto prima non annulla uno letto dopo.
    */
   async function syncPatient(
     patientId: string,
@@ -293,47 +369,66 @@ export function createAuraService(deps: AuraDeps) {
     userId: string | null = null,
   ): Promise<SyncResult> {
     if (!auraAvailable(deps)) return { outcome: 'spento', message: AURA_UNAVAILABLE, changes: 0 };
-    const [p] = await db
-      .select({ id: patient.id, studioId: patient.studioId, fiscalCode: patient.fiscalCode })
-      .from(patient)
-      .where(eq(patient.id, patientId));
-    if (!p) throw new Error('Paziente non trovato');
-    const [link] = await db.select().from(auraLink).where(eq(auraLink.patientId, p.id));
+    return withActor(db, userId, async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`aura:${patientId}`}, 0))`,
+      );
+      const [p] = await tx
+        .select({ id: patient.id, studioId: patient.studioId, fiscalCode: patient.fiscalCode })
+        .from(patient)
+        .where(eq(patient.id, patientId));
+      if (!p) throw new Error('Paziente non trovato');
+      const [link] = await tx.select().from(auraLink).where(eq(auraLink.patientId, p.id));
 
-    let auraId = link?.auraId ?? null;
-    let fetched = auraId ? await gateway.getProfile(auraId) : null;
-    // Senza identificativo, o se AURA non lo riconosce più (profili unificati), si cerca per codice fiscale.
-    if (!fetched || fetched.outcome === 'not_found') {
-      const r = await resolve(p);
-      if ('outcome' in r) {
-        await record(p, r.outcome, {
-          message: r.message,
-          ...(r.outcome === 'non_trovato' ? { auraId: null } : {}),
-        });
-        return { outcome: r.outcome, message: r.message, changes: 0 };
+      let auraId = link?.auraId ?? null;
+      let fetched = auraId ? await gateway.getProfile(auraId) : null;
+      // Senza identificativo, o se AURA non lo riconosce più (profili unificati), si cerca per codice fiscale.
+      if (!fetched || fetched.outcome === 'not_found') {
+        const r = await resolve(p);
+        if ('outcome' in r) {
+          await record(tx, p, r.outcome, {
+            message: r.message,
+            ...(r.outcome === 'non_trovato' ? { auraId: null } : {}),
+          });
+          return { outcome: r.outcome, message: r.message, changes: 0 };
+        }
+        auraId = r.auraId;
+        fetched = await gateway.getProfile(auraId);
       }
-      auraId = r.auraId;
-      fetched = await gateway.getProfile(auraId);
-    }
-    if (fetched.outcome === 'unreachable' || fetched.outcome === 'rejected') {
-      const outcome = fetched.outcome === 'unreachable' ? 'non_raggiungibile' : 'rifiutato';
-      await record(p, outcome, { message: fetched.message });
-      return { outcome, message: fetched.message, changes: 0 };
-    }
-    if (fetched.outcome === 'not_found') {
-      const message = 'L’assistito non c’è più in AURA con questo identificativo';
-      await record(p, 'non_trovato', { auraId: null, message });
-      return { outcome: 'non_trovato', message, changes: 0 };
-    }
-    const profile = fetched.profile;
-    if (profile.fiscalCode.toUpperCase() !== p.fiscalCode.toUpperCase()) {
-      const message = 'AURA ha risposto con un altro codice fiscale: nulla è stato cambiato';
-      await record(p, 'rifiutato', { auraId: null, message });
-      return { outcome: 'rifiutato', message, changes: 0 };
-    }
-    const at = deps.now();
-    const changes = await withActor(db, userId, async (tx) => {
+      if (fetched.outcome === 'unreachable' || fetched.outcome === 'rejected') {
+        const outcome = fetched.outcome === 'unreachable' ? 'non_raggiungibile' : 'rifiutato';
+        await record(tx, p, outcome, { message: fetched.message });
+        return { outcome, message: fetched.message, changes: 0 };
+      }
+      if (fetched.outcome === 'not_found') {
+        const message = 'L’assistito non c’è più in AURA con questo identificativo';
+        await record(tx, p, 'non_trovato', { auraId: null, message });
+        return { outcome: 'non_trovato', message, changes: 0 };
+      }
+      const profile = fetched.profile;
+      if (profile.fiscalCode.toUpperCase() !== p.fiscalCode.toUpperCase()) {
+        const message = 'AURA ha risposto con un altro codice fiscale: nulla è stato cambiato';
+        await record(tx, p, 'rifiutato', { auraId: null, message });
+        return { outcome: 'rifiutato', message, changes: 0 };
+      }
+      const at = deps.now();
+      const registry = profile.registry ?? null;
       const list = await reconcile(tx, p, profile, { at, userId });
+      // Anagrafica: le differenze con la cartella si registrano quando AURA manda dati nuovi; nella
+      // cartella entrano solo se qualcuno le conferma dal pannello.
+      if (registry && !sameRegistry(link?.registry, registry)) {
+        const [full] = await tx.select().from(patient).where(eq(patient.id, p.id));
+        const diffs = registryDifferences(registry, full!, link?.registryDismissed ?? {});
+        if (diffs.length)
+          list.push({
+            kind: 'anagrafica',
+            change: link?.registry ? 'cambiata' : 'nuova',
+            subject: 'Anagrafica',
+            description: registryText(diffs),
+          });
+      }
+      const status = await alignStatus(tx, p.id, { at, today: studioDate(at) });
+      if (status) list.push(status);
       if (list.length)
         await tx
           .insert(auraChange)
@@ -349,10 +444,9 @@ export function createAuraService(deps: AuraDeps) {
           outcome: 'riuscito',
           details: { avvio: trigger, variazioni: list.length },
         });
-      return list;
+      await record(tx, p, 'aggiornato', { auraId, updated: true, registry });
+      return { outcome: 'aggiornato', message: null, changes: list.length };
     });
-    await record(p, 'aggiornato', { auraId, updated: true });
-    return { outcome: 'aggiornato', message: null, changes: changes.length };
   }
 
   /**
@@ -379,10 +473,72 @@ export function createAuraService(deps: AuraDeps) {
     ]).finally(() => clearTimeout(timer));
   }
 
+  /** Differenze di oggi fra l'anagrafica di AURA e la cartella del paziente. */
+  async function differences(patientId: string): Promise<RegistryDifference[]> {
+    const [row] = await db
+      .select({ p: patient, link: auraLink })
+      .from(patient)
+      .leftJoin(auraLink, eq(auraLink.patientId, patient.id))
+      .where(eq(patient.id, patientId));
+    if (!row) return [];
+    return registryDifferences(row.link?.registry, row.p, row.link?.registryDismissed ?? {});
+  }
+
   return {
     available: () => auraAvailable(deps),
     syncPatient,
     refreshIfStale,
+    differences,
+
+    /** Valori di AURA da non usare: non si ripropongono finché AURA non ne manda altri. */
+    async dismiss(patientId: string, entries: readonly { campo: string; inAura: string }[]) {
+      const [link] = await db.select().from(auraLink).where(eq(auraLink.patientId, patientId));
+      if (!link) return;
+      const dismissed = { ...link.registryDismissed };
+      for (const e of entries) dismissed[e.campo] = e.inAura;
+      await db
+        .update(auraLink)
+        .set({ registryDismissed: dismissed })
+        .where(eq(auraLink.patientId, patientId));
+    },
+
+    /**
+     * Pazienti degli archivi indicati con differenze da confermare (il decesso per primo), per la
+     * pagina Oggi.
+     */
+    async pendingForArchives(studioId: string, archiveIds: readonly string[]) {
+      if (archiveIds.length === 0) return [];
+      const rows = await db
+        .select({ p: patient, link: auraLink })
+        .from(auraLink)
+        .innerJoin(patient, eq(patient.id, auraLink.patientId))
+        .where(
+          and(
+            eq(patient.studioId, studioId),
+            inArray(patient.archiveId, [...archiveIds]),
+            isNotNull(auraLink.registry),
+          ),
+        );
+      return rows
+        .map(({ p, link }) => ({
+          pazienteId: p.id,
+          cognome: p.lastName,
+          nome: p.firstName,
+          differenze: registryDifferences(link.registry, p, link.registryDismissed),
+        }))
+        .filter((r) => r.differenze.length > 0)
+        .map(({ differenze, ...r }) => ({
+          ...r,
+          campi: differenze.filter((d) => d.campo !== 'decesso').map((d) => d.etichetta),
+          decesso: differenze.find((d) => d.campo === 'decesso')?.inAura ?? null,
+        }))
+        .sort(
+          (a, b) =>
+            Number(b.decesso !== null) - Number(a.decesso !== null) ||
+            a.cognome.localeCompare(b.cognome, 'it') ||
+            a.nome.localeCompare(b.nome, 'it'),
+        );
+    },
 
     /** Stato del collegamento e ultime variazioni di un paziente, per il pannello amministrativo. */
     async patientState(patientId: string) {
@@ -401,6 +557,7 @@ export function createAuraService(deps: AuraDeps) {
         esito: link?.outcome ?? null,
         messaggio: link?.message ?? null,
         aggiornatoIl: link?.updatedAt?.toISOString() ?? null,
+        differenze: await differences(patientId),
         variazioni: changes.map((c) => ({
           quando: c.at.toISOString(),
           tipo: c.kind,
@@ -439,8 +596,9 @@ export function createAuraService(deps: AuraDeps) {
     },
 
     /**
-     * Il giro di ogni notte, o dal server: tutti i pazienti attivi del servizio. I numeri restano
-     * in tutto e studio per studio: lo stato del servizio di uno studio mostra solo i suoi.
+     * Il giro di ogni notte, o dal server: i pazienti in carico del servizio, e i revocati già
+     * collegati ad AURA (tornano in carico con una scelta nuova, D198). I numeri restano in tutto e
+     * studio per studio: lo stato del servizio di uno studio mostra solo i suoi.
      */
     async syncAll(trigger: 'notte' | 'comando') {
       const startedAt = deps.now();
@@ -452,7 +610,13 @@ export function createAuraService(deps: AuraDeps) {
         const all = await db
           .select({ id: patient.id, studioId: patient.studioId })
           .from(patient)
-          .where(eq(patient.status, 'active'));
+          .leftJoin(auraLink, eq(auraLink.patientId, patient.id))
+          .where(
+            or(
+              eq(patient.status, 'active'),
+              and(eq(patient.status, 'revoked'), isNotNull(auraLink.auraId)),
+            ),
+          );
         for (const { id, studioId } of all) {
           const n = byStudio.get(studioId) ?? { patients: 0, changed: 0, failed: 0 };
           byStudio.set(studioId, n);
