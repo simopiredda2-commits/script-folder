@@ -769,6 +769,64 @@ export function createAuthService(deps: AuthDeps) {
   }
 
   /**
+   * Il codice a 6 cifre a sessione aperta, per un'azione che lo chiede (collegare l'identità
+   * digitale, D189). Sbagliato conta fra i codici sbagliati, come allo sblocco; giusto non vale una
+   * seconda volta, e azzera i codici sbagliati.
+   */
+  async function confirmCode(
+    actor: Actor,
+    code: string,
+    address: string | null = null,
+  ): Promise<boolean> {
+    const rows = await db
+      .select({ user: appUser, studio })
+      .from(appUser)
+      .innerJoin(studio, eq(studio.id, appUser.studioId))
+      .where(eq(appUser.id, actor.userId));
+    const row = rows[0];
+    if (!row) return false;
+    const { user, studio: st } = row;
+    if (user.lockedUntil && user.lockedUntil > now()) return false;
+    const step =
+      user.totpSecretEnc && user.totpEnabledAt
+        ? verifyTotp(
+            decryptSecret(encryptionKey, user.totpSecretEnc),
+            code.trim(),
+            now().getTime(),
+            user.totpLastStep ?? null,
+          )
+        : null;
+    const wrongCode = async () => {
+      await onUserRow((tx) =>
+        registerFailure(tx, user.id, st, 'code', { address, workstation: actor.workstation }),
+      );
+      await logAccess(db, {
+        studioId: user.studioId,
+        userId: user.id,
+        action: 'secondo_fattore_fallito',
+        outcome: 'fallito',
+        workstation: actor.workstation,
+        details: { motivo: 'codice errato a sessione aperta', indirizzo: address },
+      });
+      return false;
+    };
+    if (step === null) return wrongCode();
+    const done = await onUserRow(async (tx) => {
+      const fresh = await lockUserRow(tx, user.id);
+      if (!fresh || fresh.status !== 'active') return 'fermo';
+      if (fresh.lockedUntil && fresh.lockedUntil > now()) return 'fermo';
+      if (fresh.totpLastStep != null && step <= fresh.totpLastStep) return 'ripetuto';
+      await tx
+        .update(appUser)
+        .set({ totpLastStep: step, failedCodes: 0 })
+        .where(eq(appUser.id, user.id));
+      return 'ok';
+    });
+    if (done === 'ripetuto') return wrongCode();
+    return done === 'ok';
+  }
+
+  /**
    * Cambio della propria password (tappa 14), anche quella temporanea data dall'amministratore.
    * Serve la password attuale: gli errori contano come tentativi falliti, perché da una sessione
    * rubata non si possa provare una password dopo l'altra. Dopo il cambio le altre sessioni
@@ -890,7 +948,15 @@ export function createAuthService(deps: AuthDeps) {
     });
   }
 
-  return { login, verifySecondFactor, authenticate, unlock, changePassword, logout };
+  return {
+    login,
+    verifySecondFactor,
+    authenticate,
+    unlock,
+    confirmCode,
+    changePassword,
+    logout,
+  };
 }
 
 export type AuthService = ReturnType<typeof createAuthService>;

@@ -92,6 +92,14 @@ export const appUser = pgTable(
      * dell'amministratore, problema 7).
      */
     suspendedByService: boolean().notNull().default(false),
+    /**
+     * Identità digitale collegata dall'utente stesso (D189): il codice fiscale che SPID o CIE
+     * hanno riconosciuto, a sessione aperta e con il codice a 6 cifre. Serve a chi non ha un
+     * profilo di medico (la segreteria) per ripristinare da sé le credenziali; per il medico vale
+     * il codice fiscale del suo profilo. L'amministratore non lo scrive.
+     */
+    identityFiscalCode: text(),
+    identityLinkedAt: timestamp({ withTimezone: true }),
   },
   (t) => [uniqueIndex('app_user_username_key').on(t.username)],
 );

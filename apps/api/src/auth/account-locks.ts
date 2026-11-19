@@ -28,7 +28,7 @@ function countedAttempts(kind: LockKind) {
     : or(
         and(
           eq(accessLog.action, 'secondo_fattore_fallito'),
-          sql`${motivo} in ('codice errato', 'codice errato allo sblocco')`,
+          sql`${motivo} in ('codice errato', 'codice errato allo sblocco', 'codice errato a sessione aperta')`,
         ),
         and(eq(accessLog.action, 'cambio_password'), sql`${motivo} = 'password attuale errata'`),
       );

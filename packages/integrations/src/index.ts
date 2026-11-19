@@ -5,6 +5,7 @@ export * from './simulated-documents';
 export * from './sick-leave-gateway';
 export * from './service-auth';
 export * from './regional-authorization';
+export * from './digital-identity';
 export * from './fse/dictionaries';
 export * from './fse/cda';
 export * from './fse/schematron';

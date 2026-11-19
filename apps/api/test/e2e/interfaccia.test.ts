@@ -25,6 +25,7 @@ import {
   accountLock,
   appointment,
   clinicalEntry,
+  doctorProfile,
   labResultDetail,
   measurementDetail,
   patient,
@@ -1945,5 +1946,45 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('button', { name: 'Sblocca' }).click();
     await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
     await expect(bar.getByRole('link').count()).resolves.toBe(before);
+  });
+
+  // In fondo: cambia la password del sostituto, che le prove prima non usano più.
+  it('ripristino con SPID o CIE senza sessione: nome utente, pagina simulata, password nuova (D189)', async () => {
+    const [profile] = await t.db
+      .select({ cf: doctorProfile.fiscalCode })
+      .from(doctorProfile)
+      .where(eq(doctorProfile.userId, s.users.sostituto.id));
+    const anonymous = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    try {
+      const p = await anonymous.newPage();
+      await p.goto(base);
+      await p.getByRole('link', { name: /Ripristina con SPID o CIE/ }).click();
+      await p.getByRole('heading', { level: 1, name: 'Ripristino con SPID o CIE' }).waitFor();
+      await check(p, 'avvio del ripristino', true);
+      await p.getByLabel('Nome utente').fill(s.users.sostituto.username);
+      await p.getByLabel('Postazione').fill('casa del sostituto');
+      await p.getByRole('button', { name: 'Entra con SPID o CIE' }).click();
+      // La pagina simulata, servita dal programma solo in prova.
+      await p.getByRole('heading', { name: 'Accesso con SPID o CIE simulato' }).waitFor();
+      await p.getByLabel('Codice fiscale di chi entra').fill(profile!.cf!);
+      await p.getByRole('button', { name: 'Entra con SPID (simulato)' }).click();
+      await p.getByText(/Riconosciuto con SPID/).waitFor();
+      await check(p, 'password nuova del ripristino', true);
+      await p.getByLabel('Nuova password', { exact: true }).fill('il sostituto ritrova la sua');
+      await p.getByLabel('Ripeti la nuova password').fill('il sostituto ritrova la sua');
+      await p.getByRole('button', { name: 'Salva la password nuova' }).click();
+      await p.getByText('Credenziali ripristinate: entra con la password nuova.').waitFor();
+      await p.getByRole('link', { name: 'Vai all’accesso' }).click();
+      await p.getByLabel('Nome utente').fill(s.users.sostituto.username);
+      await p.getByLabel('Password').fill('il sostituto ritrova la sua');
+      await p.getByLabel('Postazione').fill('casa del sostituto');
+      await p.getByRole('button', { name: 'Continua' }).click();
+      await p.getByLabel('Codice a 6 cifre').waitFor();
+    } finally {
+      await anonymous.close();
+    }
   });
 });

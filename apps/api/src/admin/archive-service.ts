@@ -292,6 +292,9 @@ export const ACTION_LABELS: Record<string, string> = {
   password_temporanea: 'Password temporanea',
   azzeramento_secondo_fattore: 'Azzeramento del secondo fattore',
   sblocco: 'Sblocco dopo i tentativi falliti',
+  ripristino: 'Ripristino delle credenziali',
+  identita_collegata: 'Identità digitale collegata',
+  identita_scollegata: 'Identità digitale scollegata',
   archiviazione: 'Archiviazione',
   elenco_da_confermare: 'Consultazione degli utenti da confermare',
   conferma: 'Conferma',
@@ -307,6 +310,7 @@ export const ACTION_LABELS: Record<string, string> = {
 /** Da dove viene l'azione, quando non dal programma (`details.tramite`): solo valori noti. */
 const VIA_LABELS: Record<string, string> = {
   'comando del server': 'dal server, con il comando di chi gestisce il servizio',
+  'SPID o CIE': 'dall’utente stesso, con SPID o CIE',
 };
 
 /** «nomeUtente» o «password_temporanea» → «nome utente», «password temporanea». */

@@ -10,12 +10,15 @@ import {
   MUST_CHANGE_PASSWORD_ERROR,
   SERVICE_BUSY_ERROR,
 } from './auth/service';
-import type { LoginSourceLimits } from './auth/login-sources';
+import { createIdentityService } from './auth/identity-service';
+import { LOGIN_SOURCE_LIMITS, type LoginSourceLimits } from './auth/login-sources';
 import { createCertificateService } from './certificates/service';
 import type { Config } from './config';
 import { createCredentialService } from './credentials/service';
 import { isPoolTimeout, type Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
+import { registerIdentityRoutes } from './http/identity-routes';
+import { registerIdentitySimulatorRoutes } from './http/identity-simulator-routes';
 import { registerLockRoutes } from './http/lock-routes';
 import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
@@ -54,10 +57,12 @@ import {
   SimulatedDocumentSigner,
   SimulatedFseGateway,
   SimulatedGateway,
+  SimulatedDigitalIdentity,
   SimulatedReminderSender,
   SimulatedRegionalAuthorization,
   SimulatedSecondFactor,
   SimulatedSickLeaveGateway,
+  type DigitalIdentityGateway,
   type DocumentSigner,
   type GatewaySystem,
   type PrescriptionGateway,
@@ -132,6 +137,13 @@ export interface AppDeps {
    * del servizio (LOGIN_SOURCE_LIMITS); `null` le spegne, solo nelle prove che guardano il conto.
    */
   loginSources?: LoginSourceLimits | null;
+  /**
+   * Accesso con SPID o CIE al programma, per il ripristino delle credenziali (D189). Per difetto il
+   * simulatore, con un codice del programma di prova e i ritorni interni: quelli veri li assegna
+   * l'accreditamento come fornitore di servizi (da completare). Con il simulatore, in produzione, il
+   * ripristino è spento.
+   */
+  identity?: { gateway: DigitalIdentityGateway; clientId: string };
 }
 
 export function buildApp({
@@ -156,6 +168,7 @@ export function buildApp({
   fse = defaultFse(now),
   referenceUpdates = new ReferenceUpdates(db, null, now ? { now } : {}),
   loginSources,
+  identity = { gateway: new SimulatedDigitalIdentity({ now }), clientId: 'SIMULATORE_IDENTITA' },
 }: AppDeps): FastifyInstance {
   // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
   // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
@@ -251,6 +264,30 @@ export function buildApp({
   });
   if (regional.gateway instanceof SimulatedRegionalAuthorization)
     registerRegionalSimulatorRoutes(app, regional.gateway);
+  // Ripristino delle credenziali con SPID o CIE (D189).
+  const identityService = createIdentityService({
+    db,
+    encryptionKey: config.encryptionKey,
+    gateway: identity.gateway,
+    clientId: identity.clientId,
+    recoveryRedirectUri: '/api/ripristino/ritorno',
+    linkRedirectUri: '/api/profilo/identita/ritorno',
+    environment: config.environment ?? 'prova',
+    now: now ?? (() => new Date()),
+    loginSources: loginSources === undefined ? LOGIN_SOURCE_LIMITS : loginSources,
+    confirmCode: (actor, code, address) => auth.confirmCode(actor, code, address),
+  });
+  registerIdentityRoutes(app, identityService, {
+    cookieSecure: config.cookieSecure,
+    sessionCookie: SESSION_COOKIE,
+    actorOf: async (token) => {
+      if (!token) return null;
+      const r = await auth.authenticate(token);
+      return r.status === 'ok' ? r.actor : null;
+    },
+  });
+  if (identity.gateway instanceof SimulatedDigitalIdentity)
+    registerIdentitySimulatorRoutes(app, identity.gateway);
   registerPatientRoutes(app, db);
   registerDoctorProfileRoutes(app, db, now ?? (() => new Date()));
   registerTodayRoutes(app, db, now ?? (() => new Date()));

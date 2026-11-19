@@ -27,6 +27,8 @@ Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id
 
 ## Accesso regionale con SPID o CIE (D109)
 
+È l'accesso della Regione per le ricette, solo per il medico prescrittore. Il ripristino delle credenziali del programma con SPID o CIE è un'altra cosa (D189, `docs/amministrazione.md`).
+
 È la modalità scelta alla terza fermata per le ricette SSN in Piemonte. Fonte: SIRPED, autenticazione forte, versione 4.0 del 2/3/2026, 3.2 e 4.3.
 
 1. Il medico preme «Entra con SPID o CIE». Il programma crea uno `state` casuale (ne conserva l'impronta) e un `code_verifier` PKCE (cifrato), poi apre la pagina di autorizzazione regionale (`/oauth2/authorize` con `client_id`, `redirect_uri`, scope `prescrizione`, `state`, `code_challenge` S256).

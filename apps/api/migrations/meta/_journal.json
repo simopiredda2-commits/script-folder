@@ -218,6 +218,13 @@
       "when": 1795093882185,
       "tag": "0030_protezione_accesso",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1795095925096,
+      "tag": "0031_identita_digitale",
+      "breakpoints": true
     }
   ]
 }

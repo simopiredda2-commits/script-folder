@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { ErrorMessage, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { Logo } from '../components/Logo';
@@ -181,6 +182,13 @@ export function PasswordPage({ forced = false }: { forced?: boolean }) {
         </p>
         {form}
         {done && <Notice kind="fatto">{done}</Notice>}
+      </section>
+      <section className="riquadro" aria-labelledby="titolo-ripristino">
+        <h2 id="titolo-ripristino">Se perdi la password o il codice</h2>
+        <p>
+          Medici e segreteria ripristinano da sé le credenziali con SPID o CIE, dalla pagina di
+          accesso. <Link to="/profilo/identita">SPID o CIE per il ripristino</Link>
+        </p>
       </section>
     </>
   );
