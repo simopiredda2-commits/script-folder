@@ -102,6 +102,7 @@ Regole di prescrizione (si cambiano con una versione nuova e la sua fonte: D41, 
 
 ## Domande per la fermata
 
+- **Elenchi dello studio** (dalla revisione del piano): posologie e pacchetti sono contenuto clinico. Consigliata: li scrivono solo i medici, il sostituto solo con un'autorizzazione attiva; suggeritori e contatti anche l'amministratore. Oggi li scrivono titolare, sostituto e amministratore.
 - **Stampa diretta**, senza la finestra di stampa (requisiti, «stampa diretta in studio»): consigliata un'impostazione del browser sulla postazione (modalità chiosco), da provare su un computer dello studio; l'alternativa è un programma da installare, contro «nessuna installazione».
 - **Formato del promemoria:** oggi A4; le «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non sono state trovate (D97).
 - **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?

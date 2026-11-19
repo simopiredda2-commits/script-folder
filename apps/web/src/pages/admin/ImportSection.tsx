@@ -304,11 +304,12 @@ function ImportWizard({ catalog }: { catalog: Catalog }) {
     <section className="riquadro" aria-labelledby="titolo-importazione">
       <h2 id="titolo-importazione">Importazione da altri programmi</h2>
       <p>
-        Porta nella cartella i dati di un altro programma: anagrafica, esenzioni, problemi,
-        allergie, diario, anamnesi, parametri, esami, vaccinazioni, terapie e ricette passate. Per
-        ogni foglio del file scegli dove vanno i dati e da quali colonne; il programma controlla
-        ogni riga come se la scrivessi a mano. Prima si prova senza scrivere, poi si importa. Nulla
-        di quanto c’è già in cartella viene sovrascritto.
+        Porta nella cartella i dati di un altro programma: anagrafica, esenzioni, scelta del medico,
+        nucleo familiare, problemi, allergie, diario, anamnesi, stili di vita, esame obiettivo,
+        parametri, esami, vaccinazioni, terapie e ricette passate. Per ogni foglio del file scegli
+        dove vanno i dati e da quali colonne; il programma controlla ogni riga come se la scrivessi
+        a mano. Prima si prova senza scrivere, poi si importa. Nulla di quanto c’è già in cartella
+        viene sovrascritto.
       </p>
       <nav aria-label="Passi dell’importazione">
         <ol className="schede passi-importazione">

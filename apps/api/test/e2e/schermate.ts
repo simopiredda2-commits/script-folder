@@ -55,7 +55,13 @@ async function shot(page: Page, name: string, fullPage = false) {
 }
 
 /** Primo accesso di un utente del seed: password, poi l'attivazione del secondo fattore. */
-async function firstLogin(browser: Browser, base: string, username: string, secret: string) {
+async function firstLogin(
+  browser: Browser,
+  base: string,
+  username: string,
+  secret: string,
+  workstation = 'Studio',
+) {
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     deviceScaleFactor: 2,
@@ -65,7 +71,7 @@ async function firstLogin(browser: Browser, base: string, username: string, secr
   await p.goto(base);
   await p.getByLabel('Nome utente').fill(username);
   await p.getByLabel('Password').fill(secret);
-  await p.getByLabel('Postazione').fill('Studio');
+  await p.getByLabel('Postazione').fill(workstation);
   await p.getByRole('button', { name: 'Continua' }).click();
   const code = (await p.locator('.segreto').innerText()).replace(/\s/g, '');
   await p.getByLabel('Codice a 6 cifre').fill(totp(base32Decode(code), Date.now()));
@@ -232,7 +238,11 @@ try {
   await page.getByLabel('Momento').selectOption('la sera');
   await page.getByLabel('Via', { exact: true }).selectOption('per bocca');
   await page.getByLabel('Istruzioni per il paziente').fill('Dopo cena.');
-  await page.getByText('1 compressa una volta al giorno, la sera, per bocca').waitFor();
+  // La lettura composta dalla scheda (la stessa frase può essere anche una posologia dello studio).
+  await page
+    .getByRole('paragraph')
+    .filter({ hasText: '1 compressa una volta al giorno, la sera, per bocca' })
+    .waitFor();
   await page
     .getByRole('heading', { name: 'Come si prende' })
     .evaluate((el) => el.scrollIntoView({ block: 'start' }));
@@ -535,7 +545,10 @@ try {
 
   // Tappa 15: importazione a passi con un CSV di pazienti inventati, fino alla prova senza
   // scrivere (D173): le cartelle dimostrative non cambiano.
-  const people = generatePatients({ seed: 'schermate-importazione', count: 4 });
+  // Solo adulti, come in tutte le schermate (D149).
+  const people = generatePatients({ seed: 'schermate-importazione', count: 40 })
+    .filter((x) => x.birthDate < '2000-01-01')
+    .slice(0, 4);
   const csv = [
     'Codice fiscale;Cognome;Nome;Sesso;Data di nascita',
     ...people.map((x) => [x.fiscalCode, x.lastName, x.firstName, x.sex, x.birthDate].join(';')),
@@ -589,7 +602,8 @@ try {
 
   // Tappa 14: le schede che vede solo l'amministratore, se si danno le sue credenziali.
   if (adminPassword) {
-    const admin = await firstLogin(browser, base, adminUser, adminPassword);
+    // Dalla postazione dell'ambulatorio: «Questa postazione» mostra le sue preferenze di stampa.
+    const admin = await firstLogin(browser, base, adminUser, adminPassword, 'Ambulatorio');
     for (const [sezione, title, name] of [
       ['utenti', 'Utenti e ruoli', '51-utenti-e-ruoli'],
       ['studio', 'Dati e impostazioni dello studio', '52-dati-dello-studio'],
