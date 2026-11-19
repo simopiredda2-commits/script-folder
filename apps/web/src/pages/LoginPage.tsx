@@ -4,6 +4,7 @@ import { Logo } from '../components/Logo';
 import { Signature } from '../components/Signature';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
+import { rememberedWorkstation, rememberWorkstation } from '../lib/storage';
 
 type Step =
   | { kind: 'password' }
@@ -42,6 +43,8 @@ export function LoginPage() {
           },
         },
       );
+      // La password è giusta: questo browser ricorda la postazione per la prossima volta.
+      rememberWorkstation(field(f, 'postazione'));
       setStep(
         r.passo === 'attiva-secondo-fattore'
           ? { kind: 'enroll', token: r.passaggio, secret: r.segreto!, otpauth: r.otpauth! }
@@ -99,9 +102,15 @@ export function LoginPage() {
             </div>
             <div className="campo">
               <label htmlFor="postazione">Postazione</label>
-              <input id="postazione" name="postazione" defaultValue="Studio" required />
+              <input
+                id="postazione"
+                name="postazione"
+                defaultValue={rememberedWorkstation()}
+                required
+              />
               <p className="aiuto">
-                Il nome del computer o del tablet: resta nel registro degli accessi.
+                Il nome del computer o del tablet: resta nel registro degli accessi, e questo
+                browser lo ricorda per il prossimo accesso.
               </p>
             </div>
             <button type="submit" className="pulsante pulsante-primario" disabled={busy}>

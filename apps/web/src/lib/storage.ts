@@ -62,3 +62,29 @@ export function usePersistentState<T>(
   }, [key]);
   return [value, set, reset];
 }
+
+/**
+ * Nome della postazione, ricordato in questo browser anche dopo l'uscita (localStorage). Descrive
+ * il computer o il tablet, non una persona né un paziente, e serve alle preferenze di stampa della
+ * postazione: senza, quasi tutti gli accessi risulterebbero dalla postazione proposta (D178).
+ */
+const WORKSTATION_KEY = 'postazione';
+export const DEFAULT_WORKSTATION = 'Studio';
+
+export function rememberedWorkstation(): string {
+  try {
+    const v = localStorage.getItem(WORKSTATION_KEY)?.trim();
+    return v ? v : DEFAULT_WORKSTATION;
+  } catch {
+    return DEFAULT_WORKSTATION;
+  }
+}
+
+export function rememberWorkstation(name: string): void {
+  try {
+    const v = name.trim();
+    if (v) localStorage.setItem(WORKSTATION_KEY, v);
+  } catch {
+    // Memoria non disponibile: la prossima volta si propone di nuovo il nome di difetto.
+  }
+}
