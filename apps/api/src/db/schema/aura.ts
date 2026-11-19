@@ -1,4 +1,14 @@
-import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import type { AuraRegistry } from '@mmg/integrations';
+import {
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core';
 import { patient } from './patients';
 import { studio } from './studio';
 
@@ -20,6 +30,13 @@ export const auraLink = pgTable('aura_link', {
   message: text(),
   /** Ultimo controllo andato a buon fine: da quando esenzioni e scelte sono quelle di AURA. */
   updatedAt: timestamp({ withTimezone: true }),
+  /**
+   * Anagrafica che AURA ha mandato all'ultimo controllo (D198). Non entra da sola nella cartella:
+   * le differenze si confermano dal pannello.
+   */
+  registry: jsonb().$type<AuraRegistry>(),
+  /** Valori di AURA che medico o segreteria hanno scelto di non usare, campo per campo. */
+  registryDismissed: jsonb().$type<Record<string, string>>().notNull().default({}),
 });
 
 /**

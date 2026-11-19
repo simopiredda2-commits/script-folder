@@ -1,5 +1,5 @@
 import { SimulatedAura } from '@mmg/integrations';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
 import { createAuraService, NOT_IN_AURA } from '../src/aura/service';
@@ -154,8 +154,17 @@ describe('AURA: esenzioni e scelte dall’anagrafe regionale (D197)', () => {
         },
       ],
     });
+    // Nello scenario il paziente può essere «revocato»: con una scelta in corso del titolare in
+    // AURA torna in carico da solo (D198), e anche questo è una variazione.
+    const [{ status: before }] = (await t.db
+      .select({ status: patient.status })
+      .from(patient)
+      .where(eq(patient.id, s.richPatient))) as [{ status: string }];
     const res = await sync();
-    expect(res.json()).toMatchObject({ esito: 'aggiornato', variazioni: 3 });
+    expect(res.json()).toMatchObject({
+      esito: 'aggiornato',
+      variazioni: before === 'revoked' ? 4 : 3,
+    });
     expect(res.json().stato).toMatchObject({ idAura: auraId, esito: 'aggiornato' });
     expect((await fromAura()).map((e) => [e.code, e.validTo])).toEqual([
       ['013', null],
@@ -384,10 +393,22 @@ describe('AURA: esenzioni e scelte dall’anagrafe regionale (D197)', () => {
       t.db.execute(sql`delete from aura_link where patient_id = ${s.richPatient}`),
       /non si cancellano/,
     );
+    // In carico, e i revocati già collegati ad AURA (D198): qui il paziente di prima, revocato
+    // quando AURA ha detto cessata la scelta del titolare.
     const active = await t.db
       .select({ id: patient.id })
       .from(patient)
-      .where(and(eq(patient.studioId, s.studioId), eq(patient.status, 'active')));
+      .leftJoin(auraLink, eq(auraLink.patientId, patient.id))
+      .where(
+        and(
+          eq(patient.studioId, s.studioId),
+          or(
+            eq(patient.status, 'active'),
+            and(eq(patient.status, 'revoked'), isNotNull(auraLink.auraId)),
+          ),
+        ),
+      );
+    expect(active.map((a) => a.id)).toContain(s.richPatient);
     expect(run.patients).toBe(active.length);
     expect(run.failed).toBe(0);
     const [stored] = await t.db.select().from(auraSyncRun).where(eq(auraSyncRun.id, run.id));

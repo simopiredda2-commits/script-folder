@@ -28,6 +28,7 @@ const state = (over: object = {}) => ({
   esito: 'aggiornato',
   messaggio: null,
   aggiornatoIl: '2026-11-19T08:00:00Z',
+  differenze: [],
   variazioni: [
     {
       quando: '2026-11-19T08:00:00Z',
@@ -107,6 +108,89 @@ describe('AURA nell’interfaccia (D197)', () => {
     expect(await screen.findByText(/non è ancora collegata al servizio vero/)).toBeTruthy();
     expect(screen.queryByText(/Collegamento simulato/)).toBeNull();
     expect(screen.queryByRole('button', { name: /Aggiorna da AURA/ })).toBeNull();
+  });
+
+  it('anagrafica di AURA: le differenze si confermano una alla volta, con il dato visto', async () => {
+    const fetchMock = stub({
+      'GET /api/pazienti/p1/aura': state({
+        differenze: [
+          {
+            campo: 'asl',
+            etichetta: 'ASL di assistenza',
+            nellaCartella: 'ASL TO1',
+            inAura: 'ASL TO5',
+          },
+          { campo: 'decesso', etichetta: 'Decesso', nellaCartella: null, inAura: '2026-11-17' },
+        ],
+      }),
+      'POST /api/pazienti/p1/aura/differenze': { campi: ['asl'], nonUsati: [], stato: state() },
+    });
+    const onUpdated = vi.fn();
+    render(<AuraSection patientId="p1" canWrite onUpdated={onUpdated} />);
+    expect(await screen.findByText('Anagrafica diversa in AURA, da confermare')).toBeTruthy();
+    expect(screen.getByText('ASL TO1')).toBeTruthy();
+    expect(screen.getByText('Deceduto il 17/11/2026')).toBeTruthy();
+    expect(screen.getByText('Non risulta deceduto')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Usa il dato di AURA: ASL di assistenza' }));
+    expect(await screen.findByText('ASL di assistenza: ora c’è il dato di AURA.')).toBeTruthy();
+    const posted = fetchMock.mock.calls.find(
+      ([u, init]) => u === '/api/pazienti/p1/aura/differenze' && init?.method === 'POST',
+    );
+    expect(JSON.parse(String(posted![1]!.body))).toEqual({
+      scelte: [{ campo: 'asl', inAura: 'ASL TO5', usa: true }],
+    });
+    expect(onUpdated).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Conferma il decesso' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Non confermare il decesso' })).toBeTruthy();
+  });
+
+  it('anagrafica di AURA: chi non scrive nell’archivio vede le differenze ma non i pulsanti', async () => {
+    stub({
+      'GET /api/pazienti/p1/aura': state({
+        differenze: [
+          { campo: 'asl', etichetta: 'ASL di assistenza', nellaCartella: null, inAura: 'ASL TO5' },
+        ],
+      }),
+    });
+    render(<AuraSection patientId="p1" canWrite={false} onUpdated={() => undefined} />);
+    expect(await screen.findByText('ASL TO5')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Usa il dato di AURA/ })).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Azioni' })).toBeNull();
+  });
+
+  it('pagina Oggi: il decesso segnalato da AURA in evidenza, con il collegamento al pannello', async () => {
+    stub({
+      'GET /api/aura/variazioni?giorni=7': {
+        disponibile: true,
+        giorni: 7,
+        variazioni: [],
+        daConfermare: [
+          {
+            paziente: { id: 'p2', cognome: 'Inventata', nome: 'Paziente' },
+            campi: [],
+            decesso: '2026-11-17',
+          },
+          {
+            paziente: { id: 'p3', cognome: 'Inventato', nome: 'Altro' },
+            campi: ['ASL di assistenza', 'Residenza: comune'],
+            decesso: null,
+          },
+        ],
+      },
+    });
+    render(
+      <MemoryRouter>
+        <AuraChangesToday />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/AURA segnala il decesso di/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Paziente Inventata' }).getAttribute('href')).toBe(
+      '/pazienti/p2/amministrazione#aura',
+    );
+    expect(screen.getByText(/il 17\/11\/2026: da confermare/)).toBeTruthy();
+    expect(
+      screen.getByText(/anagrafica diversa in AURA \(ASL di assistenza, Residenza: comune\)/),
+    ).toBeTruthy();
   });
 
   it('pagina Oggi: le variazioni con il paziente; senza variazioni, o con una risposta strana, niente', async () => {

@@ -25,6 +25,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   accountLock,
   appointment,
+  auraLink,
   clinicalEntry,
   doctorProfile,
   labResultDetail,
@@ -1945,7 +1946,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   it('AURA (D197): «Aggiorna da AURA» porta l’esenzione con la sua fonte; la variazione è in Oggi', async () => {
     const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
     // 013, diabete mellito (allegato 8 del DPCM LEA), su un assistito inventato del simulatore.
-    aura.register({
+    const auraId = aura.register({
       fiscalCode: rich!.fiscalCode,
       lastName: rich!.lastName,
       firstName: rich!.firstName,
@@ -1970,6 +1971,26 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     const today = page.getByRole('region', { name: 'Variazioni da AURA' });
     await today.getByRole('link', { name: `${rich!.firstName} ${rich!.lastName}` }).waitFor();
     await check(page, 'variazioni da AURA in Oggi');
+
+    // Anagrafica (D198): una ASL diversa in AURA si vede nel pannello e si usa con un clic.
+    aura.setRegistry(auraId, { asl: 'ASL DIMOSTRATIVA NUOVA' });
+    for (let i = 0; i < 100; i++) {
+      const [link] = await t.db
+        .select()
+        .from(auraLink)
+        .where(eq(auraLink.patientId, s.richPatient));
+      if (link?.registry) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    await page.goto(`${base}/pazienti/${s.richPatient}/amministrazione#aura`);
+    await section
+      .getByRole('heading', { name: 'Anagrafica diversa in AURA, da confermare' })
+      .waitFor();
+    await check(page, 'differenze con AURA', true);
+    await section.getByRole('button', { name: 'Usa il dato di AURA: ASL di assistenza' }).click();
+    await section.getByText('ASL di assistenza: ora c’è il dato di AURA.').waitFor();
+    const [after] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    expect(after!.asl).toBe('ASL DIMOSTRATIVA NUOVA');
   });
 
   it('dopo l’inattività la sessione si blocca e si sblocca con il codice; le cartelle aperte restano', async () => {

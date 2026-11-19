@@ -1,13 +1,32 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { adminBodyFor, REGISTRY_FIELD_KEYS } from '../aura/registry';
 import type { AuraService } from '../aura/service';
-import { logAccessForPatients } from '../audit/access-log';
+import { logAccess, logAccessForPatients } from '../audit/access-log';
 import type { Database } from '../db/client';
 import { guardPatient, visibleArchives } from '../patients/access';
+import { updateAdmin } from '../patients/admin';
 import { HttpError } from './errors';
 
 const idParams = z.object({ id: z.uuid() });
 const changesQuery = z.object({ giorni: z.coerce.number().int().min(1).max(90).default(7) });
+/** Per ogni differenza: il valore di AURA che si è visto, e se usarlo o no. */
+const choicesBody = z
+  .object({
+    scelte: z
+      .array(
+        z
+          .object({
+            campo: z.enum(REGISTRY_FIELD_KEYS),
+            inAura: z.string().trim().min(1).max(300),
+            usa: z.boolean(),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(REGISTRY_FIELD_KEYS.length),
+  })
+  .strict();
 
 /**
  * AURA, l'anagrafe regionale degli assistiti (D197): stato del collegamento e variazioni di un
@@ -16,9 +35,9 @@ const changesQuery = z.object({ giorni: z.coerce.number().int().min(1).max(90).d
  */
 export function registerAuraRoutes(
   app: FastifyInstance,
-  deps: { db: Database; aura: AuraService },
+  deps: { db: Database; aura: AuraService; now: () => Date },
 ): void {
-  const { db, aura } = deps;
+  const { db, aura, now } = deps;
   const scoped = { config: { patientScoped: true } };
 
   app.get('/api/pazienti/:id/aura', scoped, async (req) => {
@@ -41,13 +60,70 @@ export function registerAuraRoutes(
     };
   });
 
-  /** Variazioni arrivate da AURA negli ultimi giorni, dei pazienti che l'utente può vedere. */
+  /**
+   * Anagrafica da AURA (D198): medico o segreteria usano il valore di AURA (con i controlli del
+   * pannello amministrativo) o scelgono di non usarlo. Si risponde solo alle differenze di adesso,
+   * con il valore che si è visto: se AURA nel frattempo ha cambiato, si ricarica.
+   */
+  app.post('/api/pazienti/:id/aura/differenze', scoped, async (req) => {
+    const actor = req.actor!;
+    const { id } = idParams.parse(req.params);
+    const { scelte } = choicesBody.parse(req.body);
+    const { patient, context } = await guardPatient(
+      db,
+      actor,
+      id,
+      'registry.write',
+      'modifica_dati_amministrativi',
+    );
+    const current = await aura.differences(id);
+    const chosen = scelte.map((s) => {
+      const d = current.find((c) => c.campo === s.campo);
+      if (!d || d.inAura !== s.inAura)
+        throw new HttpError(
+          409,
+          'I dati di AURA sono cambiati, o la differenza non c’è più: ricarica il pannello',
+        );
+      return { ...d, usa: s.usa };
+    });
+    const used = chosen.filter((c) => c.usa);
+    const notUsed = chosen.filter((c) => !c.usa);
+    const r = used.length
+      ? await updateAdmin(db, actor, patient, context, adminBodyFor(used), now(), {
+          fonte: 'AURA',
+        })
+      : { campi: [] };
+    if (notUsed.length) {
+      await aura.dismiss(id, notUsed);
+      await logAccess(db, {
+        studioId: actor.studioId,
+        userId: actor.userId,
+        patientId: id,
+        action: 'aggiornamento_aura',
+        outcome: 'riuscito',
+        workstation: actor.workstation,
+        details: { nonUsati: notUsed.map((c) => c.campo) },
+      });
+    }
+    return {
+      campi: r.campi,
+      nonUsati: notUsed.map((c) => c.campo),
+      stato: await aura.patientState(id),
+    };
+  });
+
+  /**
+   * Variazioni arrivate da AURA negli ultimi giorni e anagrafiche da confermare (il decesso per
+   * primo), dei pazienti che l'utente può vedere.
+   */
   app.get('/api/aura/variazioni', async (req) => {
     const actor = req.actor!;
     const { giorni } = changesQuery.parse(req.query);
     const archives = await visibleArchives(db, actor, 'registry.read');
     const rows = await aura.recentChanges(actor.studioId, archives, giorni);
-    await logAccessForPatients(db, [...new Set(rows.map((r) => r.pazienteId))], {
+    const pending = await aura.pendingForArchives(actor.studioId, archives);
+    const shown = [...rows.map((r) => r.pazienteId), ...pending.map((r) => r.pazienteId)];
+    await logAccessForPatients(db, [...new Set(shown)], {
       studioId: actor.studioId,
       userId: actor.userId,
       action: 'lettura_variazioni_aura',
@@ -64,6 +140,11 @@ export function registerAuraRoutes(
         variazione: r.variazione,
         descrizione: r.descrizione,
         paziente: { id: r.pazienteId, cognome: r.cognome, nome: r.nome },
+      })),
+      daConfermare: pending.map((r) => ({
+        paziente: { id: r.pazienteId, cognome: r.cognome, nome: r.nome },
+        campi: r.campi,
+        decesso: r.decesso,
       })),
     };
   });
