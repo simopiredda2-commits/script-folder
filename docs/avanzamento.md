@@ -15,7 +15,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
   4. `docs/fse.md` (D110): fatto, con le fonti ufficiali sul Profilo Sanitario Sintetico;
   5. fermata finale fatta (D125–D128): via all'unione della pull request #5; dettatura fuori; BMI scritto a mano; via alle tappe 11 e 12.
 - **Terzo giro** (D128), nel branch `tappe-11-12`: tappe 11, 13 e 12 fatte (D130–D162). **Via dato in anticipo** da Simone il 19/11/2026 («Do già adesso l'autorizzazione al via»): pull request #6 unita in `main` (commit 033c6ed). Le domande di merito della fermata restano aperte con le scelte di oggi e si fanno alla prossima fermata, dopo la tappa 15.
-- **Richieste del 19/11/2026**, nel branch `tappe-14-15`: tappa 14 (strumenti e amministrazione completi, D163–D168, D170, D175, D177–D180) e tappa 15 (importazione da altri programmi con lo smistamento verso i menu, D169, D171–D174, D176) fatte, con una revisione del piano e una revisione avversaria dei poteri dell'amministratore. Pull request #7 aperta; fermata dopo la tappa 15: domande con il pulsante e via all'unione.
+- **Richieste del 19/11/2026**, nel branch `tappe-14-15`: tappa 14 (strumenti e amministrazione completi, D163–D168, D170, D175, D177–D180) e tappa 15 (importazione da altri programmi con lo smistamento verso i menu, D169, D171–D174, D176) fatte, con una revisione del piano e una revisione avversaria dei poteri dell'amministratore. Fermata dopo la tappa 15 fatta (D181): via dato, pull request #7 unita. Le scelte della fermata da costruire sono nella sezione «Risposte della fermata dopo la tappa 15»: blocco nuovo quando Simone dà il via.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -722,6 +722,20 @@ Durante la tappa 11 (terzo giro):
   - i dispositivi da collegare al computer, come un lettore per la tessera sanitaria o per una firma su smart card. Con SPID e con una firma remota non serve nulla (fornitore della firma: domanda della fermata, D137).
 
 - **Net Medica Italia** (domanda della Dr.ssa Rocca): far comunicare medici con programmi diversi senza comprare quel servizio. Raccolte le informazioni pubbliche, fatta una proposta (D104). È una domanda della terza fermata; non è costruito nulla.
+
+## Risposte della fermata dopo la tappa 15 (19/11/2026)
+
+Dettagli in D181. Via all'unione della pull request #7. Da costruire in un blocco nuovo, quando Simone dà il via:
+
+1. ripristino delle credenziali di medici e segreteria anche con SPID o CIE, oltre che dal server;
+2. conferma della segreteria per archivio, in medicina di gruppo;
+3. ritardi crescenti dopo i tentativi falliti, per indirizzo e postazione, e avviso di ogni blocco al medico e ai titolari (soglie da completare);
+4. correzione del codice fiscale del medico confermata dal medico;
+5. ricette fatte con altri programmi contate nelle regole R11 e R6, con il messaggio;
+6. AFT: scheda intera non riservata, con il consenso e il motivo;
+7. elenchi dello studio scritti dai medici (il sostituto con un'autorizzazione attiva) e dall'amministratore.
+
+Non cambiano: voci importate subito nel Profilo e nell'AFT; il primo titolare lo riconosce di persona chi gestisce il server; il catalogo regionale lo controlla la Dr.ssa Rocca con l'ASL; il modello della patente lo verifica la Dr.ssa Rocca.
 
 ## Risposte della fermata finale del secondo giro (18/11/2026)
 

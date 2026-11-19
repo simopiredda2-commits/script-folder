@@ -825,3 +825,20 @@ Prove, 35 sabotaggi.
 Prove d'attacco delle revisioni rovesciate (l'attacco deve fallire), prove con richieste davvero sovrapposte, prova nel browser della conferma; sabotaggi nel registro.
 
 **D180 · Preferenze di stampa (tappa 14).** Richiesta di Simone: «impostazioni stampanti». Per sei documenti (promemoria SSN, ricetta bianca, certificato INPS, certificati dai modelli, schema orario, Profilo sanitario) stampante consigliata, copie, carta e, per il promemoria, che cosa proporre per primo. Vale la postazione, poi lo studio, poi la predefinita, campo per campo: di solito una postazione cambia solo la stampante. Le imposta l'amministratore; le leggono tutti per la propria postazione, segreteria compresa, perché stampa i promemoria; ogni modifica va nel registro con prima e dopo, niente se nulla cambia; non si cancellano, si svuotano. Il programma è nel browser: stampante e copie sono suggerimenti da confermare nella finestra di stampa, la carta dei certificati dai modelli cambia il PDF (A4 o A5), lo schema orario la suggerisce soltanto. Formati senza valori ricostruiti a memoria: dove l'atto non è stato letto per la carta resta il formato di oggi, e lo dice la fonte. Le copie non impostate si scrivono 0 («come il livello sotto»), perché la colonna non ammette il vuoto. La postazione è quella scritta all'accesso, confrontata senza maiuscole con le postazioni attive (D178). Limiti di buon senso: da 1 a 5 copie, nome della stampante fino a 100 caratteri. Prove e 32 sabotaggi; domande per la fermata in `docs/amministrazione.md`.
+
+**D181 · Risposte della fermata dopo la tappa 15 (19/11/2026).** Domande con il pulsante a Simone, in tre gruppi:
+
+- **Via** all'unione della pull request #7 (tappe 14 e 15), con la CI verde.
+- **Poteri dell'amministratore** (D179): restano come sono, e in più medici e segreteria possono ripristinare da soli le proprie credenziali con SPID o CIE (D109), oltre che dal server. Da costruire.
+- **Medicina di gruppo**: la segreteria si conferma per archivio, ogni titolare per il suo; finché un titolare non la conferma, il suo archivio non lo vede (D179, problema 3). Da costruire.
+- **Blocco dopo i tentativi falliti**: ritardi crescenti per indirizzo e postazione, blocco del conto solo oltre una soglia alta, e un avviso di ogni blocco al medico e ai titolari (problema 4). Da costruire; le soglie sono valori da completare.
+- **Codice fiscale del medico corretto dall'amministratore**: la correzione resta in sospeso finché il medico non la conferma, dal programma (problema 12). Da costruire.
+- **Primo titolare confermato dal server**: chi gestisce il servizio riconosce il medico di persona, con un documento e il codice regionale, e lo annota fuori dal programma (procedura in `docs/amministrazione.md`).
+- **Voci importate**: entrano subito nel Profilo sanitario sintetico e nel riepilogo dell'AFT, come oggi, con il segno della provenienza.
+- **Ricette fatte con altri programmi**: contano nelle regole R11 e R6, e il messaggio dice che c'è una ricetta fatta con un altro programma (D176). Da costruire.
+- **Catalogo regionale** (D159): lo controlla la Dr.ssa Rocca con il catalogo dell'ASL, dalla lista di `docs/catalogo-regionale.md`.
+- **AFT** (D161): il collega vede la scheda intera non riservata (diario, esami, storico), sempre con il consenso del paziente e il motivo, invece del solo riepilogo. Da costruire; niente voci riservate o oscurate, come oggi.
+- **Modello proposto della patente** (D160): lo verifica la Dr.ssa Rocca; fino ad allora resta «da verificare».
+- **Elenchi dello studio** (D175): risposta «solo i medici e l'amministratore». Interpretata così: scrivono tutti gli elenchi i medici titolari, il sostituto con un'autorizzazione attiva sull'archivio di un titolare dello studio, e l'amministratore; la segreteria li legge. Oggi il sostituto scrive anche senza autorizzazione. Da costruire; da correggere se l'intenzione era un'altra.
+
+Le altre domande annotate nei documenti (stampa diretta, campi facoltativi non validi nell'importazione, soglie degli avvisi, salvataggi cifrati, scadenza della password temporanea e le altre) restano con la scelta di oggi.

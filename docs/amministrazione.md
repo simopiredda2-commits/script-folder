@@ -42,7 +42,7 @@ pnpm utente:ripristina -- --utente nome.cognome --mostra
 pnpm utente:ripristina -- --utente nome.cognome --conferma --richiesta-il DATA
 ```
 
-Il primo comando stampa la richiesta senza cambiare nulla: ruoli (anche con i codici), dati del medico, chi l'ha fatta e la data esatta, che il secondo vuole uguale; se nel frattempo l'amministratore ha cambiato l'utente, il secondo rifiuta e rimanda al primo. Per non confermare: `--rifiuta`. Da lì in poi medici e segreteria li conferma un titolare, dal programma; con un titolare attivo e confermato il comando rifiuta e rimanda alla conferma dal programma.
+Chi gestisce il servizio riconosce il medico di persona, con un documento e il codice regionale, e lo annota fuori dal programma (D181). Il primo comando stampa la richiesta senza cambiare nulla: ruoli (anche con i codici), dati del medico, chi l'ha fatta e la data esatta, che il secondo vuole uguale; se nel frattempo l'amministratore ha cambiato l'utente, il secondo rifiuta e rimanda al primo. Per non confermare: `--rifiuta`. Da lì in poi medici e segreteria li conferma un titolare, dal programma; con un titolare attivo e confermato il comando rifiuta e rimanda alla conferma dal programma.
 
 In uno studio con un solo medico servono due utenti, l'amministratore e il medico: nessuno cambia i propri ruoli. Al medico confermato l'amministratore può poi aggiungere il ruolo di amministratore.
 
@@ -127,6 +127,8 @@ In sola lettura per l'amministratore:
 Regole di prescrizione (si cambiano con una versione nuova e la sua fonte: D41, D47), testi dei modelli ufficiali (D144), mappature e soglie di vecchiaia delle banche dati (D156), valori fissi del Fascicolo (D133), segreti e certificati del servizio (regola 7), credenziali dei medici (D100), registro degli accessi (non si modifica, D23).
 
 ## Domande per la fermata
+
+Risposte di Simone alla fermata dopo la tappa 15 in D181: quelle sui poteri dell'amministratore, sul blocco, sul codice fiscale del medico e sugli elenchi cambiano il programma e si costruiscono in un blocco nuovo; le altre restano con la scelta di oggi.
 
 - **Elenchi dello studio** (dalla revisione del piano): posologie e pacchetti sono contenuto clinico. Consigliata: li scrivono solo i medici, il sostituto solo con un'autorizzazione attiva; suggeritori e contatti anche l'amministratore. Oggi li scrivono titolare, sostituto e amministratore.
 - **Stampa diretta**, senza la finestra di stampa (requisiti, «stampa diretta in studio»): consigliata un'impostazione del browser sulla postazione (modalità chiosco), da provare su un computer dello studio; l'alternativa è un programma da installare, contro «nessuna installazione».

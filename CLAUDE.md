@@ -57,7 +57,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 
 ## Come si procede
 
-- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`, unita (#6, via del 19/11/2026). Quarto blocco (richieste del 19/11/2026): `tappe-14-15`.
+- Un branch per blocco di tappe, ognuno con una pull request verso `main` (cosa c'è, come provarlo, scelte prese, che cosa non è stato provato). Primo giro: `tappe-0-2`, `tappe-3-4`, `tappe-5-6`, unite. Secondo giro (D90): `tappe-7-8`, `tappe-9-10`, unite. Terzo giro (D128): `tappe-11-12`, unita (#6, via del 19/11/2026). Quarto blocco (richieste del 19/11/2026): `tappe-14-15`, unito (#7, via del 19/11/2026).
 - Dopo ogni tappa: test e lint verdi, commit e push (la macchina in cloud può essere riciclata), poi aggiornare `docs/avanzamento.md` con fatto, non fatto, non provato e prossimo passo.
 - **Fermate**: dopo la tappa 2 e dopo la tappa 4. Domande con il pulsante a Simone; spiegare in parole semplici cosa devono verificare lui e la Dr.ssa Rocca (dopo la 2: struttura, modello dei dati, ruoli e permessi; dopo la 4: ciclo della ricetta e regole di prescrizione con le loro fonti) e chiedere il via. Alla prima fermata chiedere anche quale proposta di logo preferisce, con il collegamento a `docs/logo.md` su GitHub, indicando quella consigliata. Se chiede modifiche: farle, aggiornare la PR, richiedere il via. Con il via: unire la PR e continuare. Simone non interviene su GitHub: le PR le unisce Claude.
 - Dopo la tappa 6: stesso giro per l'ultima PR (fatto).
@@ -168,6 +168,8 @@ Richieste di Simone del 19/11/2026, branch `tappe-14-15`, stesso metodo:
 
 14. Strumenti e amministrazione completi: tutte le impostazioni e i dati modificabili (dati dello studio, utenti e ruoli, password, postazioni e stampa, intestazioni, elenchi dello studio, autorizzazioni sull'archivio, registro delle azioni di amministrazione, avvisi sugli accessi anomali, stato del servizio).
 15. Importazione da altri programmi in vari formati, con lo smistamento dei dati verso i menu (anagrafica e pannello amministrativo del paziente, storia clinica, patologie, farmaci in terapia e prescritti); i menu che mancavano si costruiscono. **Fermata dopo la tappa 15**, con lo stesso giro (domande con il pulsante, via, unione).
+
+Fermata dopo la tappa 15 fatta (D181): via, pull request #7 unita. Le scelte da costruire sono in `docs/avanzamento.md` («Risposte della fermata dopo la tappa 15»): si fanno in un blocco nuovo, quando Simone dà il via.
 
 ## Come si chiude
 
