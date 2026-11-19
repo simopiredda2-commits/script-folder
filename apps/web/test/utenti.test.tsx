@@ -117,6 +117,7 @@ const row = (over: Record<string, unknown>) => ({
   titolareConPazienti: false,
   ultimoTitolare: false,
   confermaDalServizio: false,
+  sospesoDalServizio: false,
   ...over,
 });
 
@@ -371,6 +372,75 @@ describe('utenti dello studio (tappa 14)', () => {
     ).toBeTruthy();
     // Nel testo della sezione, anche il primo titolare aspetta la conferma.
     expect(screen.getByText(/anche il primo\s+medico titolare/)).toBeTruthy();
+  });
+
+  it('chi è sospeso da chi gestisce il servizio non si riattiva da qui, e si dice perché; le sospensioni dell’amministratore sì', async () => {
+    const OWNER_ROLE = [{ codice: 'owner_doctor', nome: 'Medico titolare' }];
+    const SECRETARY_ROLE = [{ codice: 'secretary', nome: 'Segreteria' }];
+    fakeService({
+      '/api/studio/utenti': () => ({
+        status: 200,
+        body: {
+          ruoli: USERS.ruoli,
+          utenti: [
+            row({
+              id: 'a1',
+              nomeUtente: 'amministratore',
+              nome: 'Andrea Conti',
+              ruoli: ADMIN_ROLE,
+              io: true,
+            }),
+            row({
+              id: 's2',
+              nomeUtente: 'segreteria.server',
+              nome: 'Rita Serveri',
+              ruoli: SECRETARY_ROLE,
+              stato: 'sospeso',
+              ripristinoDalServizio: true,
+              sospesoDalServizio: true,
+            }),
+            row({
+              id: 's3',
+              nomeUtente: 'segreteria.sospesa',
+              nome: 'Gina Sospesi',
+              ruoli: SECRETARY_ROLE,
+              stato: 'sospeso',
+              ripristinoDalServizio: true,
+            }),
+            row({
+              id: 't2',
+              nomeUtente: 'titolare.server',
+              nome: 'Dott. Carlo Serveri',
+              ruoli: OWNER_ROLE,
+              stato: 'sospeso',
+              ripristinoDalServizio: true,
+              titolareConPazienti: true,
+              sospesoDalServizio: true,
+            }),
+          ],
+        },
+      }),
+    });
+    render(<UsersSection />);
+    const table = await screen.findByRole('table', { name: 'Utenti dello studio' });
+    const rows = within(table).getAllByRole('row');
+    const byName = (n: string) =>
+      rows.find((r) => r.querySelector('th')?.textContent?.startsWith(n))!;
+    const SERVICE = /L’ha sospeso chi gestisce il servizio, sul server: lo riattiva solo lui/;
+    // Sospesa dal server: niente «Riattiva», lo stato e il perché.
+    const byServer = byName('Rita Serveri');
+    expect(within(byServer).queryByRole('button', { name: /Riattiva/ })).toBeNull();
+    expect(within(byServer).getByText(/Sospeso da chi gestisce il servizio/)).toBeTruthy();
+    expect(within(byServer).getByText(SERVICE)).toBeTruthy();
+    // Sospesa dall'amministratore: si riattiva da qui.
+    const byAdmin = byName('Gina Sospesi');
+    expect(within(byAdmin).getByRole('button', { name: 'Riattiva per Gina Sospesi' })).toBeTruthy();
+    expect(within(byAdmin).queryByText(SERVICE)).toBeNull();
+    // Titolare con pazienti sospeso dal server: un solo motivo, quello del server.
+    const owner = byName('Dott. Carlo Serveri');
+    expect(within(owner).queryByRole('button', { name: /Riattiva/ })).toBeNull();
+    expect(within(owner).getByText(SERVICE)).toBeTruthy();
+    expect(within(owner).queryByText(/Ha pazienti nel suo archivio: lo riattiva/)).toBeNull();
   });
 
   it('senza conferma non parte nulla', async () => {

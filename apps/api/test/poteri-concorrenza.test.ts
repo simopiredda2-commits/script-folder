@@ -7,7 +7,11 @@ import { strToU8 } from 'fflate';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
-import { ARCHIVE_BUSY_REFUSAL, OWNER_SUSPEND_REFUSAL } from '../src/admin/user-service';
+import {
+  ARCHIVE_BUSY_REFUSAL,
+  CHANGED_MEANWHILE,
+  OWNER_SUSPEND_REFUSAL,
+} from '../src/admin/user-service';
 import {
   createAuthService,
   EXPIRED_CHALLENGE_ERROR,
@@ -374,6 +378,7 @@ describe('codici e password mandati insieme (seconda revisione, punto 5)', () =>
       await holder.query('commit');
       results = await Promise.all([wrong, right]);
     } finally {
+      await holder.query('rollback').catch(() => undefined);
       holder.release();
     }
     expect(results.map((r) => [r.statusCode, r.json().errore])).toEqual([
@@ -408,6 +413,7 @@ describe('codici e password mandati insieme (seconda revisione, punto 5)', () =>
       expect(r.statusCode).toBe(429);
       expect(r.json().errore).toBe(LOCKED_CHANGE_ERROR);
     } finally {
+      await holder.query('rollback').catch(() => undefined);
       holder.release();
     }
     expect((await h.userRow(victim.id)).mustChangePassword).toBe(false);
@@ -433,6 +439,7 @@ describe('codici e password mandati insieme (seconda revisione, punto 5)', () =>
       await holder2.query('commit');
       expect((await unlock).statusCode).toBe(401);
     } finally {
+      await holder2.query('rollback').catch(() => undefined);
       holder2.release();
     }
     expect((await h.req(cookie, 'GET', '/api/io')).statusCode).toBe(423);
@@ -637,6 +644,7 @@ describe('attese sui blocchi (seconda revisione, problema nuovo 2)', () => {
       ).toEqual([503, SERVICE_BUSY_ERROR]);
     } finally {
       await holder.query('commit');
+      await holder.query('rollback').catch(() => undefined);
       holder.release();
     }
     // Niente contato, niente aperto.
@@ -646,6 +654,152 @@ describe('attese sui blocchi (seconda revisione, problema nuovo 2)', () => {
     // Libera la riga, tutto torna a funzionare.
     s.clock.advance(30_000);
     expect((await h.codeOn(ch, h.validCodes(victim.username)[1]!)).statusCode).toBe(200);
+  });
+
+  it('anche il cambio dei ruoli di un titolare aspetta l’archivio al più due secondi, poi 409', async () => {
+    const victim = s.users.collega;
+    const { release, writing } = await holdArchiveWrite(victim.id);
+    try {
+      const started = Date.now();
+      const r = await h.req(admin, 'PATCH', `/api/studio/utenti/${victim.id}`, {
+        ruoli: ['substitute_doctor'],
+      });
+      expect(r.statusCode, r.body).toBe(409);
+      expect(r.json().errore).toBe(ARCHIVE_BUSY_REFUSAL);
+      expect(Date.now() - started).toBeGreaterThanOrEqual(1_900);
+    } finally {
+      release();
+      await writing;
+    }
+    expect((await h.userRow(victim.id)).roles).toEqual(['owner_doctor']);
+  });
+
+  it('l’attesa massima vale solo per il blocco della riga: dopo, la sospensione e l’accesso aspettano il registro quanto serve', async () => {
+    // Un titolare nuovo senza pazienti, confermato dalla titolare: la sospensione ne blocca
+    // l'archivio con l'attesa massima, poi scrive il registro.
+    const created = await h.req(admin, 'POST', '/api/studio/utenti', {
+      nomeUtente: `titolare.attesa.${randomBytes(2).toString('hex')}`,
+      nome: 'Dott. Attesi',
+      ruoli: ['owner_doctor'],
+      medico: { codiceFiscale: cf('Attesi', 'Aldo', 'M'), nome: 'Aldo', cognome: 'Attesi' },
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const ownerId = created.json().utente.id as string;
+    const owner = await h.loginAs(s.users.titolare.username, PASSWORD);
+    const confirmed = await h.req(owner, 'POST', `/api/studio/utenti/${ownerId}/conferma`, {
+      richiestaIl: created.json().utente.richiestaDiConferma.il,
+    });
+    expect(confirmed.statusCode, confirmed.body).toBe(200);
+    // Un utente di un altro studio, che apre il passaggio prima: il suo codice scrive il registro.
+    // (Uno dello stesso studio aspetterebbe gli utenti, bloccati dalla sospensione fino alla sua
+    // fine: dopo un secondo, 503.)
+    const sfx = randomBytes(2).toString('hex');
+    const other = await createFirstStudio(t.db, {
+      nome: 'Studio dell’attesa sul registro',
+      tipo: 'singolo',
+      regione: 'piemonte',
+      amministratore: `adm.registro.${sfx}`,
+      nomeAmministratore: 'Amministratore del registro',
+    });
+    await h.firstAccess(
+      `adm.registro.${sfx}`,
+      other.temporaryPassword,
+      'la password dell amministratore del registro',
+    );
+    s.clock.advance(30_000);
+    const opened = await h.access(
+      `adm.registro.${sfx}`,
+      'la password dell amministratore del registro',
+    );
+    expect(opened.statusCode, opened.body).toBe(200);
+    // La prova tiene il blocco del registro (migrazione 0002) più a lungo delle attese massime.
+    const holder = await t.pool.connect();
+    try {
+      await holder.query('begin');
+      await holder.query('select pg_advisory_xact_lock(4620119)');
+      const suspending = h.req(admin, 'POST', `/api/studio/utenti/${ownerId}/sospendi`);
+      const signing = h.codeOn(opened.json().passaggio, h.validCodes(`adm.registro.${sfx}`)[1]!);
+      await waiting(2);
+      await new Promise((r) => setTimeout(r, 2_500));
+      await holder.query('commit');
+      const [susp, signed] = await Promise.all([suspending, signing]);
+      expect(susp.statusCode, susp.body).toBe(200);
+      expect(signed.statusCode, signed.body).toBe(200);
+    } finally {
+      await holder.query('rollback').catch(() => undefined);
+      holder.release();
+    }
+    expect((await h.userRow(ownerId)).status).toBe('suspended');
+  });
+
+  it('se l’utente diventa titolare tra la prima lettura e il blocco, la sospensione si ferma invece di bloccare l’archivio dopo', async () => {
+    const created = await h.req(admin, 'POST', '/api/studio/utenti', {
+      nomeUtente: `amm.diventa.${randomBytes(2).toString('hex')}`,
+      nome: 'Amministratore che diventa titolare',
+      ruoli: ['administrator'],
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const id = created.json().utente.id as string;
+    const holder = await t.pool.connect();
+    let results: Awaited<ReturnType<typeof h.req>>[];
+    try {
+      await holder.query('begin');
+      await holder.query('select pg_advisory_xact_lock(4620119)');
+      // Il cambio dei ruoli resta a metà, con gli utenti dello studio bloccati.
+      const promoting = h.req(admin, 'PATCH', `/api/studio/utenti/${id}`, {
+        ruoli: ['administrator', 'owner_doctor'],
+        medico: { codiceFiscale: cf('Diventi', 'Ada', 'F'), nome: 'Ada', cognome: 'Diventi' },
+      });
+      await waiting(1);
+      // La sospensione legge l'utente com'era (non titolare) e aspetta gli utenti dello studio.
+      const suspending = h.req(admin, 'POST', `/api/studio/utenti/${id}/sospendi`);
+      await waiting(2);
+      await holder.query('commit');
+      results = await Promise.all([promoting, suspending]);
+    } finally {
+      await holder.query('rollback').catch(() => undefined);
+      holder.release();
+    }
+    expect(results[0]!.statusCode, results[0]!.body).toBe(200);
+    expect(results[1]!.statusCode, results[1]!.body).toBe(409);
+    expect(results[1]!.json().errore).toBe(CHANGED_MEANWHILE);
+    expect((await h.userRow(id)).status).toBe('active');
+  });
+
+  it('un ripristino dal server a metà del codice giusto non lascia una sessione', async () => {
+    const victim = s.users.titolare;
+    await h.resetUser(victim.id);
+    s.clock.advance(60_000);
+    const started = await h.access(victim.username, PASSWORD);
+    expect(started.statusCode, started.body).toBe(200);
+    const ch = started.json().passaggio as string;
+    const code = h.validCodes(victim.username)[1]!;
+    const [orig] = await t.db.select().from(appUser).where(eq(appUser.id, victim.id));
+    const sessions = await h.sessionsOf(victim.id);
+    const client = await t.pool.connect();
+    try {
+      // Come il comando del server: utente bloccato, password cambiata, passaggi chiusi.
+      await client.query('begin');
+      await client.query('select id from app_user where id = $1 for update', [victim.id]);
+      await client.query("update app_user set password_hash = 'x' where id = $1", [victim.id]);
+      await client.query(
+        'update auth_challenge set used_at = now() where user_id = $1 and used_at is null',
+        [victim.id],
+      );
+      const pending = h.codeOn(ch, code);
+      await waiting(1);
+      await client.query('commit');
+      const r = await pending;
+      expect(r.statusCode, r.body).toBe(401);
+      expect(await h.sessionsOf(victim.id)).toBe(sessions);
+    } finally {
+      await client.query('rollback').catch(() => undefined);
+      client.release();
+    }
+    await t.db
+      .update(appUser)
+      .set({ passwordHash: orig!.passwordHash })
+      .where(eq(appUser.id, victim.id));
   });
 });
 
@@ -721,6 +875,7 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
       suspended,
       finish: async () => {
         await holder.query('commit');
+        await holder.query('rollback').catch(() => undefined);
         holder.release();
       },
     };
@@ -844,15 +999,35 @@ describe('gara inversa della sospensione (seconda revisione, punto 7)', () => {
     expect(ok.statusCode, ok.body).toBe(201);
   });
 
-  it('il comando del server: --sospendi blocca anche lui l’archivio, e il paziente che arriva dopo non entra', async () => {
+  it('il comando del server: --sospendi blocca anche lui l’archivio, e il paziente che arriva durante non entra', async () => {
     const owner = await newOwner('gara.server', 'Serveri');
-    await restoreUser(t.db, { utente: `gara.server.${sfx}`, sospendi: true }, { now: s.clock.now });
-    const r = await h.req(c.segreteria, 'POST', '/api/pazienti', {
-      archivioId: owner.archiveId,
-      identita: person(6),
-    });
-    expect(r.statusCode).toBe(409);
-    expect(r.json().errore).toBe(OWNER_SUSPENDED_NO_NEW_PATIENTS);
+    // Il comando resta a metà, fermo sul blocco del registro che tiene la prova.
+    const holder = await t.pool.connect();
+    let created: Awaited<ReturnType<typeof h.req>>;
+    try {
+      await holder.query('begin');
+      await holder.query('select pg_advisory_xact_lock(4620119)');
+      const suspending = restoreUser(
+        t.db,
+        { utente: `gara.server.${sfx}`, sospendi: true },
+        { now: s.clock.now },
+      );
+      await waiting(1);
+      const creating = h.req(c.segreteria, 'POST', '/api/pazienti', {
+        archivioId: owner.archiveId,
+        identita: person(6),
+      });
+      await waiting(2);
+      await holder.query('commit');
+      const [done] = await Promise.all([suspending, creating.then((r) => (created = r))]);
+      expect(done.actions).toEqual(['sospensione']);
+    } finally {
+      await holder.query('rollback').catch(() => undefined);
+      holder.release();
+    }
+    expect(created!.statusCode, created!.body).toBe(409);
+    expect(created!.json().errore).toBe(OWNER_SUSPENDED_NO_NEW_PATIENTS);
+    expect(await patientsIn(owner.archiveId)).toBe(0);
   });
 });
 
