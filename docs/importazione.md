@@ -55,6 +55,7 @@ Ogni riga passa dagli **stessi controlli dell'inserimento a mano**. Il paziente 
 - **Paziente già in cartella:** si completano solo i campi vuoti; le differenze sono avvisi con il nome del campo, senza valori; lo stato non cambia.
 - **Paziente di un altro archivio dello studio:** la riga si scarta con un messaggio senza dati, e nel registro di quel paziente resta un accesso negato.
 - **Voce senza data:** non entra. Non prende la data dell'importazione, perché la condivisione nell'AFT usa la data clinica (D161).
+- **Terapia già in corso:** una terapia in corso o sospesa con lo stesso farmaco (stesso AIC, o senza AIC lo stesso nome) c'è già in cartella: la riga si scarta e si aggiorna quella dalla cartella. Le terapie concluse sono storia ed entrano.
 - **Ricette fatte con altri programmi:** finiscono in uno storico a sola lettura. Non si firmano, non si inviano e non si annullano verso il SAR.
 - **Scelta del medico** (D174): è sempre del titolare che importa, perché il programma conosce solo i medici dello studio. Una scelta che vale in un periodo già coperto da un'altra scelta in cartella si scarta, con il motivo e senza date; la cessazione vuole il motivo, come nel pannello.
 - **Nucleo familiare** (D174): le righe con lo stesso valore nella colonna del nucleo vanno nello stesso nucleo, anche in importazioni diverse (maiuscole e minuscole non contano). L'etichetta è quella del file, se c'è, altrimenti il valore stesso; si cambia poi dal pannello. Un paziente che è già in un altro nucleo resta nel suo e la riga si scarta.

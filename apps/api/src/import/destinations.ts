@@ -20,7 +20,7 @@ import {
   type PatientAdminInput,
   type PatientIdentityInput,
 } from '@mmg/domain';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z, type ZodError } from 'zod';
 import { entryIssues, insertEntry, newEntryBody, type NewEntry } from '../clinical/entries';
 import {
@@ -554,6 +554,25 @@ const therapiesHandler: EntryHandler<TherapyImport> = {
       ],
       warnings,
     };
+  },
+  // Una terapia in corso o sospesa con lo stesso farmaco c'è già in cartella (scritta a mano o
+  // importata prima): la riga non ne crea una seconda (dalla revisione del piano). Lo stesso AIC,
+  // o senza AIC lo stesso nome; le terapie concluse sono storia e non contano.
+  async conflict(tx, patientId, t) {
+    if (t.status === 'ended') return null;
+    const rows = await tx
+      .select({ aic: therapy.drugAic, name: therapy.drugName })
+      .from(therapy)
+      .where(
+        and(eq(therapy.patientId, patientId), inArray(therapy.status, ['active', 'suspended'])),
+      );
+    const name = t.body.drugName.trim().toLowerCase();
+    const same = rows.some((r) =>
+      t.body.drugAic && r.aic ? r.aic === t.body.drugAic : r.name.trim().toLowerCase() === name,
+    );
+    return same
+      ? 'C’è già una terapia in corso o sospesa con lo stesso farmaco: si aggiorna quella, dalla cartella'
+      : null;
   },
   async write(ctx, patientId, t) {
     const [row] = await ctx.tx

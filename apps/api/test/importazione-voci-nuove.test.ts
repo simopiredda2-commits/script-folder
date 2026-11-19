@@ -211,6 +211,42 @@ describe('importazione con gli inserimenti a mano di vaccinazioni, esami e ricet
     ]);
   });
 
+  it('terapie in corso: lo stesso farmaco già in corso in cartella non fa una seconda terapia', async () => {
+    const header = ['Farmaco', 'Tipo', 'Inizio', 'Fine', 'Confezioni', 'Stato'];
+    const campi = {
+      farmaco: 'Farmaco',
+      tipo: 'Tipo',
+      inizio: 'Inizio',
+      fine: 'Fine',
+      confezioni: 'Confezioni',
+      stato: 'Stato',
+    };
+    const first = await flow(
+      'terapie-in-corso.csv',
+      header,
+      [['Farmaco in corso di prova', 'cronica', '01/02/2026', '', '1', 'in_corso']],
+      'terapie',
+      campi,
+    );
+    expect(first.map((r) => r.esito)).toEqual(['scritta']);
+    // Un altro file con lo stesso farmaco, scritto in un altro modo e con un altro inizio.
+    const second = await flow(
+      'terapie-in-corso-2.csv',
+      header,
+      [
+        ['farmaco IN CORSO di prova', 'cronica', '01/03/2026', '', '1', 'in_corso'],
+        ['Farmaco in corso di prova', 'cronica', '01/01/2025', '01/06/2025', '1', 'conclusa'],
+        ['Altro farmaco in corso di prova', 'cronica', '01/03/2026', '', '1', 'in_corso'],
+      ],
+      'terapie',
+      campi,
+    );
+    expect(second.map((r) => r.esito)).toEqual(['scartata', 'scritta', 'scritta']);
+    expect(second[0]!.motivi).toEqual([
+      'C’è già una terapia in corso o sospesa con lo stesso farmaco: si aggiorna quella, dalla cartella',
+    ]);
+  });
+
   it('ricette passate: i controlli della rotta, l’importazione e il programma d’origine nei prescritti', async () => {
     const rapporto = await flow(
       'ricette-passate.csv',
