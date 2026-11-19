@@ -1,3 +1,4 @@
+import { studioDate } from '../prescriptions/rules-check';
 import {
   NO_VALUES,
   normalizeHeaderName,
@@ -49,6 +50,22 @@ export function parseTextDate(text: string): { date: string } | { error: string 
     const d = isoDate(Number(m[3]), Number(m[2]), Number(m[1]));
     return d ? { date: d } : { error: 'la data non esiste (giorno o mese fuori misura)' };
   }
+  // Data e ora con il fuso (Z o +hh:mm), come nei file di molti programmi: il giorno è quello
+  // italiano. «2026-05-11T23:30:00Z» è il 12 maggio a Roma (dalla revisione del piano).
+  m =
+    /^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?\s*(Z|[+-]\d{2}:?\d{2})$/i.exec(
+      t,
+    );
+  if (m) {
+    const d = isoDate(Number(m[1]), Number(m[2]), Number(m[3]));
+    if (!d) return { error: 'la data non esiste (giorno o mese fuori misura)' };
+    const zone = m[7]!.toUpperCase() === 'Z' ? 'Z' : m[7]!.replace(/^([+-]\d{2})(\d{2})$/, '$1:$2');
+    const at = new Date(`${d}T${m[4]!.padStart(2, '0')}:${m[5]}:${m[6] ?? '00'}${zone}`);
+    if (Number.isNaN(at.getTime()) || Number(m[4]) > 23)
+      return { error: 'l’ora non esiste (ore fino a 23, minuti fino a 59)' };
+    return { date: studioDate(at) };
+  }
+  // Senza fuso, l'ora dopo la data si lascia: le voci hanno il giorno, non l'ora.
   m = /^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T].*)?$/.exec(t);
   if (m) {
     const d = isoDate(Number(m[1]), Number(m[2]), Number(m[3]));

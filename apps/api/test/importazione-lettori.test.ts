@@ -341,6 +341,13 @@ describe('trasformazioni', () => {
     expect(parseTextDate('05-03-2020 10:30')).toEqual({ date: '2020-03-05' });
     expect(parseTextDate('05.03.2020')).toEqual({ date: '2020-03-05' });
     expect(parseTextDate('2020-03-05')).toEqual({ date: '2020-03-05' });
+    // Con il fuso il giorno è quello italiano; senza fuso, quello scritto.
+    expect(parseTextDate('2026-05-11T23:30:00Z')).toEqual({ date: '2026-05-12' });
+    expect(parseTextDate('2026-05-12T00:30:00+02:00')).toEqual({ date: '2026-05-12' });
+    expect(parseTextDate('2026-01-31T23:15:00.000Z')).toEqual({ date: '2026-02-01' });
+    expect(parseTextDate('2026-05-11 23:30:00 +0000')).toEqual({ date: '2026-05-12' });
+    expect(parseTextDate('2026-05-11T23:30:00')).toEqual({ date: '2026-05-11' });
+    expect(parseTextDate('2026-05-11T24:30:00Z')).toHaveProperty('error');
     expect(parseTextDate('05/03/20')).toHaveProperty('error');
     expect(parseTextDate('31/02/2020')).toHaveProperty('error');
     expect(conv('diario', 'data', '45123', 't', { formatoData: 'seriale' })).toEqual({

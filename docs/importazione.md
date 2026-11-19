@@ -8,7 +8,7 @@ L'importazione sta in **Strumenti › Importazione** ed è del **medico titolare
 
 1. **Scegli il file.** Il tipo si riconosce dal contenuto, non dal nome. Il programma mostra codifica, separatore, fogli e se lo stesso file è già stato importato.
 2. **Dove vanno i dati.** Per ogni foglio: la riga d'intestazione (o nessuna, e le colonne si chiamano per lettera) e una o più destinazioni. Si può anche smistare per valore di una colonna, per esempio una colonna «Tipo» che dice se la riga è un problema, un'allergia o una nota di diario.
-3. **Colonne e campi.** Per ogni campo una colonna (con i suggerimenti dai nomi delle intestazioni) oppure un valore uguale per tutte le righe, con le trasformazioni: date, sì/no, decimali, tabelle di corrispondenza dei valori. Niente espressioni scritte dall'utente.
+3. **Colonne e campi.** Per ogni campo una colonna (con i suggerimenti dai nomi delle intestazioni) oppure un valore uguale per tutte le righe, con le trasformazioni: date, sì/no, decimali, tabelle di corrispondenza dei valori. Niente espressioni scritte dall'utente. Una data con l'ora e il fuso (per esempio «2026-05-11T23:30:00Z») vale per il giorno italiano; senza fuso, per il giorno scritto.
 4. **Anteprima.** Le prime righe di ogni destinazione, trasformate e controllate, con gli errori.
 5. **Prova senza scrivere.** Tutto come se si importasse, in una transazione annullata: il rapporto è quello vero.
 6. **Importa.** Solo dopo la prova con la stessa mappatura; se nel frattempo qualcosa è cambiato, il programma lo dice e non scrive.
