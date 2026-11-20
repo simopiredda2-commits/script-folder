@@ -1452,4 +1452,21 @@ Non provati nella dimostrazione: «Non spostare»; l'attività svolta registrata
    - la Dott.ssa Marchi registra l'attività svolta per il paziente dell'altro studio dell'AFT. Il Dott. Rinaldi la vede in Strumenti › AFT e nella cronologia della cartella, con il nome della collega;
    - quattro sabotaggi.
 
-Non provati: tre richieste o più sullo stesso codice fiscale; due correzioni insieme dello stesso codice fiscale su due pazienti (stessa strada del codice, senza una prova sua); nella dimostrazione, la consultazione al contrario nell'AFT, del Dott. Rinaldi sui pazienti della Dott.ssa Marchi.
+4. **Le prove lanciate più volte.**
+   - Qui tutte verdi:
+     - l'interfaccia (`apps/web`), 140 prove: 10 giri di fila e 15 con tre giri insieme;
+     - il servizio, 820 prove: 3 giri di fila e 4 con due giri insieme;
+     - la prova dell'interfaccia nel browser con Chromium, 55 prove: 6 giri con tre insieme;
+     - la dimostrazione, 19 prove: 8 giri.
+   - Nelle prove su GitHub delle ultime 40 spinte, due prove instabili nuove, tutte e due in `apps/api/test/e2e/interfaccia.test.ts`. Le altre cadute erano già corrette (D224, #23).
+   - **Le venti cartelle aperte** (giri 288 e 298 con Firefox, 324 con WebKit). Due pazienti dello scenario con lo stesso nome, e la prova cercava la scheda per nome.
+     - Lo scenario cambia seme a ogni giro: lo 0,6% degli scenari ha due omonimi fra i cinque pazienti del titolare (provato su 20 000 semi).
+     - Ora la scheda si cerca dall'indirizzo della cartella. Un omonimo apposta controlla che le due schede si distinguano con la data di nascita (D68).
+     - Le schede rimaste dalle prove di prima si chiudono anche quando è una sola: «Chiudi tutte» c'è solo da due in su.
+     - Tre sabotaggi.
+   - **La ricetta specialistica con WebKit** (giro 325). Dopo «Firma e invia» «Ricetta inviata» non è arrivata, e la prova seguente, che cerca quella ricetta, è caduta con lei. La causa non si è trovata.
+     - Qui WebKit non c'è, e con Chromium sotto carico la prova non cade.
+     - Delle tre prove che inviano una ricetta, è l'unica che non aspetta la fine dei controlli. Una prova nuova del servizio fa partire insieme il controllo e la firma della stessa ricetta: la ricetta parte una volta e il controllo risponde (un sabotaggio). Il servizio, quindi, regge.
+     - La prova non si è cambiata, per non nascondere la causa. Ora, se la ricetta non parte, dice le risposte d'errore del servizio e che cosa mostra il pannello dell'invio (provato a mano, togliendo il quesito: «422 … R14: Manca il quesito diagnostico»).
+
+Non provati: tre richieste o più sullo stesso codice fiscale; due correzioni insieme dello stesso codice fiscale su due pazienti (stessa strada del codice, senza una prova sua); nella dimostrazione, la consultazione al contrario nell'AFT, del Dott. Rinaldi sui pazienti della Dott.ssa Marchi; la causa della ricetta specialistica non partita con WebKit.
