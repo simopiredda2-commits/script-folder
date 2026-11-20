@@ -20,7 +20,7 @@ import { accessLog, patient, ppipRecord } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
 import { buildExport } from '../src/export/export';
 import { DISTINTA_FIELDS, formatById, loadFormats } from '../src/ppip/formats';
-import { reportDeadline, sendMonth } from '../src/ppip/service';
+import { reportDeadline, sendMonth, totalOf } from '../src/ppip/service';
 import { importReferenceData } from '../src/reference/importer';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -457,6 +457,12 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
       ['2026-11-10', 15],
       ['2026-10-05', 12.32],
     ]);
+  });
+
+  it('totale: vuoto se una voce non ha il compenso, non contata come zero', () => {
+    expect(totalOf([{ importo: 12.32 }, { importo: 6.16 }])).toBe(18.48);
+    expect(totalOf([{ importo: 12.32 }, { importo: null }])).toBeNull();
+    expect(totalOf([])).toBe(0);
   });
 
   it('formati della distinta come dati: ogni colonna usa un campo che esiste', () => {
