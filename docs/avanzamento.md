@@ -995,7 +995,9 @@ Nello stesso branch, ripartito da `main`. Risposta di Simone alla fermata: «Sia
    - Prove: 17 nella cornice, due nuove; quattro sabotaggi.
    - Non provato: «Non spostare», l'attività svolta registrata dal collega dell'AFT, la consultazione al contrario.
 
-**Prossimo passo**: ripubblicare la dimostrazione, prove complete, pull request #23 e fermata.
+Dimostrazione ripubblicata nello stesso artifact (versione 5). Prove complete verdi: 1739 prove in 150 file e quelle di `sync/`; lint verde; 17 prove della dimostrazione in Chromium qui, WebKit e Firefox nella CI.
+
+**Prossimo passo**: pull request #23 e fermata.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
