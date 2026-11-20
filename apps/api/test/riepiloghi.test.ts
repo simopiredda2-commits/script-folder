@@ -2,6 +2,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   accessLog,
+  archiveSecretary,
   clinicalEntry,
   diaryDetail,
   patient,
@@ -367,8 +368,36 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
     });
   });
 
-  it('solo il titolare, sul suo archivio: il collega, la segreteria, il sostituto e l’amministratore no, e il no resta nel registro', async () => {
-    for (const who of ['collega', 'segreteria', 'sostituto', 'amministratore'] as const) {
+  it('il titolare e la segreteria confermata (D204); il collega, il sostituto e l’amministratore no, e il no resta nel registro', async () => {
+    // La segreteria che il titolare ha confermato legge e scarica, come il titolare (D204); il
+    // CSV resta nel registro paziente per paziente.
+    const counts = await get(
+      'segreteria',
+      `/api/archivi/${s.archives.titolare}/riepiloghi${MARCH}`,
+    );
+    expect(counts.statusCode, counts.body).toBe(200);
+    const csv = await get(
+      'segreteria',
+      `/api/archivi/${s.archives.titolare}/riepiloghi/esportazione${MARCH}`,
+    );
+    expect(csv.statusCode, csv.body).toBe(200);
+    expect(csv.body).toContain(first.fiscalCode);
+    expect(await lastLog(s.users.segreteria.id, 'esportazione_riepiloghi')).toMatchObject({
+      outcome: 'riuscito',
+      details: { archivio: s.archives.titolare },
+    });
+    const ofPatient = await t.db
+      .select()
+      .from(accessLog)
+      .where(
+        and(
+          eq(accessLog.userId, s.users.segreteria.id),
+          eq(accessLog.patientId, first.id),
+          eq(accessLog.action, 'esportazione_riepiloghi'),
+        ),
+      );
+    expect(ofPatient).toHaveLength(1);
+    for (const who of ['collega', 'sostituto', 'amministratore'] as const) {
       for (const path of ['riepiloghi', 'riepiloghi/esportazione']) {
         const res = await get(who, `/api/archivi/${s.archives.titolare}/${path}${MARCH}`);
         expect(res.statusCode, `${who} ${path}`).toBe(403);
@@ -411,5 +440,33 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
     const one = await get('titolare', `${base}?dal=2001-03-21&al=2001-03-21`);
     expect(one.statusCode).toBe(200);
     expect(one.json<Summary>().ricette.totale.inviate).toBe(1);
+  });
+
+  // Ultima del file: toglie alla segreteria la conferma sull'archivio del collega.
+  it('la segreteria che un titolare non ha confermato non ha i riepiloghi del suo archivio (D204)', async () => {
+    await t.db.insert(archiveSecretary).values({
+      archiveId: s.archives.collega,
+      userId: s.users.segreteria.id,
+      decision: 'rifiutata',
+      decidedBy: s.users.collega.id,
+      decidedAt: s.clock.now(),
+    });
+    for (const path of ['riepiloghi', 'riepiloghi/esportazione']) {
+      const res = await get('segreteria', `/api/archivi/${s.archives.collega}/${path}${MARCH}`);
+      expect(res.statusCode, path).toBe(403);
+      expect(res.json().errore).toBe(
+        'I riepiloghi dell’archivio li leggono ed esportano il medico titolare e la segreteria che ha confermato',
+      );
+    }
+    // L'elenco degli archivi dei riepiloghi: la segreteria vede quello che l'ha confermata, il
+    // titolare il suo, il sostituto e l'amministratore nessuno.
+    const archives = async (who: Who) =>
+      (await get(who, '/api/riepiloghi/archivi'))
+        .json<{ archivi: { id: string }[] }>()
+        .archivi.map((a) => a.id);
+    expect(await archives('segreteria')).toEqual([s.archives.titolare]);
+    expect(await archives('titolare')).toEqual([s.archives.titolare]);
+    expect(await archives('sostituto')).toEqual([]);
+    expect(await archives('amministratore')).toEqual([]);
   });
 });

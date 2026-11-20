@@ -1080,3 +1080,12 @@ Scelte:
   - Ancora nel browser, una simulazione più dura: il servizio fermo a mezzogiorno di ieri. Passano accesso, archivio e blocchi del conto. Cadono solo le 12 prove dei farmaci: le banche dati d'esempio sono importate con la data vera di oggi, quindi per il servizio non sono ancora in vigore. In un giro vero non capita, perché l'orologio si ferma dopo l'importazione.
   - Una prova nuova sul cookie (`apps/api/test/cookie-sessione.test.ts`), con il suo sabotaggio.
 - **Che cosa non è provato.** Un giro su GitHub che passi davvero dalla mezzanotte. Le altre prove del servizio usano ancora l'orologio vero dove non preparano dati «di oggi» da guardare dopo; se un giro a mezzanotte ne fa cadere altre, si correggono allo stesso modo.
+
+**D204 · Riepiloghi anche alla segreteria, con il CSV.** Alla fermata dopo l'unione della #15 Simone ha scelto «C. Segreteria, anche il CSV»: la segreteria vede i riepiloghi a video e scarica il file con i nomi dei pazienti, e ogni esportazione resta nel registro degli accessi. Corregge la scelta di D201 («solo il titolare»). Scelte:
+
+- **Dove la segreteria li vede.** Sugli archivi i cui titolari l'hanno confermata (D181, D185), come il resto del suo lavoro: permesso `reports.read` alla segreteria (matrice in `docs/ruoli-permessi.md`). Su un archivio che non l'ha confermata, o dopo una conferma tolta, no; il rifiuto resta nel registro. Il sostituto, il collega di gruppo e l'amministratore restano senza.
+- **Che cosa vede.** Gli stessi riepiloghi del titolare, compreso il CSV. Nel CSV ci sono, paziente per paziente, il tipo di contatto, il tipo di ricetta, e il vaccino con la campagna. Nessun testo clinico, come per il titolare (D201).
+- **Come ci arriva.** La segreteria non ha un archivio suo e la pagina «Archivio» non è sua: «Riepiloghi» è una voce del suo menu. Se gli archivi che l'hanno confermata sono più d'uno, la pagina chiede quale («Archivio»), e lo tiene nell'indirizzo insieme al periodo. Servizio: `GET /api/riepiloghi/archivi` dà gli archivi di cui chi guarda legge i riepiloghi.
+- **Il registro** è quello di D201: la lettura dei conteggi una riga, l'esportazione una riga per paziente, a nome della segreteria.
+
+Prove (permessi, servizio, interfaccia, browser con accessibilità anche su tablet) e sabotaggi.

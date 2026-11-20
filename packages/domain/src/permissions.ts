@@ -188,6 +188,8 @@ const SECRETARY: Action[] = [
   'therapy.read',
   'prescription.draft_repeat',
   'reminder.print',
+  // Riepiloghi per periodo, anche in CSV, sugli archivi che l'hanno confermata (D204).
+  'reports.read',
 ];
 
 const ADMINISTRATOR: Action[] = [

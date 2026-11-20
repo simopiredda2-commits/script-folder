@@ -687,6 +687,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
           .getByRole('link', { name: 'Archivio' })
           .count(),
       ).resolves.toBe(0);
+      // I riepiloghi degli archivi che l'hanno confermata, dal menu (D204): due archivi nello
+      // scenario, quindi la scelta dell'archivio; il CSV dello stesso archivio e periodo.
+      await sec
+        .getByRole('navigation', { name: 'Sezioni' })
+        .getByRole('link', { name: 'Riepiloghi' })
+        .click();
+      await sec.getByRole('heading', { level: 1, name: 'Riepiloghi' }).waitFor();
+      await sec.getByRole('table', { name: 'Ricette fatte nell’archivio, per tipo' }).waitFor();
+      await sec.getByLabel('Archivio').waitFor();
+      await check(sec, 'riepiloghi della segreteria', true);
+      const href = await sec.getByRole('link', { name: 'Scarica in CSV' }).getAttribute('href');
+      const csv = await sec.request.get(`${base}${href}`);
+      expect(csv.status()).toBe(200);
     } finally {
       await ctx.close();
     }
