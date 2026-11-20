@@ -22,13 +22,19 @@ export function createPool(
     max: options.max ?? 10,
     connectionTimeoutMillis: options.connectionTimeoutMillis ?? POOL_CONNECTION_TIMEOUT_MS,
   });
-  // Una connessione inattiva può essere chiusa da Postgres (riavvio, rete interrotta, database
-  // cancellato con FORCE): pg-pool la toglie dal gruppo e lo dice con un evento «error». Senza
-  // chi lo ascolta, l'evento fermerebbe il processo; le richieste dopo aprono una connessione
-  // nuova. Il messaggio di Postgres non contiene dati dei pazienti.
-  pool.on('error', (err) => {
-    process.emitWarning(`Connessione inattiva al database chiusa: ${err.message}`);
+  // Una connessione può essere chiusa da Postgres (riavvio, rete interrotta, database cancellato
+  // con FORCE), da ferma o mentre è in uso in una transazione: il client lo dice con un evento
+  // «error», e un evento «error» senza chi lo ascolta fermerebbe il processo (D207, D209). Ogni
+  // client ha il suo ascoltatore, che avvisa una volta; per i client fermi pg-pool ripete l'evento
+  // sul gruppo, che lo ascolta senza ripetere l'avviso. La richiesta in corso fallisce con il suo
+  // errore; le richieste dopo aprono una connessione nuova. Il messaggio di Postgres non contiene
+  // dati dei pazienti.
+  pool.on('connect', (client) => {
+    client.on('error', (err) => {
+      process.emitWarning(`Connessione al database chiusa: ${err.message}`);
+    });
   });
+  pool.on('error', () => {});
   return pool;
 }
 

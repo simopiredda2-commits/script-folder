@@ -623,54 +623,133 @@ export class ReferenceData {
     const latest = (ids: readonly string[]) =>
       ids.reduce((a, b) => (validFrom.get(b)! > validFrom.get(a)! ? b : a));
 
+    // Le righe si leggono una volta e si indicizzano per AIC (o per ATC e principio attivo): con
+    // migliaia di terapie e una versione nuova dell'anagrafica quasi ogni giorno, il calcolo
+    // non cresce con il numero delle versioni superate (D209).
+    const group = <T, K>(rows: readonly T[], key: (r: T) => K) => {
+      const m = new Map<K, T[]>();
+      for (const r of rows) {
+        const k = key(r);
+        const list = m.get(k);
+        if (list) list.push(r);
+        else m.set(k, [r]);
+      }
+      return m;
+    };
+
     // Anagrafica delle confezioni: sospesa, o non più presente.
-    const drugRows = (ids: string[], wanted: string[]) =>
-      ids.length && wanted.length
-        ? this.db
+    const drugsNow = drugNow.length
+      ? await this.db
+          .select({
+            aic: refDrug.aic,
+            datasetId: refDrug.datasetId,
+            adminState: refDrug.adminState,
+          })
+          .from(refDrug)
+          .where(
+            and(
+              inArray(
+                refDrug.datasetId,
+                drugNow.map((d) => d.id),
+              ),
+              inArray(refDrug.aic, aics),
+            ),
+          )
+      : [];
+    const drugsNowBy = group(drugsNow, (r) => r.aic);
+    const missing = drugNow.length ? aics.filter((a) => !drugsNowBy.has(a)) : [];
+    // Per gli AIC che non ci sono più: l'ultima versione superata che li aveva, una riga per AIC.
+    const lastSeen =
+      missing.length && drugOld.length
+        ? await this.db
             .select({
               aic: refDrug.aic,
-              datasetId: refDrug.datasetId,
-              adminState: refDrug.adminState,
+              last: sql<string>`max(${referenceDataset.validFrom})::text`,
             })
             .from(refDrug)
-            .where(and(inArray(refDrug.datasetId, ids), inArray(refDrug.aic, wanted)))
-        : Promise.resolve([]);
-    const drugsNow = await drugRows(
-      drugNow.map((d) => d.id),
-      aics,
-    );
-    const missing = drugNow.length ? aics.filter((a) => !drugsNow.some((r) => r.aic === a)) : [];
-    const drugsOld = await drugRows(
-      drugOld.map((d) => d.id),
-      missing,
-    );
-    // Classe: le righe delle liste di classe per gli AIC in terapia.
-    const classRows = (ids: string[]) =>
-      ids.length
-        ? this.db
-            .select({
-              aic: refDrugClass.aic,
-              datasetId: refDrugClass.datasetId,
-              drugClass: refDrugClass.drugClass,
-            })
-            .from(refDrugClass)
-            .where(and(inArray(refDrugClass.datasetId, ids), inArray(refDrugClass.aic, aics)))
-        : Promise.resolve([]);
-    const classesNow = await classRows(classNow.map((d) => d.id));
-    const classesOld = await classRows(classOld.map((d) => d.id));
-    // Elenco DPC: per principio attivo o ATC, come nei dati del farmaco.
+            .innerJoin(referenceDataset, eq(referenceDataset.id, refDrug.datasetId))
+            .where(
+              and(
+                inArray(
+                  refDrug.datasetId,
+                  drugOld.map((d) => d.id),
+                ),
+                inArray(refDrug.aic, missing),
+              ),
+            )
+            .groupBy(refDrug.aic)
+        : [];
+    const lastSeenBy = new Map(lastSeen.map((r) => [r.aic, r.last]));
+
+    // Classe: le righe in vigore per gli AIC in terapia; delle versioni superate, solo quali
+    // classi e serie li avevano, una riga per AIC, classe e serie.
+    const classesNow = classNow.length
+      ? await this.db
+          .select({ aic: refDrugClass.aic, drugClass: refDrugClass.drugClass })
+          .from(refDrugClass)
+          .where(
+            and(
+              inArray(
+                refDrugClass.datasetId,
+                classNow.map((d) => d.id),
+              ),
+              inArray(refDrugClass.aic, aics),
+            ),
+          )
+      : [];
+    const classesNowBy = group(classesNow, (r) => r.aic);
+    const classesOld = classOld.length
+      ? await this.db
+          .selectDistinct({
+            aic: refDrugClass.aic,
+            drugClass: refDrugClass.drugClass,
+            series: referenceDataset.series,
+          })
+          .from(refDrugClass)
+          .innerJoin(referenceDataset, eq(referenceDataset.id, refDrugClass.datasetId))
+          .where(
+            and(
+              inArray(
+                refDrugClass.datasetId,
+                classOld.map((d) => d.id),
+              ),
+              inArray(refDrugClass.aic, aics),
+            ),
+          )
+      : [];
+    const classesOldBy = group(classesOld, (r) => r.aic);
+
+    // Elenco DPC: per principio attivo o ATC, come nei dati del farmaco. Le righe in vigore con il
+    // loro ordine (vale la prima che corrisponde); delle versioni superate, le note per ATC e per
+    // principio attivo, e per ogni versione dove chiedeva il piano.
     const dpcRows = (ids: string[]) =>
       ids.length
         ? this.db.select().from(refDpcDrug).where(inArray(refDpcDrug.datasetId, ids))
         : Promise.resolve([]);
-    const dpcsNow = await dpcRows(dpcNow.map((d) => d.id));
+    const dpcsNow = (await dpcRows(dpcNow.map((d) => d.id))).map((r, index) => ({ ...r, index }));
     const dpcsOld = await dpcRows(dpcOld.map((d) => d.id));
+    const keysOf = (r: { activeIngredient: string | null; atc: string | null }) => [
+      ...(r.atc !== null ? [`atc:${r.atc}`] : []),
+      ...(r.activeIngredient !== null ? [`ing:${lower(r.activeIngredient)}`] : []),
+    ];
+    const dpcsNowBy = new Map<string, typeof dpcsNow>();
+    for (const r of dpcsNow)
+      for (const k of keysOf(r)) dpcsNowBy.set(k, [...(dpcsNowBy.get(k) ?? []), r]);
     const note = (v: string | null | undefined) => (v ?? '').trim() || null;
+    const oldNotes = new Map<string, Set<string | null>>();
+    const oldPlans = new Map<string, Set<string>>();
+    for (const r of dpcsOld) {
+      for (const k of keysOf(r)) {
+        oldNotes.set(k, (oldNotes.get(k) ?? new Set()).add(note(r.aifaNote)));
+        if (r.planRequired === true)
+          oldPlans.set(r.datasetId, (oldPlans.get(r.datasetId) ?? new Set()).add(k));
+      }
+    }
 
     for (const t of therapies) {
       if (!t.drugAic) continue;
       const aic = t.drugAic;
-      const mine = drugsNow.filter((r) => r.aic === aic);
+      const mine = drugsNowBy.get(aic) ?? [];
       const suspended = mine.find((r) => lower(r.adminState) === 'sospesa');
       if (suspended) {
         add(t.id, {
@@ -679,26 +758,24 @@ export class ReferenceData {
           text: `confezione sospesa secondo l’anagrafica AIFA delle confezioni (versione del ${day(suspended.datasetId)})`,
         });
       } else if (!mine.length && drugNow.length) {
-        const before = drugsOld.filter((r) => r.aic === aic).map((r) => r.datasetId);
-        if (before.length) {
+        const last = lastSeenBy.get(aic);
+        if (last) {
           const now = latest(drugNow.map((d) => d.id));
           add(t.id, {
             kind: 'anagrafica',
             since: validFrom.get(now)!,
-            text: `non è più nell’anagrafica AIFA delle confezioni (versione del ${day(now)}); c’era in quella del ${day(latest(before))}`,
+            text: `non è più nell’anagrafica AIFA delle confezioni (versione del ${day(now)}); c’era in quella del ${dayIt(last)}`,
           });
         }
       }
 
       const recorded = (t.drugClass ?? '').trim().toUpperCase();
       if (recorded === 'A' || recorded === 'H') {
-        const now = classesNow.filter((r) => r.aic === aic);
-        const before = classesOld.filter((r) => r.aic === aic && r.drugClass === recorded);
+        const now = classesNowBy.get(aic) ?? [];
+        const before = (classesOldBy.get(aic) ?? []).filter((r) => r.drugClass === recorded);
         if (before.length && !now.some((r) => r.drugClass === recorded)) {
           // La versione in vigore della stessa serie, che non lo ha più in quella classe.
-          const series = new Set(
-            classOld.filter((d) => before.some((r) => r.datasetId === d.id)).map((d) => d.series),
-          );
+          const series = new Set(before.map((r) => r.series));
           const nowIds = classNow.filter((d) => series.has(d.series)).map((d) => d.id);
           const other = now.find((r) => r.drugClass !== recorded)?.drugClass ?? null;
           if (nowIds.length) {
@@ -714,13 +791,17 @@ export class ReferenceData {
         }
       }
 
-      const matches = (r: { activeIngredient: string; atc: string | null }) =>
-        (t.atc !== null && r.atc !== null && r.atc === t.atc) ||
-        (t.activeIngredient !== null && lower(r.activeIngredient) === lower(t.activeIngredient));
-      const dpcNowRow = dpcsNow.find(matches);
+      // Le chiavi della terapia nell'elenco DPC: l'ATC e il principio attivo che la scheda ha.
+      const keys = keysOf(t);
+      const firstNow = (ok: (r: (typeof dpcsNow)[number]) => boolean) =>
+        keys
+          .flatMap((k) => dpcsNowBy.get(k) ?? [])
+          .filter(ok)
+          .sort((a, b) => a.index - b.index)[0];
+      const dpcNowRow = firstNow(() => true);
       const recordedNote = note(t.aifaNote);
       if (recordedNote && dpcNowRow && note(dpcNowRow.aifaNote) !== recordedNote) {
-        const before = dpcsOld.some((r) => matches(r) && note(r.aifaNote) === recordedNote);
+        const before = keys.some((k) => oldNotes.get(k)?.has(recordedNote));
         if (before) {
           const current = note(dpcNowRow.aifaNote);
           add(t.id, {
@@ -732,14 +813,11 @@ export class ReferenceData {
           });
         }
       }
-      const planNow = dpcsNow.find((r) => matches(r) && r.planRequired === true);
+      const planNow = firstNow((r) => r.planRequired === true);
       if (planNow && !t.hasPlan) {
         // Una versione superata dell'elenco che non lo chiedeva: con il farmaco senza piano, o senza
         // il farmaco.
-        const before = dpcOld.some(
-          (d) =>
-            !dpcsOld.some((r) => r.datasetId === d.id && matches(r) && r.planRequired === true),
-        );
+        const before = dpcOld.some((d) => !keys.some((k) => oldPlans.get(d.id)?.has(k)));
         if (before) {
           add(t.id, {
             kind: 'piano',

@@ -23,7 +23,9 @@ import { studioDate } from '../prescriptions/rules-check';
  * - Ricette: inviate, cartacee e annullate nel periodo, fatte nell'archivio.
  * - Vaccinazioni: per vaccino e campagna, dei pazienti dell'archivio.
  *
- * Contano solo le voci non annullate. Nessun testo clinico: né nei conteggi né nel CSV.
+ * Contano solo le voci non annullate. Nessun testo clinico: né nei conteggi né nel CSV. Le voci
+ * riservate (note, vaccinazioni, ricette di terapie riservate) contano solo per chi legge le voci
+ * riservate dell'archivio: la segreteria non le vede, come in cartella (D209).
  */
 
 /** Il periodo, giorni dello studio inclusi (AAAA-MM-GG). */
@@ -112,7 +114,12 @@ const patientFields = {
 };
 
 /** Visite e contatti: note del diario non annullate dei pazienti dell'archivio, nel periodo. */
-async function contacts(db: Database, archiveId: string, p: Period): Promise<ContactRow[]> {
+async function contacts(
+  db: Database,
+  archiveId: string,
+  p: Period,
+  includeReserved: boolean,
+): Promise<ContactRow[]> {
   const author = alias(appUser, 'autore');
   return db
     .select({
@@ -130,6 +137,7 @@ async function contacts(db: Database, archiveId: string, p: Period): Promise<Con
         eq(patient.archiveId, archiveId),
         eq(clinicalEntry.kind, 'diary'),
         eq(clinicalEntry.status, 'active'),
+        includeReserved ? undefined : eq(clinicalEntry.reserved, false),
         gte(clinicalEntry.occurredOn, p.from),
         lte(clinicalEntry.occurredOn, p.to),
       ),
@@ -143,7 +151,12 @@ async function contacts(db: Database, archiveId: string, p: Period): Promise<Con
 }
 
 /** Vaccinazioni non annullate dei pazienti dell'archivio, nel periodo. */
-async function vaccinations(db: Database, archiveId: string, p: Period): Promise<VaccinationRow[]> {
+async function vaccinations(
+  db: Database,
+  archiveId: string,
+  p: Period,
+  includeReserved: boolean,
+): Promise<VaccinationRow[]> {
   const author = alias(appUser, 'autore');
   return db
     .select({
@@ -164,6 +177,7 @@ async function vaccinations(db: Database, archiveId: string, p: Period): Promise
         eq(patient.archiveId, archiveId),
         eq(clinicalEntry.kind, 'vaccination'),
         eq(clinicalEntry.status, 'active'),
+        includeReserved ? undefined : eq(clinicalEntry.reserved, false),
         gte(clinicalEntry.occurredOn, p.from),
         lte(clinicalEntry.occurredOn, p.to),
       ),
@@ -186,6 +200,7 @@ async function prescriptionEvents(
   db: Database,
   archiveId: string,
   p: Period,
+  includeReserved: boolean,
 ): Promise<PrescriptionEventRow[]> {
   const signer = alias(appUser, 'firma');
   const printer = alias(appUser, 'stampa');
@@ -211,6 +226,11 @@ async function prescriptionEvents(
     .where(
       and(
         eq(prescription.archiveId, archiveId),
+        // Una ricetta con una riga di una terapia riservata è riservata, come in cartella.
+        includeReserved
+          ? undefined
+          : sql`not exists (select 1 from prescription_line l join therapy th on th.id = l.therapy_id
+              where l.prescription_id = ${prescription.id} and th.reserved)`,
         or(
           dayIn(prescription.sentAt, p),
           dayIn(prescription.paperPrintedAt, p),
@@ -263,12 +283,20 @@ function byName(names: string[]) {
     .sort((a, b) => b.numero - a.numero || a.medico.localeCompare(b.medico, 'it'));
 }
 
-/** Tutte le righe del periodo: per i conteggi e per l'esportazione. */
-export async function periodRows(db: Database, archiveId: string, p: Period) {
+/**
+ * Tutte le righe del periodo: per i conteggi e per l'esportazione. Le voci riservate solo con
+ * `includeReserved`, cioè per chi le legge (D209).
+ */
+export async function periodRows(
+  db: Database,
+  archiveId: string,
+  p: Period,
+  includeReserved: boolean,
+) {
   return {
-    contacts: await contacts(db, archiveId, p),
-    prescriptions: await prescriptionEvents(db, archiveId, p),
-    vaccinations: await vaccinations(db, archiveId, p),
+    contacts: await contacts(db, archiveId, p, includeReserved),
+    prescriptions: await prescriptionEvents(db, archiveId, p, includeReserved),
+    vaccinations: await vaccinations(db, archiveId, p, includeReserved),
   };
 }
 

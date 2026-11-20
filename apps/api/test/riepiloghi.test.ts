@@ -8,6 +8,7 @@ import {
   patient,
   prescription,
   prescriptionLine,
+  therapy,
   vaccinationDetail,
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
@@ -440,6 +441,86 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
     const one = await get('titolare', `${base}?dal=2001-03-21&al=2001-03-21`);
     expect(one.statusCode).toBe(200);
     expect(one.json<Summary>().ricette.totale.inviate).toBe(1);
+  });
+
+  it('le voci riservate contano per il titolare, non per la segreteria, né nei conteggi né nel CSV (D209)', async () => {
+    const { titolare } = s.users;
+    const base = `/api/archivi/${s.archives.titolare}/riepiloghi`;
+    const counts = async (who: Who) => (await get(who, `${base}${MARCH}`)).json<Summary>();
+    const csv = async (who: Who) => (await get(who, `${base}/esportazione${MARCH}`)).body;
+    const before = { titolare: await counts('titolare'), segreteria: await counts('segreteria') };
+    // A marzo, segnate «Riservata» dal titolare: una nota del diario, una vaccinazione e una
+    // ricetta inviata con la riga di una terapia riservata.
+    await withActor(t.db, titolare.id, async (tx) => {
+      const reservedEntry = async (kind: 'diary' | 'vaccination', occurredOn: string) =>
+        (
+          await tx
+            .insert(clinicalEntry)
+            .values({
+              patientId: first.id,
+              kind,
+              occurredOn,
+              authorUserId: titolare.id,
+              reserved: true,
+            })
+            .returning({ id: clinicalEntry.id })
+        )[0]!.id;
+      await tx.insert(diaryDetail).values({
+        entryId: await reservedEntry('diary', '2001-03-13'),
+        contactType: 'office',
+        text: SECRET_TEXT,
+      });
+      await tx.insert(vaccinationDetail).values({
+        entryId: await reservedEntry('vaccination', '2001-03-14'),
+        vaccine: 'Vaccino riservato',
+        doseNumber: 1,
+        campaign: null,
+        lot: 'LOTTO-RISERVATO',
+      });
+      const [th] = await tx
+        .insert(therapy)
+        .values({
+          patientId: first.id,
+          drugName: 'Farmaco riservato',
+          kind: 'chronic',
+          startOn: '2001-01-01',
+          createdBy: titolare.id,
+          reserved: true,
+        })
+        .returning({ id: therapy.id });
+      const [r] = await tx
+        .insert(prescription)
+        .values({
+          archiveId: s.archives.titolare,
+          patientId: first.id,
+          kind: 'pharma_ssn',
+          status: 'sent',
+          preparedBy: titolare.id,
+          signedBy: titolare.id,
+          nre: 'NRE-RISERVATA',
+          sentAt: new Date('2001-03-16T10:00:00Z'),
+        })
+        .returning({ id: prescription.id });
+      await tx.insert(prescriptionLine).values({
+        prescriptionId: r!.id,
+        position: 1,
+        drugName: 'Farmaco riservato',
+        activeIngredient: 'principio di prova',
+        quantity: 1,
+        therapyId: th!.id,
+      });
+    });
+    const after = { titolare: await counts('titolare'), segreteria: await counts('segreteria') };
+    expect(after.titolare.visite.totale).toBe(before.titolare.visite.totale + 1);
+    expect(after.titolare.vaccinazioni.totale).toBe(before.titolare.vaccinazioni.totale + 1);
+    expect(after.titolare.ricette.totale.inviate).toBe(before.titolare.ricette.totale.inviate + 1);
+    expect(after.segreteria).toEqual(before.segreteria);
+    const mine = await csv('titolare');
+    const secretary = await csv('segreteria');
+    for (const secret of ['NRE-RISERVATA', 'LOTTO-RISERVATO', 'Vaccino riservato']) {
+      expect(mine, secret).toContain(secret);
+      expect(secretary, secret).not.toContain(secret);
+    }
   });
 
   // Ultima del file: toglie alla segreteria la conferma sull'archivio del collega.

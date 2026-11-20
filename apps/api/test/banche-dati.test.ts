@@ -2,11 +2,12 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadMappings, readSyncState, sha256 } from '@mmg/reference';
-import { eq, sql } from 'drizzle-orm';
+import { eq, getTableName, sql } from 'drizzle-orm';
 import { strToU8, zipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   exemption,
+  REFERENCE_TABLES,
   refDrugShortage,
   refDrugTransparency,
   referenceDataset,
@@ -444,6 +445,23 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     );
     await rejectsWith(t.db.execute(sql`delete from ref_drug`), /non si modificano/);
     await rejectsWith(t.db.execute(sql`truncate ref_municipality cascade`), /non si svuotano/);
+  });
+
+  it('ogni tabella delle banche dati ha le due protezioni (anche quelle nuove, come i registri)', async () => {
+    const tables = Object.values(REFERENCE_TABLES).map((x) => getTableName(x));
+    expect(tables).toContain('ref_drug_registry');
+    const { rows } = await t.pool.query<{ table: string; trigger: string }>(
+      `select c.relname as table, g.tgname as trigger from pg_trigger g
+       join pg_class c on c.oid = g.tgrelid where not g.tgisinternal`,
+    );
+    for (const table of tables) {
+      const mine = rows.filter((r) => r.table === table).map((r) => r.trigger);
+      expect(mine, table).toEqual(
+        expect.arrayContaining([`${table}_immutable`, `${table}_no_truncate`]),
+      );
+    }
+    await rejectsWith(t.db.execute(sql`delete from ref_drug_registry`), /non si modificano/);
+    await rejectsWith(t.db.execute(sql`truncate ref_drug_registry`), /non si svuotano/);
   });
 
   it('un file in uso che non ha l’impronta registrata da sync non si importa', async () => {

@@ -26,11 +26,15 @@ export function registerReportRoutes(
 ): void {
   const { db, now } = deps;
 
-  /** Prima il permesso, anche per una richiesta sbagliata: un no resta nel registro. */
+  /**
+   * Prima il permesso, anche per una richiesta sbagliata: un no resta nel registro. Dice anche se
+   * chi guarda legge le voci riservate dell'archivio: la segreteria no (D209).
+   */
   async function guard(actor: Actor, archiveId: string, action: AccessAction) {
     const ctx = await loadArchiveContext(db, archiveId);
     const decision = can(actor, 'reports.read', { ...ctx, now: now() });
-    if (decision.allowed) return;
+    if (decision.allowed)
+      return { includeReserved: can(actor, 'reserved.read', { ...ctx, now: now() }).allowed };
     await logAccess(db, {
       studioId: actor.studioId,
       userId: actor.userId,
@@ -59,9 +63,9 @@ export function registerReportRoutes(
   app.get('/api/archivi/:id/riepiloghi', async (req) => {
     const actor = req.actor!;
     const { id } = archiveParams.parse(req.params);
-    await guard(actor, id, 'lettura_riepiloghi');
+    const { includeReserved } = await guard(actor, id, 'lettura_riepiloghi');
     const period = parsePeriod(req.query);
-    const summary = summarize(await periodRows(db, id, period), period);
+    const summary = summarize(await periodRows(db, id, period, includeReserved), period);
     await logAccess(db, {
       studioId: actor.studioId,
       userId: actor.userId,
@@ -76,9 +80,9 @@ export function registerReportRoutes(
   app.get('/api/archivi/:id/riepiloghi/esportazione', async (req, reply) => {
     const actor = req.actor!;
     const { id } = archiveParams.parse(req.params);
-    await guard(actor, id, 'esportazione_riepiloghi');
+    const { includeReserved } = await guard(actor, id, 'esportazione_riepiloghi');
     const period = parsePeriod(req.query);
-    const rows = await periodRows(db, id, period);
+    const rows = await periodRows(db, id, period, includeReserved);
     const details = { archivio: id, dal: period.from, al: period.to };
     // Il CSV ha i nomi: una riga per paziente, poi una per l'esportazione.
     await logAccessForPatients(db, patientsOf(rows), {

@@ -14,4 +14,10 @@ CREATE TABLE "ref_drug_registry" (
 );
 --> statement-breakpoint
 ALTER TABLE "ref_drug_registry" ADD CONSTRAINT "ref_drug_registry_dataset_id_reference_dataset_id_fk" FOREIGN KEY ("dataset_id") REFERENCES "public"."reference_dataset"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "ref_drug_registry_dataset_id_atc_index" ON "ref_drug_registry" USING btree ("dataset_id","atc");
+CREATE INDEX "ref_drug_registry_dataset_id_atc_index" ON "ref_drug_registry" USING btree ("dataset_id","atc");--> statement-breakpoint
+-- Aggiunto a mano, come le altre banche dati (0006, 0037): le versioni importate non si modificano e non si cancellano.
+CREATE TRIGGER ref_drug_registry_immutable BEFORE UPDATE OR DELETE ON ref_drug_registry
+  FOR EACH ROW EXECUTE FUNCTION mmg_forbid_change('Le banche dati importate non si modificano e non si cancellano: si importa una versione nuova');
+--> statement-breakpoint
+CREATE TRIGGER ref_drug_registry_no_truncate BEFORE TRUNCATE ON ref_drug_registry
+  FOR EACH STATEMENT EXECUTE FUNCTION mmg_forbid_change('Le banche dati importate non si svuotano');
