@@ -117,6 +117,14 @@ Letta il 20/11/2026 per sapere che cosa cambiano il DPCM 7 agosto 2026 e il DM 3
 | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
 | GU n. 227 del 30/9/2026, serie generale: DPCM 7/8/2026 (pp. 20–22) e DM 3/8/2026 (pp. 43–47) | `https://www.gazzettaufficiale.it/eli/gu/2026/09/30/227/sg/pdf` | 3.379.374 | `5b57a2f001b3d2bc2687f62b9ed46eb610d4760ce32b727ebad4b3a17d6a6974` |
 
+### Promemoria della ricetta (D217)
+
+Letto il 20/11/2026 per impaginare il promemoria; nel repository non entra niente, solo le diciture brevi delle specifiche nel codice e nelle prove, con la fonte accanto. Documento tecnico pubblicato sul portale del Sistema TS; il PDF resta fuori dal repository.
+
+| Documento                                                                                                                                 | Indirizzo                                                                                                                                                                          | Byte      | SHA-256                                                            |
+| ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
+| Sistema TS, «Specifiche tecniche per la stampa del promemoria della ricetta dematerializzata (D.M. 2 novembre 2011)», versione 28/02/2024 | `https://sistemats1.sanita.finanze.it/portale/documents/20182/81804/2021215_Specifiche+tecniche+per+la+stampa+del+promemoria.pdf/bd4265f5-342e-dbe3-1696-fc0ee8862260?version=1.0` | 1.210.402 | `ac4dfe432a3c86fb148242d4f6463a73ba50b5b77f5ddca0fc305fd8de7d91f1` |
+
 ### Prestazioni aggiuntive (D212)
 
 Le trascrizioni in `packages/reference/data/trascrizioni/ppip/` vengono dai PDF qui sotto, scaricati il 20/11/2026: le pagine 146 e 147 del supplemento con l'allegato 6 dell'ACN (pagine fatte di immagini, lette con la lettura ottica e controllate a vista voce per voce) e l'art. 35, comma 4, dell'AIR. Il PDF della GU n. 149 è servito solo a vedere che l'accordo del 26/6/2026 non cambia l'allegato 6. Sono testi di atti ufficiali (art. 5 della legge 633/1941) e i PDF restano fuori dal repository. Che cosa è diverso dagli atti: `docs/ppip.md`.

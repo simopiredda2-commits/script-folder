@@ -149,14 +149,19 @@ try {
   await reminder.getByRole('button', { name: 'Invia' }).waitFor();
   await reminder.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await shot(page, '17-promemoria');
-  // Il PDF del promemoria come lo riceve il paziente, in immagine (serve pdftoppm, di poppler).
+  // Il PDF del promemoria come lo riceve il paziente, in immagine (serve pdftoppm, di poppler):
+  // la metà alta della pagina A4, che è il promemoria (specifiche del 28/02/2024, D217).
   const href = await reminder.getByRole('link', { name: 'Promemoria (PDF)' }).getAttribute('href');
   const pdfPath = join(work, 'promemoria.pdf');
   writeFileSync(pdfPath, await (await page.request.get(`${base}${href}`)).body());
   execFileSync('pdftoppm', [
     '-png',
     '-r',
-    '96',
+    '120',
+    '-W',
+    '993',
+    '-H',
+    '702',
     '-singlefile',
     pdfPath,
     join(OUT, '18-promemoria-pdf'),

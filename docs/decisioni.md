@@ -235,7 +235,7 @@ Branch `tappe-7-8` e `tappe-9-10`, con una pull request ciascuno. Restano dopo: 
 
 **D96 · Risposta senza codice di autenticazione = rifiuto.** Le specifiche del Sistema TS dicono che senza codice la ricetta non è valida; il documento piemontese lo tratta come esito negativo. La ricetta va in errore con il codice `SENZA_CODICE_AUTENTICAZIONE` e il promemoria non esce.
 
-**D97 · Che cosa non si è potuto verificare del promemoria.** Il documento «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non è sul portale: posizioni sulla pagina, suddivisione dell’NRE nei codici a barre e dicitura aggiornata restano «da completare». L’NRE in chiaro va in OCR-A (ECMA, tipo 1): oggi è in Courier, da completare con un carattere OCR-A di licenza compatibile. Le descrizioni delle righe (codice della prestazione tra parentesi, «NON SOSTITUIBILE») e il tipo di accesso sulla specialistica sono scelte nostre in attesa di quel documento.
+**D97 · Che cosa non si è potuto verificare del promemoria.** Il documento «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non è sul portale: posizioni sulla pagina, suddivisione dell’NRE nei codici a barre e dicitura aggiornata restano «da completare». L’NRE in chiaro va in OCR-A (ECMA, tipo 1): oggi è in Courier, da completare con un carattere OCR-A di licenza compatibile. Le descrizioni delle righe (codice della prestazione tra parentesi, «NON SOSTITUIBILE») e il tipo di accesso sulla specialistica sono scelte nostre in attesa di quel documento. Superata: D211 per l'OCR-A, D217 per le specifiche di stampa, trovate nella versione del 28/02/2024.
 
 **D98 · Email e SMS: il minimo, e solo a chi ha diritto.** L’email porta il promemoria allegato e un testo senza dati clinici; l’SMS porta solo il numero di ricetta (e il PIN per la bianca). Destinatari: il recapito del paziente in anagrafica o quello di un delegato con delega valida oggi (stesso criterio di R16). Ogni consegna, riuscita o no, resta in `reminder_delivery`. Fornitore vero da scegliere con le garanzie sul trattamento dei dati.
 
@@ -1241,3 +1241,48 @@ Che cosa vuol dire per il programma:
 - **Nomenclatore**: nelle ricette vale il catalogo regionale, che la Regione aggiorna con le sue determinazioni (dal 30/10/2026 la D.D. 710/2026, D159). Qui non cambia niente.
 
 Non verificato: il testo degli allegati dei due decreti.
+
+**D217 · Promemoria secondo le specifiche di stampa del Sistema TS (28/02/2024).** Trovate sul portale del Sistema TS il 20/11/2026: «Specifiche tecniche per la stampa del promemoria della ricetta dematerializzata (D.M. 2 novembre 2011)», versione 28/02/2024, 22 pagine. È il documento che D97 non aveva trovato; la versione del 1/3/2016 è superata. Il modello vale in tutta Italia, sostituisce quello dell'allegato tecnico del DM e i modelli regionali.
+
+Che cosa cambia nel promemoria:
+
+- **Mezzo foglio A4.** La pagina resta A4 e il promemoria ne occupa la metà alta (148,5 mm). Stampato al 100%, i codici a barre restano delle misure giuste; una pagina di mezzo A4 molte stampanti la ingrandirebbero.
+- **Campi e diciture del facsimile nr. 0**, con i loro numeri:
+  - intestazione e riquadro della Regione (1), NRE (2), assistito (3–9), esenzione e altri dati della ricetta (10–16);
+  - area delle prescrizioni (17–20), quesito (21), totale, tipo ricetta, data e medico (22–27);
+  - dicitura «Rilasciato ai sensi dell'art.11, comma 16 del DL 31 mag 2010,n.78 e dell'art.1, comma 4 del DM 2 nov 2011», frase regionale (28).
+- **NRE in due codici a barre separati**, i primi 5 caratteri (Regione e raggruppamento del lotto) e il resto. Le barre sono alte 8 mm, e sotto c'è il valore tra asterischi in OCR-A (D211); lo stesso vale per il codice fiscale.
+- **Modulo del codice a barre di 0,254 mm**, prima 0,339. Il codice fiscale deve stare nello spazio del modello accanto al nome, e così resta sopra il minimo di 0,240 mm del DM.
+- **Diciture delle specifiche**: dati oscurati, «SUGG» e «RICOV», priorità in parole, «PRIMO ACCESSO» e «ALTRA TIPOLOGIA DI ACCESSO», «PRESCRIZIONE VALIDA 180 GIORNI AI FINI DELLA PRENOTAZIONE», «---» per la nota non compilata, «Assist. SSN».
+- **Area delle prescrizioni fissa.** È grande come nel facsimile nr. 0, si disegnano solo le righe usate e i campi dal 21 non si spostano. Se le righe non ci stanno, il carattere scende fino a 6 punti.
+- **Farmaci.** Prima il gruppo di equivalenza, con codice e denominazione: principio attivo e confezione di riferimento della lista di trasparenza AIFA in vigore alla data. Poi l'AIC con il nome. Infine «NON SOSTITUIBILE - motivazione».
+- **Specialistica**: «codice nomenclatore (codice catalogo) – descrizione», con i codici proprio come sono partiti (D154).
+- **Farmaci in DPC.** La frase arriva con il messaggio 0196 della ricevuta e si stampa sotto l'ultima prescrizione, centrata. L'interfaccia delle integrazioni porta ora i messaggi della ricevuta; il simulatore li dà solo nelle prove.
+
+Scelte, dove le specifiche tacciono o il programma non ha il dato:
+
+- **Tipologia S o H (campo 14)**: una per ricetta, e c'è solo se tutte le prescrizioni la hanno uguale. Prima si stampava per riga.
+- **Piemonte** (SIRPE, «Cartelle cliniche MMG e PLS», 4.4.3): nel campo 27 il codice regionale davanti al nome. Da verificare al collaudo, perché le specifiche nazionali vogliono lo stesso modello in tutta Italia.
+- **Validità di 180 giorni**: è il valore delle specifiche. Un valore minore comunicato dal Piemonte non è noto (A1).
+- **Campi vuoti**, come vogliono le specifiche quando il dato manca:
+  - disposizioni regionali (13), «Altro» (15), frase regionale (28);
+  - ambulatorio di erogazione, televisita, note e numero di sedute (18A);
+  - note del DM 9/12/2015 (20, che stampa «---»);
+  - codice ICD-9-CM nel quesito (21): il programma scrive il quesito come testo.
+- **Tipo ricetta (23).** Il messaggio di invio porta solo ricette di assistiti del SSN, quindi si stampa «Assist. SSN». Gli altri tipi (UE, EE, ST, NA…) sono da completare con l'adattatore vero. Per gli assicurati esteri il promemoria stampa istituzione e tessera, con le etichette del facsimile nr. 4.
+- **Foglio «solo NRE»**: stesse misure e stessi codici a barre, con data, medico, codice di autenticazione e dicitura.
+
+Ristampe: i dati del promemoria hanno una versione. Quelli fissati prima (versione 1) si ristampano con il modello di prima, uguali byte per byte; una prova ne controlla l'impronta. I nuovi sono della versione 2.
+
+Prove (`apps/api/test/promemoria-modello.test.ts`, `apps/api/test/promemoria.test.ts`):
+
+- versione 1 identica;
+- NRE in due parti con gli asterischi;
+- misure delle barre;
+- tutto nella metà alta e campi dal 21 fermi;
+- diciture uguali al testo delle specifiche;
+- gruppo di equivalenza, AIC, non sostituibile e frase DPC;
+- codici e righe della specialistica;
+- SUGG.
+
+28 sabotaggi. Guardati a vista quattro promemoria con dati inventati: farmaci, specialistica con otto righe lunghe, dati oscurati con assicurato estero, solo NRE. I tre codici a barre letti con un lettore indipendente (ZXing, solo per la prova, fuori dal repository) a 300 e 600 punti per pollice. Non provato: la stampa vera e la lettura in farmacia.

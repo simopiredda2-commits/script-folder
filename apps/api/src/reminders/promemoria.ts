@@ -1,3 +1,4 @@
+import type { PrescriptionLineMessage, ReceiptMessage } from '@mmg/integrations';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
@@ -6,22 +7,101 @@ import {
   patient,
   prescription,
   prescriptionLine,
+  refDrugTransparency,
   studio,
   therapy,
 } from '../db/schema';
 import { HttpError } from '../http/errors';
+import { ReferenceData } from '../reference/lookup';
 
 /**
- * Il promemoria della ricetta SSN, campo per campo come nel modello del DM 2 novembre 2011
- * (allegato 2, «Descrizione dei campi del promemoria»), con le aggiunte delle specifiche del
- * Sistema TS (prescrizione, 5/12/2024: codice di autenticazione, cognome e nome del medico dal SAC)
- * e della Regione Piemonte (SIRPE, «Cartelle cliniche MMG e PLS», 4.4.3: codice regionale e
- * nominativo del medico sotto il codice fiscale). Si fissa all'invio: ogni ristampa è identica.
+ * Il promemoria della ricetta SSN. Si fissa all'invio, con un numero di versione: ogni ristampa è
+ * identica, anche dopo un cambio del modello.
  *
- * Le posizioni sulla pagina del documento «Specifiche tecniche per la stampa del promemoria»
- * (versione 1/3/2016, citata dalla Regione) non sono state trovate sul portale: da completare.
+ * - **Versione 2** (dal 20/11/2026, D217): campo per campo come le «Specifiche tecniche per la
+ *   stampa del promemoria della ricetta dematerializzata (D.M. 2 novembre 2011)» del Sistema TS,
+ *   versione 28/02/2024, che sostituiscono il modello dell'allegato tecnico del DM. I numeri dei
+ *   campi sono quelli delle specifiche.
+ * - **Versione 1**: il modello del DM 2 novembre 2011 (allegato 2), con le aggiunte delle specifiche
+ *   del Sistema TS sulla prescrizione (5/12/2024) e della Regione Piemonte (SIRPE, «Cartelle
+ *   cliniche MMG e PLS», 4.4.3). Resta per ristampare i promemoria fissati prima.
  */
-export interface PromemoriaData {
+export type PromemoriaData = PromemoriaDataV1 | PromemoriaDataV2;
+
+/** Specifiche di stampa del promemoria, versione 28/02/2024. */
+export interface PromemoriaDataV2 {
+  versione: 2;
+  tipo: 'pharma_ssn' | 'specialist_ssn';
+  /** Campo 1: la Regione di emissione, come la dice l'intestazione. */
+  regione: string;
+  /** Campo 2: NRE, a barre in due parti e in chiaro. */
+  nre: string;
+  /** Campo 26. */
+  codiceAutenticazione: string;
+  assistito: {
+    /** Campo 9: a barre e in chiaro. */
+    codiceFiscale: string;
+    /** Campi 3–8; null se oscurati su richiesta del paziente o non compilati. */
+    cognomeNome: string | null;
+    indirizzo: string | null;
+    cap: string | null;
+    citta: string | null;
+    provincia: string | null;
+    oscurato: boolean;
+    /** Campi 11 e 12. */
+    siglaProvincia: string | null;
+    codiceAsl: string | null;
+  };
+  /** Campo 10: il codice, oppure «NON ESENTE». */
+  esenzione: string;
+  /** Campo 13. */
+  disposizioniRegionali: string | null;
+  /** Campo 14: «S» (stampato «SUGG») o «H» («RICOV»). */
+  tipologia: 'S' | 'H' | null;
+  /** Campo 15: «Altro», biffato o con un valore della Regione. */
+  altro: string | null;
+  /** Campo 16. */
+  priorita: 'U' | 'B' | 'D' | 'P' | null;
+  /** Ricetta specialistica: giorni di validità ai fini della prenotazione, nell'intestazione. */
+  validitaGiorni: number | null;
+  /** Campi 17–20 (17A e 18A per la specialistica), una voce per prescrizione. */
+  righe: {
+    /** Campo 17 o 17A: una o due righe (gruppo di equivalenza e nome commerciale). */
+    prescrizione: string[];
+    /** Campo 18 o 18A; null se non c'è niente da stampare. */
+    dettagli: string | null;
+    /** Campo 19. */
+    quantita: number;
+    /** Campo 20: la nota, oppure «---». */
+    nota: string;
+  }[];
+  /** Farmaci in DPC: la frase del messaggio 0196 della ricevuta, sotto l'ultima prescrizione. */
+  fraseDpc: string | null;
+  /** Campo 21. */
+  quesitoDiagnostico: string | null;
+  /** Campo 22: somma delle quantità. */
+  numeroConfezioniPrestazioni: number;
+  /** Campo 23. */
+  tipoRicetta: string | null;
+  /** Assicurati da istituzioni estere: i dati che il programma conosce (facsimile 4). */
+  esteri: { tessera: string | null; istituzione: string | null } | null;
+  /** Campo 24: data di compilazione, AAAA-MM-GG. */
+  data: string;
+  medico: {
+    /** Campo 25. */
+    codiceFiscale: string;
+    /** Regione Piemonte (SIRPE, 4.4.3): davanti al nome, nel campo 27. */
+    codiceRegionale: string | null;
+    /** Campo 27: come lo restituisce il SAC; se manca, il nome nel programma. */
+    nominativo: string;
+  };
+  dicitura: string;
+  /** Campo 28: la frase di interesse sanitario della Regione, se c'è. */
+  fraseRegionale: string | null;
+}
+
+/** DM 2 novembre 2011, allegato 2: i promemoria fissati prima del 20/11/2026. */
+export interface PromemoriaDataV1 {
   versione: 1;
   tipo: 'pharma_ssn' | 'specialist_ssn';
   /** Campo 1. */
@@ -75,23 +155,117 @@ export interface PromemoriaData {
   dicitura: string;
 }
 
-/** Campi 4 e 5 oscurati (DM 2 novembre 2011, allegato 2). */
+/** Versione 1: campi 4 e 5 oscurati (DM 2 novembre 2011, allegato 2). */
 export const OBSCURED_TEXT = 'OSCURATO AI SENSI DELL’ART 87, COMMA 2, DLG 30 giugno 2003, N.196';
 
-/** Dicitura in fondo al modello (DM 2 novembre 2011, allegato 2). */
+/** Versione 1: dicitura in fondo al modello (DM 2 novembre 2011, allegato 2). */
 export const RELEASE_TEXT = 'Rilasciato ai sensi dell’art 11 comma 16 del DL 78 del 30 maggio 2010';
 
-const ACCESS_TYPE: Record<string, string> = {
-  first: 'Primo accesso',
-  subsequent: 'Altra tipologia di accesso',
-};
+/** Versione 2: al posto dei campi 3–8 oscurati (specifiche del 28/02/2024, campo 3). */
+export const OBSCURED_TEXT_2024 =
+  'DATI DELL’ASSISTITO OSCURATI AI SENSI DELL’ARTICOLO 87 DEL DL 30 giugno 2003, n. 196';
 
-/** Dati del promemoria dalla ricetta appena accettata, con il codice di autenticazione. */
+/** Versione 2: dicitura in fondo al modello (specifiche del 28/02/2024). */
+export const RELEASE_TEXT_2024 =
+  'Rilasciato ai sensi dell’art.11, comma 16 del DL 31 mag 2010,n.78 e dell’art.1, comma 4 del DM 2 nov 2011';
+
+/** Campo 10 senza codice di esenzione. */
+export const NOT_EXEMPT = 'NON ESENTE';
+
+/** Campo 20 vuoto: la nota non si può compilare (specifiche del 28/02/2024). */
+export const NO_NOTE = '---';
+
+/** Campo 23 per gli assistiti del SSN: il medico non lo compila, la stampa lo riporta. */
+export const SSN_RECIPE_TYPE = 'Assist. SSN';
+
+/**
+ * Validità della ricetta specialistica ai fini della prenotazione, nell'intestazione della
+ * prescrizione: 180 giorni, o meno se la Regione lo ha comunicato al Sistema TS (specifiche del
+ * 28/02/2024, 2.1). Per il Piemonte un valore minore non è noto: da completare con il collaudo.
+ */
+export const SPECIALIST_VALIDITY_DAYS = 180;
+
+/** Campo 14. */
+export const TYPOLOGY_TEXT = { S: 'SUGG', H: 'RICOV' } as const;
+
+/** Campo 16. */
+export const PRIORITY_TEXT = {
+  U: 'Nel più breve tempo possibile; se differibile entro 72 ore',
+  B: 'Entro 10 giorni',
+  D: 'Entro 30 (visite), entro 60 gg (visite strumentali)',
+  P: 'Programmabile',
+} as const;
+
+/** Campo 18A: la tipologia di accesso, coerente con il PNGLA. */
+export const ACCESS_TEXT_2024 = {
+  first: 'PRIMO ACCESSO',
+  subsequent: 'ALTRA TIPOLOGIA DI ACCESSO',
+} as const;
+
+/** Campo 18: farmaco non sostituibile. */
+export const NOT_SUBSTITUTABLE_TEXT = 'NON SOSTITUIBILE';
+
+/** Codice del messaggio della ricevuta con la frase sui farmaci in DPC. */
+export const DPC_MESSAGE_CODE = '0196';
+
+/** Campo 1: «REGIONE PIEMONTE»; una Provincia autonoma resta com'è scritta. */
+export function regionHeading(regionName: string): string {
+  const name = regionName.trim().toUpperCase();
+  return /^(REGIONE|PROVINCIA)\b/.test(name) ? name : `REGIONE ${name}`;
+}
+
+/**
+ * Gruppo di equivalenza di ogni AIC secondo la lista di trasparenza AIFA in vigore alla data:
+ * codice e denominazione, cioè principio attivo e confezione di riferimento, le colonne che nella
+ * lista definiscono il gruppo. Senza la lista, o fuori dalla lista, niente.
+ */
+async function equivalenceGroups(
+  db: Database,
+  aics: readonly string[],
+  date: string,
+): Promise<Map<string, string>> {
+  const wanted = [...new Set(aics.filter(Boolean))];
+  const out = new Map<string, string>();
+  if (!wanted.length) return out;
+  const ids = (await new ReferenceData(db).inEffect('farmaci_trasparenza', date)).map((d) => d.id);
+  if (!ids.length) return out;
+  const rows = await db
+    .select({
+      aic: refDrugTransparency.aic,
+      activeIngredient: refDrugTransparency.activeIngredient,
+      referencePack: refDrugTransparency.referencePack,
+      group: refDrugTransparency.equivalenceGroup,
+    })
+    .from(refDrugTransparency)
+    .where(
+      and(inArray(refDrugTransparency.datasetId, ids), inArray(refDrugTransparency.aic, wanted)),
+    )
+    .orderBy(asc(refDrugTransparency.aic), asc(refDrugTransparency.id));
+  for (const r of rows) {
+    if (!r.group || out.has(r.aic)) continue;
+    const name = [r.activeIngredient?.toUpperCase(), r.referencePack].filter(Boolean).join(' ');
+    out.set(r.aic, name ? `${r.group} - ${name}` : r.group);
+  }
+  return out;
+}
+
+/**
+ * Dati del promemoria dalla ricetta appena accettata, con il codice di autenticazione e i messaggi
+ * della ricevuta. Le righe della specialistica usano i codici proprio come sono partiti (`sent`):
+ * il codice del nomenclatore può venire dal catalogo regionale al momento dell'invio (D154).
+ */
 export async function buildPromemoriaData(
   db: Database,
   prescriptionId: string,
-  accepted: { nre: string; authCode: string; sacDoctorName: string | null; compiledAt: string },
-): Promise<PromemoriaData> {
+  accepted: {
+    nre: string;
+    authCode: string;
+    sacDoctorName: string | null;
+    compiledAt: string;
+    messages?: readonly ReceiptMessage[] | null;
+  },
+  sent?: readonly PrescriptionLineMessage[],
+): Promise<PromemoriaDataV2> {
   const [row] = await db
     .select({ p: prescription, pt: patient, st: studio })
     .from(prescription)
@@ -105,7 +279,7 @@ export async function buildPromemoriaData(
   if (!st.regionName)
     throw new HttpError(
       409,
-      'Manca la regione dello studio: serve per l’intestazione del promemoria (DM 2/11/2011, campo 1)',
+      'Manca la regione dello studio: serve per l’intestazione del promemoria (campo 1)',
     );
   const [doctor] = await db
     .select({ name: appUser.displayName, profile: doctorProfile })
@@ -115,7 +289,7 @@ export async function buildPromemoriaData(
   if (!doctor?.profile?.fiscalCode)
     throw new HttpError(
       409,
-      'Manca il codice fiscale del medico nel profilo: va sul promemoria (DM 2/11/2011, campo 20)',
+      'Manca il codice fiscale del medico nel profilo: va sul promemoria (campo 25)',
     );
 
   const lines = await db
@@ -130,55 +304,87 @@ export async function buildPromemoriaData(
         .from(therapy)
         .where(and(inArray(therapy.id, therapyIds), eq(therapy.patientId, pt.id)))
     : [];
-  const typology = (therapyId: string | null) => {
-    const t = therapies.find((x) => x.id === therapyId);
+  // Campo 14, uno per ricetta: la tipologia c'è se tutte le prescrizioni la hanno uguale.
+  const typologies = lines.map((l) => {
+    const t = therapies.find((x) => x.id === l.therapyId);
     return t?.s ? 'S' : t?.h ? 'H' : null;
-  };
+  });
+  const tipologia =
+    typologies.length && typologies.every((x) => x && x === typologies[0]) ? typologies[0]! : null;
 
-  const address = [
-    [pt.residenceStreet, pt.residenceNumber].filter(Boolean).join(' '),
-    [pt.residencePostalCode, pt.residenceTown, pt.residenceProvince && `(${pt.residenceProvince})`]
-      .filter(Boolean)
-      .join(' '),
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const specialist = p.kind === 'specialist_ssn';
+  const groups = specialist
+    ? new Map<string, string>()
+    : await equivalenceGroups(
+        db,
+        lines.map((l) => l.drugAic ?? ''),
+        accepted.compiledAt,
+      );
+  const accessText = specialist && p.accessType ? ACCESS_TEXT_2024[p.accessType] : null;
 
+  const righe = lines.map((l, i) => {
+    if (specialist) {
+      const nationalCode = sent?.[i]?.serviceNationalCode ?? l.serviceNationalCode;
+      const codes = [nationalCode, l.serviceCode && `(${l.serviceCode})`].filter(Boolean).join(' ');
+      const description = l.serviceDescription ?? '';
+      return {
+        // 17A: codice nomenclatore (codice catalogo) – descrizione del catalogo.
+        prescrizione: [codes && description ? `${codes} – ${description}` : codes || description],
+        // 18A: tipologia di accesso; ambulatorio, televisita, note e sedute non sono nella ricetta.
+        dettagli: accessText,
+        quantita: l.quantity,
+        // 20: le note del DM 9/12/2015 non sono nella ricetta.
+        nota: NO_NOTE,
+      };
+    }
+    const group = l.drugAic ? (groups.get(l.drugAic) ?? null) : null;
+    const product = l.drugAic && l.drugName ? `${l.drugAic} - ${l.drugName}` : l.drugName;
+    // 17: gruppo di equivalenza e nome commerciale; per principio attivo solo il gruppo.
+    const prescrizione = l.byActiveIngredient
+      ? [group ?? l.activeIngredient ?? l.drugName ?? '']
+      : [group, product ?? ''].filter((x): x is string => x !== null);
+    return {
+      prescrizione,
+      dettagli: l.notSubstitutable
+        ? [NOT_SUBSTITUTABLE_TEXT, l.notSubstitutableReason?.trim()].filter(Boolean).join(' - ')
+        : null,
+      quantita: l.quantity,
+      nota: l.aifaNote?.trim() || NO_NOTE,
+    };
+  });
+
+  const street = [pt.residenceStreet, pt.residenceNumber].filter(Boolean).join(' ');
+  const obscured = p.obscured;
   return {
-    versione: 1,
+    versione: 2,
     tipo: p.kind,
-    intestazione: `SERVIZIO SANITARIO NAZIONALE – REGIONE ${st.regionName.toUpperCase()}`,
+    regione: regionHeading(st.regionName),
     nre: accepted.nre,
     codiceAutenticazione: accepted.authCode,
     assistito: {
       codiceFiscale: pt.fiscalCode,
-      cognomeNome: p.obscured ? null : `${pt.lastName} ${pt.firstName}`,
-      indirizzo: p.obscured ? null : address || null,
-      oscurato: p.obscured,
+      cognomeNome: obscured ? null : `${pt.lastName} ${pt.firstName}`,
+      indirizzo: obscured ? null : street || null,
+      cap: obscured ? null : pt.residencePostalCode,
+      citta: obscured ? null : pt.residenceTown,
+      provincia: obscured ? null : pt.residenceProvince,
+      oscurato: obscured,
       siglaProvincia: pt.residenceProvince,
       codiceAsl: pt.asl,
     },
-    esenzione: p.exemptionCode ?? 'NON ESENTE',
+    esenzione: p.exemptionCode ?? NOT_EXEMPT,
     disposizioniRegionali: null,
-    tipoRicetta: null,
-    tipoAccesso: p.kind === 'specialist_ssn' && p.accessType ? ACCESS_TYPE[p.accessType]! : null,
-    righe: lines.map((l) => ({
-      descrizione:
-        p.kind === 'specialist_ssn'
-          ? [l.serviceDescription, l.serviceCode && `(${l.serviceCode})`].filter(Boolean).join(' ')
-          : [
-              l.byActiveIngredient ? (l.activeIngredient ?? l.drugName) : l.drugName,
-              l.notSubstitutable ? '– NON SOSTITUIBILE' : null,
-            ]
-              .filter(Boolean)
-              .join(' '),
-      quantita: l.quantity,
-      notaAifa: l.aifaNote,
-      tipologia: typology(l.therapyId),
-      priorita: p.kind === 'specialist_ssn' ? p.priority : null,
-    })),
+    tipologia,
+    altro: null,
+    priorita: specialist ? p.priority : null,
+    validitaGiorni: specialist ? SPECIALIST_VALIDITY_DAYS : null,
+    righe,
+    fraseDpc: accepted.messages?.find((m) => m.code === DPC_MESSAGE_CODE)?.text.trim() || null,
+    quesitoDiagnostico: p.diagnosticQuestion,
     numeroConfezioniPrestazioni: lines.reduce((sum, l) => sum + l.quantity, 0),
-    diagnosi: { codice: null, descrizione: p.diagnosticQuestion },
+    // La ricetta parte come ricetta di un assistito del SSN: gli altri tipi (UE, EE, ST, NA…)
+    // non sono nel messaggio di invio, da completare con l'adattatore vero.
+    tipoRicetta: SSN_RECIPE_TYPE,
     esteri:
       pt.foreignHealthCard || pt.foreignInstitution
         ? { tessera: pt.foreignHealthCard, istituzione: pt.foreignInstitution }
@@ -189,6 +395,7 @@ export async function buildPromemoriaData(
       codiceRegionale: doctor.profile.regionalCode,
       nominativo: accepted.sacDoctorName ?? doctor.name,
     },
-    dicitura: RELEASE_TEXT,
+    dicitura: RELEASE_TEXT_2024,
+    fraseRegionale: null,
   };
 }

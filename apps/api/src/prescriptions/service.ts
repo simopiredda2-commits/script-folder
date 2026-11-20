@@ -600,12 +600,18 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const accepted = result.outcome === 'accepted' ? result : null;
     const promemoria =
       accepted && ssn
-        ? await buildPromemoriaData(db, p.id, {
-            nre: accepted.nre,
-            authCode: accepted.authCode!,
-            sacDoctorName: accepted.doctorName ?? null,
-            compiledAt: message.compiledAt,
-          })
+        ? await buildPromemoriaData(
+            db,
+            p.id,
+            {
+              nre: accepted.nre,
+              authCode: accepted.authCode!,
+              sacDoctorName: accepted.doctorName ?? null,
+              compiledAt: message.compiledAt,
+              messages: accepted.messages ?? null,
+            },
+            message.lines,
+          )
         : null;
 
     await withActor(db, actor.userId, async (tx) => {

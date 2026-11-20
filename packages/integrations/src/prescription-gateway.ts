@@ -69,7 +69,19 @@ export interface AcceptedSend {
   doctorName?: string | null;
   pinNrbe?: string | null;
   reminderPdf?: Uint8Array | null;
+  /**
+   * Messaggi della ricevuta, con il loro codice. Il codice 0196 porta la frase da stampare sul
+   * promemoria quando la ricetta contiene farmaci in distribuzione per conto (specifiche di stampa
+   * del promemoria del Sistema TS, 28/02/2024, campo 18).
+   */
+  messages?: ReceiptMessage[] | null;
   raw: unknown;
+}
+
+/** Un messaggio della ricevuta di invio: codice e testo, come li restituisce il SAC. */
+export interface ReceiptMessage {
+  code: string;
+  text: string;
 }
 
 export type SendResult =

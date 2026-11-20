@@ -4,6 +4,7 @@ import type {
   GatewaySystem,
   PrescriptionGateway,
   PrescriptionMessage,
+  ReceiptMessage,
   SendResult,
   StatusResult,
 } from './prescription-gateway';
@@ -25,6 +26,11 @@ export interface SimulatorOptions {
   decideStatus?: (nre: string) => DispensingState | 'unreachable' | 'timeout';
   /** Ricetta SSN accettata ma senza codice di autenticazione: per provare che il promemoria non esce. */
   omitAuthCode?: (message: PrescriptionMessage) => boolean;
+  /**
+   * Messaggi della ricevuta di una ricetta SSN accettata, per esempio il codice 0196 con la frase
+   * sui farmaci in DPC. Per difetto nessuno: il simulatore non sa quali farmaci sono in DPC.
+   */
+  receiptMessages?: (message: PrescriptionMessage) => ReceiptMessage[];
   /**
    * Catalogo regionale che la Regione ha trasmesso al Sistema TS (D154): il SAR controlla la coppia
    * «codice del nomenclatore – codice del catalogo» di ogni prestazione e rifiuta quelle che non
@@ -129,12 +135,19 @@ export class SimulatedGateway implements PrescriptionGateway {
           const authCode = this.options.omitAuthCode?.(message)
             ? null
             : `SIMAUT${String(this.counter).padStart(24, '0')}`;
+          const messages = this.options.receiptMessages?.(message) ?? [];
           return {
             outcome,
             nre,
             authCode,
             doctorName: message.doctor.name,
-            raw: { simulatore: this.system, nre, codAutenticazione: authCode },
+            messages,
+            raw: {
+              simulatore: this.system,
+              nre,
+              codAutenticazione: authCode,
+              ...(messages.length ? { messaggi: messages } : {}),
+            },
           };
         }
         const pinNrbe = `S${String(this.counter % 10000).padStart(4, '0')}`;
