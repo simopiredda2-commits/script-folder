@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { logAccess, type AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
+import type { Tx } from '../db/tx';
 import { archive, archiveGrant, patient, studio } from '../db/schema';
 import { confirmedSecretaries } from '../admin/secretary-archives';
 import { HttpError } from '../http/errors';
@@ -15,7 +16,10 @@ export interface ArchiveContext {
   secretaries: string[];
 }
 
-export async function loadArchiveContext(db: Database, archiveId: string): Promise<ArchiveContext> {
+export async function loadArchiveContext(
+  db: Database | Tx,
+  archiveId: string,
+): Promise<ArchiveContext> {
   const [a] = await db
     .select({ archive, studio })
     .from(archive)

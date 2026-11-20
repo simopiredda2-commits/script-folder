@@ -1389,3 +1389,37 @@ Prove:
   - Restano fuori da `pnpm test`, perché vogliono la dimostrazione costruita.
 
 Non provati nella dimostrazione: AFT (servono due studi), esportazione completa (un archivio che il visore non apre), «Aggiorna adesso» delle banche dati (nel browser non c'è `sync/`), cambio di medico dentro lo studio. La dimostrazione dentro la cornice vera di claude.ai e sul tablet resta da provare a mano.
+
+**D225 · Risposte della fermata dopo l'unione della #21.** Via alla #22, unita con le verifiche su GitHub verdi. Dopo l'unione Simone ha scelto «Sia punto 1 che 2».
+
+1. **Transazioni del servizio.** «Registra» un nuovo assistito da AURA crea il paziente fuori dalla transazione della registrazione. Lo ha mostrato la dimostrazione, dove PGlite ha una sola sessione (D224). Si porta dentro, e un controllo nelle prove cerca nel servizio gli altri punti che usano il database fuori dalla transazione aperta.
+2. **AFT e cambio di medico nella dimostrazione.** Un secondo studio e un secondo medico titolare, per provare la condivisione nell'AFT (D161) e il cambio di medico dentro lo studio (D200).
+
+**D226 · Una transazione sola per «Registra», e il controllo delle transazioni nelle prove.** Primo punto della risposta di Simone alla fermata (D225).
+
+- **«Registra» un nuovo assistito da AURA** (`apps/api/src/http/aura-routes.ts`): il paziente e l'assistito «registrato» entrano insieme o per niente. Prima il paziente nasceva in una transazione sua: se l'ultimo passo non riusciva, il paziente restava e l'assistito risultava ancora «da registrare».
+  - La creazione del paziente lavora nella transazione di chi chiama (`createPatientIn`). «Nuovo paziente» apre la sua, come prima.
+  - I rifiuti escono con la loro riga del registro (`Refusal`) e si scrivono dopo il ritorno indietro (`settleRefusal`): permesso negato, archivio chiuso, codice fiscale già registrato. Dentro la transazione la riga tornerebbe indietro. Scritta con un'altra connessione, aspetterebbe la fine della transazione se questa ha già scritto nel registro: la catena delle righe tiene un blocco fino alla fine (migrazione 0002).
+  - Il comune di nascita si cerca prima della transazione. Se intanto AURA cambia il codice fiscale, la risposta è 409: «AURA ha cambiato il codice fiscale: ricarica la pagina».
+- **Controllo delle transazioni** in ogni prova del servizio (`apps/api/test/helpers/transaction-guard.ts`). Se il servizio chiama il database (`db`) mentre una transazione è aperta, la prova fallisce e dice il punto del codice e dove si è aperta la transazione.
+  - Le uscite volute vanno in `ALLOWED`, con il motivo: oggi nessuna.
+  - Con `CONTROLLO_TRANSAZIONI=annota` le annotazioni si scrivono in un file (`CONTROLLO_TRANSAZIONI_FILE`), senza far fallire.
+  - Sulle 807 prove del servizio di allora trovava solo «Registra».
+  - Una lettura dei tipi di tutto il servizio (151 file) ha trovato lo stesso punto: `createPatient(db…)` e la ricerca del comune dentro la transazione. Le altre segnalazioni erano l'orologio (`deps.now()`), che non tocca il database.
+- Nella dimostrazione resta la sessione sola di `database.ts` (D224), come protezione.
+
+Non provati: i percorsi che le prove non percorrono, guardati solo dalla lettura dei tipi, che non vede un servizio che tiene `db` dentro una funzione; due registrazioni dello stesso codice fiscale nello stesso istante (il 409 «appena stato registrato» non ha una prova, né prima né ora).
+
+**D227 · AFT e cambio di medico nella dimostrazione.** Secondo punto della risposta di Simone alla fermata (D225). Tutto in `apps/demo/src/worker/colleghi.ts` e in AURA simulata (`aura.ts`), con i servizi del programma: i dati dimostrativi di `seedDemo`, che usano anche `pnpm db:seed` e le prove, non cambiano.
+
+- **Una collega titolare nello studio dimostrativo**, la Dott.ssa Sara Galli, con il suo archivio. Con due titolari attivi lo studio è una medicina di gruppo, come vuole Strumenti › Studio.
+  - In AURA simulata un paziente della Dott.ssa Marchi sceglie la collega. È il più giovane senza ricette né certificati aperti, perché quelli fermano lo spostamento (D200).
+  - In «Oggi», «Cambi di medico nello studio», la Dott.ssa Marchi lo sposta, e la collega lo trova nel suo archivio.
+- **Un altro studio nella stessa AFT**, con il Dott. Luca Rinaldi e un suo paziente inventato. Il paziente ha dato il consenso alla condivisione, anche dei dati precedenti.
+  - Il Dott. Rinaldi condivide i suoi pazienti. La Dott.ssa Marchi, come per difetto, no: chi prova può accendere la condivisione e registrare il consenso di un suo paziente.
+  - In Strumenti › AFT la Dott.ssa Marchi consulta la scheda con il codice fiscale e il motivo. Il Dott. Rinaldi vede la consultazione nel suo registro.
+- Il riquadro della dimostrazione elenca i due utenti nuovi, `collega` e `medico.aft`, con la stessa password. Dice anche chi ha scelto la collega e quale codice fiscale consultare.
+- In AURA simulata ci sono solo i pazienti dello studio dimostrativo.
+- Prove: due nuove nella cornice, 17 in tutto, e quattro sabotaggi.
+
+Non provati nella dimostrazione: «Non spostare»; l'attività svolta registrata da un collega dell'AFT; la consultazione al contrario, del Dott. Rinaldi sui pazienti della Dott.ssa Marchi, che vuole prima la condivisione e un consenso.

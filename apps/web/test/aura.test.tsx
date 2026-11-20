@@ -269,8 +269,11 @@ describe('AURA nell’interfaccia (D197)', () => {
     expect(screen.getByRole('link', { name: 'Apri la cartella' }).getAttribute('href')).toBe(
       '/pazienti/p9',
     );
-    // L'elenco si ricarica dopo il clic.
-    expect(fetchMock.mock.calls.filter(([u]) => u === '/api/aura/nuovi').length).toBe(2);
+    // L'elenco si ricarica dopo il clic: la lettura nuova parte dopo che il messaggio si vede, e
+    // la prova l'aspetta (con un controllo subito, prima era rossa 1 volta su 25).
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([u]) => u === '/api/aura/nuovi').length).toBe(2),
+    );
     expect(screen.getByRole('button', { name: 'Non registrare PAZIENTE INVENTATO' })).toBeTruthy();
   });
 
@@ -367,8 +370,11 @@ describe('AURA nell’interfaccia (D197)', () => {
       medico: 'u2',
       sceltaDal: '2026-11-18',
     });
-    // L'elenco si ricarica dopo il clic.
-    expect(fetchMock.mock.calls.filter(([u]) => u === '/api/aura/cambi-medico').length).toBe(2);
+    // L'elenco si ricarica dopo il clic: la lettura nuova parte dopo che il messaggio si vede, e
+    // la prova l'aspetta (con un controllo subito, prima era rossa 2 volte su 25).
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.filter(([u]) => u === '/api/aura/cambi-medico').length).toBe(2),
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Non spostare PAZIENTE INVENTATO' }));
     expect(
       await screen.findByText(

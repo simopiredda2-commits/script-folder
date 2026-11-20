@@ -16,6 +16,8 @@ export interface DemoUser {
   username: string;
   name: string;
   roles: string[];
+  /** Dove lavora, per chi non è dello studio dimostrativo o è un collega (D227). */
+  note?: string;
 }
 
 /** Che cosa ha mandato AURA simulata all'avvio (D223): i nomi dei pazienti inventati. */
@@ -25,6 +27,18 @@ export interface AuraHints {
   deceased: string | null;
   revoked: string | null;
   newPatient: string;
+  /** Il paziente che ha scelto la collega dello studio: il cambio di medico in «Oggi» (D227). */
+  doctorChange: string | null;
+  colleague: string;
+}
+
+/** L'AFT della dimostrazione (D227): il medico dell'altro studio e il suo paziente con il consenso. */
+export interface AftHints {
+  name: string;
+  colleague: string;
+  studio: string;
+  patient: string;
+  fiscalCode: string;
 }
 
 export type ToWorker =
@@ -34,7 +48,14 @@ export type ToWorker =
 
 export type FromWorker =
   | { type: 'progress'; message: string }
-  | { type: 'ready'; users: DemoUser[]; aura: AuraHints; password: string; ms: number }
+  | {
+      type: 'ready';
+      users: DemoUser[];
+      aura: AuraHints;
+      aft: AftHints;
+      password: string;
+      ms: number;
+    }
   | { type: 'failed'; message: string }
   | { type: 'response'; id: number; response: WireResponse }
   | { type: 'request-failed'; id: number; message: string }

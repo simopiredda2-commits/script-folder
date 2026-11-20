@@ -14,9 +14,10 @@ import * as schema from '../../../api/src/db/schema';
 import { base32Decode } from '../../../api/src/security/base32';
 import { totp, TOTP_STEP_SECONDS } from '../../../api/src/security/totp';
 import { createAuraDemo } from './aura';
+import { COLLEAGUE_USERS, prepareColleagues } from './colleghi';
 import { singleSession, type SingleSession } from './database';
 import { getRequestHandler, IncomingMessage, ServerResponse } from './shims/http';
-import type { AuraHints, DemoUser, WireRequest, WireResponse } from '../protocol';
+import type { AftHints, AuraHints, DemoUser, WireRequest, WireResponse } from '../protocol';
 
 /** Password di tutti gli utenti dimostrativi: la mostra la pagina, non è un segreto. */
 export const DEMO_PASSWORD = 'dimostrazione';
@@ -52,7 +53,7 @@ async function fetchBase64(base: string, name: string, gunzip: boolean): Promise
 export async function start(
   base: string,
   progress: (message: string) => void,
-): Promise<{ users: DemoUser[]; aura: AuraHints }> {
+): Promise<{ users: DemoUser[]; aura: AuraHints; aft: AftHints }> {
   progress(
     'Scarico il database e il programma (circa 20 MB, solo la prima volta che il browser li vede)…',
   );
@@ -81,12 +82,16 @@ export async function start(
   progress('Creo lo studio dimostrativo e i pazienti inventati…');
   const encryptionKey = randomBytes(32);
   await seedDemo(db, { encryptionKey, passwordFor: () => DEMO_PASSWORD });
+  // Una collega nello studio e un altro studio dell'AFT (D227), prima di AURA: la collega serve
+  // al cambio di medico che AURA manda.
+  progress('Preparo la collega dello studio e l’AFT…');
+  const colleagues = await prepareColleagues(db, DEMO_PASSWORD);
 
   // AURA simulata con i pazienti dimostrativi (D223): collegati e con le loro variazioni prima che
   // il servizio la ascolti; il nuovo assistito arriva dopo, come una notifica.
   progress('Collego i pazienti con AURA simulata…');
   const auraDemo = createAuraDemo();
-  const before = await auraDemo.beforeStart(db);
+  const before = await auraDemo.beforeStart(db, colleagues);
   progress('Avvio il servizio…');
   const app = buildApp({
     db,
@@ -96,12 +101,20 @@ export async function start(
   await app.ready();
   const after = await auraDemo.afterStart(db, () => session!.idle());
   const aura: AuraHints = { ...before, ...after };
-  const users = DEMO_USERS.map((u) => ({
-    username: u.username,
-    name: u.displayName,
-    roles: u.roles.map((r) => ROLE_LABELS[r]),
-  }));
-  return { users, aura };
+  const users: DemoUser[] = [
+    ...DEMO_USERS.map((u) => ({
+      username: u.username,
+      name: u.displayName,
+      roles: u.roles.map((r) => ROLE_LABELS[r]),
+    })),
+    ...COLLEAGUE_USERS.map((u) => ({
+      username: u.username,
+      name: u.displayName,
+      roles: u.roles.map((r) => ROLE_LABELS[r]),
+      note: u.note,
+    })),
+  ];
+  return { users, aura, aft: colleagues.aft };
 }
 
 function remember(setCookie: string) {

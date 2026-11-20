@@ -3,6 +3,7 @@
  * /api/… dell'interfaccia, che resta quella di sempre. Nessuna richiesta esce dal browser.
  */
 import type {
+  AftHints,
   AuraHints,
   DemoUser,
   FromWorker,
@@ -14,6 +15,7 @@ import type {
 export interface Ready {
   users: DemoUser[];
   aura: AuraHints;
+  aft: AftHints;
   password: string;
   ms: number;
 }
@@ -50,7 +52,7 @@ export function startService(
       if (m.type === 'progress') onProgress(m.message);
       else if (m.type === 'ready') {
         started = true;
-        resolve({ users: m.users, aura: m.aura, password: m.password, ms: m.ms });
+        resolve({ users: m.users, aura: m.aura, aft: m.aft, password: m.password, ms: m.ms });
       } else if (m.type === 'failed') reject(new Error(m.message));
       else if (m.type === 'response') {
         pending.get(m.id)?.resolve(m.response);

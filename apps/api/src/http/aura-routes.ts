@@ -11,7 +11,7 @@ import type { Database } from '../db/client';
 import { auraDoctorChange, auraNewPatient } from '../db/schema';
 import { withActor } from '../db/tx';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
-import { createPatient, updateAdmin } from '../patients/admin';
+import { createPatientIn, settleNewPatientError, updateAdmin } from '../patients/admin';
 import { studioDate } from '../prescriptions/rules-check';
 import type { ReferenceData } from '../reference/lookup';
 import { HttpError } from './errors';
@@ -122,6 +122,10 @@ export function registerAuraRoutes(
    * di «Nuovo paziente», poi si collega ad AURA, che porta esenzioni e scelte. Un assistito alla
    * volta, insieme alle notifiche: due clic non registrano due volte. Chi arriva mentre un altro
    * registra non aspetta il blocco (terrebbe occupata una connessione al database): lo si dice.
+   *
+   * Una transazione sola (D226): il paziente e l'assistito «registrato» entrano insieme o per niente.
+   * Il comune di nascita si legge prima, dalla banca dati; dentro, tutto passa da `tx`. I rifiuti
+   * entrano nel registro dopo il ritorno indietro.
    */
   app.post('/api/aura/nuovi/:id/registra', async (req, reply) => {
     const actor = req.actor!;
@@ -129,6 +133,8 @@ export function registerAuraRoutes(
     const first = await candidate(actor, id);
     await guardCandidate(actor, first, 'nuovo_paziente');
     const at = now();
+    const facts = fiscalCodeFacts(first.fiscalCode);
+    const place = facts ? await reference?.municipality(facts.placeCode, studioDate(at)) : null;
     let created: { id: string; avvisi: string[] };
     try {
       created = await withActor(db, actor.userId, async (tx) => {
@@ -146,9 +152,10 @@ export function registerAuraRoutes(
               : 'Non è più fra i nuovi assistiti: ricarica la pagina',
             c!.patientId ? { paziente: { id: c!.patientId } } : undefined,
           );
-        const facts = fiscalCodeFacts(c!.fiscalCode);
-        const place = facts ? await reference?.municipality(facts.placeCode, studioDate(at)) : null;
-        const p = await createPatient(db, actor, newPatientBody(c!, place?.name ?? null), at, {
+        // Il comune di nascita viene dal codice fiscale letto prima: se AURA l'ha cambiato, si ricarica.
+        if (c!.fiscalCode !== first.fiscalCode)
+          throw new HttpError(409, 'AURA ha cambiato il codice fiscale: ricarica la pagina');
+        const p = await createPatientIn(tx, actor, newPatientBody(c!, place?.name ?? null), at, {
           details: { fonte: 'AURA', nuovoAssistito: c!.id },
           choiceFromAura: true,
         });
@@ -158,7 +165,8 @@ export function registerAuraRoutes(
           .where(eq(auraNewPatient.id, id));
         return p;
       });
-    } catch (err) {
+    } catch (thrown) {
+      const err = await settleNewPatientError(db, thrown);
       // Il codice fiscale c'è già nello studio: l'assistito esce dall'elenco, e lo si dice.
       const details = err instanceof HttpError ? (err.details as { paziente?: unknown }) : null;
       if (err instanceof HttpError && err.statusCode === 409 && details && 'paziente' in details)

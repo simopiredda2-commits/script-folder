@@ -21,7 +21,7 @@ import {
 } from '@mmg/domain';
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { logAccess } from '../audit/access-log';
+import { logAccess, Refusal, settleRefusal, type AccessEntry } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import { assertNoIssues } from '../clinical/entries';
 import type { Database } from '../db/client';
@@ -206,7 +206,7 @@ export interface WritableArchive {
  * titolare e confermato (archive-owner.ts, che lo ricontrolla sotto blocco al salvataggio, D179).
  */
 export async function writableArchives(
-  db: Database,
+  db: Db,
   actor: Actor,
   now: Date,
 ): Promise<WritableArchive[]> {
@@ -269,18 +269,18 @@ async function studioDoctors(db: Db, studioId: string) {
 // --- Doppioni del codice fiscale --------------------------------------------------------------
 
 /**
- * Il codice fiscale è già di un altro paziente dello studio: 409, con il nome solo se chi agisce
- * può vedere quel paziente. Il tentativo resta nel registro di quel paziente.
+ * Il codice fiscale è già di un altro paziente dello studio: il rifiuto 409, con il nome solo se chi
+ * agisce può vedere quel paziente, e la riga del registro per quel paziente. null se è libero.
  */
-async function assertFiscalCodeFree(
-  db: Database,
+async function fiscalCodeTaken(
+  q: Db,
   actor: Actor,
   fiscalCode: string,
   now: Date,
   action: 'nuovo_paziente' | 'correzione_identita',
   exceptId?: string,
-): Promise<void> {
-  const [other] = await db
+): Promise<Refusal | null> {
+  const [other] = await q
     .select()
     .from(patient)
     .where(
@@ -290,10 +290,10 @@ async function assertFiscalCodeFree(
         exceptId ? ne(patient.id, exceptId) : undefined,
       ),
     );
-  if (!other) return;
-  const ctx = await loadArchiveContext(db, other.archiveId);
+  if (!other) return null;
+  const ctx = await loadArchiveContext(q, other.archiveId);
   const visible = can(actor, 'registry.read', { ...ctx, now }).allowed;
-  await logAccess(db, {
+  const entry: AccessEntry = {
     studioId: actor.studioId,
     userId: actor.userId,
     patientId: other.id,
@@ -304,25 +304,44 @@ async function assertFiscalCodeFree(
       motivo: 'codice fiscale già registrato per questo paziente',
       visibile: visible,
     },
-  });
+  };
   if (visible)
-    throw new HttpError(
-      409,
-      `Il codice fiscale è già registrato: ${other.lastName} ${other.firstName}, ${other.sex === 'F' ? 'nata' : 'nato'} il ${it(other.birthDate)}`,
-      {
-        paziente: {
-          id: other.id,
-          cognome: other.lastName,
-          nome: other.firstName,
-          nascita: other.birthDate,
+    return new Refusal(
+      new HttpError(
+        409,
+        `Il codice fiscale è già registrato: ${other.lastName} ${other.firstName}, ${other.sex === 'F' ? 'nata' : 'nato'} il ${it(other.birthDate)}`,
+        {
+          paziente: {
+            id: other.id,
+            cognome: other.lastName,
+            nome: other.firstName,
+            nascita: other.birthDate,
+          },
         },
-      },
+      ),
+      entry,
     );
-  throw new HttpError(
-    409,
-    'Il codice fiscale è già registrato nello studio, in un archivio che non puoi vedere: chiedi al medico titolare di quell’archivio',
-    { paziente: null },
+  return new Refusal(
+    new HttpError(
+      409,
+      'Il codice fiscale è già registrato nello studio, in un archivio che non puoi vedere: chiedi al medico titolare di quell’archivio',
+      { paziente: null },
+    ),
+    entry,
   );
+}
+
+/** Fuori da una transazione: il doppione è un 409, e il tentativo resta nel registro di quel paziente. */
+async function assertFiscalCodeFree(
+  db: Database,
+  actor: Actor,
+  fiscalCode: string,
+  now: Date,
+  action: 'nuovo_paziente' | 'correzione_identita',
+  exceptId?: string,
+): Promise<void> {
+  const refusal = await fiscalCodeTaken(db, actor, fiscalCode, now, action, exceptId);
+  if (refusal) throw await settleRefusal(db, refusal);
 }
 
 // --- Nuovo paziente ---------------------------------------------------------------------------
@@ -343,8 +362,15 @@ export const newPatientSchema = z
 
 const archiveOnly = z.object({ archivioId: z.uuid().optional() }).loose();
 
-/** L'archivio non accetta pazienti nuovi: il titolare è sospeso, non è più titolare o aspetta la conferma. */
-class ArchiveClosed extends Error {}
+interface NewPatientOptions {
+  /** Altro da scrivere nel registro (per esempio la fonte «AURA», D199). */
+  details?: Record<string, unknown>;
+  /**
+   * Paziente temporaneo arrivato da AURA (D199): la sua scelta, con la scadenza, la porta il
+   * collegamento con AURA subito dopo; qui non si chiede.
+   */
+  choiceFromAura?: boolean;
+}
 
 /**
  * Registra un paziente nuovo. Prima il permesso (registry.write sull'archivio, registrato anche se
@@ -355,21 +381,35 @@ export async function createPatient(
   actor: Actor,
   body: unknown,
   now: Date,
-  options: {
-    /** Altro da scrivere nel registro (per esempio la fonte «AURA», D199). */
-    details?: Record<string, unknown>;
-    /**
-     * Paziente temporaneo arrivato da AURA (D199): la sua scelta, con la scadenza, la porta il
-     * collegamento con AURA subito dopo; qui non si chiede.
-     */
-    choiceFromAura?: boolean;
-  } = {},
+  options: NewPatientOptions = {},
+): Promise<{ id: string; avvisi: string[] }> {
+  try {
+    return await withActor(db, actor.userId, (tx) =>
+      createPatientIn(tx, actor, body, now, options),
+    );
+  } catch (err) {
+    throw await settleNewPatientError(db, err);
+  }
+}
+
+/**
+ * Lo stesso dentro la transazione di chi chiama (D226), per esempio «Registra» un nuovo assistito
+ * da AURA: controlli e scritture passano da `tx`, e un errore riporta indietro tutto. I rifiuti non
+ * si scrivono qui: escono come `Refusal`, e chi ha aperto la transazione, dopo il ritorno indietro,
+ * li passa a `settleNewPatientError`.
+ */
+export async function createPatientIn(
+  tx: Tx,
+  actor: Actor,
+  body: unknown,
+  now: Date,
+  options: NewPatientOptions = {},
 ): Promise<{ id: string; avvisi: string[] }> {
   const { archivioId } = archiveOnly.parse(body ?? {});
-  const writable = await writableArchives(db, actor, now);
+  const writable = await writableArchives(tx, actor, now);
   const target = archivioId ?? proposedArchive(writable);
-  const denied = async (status: number, message: string, details: Record<string, unknown>) => {
-    await logAccess(db, {
+  const denied = (status: number, message: string, details: Record<string, unknown>) =>
+    new Refusal(new HttpError(status, message), {
       studioId: actor.studioId,
       userId: actor.userId,
       action: 'nuovo_paziente',
@@ -377,11 +417,9 @@ export async function createPatient(
       workstation: actor.workstation,
       details: { permesso: 'registry.write', ...details },
     });
-    return new HttpError(status, message);
-  };
   if (!target) {
     if (writable.length === 0)
-      throw await denied(
+      throw denied(
         403,
         'Non puoi registrare pazienti: serve il permesso di modificare l’anagrafica di un archivio',
         { motivo: 'nessun archivio con il permesso' },
@@ -390,13 +428,13 @@ export async function createPatient(
   }
   let decision: Decision;
   try {
-    decision = can(actor, 'registry.write', { ...(await loadArchiveContext(db, target)), now });
+    decision = can(actor, 'registry.write', { ...(await loadArchiveContext(tx, target)), now });
   } catch (err) {
     if (!(err instanceof HttpError && err.statusCode === 404)) throw err;
     decision = { allowed: false, reason: 'Archivio non trovato' };
   }
   if (!decision.allowed)
-    throw await denied(403, decision.reason, { archivio: target, motivo: decision.reason });
+    throw denied(403, decision.reason, { archivio: target, motivo: decision.reason });
 
   const input = newPatientSchema.parse(body);
   const today = studioDate(now);
@@ -412,67 +450,71 @@ export async function createPatient(
       ? ['La scelta con la scadenza si registra qui solo per il paziente temporaneo']
       : []),
   ]);
-  await assertFiscalCodeFree(db, actor, input.identita.codiceFiscale, now, 'nuovo_paziente');
-  let id: string;
-  try {
-    id = await withActor(db, actor.userId, async (tx) => {
-      // Il titolare dell'archivio si ricontrolla sotto il blocco della riga dell'archivio: sospeso
-      // (anche un istante prima), il paziente non entra (gara inversa della sospensione).
-      const closed = await archiveClosedToNewPatients(tx, target);
-      if (closed) throw new ArchiveClosed(closed);
-      const [row] = await tx
-        .insert(patient)
-        .values({
-          studioId: actor.studioId,
-          archiveId: target,
-          ...(identityColumns(input.identita) as Pick<
-            PatientInsert,
-            'lastName' | 'firstName' | 'sex' | 'birthDate' | 'fiscalCode'
-          >),
-          ...adminColumns(dati),
-        })
-        .returning({ id: patient.id });
-      // Paziente temporaneo: la scelta del titolare dell'archivio, a mano, fino alla scadenza.
-      const choice = input.sceltaTemporanea;
-      if (choice) {
-        const [owner] = await tx
-          .select({ ownerUserId: archive.ownerUserId })
-          .from(archive)
-          .where(eq(archive.id, target));
-        await tx.insert(patientChoice).values({
-          patientId: row!.id,
-          doctorUserId: owner!.ownerUserId,
-          chosenOn: choice.dal,
-          expiresOn: choice.scadenza,
-          source: 'manual',
-        });
-      }
-      await logAccess(tx, {
-        studioId: actor.studioId,
-        userId: actor.userId,
-        patientId: row!.id,
-        action: 'nuovo_paziente',
-        outcome: 'consentito',
-        workstation: actor.workstation,
-        details: {
-          permesso: 'registry.write',
-          motivo: decision.reason,
-          archivio: target,
-          ...(choice ? { sceltaTemporanea: { dal: choice.dal, scadenza: choice.scadenza } } : {}),
-          ...options.details,
-        },
-      });
-      return row!.id;
+  const taken = await fiscalCodeTaken(
+    tx,
+    actor,
+    input.identita.codiceFiscale,
+    now,
+    'nuovo_paziente',
+  );
+  if (taken) throw taken;
+  // Il titolare dell'archivio si ricontrolla sotto il blocco della riga dell'archivio: sospeso
+  // (anche un istante prima), il paziente non entra (gara inversa della sospensione).
+  const closed = await archiveClosedToNewPatients(tx, target);
+  if (closed) throw denied(409, closed, { archivio: target, motivo: closed });
+  const [row] = await tx
+    .insert(patient)
+    .values({
+      studioId: actor.studioId,
+      archiveId: target,
+      ...(identityColumns(input.identita) as Pick<
+        PatientInsert,
+        'lastName' | 'firstName' | 'sex' | 'birthDate' | 'fiscalCode'
+      >),
+      ...adminColumns(dati),
+    })
+    .returning({ id: patient.id });
+  // Paziente temporaneo: la scelta del titolare dell'archivio, a mano, fino alla scadenza.
+  const choice = input.sceltaTemporanea;
+  if (choice) {
+    const [owner] = await tx
+      .select({ ownerUserId: archive.ownerUserId })
+      .from(archive)
+      .where(eq(archive.id, target));
+    await tx.insert(patientChoice).values({
+      patientId: row!.id,
+      doctorUserId: owner!.ownerUserId,
+      chosenOn: choice.dal,
+      expiresOn: choice.scadenza,
+      source: 'manual',
     });
-  } catch (err) {
-    if (err instanceof ArchiveClosed)
-      throw await denied(409, err.message, { archivio: target, motivo: err.message });
-    // Due registrazioni dello stesso codice fiscale nello stesso momento: vince la prima.
-    if (isUniqueViolation(err))
-      throw new HttpError(409, 'Il codice fiscale è appena stato registrato per un altro paziente');
-    throw err;
   }
-  return { id, avvisi: fiscalCodeCoherence(input.identita) };
+  await logAccess(tx, {
+    studioId: actor.studioId,
+    userId: actor.userId,
+    patientId: row!.id,
+    action: 'nuovo_paziente',
+    outcome: 'consentito',
+    workstation: actor.workstation,
+    details: {
+      permesso: 'registry.write',
+      motivo: decision.reason,
+      archivio: target,
+      ...(choice ? { sceltaTemporanea: { dal: choice.dal, scadenza: choice.scadenza } } : {}),
+      ...options.details,
+    },
+  });
+  return { id: row!.id, avvisi: fiscalCodeCoherence(input.identita) };
+}
+
+/**
+ * Dopo il ritorno indietro della transazione di un paziente nuovo: il rifiuto nel registro, con il
+ * suo errore; due registrazioni dello stesso codice fiscale nello stesso momento, vince la prima.
+ */
+export async function settleNewPatientError(db: Database, err: unknown): Promise<unknown> {
+  if (isUniqueViolation(err))
+    return new HttpError(409, 'Il codice fiscale è appena stato registrato per un altro paziente');
+  return settleRefusal(db, err);
 }
 
 // --- Lettura ----------------------------------------------------------------------------------
