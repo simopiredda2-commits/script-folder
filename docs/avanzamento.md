@@ -56,7 +56,14 @@ _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 _C. Decisioni o materiali di Simone_
 
 1. **PPIP**: costruite e unite (#19, D212, D213). Sono verifiche per la fine, in B2: il controllo delle 17 voci trascritte, senza il quale il catalogo non si usa, e come la Dr.ssa Rocca manda oggi la distinta. Risposta del 20/11/2026.
-2. **Allegati 2 e 3 del DPCM LEA** (presidi) nella versione in vigore, dalla pagina LEA del Ministero: da qui risponde un controllo anti-robot («Gcore», 20/11/2026). Simone li manda (D212); con quelli, le modifiche del 2026 ai LEA (D124).
+2. **Allegati dei LEA per i presidi**, dalla pagina LEA del Ministero, che da qui risponde con un controllo anti-robot («Gcore», 20/11/2026). Le modifiche del 2026 sono verificate sulla Gazzetta (D216); servono da Simone:
+   - l'allegato 2 «Ausili monouso» aggiornato, o l'allegato M del DM 3/8/2026;
+   - l'allegato 11 aggiornato, o l'allegato V del DM;
+   - l'allegato 1 del DM, che cambia gli articoli 11 e 14 (e 17, 18, 27, 33, 35, 38);
+   - per controllare gli allegati 7 e 8 già trascritti: gli allegati R e D del DM e l'allegato D del DPCM 7/8/2026.
+
+   L'allegato 3 non serve: i decreti del 2026 non lo toccano, si prende dalla Gazzetta del 2017.
+
 3. **Ready!** e la versione «Full» (D78), poi l'Agenda.
 4. **Un file d'esempio dell'esportazione del programma di oggi**, senza dati veri, per l'importazione.
 5. **Banca dati farmaci con licenza** (per esempio Farmadati): note AIFA per AIC e i fatti oggi non noti (R3, R4, R8, R11).
@@ -868,6 +875,17 @@ Risposta di Simone alla fermata del 20/11/2026: «Ok adesso ma predisponiamo il 
 - WebKit e Firefox su questa macchina (li prova la CI).
 
 **Prossimo passo**: fatto: pull request #19 unita con il via di Simone. Poi si aspettano i file di Simone (allegati 2 e 3 dei LEA) e le risposte di Regione, ASL e CSI.
+
+### Dopo l'unione della #19 – Fonti dei LEA e promemoria (D216)
+
+Richiesta di Simone del 20/11/2026: «Dimmi tu cosa devo scaricare e chiudi, se puoi, altri punti che eventualmente puoi chiudere». Nello stesso branch, ripartito da `main`.
+
+**Fatto**
+
+- **Che cosa scaricare**: l'elenco è in «Che cosa resta aperto», C2, ed è stato mandato a Simone.
+- **Modifiche del 2026 ai LEA verificate sulla Gazzetta (D216)**, come chiedeva D124. GU n. 227 del 30/9/2026: DPCM 7/8/2026 e DM 3/8/2026, in vigore dal 30/10/2026. Il DM cambia gli articoli 11 e 14 e l'allegato 2 dei presidi; l'art. 13 e l'allegato 3 restano quelli del 2017. Gli allegati dei decreti sono solo sulla pagina del Ministero.
+
+**Prossimo passo**: allegato 3 dalla Gazzetta del 2017; promemoria secondo le specifiche di stampa del Sistema TS.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 

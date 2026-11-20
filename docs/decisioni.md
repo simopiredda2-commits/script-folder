@@ -400,7 +400,7 @@ Da completare:
 - i codici del nomenclatore (allegati 2 e 3), da importare come banca dati;
 - i percorsi dematerializzati (alimenti senza glutine, dispositivi per diabetici con il piano di automonitoraggio glicemico): non ho trovato specifiche pubbliche.
 
-**D124 · Modifiche del 2026 ai LEA da verificare.** La ricerca ha riportato una nota del Ministero della salute: il DPCM 12/1/2017 sarebbe stato integrato e modificato dal DM 3 agosto 2026 e dal DPCM 7 agosto 2026. La pagina del Ministero non si legge in modo automatico (controllo anti-robot), quindi non l'ho verificato. Gli articoli usati (10–14) sono quelli del testo del 2017: prima dell'uso vero vanno confrontati con il testo vigente.
+**D124 · Modifiche del 2026 ai LEA da verificare.** La ricerca ha riportato una nota del Ministero della salute: il DPCM 12/1/2017 sarebbe stato integrato e modificato dal DM 3 agosto 2026 e dal DPCM 7 agosto 2026. La pagina del Ministero non si legge in modo automatico (controllo anti-robot), quindi non l'ho verificato. Gli articoli usati (10–14) sono quelli del testo del 2017: prima dell'uso vero vanno confrontati con il testo vigente. Verificato il 20/11/2026 sulla Gazzetta Ufficiale: D216.
 
 ## Risposte della fermata finale del secondo giro (18/11/2026)
 
@@ -1226,3 +1226,18 @@ Prove (`packages/brand/test/logo-scelto.test.ts`):
 Sei sabotaggi. Guardato a vista nei due temi a 16, 32 e 64 px. Non provato: l'icona su un tablet vero, e le favicon in Safari.
 
 **D215 · Risposte della fermata dopo l'unione della #18.** Via alla #19, unita. Il controllo delle 17 voci trascritte delle PPIP e il modo in cui la Dr.ssa Rocca manda oggi la distinta si fanno alla fine, con le altre verifiche (`docs/avanzamento.md`, «Che cosa resta aperto», B2). Fino al controllo, il catalogo vero delle PPIP resta spento (A8). Il resto aspetta i file di Simone (allegati 2 e 3 dei LEA) e le risposte di Regione, ASL e CSI.
+
+**D216 · Modifiche del 2026 ai LEA, verificate sulla Gazzetta (D124).** I due decreti sono nella GU n. 227 del 30/9/2026, serie generale, che si scarica da gazzettaufficiale.it: il DPCM 7 agosto 2026 alle pagine 20–22, il DM 3 agosto 2026 alle pagine 43–47. Entrambi entrano in vigore il trentesimo giorno dopo la pubblicazione, cioè il 30/10/2026. La Gazzetta pubblica gli articoli; gli allegati sono sulla pagina LEA del Ministero (avvertenza in fondo a ciascun decreto), che da qui risponde con un controllo anti-robot.
+
+Che cosa cambiano, secondo gli articoli dei decreti:
+
+- **DPCM 7/8/2026**: allegato 1 (screening), allegati 4 e 4D (nomenclatore e note), allegato 5 (protesica, elenchi 1 e 2B), allegato 8 (malattie croniche: condizioni nuove, tabella di corrispondenza, prestazioni; allegato D, fogli D–D4) e allegato 10B (gravidanza).
+- **DM 3/8/2026**: gli articoli 11, 14, 17, 18, 27, 33, 35 e 38 del DPCM (con il suo allegato 1); l'allegato 2 «Ausili monouso» (allegato M, fogli M1–M4); l'allegato 11 sui dispositivi medici monouso e l'allegato 12 sulla protesica (allegato V); gli allegati 1, 4 e 4D, 5, 7 (malattie rare, allegato R, fogli R1–R6), 8 (allegato D, fogli D1–D4) e 10B; sostituisce gli allegati 6A e 9.
+
+Che cosa vuol dire per il programma:
+
+- **Presidi** (D121–D123): l'art. 11 (dispositivi medici monouso), l'allegato 2 e l'art. 14 (prodotti dietetici) cambiano; l'art. 13 (presidi per diabetici e malattie rare) e l'allegato 3 no. Le categorie restano: citano articoli e allegati, non il loro testo. Quando Simone manda l'allegato 2 aggiornato (o l'allegato M), l'allegato 11 e l'allegato 1 del DM, si trascrivono come gli allegati 7 e 8. L'allegato 3 si trascrive dalla Gazzetta del 2017 (D217).
+- **Esenzioni**: le trascrizioni degli allegati 7 e 8 vengono dai PDF della pagina del Ministero (versione del 29/9/2026) e valgono dal 30/10/2026. I fogli R e D dei decreti servono a controllare che quei PDF abbiano già le modifiche.
+- **Nomenclatore**: nelle ricette vale il catalogo regionale, che la Regione aggiorna con le sue determinazioni (dal 30/10/2026 la D.D. 710/2026, D159). Qui non cambia niente.
+
+Non verificato: il testo degli allegati dei due decreti.
