@@ -244,6 +244,25 @@ export const refAdditionalService = pgTable(
   (t) => [index().on(t.datasetId, t.code)],
 );
 
+/**
+ * Nomenclatore dei presidi del DPCM LEA (D218): i presidi con il loro codice e le malattie rare che
+ * danno diritto a quelli dell'allegato 3. Un codice può valere per più presidi.
+ */
+export const refSupply = pgTable(
+  'ref_supply',
+  {
+    id: rowId(),
+    datasetId: datasetId(),
+    /** «presidio» o «malattia_rara». */
+    entryType: text().notNull(),
+    code: text().notNull(),
+    description: text().notNull(),
+    group: text().notNull(),
+    annex: text().notNull(),
+  },
+  (t) => [index().on(t.datasetId, t.entryType)],
+);
+
 export const refExemptionService = pgTable(
   'ref_exemption_service',
   {
@@ -289,6 +308,7 @@ export const REFERENCE_TABLES = {
   esenzioni_prestazioni: refExemptionService,
   diagnosi: refDiagnosis,
   prestazioni_aggiuntive: refAdditionalService,
+  presidi: refSupply,
 } as const;
 
 /**

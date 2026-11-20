@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { SimulatedGateway, SimulatedReminderSender, type DeliveryResult } from '@mmg/integrations';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -9,10 +9,20 @@ import {
   patient,
   prescription,
   prescriptionDocument,
+  refDrugTransparency,
+  referenceDataset,
   reminderDelivery,
+  therapy,
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
-import { OBSCURED_TEXT, RELEASE_TEXT, type PromemoriaData } from '../src/reminders/promemoria';
+import { nreParts } from '../src/reminders/pdf';
+import {
+  NO_NOTE,
+  OBSCURED_TEXT_2024,
+  RELEASE_TEXT_2024,
+  SSN_RECIPE_TYPE,
+  type PromemoriaDataV2,
+} from '../src/reminders/promemoria';
 import { pdfFontNames } from './helpers/pdf-fonts';
 import { pdfText } from './helpers/pdf-text';
 import { createScenario, login, type Scenario } from './helpers/scenario';
@@ -26,8 +36,12 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
   let s: Scenario;
   const c: Record<string, string> = {};
   let omitAuthCode = false;
+  let dpcPhrase: string | null = null;
   let deliveryOutcome: DeliveryResult['outcome'] = 'sent';
-  const sar = new SimulatedGateway('sar', { omitAuthCode: () => omitAuthCode });
+  const sar = new SimulatedGateway('sar', {
+    omitAuthCode: () => omitAuthCode,
+    receiptMessages: () => (dpcPhrase ? [{ code: '0196', text: dpcPhrase }] : []),
+  });
   const ts = new SimulatedGateway('sistema_ts');
   const sender = new SimulatedReminderSender({ decide: () => deliveryOutcome });
   let pt: typeof patient.$inferSelect;
@@ -81,21 +95,32 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     const [doc] = await docs(id);
     expect(doc!.kind).toBe('promemoria_dati');
     expect(doc!.sha256).toBe(createHash('sha256').update(doc!.content).digest('hex'));
-    const data = JSON.parse(doc!.content) as PromemoriaData;
+    // Versione 2: le specifiche di stampa del Sistema TS del 28/02/2024 (D217).
+    const data = JSON.parse(doc!.content) as PromemoriaDataV2;
     expect(data).toMatchObject({
-      intestazione: 'SERVIZIO SANITARIO NAZIONALE – REGIONE PIEMONTE',
+      versione: 2,
+      regione: 'REGIONE PIEMONTE',
       nre: p.nre,
       codiceAutenticazione: p.authCode,
       esenzione: 'NON ESENTE',
       numeroConfezioniPrestazioni: 3,
-      dicitura: RELEASE_TEXT,
+      tipoRicetta: SSN_RECIPE_TYPE,
+      priorita: null,
+      validitaGiorni: null,
+      dicitura: RELEASE_TEXT_2024,
     });
     expect(data.assistito).toMatchObject({
       codiceFiscale: pt.fiscalCode,
       cognomeNome: `${pt.lastName} ${pt.firstName}`,
+      cap: pt.residencePostalCode,
+      citta: pt.residenceTown,
+      provincia: pt.residenceProvince,
       oscurato: false,
     });
-    expect(data.righe[0]).toMatchObject({ descrizione: 'Farmaco di prova 5 mg', notaAifa: '13' });
+    expect(data.righe).toEqual([
+      { prescrizione: ['Farmaco di prova 5 mg'], dettagli: null, quantita: 2, nota: '13' },
+      { prescrizione: ['Secondo farmaco di prova'], dettagli: null, quantita: 1, nota: NO_NOTE },
+    ]);
     expect(data.medico.codiceRegionale).toBe('MMG-PROVA-1');
     expect(data.medico.codiceFiscale).toMatch(/^[A-Z]{6}\d{2}[A-Z]\d{2}X\d{3}[A-Z]$/);
   });
@@ -108,17 +133,24 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     expect(res.headers['content-type']).toBe('application/pdf');
     expect(res.rawPayload.subarray(0, 5).toString()).toBe('%PDF-');
     const text = norm(await pdfText(res.rawPayload));
+    const [first, second] = nreParts(p.nre!);
     for (const expected of [
-      'SERVIZIO SANITARIO NAZIONALE – REGIONE PIEMONTE',
-      `NRE ${p.nre}`,
-      `CF ${pt.fiscalCode}`,
-      `${pt.lastName} ${pt.firstName}`,
-      'P00',
-      'Farmaco di prova 5 mg',
-      'Codice di autenticazione',
-      p.authCode!,
-      'MMG-PROVA-1 - DOTT.SSA ELENA MARCHI',
-      RELEASE_TEXT,
+      'SERVIZIO SANITARIO NAZIONALE',
+      'RICETTA ELETTRONICA – PROMEMORIA PER L’ASSISTITO',
+      'REGIONE PIEMONTE',
+      // Campo 2: due codici, tra asterischi; campo 9: il codice fiscale.
+      `*${first}*`,
+      `*${second}*`,
+      `*${pt.fiscalCode}*`,
+      `COGNOME E NOME /INIZIALI DELL’ASSISTITO: ${pt.lastName} ${pt.firstName}`,
+      'ESENZIONE: P00',
+      'PRESCRIZIONE QTA NOTA',
+      'Farmaco di prova 5 mg 2 13',
+      `Secondo farmaco di prova 1 ${NO_NOTE}`,
+      `TIPO RICETTA: ${SSN_RECIPE_TYPE}`,
+      `CODICE AUTENTICAZIONE: ${p.authCode!}`,
+      'COGNOME E NOME DEL MEDICO: MMG-PROVA-1 - DOTT.SSA ELENA MARCHI',
+      RELEASE_TEXT_2024,
     ]) {
       expect(text, expected).toContain(expected);
     }
@@ -143,8 +175,10 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     const res = await req('GET', `/api/ricette/${id}/promemoria?formato=nre`);
     expect(res.statusCode, res.body).toBe(200);
     const text = norm(await pdfText(res.rawPayload));
-    expect(text).toContain(`NRE ${p.nre}`);
-    expect(text).toContain(`CF ${pt.fiscalCode}`);
+    const [first, second] = nreParts(p.nre!);
+    expect(text).toContain(`*${first}*`);
+    expect(text).toContain(`*${second}*`);
+    expect(text).toContain(`*${pt.fiscalCode}*`);
     expect(text).toContain(p.authCode!);
     expect(text).not.toContain('Farmaco di prova');
   });
@@ -172,8 +206,9 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     const text = norm(
       await pdfText((await req('GET', `/api/ricette/${id}/promemoria`)).rawPayload),
     );
-    expect(text).toContain(OBSCURED_TEXT);
+    expect(text).toContain(OBSCURED_TEXT_2024);
     expect(text).not.toContain(`${pt.lastName} ${pt.firstName}`);
+    if (pt.residenceTown) expect(text).not.toContain(pt.residenceTown);
     expect(text).toContain(pt.fiscalCode);
   });
 
@@ -203,20 +238,122 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     }
   });
 
-  it('ricetta specialistica: tipo di accesso, priorità e quesito sul promemoria', async () => {
+  it('ricetta specialistica: codici, validità, tipo di accesso, priorità e quesito (D217)', async () => {
     const id = await sent({
       kind: 'specialist_ssn',
       accessType: 'subsequent',
       priority: 'D',
       diagnosticQuestion: 'Quesito di prova',
-      lines: [{ serviceCode: '89.7', serviceDescription: 'Visita di prova', quantity: 1 }],
+      lines: [
+        {
+          serviceCode: '89.7.1',
+          serviceNationalCode: '89.7',
+          serviceDescription: 'Visita di prova',
+          quantity: 1,
+        },
+      ],
     });
     const text = norm(
       await pdfText((await req('GET', `/api/ricette/${id}/promemoria`)).rawPayload),
     );
-    expect(text).toContain('Visita di prova (89.7)');
-    expect(text).toContain('Altra tipologia di accesso');
-    expect(text).toContain('Quesito di prova');
+    // 17A: codice nomenclatore (codice catalogo) – descrizione; 18A: tipologia di accesso.
+    expect(text).toContain('89.7 (89.7.1) – Visita di prova ALTRA TIPOLOGIA DI ACCESSO 1 ---');
+    expect(text).toContain('PRESCRIZIONE VALIDA 180 GIORNI AI FINI DELLA PRENOTAZIONE');
+    expect(text).toContain(
+      'PRIORITA’PRESCRIZIONE(U,B,D,P): Entro 30 (visite), entro 60 gg (visite strumentali)',
+    );
+    expect(text).toContain('QUESITO DIAGNOSTICO: Quesito di prova');
+  });
+
+  it('farmaco della lista di trasparenza: gruppo di equivalenza, AIC, non sostituibile, DPC', async () => {
+    const [dataset] = await t.db
+      .insert(referenceDataset)
+      .values({
+        kind: 'farmaci_trasparenza',
+        series: 'trasparenza-prova-promemoria',
+        title: 'Lista di trasparenza di prova',
+        mappingVersion: 'prova',
+        origin: 'sync',
+        sha256: randomBytes(32).toString('hex'),
+        bytes: 1,
+        validFrom: '2026-01-01',
+        validFromBasis: 'scaricamento',
+        rows: 1,
+        importedBy: 'prova',
+      })
+      .returning();
+    await t.db.insert(refDrugTransparency).values({
+      datasetId: dataset!.id,
+      aic: '099999019',
+      activeIngredient: 'Principio di prova',
+      referencePack: "28 UNITA' 5 MG - USO ORALE",
+      name: 'FARMACO EQUIVALENTE DI PROVA',
+      equivalenceGroup: 'ZZ1',
+    });
+    dpcPhrase = 'Frase di prova sui farmaci in distribuzione per conto';
+    try {
+      const id = await sent({
+        kind: 'pharma_ssn',
+        lines: [
+          {
+            drugAic: '099999019',
+            drugName: 'FARMACO EQUIVALENTE DI PROVA 5 MG',
+            quantity: 1,
+            notSubstitutable: true,
+            notSubstitutableReason: 'motivazione di prova',
+          },
+        ],
+      });
+      const [doc] = await docs(id);
+      const data = JSON.parse(doc!.content) as PromemoriaDataV2;
+      expect(data.righe).toEqual([
+        {
+          prescrizione: [
+            "ZZ1 - PRINCIPIO DI PROVA 28 UNITA' 5 MG - USO ORALE",
+            '099999019 - FARMACO EQUIVALENTE DI PROVA 5 MG',
+          ],
+          dettagli: 'NON SOSTITUIBILE - motivazione di prova',
+          quantita: 1,
+          nota: NO_NOTE,
+        },
+      ]);
+      expect(data.fraseDpc).toBe(dpcPhrase);
+      const text = norm(
+        await pdfText((await req('GET', `/api/ricette/${id}/promemoria`)).rawPayload),
+      );
+      expect(text).toContain("ZZ1 - PRINCIPIO DI PROVA 28 UNITA' 5 MG - USO ORALE");
+      expect(text).toContain('099999019 - FARMACO EQUIVALENTE DI PROVA 5 MG');
+      expect(text).toContain('NON SOSTITUIBILE - motivazione di prova');
+      expect(text).toContain(dpcPhrase);
+    } finally {
+      dpcPhrase = null;
+    }
+  });
+
+  it('terapia suggerita dallo specialista: campo 14 «SUGG», una volta per ricetta', async () => {
+    const [th] = await t.db
+      .select()
+      .from(therapy)
+      .where(and(eq(therapy.patientId, pt.id), eq(therapy.drugName, 'Farmaco di prova 5 mg')));
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx.update(therapy).set({ suggestedS: true }).where(eq(therapy.id, th!.id)),
+    );
+    try {
+      const id = await sent({
+        kind: 'pharma_ssn',
+        lines: [{ therapyId: th!.id, drugName: 'Farmaco di prova 5 mg', quantity: 1 }],
+      });
+      const [doc] = await docs(id);
+      expect((JSON.parse(doc!.content) as PromemoriaDataV2).tipologia).toBe('S');
+      const text = norm(
+        await pdfText((await req('GET', `/api/ricette/${id}/promemoria`)).rawPayload),
+      );
+      expect(text).toContain('TIPOLOGIA PRESCRIZIONE(S,H): SUGG');
+    } finally {
+      await withActor(t.db, s.users.titolare.id, (tx) =>
+        tx.update(therapy).set({ suggestedS: false }).where(eq(therapy.id, th!.id)),
+      );
+    }
   });
 
   it('ricetta bianca: si consegna solo il PDF del SAC, byte per byte; niente «solo NRE»', async () => {
@@ -261,7 +398,8 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     const mail = sender.emails[before]!;
     expect(mail.to).toBe(pt.email);
     expect(mail.attachments[0]!.contentType).toBe('application/pdf');
-    expect(await pdfText(mail.attachments[0]!.content)).toContain(p.nre!);
+    const attached = await pdfText(mail.attachments[0]!.content);
+    for (const part of nreParts(p.nre!)) expect(attached).toContain(`*${part}*`);
     // Nel testo della email nessun dato clinico: è tutto nell'allegato.
     expect(mail.text).not.toContain('Farmaco');
 

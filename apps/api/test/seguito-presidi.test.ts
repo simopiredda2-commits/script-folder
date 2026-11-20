@@ -1,8 +1,9 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { supplyEndOn } from '@mmg/domain';
 import { sql } from 'drizzle-orm';
 import { unzipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { referenceDataset, refSupply } from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 import { studioDayFrom } from './helpers/dates';
@@ -410,5 +411,82 @@ describe('presidi e assistenza integrativa (tappa 10)', () => {
 
   it('i presidi non si cancellano', async () => {
     await expect(t.db.execute(sql`delete from supply_prescription`)).rejects.toThrow();
+  });
+
+  it('nomenclatore dell’allegato 3 (D218): vuoto senza banca dati, poi presidi e malattie rare', async () => {
+    const catalog = async () => {
+      const res = await req('GET', '/api/presidi/nomenclatore', secretary);
+      expect(res.statusCode, res.body).toBe(200);
+      return res.json<{
+        presidi: { codice: string; descrizione: string; gruppo: string; allegato: string }[];
+        malattieRare: { codice: string; descrizione: string }[];
+      }>();
+    };
+    expect(await catalog()).toEqual({ presidi: [], malattieRare: [] });
+    // Due serie inventate: la seconda, più recente, riscrive una voce e ne aggiunge una; una
+    // terza comincia domani e oggi non vale.
+    const series = async (name: string, validFrom: string, rows: string[][]) => {
+      const [d] = await t.db
+        .insert(referenceDataset)
+        .values({
+          kind: 'presidi',
+          series: name,
+          title: `Nomenclatore di prova ${name}`,
+          mappingVersion: 'prova',
+          origin: 'trascrizione',
+          sha256: randomBytes(32).toString('hex'),
+          bytes: 1,
+          validFrom,
+          validFromBasis: 'atto',
+          act: `Atto di prova ${name}`,
+          rows: rows.length,
+          importedBy: 'prova',
+        })
+        .returning();
+      await t.db.insert(refSupply).values(
+        rows.map(([entryType, code, description, group]) => ({
+          datasetId: d!.id,
+          entryType: entryType!,
+          code: code!,
+          description: description!,
+          group: group!,
+          annex: '3',
+        })),
+      );
+    };
+    await series('presidi-prova-1', day(-400), [
+      ['presidio', 'V0104', 'Lancette pungidito di prova', 'Lancette pungidito'],
+      ['presidio', 'A01010102', 'Ago per penna di prova', 'Aghi'],
+      ['malattia_rara', 'RCG061', 'MALATTIA RARA DI PROVA', 'Malattie rare'],
+    ]);
+    await series('presidi-prova-2', day(-10), [
+      ['presidio', 'V0104', 'Lancette pungidito di prova', 'Lancette pungidito'],
+      ['presidio', 'V9009', 'Penna pungidito di prova', 'Penna pungidito'],
+    ]);
+    await series('presidi-prova-3', day(1), [
+      ['presidio', 'Z0000', 'Presidio di domani', 'Futuro'],
+    ]);
+    const c = await catalog();
+    expect(c.presidi.map((p) => `${p.codice} ${p.descrizione}`).sort()).toEqual([
+      'A01010102 Ago per penna di prova',
+      'V0104 Lancette pungidito di prova',
+      'V9009 Penna pungidito di prova',
+    ]);
+    expect(c.presidi.find((p) => p.codice === 'V0104')).toMatchObject({
+      allegato: '3',
+      atto: 'Atto di prova presidi-prova-2',
+    });
+    expect(c.malattieRare).toEqual([
+      expect.objectContaining({ codice: 'RCG061', descrizione: 'MALATTIA RARA DI PROVA' }),
+    ]);
+    // Le categorie dicono quale allegato le descrive.
+    const cats = (await req('GET', '/api/presidi/categorie', secretary)).json<{
+      categorie: { chiave: string; allegato: string | null }[];
+    }>().categorie;
+    expect(cats.find((x) => x.chiave === 'diabetici')!.allegato).toBe('3');
+    expect(cats.find((x) => x.chiave === 'monouso')!.allegato).toBe('2');
+    expect(cats.find((x) => x.chiave === 'dietetici')!.allegato).toBeNull();
+    // Il nomenclatore importato non si modifica.
+    await expect(t.db.execute(sql`update ref_supply set code = 'X'`)).rejects.toThrow();
   });
 });

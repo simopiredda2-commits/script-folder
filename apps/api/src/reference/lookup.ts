@@ -26,6 +26,7 @@ import {
   refDrugShortage,
   refDrugTransparency,
   refAdditionalService,
+  refSupply,
   refExemption,
   refExemptionService,
   refMunicipality,
@@ -285,6 +286,20 @@ export interface AdditionalServiceItem {
   datasetId: string;
   series: string;
   /** L'atto da cui viene la voce, come lo dice la trascrizione. */
+  act: string | null;
+  validFrom: string;
+}
+
+/** Una voce del nomenclatore dei presidi del DPCM LEA (D218). */
+export interface SupplyCatalogItem {
+  /** Un presidio con il suo codice, o una malattia rara che dà diritto ai presidi dell'allegato. */
+  entryType: 'presidio' | 'malattia_rara';
+  code: string;
+  description: string;
+  group: string;
+  /** Allegato del DPCM: «3», poi «2». */
+  annex: string;
+  series: string;
   act: string | null;
   validFrom: string;
 }
@@ -1147,6 +1162,40 @@ export class ReferenceData {
       if (!prev || prev.validFrom < item.validFrom) best.set(r.code, item);
     }
     return [...best.values()].sort(compareAdditionalServices);
+  }
+
+  /**
+   * Il nomenclatore dei presidi in vigore alla data (D218): presidi e malattie rare dell'allegato 3,
+   * poi quelli degli altri allegati che verranno trascritti. Una voce è uguale in due serie se ha lo
+   * stesso tipo, codice e descrizione: vale la serie più recente. Ordine dell'allegato.
+   */
+  async supplyCatalog(date: string): Promise<SupplyCatalogItem[]> {
+    const sets = await this.inEffect('presidi', date);
+    if (!sets.length) return [];
+    const byId = new Map(sets.map((d) => [d.id, d]));
+    const rows = await this.db
+      .select()
+      .from(refSupply)
+      .where(inArray(refSupply.datasetId, [...byId.keys()]))
+      .orderBy(refSupply.id);
+    const best = new Map<string, SupplyCatalogItem>();
+    for (const r of rows) {
+      const d = byId.get(r.datasetId)!;
+      const item: SupplyCatalogItem = {
+        entryType: r.entryType === 'malattia_rara' ? 'malattia_rara' : 'presidio',
+        code: r.code,
+        description: r.description,
+        group: r.group,
+        annex: r.annex,
+        series: d.series,
+        act: d.act,
+        validFrom: d.validFrom,
+      };
+      const key = `${item.entryType}|${item.code}|${item.description}`;
+      const prev = best.get(key);
+      if (!prev || prev.validFrom < item.validFrom) best.set(key, item);
+    }
+    return [...best.values()];
   }
 
   async exemptionLookups(date: string): Promise<{

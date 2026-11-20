@@ -235,7 +235,7 @@ Branch `tappe-7-8` e `tappe-9-10`, con una pull request ciascuno. Restano dopo: 
 
 **D96 · Risposta senza codice di autenticazione = rifiuto.** Le specifiche del Sistema TS dicono che senza codice la ricetta non è valida; il documento piemontese lo tratta come esito negativo. La ricetta va in errore con il codice `SENZA_CODICE_AUTENTICAZIONE` e il promemoria non esce.
 
-**D97 · Che cosa non si è potuto verificare del promemoria.** Il documento «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non è sul portale: posizioni sulla pagina, suddivisione dell’NRE nei codici a barre e dicitura aggiornata restano «da completare». L’NRE in chiaro va in OCR-A (ECMA, tipo 1): oggi è in Courier, da completare con un carattere OCR-A di licenza compatibile. Le descrizioni delle righe (codice della prestazione tra parentesi, «NON SOSTITUIBILE») e il tipo di accesso sulla specialistica sono scelte nostre in attesa di quel documento.
+**D97 · Che cosa non si è potuto verificare del promemoria.** Il documento «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non è sul portale: posizioni sulla pagina, suddivisione dell’NRE nei codici a barre e dicitura aggiornata restano «da completare». L’NRE in chiaro va in OCR-A (ECMA, tipo 1): oggi è in Courier, da completare con un carattere OCR-A di licenza compatibile. Le descrizioni delle righe (codice della prestazione tra parentesi, «NON SOSTITUIBILE») e il tipo di accesso sulla specialistica sono scelte nostre in attesa di quel documento. Superata: D211 per l'OCR-A, D217 per le specifiche di stampa, trovate nella versione del 28/02/2024.
 
 **D98 · Email e SMS: il minimo, e solo a chi ha diritto.** L’email porta il promemoria allegato e un testo senza dati clinici; l’SMS porta solo il numero di ricetta (e il PIN per la bianca). Destinatari: il recapito del paziente in anagrafica o quello di un delegato con delega valida oggi (stesso criterio di R16). Ogni consegna, riuscita o no, resta in `reminder_delivery`. Fornitore vero da scegliere con le garanzie sul trattamento dei dati.
 
@@ -400,7 +400,7 @@ Da completare:
 - i codici del nomenclatore (allegati 2 e 3), da importare come banca dati;
 - i percorsi dematerializzati (alimenti senza glutine, dispositivi per diabetici con il piano di automonitoraggio glicemico): non ho trovato specifiche pubbliche.
 
-**D124 · Modifiche del 2026 ai LEA da verificare.** La ricerca ha riportato una nota del Ministero della salute: il DPCM 12/1/2017 sarebbe stato integrato e modificato dal DM 3 agosto 2026 e dal DPCM 7 agosto 2026. La pagina del Ministero non si legge in modo automatico (controllo anti-robot), quindi non l'ho verificato. Gli articoli usati (10–14) sono quelli del testo del 2017: prima dell'uso vero vanno confrontati con il testo vigente.
+**D124 · Modifiche del 2026 ai LEA da verificare.** La ricerca ha riportato una nota del Ministero della salute: il DPCM 12/1/2017 sarebbe stato integrato e modificato dal DM 3 agosto 2026 e dal DPCM 7 agosto 2026. La pagina del Ministero non si legge in modo automatico (controllo anti-robot), quindi non l'ho verificato. Gli articoli usati (10–14) sono quelli del testo del 2017: prima dell'uso vero vanno confrontati con il testo vigente. Verificato il 20/11/2026 sulla Gazzetta Ufficiale: D216.
 
 ## Risposte della fermata finale del secondo giro (18/11/2026)
 
@@ -1224,3 +1224,87 @@ Prove (`packages/brand/test/logo-scelto.test.ts`):
 - la favicon cambia nel tema scuro.
 
 Sei sabotaggi. Guardato a vista nei due temi a 16, 32 e 64 px. Non provato: l'icona su un tablet vero, e le favicon in Safari.
+
+**D215 · Risposte della fermata dopo l'unione della #18.** Via alla #19, unita. Il controllo delle 17 voci trascritte delle PPIP e il modo in cui la Dr.ssa Rocca manda oggi la distinta si fanno alla fine, con le altre verifiche (`docs/avanzamento.md`, «Che cosa resta aperto», B2). Fino al controllo, il catalogo vero delle PPIP resta spento (A8). Il resto aspetta i file di Simone (allegati 2 e 3 dei LEA) e le risposte di Regione, ASL e CSI.
+
+**D216 · Modifiche del 2026 ai LEA, verificate sulla Gazzetta (D124).** I due decreti sono nella GU n. 227 del 30/9/2026, serie generale, che si scarica da gazzettaufficiale.it: il DPCM 7 agosto 2026 alle pagine 20–22, il DM 3 agosto 2026 alle pagine 43–47. Entrambi entrano in vigore il trentesimo giorno dopo la pubblicazione, cioè il 30/10/2026. La Gazzetta pubblica gli articoli; gli allegati sono sulla pagina LEA del Ministero (avvertenza in fondo a ciascun decreto), che da qui risponde con un controllo anti-robot.
+
+Che cosa cambiano, secondo gli articoli dei decreti:
+
+- **DPCM 7/8/2026**: allegato 1 (screening), allegati 4 e 4D (nomenclatore e note), allegato 5 (protesica, elenchi 1 e 2B), allegato 8 (malattie croniche: condizioni nuove, tabella di corrispondenza, prestazioni; allegato D, fogli D–D4) e allegato 10B (gravidanza).
+- **DM 3/8/2026**: gli articoli 11, 14, 17, 18, 27, 33, 35 e 38 del DPCM (con il suo allegato 1); l'allegato 2 «Ausili monouso» (allegato M, fogli M1–M4); l'allegato 11 sui dispositivi medici monouso e l'allegato 12 sulla protesica (allegato V); gli allegati 1, 4 e 4D, 5, 7 (malattie rare, allegato R, fogli R1–R6), 8 (allegato D, fogli D1–D4) e 10B; sostituisce gli allegati 6A e 9.
+
+Che cosa vuol dire per il programma:
+
+- **Presidi** (D121–D123): l'art. 11 (dispositivi medici monouso), l'allegato 2 e l'art. 14 (prodotti dietetici) cambiano; l'art. 13 (presidi per diabetici e malattie rare) e l'allegato 3 no. Le categorie restano: citano articoli e allegati, non il loro testo. Quando Simone manda l'allegato 2 aggiornato (o l'allegato M), l'allegato 11 e l'allegato 1 del DM, si trascrivono come gli allegati 7 e 8. L'allegato 3 si trascrive dalla Gazzetta del 2017 (D217).
+- **Esenzioni**: le trascrizioni degli allegati 7 e 8 vengono dai PDF della pagina del Ministero (versione del 29/9/2026) e valgono dal 30/10/2026. I fogli R e D dei decreti servono a controllare che quei PDF abbiano già le modifiche.
+- **Nomenclatore**: nelle ricette vale il catalogo regionale, che la Regione aggiorna con le sue determinazioni (dal 30/10/2026 la D.D. 710/2026, D159). Qui non cambia niente.
+
+Non verificato: il testo degli allegati dei due decreti.
+
+**D217 · Promemoria secondo le specifiche di stampa del Sistema TS (28/02/2024).** Trovate sul portale del Sistema TS il 20/11/2026: «Specifiche tecniche per la stampa del promemoria della ricetta dematerializzata (D.M. 2 novembre 2011)», versione 28/02/2024, 22 pagine. È il documento che D97 non aveva trovato; la versione del 1/3/2016 è superata. Il modello vale in tutta Italia, sostituisce quello dell'allegato tecnico del DM e i modelli regionali.
+
+Che cosa cambia nel promemoria:
+
+- **Mezzo foglio A4.** La pagina resta A4 e il promemoria ne occupa la metà alta (148,5 mm). Stampato al 100%, i codici a barre restano delle misure giuste; una pagina di mezzo A4 molte stampanti la ingrandirebbero.
+- **Campi e diciture del facsimile nr. 0**, con i loro numeri:
+  - intestazione e riquadro della Regione (1), NRE (2), assistito (3–9), esenzione e altri dati della ricetta (10–16);
+  - area delle prescrizioni (17–20), quesito (21), totale, tipo ricetta, data e medico (22–27);
+  - dicitura «Rilasciato ai sensi dell'art.11, comma 16 del DL 31 mag 2010,n.78 e dell'art.1, comma 4 del DM 2 nov 2011», frase regionale (28).
+- **NRE in due codici a barre separati**, i primi 5 caratteri (Regione e raggruppamento del lotto) e il resto. Le barre sono alte 8 mm, e sotto c'è il valore tra asterischi in OCR-A (D211); lo stesso vale per il codice fiscale.
+- **Modulo del codice a barre di 0,254 mm**, prima 0,339. Il codice fiscale deve stare nello spazio del modello accanto al nome, e così resta sopra il minimo di 0,240 mm del DM.
+- **Diciture delle specifiche**: dati oscurati, «SUGG» e «RICOV», priorità in parole, «PRIMO ACCESSO» e «ALTRA TIPOLOGIA DI ACCESSO», «PRESCRIZIONE VALIDA 180 GIORNI AI FINI DELLA PRENOTAZIONE», «---» per la nota non compilata, «Assist. SSN».
+- **Area delle prescrizioni fissa.** È grande come nel facsimile nr. 0, si disegnano solo le righe usate e i campi dal 21 non si spostano. Se le righe non ci stanno, il carattere scende fino a 6 punti.
+- **Farmaci.** Prima il gruppo di equivalenza, con codice e denominazione: principio attivo e confezione di riferimento della lista di trasparenza AIFA in vigore alla data. Poi l'AIC con il nome. Infine «NON SOSTITUIBILE - motivazione».
+- **Specialistica**: «codice nomenclatore (codice catalogo) – descrizione», con i codici proprio come sono partiti (D154).
+- **Farmaci in DPC.** La frase arriva con il messaggio 0196 della ricevuta e si stampa sotto l'ultima prescrizione, centrata. L'interfaccia delle integrazioni porta ora i messaggi della ricevuta; il simulatore li dà solo nelle prove.
+
+Scelte, dove le specifiche tacciono o il programma non ha il dato:
+
+- **Tipologia S o H (campo 14)**: una per ricetta, e c'è solo se tutte le prescrizioni la hanno uguale. Prima si stampava per riga.
+- **Piemonte** (SIRPE, «Cartelle cliniche MMG e PLS», 4.4.3): nel campo 27 il codice regionale davanti al nome. Da verificare al collaudo, perché le specifiche nazionali vogliono lo stesso modello in tutta Italia.
+- **Validità di 180 giorni**: è il valore delle specifiche. Un valore minore comunicato dal Piemonte non è noto (A1).
+- **Campi vuoti**, come vogliono le specifiche quando il dato manca:
+  - disposizioni regionali (13), «Altro» (15), frase regionale (28);
+  - ambulatorio di erogazione, televisita, note e numero di sedute (18A);
+  - note del DM 9/12/2015 (20, che stampa «---»);
+  - codice ICD-9-CM nel quesito (21): il programma scrive il quesito come testo.
+- **Tipo ricetta (23).** Il messaggio di invio porta solo ricette di assistiti del SSN, quindi si stampa «Assist. SSN». Gli altri tipi (UE, EE, ST, NA…) sono da completare con l'adattatore vero. Per gli assicurati esteri il promemoria stampa istituzione e tessera, con le etichette del facsimile nr. 4.
+- **Foglio «solo NRE»**: stesse misure e stessi codici a barre, con data, medico, codice di autenticazione e dicitura.
+
+Ristampe: i dati del promemoria hanno una versione. Quelli fissati prima (versione 1) si ristampano con il modello di prima, uguali byte per byte; una prova ne controlla l'impronta. I nuovi sono della versione 2.
+
+Prove (`apps/api/test/promemoria-modello.test.ts`, `apps/api/test/promemoria.test.ts`):
+
+- versione 1 identica;
+- NRE in due parti con gli asterischi;
+- misure delle barre;
+- tutto nella metà alta e campi dal 21 fermi;
+- diciture uguali al testo delle specifiche;
+- gruppo di equivalenza, AIC, non sostituibile e frase DPC;
+- codici e righe della specialistica;
+- SUGG.
+
+28 sabotaggi. Guardati a vista quattro promemoria con dati inventati: farmaci, specialistica con otto righe lunghe, dati oscurati con assicurato estero, solo NRE. I tre codici a barre letti con un lettore indipendente (ZXing, solo per la prova, fuori dal repository) a 300 e 600 punti per pollice. Non provato: la stampa vera e la lettura in farmacia.
+
+**D218 · Nomenclatore dei presidi: l'allegato 3 del DPCM LEA come banca dati.** D123 aveva lasciato «da completare» i codici del nomenclatore dei presidi (allegati 2 e 3). Simone doveva mandare i due allegati dalla pagina del Ministero, che da qui non si legge. La Gazzetta del 2026 dice però che i decreti di agosto non toccano né l'art. 13 né l'allegato 3 (D216). Quindi l'allegato 3 si prende dalla Gazzetta del 2017, che da qui si scarica: supplemento ordinario n. 15 alla GU n. 65 del 18/3/2017, pagine 52 e 53.
+
+- **Tipo di banca dati nuovo**, `presidi`, con tabella `ref_supply` (migrazione 0041, non si modifica e non si svuota). Una voce è un presidio con il suo codice, oppure una delle malattie rare che danno diritto ai presidi dell'allegato. Ogni voce ha il titolo del suo gruppo e il numero dell'allegato. L'allegato 2 (ausili monouso, con le modifiche del DM 3/8/2026) entrerà come serie dello stesso tipo.
+- **La trascrizione** (`lea/allegato-3-presidi`): 18 presidi in 10 gruppi e 12 malattie rare, in vigore dal 19/3/2017, il giorno dopo la Gazzetta. Testo e codici come stampati. Controllata così:
+  - ogni cella si ritrova nel testo del PDF;
+  - ogni codice sta sulla riga della sua descrizione;
+  - le due pagine sono state guardate come immagine.
+
+  Resta **da controllare** da una persona, e fino ad allora non si usa (A8).
+
+- **Nel programma**: nella prescrizione dei presidi per diabetici si sceglie la voce dal nomenclatore in vigore, e prodotto e codice si riempiono da soli. Si può sempre scrivere a mano, come prima. Sotto la scelta c'è l'elenco delle malattie rare dell'art. 13, solo come informazione: il diritto lo accertano le Regioni (art. 13, comma 2), e il programma non lo controlla.
+- **Le categorie dicono il loro allegato**: per diabetici il 3, monouso il 2. Una categoria senza nomenclatore trascritto resta a testo libero.
+- **Rotta** `GET /api/presidi/nomenclatore`: dati pubblici, come le categorie. Se una voce è in due serie, vale la più recente.
+
+Prove:
+
+- trascrizione (`packages/reference/test/lea.test.ts`, 4);
+- servizio, con tre serie inventate: una vecchia, una più recente e una di domani (`apps/api/test/seguito-presidi.test.ts`);
+- interfaccia (`apps/web/test/presidi.test.tsx`, 3).
+
+15 sabotaggi. Non provato: nel browser e nelle schermate, perché i dati dimostrativi non hanno il nomenclatore.

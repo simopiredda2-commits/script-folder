@@ -29,6 +29,7 @@ import type { Database } from '../db/client';
 import { withActor } from '../db/tx';
 import { guardPatient } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
+import { ReferenceData, type SupplyCatalogItem } from '../reference/lookup';
 
 const params = z.object({ id: z.uuid() });
 const executionParams = z.object({ id: z.uuid(), esecuzioneId: z.uuid() });
@@ -106,8 +107,32 @@ export function registerFollowUpRoutes(app: FastifyInstance, db: Database, now: 
   });
 
   app.get('/api/presidi/categorie', () => ({
-    categorie: SUPPLY_CATEGORIES.map((c) => ({ chiave: c.key, nome: c.label, fonte: c.source })),
+    categorie: SUPPLY_CATEGORIES.map((c) => ({
+      chiave: c.key,
+      nome: c.label,
+      fonte: c.source,
+      allegato: 'annex' in c ? c.annex : null,
+    })),
   }));
+
+  /**
+   * Il nomenclatore dei presidi del DPCM LEA in vigore oggi (D218): dati pubblici, come le
+   * categorie. Vuoto finché la trascrizione non è controllata e importata (A8).
+   */
+  app.get('/api/presidi/nomenclatore', async () => {
+    const items = await new ReferenceData(db).supplyCatalog(studioDate(now()));
+    const out = (type: SupplyCatalogItem['entryType']) =>
+      items
+        .filter((i) => i.entryType === type)
+        .map((i) => ({
+          codice: i.code,
+          descrizione: i.description,
+          gruppo: i.group,
+          allegato: i.annex,
+          atto: i.act,
+        }));
+    return { presidi: out('presidio'), malattieRare: out('malattia_rara') };
+  });
 
   app.get('/api/pazienti/:id/presidi', scoped, async (req) => {
     const actor = req.actor!;

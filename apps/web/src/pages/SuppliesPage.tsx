@@ -14,6 +14,22 @@ interface Category {
   chiave: string;
   nome: string;
   fonte: string | null;
+  /** Allegato del DPCM con il nomenclatore della categoria (D218). */
+  allegato?: string | null;
+}
+
+/** Una voce del nomenclatore dei presidi del DPCM LEA (D218). */
+interface CatalogItem {
+  codice: string;
+  descrizione: string;
+  gruppo: string;
+  allegato: string;
+  atto: string | null;
+}
+
+interface Catalog {
+  presidi: CatalogItem[];
+  malattieRare: CatalogItem[];
 }
 
 interface Supply {
@@ -61,6 +77,7 @@ export function SuppliesPage() {
     `/api/pazienti/${id}/presidi`,
   );
   const categories = useApi<{ categorie: Category[] }>('/api/presidi/categorie');
+  const catalog = useApi<Catalog>('/api/presidi/nomenclatore');
   const problems = useApi<EntryList>(
     isDoctor ? `/api/pazienti/${id}/voci?tipo=problema&annullate=no` : null,
   );
@@ -92,6 +109,7 @@ export function SuppliesPage() {
         <SupplyForm
           patientId={id!}
           categories={categories.data.categorie}
+          catalog={catalog.data ?? { presidi: [], malattieRare: [] }}
           problems={(problems.data?.voci ?? []).map((v) => ({
             id: v.id,
             nome: String(v.dettaglio?.descrizione ?? ''),
@@ -237,11 +255,13 @@ function SupplyItem({
 function SupplyForm({
   patientId,
   categories,
+  catalog,
   problems,
   onSaved,
 }: {
   patientId: string;
   categories: Category[];
+  catalog: Catalog;
   problems: { id: string; nome: string }[];
   onSaved: () => void;
 }) {
@@ -272,6 +292,16 @@ function SupplyForm({
     setF((x) => ({ ...x, [k]: e.target.value }));
   const category = categories.find((c) => c.chiave === f.categoria);
   const advanced = f.categoria === 'medicazione_avanzata';
+  // Il nomenclatore dell'allegato della categoria, se trascritto e controllato (D218).
+  const annex = category?.allegato ?? null;
+  const items = annex ? catalog.presidi.filter((i) => i.allegato === annex) : [];
+  const groups = [...new Set(items.map((i) => i.gruppo))];
+  const rare = annex ? catalog.malattieRare.filter((i) => i.allegato === annex) : [];
+  const chosen = items.findIndex((i) => i.descrizione === f.prodotto && i.codice === f.codice);
+  const pick = (index: string) => {
+    const item = items[Number(index)];
+    if (item) setF((x) => ({ ...x, prodotto: item.descrizione, codice: item.codice }));
+  };
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -344,6 +374,45 @@ function SupplyForm({
             {category?.fonte ? `Fonte: ${category.fonte}.` : 'Fuori dalle categorie del decreto.'}
           </p>
         </div>
+        {items.length > 0 && (
+          <div className="campo">
+            <label htmlFor="presidio-nomenclatore">Dal nomenclatore (allegato {annex})</label>
+            <select
+              id="presidio-nomenclatore"
+              value={chosen >= 0 ? String(chosen) : ''}
+              aria-describedby="presidio-nomenclatore-aiuto"
+              onChange={(e) => pick(e.target.value)}
+            >
+              <option value="">Scrivi il prodotto o scegli dal nomenclatore</option>
+              {groups.map((g) => (
+                <optgroup key={g} label={g}>
+                  {items.map((i, index) =>
+                    i.gruppo === g ? (
+                      <option key={`${i.codice}-${i.descrizione}`} value={String(index)}>
+                        {i.descrizione} · {i.codice}
+                      </option>
+                    ) : null,
+                  )}
+                </optgroup>
+              ))}
+            </select>
+            <p className="aiuto" id="presidio-nomenclatore-aiuto">
+              Riempie prodotto e codice. Fonte: {items[0]!.atto ?? `allegato ${annex}`}.
+            </p>
+            {rare.length > 0 && (
+              <details className="malattie-rare">
+                <summary>Malattie rare che danno diritto a questi presidi (art. 13)</summary>
+                <ul>
+                  {rare.map((r) => (
+                    <li key={r.codice}>
+                      <span className="codice">{r.codice}</span> {r.descrizione}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
         <div className="campi-in-riga">
           {field('prodotto', 'Prodotto', { required: true, maxLength: 300 })}
           {field('codice', 'Codice del nomenclatore', { className: 'codice', maxLength: 30 }, true)}

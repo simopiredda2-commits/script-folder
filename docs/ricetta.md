@@ -67,12 +67,13 @@ Fonti lette sul portale del Sistema TS e della Regione (18/11/2026):
 - **Regione Piemonte, SIRPE «Cartelle cliniche MMG e PLS» (4.4.3, 4.4.7)**: sotto il codice fiscale, senza etichetta, «codice regionale – nominativo del medico»; tempo massimo di attesa del codice di autenticazione «al momento definiti in 6-8 secondi», poi ricetta cartacea.
 - **Ricetta bianca, Disciplinare tecnico (1/12/2022)**: il SAC restituisce NRBE, PIN-NRBE e il PDF del promemoria; «l’unico promemoria della Ricetta Bianca Elettronica che il medico può rilasciare al paziente è quello prodotto dal SAC, non sono ammesse stampe prodotte in proprio dai gestionali dei medici o dai SAR»; ripetibilità con `numRipetibilita` e `validitaFarm`.
 - **DM 30 dicembre 2020, art. 3**: email con il promemoria allegato, SMS con il numero di ricetta, Fascicolo.
+- **Sistema TS, «Specifiche tecniche per la stampa del promemoria della ricetta dematerializzata (D.M. 2 novembre 2011)», versione 28/02/2024** (letta il 20/11/2026): il modello che sostituisce quello del DM, uguale in tutta Italia. Mezzo foglio A4, campi numerati da 1 a 28, NRE in due codici a barre alti 8 mm, valori tra asterischi, diciture e area delle prescrizioni fissa (D217).
 
 Come funziona:
 
 - **All’invio** di una ricetta SSN si salvano il codice di autenticazione e i dati del promemoria (`prescription_document`, tipo `promemoria_dati`): ogni ristampa esce identica, anche se poi cambia l’anagrafica. Una risposta senza codice di autenticazione vale come rifiuto. Prima di inviare si controlla che il promemoria si possa fare: regione dello studio e codice fiscale del medico; se mancano, nessun invio.
 - **Ricetta bianca**: si conserva il PDF del SAC (`promemoria_sac`, in base64 con l’impronta SHA-256) e si consegna byte per byte; il foglio «solo NRE» non c’è.
-- **Stampa**: `GET /api/ricette/:id/promemoria` (completo) e `?formato=nre` (numero, codice fiscale e codice di autenticazione). Codice a barre: modulo 0,339 mm (minimo 0,240), largo 2,5 volte, barre alte 10 mm (minimo 7,5), asterischi di apertura e chiusura.
+- **Stampa**: `GET /api/ricette/:id/promemoria` (completo) e `?formato=nre` (numero, codice fiscale e codice di autenticazione). Dal 20/11/2026 il modello è quello delle specifiche del 28/02/2024 (D217): metà alta di una pagina A4, NRE in due codici a barre (i primi 5 caratteri e il resto) e codice fiscale, modulo 0,254 mm (minimo 0,240), largo 2,5 volte, barre alte 8 mm, valori tra asterischi in OCR-A. I promemoria fissati prima si ristampano con il modello di prima, uguali byte per byte (versione dei dati).
 - **Invio**: `POST /api/ricette/:id/promemoria/invio`, email con il PDF allegato o SMS con il solo numero, al paziente o a un delegato con delega valida oggi (R16). Nel testo dell’email nessun dato clinico. Simulatore, nessun invio vero.
 - **Consegne**: ogni stampa e ogni invio entrano in `reminder_delivery`, che non si modifica; `GET /api/ricette/:id/promemoria/consegne`.
 - **Tempo massimo di attesa** dell’invio al SAR: 8 secondi (il limite alto dei 6–8 del Piemonte); oltre, esito incerto (D94).
@@ -83,6 +84,6 @@ Come funziona:
 - Adattatori veri per SAR e Sistema TS, con l'autenticazione forte (Id-Sessione) del Sistema TS.
 - Casi in cui l'annullamento è ammesso.
 - Modulo di stampa della ricetta rossa.
-- Promemoria: posizioni sulla pagina, suddivisione dell’NRE nei codici a barre e dicitura aggiornata secondo le «Specifiche tecniche per la stampa del promemoria» (versione 1/3/2016, citata dalla Regione): il documento non è stato trovato sul portale. Il carattere OCR-A per l’NRE in chiaro c’è dal 20/11/2026 (D211); resta da controllare con una stampa vera. Frase regionale nell’ultima riga, comunicata dal SAC.
+- Promemoria (D217): la frase regionale (campo 28) e la frase sui farmaci in DPC come le restituisce il SAC vero; un'eventuale validità minore di 180 giorni comunicata dal Piemonte; i tipi di ricetta diversi da «Assist. SSN»; il codice regionale davanti al nome del medico, da confermare al collaudo. Stampa vera e lettura dei codici in farmacia.
 - Fornitore vero di email e SMS, con le garanzie sul trattamento dei dati.
 - Se il SAR comunica l'erogazione in farmacia; lo stato «sospesa» (6) delle specifiche del Sistema TS nella tavola degli stati di processo, oggi non tra gli stati del prodotto (D70).
