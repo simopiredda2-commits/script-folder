@@ -25,7 +25,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199). Fermata fatta: via, pull request #14 unita (risposte in «Risposte della fermata dopo l'unione della #13»).
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
-- **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Pull request #17 e fermata, con le domande pronte per la mattina del 20/11/2026.
+- **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -765,7 +765,7 @@ Il blocco che segue dalle risposte della fermata, nello stesso branch ripartito 
 
 **Non provato**: WebKit e Firefox su questa macchina (li prova la CI); due versioni vere dell'anagrafica o delle liste AIFA, una dopo l'altra; le schede zip dei registri; un riavvio vero di Postgres con il servizio acceso.
 
-**Prossimo passo**: pull request #17 e domande della fermata (sotto, «Domande per la prossima fermata»).
+**Prossimo passo**: fatto: pull request #17 unita con il via di Simone. Alla ripresa, la regola che informa sulla confezione sospesa alla ricetta.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -998,20 +998,24 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Fermata dopo il blocco della notte fra il 19 e il 20/11/2026 (pull request #17). Simone le guarda la mattina del 20/11/2026, prima delle 9:15. Che cosa guardare, in parole semplici:
+Si riprende il pomeriggio o la sera del 20/11/2026, quando Simone lo dice. Da fare allora: la regola che informa sulla confezione sospesa alla ricetta (la sua scelta A). Restano le verifiche alla fine della Dr.ssa Rocca: ICD-9-CM, catalogo regionale, allegati 8 e 7, R19, R20, R21 e i testi delle variazioni e dei registri AIFA.
 
-- **Variazioni AIFA** (schermata 70): se i testi sono chiari per un medico e se il modo in cui la voce si chiude va bene. Oggi la voce resta finché la terapia non è aggiornata o conclusa.
-- **Registri AIFA** (schermata 71): se le informazioni sono quelle che servono quando si prescrive, e se il collegamento per ATC (anche agli equivalenti) va bene.
-- **Riepiloghi alla segreteria** (D204): come ha scelto Simone, con il CSV, sugli archivi che l'hanno confermata.
+## Risposte della fermata dopo l'unione della #16 (20/11/2026)
 
-Domande:
+Simone ha risposto con il pulsante la mattina del 20/11/2026, prima di spegnere.
+
+- **Via**: «Via: unisci». Prima dell'unione, le correzioni della revisione indipendente (D209). Pull request #17 unita in `main` il 20/11/2026 (commit 491e2bf), con le prove verdi su GitHub dell'ultimo commit (TypeScript, WebKit, Firefox e `sync/`).
+- **Variazioni AIFA**: «Terapia aggiornata». Restano come sono: la voce resta finché la terapia non è aggiornata o conclusa; per classe e nota c'è «Aggiorna dalla banca dati» nella scheda (D208).
+- **Confezione sospesa alla ricetta**: «Regola che informa». Da fare: una regola nuova che informa soltanto, come R21 per i farmaci carenti; non blocca e non chiede motivi.
+- **Dopo**: «Riprendiamo nel pomeriggio o in serata. Verifiche o domande ovviamente dovremo poi farle».
+- **Che cosa ne segue**: pausa. Il branch riparte da `main`; alla ripresa, la regola sulla confezione sospesa.
+
+## Domande della fermata dopo l'unione della #16 (chiuse)
 
 1. **Via** all'unione della pull request #17: A. Via: unisci (consigliata); B. prima delle modifiche; C. fermati qui.
 2. **Variazioni AIFA, quando la voce sparisce**: A. finché la terapia non è aggiornata o conclusa, come ora (consigliata; per classe e nota c'è il pulsante «Aggiorna dalla banca dati» nella scheda, D208); B. anche con un pulsante «Visto» del medico; C. dopo 30 giorni dall'aggiornamento.
 3. **Confezione sospesa alla ricetta**: oggi lo dicono la ricerca, la terapia e Oggi, non la ricetta. A. una regola che informa, come la carenza (R21) (consigliata); B. un avviso che chiede il motivo; C. nessuna regola.
 4. **Dopo**: A. pausa dopo l'unione (consigliata, come ha detto Simone); B. i registri anche nella scheda della terapia e in Oggi; C. le verifiche finali con la Dr.ssa Rocca.
-
-Restano le verifiche alla fine della Dr.ssa Rocca: ICD-9-CM, catalogo regionale, allegati 8 e 7, R19, R20, R21 e ora i testi delle variazioni e dei registri AIFA.
 
 ## Risposte della fermata dopo l'unione della #15 (19–20/11/2026)
 
