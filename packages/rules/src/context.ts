@@ -19,6 +19,11 @@ export interface DrugFacts {
   unitsPerPack?: number;
   /** Carenza secondo l'elenco AIFA dei farmaci carenti in vigore (R21); assente se non c'è. */
   shortage?: ShortageFacts;
+  /**
+   * Confezione «Sospesa» secondo l'anagrafica AIFA delle confezioni in vigore (R22, D210). Assente
+   * se l'anagrafica non lo dice: la confezione «Autorizzata» o non trovata non è «sospesa».
+   */
+  suspended?: boolean;
 }
 
 /** Una carenza come la dice l'elenco AIFA dei farmaci carenti (D202). */

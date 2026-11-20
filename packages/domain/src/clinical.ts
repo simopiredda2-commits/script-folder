@@ -112,7 +112,8 @@ export interface MeasureDefinition {
 /**
  * I parametri dei requisiti («Parametri e misure»: pressione, peso, altezza, BMI, glicemia,
  * saturazione), con l'unità in cui si scrivono. La pressione ha due valori. Il BMI si scrive
- * come valore misurato: calcolarlo dal peso e dall'altezza è una domanda per la fermata (R12).
+ * come valore misurato: il programma non lo calcola, perché i calcoli clinici restano fuori dalla
+ * prima versione (requisiti, R12; scelta di oggi confermata alla fermata dopo la tappa 15, D181).
  */
 export const MEASURES = [
   { key: 'pressione_sistolica', label: 'Pressione sistolica', unit: 'mmHg' },

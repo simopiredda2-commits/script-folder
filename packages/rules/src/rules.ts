@@ -4,9 +4,9 @@ import { addDays, addMonths, daysBetween, italian } from './dates';
 import { value, type Rule, type RuleId } from './ruleset';
 
 /**
- * Le regole di prescrizione R1–R17 dei requisiti, R18 (D154), lo stato del paziente R19–R20 (D199)
- * e i farmaci carenti R21 (D202), come controlli formali (regola 3: nessun suggerimento diagnostico
- * o terapeutico). Nessun numero è scritto qui: i valori vengono dal file dei dati
+ * Le regole di prescrizione R1–R17 dei requisiti, R18 (D154), lo stato del paziente R19–R20 (D199),
+ * i farmaci carenti R21 (D202) e la confezione sospesa R22 (D210), come controlli formali (regola 3:
+ * nessun suggerimento diagnostico o terapeutico). Nessun numero è scritto qui: i valori vengono dal file dei dati
  * (packages/rules/data/), e una regola di lint lo controlla.
  */
 
@@ -647,6 +647,23 @@ const evaluators: Record<RuleId, Evaluator> = {
         },
       ];
     }),
+
+  // Confezione «Sospesa» nell'anagrafica AIFA delle confezioni in vigore alla data della ricetta:
+  // solo informazione, con le parole dell'anagrafica (scelta di Simone del 20/11/2026, D210). Come
+  // la R21 vale per ogni ricetta con il farmaco, anche bianca: lo stato non dipende dal SSN.
+  R22: (rule, ctx) =>
+    ctx.prescription.lines.flatMap((line): Issue[] =>
+      ctx.drugFacts(line.drugAic)?.suspended === true
+        ? [
+            {
+              ruleId: 'R22',
+              severity: severityOf(rule),
+              lineId: line.id,
+              message: `${lineLabel(line)}: confezione sospesa secondo l’anagrafica AIFA delle confezioni`,
+            },
+          ]
+        : [],
+    ),
 };
 
 /**

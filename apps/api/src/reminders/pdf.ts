@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import fontkit from '@pdf-lib/fontkit';
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib';
 import { code39Bars } from './code39';
 import { OBSCURED_TEXT, type PromemoriaData } from './promemoria';
@@ -20,9 +23,18 @@ const RIGHT = A4[0] - 40;
 interface Fonts {
   regular: PDFFont;
   bold: PDFFont;
-  /** NRE in chiaro. Il decreto chiede l'OCR-A (ECMA, tipo 1): carattere da completare. */
+  /** NRE e codice fiscale in chiaro sotto i codici a barre: OCR-A, come chiede il decreto (D211). */
   code: PDFFont;
 }
+
+/**
+ * Carattere OCR-A (ANSI X3.17-1977) di John Sauter, di pubblico dominio, dal pacchetto Debian
+ * `fonts-ocr-a` 1.0-10: file, impronta e provenienza in `apps/api/caratteri/ocr-a/` (D211). Si
+ * incorpora nel PDF, solo con i caratteri usati; niente si scarica da fuori (regola 8).
+ */
+export const OCR_A_FILE = join(import.meta.dirname, '..', '..', 'caratteri', 'ocr-a', 'OCRA.ttf');
+let ocrA: Uint8Array | undefined;
+const ocrABytes = () => (ocrA ??= readFileSync(OCR_A_FILE));
 
 /** Testo che il carattere sa scrivere: i simboli fuori dal suo insieme diventano «?». */
 function safe(font: PDFFont, text: string): string {
@@ -121,10 +133,11 @@ async function newDocument(title: string, created: string) {
   doc.setModificationDate(when);
   doc.setProducer('Cartella clinica');
   const page = doc.addPage(A4);
+  doc.registerFontkit(fontkit);
   const fonts: Fonts = {
     regular: await doc.embedFont(StandardFonts.Helvetica),
     bold: await doc.embedFont(StandardFonts.HelveticaBold),
-    code: await doc.embedFont(StandardFonts.Courier),
+    code: await doc.embedFont(ocrABytes(), { subset: true }),
   };
   return { doc, page, fonts };
 }

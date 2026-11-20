@@ -248,8 +248,9 @@ const FISCAL_CODE_PROBLEMS: Record<FiscalCodeProblem, string> = {
 };
 
 /**
- * Password temporanea casuale, come quelle dei dati dimostrativi: 16 caratteri. Per ora non
- * scade: la durata è da completare (domanda per la fermata).
+ * Password temporanea casuale, come quelle dei dati dimostrativi: 16 caratteri. Non scade: va
+ * cambiata al primo accesso, e alla fermata dopo la tappa 15 Simone ha lasciato la scelta di oggi
+ * (D165, D181).
  */
 export const temporaryPassword = () => randomBytes(12).toString('base64url');
 

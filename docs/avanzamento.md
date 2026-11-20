@@ -25,17 +25,40 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199). Fermata fatta: via, pull request #14 unita (risposte in «Risposte della fermata dopo l'unione della #13»).
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
-- **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Pull request #17 e fermata, con le domande pronte per la mattina del 20/11/2026.
+- **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
+- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Pull request #18.
 
-**Fuori dal secondo giro, da fare dopo** (nessuno avviato):
+**Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
-1. Primo giro di `sync/` dal computer dello studio e confermare le intestazioni ISTAT (D55, D56). Le mappature AIFA sono complete, controllate sui file interi del 18/11/2026 (D148).
-2. Specifiche e credenziali di collaudo di SAR, Sistema TS e AURA: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo della ricetta rossa e del promemoria. Insieme: registrazione del programma presso la Regione (codice del gestionale, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103).
-3. Decisione su Ready! e sulla versione «Full» (D78).
-4. Agenda (dopo la decisione su Ready!), AURA vera (oggi con il simulatore, D197) e FSE, importazione dei dati dal software attuale (serve il formato dell'esportazione di Next² con un file d'esempio senza dati veri). Riepiloghi: fatti (D201), senza PPIP e fatture.
-5. A7 per nota, classe, piano e ritiro: fatti (D205), come i registri AIFA (D206). Lista di trasparenza e farmaci carenti: fatti (D202), con A7 per le carenze. La lista di trasparenza non porta la nota AIFA (correzione di D148): una fonte delle note per AIC manca ancora. Soglie di vecchiaia: fatte (D156).
-6. Dicitura del tipo di accesso nella versione viva dei requisiti (D79). Collegamento alla segnalazione di farmacovigilanza: fatto (D202).
-7. Prove con lettori di schermo e tablet veri, e una giornata di lavoro con la Dr.ssa Rocca.
+_A. Aspetta la Regione Piemonte, CSI Piemonte o un altro ente_
+
+1. **SAR (SIRPED) e Sistema TS**: specifiche e credenziali di collaudo, piano di test della Regione; registrazione del programma (codice del gestionale, `client_id`, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103). Con queste: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo di stampa della ricetta rossa, specifiche di stampa del promemoria del 1/3/2016 e frase regionale (D97).
+2. **AURA vera** (oggi un simulatore, D197–D200): servizio, campi, codici degli eventi e credenziali, chiesti con la PEC di Simone al CSI del 19/11/2026.
+3. **Certificati INPS veri**: credenziali del Sistema TS (D100–D103).
+4. **Fascicolo Sanitario Elettronico**: accreditamento del programma e valori delle tabelle (D133); licenza dei file ufficiali del Ministero (D131).
+5. **SPID e CIE**: accreditamento come fornitore di servizi (D109).
+6. **PPIP, l'invio**: l'AIR 2024 del Piemonte (DGR del 27/5/2024) le fa rendicontare «attraverso portale regionale», con lo strumento che predispone l'ASL; le prestazioni aggiunte dagli accordi aziendali sono dell'ASL. La registrazione in cartella è una domanda della fermata.
+7. **Presidi**: modulo da consegnare all'ASL e percorsi dematerializzati (D123).
+8. **Flussi regionali** (diabete, vaccinazioni, PPIP): nei requisiti sono per la seconda versione.
+
+_B. Controlli reali, allo studio e con la Dr.ssa Rocca_
+
+1. Validazione clinica di tutte le regole (R1–R22) e verifica dei riferimenti normativi con un consulente: oggi «Validata: no».
+2. Le verifiche già annotate: ICD-9-CM, catalogo regionale con l'ASL, allegati 8 e 7, modello della patente, R19–R22, testi delle variazioni e dei registri AIFA.
+3. Primo giro di `sync/` dal computer dello studio, con le intestazioni ISTAT (D55, D56); due versioni vere dell'anagrafica AIFA una dopo l'altra.
+4. Stampa vera: promemoria con l'OCR-A e codici a barre letti da un lettore (D211); ricetta rossa sui moduli veri.
+5. Lettori di schermo e tablet veri; WebKit e Firefox anche fuori dalla CI; un riavvio vero di Postgres con il servizio acceso (D207); una giornata di lavoro con la Dr.ssa Rocca.
+
+_C. Decisioni o materiali di Simone_
+
+1. **PPIP**: costruire adesso la registrazione e il riepilogo del mese, o aspettare la Regione (domanda della fermata).
+2. **Allegati 2 e 3 del DPCM LEA** (presidi) nella versione in vigore, dalla pagina LEA del Ministero: da qui risponde un controllo anti-robot («Gcore», 20/11/2026). Con quelli, le modifiche del 2026 ai LEA (D124).
+3. **Ready!** e la versione «Full» (D78), poi l'Agenda.
+4. **Un file d'esempio dell'esportazione del programma di oggi**, senza dati veri, per l'importazione.
+5. **Banca dati farmaci con licenza** (per esempio Farmadati): note AIFA per AIC e i fatti oggi non noti (R3, R4, R8, R11).
+6. **Fornitore vero di email e SMS**; dove ospitare il servizio, con i salvataggi cifrati (D166).
+7. **Dicitura del tipo di accesso** nella versione viva dei requisiti (D79).
+8. Revisione di un avvocato prima del lancio.
 
 ## Come provarlo
 
@@ -281,7 +304,7 @@ Fonti ufficiali lette il 18/11/2026 (sessione nell'ambiente «Folder», D92): DM
 
 **Non fatto**
 
-- Posizioni di stampa, suddivisione dell'NRE nei codici a barre e dicitura delle specifiche di stampa del 1/3/2016: il documento non è sul portale. Carattere OCR-A per l'NRE in chiaro (D97).
+- Posizioni di stampa, suddivisione dell'NRE nei codici a barre e dicitura delle specifiche di stampa del 1/3/2016: il documento non è sul portale. Carattere OCR-A per l'NRE in chiaro (D97): fatto il 20/11/2026 (D211).
 - Fornitore vero di email e SMS; frase regionale nell'ultima riga del promemoria.
 
 **Non provato**
@@ -765,7 +788,32 @@ Il blocco che segue dalle risposte della fermata, nello stesso branch ripartito 
 
 **Non provato**: WebKit e Firefox su questa macchina (li prova la CI); due versioni vere dell'anagrafica o delle liste AIFA, una dopo l'altra; le schede zip dei registri; un riavvio vero di Postgres con il servizio acceso.
 
-**Prossimo passo**: pull request #17 e domande della fermata (sotto, «Domande per la prossima fermata»).
+**Prossimo passo**: fatto: pull request #17 unita con il via di Simone. Alla ripresa, la regola che informa sulla confezione sospesa alla ricetta.
+
+### Dopo l'unione della #17 – Confezione sospesa alla ricetta e OCR-A (D210, D211)
+
+Alla ripresa del 20/11/2026, con la richiesta di Simone di chiudere in fretta e lasciare in sospeso solo i controlli reali. Stesso branch, ripartito da `main` dopo l'unione della #17.
+
+**Fatto**
+
+- **R22, confezione sospesa alla ricetta (D210)**, la scelta «Regola che informa» della fermata. Sulla riga del farmaco: «confezione sospesa secondo l'anagrafica AIFA delle confezioni», con la fonte, quando l'anagrafica in vigore alla data della ricetta dice «Sospesa». Non ferma l'invio e non chiede un motivo, anche per la ricetta bianca. Versione nuova delle regole, 2026-11-20.1; le ricette controllate prima restano com'erano.
+- **OCR-A per l'NRE del promemoria (D211)**. Il testo in chiaro sotto i due codici a barre è in OCR-A, come chiede il DM 2/11/2011, al posto del Courier. È il carattere di John Sauter, di pubblico dominio, dal pacchetto Debian `fonts-ocr-a`, con impronta e provenienza in `apps/api/caratteri/ocr-a/`. Guardato a vista su un promemoria con dati inventati.
+- **Note superate allineate alle scelte già prese.** Password temporanea che non scade, blocco per inattività di 5 minuti su ogni postazione, BMI scritto e non calcolato: alla fermata dopo la tappa 15 Simone aveva lasciato la scelta di oggi (D181). Il codice diceva ancora «domanda per la fermata».
+- **Che cosa resta aperto**: l'elenco per chi lo sblocca, in cima a questo file.
+- **Cercato e non fatto.**
+  - PPIP: letto l'AIR 2024 del Piemonte. L'invio passa dal portale regionale. L'elenco delle prestazioni è l'allegato 6 dell'ACN: secondo le notizie trovate (regioni.it), oggi vale l'ACN 2022-2024, con l'intesa del 15/1/2026 (GU n. 24 del 30/1/2026, S.O. n. 5). Il testo nella Gazzetta non è ancora stato letto. È una domanda della fermata.
+  - Allegati 2 e 3 del DPCM LEA: la pagina del Ministero risponde con un controllo anti-robot.
+- **Prove**:
+  - regole: `packages/rules/test/regole.test.ts`;
+  - servizio: `apps/api/test/banche-dati.test.ts`, con la ranitidina «Sospesa» accanto all'amlodipina «Autorizzata»; `apps/api/test/promemoria.test.ts`; `apps/api/test/carattere-ocr-a.test.ts`;
+  - interfaccia: `apps/web/test/regole-informative.test.tsx`;
+  - 12 sabotaggi.
+
+**Prove complete**: 142 file e 1661 prove TypeScript, più `sync/`, tutto verde; lint verde.
+
+**Non provato**: la R22 nel browser, perché la ricetta mostra i problemi delle regole tutti allo stesso modo; un'anagrafica vera con una confezione che passa da «Autorizzata» a «Sospesa»; la stampa vera e la lettura ottica dell'OCR-A; WebKit e Firefox su questa macchina (li prova la CI).
+
+**Prossimo passo**: pull request #18 e fermata.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -998,20 +1046,31 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Fermata dopo il blocco della notte fra il 19 e il 20/11/2026 (pull request #17). Simone le guarda la mattina del 20/11/2026, prima delle 9:15. Che cosa guardare, in parole semplici:
+Fermata dopo il blocco D210–D211 (pull request #18):
 
-- **Variazioni AIFA** (schermata 70): se i testi sono chiari per un medico e se il modo in cui la voce si chiude va bene. Oggi la voce resta finché la terapia non è aggiornata o conclusa.
-- **Registri AIFA** (schermata 71): se le informazioni sono quelle che servono quando si prescrive, e se il collegamento per ATC (anche agli equivalenti) va bene.
-- **Riepiloghi alla segreteria** (D204): come ha scelto Simone, con il CSV, sugli archivi che l'hanno confermata.
+1. **Via** all'unione della #18.
+2. **PPIP**: costruire adesso la registrazione in cartella e il riepilogo del mese, dall'ACN in vigore e dall'AIR Piemonte 2024, lasciando l'invio al portale regionale a quando la Regione dirà come; oppure aspettare la Regione e l'ASL.
+3. **Allegati 2 e 3 del DPCM LEA** (presidi): da qui il sito del Ministero non si legge. Simone può mandarli, come gli altri allegati.
+4. **Versione viva dei requisiti**: aggiornare la dicitura del tipo di accesso (D79).
 
-Domande:
+Restano le verifiche alla fine della Dr.ssa Rocca, nell'elenco «Che cosa resta aperto».
+
+## Risposte della fermata dopo l'unione della #16 (20/11/2026)
+
+Simone ha risposto con il pulsante la mattina del 20/11/2026, prima di spegnere.
+
+- **Via**: «Via: unisci». Prima dell'unione, le correzioni della revisione indipendente (D209). Pull request #17 unita in `main` il 20/11/2026 (commit 491e2bf), con le prove verdi su GitHub dell'ultimo commit (TypeScript, WebKit, Firefox e `sync/`).
+- **Variazioni AIFA**: «Terapia aggiornata». Restano come sono: la voce resta finché la terapia non è aggiornata o conclusa; per classe e nota c'è «Aggiorna dalla banca dati» nella scheda (D208).
+- **Confezione sospesa alla ricetta**: «Regola che informa». Da fare: una regola nuova che informa soltanto, come R21 per i farmaci carenti; non blocca e non chiede motivi.
+- **Dopo**: «Riprendiamo nel pomeriggio o in serata. Verifiche o domande ovviamente dovremo poi farle».
+- **Che cosa ne segue**: pausa. Il branch riparte da `main`; alla ripresa, la regola sulla confezione sospesa.
+
+## Domande della fermata dopo l'unione della #16 (chiuse)
 
 1. **Via** all'unione della pull request #17: A. Via: unisci (consigliata); B. prima delle modifiche; C. fermati qui.
 2. **Variazioni AIFA, quando la voce sparisce**: A. finché la terapia non è aggiornata o conclusa, come ora (consigliata; per classe e nota c'è il pulsante «Aggiorna dalla banca dati» nella scheda, D208); B. anche con un pulsante «Visto» del medico; C. dopo 30 giorni dall'aggiornamento.
 3. **Confezione sospesa alla ricetta**: oggi lo dicono la ricerca, la terapia e Oggi, non la ricetta. A. una regola che informa, come la carenza (R21) (consigliata); B. un avviso che chiede il motivo; C. nessuna regola.
 4. **Dopo**: A. pausa dopo l'unione (consigliata, come ha detto Simone); B. i registri anche nella scheda della terapia e in Oggi; C. le verifiche finali con la Dr.ssa Rocca.
-
-Restano le verifiche alla fine della Dr.ssa Rocca: ICD-9-CM, catalogo regionale, allegati 8 e 7, R19, R20, R21 e ora i testi delle variazioni e dei registri AIFA.
 
 ## Risposte della fermata dopo l'unione della #15 (19–20/11/2026)
 
@@ -2386,3 +2445,15 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D209: calcolo nuovo, nota scritta a mano                                                                      | lookup.ts: nota della versione superata non guardata                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D209: calcolo nuovo, piano collegato                                                                          | lookup.ts: piano collegato ignorato                                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D209: calcolo nuovo, piano chiesto da sempre                                                                  | lookup.ts: versione superata non guardata                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210: la R22 informa sulla confezione sospesa                                                                 | rules.ts: condizione rovesciata                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210: solo le righe sospese, non tutte                                                                        | rules.ts: ogni riga con dei fatti                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210: anche la ricetta bianca                                                                                 | rules.ts: solo la ricetta SSN                                                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210: in vigore dal 20/11/2026                                                                                | regole-2026-11-20-1.json: dal giorno dopo                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210: informa, non chiede un motivo                                                                           | regole-2026-11-20-1.json: «warn»                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210: la tabella delle regole è quella dei dati                                                               | regole-2026-11-20-1.json: testo cambiato, documento no                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210: lo stato viene dall'anagrafica in vigore                                                                | lookup.ts: «Sospesa» non riconosciuto                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210: «Autorizzata» non è una sospensione                                                                     | lookup.ts: ogni stato preso per sospeso                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210 nell'interfaccia: la fonte della regola                                                                  | common.tsx: fonte tolta                                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D210 nell'interfaccia: il simbolo dell'informazione                                                           | common.tsx: simbolo dell'avviso                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D211: l'NRE in chiaro è in OCR-A                                                                              | pdf.ts: di nuovo il Courier                                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D211: il carattere è il file registrato                                                                       | SHA256SUMS: impronta cambiata                                                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
