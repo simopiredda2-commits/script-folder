@@ -123,7 +123,7 @@ export function registerAuraRoutes(
    * volta, insieme alle notifiche: due clic non registrano due volte. Chi arriva mentre un altro
    * registra non aspetta il blocco (terrebbe occupata una connessione al database): lo si dice.
    *
-   * Una transazione sola (D225): il paziente e l'assistito «registrato» entrano insieme o per niente.
+   * Una transazione sola (D226): il paziente e l'assistito «registrato» entrano insieme o per niente.
    * Il comune di nascita si legge prima, dalla banca dati; dentro, tutto passa da `tx`. I rifiuti
    * entrano nel registro dopo il ritorno indietro.
    */

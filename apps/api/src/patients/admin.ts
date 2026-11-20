@@ -393,7 +393,7 @@ export async function createPatient(
 }
 
 /**
- * Lo stesso dentro la transazione di chi chiama (D225), per esempio «Registra» un nuovo assistito
+ * Lo stesso dentro la transazione di chi chiama (D226), per esempio «Registra» un nuovo assistito
  * da AURA: controlli e scritture passano da `tx`, e un errore riporta indietro tutto. I rifiuti non
  * si scrivono qui: escono come `Refusal`, e chi ha aperto la transazione, dopo il ritorno indietro,
  * li passa a `settleNewPatientError`.

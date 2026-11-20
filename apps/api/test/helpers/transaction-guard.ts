@@ -1,5 +1,5 @@
 /**
- * Controllo delle transazioni (D225), in ogni prova del servizio.
+ * Controllo delle transazioni (D226), in ogni prova del servizio.
  *
  * Mentre una transazione è aperta, il servizio deve lavorare con la sua connessione (`tx`), non con
  * il database (`db`):

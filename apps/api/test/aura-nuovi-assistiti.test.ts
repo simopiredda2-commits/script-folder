@@ -420,7 +420,7 @@ describe('AURA: nuovi assistiti (D199)', () => {
     ]);
   });
 
-  it('AURA cambia il codice fiscale mentre si registra (D225): 409, si ricarica, e nessun paziente', async () => {
+  it('AURA cambia il codice fiscale mentre si registra (D226): 409, si ricarica, e nessun paziente', async () => {
     const { p, candidateId } = await chooses('n');
     const changed = `${p.fiscalCode.slice(0, -1)}${p.fiscalCode.endsWith('A') ? 'B' : 'A'}`;
     // Il comune di nascita si cerca prima della transazione: in quel momento AURA corregge il codice.
@@ -451,7 +451,7 @@ describe('AURA: nuovi assistiti (D199)', () => {
     expect(c!.status).toBe('da_registrare');
   });
 
-  it('una transazione sola (D225): se l’ultimo passo non riesce, il paziente non resta e l’assistito si registra dopo', async () => {
+  it('una transazione sola (D226): se l’ultimo passo non riesce, il paziente non resta e l’assistito si registra dopo', async () => {
     const { p, candidateId } = await chooses('m');
     // Un guasto apposta all'ultimo passo: l'assistito che diventa «registrato».
     await t.pool.query(

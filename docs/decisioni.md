@@ -1394,3 +1394,18 @@ Non provati nella dimostrazione: AFT (servono due studi), esportazione completa 
 
 1. **Transazioni del servizio.** «Registra» un nuovo assistito da AURA crea il paziente fuori dalla transazione della registrazione. Lo ha mostrato la dimostrazione, dove PGlite ha una sola sessione (D224). Si porta dentro, e un controllo nelle prove cerca nel servizio gli altri punti che usano il database fuori dalla transazione aperta.
 2. **AFT e cambio di medico nella dimostrazione.** Un secondo studio e un secondo medico titolare, per provare la condivisione nell'AFT (D161) e il cambio di medico dentro lo studio (D200).
+
+**D226 · Una transazione sola per «Registra», e il controllo delle transazioni nelle prove.** Primo punto della risposta di Simone alla fermata (D225).
+
+- **«Registra» un nuovo assistito da AURA** (`apps/api/src/http/aura-routes.ts`): il paziente e l'assistito «registrato» entrano insieme o per niente. Prima il paziente nasceva in una transazione sua: se l'ultimo passo non riusciva, il paziente restava e l'assistito risultava ancora «da registrare».
+  - La creazione del paziente lavora nella transazione di chi chiama (`createPatientIn`). «Nuovo paziente» apre la sua, come prima.
+  - I rifiuti escono con la loro riga del registro (`Refusal`) e si scrivono dopo il ritorno indietro (`settleRefusal`): permesso negato, archivio chiuso, codice fiscale già registrato. Dentro la transazione la riga tornerebbe indietro. Scritta con un'altra connessione, aspetterebbe la fine della transazione se questa ha già scritto nel registro: la catena delle righe tiene un blocco fino alla fine (migrazione 0002).
+  - Il comune di nascita si cerca prima della transazione. Se intanto AURA cambia il codice fiscale, la risposta è 409: «AURA ha cambiato il codice fiscale: ricarica la pagina».
+- **Controllo delle transazioni** in ogni prova del servizio (`apps/api/test/helpers/transaction-guard.ts`). Se il servizio chiama il database (`db`) mentre una transazione è aperta, la prova fallisce e dice il punto del codice e dove si è aperta la transazione.
+  - Le uscite volute vanno in `ALLOWED`, con il motivo: oggi nessuna.
+  - Con `CONTROLLO_TRANSAZIONI=annota` le annotazioni si scrivono in un file (`CONTROLLO_TRANSAZIONI_FILE`), senza far fallire.
+  - Sulle 807 prove del servizio di allora trovava solo «Registra».
+  - Una lettura dei tipi di tutto il servizio (151 file) ha trovato lo stesso punto: `createPatient(db…)` e la ricerca del comune dentro la transazione. Le altre segnalazioni erano l'orologio (`deps.now()`), che non tocca il database.
+- Nella dimostrazione resta la sessione sola di `database.ts` (D224), come protezione.
+
+Non provati: i percorsi che le prove non percorrono, guardati solo dalla lettura dei tipi, che non vede un servizio che tiene `db` dentro una funzione; due registrazioni dello stesso codice fiscale nello stesso istante (il 409 «appena stato registrato» non ha una prova, né prima né ora).

@@ -162,7 +162,7 @@ export async function logAccess(db: Database | Tx, entry: AccessEntry): Promise<
 }
 
 /**
- * Un rifiuto con la sua riga del registro (D225). Dentro una transazione la riga non si scrive:
+ * Un rifiuto con la sua riga del registro (D226). Dentro una transazione la riga non si scrive:
  * tornerebbe indietro con la transazione, e su un'altra connessione aspetterebbe la fine della
  * transazione, se questa ha già scritto nel registro (la catena delle righe si blocca fino alla fine,
  * migrazione 0002). Chi ha aperto la transazione, dopo il ritorno indietro, la scrive con

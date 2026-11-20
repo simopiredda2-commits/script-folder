@@ -1,14 +1,14 @@
 /**
  * Una sessione sola (D223). PGlite ha una sola sessione con il database: mentre una transazione è
- * aperta, una query che arriva da fuori aspetta che finisca. Il servizio è scritto per Postgres,
- * con più connessioni, e in qualche punto usa `db` dentro una transazione: per esempio «Registra»
- * un nuovo assistito da AURA, che crea il paziente e cerca il comune di nascita con `db`. Con
- * PGlite la query aspetterebbe la transazione, e la transazione la query: tutto fermo.
+ * aperta, una query che arriva da fuori aspetta che finisca. Se il servizio usasse `db` dentro una
+ * transazione, la query aspetterebbe la transazione, e la transazione la query: tutto fermo. Così
+ * faceva «Registra» un nuovo assistito da AURA, prima di D226; ora dentro una transazione il
+ * servizio usa solo `tx`, e lo controllano le prove del servizio (transaction-guard.ts).
  *
- * Qui ciò che arriva mentre una transazione è aperta entra in quella transazione: le query
- * direttamente, le transazioni come punti di salvataggio. Perché sia giusto, la transazione aperta
- * deve essere di chi chiede: le richieste dell'interfaccia passano una alla volta (`queue`), e i
- * lavori dell'avvio aspettano che il database sia libero (`idle`).
+ * Qui resta una protezione: ciò che arriva mentre una transazione è aperta entra in quella
+ * transazione, le query direttamente, le transazioni come punti di salvataggio. Perché sia giusto,
+ * la transazione aperta deve essere di chi chiede: le richieste dell'interfaccia passano una alla
+ * volta (`queue`), e i lavori dell'avvio aspettano che il database sia libero (`idle`).
  */
 import type { PGlite, Transaction } from '@electric-sql/pglite';
 

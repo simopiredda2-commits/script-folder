@@ -6,11 +6,11 @@ import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 import { takeOutsideCalls } from './helpers/transaction-guard';
 
 /**
- * Il controllo delle transazioni (D225), che gira in ogni prova del servizio: si annota il database
+ * Il controllo delle transazioni (D226), che gira in ogni prova del servizio: si annota il database
  * usato mentre una transazione è aperta, con il punto del codice e la transazione; con `tx`, o
  * fuori da una transazione, nulla.
  */
-describe('controllo delle transazioni (D225)', () => {
+describe('controllo delle transazioni (D226)', () => {
   let t: TestDatabase;
 
   beforeAll(async () => {
