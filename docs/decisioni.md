@@ -1139,3 +1139,12 @@ Prove: lettura e mappatura, importazione e consultazione, indirizzo della scheda
 - **Lo stesso nel servizio.** Se Postgres si riavvia o la rete si interrompe, le connessioni inattive ricevono lo stesso errore, e un evento «error» senza ascoltatore ferma il processo.
 - **Scelta.** Il gruppo ascolta l'evento e scrive un avviso con il messaggio di Postgres, che non contiene dati dei pazienti. Le richieste dopo aprono una connessione nuova.
 - **Prova.** Una connessione inattiva chiusa con `pg_terminate_backend`: si avvisa e la richiesta dopo va. Un sabotaggio toglie l'ascoltatore e la prova diventa rossa.
+
+**D208 · Aggiornare la scheda della terapia dalla banca dati.** Con le variazioni AIFA (D205), una variazione di classe o di nota si chiudeva solo scegliendo di nuovo il farmaco nella scheda della terapia. Ora nella scheda, sotto la variazione, il medico ha il pulsante «Aggiorna dalla banca dati».
+
+- **Che cosa fa.** Classe, nota AIFA, DPC e gruppo di equivalenza vengono dalle banche dati in vigore oggi, come quando si sceglie il farmaco. Il resto della scheda (dose, date, opzioni) non cambia, e lo storico delle modifiche conserva i valori di prima.
+- **Quando no.** Non per una terapia conclusa, né senza il codice AIC, né per un farmaco che non è nelle banche dati in vigore: il servizio lo dice e non cambia nulla.
+- **Chi.** Il pulsante è del medico, come «Modifica»; il servizio chiede lo stesso permesso della modifica della terapia.
+- **Non è una scelta della fermata.** Qualunque sia la risposta sulla domanda delle variazioni (fine con la terapia aggiornata, pulsante «Visto» o 30 giorni), il pulsante serve, perché aggiorna la scheda.
+
+Prove: servizio (aggiornamento, rifiuti, archivio di un altro medico), interfaccia (medico e segreteria) e quattro sabotaggi. Non provato nel browser: la prova nel browser ha un solo aggiornamento delle banche dati d'esempio, quindi nessuna variazione di classe.

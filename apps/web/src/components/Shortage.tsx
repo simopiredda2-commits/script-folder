@@ -62,8 +62,9 @@ export const AIFA_CHANGE_LABEL: Record<AifaChange['kind'], string> = {
 const HOW_TO: Record<AifaChange['kind'], string> = {
   sospesa: 'si chiude quando la terapia passa a un’altra confezione o è conclusa',
   anagrafica: 'si chiude quando la terapia passa a un’altra confezione o è conclusa',
-  classe: 'per aggiornare la scheda, scegli di nuovo il farmaco e salva',
-  nota: 'per aggiornare la scheda, scegli di nuovo il farmaco (la nota viene dalla banca dati) e salva',
+  classe:
+    'si chiude aggiornando la scheda dalla banca dati in vigore («Aggiorna dalla banca dati»)',
+  nota: 'si chiude aggiornando la scheda dalla banca dati in vigore («Aggiorna dalla banca dati»): la nota viene dall’elenco DPC',
   piano: 'si chiude collegando il piano terapeutico alla terapia',
 };
 

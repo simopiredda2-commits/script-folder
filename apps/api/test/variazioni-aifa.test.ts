@@ -373,5 +373,88 @@ describe('variazioni AIFA sui farmaci in terapia (A7, D205)', () => {
         ['FARMACO USCITO', 'ended', []],
       ]);
     });
+
+    const post = async (who: keyof Scenario['users'], url: string) =>
+      s.app.inject({
+        method: 'POST',
+        url,
+        payload: {},
+        headers: { cookie: await login(s, who) },
+      });
+
+    it('aggiornare la scheda dalla banca dati (D208) chiude la variazione di classe; il resto resta', async () => {
+      const { terapie } = await get('titolare', `/api/pazienti/${p2}/terapie`);
+      const reclassed = terapie.find((x: { drugAic: string }) => x.drugAic === RECLASSED);
+      const res = await post(
+        'titolare',
+        `/api/pazienti/${p2}/terapie/${reclassed.id}/aggiorna-dati-farmaco`,
+      );
+      expect(res.statusCode, res.body).toBe(200);
+      // In vigore: nell'elenco di classe H, senza nota e fuori dalla DPC.
+      expect(res.json()).toEqual({
+        id: reclassed.id,
+        drugClass: 'H',
+        aifaNote: null,
+        dpc: false,
+        equivalenceGroup: null,
+      });
+      const after = (await get('titolare', `/api/pazienti/${p2}/terapie`)).terapie.find(
+        (x: { id: string }) => x.id === reclassed.id,
+      );
+      expect(after).toMatchObject({
+        drugClass: 'H',
+        drugName: 'FARMACO RICLASSIFICATO',
+        startOn: '2026-01-01',
+        aifaChanges: [],
+      });
+      expect((await today('titolare')).map((e) => e.aic)).toEqual([PLAN_DRUG, SUSPENDED, GONE]);
+    });
+
+    it('aggiornare la scheda: non una terapia conclusa, non senza AIC, non un farmaco che non c’è', async () => {
+      const { terapie } = await get('titolare', `/api/pazienti/${p1}/terapie`);
+      const ended = terapie.find((x: { status: string }) => x.status === 'ended');
+      expect(
+        (await post('titolare', `/api/pazienti/${p1}/terapie/${ended.id}/aggiorna-dati-farmaco`))
+          .statusCode,
+      ).toBe(409);
+      const [noAic, unknown] = await withActor(t.db, s.users.titolare.id, (tx) =>
+        tx
+          .insert(therapy)
+          .values([
+            {
+              patientId: p1,
+              drugName: 'FARMACO SCRITTO A MANO',
+              kind: 'chronic' as const,
+              startOn: '2026-01-01',
+              createdBy: s.users.titolare.id,
+            },
+            {
+              patientId: p1,
+              drugAic: '099999999',
+              drugName: 'FARMACO SCONOSCIUTO',
+              kind: 'chronic' as const,
+              startOn: '2026-01-01',
+              createdBy: s.users.titolare.id,
+            },
+          ])
+          .returning({ id: therapy.id }),
+      );
+      const a = await post(
+        'titolare',
+        `/api/pazienti/${p1}/terapie/${noAic!.id}/aggiorna-dati-farmaco`,
+      );
+      expect(a.statusCode, a.body).toBe(400);
+      const b = await post(
+        'titolare',
+        `/api/pazienti/${p1}/terapie/${unknown!.id}/aggiorna-dati-farmaco`,
+      );
+      expect(b.statusCode, b.body).toBe(404);
+      // Un altro archivio: non si vede nemmeno.
+      const other = await post(
+        'collega',
+        `/api/pazienti/${p1}/terapie/${noAic!.id}/aggiorna-dati-farmaco`,
+      );
+      expect(other.statusCode).toBe(403);
+    });
   });
 });

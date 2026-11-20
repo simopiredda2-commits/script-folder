@@ -545,6 +545,21 @@ export function TherapyPage() {
   // Conclusa (tappa 15): finita, con la data di fine vera; non si sospende e non si riprende.
   const ended = t.status === 'ended';
 
+  // Classe, nota e DPC dalle banche dati in vigore: chiude le variazioni di classe e nota (D208).
+  async function refreshDrugData() {
+    setActionError(null);
+    try {
+      await api(`/api/pazienti/${id}/terapie/${therapyId}/aggiorna-dati-farmaco`, {
+        method: 'POST',
+        body: {},
+      });
+      setDone('Classe, nota e DPC della scheda aggiornati dalle banche dati in vigore oggi.');
+      therapies.reload();
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e : null);
+    }
+  }
+
   async function resume() {
     setActionError(null);
     try {
@@ -620,6 +635,15 @@ export function TherapyPage() {
           {t.aifaChanges!.map((c) => (
             <AifaChangeNote key={`${c.kind}-${c.text}`} change={c} details />
           ))}
+          {isDoctor &&
+            !ended &&
+            t.aifaChanges!.some((c) => c.kind === 'classe' || c.kind === 'nota') && (
+              <p>
+                <button type="button" className="pulsante" onClick={() => void refreshDrugData()}>
+                  <Icon name="ripeti" /> <span>Aggiorna dalla banca dati</span>
+                </button>
+              </p>
+            )}
         </div>
       )}
       {ended && (
