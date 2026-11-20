@@ -2,10 +2,18 @@
  * Lato pagina del ponte (D221): avvia il Worker del servizio e gira al servizio ogni chiamata a
  * /api/… dell'interfaccia, che resta quella di sempre. Nessuna richiesta esce dal browser.
  */
-import type { DemoUser, FromWorker, ToWorker, WireRequest, WireResponse } from './protocol';
+import type {
+  AuraHints,
+  DemoUser,
+  FromWorker,
+  ToWorker,
+  WireRequest,
+  WireResponse,
+} from './protocol';
 
 export interface Ready {
   users: DemoUser[];
+  aura: AuraHints;
   password: string;
   ms: number;
 }
@@ -42,7 +50,7 @@ export function startService(
       if (m.type === 'progress') onProgress(m.message);
       else if (m.type === 'ready') {
         started = true;
-        resolve({ users: m.users, password: m.password, ms: m.ms });
+        resolve({ users: m.users, aura: m.aura, password: m.password, ms: m.ms });
       } else if (m.type === 'failed') reject(new Error(m.message));
       else if (m.type === 'response') {
         pending.get(m.id)?.resolve(m.response);

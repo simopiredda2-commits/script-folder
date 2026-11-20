@@ -250,3 +250,78 @@
     scroll-behavior: auto;
   }
 }
+
+/* Conferma nella pagina e avvisi (D223): le finestre del browser non si aprono nella cornice. */
+.dimo-conferma {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgb(14 20 53 / 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
+    max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.dimo-conferma-riquadro {
+  background: var(--color-surface);
+  color: var(--color-text);
+  width: min(560px, 100%);
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius);
+  font-family: var(--font-text);
+}
+.dimo-conferma-riquadro h2 {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  margin: 0 0 0.75rem;
+}
+.dimo-conferma-azioni {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.dimo-conferma-azioni button,
+.dimo-avviso button {
+  min-height: var(--size-min-target);
+  min-width: var(--size-min-target);
+  padding: 0 1rem;
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font: inherit;
+  cursor: pointer;
+}
+.dimo-conferma-azioni .dimo-conferma-si {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.dimo-conferma button:focus-visible,
+.dimo-avviso button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.dimo-avviso {
+  position: fixed;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 1150;
+  width: min(640px, calc(100% - 32px));
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+  font-family: var(--font-text);
+  box-shadow: 0 4px 16px rgb(14 20 53 / 0.25);
+}
+.dimo-avviso p {
+  margin: 0;
+  flex: 1;
+}

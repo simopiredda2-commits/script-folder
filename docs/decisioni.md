@@ -1363,3 +1363,29 @@ Prove:
 - `apps/web/test/stampa.test.tsx`: il pannello del promemoria dice la carta che vale alla postazione e di stampare al 100% («dimensioni effettive»).
 
 6 sabotaggi. Non provato: la stampa vera su A5 e su A4 con stampanti diverse, e la lettura dei codici in farmacia.
+
+**D223 · Risposte della fermata dopo l'unione della #20.** Via alla #21, unita con le verifiche su GitHub verdi. Per la conferma del CSI sul modulo di accesso al Fascicolo del 2019 Simone ha risposto «Rimandiamo»: resta in «Che cosa resta aperto» (A4), e il programma usa il simulatore, spento in produzione (D220). Mentre si aspettano i file dei LEA e le risposte di Regione, ASL e CSI: «Dimostrazione completa». Nell'artifact (D221) si rende provabile tutto il programma, compresi certificati, importazione, strumenti e AURA, con prove automatiche della dimostrazione anche su WebKit (Safari) e Firefox.
+
+**D224 · Dimostrazione completa.** Risposta di Simone alla fermata (D223): nella dimostrazione (D221) si prova tutto il programma, con prove automatiche anche su Safari e Firefox.
+
+- **AURA simulata con i pazienti dimostrativi** (`apps/demo/src/worker/aura.ts`):
+  - all'avvio i pazienti si iscrivono nel simulatore e si collegano;
+  - poi arrivano le variazioni, che si vedono in «Oggi»: un'esenzione 013 per un paziente diabetico, un'ASL diversa e un decesso da confermare, una scelta cessata che fa revocato il paziente, un nuovo assistito da registrare;
+  - il riquadro della dimostrazione dice chi sono;
+  - non c'è il cambio di medico dentro lo studio (D200): lo studio dimostrativo ha un solo titolare.
+- **Conferme e stampa nella cornice** (`apps/demo/src/dialogs.ts`). Nell'artifact il browser non apre le sue finestre: `window.confirm` risponde subito «no» e `window.print` non fa nulla.
+  - Nella cornice la domanda compare subito in un riquadro della pagina, senza provare la finestra del browser. Safari, che non la apre, segnala il tentativo come errore della pagina: lo ha trovato la prima prova su WebKit. Con «Conferma» il clic si ripete e passa.
+  - Nella cornice la stampa mostra un avviso, senza chiamare la stampa del browser.
+  - Fuori dalla cornice le finestre del browser funzionano come sempre. Se una conferma risponde «no» prima che una persona possa leggere la domanda, la finestra era bloccata: la domanda passa nel riquadro.
+- **Una sessione sola con il database** (`apps/demo/src/worker/database.ts`). PGlite ha una sola sessione: mentre una transazione è aperta, ogni altra query aspetta che finisca. Il servizio è scritto per Postgres, con più connessioni, e in qualche punto usa `db` dentro una transazione. «Registra» un nuovo assistito da AURA, per esempio, crea il paziente e cerca il comune con `db`: nella dimostrazione tutto si fermava.
+  - Ora ciò che arriva mentre una transazione è aperta entra in quella transazione, e le transazioni dentro diventano punti di salvataggio.
+  - Perché sia giusto, le richieste dell'interfaccia passano una alla volta.
+  - Le variazioni di AURA dell'avvio si applicano con due giri in fila, prima che il servizio ascolti. Il nuovo assistito arriva dopo, con una notifica sola.
+- **Prove della dimostrazione costruita** (`apps/demo/prove/dimostrazione.e2e.ts`, `pnpm --filter @mmg/demo test:browser`).
+  - La pagina gira dentro un iframe con la sandbox dell'artifact: niente finestre del browser, niente schede nuove, niente download.
+  - 15 prove: avvio, accesso con il codice del riquadro, AURA, ricetta con SPID simulato e promemoria su A5, certificato, ricetta dalla banca dati, voci cliniche e Profilo sanitario firmato, specialistica e seguito con il referto, prestazioni aggiuntive, ripetizione della segreteria, Fascicolo regionale, stampa, riepiloghi in CSV, importazione, strumenti con la conferma nella pagina.
+  - Accessibilità (axe) e bersagli di 44 px del riquadro, del visore e della conferma. In tutto il giro nessun errore della pagina né del servizio, e nessun messaggio d'errore nella console, nemmeno quelli del browser sulle finestre bloccate.
+  - Nella CI c'è una parte apposta, «Dimostrazione con …», che costruisce e prova con Chromium, WebKit e Firefox.
+  - Restano fuori da `pnpm test`, perché vogliono la dimostrazione costruita.
+
+Non provati nella dimostrazione: AFT (servono due studi), esportazione completa (un archivio che il visore non apre), «Aggiorna adesso» delle banche dati (nel browser non c'è `sync/`), cambio di medico dentro lo studio. La dimostrazione dentro la cornice vera di claude.ai e sul tablet resta da provare a mano.

@@ -10,6 +10,7 @@ import '../../web/src/styles/global.css';
 import './demo.css';
 import { installFetch, startService } from './bridge';
 import { DemoPanel } from './DemoPanel';
+import { installDialogs } from './dialogs';
 import { installNavigation } from './navigation';
 import { installDocumentViewer } from './viewer';
 import workerUrl from './worker/index.ts?worker&url';
@@ -46,6 +47,7 @@ function renderApp() {
 
 installFetch();
 installDocumentViewer();
+installDialogs();
 installNavigation(renderApp);
 
 startService(workerUrl, show).then(
