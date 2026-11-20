@@ -160,19 +160,20 @@ export function installDocumentViewer() {
   );
   const original = window.open.bind(window);
   window.open = (url?: string | URL, target?: string, features?: string) => {
-    if (url) {
-      const href = String(url);
-      if (href.startsWith('blob:')) {
-        void fetch(href)
-          .then((r) => r.blob())
-          .then((b) => show(b, 'Documento'));
-        return null;
-      }
-      const api = serviceUrl(href);
-      if (api) {
-        void openFromService(`${api.pathname}${api.search}`, 'Documento');
-        return null;
-      }
+    // Una scheda vuota da riempire dopo (Fascicolo regionale, D220): nella cornice non serve, e
+    // la pagina offre il collegamento, che si apre qui.
+    if (!url) return null;
+    const href = String(url);
+    if (href.startsWith('blob:')) {
+      void fetch(href)
+        .then((r) => r.blob())
+        .then((b) => show(b, 'Documento'));
+      return null;
+    }
+    const api = serviceUrl(href);
+    if (api) {
+      void openFromService(`${api.pathname}${api.search}`, 'Documento');
+      return null;
     }
     return original(url, target, features);
   };

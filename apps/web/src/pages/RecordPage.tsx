@@ -301,6 +301,11 @@ export function RecordPage() {
         <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/profilo-sanitario`}>
           <Icon name="archivio" /> <span>Profilo sanitario sintetico</span>
         </Link>
+        {isDoctor && (
+          <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/fascicolo-regionale`}>
+            <Icon name="archivio" /> <span>Fascicolo regionale</span>
+          </Link>
+        )}
       </nav>
 
       <div className="griglia-cartella">

@@ -1311,6 +1311,23 @@ Prove:
 
 **D219 · Risposte della fermata dopo l'unione della #19.** Via alla #20, unita. Nel campo 27 del promemoria resta il codice regionale davanti al nome (D217), da confermare al collaudo con il CSI. Per aprire il Fascicolo dalla cartella Simone ha risposto: «predisponilo subito ma poi chiediamo al CSI». Si costruisce con un simulatore sul modulo regionale del 2019 (D220); se valga ancora con l'autenticazione forte è una domanda per il CSI (`docs/avanzamento.md`, «Che cosa resta aperto», A4).
 
+**D220 · Aprire il Fascicolo regionale dalla cartella.** Risposta di Simone alla fermata dopo l'unione della #19 (D219): «predisponilo subito ma poi chiediamo al CSI». Fonte: CSI Piemonte, «Modulo regionale di accesso semplificato dalle CCE – Specifiche di integrazione dei servizi di accesso», V03, settembre 2019 (`docs/fse.md`).
+
+- **Come funziona, dalle specifiche.** La cartella chiama il servizio `getAuthentication` con:
+  - le credenziali RUPAR del medico;
+  - il ruolo (MMG) e l'applicazione (DMAWA);
+  - l'IP della postazione e il codice fiscale del paziente.
+
+  Il servizio controlla le credenziali e chiede al Fascicolo se il paziente c'è e se ha dato il consenso alla consultazione. Se va bene dà un token, e la cartella apre la pagina regionale con quel token. Il token vale una volta, e solo dall'IP dichiarato.
+
+- **Nel programma**: nella cartella, per i medici, «Fascicolo regionale». La pagina ha il filtro dei documenti delle specifiche (TIPO_DOCUMENTO, 16 tipi, scritti come una frase) e il pulsante «Apri il Fascicolo». La scheda nuova si prepara al clic, staccata dalla cartella (`opener` nullo), poi riceve l'indirizzo. Se il browser la blocca, resta un collegamento che vale una volta.
+- **Chi lo apre**: il medico sul suo archivio e il sostituto su quelli autorizzati (permesso `fse.consult`), ognuno con le sue credenziali RUPAR. Segreteria e amministratore no. Ogni richiesta resta nel registro degli accessi alla cartella (`apertura_fascicolo_regionale`).
+- **Errori**: i codici delle specifiche arrivano al medico con le loro parole. Quando la Regione rifiuta le credenziali (AUTH_ER_501), il rifiuto si annota come per gli invii (D102) e la pagina porta a «Credenziali dei servizi».
+- **Simulatore** (regola 7). Tiene i token in memoria, monouso e legati all'IP, e mostra una pagina del programma al posto di quella regionale. La pagina della cartella dice che il collegamento è simulato. In produzione, con il simulatore, l'apertura è spenta.
+- **Secondo fattore**: il modulo del 2019 chiede utente, password e PIN RUPAR, senza secondo fattore. Con l'autenticazione forte di oggi (D102, D109) è la domanda per il CSI (A4): se il modulo vale ancora, e con quali credenziali.
+
+Prove: `packages/integrations/test/fascicolo-regionale.test.ts` (5), `apps/api/test/fascicolo-regionale.test.ts` (8), `apps/web/test/fascicolo-regionale.test.tsx` (7), e la prova nel browser. Nel browser si controllano accessibilità, bersagli di 44 px e tablet; la scheda nuova con la pagina simulata, staccata dalla cartella; il token già usato, rifiutato. 14 sabotaggi. Non provato: il servizio vero del CSI e la pagina regionale vera.
+
 **D221 · Dimostrazione nel browser.** Richiesta di Simone del 20/11/2026: «per iniziare a testare il programma mi restituisci un artifact?». Un artifact è una pagina su claude.ai, senza servizio e senza database. Per provare il programma vero e non un'imitazione, gira tutto nel browser (pacchetto `apps/demo`):
 
 - **Interfaccia** di `apps/web` senza modifiche; **servizio** di `apps/api` in un Web Worker, con `buildApp` e i simulatori di sempre (regola 7).

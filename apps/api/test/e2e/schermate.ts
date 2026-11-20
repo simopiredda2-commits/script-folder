@@ -494,6 +494,15 @@ try {
     join(OUT, '32-profilo-sanitario-pdf'),
   ]);
   console.log('  32-profilo-sanitario-pdf.png');
+  // D220: aprire il Fascicolo regionale dalla cartella (simulatore del modulo del CSI).
+  await page.goto(`${base}/pazienti/${patientId}`);
+  await page
+    .getByRole('navigation', { name: 'Sezioni della cartella' })
+    .getByRole('link', { name: 'Fascicolo regionale', exact: true })
+    .click();
+  await page.getByRole('heading', { level: 1, name: 'Fascicolo regionale' }).waitFor();
+  await page.getByLabel('Documenti da mostrare').selectOption({ label: 'Referto di laboratorio' });
+  await shot(page, '74-fascicolo-regionale');
   await page.goto(`${base}/profilo/recapiti`);
   await page.getByRole('heading', { level: 1, name: 'Recapiti di studio' }).waitFor();
   await shot(page, '33-recapiti-di-studio');

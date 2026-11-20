@@ -32,6 +32,7 @@ import { SuppliesPage } from './pages/SuppliesPage';
 import { PpipPage } from './pages/PpipPage';
 import { PpipReportPage } from './pages/PpipReportPage';
 import { HealthProfilePage } from './pages/HealthProfilePage';
+import { FseAccessPage } from './pages/FseAccessPage';
 import { TemplateCertificatesPage } from './pages/TemplateCertificatesPage';
 import { TherapyForm } from './pages/TherapyForm';
 import { TodayPage } from './pages/TodayPage';
@@ -73,6 +74,7 @@ function Screens() {
           <Route path="/pazienti/:id/presidi" element={<SuppliesPage />} />
           <Route path="/pazienti/:id/prestazioni-aggiuntive" element={<PpipPage />} />
           <Route path="/pazienti/:id/profilo-sanitario" element={<HealthProfilePage />} />
+          <Route path="/pazienti/:id/fascicolo-regionale" element={<FseAccessPage />} />
           <Route path="/pazienti/:id/certificati-modelli" element={<TemplateCertificatesPage />} />
           <Route path="/pazienti/:id/terapie/nuova" element={<TherapyForm />} />
           <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
