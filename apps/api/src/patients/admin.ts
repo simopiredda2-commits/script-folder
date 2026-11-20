@@ -184,10 +184,46 @@ function changedKeys<K extends string>(
 const pick = <T extends object, K extends keyof T>(o: T, keys: readonly K[]) =>
   Object.fromEntries(keys.map((k) => [k, o[k]])) as Pick<T, K>;
 
-/** Errore di unicità di Postgres (codice fiscale già presente), anche avvolto da Drizzle. */
-function isUniqueViolation(err: unknown): boolean {
-  const e = err as { code?: string; cause?: { code?: string } };
-  return e?.code === '23505' || e?.cause?.code === '23505';
+/**
+ * Errore di unicità di Postgres sul codice fiscale dello studio (`patient_studio_fiscal_code_key`),
+ * anche avvolto da Drizzle. Gli altri errori di unicità restano errori del servizio.
+ */
+function isFiscalCodeConflict(err: unknown): boolean {
+  const e = err as { code?: string; constraint?: string; cause?: unknown };
+  if (e?.code === '23505') return e.constraint === 'patient_studio_fiscal_code_key';
+  return e?.cause !== undefined && e.cause !== err && isFiscalCodeConflict(e.cause);
+}
+
+/** Il doppione arrivato nello stesso istante, quando il primo non si trova più (D229). */
+const JUST_REGISTERED = 'Il codice fiscale è appena stato registrato per un altro paziente';
+
+/**
+ * Due richieste con lo stesso codice fiscale nello stesso istante: tutte e due passano il controllo,
+ * l'indice unico ferma la seconda (D229). Esce dalla transazione con quello che serve per scrivere,
+ * dopo il ritorno indietro, la risposta e la riga del registro del doppione.
+ */
+class FiscalCodeRace extends Error {
+  constructor(
+    readonly actor: Actor,
+    readonly fiscalCode: string,
+    readonly now: Date,
+  ) {
+    super('codice fiscale registrato nello stesso istante da un’altra richiesta');
+  }
+}
+
+/**
+ * Dopo il ritorno indietro il paziente entrato per primo c'è: la seconda richiesta riceve la
+ * risposta del doppione, con la sua riga nel registro, come se fosse arrivata dopo (D229).
+ */
+async function settleFiscalCodeRace(
+  db: Database,
+  race: FiscalCodeRace,
+  action: 'nuovo_paziente' | 'correzione_identita',
+  exceptId?: string,
+): Promise<unknown> {
+  const taken = await fiscalCodeTaken(db, race.actor, race.fiscalCode, race.now, action, exceptId);
+  return taken ? settleRefusal(db, taken) : new HttpError(409, JUST_REGISTERED);
 }
 
 // --- Archivi ---------------------------------------------------------------------------------
@@ -473,7 +509,13 @@ export async function createPatientIn(
       >),
       ...adminColumns(dati),
     })
-    .returning({ id: patient.id });
+    .returning({ id: patient.id })
+    .catch((err: unknown) => {
+      // Lo stesso codice fiscale entrato da un'altra richiesta dopo il controllo (D229).
+      throw isFiscalCodeConflict(err)
+        ? new FiscalCodeRace(actor, input.identita.codiceFiscale, now)
+        : err;
+    });
   // Paziente temporaneo: la scelta del titolare dell'archivio, a mano, fino alla scadenza.
   const choice = input.sceltaTemporanea;
   if (choice) {
@@ -509,11 +551,11 @@ export async function createPatientIn(
 
 /**
  * Dopo il ritorno indietro della transazione di un paziente nuovo: il rifiuto nel registro, con il
- * suo errore; due registrazioni dello stesso codice fiscale nello stesso momento, vince la prima.
+ * suo errore; due registrazioni dello stesso codice fiscale nello stesso momento, vince la prima, e
+ * la seconda è un doppione come gli altri (D229).
  */
 export async function settleNewPatientError(db: Database, err: unknown): Promise<unknown> {
-  if (isUniqueViolation(err))
-    return new HttpError(409, 'Il codice fiscale è appena stato registrato per un altro paziente');
+  if (err instanceof FiscalCodeRace) return settleFiscalCodeRace(db, err, 'nuovo_paziente');
   return settleRefusal(db, err);
 }
 
@@ -809,8 +851,14 @@ export async function correctIdentity(
       return row!;
     });
   } catch (err) {
-    if (isUniqueViolation(err))
-      throw new HttpError(409, 'Il codice fiscale è appena stato registrato per un altro paziente');
+    // Lo stesso codice fiscale entrato da un'altra richiesta dopo il controllo (D229).
+    if (isFiscalCodeConflict(err))
+      throw await settleFiscalCodeRace(
+        db,
+        new FiscalCodeRace(actor, after.codiceFiscale, now),
+        'correzione_identita',
+        p.id,
+      );
     throw err;
   }
   return { identita: identityFields(updated), campi: changed, avvisi: fiscalCodeCoherence(after) };

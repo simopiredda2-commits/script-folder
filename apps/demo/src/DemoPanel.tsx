@@ -105,10 +105,11 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           {ready.aura.registry && <li>un’ASL diversa per {ready.aura.registry}, da confermare;</li>}
           {ready.aura.deceased && <li>il decesso di {ready.aura.deceased}, da confermare;</li>}
           {ready.aura.revoked && <li>la revoca di {ready.aura.revoked};</li>}
-          {ready.aura.doctorChange && (
+          {ready.aura.doctorChanges.length > 0 && (
             <li>
-              la scelta di {ready.aura.doctorChange} per la collega {ready.aura.colleague}: il
-              cambio di medico, da decidere;
+              la scelta di {ready.aura.doctorChanges.join(' e di ')} per la collega{' '}
+              {ready.aura.colleague}: il cambio di medico, da decidere con «Sposta» o «Non
+              spostare»;
             </li>
           )}
           <li>un nuovo assistito, {ready.aura.newPatient}, da registrare.</li>

@@ -6,7 +6,8 @@
  * - un'anagrafica diversa (l'ASL), da confermare;
  * - un decesso segnalato, da confermare;
  * - una scelta cessata, che fa revocato il paziente;
- * - la scelta della collega dello studio (colleghi.ts): il cambio di medico dentro lo studio (D200);
+ * - la scelta della collega dello studio (colleghi.ts) per due pazienti: il cambio di medico dentro
+ *   lo studio (D200), uno da spostare e uno da lasciare con «Non spostare» (D229);
  * - un nuovo assistito che ha scelto il medico.
  *
  * Le variazioni dei pazienti si applicano prima che il servizio ascolti AURA, con due giri in fila
@@ -171,11 +172,13 @@ export function createAuraDemo(): AuraDemo {
       const registry = pick(byAge);
       if (registry) gateway.setRegistry(auraIds.get(registry)!, { asl: AURA_DEMO_ASL });
 
-      // Il più giovane senza ricette né certificati aperti sceglie la collega dello studio.
+      // I due più giovani senza ricette né certificati aperti scelgono la collega dello studio: uno
+      // da spostare e uno da lasciare nell'archivio (D229).
       const open = await withOpenItems(db);
-      const moving = pick([...byAge].reverse().filter((id) => !open.has(id)));
-      if (moving)
-        gateway.setChoice(auraIds.get(moving)!, {
+      const young = [...byAge].reverse().filter((id) => !open.has(id));
+      const changing = [pick(young), pick(young)].filter((id) => id !== undefined);
+      for (const id of changing)
+        gateway.setChoice(auraIds.get(id)!, {
           doctorFiscalCode: colleagues.colleagueFiscalCode,
           chosenOn: day(-3),
           expiresOn: null,
@@ -190,7 +193,7 @@ export function createAuraDemo(): AuraDemo {
         registry: name(registry),
         deceased: name(deceased),
         revoked: name(revoked),
-        doctorChange: name(moving),
+        doctorChanges: changing.map((id) => name(id)!),
         colleague: colleagues.colleagueName,
       };
     },
