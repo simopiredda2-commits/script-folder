@@ -281,7 +281,7 @@ Fonti ufficiali lette il 18/11/2026 (sessione nell'ambiente «Folder», D92): DM
 
 **Non fatto**
 
-- Posizioni di stampa, suddivisione dell'NRE nei codici a barre e dicitura delle specifiche di stampa del 1/3/2016: il documento non è sul portale. Carattere OCR-A per l'NRE in chiaro (D97).
+- Posizioni di stampa, suddivisione dell'NRE nei codici a barre e dicitura delle specifiche di stampa del 1/3/2016: il documento non è sul portale. Carattere OCR-A per l'NRE in chiaro (D97): fatto il 20/11/2026 (D211).
 - Fornitore vero di email e SMS; frase regionale nell'ultima riga del promemoria.
 
 **Non provato**

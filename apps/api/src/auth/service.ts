@@ -659,8 +659,9 @@ export function createAuthService(deps: AuthDeps) {
   }
 
   /**
-   * Riconosce la sessione. Dopo `idleLockMinutes` di inattività (impostazione dello studio,
-   * da completare) la sessione si blocca: serve la password per sbloccarla.
+   * Riconosce la sessione. Dopo `idleLockMinutes` di inattività (impostazione dello studio: 5
+   * minuti per difetto, scelta della prima fermata, D29) la sessione si blocca, su ogni postazione
+   * (D178, D181); si sblocca con il codice a 6 cifre (D31).
    */
   async function authenticate(sessionToken: string): Promise<AuthenticateResult> {
     const row = await loadSession(sessionToken);

@@ -12,7 +12,7 @@ sync/banche_dati.py  →  dati-pubblici/correnti/…, stato.json  →  importazi
 
 | Tipo                    | Da dove                                                             | Come            | Serve per                                 |
 | ----------------------- | ------------------------------------------------------------------- | --------------- | ----------------------------------------- |
-| `farmaci`               | AIFA, anagrafica delle confezioni (CSV)                             | file di `sync/` | ricerca farmaci                           |
+| `farmaci`               | AIFA, anagrafica delle confezioni (CSV)                             | file di `sync/` | ricerca farmaci, R22 (D210)               |
 | `farmaci_classe`        | AIFA, classe A e H per principio attivo (CSV)                       | file di `sync/` | R8, prezzo, equivalenti                   |
 | `farmaci_trasparenza`   | AIFA, lista di trasparenza dei farmaci equivalenti (CSV)            | file di `sync/` | prezzo di riferimento, equivalenti (D202) |
 | `farmaci_carenti`       | AIFA, elenco dei medicinali carenti (CSV)                           | file di `sync/` | R21, carenze in terapia e in Oggi (D202)  |
@@ -258,7 +258,7 @@ Solo fatti che hanno una fonte; l'assenza da un elenco non diventa mai un «no»
 | Prestazioni di un'esenzione                   | elenco esenzione → prestazioni                                                                                         | R17     |
 | Prescrivibile dal medico di medicina generale | **non noto**: serve una fonte strutturata                                                                              | R8      |
 | Regime di fornitura                           | anagrafica (`FORNITURA`): letto, non ancora usato dalle regole                                                         | —       |
-| Confezione sospesa                            | anagrafica (`STATO_AMMINISTRATIVO`): variazioni in terapia e ricerca (D205), non usata dalle regole                    | —       |
+| Confezione sospesa                            | anagrafica in vigore alla data (`STATO_AMMINISTRATIVO` «Sospesa»): variazioni in terapia e ricerca (D205), ricetta (D210) | R22     |
 | Registro o piano AIFA                         | elenco dei registri attivi, per ATC (D206): mostrato nei dati del farmaco, non usato dalle regole                      | —       |
 | Unità per confezione                          | **non noto**                                                                                                           | R4, R11 |
 | Antibiotico iniettabile o infusione           | **non noto**                                                                                                           | R3      |

@@ -83,6 +83,6 @@ Come funziona:
 - Adattatori veri per SAR e Sistema TS, con l'autenticazione forte (Id-Sessione) del Sistema TS.
 - Casi in cui l'annullamento è ammesso.
 - Modulo di stampa della ricetta rossa.
-- Promemoria: posizioni sulla pagina, suddivisione dell’NRE nei codici a barre e dicitura aggiornata secondo le «Specifiche tecniche per la stampa del promemoria» (versione 1/3/2016, citata dalla Regione): il documento non è stato trovato sul portale. Carattere OCR-A per l’NRE in chiaro: oggi Courier, serve un carattere OCR-A con licenza compatibile. Frase regionale nell’ultima riga, comunicata dal SAC.
+- Promemoria: posizioni sulla pagina, suddivisione dell’NRE nei codici a barre e dicitura aggiornata secondo le «Specifiche tecniche per la stampa del promemoria» (versione 1/3/2016, citata dalla Regione): il documento non è stato trovato sul portale. Il carattere OCR-A per l’NRE in chiaro c’è dal 20/11/2026 (D211); resta da controllare con una stampa vera. Frase regionale nell’ultima riga, comunicata dal SAC.
 - Fornitore vero di email e SMS, con le garanzie sul trattamento dei dati.
 - Se il SAR comunica l'erogazione in farmacia; lo stato «sospesa» (6) delle specifiche del Sistema TS nella tavola degli stati di processo, oggi non tra gli stati del prodotto (D70).

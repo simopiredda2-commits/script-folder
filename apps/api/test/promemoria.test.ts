@@ -13,6 +13,7 @@ import {
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
 import { OBSCURED_TEXT, RELEASE_TEXT, type PromemoriaData } from '../src/reminders/promemoria';
+import { pdfFontNames } from './helpers/pdf-fonts';
 import { pdfText } from './helpers/pdf-text';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -146,6 +147,23 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     expect(text).toContain(`CF ${pt.fiscalCode}`);
     expect(text).toContain(p.authCode!);
     expect(text).not.toContain('Farmaco di prova');
+  });
+
+  it('NRE e codice fiscale in chiaro con l’OCR-A incorporato, non più il Courier (D211)', async () => {
+    const id = await sent(pharma());
+    for (const query of ['', '?formato=nre']) {
+      const res = await req('GET', `/api/ricette/${id}/promemoria${query}`);
+      expect(res.statusCode, res.body).toBe(200);
+      const fonts = await pdfFontNames(res.rawPayload);
+      expect(
+        fonts.filter((f) => /OCRA/.test(f)),
+        fonts.join(', '),
+      ).toHaveLength(1);
+      expect(
+        fonts.some((f) => /Courier/.test(f)),
+        fonts.join(', '),
+      ).toBe(false);
+    }
   });
 
   it('oscuramento chiesto dal paziente: nome e indirizzo non compaiono', async () => {
