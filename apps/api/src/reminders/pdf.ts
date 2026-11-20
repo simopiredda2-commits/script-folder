@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import fontkit from '@pdf-lib/fontkit';
+import { printDocumentKind, type PaperSize } from '@mmg/domain';
 import { PDFDocument, rgb, StandardFonts, type PDFFont, type PDFPage } from 'pdf-lib';
 import { code39Bars } from './code39';
 import {
@@ -32,10 +33,17 @@ export const BARCODE_HEIGHT_MM = 10;
 export const BARCODE_MODULE_MM_2024 = 25.4 / 100;
 /** Versione 2: l'altezza del codice deve essere di 8 mm (campi 2 e 9). */
 export const BARCODE_HEIGHT_MM_2024 = 8;
-/** Il promemoria deve avere formato pari alla metà di un foglio A4: la metà alta della pagina. */
+/**
+ * Il promemoria deve avere formato pari alla metà di un foglio A4: una pagina A5 orizzontale
+ * oppure, per le stampanti senza A5, la metà alta di una pagina A4 (D222).
+ */
 export const HALF_A4_MM = 297 / 2;
 
 const A4: [number, number] = [595.28, 841.89];
+/** A5 orizzontale (ISO 216): 210 × 148 mm. Il modello del 2024 finisce a 146 mm dall'alto. */
+const A5_LANDSCAPE: [number, number] = [595.28, 419.53];
+/** Carta del promemoria senza preferenza: quella dei tipi di documento da stampare (A5, D222). */
+export const DEFAULT_REMINDER_PAPER: PaperSize = printDocumentKind('promemoria').defaultPaper!;
 const LEFT = 40;
 const RIGHT = A4[0] - 40;
 
@@ -93,14 +101,14 @@ function clip(font: PDFFont, text: string, size: number, width: number): string 
   return `${out.trimEnd()}…`;
 }
 
-async function newDocument(title: string, created: string) {
+async function newDocument(title: string, created: string, size: [number, number] = A4) {
   const doc = await PDFDocument.create();
   const when = new Date(`${created}T12:00:00Z`);
   doc.setTitle(title);
   doc.setCreationDate(when);
   doc.setModificationDate(when);
   doc.setProducer('Cartella clinica');
-  const page = doc.addPage(A4);
+  const page = doc.addPage(size);
   doc.registerFontkit(fontkit);
   return { doc, page };
 }
@@ -124,18 +132,30 @@ async function fonts2024(doc: PDFDocument): Promise<Fonts2024> {
 
 const ddmmyyyy = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
-/** Il promemoria completo della ricetta SSN, dai dati fissati all'invio, nella loro versione. */
-export async function renderPromemoria(d: PromemoriaData): Promise<Uint8Array> {
-  return d.versione === 1 ? renderPromemoriaV1(d) : renderPromemoria2024(d);
+/**
+ * Il promemoria completo della ricetta SSN, dai dati fissati all'invio, nella loro versione. La
+ * carta vale per il modello del 2024; la versione 1 si ristampa com'era, su A4.
+ */
+export async function renderPromemoria(
+  d: PromemoriaData,
+  paper: PaperSize = DEFAULT_REMINDER_PAPER,
+): Promise<Uint8Array> {
+  return d.versione === 1 ? renderPromemoriaV1(d) : renderPromemoria2024(d, paper);
 }
 
 /**
  * Il foglio con il solo numero di ricetta: NRE e codice fiscale, a barre e in chiaro, con il
  * codice di autenticazione, che va su ogni documento consegnato al paziente.
  */
-export async function renderSoloNre(d: PromemoriaData): Promise<Uint8Array> {
-  return d.versione === 1 ? renderSoloNreV1(d) : renderSoloNre2024(d);
+export async function renderSoloNre(
+  d: PromemoriaData,
+  paper: PaperSize = DEFAULT_REMINDER_PAPER,
+): Promise<Uint8Array> {
+  return d.versione === 1 ? renderSoloNreV1(d) : renderSoloNre2024(d, paper);
 }
+
+/** La pagina del modello del 2024 per la carta scelta. */
+const pageFor = (paper: PaperSize): [number, number] => (paper === 'A5' ? A5_LANDSCAPE : A4);
 
 // ---------------------------------------------------------------------------------------------
 // Versione 2: specifiche di stampa del promemoria del Sistema TS, 28/02/2024 (D217).
@@ -206,7 +226,7 @@ class Sheet {
     const left = opts.align === 'center' ? x - w / 2 : opts.align === 'right' ? x - w : x;
     this.page.drawText(t, {
       x: left * MM,
-      y: A4[1] - baseline * MM,
+      y: this.page.getHeight() - baseline * MM,
       size,
       font,
       color: rgb(0, 0, 0),
@@ -243,8 +263,8 @@ class Sheet {
 
   line(x1: number, y1: number, x2: number, y2: number, thickness = 0.6) {
     this.page.drawLine({
-      start: { x: x1 * MM, y: A4[1] - y1 * MM },
-      end: { x: x2 * MM, y: A4[1] - y2 * MM },
+      start: { x: x1 * MM, y: this.page.getHeight() - y1 * MM },
+      end: { x: x2 * MM, y: this.page.getHeight() - y2 * MM },
       thickness,
       color: rgb(0, 0, 0),
     });
@@ -264,7 +284,7 @@ class Sheet {
     for (const b of bars) {
       this.page.drawRectangle({
         x: (x + b.x) * MM,
-        y: A4[1] - (top + height) * MM,
+        y: this.page.getHeight() - (top + height) * MM,
         width: b.width * MM,
         height: height * MM,
         color: rgb(0, 0, 0),
@@ -313,8 +333,12 @@ function heading(s: Sheet, d: PromemoriaDataV2, title: string) {
 }
 
 /** Il promemoria della ricetta SSN, modello del Sistema TS del 28/02/2024 (facsimile nr. 0). */
-async function renderPromemoria2024(d: PromemoriaDataV2): Promise<Uint8Array> {
-  const { doc, page } = await newDocument(`Promemoria della ricetta ${d.nre}`, d.data);
+async function renderPromemoria2024(d: PromemoriaDataV2, paper: PaperSize): Promise<Uint8Array> {
+  const { doc, page } = await newDocument(
+    `Promemoria della ricetta ${d.nre}`,
+    d.data,
+    pageFor(paper),
+  );
   const fonts = await fonts2024(doc);
   const s = new Sheet(page, fonts);
   const leftOfCf = heading(s, d, 'RICETTA ELETTRONICA – PROMEMORIA PER L’ASSISTITO');
@@ -472,8 +496,8 @@ function prescriptionTable(s: Sheet, d: PromemoriaDataV2) {
 }
 
 /** Il foglio «solo NRE» con le misure del modello del 2024: numero, codice fiscale e medico. */
-async function renderSoloNre2024(d: PromemoriaDataV2): Promise<Uint8Array> {
-  const { doc, page } = await newDocument(`Numero della ricetta ${d.nre}`, d.data);
+async function renderSoloNre2024(d: PromemoriaDataV2, paper: PaperSize): Promise<Uint8Array> {
+  const { doc, page } = await newDocument(`Numero della ricetta ${d.nre}`, d.data, pageFor(paper));
   const fonts = await fonts2024(doc);
   const s = new Sheet(page, fonts);
   const leftOfCf = heading(s, d, 'RICETTA ELETTRONICA – NUMERO DELLA RICETTA');

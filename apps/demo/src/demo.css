@@ -1,0 +1,252 @@
+/*
+ * La cornice della dimostrazione (D221): avvio, riquadro con utenti e codice, visore dei documenti.
+ * Colori e caratteri dai gettoni del marchio (packages/brand/tokens.css); l'interfaccia resta la sua.
+ */
+.avvio {
+  max-width: 34rem;
+  margin: 12vh auto 0;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px))
+    max(16px, env(safe-area-inset-right, 0px));
+  font-family: var(--font-text);
+  color: var(--color-text);
+}
+.avvio-marchio {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  color: var(--color-primary);
+  margin: 0;
+}
+.avvio-azienda {
+  font-family: var(--font-text);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+.avvio-titolo {
+  font-size: 1.125rem;
+  margin: 0.25rem 0 1.5rem;
+}
+.avvio-stato {
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid var(--color-primary);
+  background: var(--color-info-surface);
+}
+.avvio-errore .avvio-stato {
+  border-left-color: var(--color-danger);
+  background: var(--color-danger-surface);
+}
+.avvio-dettaglio {
+  color: var(--color-text);
+}
+.avvio-nota {
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+}
+
+.dimo,
+.dimo-apri {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  font-family: var(--font-text);
+  color: var(--color-text);
+}
+.dimo {
+  width: min(24rem, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius);
+  box-shadow: 0 6px 24px rgb(14 20 53 / 0.18);
+  padding: 0.75rem 1rem 1rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+.dimo h2 {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  margin: 0;
+  color: var(--color-primary);
+}
+.dimo h3 {
+  font-size: 0.9375rem;
+  margin: 0.75rem 0 0.25rem;
+}
+.dimo p {
+  margin: 0.375rem 0;
+}
+.dimo-testata {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dimo-etichetta {
+  background: var(--color-mark);
+  color: var(--color-on-mark);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+.dimo button {
+  min-height: var(--size-min-target);
+  min-width: var(--size-min-target);
+  font: inherit;
+  cursor: pointer;
+}
+.dimo-chiudi {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  padding: 0 0.75rem;
+}
+.dimo table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.dimo th,
+.dimo td {
+  text-align: left;
+  padding: 0.25rem 0.375rem 0.25rem 0;
+  border-bottom: 1px solid var(--color-divider);
+  vertical-align: top;
+}
+.dimo code {
+  font-family: var(--font-mono);
+}
+.dimo-codice {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  background: var(--color-mark);
+  color: var(--color-on-mark);
+  padding: 0 0.375rem;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.dimo-tenue {
+  color: var(--color-text-muted);
+}
+.dimo-ricomincia {
+  margin-top: 0.5rem;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0 1rem;
+}
+.dimo-apri {
+  min-height: var(--size-min-target);
+  padding: 0 1rem;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: 0;
+  border-radius: var(--radius);
+  font-weight: 600;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  cursor: pointer;
+}
+.dimo-codice-breve {
+  font-family: var(--font-mono);
+  background: var(--color-mark);
+  color: var(--color-on-mark);
+  padding: 0 0.25rem;
+  border-radius: 4px;
+}
+.dimo button:focus-visible,
+.dimo-apri:focus-visible,
+.dimo-visore button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.dimo-visore {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  background: rgb(14 20 53 / 0.55);
+  display: flex;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px))
+    max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+}
+.dimo-visore-riquadro {
+  background: var(--color-surface);
+  color: var(--color-text);
+  width: min(960px, 100%);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius);
+  overflow: hidden;
+  font-family: var(--font-text);
+}
+.dimo-visore-testata {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--color-divider);
+}
+.dimo-visore-testata h2 {
+  font-size: 1rem;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.dimo-visore-chiudi {
+  margin-left: auto;
+  min-height: var(--size-min-target);
+  padding: 0 1rem;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: 0;
+  border-radius: var(--radius);
+  font: inherit;
+  cursor: pointer;
+}
+.dimo-visore-nota {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+.dimo-visore-corpo {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  background: var(--color-surface-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.dimo-visore-corpo canvas {
+  max-width: 100%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(14 20 53 / 0.25);
+}
+.dimo-visore-corpo pre {
+  align-self: stretch;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+.dimo-visore-errore {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dimo,
+  .dimo-visore {
+    scroll-behavior: auto;
+  }
+}

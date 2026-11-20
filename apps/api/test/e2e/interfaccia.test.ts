@@ -2473,6 +2473,39 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     );
   });
 
+  it('Fascicolo regionale (D220): dalla cartella in una scheda nuova, con la pagina simulata', async () => {
+    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('navigation', { name: 'Sezioni della cartella' })
+      .getByRole('link', { name: 'Fascicolo regionale', exact: true })
+      .click();
+    await page.getByRole('heading', { level: 1, name: 'Fascicolo regionale' }).waitFor();
+    await page.getByText(/^Collegamento simulato: si apre una pagina di prova/).waitFor();
+    await page
+      .getByLabel('Documenti da mostrare')
+      .selectOption({ label: 'Referto di laboratorio' });
+    await check(page, 'apertura del Fascicolo regionale', true);
+    // La scheda nuova si apre al clic e riceve l'indirizzo con il token, che vale una volta.
+    const [tab] = await Promise.all([
+      doctor.waitForEvent('page'),
+      page.getByRole('button', { name: 'Apri il Fascicolo' }).click(),
+    ]);
+    await tab
+      .getByText(
+        /^Fascicolo Sanitario Elettronico regionale \(simulatore\)\. Qui si aprirebbe il Fascicolo dell’assistito [A-Z0-9]{16}, con i documenti di tipo REFERTO DI LABORATORIO\.$/,
+      )
+      .waitFor();
+    expect(new URL(tab.url()).pathname).toBe('/api/simulatori/fascicolo');
+    // La pagina regionale non vede la cartella che l'ha aperta.
+    expect(await tab.evaluate(() => window.opener)).toBeNull();
+    await page.getByText('Fascicolo aperto in una scheda nuova.').waitFor();
+    // Il token è già usato: riaprire lo stesso indirizzo non vale.
+    const again = await page.request.get(tab.url());
+    expect(again.status()).toBe(403);
+    expect(await again.text()).toContain('Token di autenticazione non valido (WEB_001)');
+    await tab.close();
+  });
+
   it('prestazioni aggiuntive (D212): dalla cartella, distinta del mese con il CSV, invio simulato all’ASL', async () => {
     // La distinta si manda per il mese finito: la prestazione è del 10 del mese scorso.
     const [y, m] = studioDate(s.clock.now()).split('-').map(Number) as [number, number];

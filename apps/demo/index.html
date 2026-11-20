@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dimostrazione di %NOME_PRODOTTO%</title>
+  </head>
+  <body>
+    <div id="avvio" class="avvio" role="status" aria-live="polite">
+      <p class="avvio-marchio">
+        %NOME_PRODOTTO% <span class="avvio-azienda">by %MARCHIO_AZIENDA%</span>
+      </p>
+      <p class="avvio-titolo">Dimostrazione nel browser</p>
+      <p id="avvio-stato" class="avvio-stato">Preparo il programma…</p>
+      <p id="avvio-dettaglio" class="avvio-dettaglio" hidden></p>
+      <p class="avvio-nota">
+        Programma, database e servizi simulati girano in questa pagina. Pazienti inventati: niente
+        esce dal browser.
+      </p>
+    </div>
+    <div id="root"></div>
+    <div id="dimostrazione"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

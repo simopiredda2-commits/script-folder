@@ -134,9 +134,9 @@ In **Strumenti › Registro di amministrazione**, per i titolari e l'amministrat
 ## Postazioni e stampa (D166, D178, D180)
 
 - **Postazioni:** il nome che ognuno scrive all'accesso, per ogni computer dello studio, condivisa o personale; il browser lo ricorda dopo una password giusta (D178). Si archiviano, non si cancellano.
-- **Preferenze di stampa** per sei documenti: promemoria SSN, ricetta bianca, certificato INPS, certificati dai modelli, schema orario, Profilo sanitario. Per ognuno: stampante consigliata, copie (da 1 a 5), carta (A4 o A5, solo per i certificati dai modelli e lo schema orario), e per il promemoria che cosa proporre per primo (completo o solo NRE). Vale la postazione, poi lo studio, poi la predefinita, campo per campo.
+- **Preferenze di stampa** per sei documenti: promemoria SSN, ricetta bianca, certificato INPS, certificati dai modelli, schema orario, Profilo sanitario. Per ognuno: stampante consigliata, copie (da 1 a 5), carta (A5 o A4 per il promemoria SSN, A5 per difetto, D222; A4 o A5 per i certificati dai modelli e lo schema orario), e per il promemoria che cosa proporre per primo (completo o solo NRE). Vale la postazione, poi lo studio, poi la predefinita, campo per campo.
 - **Chi:** le imposta l'amministratore, per lo studio o per una postazione; medici e segreteria vedono che cosa vale sulla loro postazione e un suggerimento accanto a ogni pulsante di stampa.
-- **Che cosa fa davvero il programma**, che sta nel browser: stampante e copie si suggeriscono e si confermano nella finestra di stampa; la carta dei certificati dai modelli cambia il PDF. I formati dei documenti ufficiali non si scelgono: dove l'atto non è stato letto per la carta resta quello di oggi (promemoria A4, D97; INPS A4; Profilo A4; ricetta bianca il PDF del Sistema TS).
+- **Che cosa fa davvero il programma**, che sta nel browser: stampante e copie si suggeriscono e si confermano nella finestra di stampa; la carta del promemoria SSN e dei certificati dai modelli cambia il PDF, anche quello allegato all'email. Il promemoria è grande metà foglio A4 come vogliono le specifiche del 28/02/2024 (D217): su A5 riempie la pagina, su A4 ne occupa la metà alta. Gli altri formati ufficiali non si scelgono: INPS A4, Profilo A4, ricetta bianca il PDF del Sistema TS.
 
 ## Stato del servizio e ambiente (D170)
 
@@ -159,7 +159,7 @@ Risposte di Simone alla fermata dopo la tappa 15 in D181: quelle sui poteri dell
 
 - **Elenchi dello studio** (dalla revisione del piano): posologie e pacchetti sono contenuto clinico. Risposta di Simone (D181): «solo i medici e l'amministratore». Fatto nella tappa 16: li scrivono i titolari, l'amministratore e il sostituto solo con un'autorizzazione attiva su un archivio dello studio; senza, li legge e il tentativo di scrivere resta nel registro.
 - **Stampa diretta**, senza la finestra di stampa (requisiti, «stampa diretta in studio»): consigliata un'impostazione del browser sulla postazione (modalità chiosco), da provare su un computer dello studio; l'alternativa è un programma da installare, contro «nessuna installazione».
-- **Formato del promemoria:** oggi A4; le «Specifiche tecniche per la stampa del promemoria» (1/3/2016) non sono state trovate (D97).
+- **Formato del promemoria:** chiusa. Le specifiche di stampa del 28/02/2024 vogliono mezzo foglio A4 (D217); per richiesta di Simone A5 per difetto, A4 come scelta (D222).
 - **Copie dentro il PDF** (per esempio due copie per il lavoratore) invece del solo suggerimento?
 - **Poteri dell'amministratore** (D179, dalle revisioni avversarie):
   - in medicina di gruppo una segreteria confermata da un solo titolare leggeva gli archivi di tutti: risposta di Simone, la conferma per archivio; fatto nella tappa 16 (D185, problema 3);

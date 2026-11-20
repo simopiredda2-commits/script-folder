@@ -58,7 +58,7 @@ const STATIONS = {
 };
 
 const KINDS = [
-  ['promemoria', 'Promemoria della ricetta SSN', [], 'A4', true],
+  ['promemoria', 'Promemoria della ricetta SSN', ['A5', 'A4'], 'A5', true],
   ['certificato_inps', 'Certificato di malattia INPS', [], 'A4', false],
   ['certificato_modello', 'Certificati dai modelli', ['A4', 'A5'], 'A4', false],
   ['schema_orario', 'Schema orario della terapia', ['A4', 'A5'], null, false],
@@ -241,10 +241,11 @@ describe('preferenze di stampa (tappa 14)', () => {
           promemoria: {
             stampante: 'Stampante della segreteria',
             variante: 'solo_nre',
+            carta: 'A4',
             da: {
               stampante: 'studio',
               copie: 'predefinito',
-              carta: 'predefinito',
+              carta: 'studio',
               variante: 'studio',
             },
             suggerimento:
@@ -269,6 +270,9 @@ describe('preferenze di stampa (tappa 14)', () => {
     expect(links[0]!.getAttribute('href')).toBe('/api/ricette/r1/promemoria?formato=nre');
     expect(links[0]!.getAttribute('aria-describedby')).toBe(hint.id);
     expect(hint.textContent).toMatch(/Si confermano nella finestra di stampa\./);
+    // La carta scelta dallo studio, e come stampare perché i codici restino delle misure giuste.
+    expect(within(panel).getByText(/Carta A4, con il promemoria nella metà alta\./)).toBeTruthy();
+    expect(within(panel).getByText(/Stampa al 100% \(«dimensioni effettive»\)/)).toBeTruthy();
   });
 
   it('senza preferenze il promemoria resta com’è: completo per primo, nessun suggerimento', async () => {
@@ -293,5 +297,7 @@ describe('preferenze di stampa (tappa 14)', () => {
     expect(links.every((l) => !l.className.includes('pulsante-primario'))).toBe(true);
     expect(links.every((l) => !l.hasAttribute('aria-describedby'))).toBe(true);
     expect(within(panel).queryByText(/finestra di stampa/)).toBeNull();
+    // Senza preferenze: A5 orizzontale (D222).
+    expect(await within(panel).findByText(/Carta A5 orizzontale\./)).toBeTruthy();
   });
 });

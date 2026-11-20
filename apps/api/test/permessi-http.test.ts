@@ -50,7 +50,12 @@ describe('ruoli e permessi attraverso il servizio', () => {
     expect(own.sort()).toEqual([...s.patients.titolare].sort());
     const all = (await get('segreteria', '/api/pazienti')).json().pazienti;
     expect(all).toHaveLength(s.patients.titolare.length + s.patients.collega.length);
-    expect((await get('amministratore', '/api/pazienti')).json().pazienti).toHaveLength(0);
+    // L'amministratore dello studio non vede nessun archivio: la risposta lo dice, per spiegarlo.
+    expect((await get('amministratore', '/api/pazienti')).json()).toEqual({
+      pazienti: [],
+      archivi: 0,
+    });
+    expect((await get('titolare', '/api/pazienti')).json().archivi).toBe(1);
   });
 
   it('la ricerca trova per cognome e per codice fiscale', async () => {

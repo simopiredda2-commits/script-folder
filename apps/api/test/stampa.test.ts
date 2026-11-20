@@ -180,7 +180,7 @@ describe('preferenze di stampa (tappa 14)', () => {
         expect(x.suggerimento).toBeNull();
         expect(x.copie).toBe(1);
       }
-      expect(of(p, 'promemoria')).toMatchObject({ carta: 'A4', variante: 'completo' });
+      expect(of(p, 'promemoria')).toMatchObject({ carta: 'A5', variante: 'completo' });
       expect(of(p, 'certificato_modello')).toMatchObject({ carta: 'A4', cartaScelta: true });
       expect(of(p, 'promemoria_bianca')).toMatchObject({ carta: null, cartaScelta: false });
     }
@@ -227,10 +227,14 @@ describe('preferenze di stampa (tappa 14)', () => {
   });
 
   it('la carta si sceglie solo dove è ammessa, e solo A4 o A5', async () => {
-    const fixed = await put(setting({ tipo: 'promemoria', carta: 'A5' }));
+    // Il promemoria: A5 per difetto, A4 a metà per le stampanti senza A5 (D222).
+    expect((await put(setting({ tipo: 'promemoria', carta: 'A4' }))).statusCode).toBe(200);
+    const notReminder = await put(setting({ tipo: 'promemoria', carta: 'A3' }));
+    expect(problems(notReminder)).toEqual(['Carta: per «Promemoria della ricetta SSN» A5 o A4']);
+    const fixed = await put(setting({ tipo: 'certificato_inps', carta: 'A5' }));
     expect(fixed.statusCode).toBe(400);
     expect(problems(fixed)).toEqual([
-      'Carta: per «Promemoria della ricetta SSN» il formato è fissato (A4), non si sceglie',
+      'Carta: per «Certificato di malattia INPS» il formato è fissato (A4), non si sceglie',
     ]);
     for (const tipo of ['certificato_inps', 'profilo_sanitario', 'promemoria_bianca'])
       expect((await put(setting({ tipo, carta: 'A4' }))).statusCode, tipo).toBe(400);

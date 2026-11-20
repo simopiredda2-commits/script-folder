@@ -30,6 +30,7 @@ import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
 import { registerFollowUpRoutes } from './http/followup-routes';
 import { registerFseRoutes } from './http/fse-routes';
+import { registerFseAccessRoutes } from './http/fse-access-routes';
 import { createPssService } from './fse/service';
 import { registerPrivacyRoutes } from './http/privacy-routes';
 import { registerAftRoutes } from './http/aft-routes';
@@ -80,6 +81,8 @@ import {
   type AuraGateway,
   SimulatedAdditionalServicesPortal,
   type AdditionalServicesPortal,
+  SimulatedRegionalFseAccess,
+  type RegionalFseAccess,
 } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
@@ -166,6 +169,12 @@ export interface AppDeps {
    * simulatore, in produzione, l'invio è spento.
    */
   ppipPortal?: AdditionalServicesPortal;
+  /**
+   * Apertura del Fascicolo regionale dalla cartella (D220), con il modulo di accesso del CSI. Per
+   * difetto il simulatore: l'adattatore vero si scrive con il CSI; con il simulatore, in
+   * produzione, l'apertura è spenta.
+   */
+  fseAccess?: RegionalFseAccess;
 }
 
 export function buildApp({
@@ -193,6 +202,7 @@ export function buildApp({
   identity = { gateway: new SimulatedDigitalIdentity({ now }), clientId: 'SIMULATORE_IDENTITA' },
   aura = {},
   ppipPortal = new SimulatedAdditionalServicesPortal(),
+  fseAccess = new SimulatedRegionalFseAccess(),
 }: AppDeps): FastifyInstance {
   // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
   // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
@@ -432,6 +442,13 @@ export function buildApp({
       now,
     }),
   );
+  // Fascicolo regionale aperto dalla cartella (D220): modulo del CSI, oggi simulato.
+  registerFseAccessRoutes(app, {
+    db,
+    credentials,
+    access: fseAccess,
+    environment: config.environment ?? 'prova',
+  });
   registerFseRoutes(
     app,
     db,

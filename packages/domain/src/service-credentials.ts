@@ -23,7 +23,7 @@ export const CREDENTIAL_SERVICE_LABELS: Record<CredentialService, string> = {
 /** A che cosa serve ogni credenziale, detto al medico. */
 export const CREDENTIAL_SERVICE_USES: Record<CredentialService, string> = {
   sistema_ts: 'Certificati di malattia INPS e ricetta bianca elettronica',
-  rupar_piemonte: 'Ricette SSN al SAR della Regione Piemonte',
+  rupar_piemonte: 'Ricette SSN al SAR e apertura del Fascicolo regionale della Regione Piemonte',
 };
 
 /**
@@ -62,24 +62,33 @@ export function passwordState(
 }
 
 /** Gli invii che usano le credenziali. */
-export const SERVICE_USES = ['ricetta_ssn', 'ricetta_bianca', 'certificato_inps'] as const;
+export const SERVICE_USES = [
+  'ricetta_ssn',
+  'ricetta_bianca',
+  'certificato_inps',
+  'fascicolo_regionale',
+] as const;
 export type ServiceUse = (typeof SERVICE_USES)[number];
 
 export const SERVICE_FOR_USE: Record<ServiceUse, CredentialService> = {
   ricetta_ssn: 'rupar_piemonte',
   ricetta_bianca: 'sistema_ts',
   certificato_inps: 'sistema_ts',
+  fascicolo_regionale: 'rupar_piemonte',
 };
 
 /**
  * Quali invii chiedono il secondo fattore. Ricetta SSN: DM 27/2/2025 e SIRPED, autenticazione
  * forte. Ricetta bianca: DM 8/6/2023. Certificato INPS: le fonti lette non lo chiedono, da
- * verificare in collaudo (D102).
+ * verificare in collaudo (D102). Fascicolo regionale dalla cartella: il modulo del CSI del 2019
+ * chiede utente, password e PIN RUPAR, senza secondo fattore; con l'autenticazione forte di oggi
+ * è una domanda per il CSI (D220).
  */
 export const NEEDS_SECOND_FACTOR: Record<ServiceUse, boolean> = {
   ricetta_ssn: true,
   ricetta_bianca: true,
   certificato_inps: false,
+  fascicolo_regionale: false,
 };
 
 /** Le ultime tre lettere dell'utente, per riconoscere la credenziale senza mostrarla. */

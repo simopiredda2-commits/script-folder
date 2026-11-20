@@ -78,12 +78,12 @@ export const PRINT_DOCUMENT_KINDS: readonly PrintDocumentKind[] = [
     key: 'promemoria',
     label: 'Promemoria della ricetta SSN',
     description:
-      'Dal modello del DM 2 novembre 2011: completo, oppure con il solo numero di ricetta (NRE) e il codice fiscale.',
+      'Dalle specifiche di stampa del Sistema TS del 28/02/2024: completo, oppure con il solo numero di ricetta (NRE) e il codice fiscale.',
     output: 'pdf',
-    paperChoices: [],
-    defaultPaper: 'A4',
+    paperChoices: ['A5', 'A4'],
+    defaultPaper: 'A5',
     paperBasis:
-      'A4, come oggi. Il contenuto segue il modello del DM 2/11/2011 (allegato 2); posizioni e formato della pagina sono nelle «Specifiche tecniche per la stampa del promemoria» (1/3/2016), non trovate sul portale (D97): da verificare.',
+      'Le specifiche di stampa del 28/02/2024 vogliono il promemoria grande metà foglio A4 (D217). A5 orizzontale, per difetto (D222); oppure A4 con il promemoria nella metà alta, per le stampanti senza A5: stampato al 100%, codici a barre nelle misure giuste.',
     reminderVariant: true,
   },
   {

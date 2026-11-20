@@ -1308,3 +1308,58 @@ Prove:
 - interfaccia (`apps/web/test/presidi.test.tsx`, 3).
 
 15 sabotaggi. Non provato: nel browser e nelle schermate, perché i dati dimostrativi non hanno il nomenclatore.
+
+**D219 · Risposte della fermata dopo l'unione della #19.** Via alla #20, unita. Nel campo 27 del promemoria resta il codice regionale davanti al nome (D217), da confermare al collaudo con il CSI. Per aprire il Fascicolo dalla cartella Simone ha risposto: «predisponilo subito ma poi chiediamo al CSI». Si costruisce con un simulatore sul modulo regionale del 2019 (D220); se valga ancora con l'autenticazione forte è una domanda per il CSI (`docs/avanzamento.md`, «Che cosa resta aperto», A4).
+
+**D220 · Aprire il Fascicolo regionale dalla cartella.** Risposta di Simone alla fermata dopo l'unione della #19 (D219): «predisponilo subito ma poi chiediamo al CSI». Fonte: CSI Piemonte, «Modulo regionale di accesso semplificato dalle CCE – Specifiche di integrazione dei servizi di accesso», V03, settembre 2019 (`docs/fse.md`).
+
+- **Come funziona, dalle specifiche.** La cartella chiama il servizio `getAuthentication` con:
+  - le credenziali RUPAR del medico;
+  - il ruolo (MMG) e l'applicazione (DMAWA);
+  - l'IP della postazione e il codice fiscale del paziente.
+
+  Il servizio controlla le credenziali e chiede al Fascicolo se il paziente c'è e se ha dato il consenso alla consultazione. Se va bene dà un token, e la cartella apre la pagina regionale con quel token. Il token vale una volta, e solo dall'IP dichiarato.
+
+- **Nel programma**: nella cartella, per i medici, «Fascicolo regionale». La pagina ha il filtro dei documenti delle specifiche (TIPO_DOCUMENTO, 16 tipi, scritti come una frase) e il pulsante «Apri il Fascicolo». La scheda nuova si prepara al clic, staccata dalla cartella (`opener` nullo), poi riceve l'indirizzo. Se il browser la blocca, resta un collegamento che vale una volta.
+- **Chi lo apre**: il medico sul suo archivio e il sostituto su quelli autorizzati (permesso `fse.consult`), ognuno con le sue credenziali RUPAR. Segreteria e amministratore no. Ogni richiesta resta nel registro degli accessi alla cartella (`apertura_fascicolo_regionale`).
+- **Errori**: i codici delle specifiche arrivano al medico con le loro parole. Quando la Regione rifiuta le credenziali (AUTH_ER_501), il rifiuto si annota come per gli invii (D102) e la pagina porta a «Credenziali dei servizi».
+- **Simulatore** (regola 7). Tiene i token in memoria, monouso e legati all'IP, e mostra una pagina del programma al posto di quella regionale. La pagina della cartella dice che il collegamento è simulato. In produzione, con il simulatore, l'apertura è spenta.
+- **Secondo fattore**: il modulo del 2019 chiede utente, password e PIN RUPAR, senza secondo fattore. Con l'autenticazione forte di oggi (D102, D109) è la domanda per il CSI (A4): se il modulo vale ancora, e con quali credenziali.
+
+Prove: `packages/integrations/test/fascicolo-regionale.test.ts` (5), `apps/api/test/fascicolo-regionale.test.ts` (8), `apps/web/test/fascicolo-regionale.test.tsx` (7), e la prova nel browser. Nel browser si controllano accessibilità, bersagli di 44 px e tablet; la scheda nuova con la pagina simulata, staccata dalla cartella; il token già usato, rifiutato. 14 sabotaggi. Non provato: il servizio vero del CSI e la pagina regionale vera.
+
+**D221 · Dimostrazione nel browser.** Richiesta di Simone del 20/11/2026: «per iniziare a testare il programma mi restituisci un artifact?». Un artifact è una pagina su claude.ai, senza servizio e senza database. Per provare il programma vero e non un'imitazione, gira tutto nel browser (pacchetto `apps/demo`):
+
+- **Interfaccia** di `apps/web` senza modifiche; **servizio** di `apps/api` in un Web Worker, con `buildApp` e i simulatori di sempre (regola 7).
+- **Database**: PGlite, cioè Postgres compilato in WebAssembly (licenze Apache-2.0 e PostgreSQL, permissive). Le 43 migrazioni e le banche dati d'esempio di `sync/` si preparano in Node durante la costruzione. I dati dimostrativi si creano nel browser all'avvio, con le date di quel giorno: `seedDemo` (`apps/api/src/db/demo-seed.ts`), separato da `pnpm db:seed` senza cambiarlo.
+- **Moduli di Node che il browser non ha**: sostituti in `apps/demo/src/worker/shims`. Crypto con @noble/hashes e @noble/ciphers (MIT); RSA dei certificati di prova del Fascicolo con i BigInt e una scorta di chiavi nuove a ogni costruzione; un disco in memoria con i file che il servizio legge; un server HTTP finto che passa le richieste al gestore di Fastify.
+- **Limiti della cornice**: dentro un artifact non si aprono schede, non si scarica e non si stampa. PDF e file si aprono in un visore della pagina (pdf.js, Apache-2.0) con la filigrana «DIMOSTRAZIONE – DOCUMENTO NON VALIDO»: i numeri sono inventati ma i moduli somigliano a quelli veri. Le pagine dei simulatori di SPID e CIE si aprono nel visore; il ritorno al programma fa ripartire l'interfaccia, come farebbe il ricaricamento della pagina.
+- **Riquadro della dimostrazione**: utenti, password unica `dimostrazione` (non è un segreto: la mostra la pagina), codice del secondo fattore di chi sta entrando, ripartenza da capo.
+- Nessun dato esce dal browser; ricaricando la pagina si riparte da capo.
+
+`apps/demo` è uno strumento di prova, non parte del prodotto: le sue dipendenze sono di sviluppo (la prova delle licenze guarda quelle di produzione). Pagina di 1,9 MB e file accanto per circa 25 MB. Quando il programma cambia si ricostruisce (`pnpm --filter @mmg/demo build`) e si ripubblica sullo stesso indirizzo.
+
+**D222 · Promemoria su carta A5 per difetto.** Richiesta di Simone del 20/11/2026: «le ricette dematerializzate (al netto di alcune tipologie) vengono stampate di solito su carta A5 o sbaglio? direi di predisporre pdf di stampa direttamente su A5 per evitare margini di carta bianca inutili». Le specifiche del 28/02/2024 vogliono il promemoria grande metà foglio A4 (D217): è un A5 orizzontale, 210 × 148 mm.
+
+- **Per difetto, A5 orizzontale.** Il promemoria completo e il foglio «solo NRE» escono su una pagina A5 orizzontale. Misure e campi sono quelli di D217, alle stesse distanze dal bordo alto e da quello sinistro.
+- **A4 resta una scelta**, per le stampanti senza cassetto A5: in Strumenti › Stampa, per lo studio o per una postazione. Il promemoria sta allora nella metà alta della pagina, come prima.
+- **Chi decide la carta**: le preferenze di stampa (D180), nell'ordine postazione, studio, A5. Vale anche per l'email al paziente: l'allegato ha la carta della postazione di chi lo invia.
+- **Supera il punto «Mezzo foglio A4» di D217.** Lì la pagina restava A4 perché molte stampanti, con l'A4 nel cassetto, ingrandiscono una pagina più piccola. Il rischio resta per chi stampa l'A5 su carta A4 con «adatta alla pagina»: i codici a barre escono 1,41 volte più grandi delle misure del decreto. Per questo c'è la scelta A4, e il PDF si stampa al 100% («dimensioni effettive»).
+- **Margini sull'A5**: 8 mm a sinistra e a destra. La base della prima riga è a 7 mm dal bordo alto, quella della dicitura finale a 141,2 mm, cioè 6,8 mm sopra il bordo basso. La frase regionale (campo 28) avrebbe la base a 144,8 mm, 3,2 mm sopra il bordo basso, dentro la striscia che molte stampanti non stampano. Oggi è sempre vuota (D217): se il Piemonte la chiederà, va guardata su carta.
+- **Che cosa non cambia**:
+  - i promemoria fissati prima del 20/11/2026 (versione 1) si ristampano su A4, uguali byte per byte;
+  - il promemoria della ricetta bianca elettronica è il PDF del Sistema TS, consegnato com'è (D93);
+  - il certificato INPS resta A4, sui fac-simile del DM 26/2/2010;
+  - i certificati dai modelli avevano già la scelta tra A4 e A5;
+  - la ricetta rossa non ha ancora il suo modulo di stampa («da completare»): si stampa sul modulo ufficiale, con la sua misura.
+- **Nel pannello del promemoria**, sotto i pulsanti: la carta che vale alla postazione e «Stampa al 100% («dimensioni effettive»), senza adattare alla pagina».
+- **Una sola fonte per la carta predefinita**: il tipo di documento `promemoria` in `packages/domain/src/printing.ts`. Il PDF (`apps/api/src/reminders/pdf.ts`) la legge da lì.
+
+Prove:
+
+- `apps/api/test/promemoria-modello.test.ts`: pagina A5 per difetto con tutte le scritte dentro; su A4 le stesse scritte alle stesse distanze dall'alto, nella metà alta; la versione 1 sempre su A4;
+- `apps/api/test/promemoria.test.ts`: dal servizio A5, poi A4 quando lo studio sceglie A4, anche per l'allegato dell'email, poi di nuovo A5;
+- `packages/domain/test/printing.test.ts` e `apps/api/test/stampa.test.ts`: per il promemoria si sceglie A5 o A4, mai altro;
+- `apps/web/test/stampa.test.tsx`: il pannello del promemoria dice la carta che vale alla postazione e di stampare al 100% («dimensioni effettive»).
+
+6 sabotaggi. Non provato: la stampa vera su A5 e su A4 con stampanti diverse, e la lettura dei codici in farmacia.

@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { SimulatedGateway, SimulatedReminderSender, type DeliveryResult } from '@mmg/integrations';
 import { and, eq, sql } from 'drizzle-orm';
+import { PDFDocument } from 'pdf-lib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   accessLog,
@@ -53,7 +54,8 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
       {},
       { gateways: { sar, sistema_ts: ts }, preSendChecks: noRules, reminderSender: sender },
     );
-    for (const who of ['titolare', 'segreteria'] as const) c[who] = await login(s, who);
+    for (const who of ['titolare', 'segreteria', 'amministratore'] as const)
+      c[who] = await login(s, who);
     pt = (await t.db.select().from(patient).where(eq(patient.id, s.richPatient)))[0]!;
   });
   afterAll(async () => {
@@ -61,7 +63,7 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     await t?.drop();
   });
 
-  const req = (method: 'GET' | 'POST', url: string, who = 'titolare', payload?: object) =>
+  const req = (method: 'GET' | 'POST' | 'PUT', url: string, who = 'titolare', payload?: object) =>
     s.app.inject({ method, url, headers: { cookie: c[who]! }, ...(payload ? { payload } : {}) });
   const draft = async (body: object) => {
     const res = await req('POST', `/api/pazienti/${s.richPatient}/ricette`, 'titolare', body);
@@ -492,6 +494,46 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     expect((await req('GET', `/api/ricette/${id}/promemoria`, 'segreteria')).statusCode).toBe(200);
     const draftId = await draft(pharma());
     expect((await req('GET', `/api/ricette/${draftId}/promemoria`)).statusCode).toBe(409);
+  });
+
+  it('carta: A5 orizzontale per difetto; A4 se lo studio sceglie A4, anche per l’email (D222)', async () => {
+    const size = async (bytes: Uint8Array) => {
+      const { width, height } = (await PDFDocument.load(bytes)).getPage(0).getSize();
+      return [Math.round(width * 100) / 100, Math.round(height * 100) / 100];
+    };
+    const A5_LANDSCAPE = [595.28, 419.53];
+    const A4 = [595.28, 841.89];
+    const reminder = (id: string, query = '') =>
+      req('GET', `/api/ricette/${id}/promemoria${query}`).then((r) => new Uint8Array(r.rawPayload));
+    const setPaper = async (carta: string | null) => {
+      const res = await req('PUT', '/api/stampa/impostazioni', 'amministratore', {
+        postazione: null,
+        tipo: 'promemoria',
+        stampante: null,
+        carta,
+        copie: null,
+        variante: null,
+      });
+      expect(res.statusCode, res.body).toBe(200);
+    };
+    const id = await sent(pharma());
+    expect(await size(await reminder(id))).toEqual(A5_LANDSCAPE);
+    expect(await size(await reminder(id, '?formato=nre'))).toEqual(A5_LANDSCAPE);
+    try {
+      await setPaper('A4');
+      expect(await size(await reminder(id))).toEqual(A4);
+      expect(await size(await reminder(id, '?formato=nre'))).toEqual(A4);
+      const before = sender.emails.length;
+      const mail = await req('POST', `/api/ricette/${id}/promemoria/invio`, 'titolare', {
+        canale: 'email',
+        destinatario: 'paziente',
+      });
+      expect(mail.statusCode, mail.body).toBe(200);
+      expect(await size(sender.emails[before]!.attachments[0]!.content)).toEqual(A4);
+    } finally {
+      await setPaper(null);
+    }
+    expect(await size(await reminder(id))).toEqual(A5_LANDSCAPE);
   });
 
   it('documenti e consegne non si modificano e non si cancellano', async () => {

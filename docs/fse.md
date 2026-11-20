@@ -110,6 +110,14 @@ Condividere la cartella tra i medici dell'AFT che usano il programma: le voci os
 
 Il Profilo si compone dalla cartella. Il medico lo controlla, lo valida, lo firma e lo pubblica nel simulatore del Gateway; poi lo stato della transazione conferma l'invio a INI. Le scelte sono in `docs/decisioni.md` (D130–D141); che cosa manca e che cosa non è stato provato, in `docs/avanzamento.md`.
 
+## Aprire il Fascicolo regionale dalla cartella (D220)
+
+Dalla cartella il medico apre il Fascicolo del paziente nella pagina regionale dei medici, senza riscrivere le credenziali: il modulo di accesso semplificato del CSI del 2019 (fonti, sopra). Il programma chiede l'accesso con le credenziali RUPAR del medico e apre la pagina regionale in una scheda nuova, con un token che vale una volta e solo da quella postazione. Il consenso del paziente alla consultazione lo controlla la Regione.
+
+- Pagina «Fascicolo regionale» della cartella, per i medici, con il filtro dei documenti delle specifiche.
+- Servizio: `GET /api/fascicolo-regionale` (filtri e stato del collegamento), `POST /api/pazienti/:id/fascicolo-regionale` (l'indirizzo con il token); ogni richiesta nel registro degli accessi.
+- Oggi con un simulatore, spento in produzione. Da chiedere al CSI: se il modulo vale ancora con l'autenticazione forte, e l'accesso per il programma (richiesta scritta, certificato X.509 del fornitore).
+
 ## Ancora da leggere
 
 - La guida HL7 Italia del PSS: il sito di HL7 Italia non si raggiunge da qui. Le regole da rispettare sono nello schematron ufficiale, che il simulatore applica (D132).

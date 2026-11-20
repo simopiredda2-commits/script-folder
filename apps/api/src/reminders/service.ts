@@ -16,7 +16,8 @@ import {
 import { HttpError } from '../http/errors';
 import { guardPatient } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
-import { renderPromemoria, renderSoloNre } from './pdf';
+import { printSettingsFor } from '../admin/print-service';
+import { DEFAULT_REMINDER_PAPER, renderPromemoria, renderSoloNre } from './pdf';
 import type { PromemoriaData } from './promemoria';
 
 export interface ReminderDeps {
@@ -90,8 +91,15 @@ export function createReminderService(deps: ReminderDeps) {
     return doc ?? null;
   }
 
-  /** Il PDF da consegnare: per la bianca quello del SAC, per la SSN il nostro dai dati fissati. */
-  async function pdfFor(p: typeof prescription.$inferSelect, format: 'completo' | 'nre') {
+  /**
+   * Il PDF da consegnare: per la bianca quello del SAC, per la SSN il nostro dai dati fissati, sulla
+   * carta della postazione di chi lo chiede (preferenze di stampa, D180 e D222).
+   */
+  async function pdfFor(
+    actor: Actor,
+    p: typeof prescription.$inferSelect,
+    format: 'completo' | 'nre',
+  ) {
     if (p.kind === 'white') {
       if (format === 'nre')
         throw new HttpError(
@@ -113,7 +121,9 @@ export function createReminderService(deps: ReminderDeps) {
     const doc = await document(p.id, 'promemoria_dati');
     if (!doc) throw new HttpError(409, 'Mancano i dati del promemoria fissati all’invio');
     const data = JSON.parse(doc.content) as PromemoriaData;
-    const bytes = format === 'nre' ? await renderSoloNre(data) : await renderPromemoria(data);
+    const paper = (await printSettingsFor(db, actor, 'promemoria')).paper ?? DEFAULT_REMINDER_PAPER;
+    const bytes =
+      format === 'nre' ? await renderSoloNre(data, paper) : await renderPromemoria(data, paper);
     return { bytes, name: `${format === 'nre' ? 'nre' : 'promemoria'}-${p.nre}.pdf` };
   }
 
@@ -124,7 +134,7 @@ export function createReminderService(deps: ReminderDeps) {
       .object({ formato: z.enum(['completo', 'nre']).default('completo') })
       .parse(query);
     requireSent(p);
-    const pdf = await pdfFor(p, formato);
+    const pdf = await pdfFor(actor, p, formato);
     await db.insert(reminderDelivery).values({
       prescriptionId: p.id,
       userId: actor.userId,
@@ -180,7 +190,7 @@ export function createReminderService(deps: ReminderDeps) {
     const date = ddmmyyyy(studioDate(p.sentAt ?? now()));
     let result;
     if (input.canale === 'email') {
-      const pdf = await pdfFor(p, 'completo');
+      const pdf = await pdfFor(actor, p, 'completo');
       result = await sender.sendEmail({
         to: to.to,
         subject: `Promemoria della ricetta del ${date}`,

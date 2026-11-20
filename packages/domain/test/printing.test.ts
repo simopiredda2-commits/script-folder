@@ -40,9 +40,11 @@ describe('tipi di documento da stampare', () => {
 
   it('la carta si sceglie solo dove nessun atto o documento esterno la fissa', () => {
     const choosable = PRINT_DOCUMENT_KINDS.filter((k) => k.paperChoices.length).map((k) => k.key);
-    expect(choosable).toEqual(['certificato_modello', 'schema_orario']);
-    // Promemoria, certificato INPS e Profilo: A4 come oggi; ricetta bianca: il PDF del Sistema TS.
-    expect(printDocumentKind('promemoria').defaultPaper).toBe('A4');
+    expect(choosable).toEqual(['promemoria', 'certificato_modello', 'schema_orario']);
+    // Promemoria: metà A4 per le specifiche del 2024, A5 per difetto o A4 a metà (D222).
+    expect(printDocumentKind('promemoria').defaultPaper).toBe('A5');
+    expect(printDocumentKind('promemoria').paperChoices).toEqual(['A5', 'A4']);
+    // Certificato INPS e Profilo: A4 come oggi; ricetta bianca: il PDF del Sistema TS.
     expect(printDocumentKind('certificato_inps').defaultPaper).toBe('A4');
     expect(printDocumentKind('profilo_sanitario').defaultPaper).toBe('A4');
     expect(printDocumentKind('promemoria_bianca').defaultPaper).toBeNull();
@@ -60,7 +62,7 @@ describe('ordine delle preferenze: postazione, poi studio, poi predefinite', () 
     const e = resolvePrintSettings('promemoria', {});
     expect(e).toMatchObject({
       printer: null,
-      paper: 'A4',
+      paper: 'A5',
       copies: 1,
       reminderVariant: 'completo',
     });
@@ -133,7 +135,11 @@ describe('controlli prima di salvare', () => {
     expect(printSettingIssues('certificato_modello', input({ paper: 'A3' }))).toEqual([
       'Carta: per «Certificati dai modelli» A4 o A5',
     ]);
-    for (const k of ['promemoria', 'certificato_inps', 'profilo_sanitario'] as const)
+    expect(printSettingIssues('promemoria', input({ paper: 'A4' }))).toEqual([]);
+    expect(printSettingIssues('promemoria', input({ paper: 'A3' }))).toEqual([
+      'Carta: per «Promemoria della ricetta SSN» A5 o A4',
+    ]);
+    for (const k of ['certificato_inps', 'profilo_sanitario'] as const)
       expect(printSettingIssues(k, input({ paper: 'A5' }))[0], k).toMatch(
         /il formato è fissato \(A4\), non si sceglie/,
       );
@@ -198,7 +204,7 @@ describe('suggerimento accanto ai pulsanti di stampa', () => {
         resolvePrintSettings('promemoria', { studio: values({ reminderVariant: 'solo_nre' }) }),
       ),
     ).toBe(
-      'Stampante: quella proposta dalla finestra di stampa, 1 copia, carta A4, solo NRE e codice fiscale',
+      'Stampante: quella proposta dalla finestra di stampa, 1 copia, carta A5, solo NRE e codice fiscale',
     );
   });
 });
