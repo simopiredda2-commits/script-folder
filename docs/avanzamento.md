@@ -26,7 +26,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
 - **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
-- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Poi, nello stesso branch ripartito da `main`: fonti dei LEA verificate (D216), promemoria secondo le specifiche di stampa del Sistema TS del 28/02/2024 (D217), nomenclatore dei presidi dell'allegato 3 (D218); sezione «Dopo l'unione della #19». Fermata fatta il 20/11/2026: via, pull request #20 unita (risposte in «Risposte della fermata dopo l'unione della #19»). Poi, nello stesso branch: l'apertura del Fascicolo dalla cartella con un simulatore (D220, fatta), la dimostrazione nel browser chiesta da Simone (D221, pubblicata come artifact) e il promemoria in A5 chiesto da Simone (fatto, D222); sezione «Dopo l'unione della #20». Si aspettano i file dei LEA e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
+- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Poi, nello stesso branch ripartito da `main`: fonti dei LEA verificate (D216), promemoria secondo le specifiche di stampa del Sistema TS del 28/02/2024 (D217), nomenclatore dei presidi dell'allegato 3 (D218); sezione «Dopo l'unione della #19». Fermata fatta il 20/11/2026: via, pull request #20 unita (risposte in «Risposte della fermata dopo l'unione della #19»). Poi, nello stesso branch: l'apertura del Fascicolo dalla cartella con un simulatore (D220, fatta), la dimostrazione nel browser chiesta da Simone (D221, pubblicata come artifact) e il promemoria in A5 chiesto da Simone (fatto, D222); sezione «Dopo l'unione della #20». Fermata fatta il 20/11/2026: via, pull request #21 unita (risposte in «Risposte della fermata dopo l'unione della #20»). Poi, nello stesso branch ripartito da `main`, la dimostrazione completa: tutto il programma provabile nell'artifact, con prove automatiche anche su Safari e Firefox (D223); sezione «Dopo l'unione della #21». Si aspettano i file dei LEA e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -37,7 +37,7 @@ Contatto per le applicazioni sanitarie della Regione gestite dal CSI (AURA, SAR,
 1. **SAR (SIRPED) e Sistema TS**: specifiche e credenziali di collaudo, piano di test della Regione; registrazione del programma (codice del gestionale, `client_id`, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103). Con queste: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo di stampa della ricetta rossa. Per il promemoria, che segue già le specifiche di stampa del 28/02/2024 (D217): frase regionale e frase sui farmaci in DPC come le dà il SAC vero, un'eventuale validità minore di 180 giorni, i tipi di ricetta diversi da «Assist. SSN», il codice regionale nel campo 27.
 2. **AURA vera** (oggi un simulatore, D197–D200): servizio, campi, codici degli eventi e credenziali, chiesti con la PEC di Simone al CSI del 19/11/2026.
 3. **Certificati INPS veri**: credenziali del Sistema TS (D100–D103).
-4. **Fascicolo Sanitario Elettronico**: accreditamento del programma e valori delle tabelle (D133); licenza dei file ufficiali del Ministero (D131). Per aprire il Fascicolo del paziente dalla cartella, il CSI ha un «modulo di accesso semplificato» del 2019 con le credenziali RUPAR del medico (`docs/fse.md`). Costruito con un simulatore (D220): da chiedere al CSI se vale ancora con l'autenticazione forte, e l'accesso per il programma (richiesta scritta, certificato del fornitore).
+4. **Fascicolo Sanitario Elettronico**: accreditamento del programma e valori delle tabelle (D133); licenza dei file ufficiali del Ministero (D131). Per aprire il Fascicolo del paziente dalla cartella, il CSI ha un «modulo di accesso semplificato» del 2019 con le credenziali RUPAR del medico (`docs/fse.md`). Costruito con un simulatore (D220): da chiedere al CSI se vale ancora con l'autenticazione forte, e l'accesso per il programma (richiesta scritta, certificato del fornitore). Alla fermata dopo la #20 Simone ha risposto «Rimandiamo» (D223).
 5. **SPID e CIE**: accreditamento come fornitore di servizi (D109).
 6. **PPIP, come si manda la distinta** (D212, D213). Registrazione in cartella, distinta del mese e CSV ci sono. Mancano quattro cose da Regione e ASL; ognuna si aggiunge come dato o con l'interfaccia già pronta (`docs/ppip.md`):
    - il canale: l'AIR 2024 nomina il portale regionale per i medici ad attività oraria (art. 30) e uno strumento su supporto digitale dell'ASL (art. 36, comma 6);
@@ -947,7 +947,18 @@ Nello stesso branch, ripartito da `main`.
 
 - **Dimostrazione ripubblicata** (versione 3), con il promemoria su A5 e il Fascicolo regionale. Provata in Chromium con la versione costruita: accesso, SPID simulato, codice del Sistema TS, firma e invio, promemoria nel visore su A5 orizzontale, Fascicolo dalla cartella con la pagina simulata nel visore.
 
-**Prossimo passo**: prove complete, pull request #21 e fermata.
+**Prossimo passo**: fatto. Prove complete verdi, pull request #21 unita dopo la fermata (D223); si continua in «Dopo l'unione della #21».
+
+### Dopo l'unione della #21 – Dimostrazione completa (D223)
+
+Nello stesso branch, ripartito da `main`. Risposta di Simone alla fermata: «Dimostrazione completa».
+
+**Da fare**
+
+- Rendere provabile nell'artifact tutto il programma: certificati, importazione, strumenti e AURA, oltre a ricette, promemoria e Fascicolo.
+- Prove automatiche della dimostrazione costruita, anche con WebKit (Safari) e Firefox.
+
+**Prossimo passo**: provare nella dimostrazione ogni parte del programma e correggere quello che non va.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -1180,7 +1191,21 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Nessuna per ora. L'apertura del Fascicolo dalla cartella è costruita con un simulatore (D220); si aspettano i file dei LEA (C2) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
+Nessuna per ora. Si rende provabile tutta la dimostrazione (D223); si aspettano i file dei LEA (C2) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
+
+## Risposte della fermata dopo l'unione della #20 (20/11/2026)
+
+Simone ha risposto con il pulsante il 20/11/2026.
+
+- **Via**: «Via, unisci». Pull request #21 unita in `main` (commit 0849768), con le verifiche su GitHub verdi (TypeScript, WebKit, Firefox e `sync/`).
+- **Domanda al CSI sul Fascicolo dalla cartella**: «Rimandiamo». Resta in «Che cosa resta aperto», A4; il programma usa il simulatore, spento in produzione.
+- **Dopo l'unione**: «Dimostrazione completa» (D223), sezione «Dopo l'unione della #21».
+
+## Domande della fermata dopo l'unione della #20 (chiuse)
+
+1. **Via alla #21**: A. unisci (consigliata); B. prima provo la dimostrazione; C. servono modifiche.
+2. **Conferma del CSI sul modulo di accesso al Fascicolo del 2019**: A. al telefono, 011 3168050 (consigliata); B. con una PEC preparata da qui; C. rimandiamo.
+3. **Dopo l'unione**: A. dimostrazione completa, con prove automatiche anche su Safari e Firefox (consigliata); B. fermarsi e aspettare.
 
 ## Risposte della fermata dopo l'unione della #19 (20/11/2026)
 

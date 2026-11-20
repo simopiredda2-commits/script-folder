@@ -1363,3 +1363,5 @@ Prove:
 - `apps/web/test/stampa.test.tsx`: il pannello del promemoria dice la carta che vale alla postazione e di stampare al 100% («dimensioni effettive»).
 
 6 sabotaggi. Non provato: la stampa vera su A5 e su A4 con stampanti diverse, e la lettura dei codici in farmacia.
+
+**D223 · Risposte della fermata dopo l'unione della #20.** Via alla #21, unita con le verifiche su GitHub verdi. Per la conferma del CSI sul modulo di accesso al Fascicolo del 2019 Simone ha risposto «Rimandiamo»: resta in «Che cosa resta aperto» (A4), e il programma usa il simulatore, spento in produzione (D220). Mentre si aspettano i file dei LEA e le risposte di Regione, ASL e CSI: «Dimostrazione completa». Nell'artifact (D221) si rende provabile tutto il programma, compresi certificati, importazione, strumenti e AURA, con prove automatiche della dimostrazione anche su WebKit (Safari) e Firefox.
