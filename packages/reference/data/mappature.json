@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-19.2",
+  "versione": "2026-11-20.2",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -33,10 +33,11 @@
         "atc": "CODICE_ATC",
         "form": "FORMA",
         "supplyRegime": "FORNITURA",
-        "holder": "RAGIONE_SOCIALE"
+        "holder": "RAGIONE_SOCIALE",
+        "adminState": "STATO_AMMINISTRATIVO"
       },
       "vecchiaDopoGiorni": null,
-      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA confezioni_fornitura.csv (drive.aifa.gov.it/farmaci/, collegato dalla pagina «Liste dei farmaci»): 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Nessuna soglia di vecchiaia (D156): AIFA pubblica ogni giorno, ma il contenuto può restare uguale e una soglia d'età darebbe avvisi falsi; vale il controllo di ogni notte."
+      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA confezioni_fornitura.csv (drive.aifa.gov.it/farmaci/, collegato dalla pagina «Liste dei farmaci»): 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Nessuna soglia di vecchiaia (D156): AIFA pubblica ogni giorno, ma il contenuto può restare uguale e una soglia d'età darebbe avvisi falsi; vale il controllo di ogni notte. Stato amministrativo (D205) letto il 20/11/2026 dal file scaricato quel giorno: 160.067 confezioni «Autorizzata» e 33 «Sospesa»; le confezioni revocate non ci sono."
     },
     {
       "id": "aifa-classe-a",
@@ -130,6 +131,29 @@
       },
       "vecchiaDopoGiorni": null,
       "nota": "Intestazioni lette il 19/11/2026 dal file AIFA elenco_medicinali_carenti.csv (pagina «Liste dei farmaci», cp1252, aggiornato al 17/11/2026): l'intestazione è alla terza riga, sotto un'avvertenza e la data; 2.516 righe, tutti gli AIC di 9 cifre, tutte le date GG/MM/AAAA, «Equivalente» sempre «Sì» o «No», tutti gli ATC nella forma attesa; 3 AIC compaiono due volte. «Nota AIFA» qui è un testo in parole, che può andare a capo dentro le virgolette. Nessuna soglia di vecchiaia (D156): AIFA aggiorna l'elenco senza una cadenza dichiarata; vale il controllo di ogni notte."
+    },
+    {
+      "id": "aifa-registri",
+      "titolo": "AIFA: registri di monitoraggio e piani terapeutici attivi",
+      "tipo": "registri_aifa",
+      "origine": "sync",
+      "fonte": "aifa_liste",
+      "chiave": "*_Elenco_Registri_PT_attivi.csv",
+      "colonne": {
+        "name": "Farmaco",
+        "activeIngredient": "Principio attivo",
+        "atc": "Codice ATC",
+        "reimbursedIndication": "Indicazione rimborsata",
+        "condition": "Patologia",
+        "monitoringType": "Tipologia di Monitoraggio",
+        "monitoringState": "Stato del Monitoraggio",
+        "therapeuticArea": "Area terapeutica",
+        "monitoringStart": "Data inizio monitoraggio",
+        "sheetUrl": "Scheda"
+      },
+      "saltaRigheSenza": ["name"],
+      "vecchiaDopoGiorni": null,
+      "nota": "Intestazioni lette il 20/11/2026 dal file AIFA Elenco_Registri_PT_attivi_19.11.2026.csv (pagina «Liste dei farmaci», utf-8 con BOM, righe che vanno a capo dentro le virgolette): 374 registri, piani terapeutici e registri semplificati, nessun AIC; si collegano ai farmaci per ATC. Alcuni ATC hanno spazi prima o dopo, che la lettura toglie. In fondo al file ci sono 33 righe vuote o quasi: una con il solo «Nessuno» fra le colonne MEA e una con il solo «quan» nel principio attivo, senza il farmaco; si saltano le righe senza «Farmaco» (saltaRigheSenza) e il rapporto le conta. «Indicazione autorizzata» e le colonne MEA non si importano: per la prescrizione conta l'indicazione rimborsata. Nessuna soglia di vecchiaia (D156): AIFA aggiorna l'elenco senza una cadenza dichiarata; vale il controllo di ogni notte."
     },
     {
       "id": "trascrizione-farmaci-dpc",

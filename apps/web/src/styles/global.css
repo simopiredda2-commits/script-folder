@@ -800,6 +800,32 @@ legend {
   white-space: pre-line;
 }
 
+.variazioni-aifa {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* Registri e piani terapeutici AIFA (D206): un'informazione, in blu, con il simbolo. */
+.registro-aifa {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  color: var(--color-info);
+}
+
+.registro-aifa .icona {
+  flex: none;
+  margin-top: 0.2rem;
+}
+
+.registro-aifa-dettagli ul {
+  margin: 0.25rem 0 0;
+}
+
+.registro-aifa-indicazione {
+  white-space: pre-line;
+}
+
 .esito-info {
   color: var(--color-info);
 }

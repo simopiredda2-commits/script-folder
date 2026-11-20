@@ -233,6 +233,11 @@ async function importRecords(
   const padded = Object.entries(out.padded).map(
     ([field, n]) => `${field}: ${n} valori con gli zeri davanti secondo la mappatura ${mapping.id}`,
   );
+  const skipped = out.skipped
+    ? [
+        `${out.skipped} righe saltate perché senza ${mapping.saltaRigheSenza.join(', ')} secondo la mappatura ${mapping.id}`,
+      ]
+    : [];
   return {
     ...line,
     outcome: 'importato',
@@ -241,6 +246,7 @@ async function importRecords(
       ...line.notes,
       ...noValue,
       ...padded,
+      ...skipped,
       ...visits,
       ...(discarded ? [`${discarded} righe scartate e accettate`] : []),
     ],

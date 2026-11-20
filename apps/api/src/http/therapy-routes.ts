@@ -7,6 +7,7 @@ import { allergyDetail, clinicalEntry, problemDetail, therapy } from '../db/sche
 import { withActor } from '../db/tx';
 import { guardPatient } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
+import type { ReferenceData } from '../reference/lookup';
 import { HttpError } from './errors';
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
@@ -135,7 +136,12 @@ function normalize(body: z.infer<typeof therapyBody>) {
   return out as z.infer<typeof therapyBody>;
 }
 
-export function registerTherapyRoutes(app: FastifyInstance, db: Database, now: () => Date) {
+export function registerTherapyRoutes(
+  app: FastifyInstance,
+  db: Database,
+  now: () => Date,
+  reference?: ReferenceData,
+) {
   const scoped = { config: { patientScoped: true } };
 
   /** L'indicazione dev'essere un problema di questo paziente. */
@@ -215,6 +221,40 @@ export function registerTherapyRoutes(app: FastifyInstance, db: Database, now: (
         .where(eq(therapy.id, therapyId)),
     );
     return { id: therapyId };
+  });
+
+  /**
+   * Classe, nota AIFA, DPC e gruppo di equivalenza dalle banche dati in vigore oggi, come quando si
+   * sceglie di nuovo il farmaco nella scheda (D208): chiude le variazioni AIFA di classe e di nota
+   * (D205). Il resto della scheda non cambia; lo storico delle modifiche conserva i valori di prima.
+   */
+  app.post('/api/pazienti/:id/terapie/:therapyId/aggiorna-dati-farmaco', scoped, async (req) => {
+    const actor = req.actor!;
+    const { id } = params.parse(req.params);
+    const { context } = await guardPatient(db, actor, id, 'therapy.write', 'modifica_terapia');
+    const { therapyId } = therapyParams.parse(req.params);
+    const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
+    const t = await loadTherapy(id, therapyId, reservedAllowed);
+    if (t.status === 'ended') throw new HttpError(409, 'La terapia è conclusa');
+    if (!t.drugAic)
+      throw new HttpError(400, 'La terapia non ha il codice AIC del farmaco: non si aggiorna');
+    const drug = reference
+      ? (await reference.drugs([t.drugAic], studioDate(now()))).get(t.drugAic)
+      : undefined;
+    if (!drug) throw new HttpError(404, 'Il farmaco non è nelle banche dati in vigore oggi');
+    const patch = {
+      drugClass: drug.drugClass,
+      aifaNote: drug.aifaNote,
+      dpc: drug.dpc,
+      equivalenceGroup: drug.equivalenceGroup,
+    };
+    await withActor(db, actor.userId, (tx) =>
+      tx
+        .update(therapy)
+        .set({ ...patch, updatedAt: now() })
+        .where(eq(therapy.id, therapyId)),
+    );
+    return { id: therapyId, ...patch };
   });
 
   /**

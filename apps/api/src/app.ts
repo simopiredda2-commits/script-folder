@@ -259,7 +259,10 @@ export function buildApp({
     return { stato: 'ok' };
   });
 
-  registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
+  registerAuthRoutes(app, auth, {
+    cookieSecure: config.cookieSecure,
+    now: now ?? (() => new Date()),
+  });
   registerLockRoutes(app, db, now ?? (() => new Date()));
   const credentials = createCredentialService({
     db,
@@ -312,7 +315,7 @@ export function buildApp({
   registerPatientRoutes(app, db, { reference, now: now ?? (() => new Date()) });
   registerDoctorProfileRoutes(app, db, now ?? (() => new Date()));
   registerTodayRoutes(app, db, now ?? (() => new Date()), reference);
-  registerTherapyRoutes(app, db, now ?? (() => new Date()));
+  registerTherapyRoutes(app, db, now ?? (() => new Date()), reference);
   registerClinicalRoutes(app, db, now ?? (() => new Date()));
   registerPrivacyRoutes(app, db, now ?? (() => new Date()));
   registerAftRoutes(app, createAftService({ db, now: now ?? (() => new Date()) }));

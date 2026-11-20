@@ -1062,3 +1062,96 @@ Prove (servizio, interfaccia, browser con accessibilità) e sabotaggi.
   - «Segnala online (AIFA)»: https://servizionline.aifa.gov.it/schedasegnalazioni/#/, l'indirizzo scritto in quella pagina («Segnala online una reazione avversa a farmaci e/o vaccini»). Il modulo non è stato aperto da qui: la rete di questo ambiente non raggiunge servizionline.aifa.gov.it (rifiuto del proxy). Il programma non chiama nessuno dei due siti (regola 7): sono collegamenti che apre il medico.
 
 Prove (lettura dei file, importazione, regole, servizio, interfaccia, browser con accessibilità) e sabotaggi.
+
+**D203 · Prove indipendenti dalla mezzanotte; il cookie della sessione dice quanto dura.** Il primo giro delle prove su GitHub della #16 è partito alle 23:57 ora di Roma ed è finito dopo la mezzanotte. Sono cadute prove che c'erano già: quattro dell'importazione, e nel browser l'accesso, l'archivio e i blocchi del conto. La causa erano gli orologi diversi, che a mezzanotte non segnano più lo stesso giorno:
+
+- l'orologio vero, con cui le prove scrivono i dati «di oggi» o «di domani»;
+- quello dello scenario, che usa il servizio e che avanza di 30 secondi a ogni accesso con il codice;
+- quello del browser.
+
+Scelte:
+
+- **Un orologio solo, fermo a mezzogiorno.** Lo scenario delle prove accetta l'ora di partenza (`clockAt`), e `middayOf` dà il mezzogiorno del giorno dello studio. L'importazione e le prove nel browser calcolano le loro date dallo stesso istante. Lontano dalla mezzanotte, i minuti che l'orologio avanza non cambiano la data, anche se l'ora vera passa dalla mezzanotte durante il giro.
+- **Nel browser la stessa data.** Ogni contesto del browser ha la data fissata con lo strumento di Playwright (`clock.setFixedTime`); i timer continuano a girare. Così le date proposte dai moduli (per esempio «Dal» di un'autorizzazione) sono quelle del servizio.
+- **Il cookie della sessione dice quanto dura (Max-Age), non a che ora scade.** Prima portava l'ora di scadenza calcolata dall'orologio del servizio, e il browser la confronta con il suo. In una prova con l'orologio fermo a mezzogiorno e sessioni di 12 ore, il cookie sarebbe scaduto proprio alla mezzanotte vera. Lo stesso vale per un computer dello studio con l'ora sbagliata: perderebbe la sessione prima del tempo, o la terrebbe dopo. La durata il browser la conta con il suo orologio; la scadenza vera resta quella del servizio, che la controlla a ogni richiesta.
+- **Come è provato.**
+  - Simulazione nella prova dell'importazione, con la prova caricata un istante prima della mezzanotte di ieri. Col vecchio modo cadono le stesse 4 prove di GitHub; con l'orologio unico passano tutte e 31.
+  - Nel browser, 52 prove su 52 con l'orologio a mezzogiorno di oggi.
+  - Ancora nel browser, una simulazione più dura: il servizio fermo a mezzogiorno di ieri. Passano accesso, archivio e blocchi del conto. Cadono solo le 12 prove dei farmaci: le banche dati d'esempio sono importate con la data vera di oggi, quindi per il servizio non sono ancora in vigore. In un giro vero non capita, perché l'orologio si ferma dopo l'importazione.
+  - Una prova nuova sul cookie (`apps/api/test/cookie-sessione.test.ts`), con il suo sabotaggio.
+- **Che cosa non è provato.** Un giro su GitHub che passi davvero dalla mezzanotte. Le altre prove del servizio usano ancora l'orologio vero dove non preparano dati «di oggi» da guardare dopo; se un giro a mezzanotte ne fa cadere altre, si correggono allo stesso modo.
+
+**D204 · Riepiloghi anche alla segreteria, con il CSV.** Alla fermata dopo l'unione della #15 Simone ha scelto «C. Segreteria, anche il CSV»: la segreteria vede i riepiloghi a video e scarica il file con i nomi dei pazienti, e ogni esportazione resta nel registro degli accessi. Corregge la scelta di D201 («solo il titolare»). Scelte:
+
+- **Dove la segreteria li vede.** Sugli archivi i cui titolari l'hanno confermata (D181, D185), come il resto del suo lavoro: permesso `reports.read` alla segreteria (matrice in `docs/ruoli-permessi.md`). Su un archivio che non l'ha confermata, o dopo una conferma tolta, no; il rifiuto resta nel registro. Il sostituto, il collega di gruppo e l'amministratore restano senza.
+- **Che cosa vede.** Gli stessi riepiloghi del titolare, compreso il CSV. Nel CSV ci sono, paziente per paziente, il tipo di contatto, il tipo di ricetta, e il vaccino con la campagna. Nessun testo clinico, come per il titolare (D201).
+- **Come ci arriva.** La segreteria non ha un archivio suo e la pagina «Archivio» non è sua: «Riepiloghi» è una voce del suo menu. Se gli archivi che l'hanno confermata sono più d'uno, la pagina chiede quale («Archivio»), e lo tiene nell'indirizzo insieme al periodo. Servizio: `GET /api/riepiloghi/archivi` dà gli archivi di cui chi guarda legge i riepiloghi.
+- **Il registro** è quello di D201: la lettura dei conteggi una riga, l'esportazione una riga per paziente, a nome della segreteria.
+
+Prove (permessi, servizio, interfaccia, browser con accessibilità anche su tablet) e sabotaggi.
+
+**D205 · Variazioni AIFA sui farmaci in terapia (A7): confezione sospesa o uscita dall'anagrafica, classe, nota, piano.** Alla fermata dopo l'unione della #15 Simone ha scelto «Sia altre variazioni AIFA che registri AIFA». Requisito A7: «Un aggiornamento che tocca un farmaco in terapia (carenza, nota, classe, piano, ritiro) arriva in Da fare, con i pazienti interessati» (avvisa). Le carenze erano fatte (D202). Scelte:
+
+- **Stato amministrativo dall'anagrafica.** Il file AIFA `confezioni_fornitura.csv` ha la colonna «STATO_AMMINISTRATIVO»: nel file scaricato il 20/11/2026, 160.067 confezioni «Autorizzata» e 33 «Sospesa»; le confezioni revocate non ci sono. Campo nuovo `adminState` (mappature 2026-11-20.1, migrazione 0038). Nel sito d'esempio c'è una riga vera di ranitidina «Sospesa», copiata senza cambiare un byte.
+- **Che cosa è una variazione**, per le terapie in corso con l'AIC, alla data e con le versioni in vigore:
+  - _confezione sospesa_: l'anagrafica in vigore la dà «Sospesa»;
+  - _uscita dall'anagrafica_: non c'è nell'anagrafica in vigore e c'era in una versione superata. Il testo dice «non è più nell'anagrafica», mai «revocata»: l'assenza non dice il motivo (D59);
+  - _classe_: la scheda della terapia ha la classe A o H; la confezione era in quell'elenco in una versione superata e non c'è più nella versione in vigore della stessa serie. Se è nell'altro elenco, il testo dice la classe nuova;
+  - _nota_: la nota della scheda era quella dell'elenco DPC in una versione superata, e l'elenco in vigore ne dice un'altra, o nessuna;
+  - _piano_: l'elenco DPC in vigore chiede il piano, la terapia non ne ha uno collegato e una versione superata dell'elenco non lo chiedeva.
+- **Perché il confronto con la scheda e con una versione superata.** Quando si sceglie il farmaco, la scheda della terapia registra classe e nota dalla banca dati. Confrontarle con i dati in vigore dice che cosa è cambiato per quella terapia. Chiedere che il dato della scheda si ritrovi in una versione superata evita di chiamare «variazione» una scheda scritta a mano o importata da un altro programma.
+- **Quanto resta.** Nessuna soglia di giorni da inventare: la voce resta finché la terapia non è aggiornata o conclusa. Per classe e nota basta scegliere di nuovo il farmaco nella scheda, che riporta i dati in vigore; per il piano, collegarlo; per la confezione sospesa o uscita, passare a un'altra confezione.
+- **Dove si vede.** In Oggi, «Variazioni AIFA sui farmaci in terapia»: una voce per farmaco e variazione, con i pazienti e il collegamento alla cartella. Poi nella cartella, sotto la terapia, e nella scheda, con come si chiude. La visibilità è quella delle carenze (D202): chi legge le terapie dell'archivio; le riservate, solo chi le legge.
+- **Nella ricerca dei farmaci** la confezione sospesa si dice con simbolo e parola: «Confezione sospesa secondo l'anagrafica AIFA delle confezioni». Nessuna regola nuova alla ricetta: le regole vengono dai requisiti. Se serve un avviso alla ricetta, è una domanda per la fermata.
+- **Fonti.** L'anagrafica e le liste di classe di AIFA, già importate; l'elenco DPC della Regione (trascrizione). La nota AIFA non ha ancora una fonte per AIC (D202): le variazioni di nota valgono per i farmaci dell'elenco DPC.
+
+Prove nel servizio con versioni scritte a mano, nell'interfaccia e nel browser, con 17 sabotaggi. Non provato: due versioni vere dell'anagrafica o delle liste, una dopo l'altra (le prove usano versioni scritte a mano); quanto spesso AIFA sospende o toglie le confezioni.
+
+**D206 · Registri di monitoraggio e piani terapeutici AIFA nei dati del farmaco.** È la seconda parte della scelta di Simone alla fermata dopo l'unione della #15 («Sia altre variazioni AIFA che registri AIFA»). La fonte è la pagina AIFA «Liste dei farmaci», che `sync/` già scarica per intero: l'elenco dei registri e dei piani attivi (`Elenco_Registri_PT_attivi_19.11.2026.csv`, letto il 20/11/2026). Scelte:
+
+- **Che cosa si importa.** L'elenco dei registri attivi. Per ogni farmaco e indicazione:
+  - il tipo di monitoraggio: «Registro» 327, «Registro semplificato» 23, «Piano Terapeutico» 19, «Registro 648/96» 4, «Registro - Legge 326/2003 (fondo 5%)» 1;
+  - lo stato, la patologia, l'indicazione rimborsata, la data d'inizio e l'indirizzo della scheda.
+
+  Non si importano l'indicazione autorizzata e le colonne MEA (gli accordi di rimborso fra AIFA e le ditte): per la prescrizione conta l'indicazione rimborsata. Non si importa nemmeno l'elenco dei registri chiusi.
+
+- **Come si collega ai farmaci: per ATC.** Il file non ha l'AIC. Il principio attivo è scritto in modi diversi da un file all'altro: «Sacubitril e Valsartan» nei registri, «VALSARTAN/SACUBITRIL» nell'anagrafica. L'ATC invece è un codice, uguale nei due file. Così il registro di un farmaco di marca vale anche per gli equivalenti con lo stesso ATC. Il testo dice «per lo stesso ATC» e nomina il farmaco del registro; decide il medico (regola 3).
+- **Le righe in fondo al file.** Il file vero finisce con 33 righe vuote o quasi. Due hanno un valore spurio («Nessuno» fra le colonne MEA, «quan» nel principio attivo) e non hanno il farmaco. Una riga senza un campo obbligatorio fermerebbe il file (D61), e l'aggiornamento di ogni notte non entrerebbe mai.
+  - Opzione nuova delle mappature, `saltaRigheSenza`: le righe senza il farmaco si saltano, e il rapporto le conta («2 righe saltate perché senza name»).
+  - Sul file vero intero: 374 registri, nessun problema, 2 righe saltate.
+- **La scheda AIFA.** L'elenco dà l'indirizzo della scheda del registro o del piano (un archivio zip).
+  - Il collegamento si mostra solo se l'indirizzo è in https su aifa.gov.it o su un suo sottodominio: un file importato non può mettere nel programma un collegamento verso un altro sito.
+  - Nel file vero 361 indirizzi su 374 si collegano. Gli altri 13 sono in http: 12 su www.aifa.gov.it e uno sul vecchio agenziafarmaco.gov.it. Per quelli il collegamento non c'è, ma il resto della voce sì.
+  - Il collegamento si apre in una scheda nuova, senza l'indirizzo della cartella.
+- **Dove si vede.** Nella ricerca dei farmaci (ricetta, terapia, banche dati), una riga informativa in blu con il simbolo: «Registri e piani AIFA per lo stesso ATC: …». Nei dati del farmaco (Banche dati), ogni registro con tipo, stato, data, patologia, indicazione rimborsata e scheda. Nessuna regola nuova alla ricetta.
+- **Sito d'esempio.** Righe vere del file del 19/11/2026: i due piani di ENTRESTO (adulti e pediatrico), LEQVIO (indicazione su più righe), NEMLUVIO (ATC fra spazi) e tre righe della coda. Nell'anagrafica d'esempio c'è anche una confezione vera di ENTRESTO, dal file del 20/11/2026.
+
+Prove: lettura e mappatura, importazione e consultazione, indirizzo della scheda, interfaccia e browser, con 12 sabotaggi. Non provato:
+
+- lo scaricamento con `sync/` dal computer dello studio (la pagina è la stessa delle altre liste AIFA);
+- le schede zip, che non sono state aperte;
+- gli indirizzi in http, che non sono stati provati né trasformati in https;
+- se il collegamento per ATC basta per i farmaci in associazione che hanno un ATC di gruppo.
+
+**D207 · Connessioni inattive chiuse da Postgres: si avvisa, il servizio non si ferma.** Il giro completo delle prove del 20/11/2026, notte, ha superato tutte le 1643 prove ma è uscito con un errore non gestito: «terminating connection due to administrator command», mentre una prova cancellava il suo database.
+
+- **Causa.** Quando il gruppo di connessioni si chiude, pg-pool lo dà per chiuso prima che le connessioni lo siano davvero. Il `DROP DATABASE … WITH (FORCE)` della prova manda allora la chiusura a una connessione ancora aperta, e il gruppo la segnala con un evento «error» che nessuno ascoltava.
+- **Lo stesso nel servizio.** Se Postgres si riavvia o la rete si interrompe, le connessioni inattive ricevono lo stesso errore, e un evento «error» senza ascoltatore ferma il processo.
+- **Scelta.** Il gruppo ascolta l'evento e scrive un avviso con il messaggio di Postgres, che non contiene dati dei pazienti. Le richieste dopo aprono una connessione nuova.
+- **Prova.** Una connessione inattiva chiusa con `pg_terminate_backend`: si avvisa e la richiesta dopo va. Un sabotaggio toglie l'ascoltatore e la prova diventa rossa.
+
+**D208 · Aggiornare la scheda della terapia dalla banca dati.** Con le variazioni AIFA (D205), una variazione di classe o di nota si chiudeva solo scegliendo di nuovo il farmaco nella scheda della terapia. Ora nella scheda, sotto la variazione, il medico ha il pulsante «Aggiorna dalla banca dati».
+
+- **Che cosa fa.** Classe, nota AIFA, DPC e gruppo di equivalenza vengono dalle banche dati in vigore oggi, come quando si sceglie il farmaco. Il resto della scheda (dose, date, opzioni) non cambia, e lo storico delle modifiche conserva i valori di prima.
+- **Quando no.** Non per una terapia conclusa, né senza il codice AIC, né per un farmaco che non è nelle banche dati in vigore: il servizio lo dice e non cambia nulla.
+- **Chi.** Il pulsante è del medico, come «Modifica»; il servizio chiede lo stesso permesso della modifica della terapia.
+- **Non è una scelta della fermata.** Qualunque sia la risposta sulla domanda delle variazioni (fine con la terapia aggiornata, pulsante «Visto» o 30 giorni), il pulsante serve, perché aggiorna la scheda.
+
+Prove: servizio (aggiornamento, rifiuti, archivio di un altro medico), interfaccia (medico e segreteria) e quattro sabotaggi. Non provato nel browser: la prova nel browser ha un solo aggiornamento delle banche dati d'esempio, quindi nessuna variazione di classe.
+
+**D209 · Correzioni dopo una revisione indipendente della #17.** Prima dell'unione, un agente separato ha rivisto il codice della pull request #17 e ha trovato quattro difetti veri. Sono corretti, ciascuno con prove e sabotaggi:
+
+1. **Riepiloghi della segreteria e voci riservate.** I riepiloghi della segreteria (D204) contavano ed esportavano anche le voci che il medico ha segnato «Riservata»: note del diario, vaccinazioni e ricette con la riga di una terapia riservata. Altrove la segreteria non le vede. Ora le voci riservate contano solo per chi le legge; il titolare le ha come prima. È la regola di sempre sulle riservate, non una scelta nuova: corregge «gli stessi riepiloghi del titolare» di D204.
+2. **Registri AIFA modificabili.** La tabella dei registri (migrazione 0039) non aveva le due protezioni delle altre banche dati: niente modifiche, cancellazioni o svuotamenti. Ora le ha, e una prova controlla che ogni tabella delle banche dati le abbia, comprese quelle che verranno.
+3. **Variazioni AIFA più lente col passare dei mesi.** Il calcolo leggeva una riga per ogni versione superata delle banche dati e la confrontava con ogni terapia. Le versioni non si cancellano e l'anagrafica ne ha una quasi ogni giorno, quindi Oggi sarebbe diventata più lenta ogni giorno. Ora il database riassume le versioni superate in una riga per farmaco, e le righe si cercano per codice: il tempo non cresce con il numero delle versioni. Le prove e gli otto sabotaggi del calcolo sono ripetuti sul codice nuovo.
+4. **Connessioni in uso.** D207 copriva solo le connessioni ferme. Una transazione in corso quando Postgres si riavvia avrebbe fermato il processo. Ora ogni connessione ha il suo ascoltatore e scrive un avviso solo.

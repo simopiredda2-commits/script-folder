@@ -261,7 +261,7 @@ describe('azioni sullo studio di più ruoli (tappa 14)', () => {
     expect(ok(collega, 'archive.grants')).toBe(false);
     expect(ok(amministratore, 'archive.grants')).toBe(false);
   });
-  it('i riepiloghi dell’archivio li legge ed esporta solo il titolare (D201)', () => {
+  it('i riepiloghi dell’archivio: il titolare, e la segreteria che ha confermato (D201, D204)', () => {
     expect(ok(titolare, 'reports.read')).toBe(true);
     const grants = ctx({
       grants: [
@@ -271,7 +271,9 @@ describe('azioni sullo studio di più ruoli (tappa 14)', () => {
     });
     expect(ok(sostituto, 'reports.read', grants)).toBe(false);
     expect(ok(collega, 'reports.read', grants)).toBe(false);
-    expect(ok(segreteria, 'reports.read', ctx({ secretaries: [segreteria.userId] }))).toBe(false);
+    // La segreteria sì, ma solo dove il titolare l'ha confermata (D204).
+    expect(ok(segreteria, 'reports.read', ctx({ secretaries: [segreteria.userId] }))).toBe(true);
+    expect(ok(segreteria, 'reports.read', ctx({ secretaries: [] }))).toBe(false);
     expect(ok(amministratore, 'reports.read')).toBe(false);
   });
   it('lo spostamento nell’archivio del medico scelto in AURA lo decide solo il titolare (D200)', () => {

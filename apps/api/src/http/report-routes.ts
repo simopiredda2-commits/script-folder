@@ -4,18 +4,21 @@ import { z } from 'zod';
 import { logAccess, logAccessForPatients, type AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
-import { loadArchiveContext } from '../patients/access';
+import { loadArchiveContext, visibleArchives } from '../patients/access';
+import { archive } from '../db/schema';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { parsePeriod, patientsOf, periodRows, reportCsv, summarize } from '../reports/period';
 import { HttpError } from './errors';
 
 const archiveParams = z.object({ id: z.uuid() });
 
-const ONLY_OWNER = 'I riepiloghi dell’archivio li legge ed esporta solo il medico titolare';
+const ONLY_OWNER =
+  'I riepiloghi dell’archivio li leggono ed esportano il medico titolare e la segreteria che ha confermato';
 
 /**
- * Riepiloghi dell'archivio per periodo (D201): conteggi a video, righe in CSV. Solo il titolare,
- * come l'esportazione completa: i dati sono suoi (regola 4). I conteggi non hanno nomi di
- * pazienti e lasciano una riga nel registro; il CSV ne ha, e lascia una riga per paziente.
+ * Riepiloghi dell'archivio per periodo (D201): conteggi a video, righe in CSV. Il titolare, e la
+ * segreteria sugli archivi che l'hanno confermata (D204). I conteggi non hanno nomi di pazienti e
+ * lasciano una riga nel registro; il CSV ne ha, e lascia una riga per paziente.
  */
 export function registerReportRoutes(
   app: FastifyInstance,
@@ -23,11 +26,15 @@ export function registerReportRoutes(
 ): void {
   const { db, now } = deps;
 
-  /** Prima il permesso, anche per una richiesta sbagliata: un no resta nel registro. */
+  /**
+   * Prima il permesso, anche per una richiesta sbagliata: un no resta nel registro. Dice anche se
+   * chi guarda legge le voci riservate dell'archivio: la segreteria no (D209).
+   */
   async function guard(actor: Actor, archiveId: string, action: AccessAction) {
     const ctx = await loadArchiveContext(db, archiveId);
     const decision = can(actor, 'reports.read', { ...ctx, now: now() });
-    if (decision.allowed) return;
+    if (decision.allowed)
+      return { includeReserved: can(actor, 'reserved.read', { ...ctx, now: now() }).allowed };
     await logAccess(db, {
       studioId: actor.studioId,
       userId: actor.userId,
@@ -39,12 +46,26 @@ export function registerReportRoutes(
     throw new HttpError(403, ONLY_OWNER);
   }
 
+  /** Gli archivi di cui chi guarda legge i riepiloghi: il suo, o quelli che l'hanno confermata. */
+  app.get('/api/riepiloghi/archivi', async (req) => {
+    const actor = req.actor!;
+    const ids = await visibleArchives(db, actor, 'reports.read');
+    const rows = ids.length
+      ? await db
+          .select({ id: archive.id, nome: archive.name })
+          .from(archive)
+          .where(and(eq(archive.studioId, actor.studioId), inArray(archive.id, ids)))
+          .orderBy(asc(archive.name))
+      : [];
+    return { archivi: rows };
+  });
+
   app.get('/api/archivi/:id/riepiloghi', async (req) => {
     const actor = req.actor!;
     const { id } = archiveParams.parse(req.params);
-    await guard(actor, id, 'lettura_riepiloghi');
+    const { includeReserved } = await guard(actor, id, 'lettura_riepiloghi');
     const period = parsePeriod(req.query);
-    const summary = summarize(await periodRows(db, id, period), period);
+    const summary = summarize(await periodRows(db, id, period, includeReserved), period);
     await logAccess(db, {
       studioId: actor.studioId,
       userId: actor.userId,
@@ -59,9 +80,9 @@ export function registerReportRoutes(
   app.get('/api/archivi/:id/riepiloghi/esportazione', async (req, reply) => {
     const actor = req.actor!;
     const { id } = archiveParams.parse(req.params);
-    await guard(actor, id, 'esportazione_riepiloghi');
+    const { includeReserved } = await guard(actor, id, 'esportazione_riepiloghi');
     const period = parsePeriod(req.query);
-    const rows = await periodRows(db, id, period);
+    const rows = await periodRows(db, id, period, includeReserved);
     const details = { archivio: id, dal: period.from, al: period.to };
     // Il CSV ha i nomi: una riga per paziente, poi una per l'esportazione.
     await logAccessForPatients(db, patientsOf(rows), {

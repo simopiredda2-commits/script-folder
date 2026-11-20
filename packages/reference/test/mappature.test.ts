@@ -93,7 +93,7 @@ describe('estrazione dei record', () => {
     const m = mappingForSyncFile(repo, 'aifa_liste', 'confezioni_fornitura.csv')!;
     const out = extractRecords(m, table('aifa', 'farmaci', 'confezioni_fornitura.csv'));
     expect(out.problems).toEqual([]);
-    expect(out.records).toHaveLength(11);
+    expect(out.records).toHaveLength(13);
     expect(out.records[0]).toEqual({
       aic: '038092019',
       name: 'AMLODIPINA DOC GENERICI',
@@ -103,6 +103,13 @@ describe('estrazione dei record', () => {
       form: 'Compressa',
       supplyRegime: 'Medicinali soggetti a prescrizione medica',
       holder: 'DOC GENERICI SRL',
+      adminState: 'Autorizzata',
+    });
+    // Lo stato amministrativo (D205): la riga vera di una confezione sospesa.
+    expect(out.records.find((r) => r.aic === '034471021')).toMatchObject({
+      aic: '034471021',
+      name: 'RANITIDINA DOC GENERICI',
+      adminState: 'Sospesa',
     });
   });
 
@@ -192,6 +199,84 @@ describe('estrazione dei record', () => {
       atc: 'C08CA01',
     });
     expect(String(out.records[0]!.aifaNote).split('\n')).toHaveLength(3);
+  });
+
+  it('registri AIFA (D206): BOM, ATC fra spazi, testo che va a capo; le righe senza farmaco si saltano e si contano', () => {
+    const m = mappingForSyncFile(repo, 'aifa_liste', '3258518_Elenco_Registri_PT_attivi.csv')!;
+    expect(m.id).toBe('aifa-registri');
+    expect(missingFields(m)).toEqual([]);
+    expect(pendingColumns(m)).toEqual([]);
+    // L'elenco dei registri chiusi non si importa: nessuna mappatura.
+    expect(mappingForSyncFile(repo, 'aifa_liste', '3258518_Elenco_Registri_PT_chiusi.csv')).toBe(
+      undefined,
+    );
+    const out = extractRecords(
+      m,
+      table('aifa', 'documents', '20142', '3258518', 'Elenco_Registri_PT_attivi_19.11.2026.csv'),
+    );
+    expect(out.missingColumns).toEqual([]);
+    expect(out.problems).toEqual([]);
+    expect(out.headerLine).toBe(1);
+    // In fondo: una riga vuota (non conta), una con il solo «Nessuno» e una con il solo «quan».
+    expect(out.skipped).toBe(2);
+    expect(out.records.map((r) => [r.name, r.atc, r.monitoringType, r.monitoringStart])).toEqual([
+      ['ENTRESTO PEDIATRICO', 'C09DX04', 'Piano Terapeutico', '2025-09-04'],
+      ['ENTRESTO', 'C09DX04', 'Piano Terapeutico', '2017-03-12'],
+      ['LEQVIO', 'C10AX16', 'Piano Terapeutico', '2025-09-04'],
+      ['NEMLUVIO', 'D11AH12', 'Piano Terapeutico', '2026-05-29'],
+    ]);
+    expect(out.records[1]).toMatchObject({
+      activeIngredient: 'Sacubitril e Valsartan',
+      condition: 'INSUFFICIENZA CARDIACA CRONICA SINTOMATICA',
+      monitoringState: 'Attivo',
+      therapeuticArea: 'Malattie del sistema circolatorio',
+      sheetUrl: 'https://www.aifa.gov.it/documents/20142/2152764/Scheda_ENTRESTO_HF_07.12.2023.zip',
+    });
+    expect(String(out.records[2]!.reimbursedIndication).split('\n')).toHaveLength(3);
+  });
+
+  it('saltaRigheSenza: solo campi del tipo, e senza le righe il file intero', () => {
+    const base = {
+      id: 'prova',
+      titolo: 'prova',
+      tipo: 'registri_aifa',
+      origine: 'sync',
+      fonte: 'f',
+      chiave: 'k',
+      colonne: { name: 'Farmaco', atc: 'ATC' },
+      vecchiaDopoGiorni: null,
+    };
+    expect(() =>
+      parseMappings({ versione: '1', mappature: [{ ...base, saltaRigheSenza: ['nessuno'] }] }),
+    ).toThrow(/non ha il campo nessuno/);
+    const m = parseMappings({ versione: '1', mappature: [{ ...base, saltaRigheSenza: ['name'] }] })
+      .mappings[0]!;
+    const rows = [
+      ['Farmaco', 'ATC'],
+      ['ENTRESTO', 'C09DX04'],
+      ['', 'C10AX16'],
+      ['   ', ''],
+    ];
+    const out = extractRecords(m, rows);
+    expect(out.records).toEqual([
+      {
+        name: 'ENTRESTO',
+        atc: 'C09DX04',
+        activeIngredient: null,
+        reimbursedIndication: null,
+        condition: null,
+        monitoringType: null,
+        monitoringState: null,
+        therapeuticArea: null,
+        monitoringStart: null,
+        sheetUrl: null,
+      },
+    ]);
+    // La riga senza farmaco si salta; quella vuota non conta come saltata.
+    expect(out.skipped).toBe(1);
+    // Senza l'opzione la stessa riga è un problema: il file non entrerebbe.
+    const strict = extractRecords({ ...m, saltaRigheSenza: [] }, rows);
+    expect(strict.problems).toEqual([{ line: 3, field: 'name', problem: 'valore mancante' }]);
   });
 
   it('date e prezzi: GG/MM/AAAA o AAAA-MM-GG, solo date vere; l’euro solo in fondo', () => {

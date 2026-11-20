@@ -52,7 +52,7 @@ import { totp } from '../../src/security/totp';
 import { createScenario, PASSWORD, type Scenario } from '../helpers/scenario';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db';
 import { buildWeb, serveWeb } from './serve-web';
-import { studioDayFrom } from '../helpers/dates';
+import { middayOf, studioDayFrom } from '../helpers/dates';
 
 const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf-8');
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
@@ -263,6 +263,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       t.db,
       {},
       {
+        // L'orologio del servizio fermo a mezzogiorno di oggi: i dati «di oggi» preparati qui e le
+        // pagine guardate dopo restano sullo stesso giorno anche se il giro passa dalla mezzanotte
+        // (prove su GitHub del 19/11/2026). Le date qui sotto vengono da questo orologio.
+        clockAt: middayOf(new Date()),
         aura: { gateway: aura },
         referenceUpdates: (now) => {
           updates = new ReferenceUpdates(
@@ -293,7 +297,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     therapyId = (
       await t.db.select().from(therapy).where(eq(therapy.patientId, s.richPatient))
     ).find((x) => !x.reserved)!.id;
-    const midnight = startOfStudioDay(studioDate(new Date())).getTime();
+    const midnight = startOfStudioDay(studioDate(s.clock.now())).getTime();
     await withActor(t.db, s.users.titolare.id, async (tx) => {
       await tx.insert(appointment).values({
         studioId: s.studioId,
@@ -331,7 +335,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .values({
           patientId: s.richPatient,
           kind: 'measurement',
-          occurredOn: studioDate(new Date()),
+          occurredOn: studioDate(s.clock.now()),
           authorUserId: s.users.titolare.id,
         })
         .returning();
@@ -348,6 +352,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     // Il motore avviato è quello chiesto: una prova su WebKit non deve girare su Chromium.
     expect(browser.browserType().name()).toBe(ENGINE);
     doctor = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'it-IT' });
+    await doctor.clock.setFixedTime(s.clock.now());
     page = await doctor.newPage();
   }, 120_000);
 
@@ -646,6 +651,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       viewport: { width: 1024, height: 768 },
       locale: 'it-IT',
     });
+    await ctx.clock.setFixedTime(s.clock.now());
     const sec = await ctx.newPage();
     try {
       await loginInBrowser(sec, 'segreteria');
@@ -681,6 +687,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
           .getByRole('link', { name: 'Archivio' })
           .count(),
       ).resolves.toBe(0);
+      // I riepiloghi degli archivi che l'hanno confermata, dal menu (D204): due archivi nello
+      // scenario, quindi la scelta dell'archivio; il CSV dello stesso archivio e periodo.
+      await sec
+        .getByRole('navigation', { name: 'Sezioni' })
+        .getByRole('link', { name: 'Riepiloghi' })
+        .click();
+      await sec.getByRole('heading', { level: 1, name: 'Riepiloghi' }).waitFor();
+      await sec.getByRole('table', { name: 'Ricette fatte nell’archivio, per tipo' }).waitFor();
+      await sec.getByLabel('Archivio').waitFor();
+      await check(sec, 'riepiloghi della segreteria', true);
+      const href = await sec.getByRole('link', { name: 'Scarica in CSV' }).getAttribute('href');
+      const csv = await sec.request.get(`${base}${href}`);
+      expect(csv.status()).toBe(200);
     } finally {
       await ctx.close();
     }
@@ -1205,6 +1224,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       viewport: { width: 1280, height: 900 },
       locale: 'it-IT',
     });
+
+    await ctx.clock.setFixedTime(s.clock.now());
     const admin = await ctx.newPage();
     try {
       await loginInBrowser(admin, 'amministratore');
@@ -1254,6 +1275,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       viewport: { width: 1280, height: 900 },
       locale: 'it-IT',
     });
+
+    await ctx.clock.setFixedTime(s.clock.now());
     const admin = await ctx.newPage();
     try {
       await loginInBrowser(admin, 'amministratore');
@@ -1405,6 +1428,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       viewport: { width: 1280, height: 900 },
       locale: 'it-IT',
     });
+
+    await ctx.clock.setFixedTime(s.clock.now());
     const colleague = await ctx.newPage();
     try {
       await loginInBrowser(colleague, 'collega');
@@ -1461,6 +1486,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       viewport: { width: 1280, height: 900 },
       locale: 'it-IT',
     });
+    await ctx.clock.setFixedTime(s.clock.now());
     const admin = await ctx.newPage();
     try {
       await loginInBrowser(admin, 'amministratore');
@@ -1536,6 +1562,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       viewport: { width: 1280, height: 900 },
       locale: 'it-IT',
     });
+    await ctx.clock.setFixedTime(s.clock.now());
     const admin = await ctx.newPage();
     try {
       await loginInBrowser(admin, 'amministratore');
@@ -1610,7 +1637,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
   it('nuovo paziente temporaneo: stato e scadenza della scelta in un passo solo (D199)', async () => {
     const [nuovo] = generatePatients({ seed: `temporaneo-e2e-${s.studioId}`, count: 1 });
-    const scadenza = studioDate(new Date(Date.now() + 120 * 24 * 60 * 60 * 1000));
+    const scadenza = studioDayFrom(s.clock.now(), 120);
     await page.goto(`${base}/pazienti`);
     await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
     await page.getByRole('link', { name: 'Nuovo paziente' }).click();
@@ -1726,8 +1753,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.goto(`${base}/archivio`);
     await page.getByRole('heading', { level: 2, name: 'Autorizzazioni sull’archivio' }).waitFor();
     await page.getByLabel('Medico', { exact: true }).selectOption({ index: 1 });
-    await page.getByLabel('Dal', { exact: true }).fill(studioDate(new Date()));
-    await page.getByLabel('Al (compreso)').fill(studioDayFrom(new Date(), 3));
+    await page.getByLabel('Dal', { exact: true }).fill(studioDate(s.clock.now()));
+    await page.getByLabel('Al (compreso)').fill(studioDayFrom(s.clock.now(), 3));
     await page.getByLabel('Motivo', { exact: true }).fill('Ferie di prova nel browser');
     await page.getByRole('button', { name: 'Autorizza', exact: true }).click();
     const row = page.getByRole('row').filter({ hasText: 'Ferie di prova nel browser' });
@@ -1756,7 +1783,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   it('referto di laboratorio con due esami e vaccinazione, scritti a mano (tappa 15, D176)', async () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/esami`);
     await page.getByRole('heading', { level: 2, name: 'Nuovo referto di laboratorio' }).waitFor();
-    await page.getByLabel('Data del referto').fill(studioDate(new Date()));
+    await page.getByLabel('Data del referto').fill(studioDate(s.clock.now()));
     const first = page.getByRole('group', { name: 'Esame 1' });
     await first.getByLabel('Esame', { exact: true }).fill('Esame di prova nel browser');
     await first.getByLabel('Valore', { exact: true }).fill('13,5');
@@ -1817,7 +1844,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/terapie/${t1!.id}`);
     await page.getByRole('button', { name: 'Concludi…' }).click();
     await page.getByRole('heading', { level: 2, name: 'Concludi la terapia' }).waitFor();
-    await page.getByLabel('Conclusa il').fill(studioDate(new Date()));
+    await page.getByLabel('Conclusa il').fill(studioDate(s.clock.now()));
     await check(page, 'conclusione della terapia', true);
     await page.getByRole('button', { name: 'Concludi la terapia' }).click();
     // L'avviso dell'azione, poi la testata della terapia riletta: «Terapia conclusa il …» compare in
@@ -2057,7 +2084,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
     aura.setChoice(auraId, {
       doctorFiscalCode: owner!.cf!,
-      chosenOn: studioDate(new Date()),
+      chosenOn: studioDate(s.clock.now()),
       expiresOn: null,
       endedOn: null,
       endReason: null,
@@ -2112,7 +2139,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       return rx!.id;
     });
     // AURA, il simulatore con dati inventati, segnala il decesso.
-    const died = studioDate(new Date(Date.now() - 3 * 86_400_000));
+    const died = studioDayFrom(s.clock.now(), -3);
     const diedIt = died.split('-').reverse().join('/');
     aura.register({
       fiscalCode: dead!.fiscalCode,
@@ -2206,6 +2233,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       viewport: { width: 1280, height: 900 },
       locale: 'it-IT',
     });
+    await anonymous.clock.setFixedTime(s.clock.now());
     try {
       const p = await anonymous.newPage();
       await p.goto(base);
@@ -2370,7 +2398,77 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await withActor(t.db, s.users.titolare.id, (tx) =>
       tx
         .update(therapy)
-        .set({ status: 'ended', endOn: studioDate(new Date()) })
+        .set({ status: 'ended', endOn: studioDate(s.clock.now()) })
+        .where(eq(therapy.id, row!.id)),
+    );
+  });
+
+  it('variazioni AIFA (D205): la confezione sospesa in Oggi, in cartella, nella scheda e nella ricerca', async () => {
+    // RANITIDINA DOC GENERICI è «Sospesa» nell'anagrafica del sito d'esempio (riga vera del 20/11/2026).
+    const [row] = await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .insert(therapy)
+        .values({
+          patientId: s.richPatient,
+          drugAic: '034471021',
+          drugName: 'RANITIDINA DOC GENERICI 300 MG COMPRESSE',
+          activeIngredient: 'RANITIDINA CLORIDRATO',
+          atc: 'A02BA02',
+          kind: 'chronic',
+          startOn: '2026-01-01',
+          createdBy: s.users.titolare.id,
+        })
+        .returning({ id: therapy.id }),
+    );
+    await gotoNewPage(page, `${base}/`);
+    await page.getByRole('heading', { name: 'Variazioni AIFA sui farmaci in terapia' }).waitFor();
+    const patients = page.getByRole('list', {
+      name: 'Pazienti con RANITIDINA DOC GENERICI 300 MG COMPRESSE in terapia: confezione sospesa',
+    });
+    await patients.getByRole('link').first().waitFor();
+    await check(page, 'Oggi con una variazione AIFA', true);
+    await patients.getByRole('link').first().click();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    await page
+      .locator('.terapia-riga')
+      .filter({ hasText: 'RANITIDINA DOC GENERICI' })
+      .getByText(
+        /^Variazione AIFA: confezione sospesa secondo l’anagrafica AIFA delle confezioni \(versione del \d{2}\/\d{2}\/\d{4}\)\.$/,
+      )
+      .waitFor();
+    await check(page, 'cartella con una variazione AIFA', true);
+    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}/terapie/${row!.id}`);
+    await page
+      .getByText(/Si chiude quando la terapia passa a un’altra confezione o è conclusa\.$/)
+      .waitFor();
+    await check(page, 'scheda della terapia con una variazione AIFA', true);
+    await gotoNewPage(page, `${base}/banche-dati`);
+    await page
+      .getByLabel('Nome commerciale, principio attivo, codice AIC o ATC')
+      .fill('ranitidina');
+    await page
+      .locator('.risultato')
+      .filter({ hasText: 'RANITIDINA DOC GENERICI' })
+      .getByText('Confezione sospesa secondo l’anagrafica AIFA delle confezioni.')
+      .waitFor();
+    await check(page, 'ricerca dei farmaci con una confezione sospesa', true);
+    // Registri e piani AIFA (D206): ENTRESTO ha due piani terapeutici nell'elenco d'esempio (righe vere).
+    await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('entresto');
+    const entresto = page.locator('.risultato').filter({ hasText: 'ENTRESTO' });
+    const sheet = entresto.getByRole('link', { name: 'scheda di ENTRESTO sul sito di AIFA' });
+    await sheet.waitFor();
+    expect(await sheet.getAttribute('href')).toBe(
+      'https://www.aifa.gov.it/documents/20142/2152764/Scheda_ENTRESTO_HF_07.12.2023.zip',
+    );
+    expect(await sheet.getAttribute('rel')).toBe('noreferrer');
+    await entresto
+      .getByText(/^ENTRESTO PEDIATRICO: Piano Terapeutico, attivo dal 04\/09\/2025\./)
+      .waitFor();
+    await check(page, 'ricerca dei farmaci con i registri AIFA', true);
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .update(therapy)
+        .set({ status: 'ended', endOn: studioDate(s.clock.now()) })
         .where(eq(therapy.id, row!.id)),
     );
   });

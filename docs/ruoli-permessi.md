@@ -39,7 +39,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Leggere il registro degli accessi | Sì | No | No | No | No | No |
 | Esportare tutti i dati dell’archivio | Sì | No | No | No | No | No |
 | Importare dati da altri programmi nell’archivio | Sì | No | No | No | No | No |
-| Leggere ed esportare i riepiloghi dell’archivio per periodo | Sì | No | No | No | No | No |
+| Leggere ed esportare i riepiloghi dell’archivio per periodo | Sì | Sì | No | No | No | No |
 | Decidere che cosa vede la segreteria dell’archivio | Sì | No | No | No | No | No |
 | Autorizzare un sostituto o un collega di gruppo sull’archivio | Sì | No | No | No | No | No |
 | Spostare un paziente nell’archivio del medico scelto in AURA | Sì | No | No | No | No | No |

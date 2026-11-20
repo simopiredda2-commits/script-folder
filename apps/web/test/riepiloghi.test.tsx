@@ -100,6 +100,7 @@ describe('Riepiloghi per periodo nell’interfaccia (D201)', () => {
     window.history.pushState({}, '', '/archivio/riepiloghi?dal=2026-11-01&al=2026-11-19');
     const calls = stubFetch({
       '/api/io': ok(OWNER),
+      '/api/riepiloghi/archivi': ok({ archivi: [OWNER.archivio] }),
       '/api/archivi/a1/riepiloghi': (search) => ok(summary(...period(search)))(),
     });
     render(<App />);
@@ -134,6 +135,7 @@ describe('Riepiloghi per periodo nell’interfaccia (D201)', () => {
     window.history.pushState({}, '', '/archivio/riepiloghi?dal=2026-11-01&al=2026-11-19');
     const calls = stubFetch({
       '/api/io': ok(OWNER),
+      '/api/riepiloghi/archivi': ok({ archivi: [OWNER.archivio] }),
       '/api/archivi/a1/riepiloghi': (search) => ok(summary(...period(search), false))(),
     });
     render(<App />);
@@ -150,17 +152,60 @@ describe('Riepiloghi per periodo nell’interfaccia (D201)', () => {
     );
   });
 
-  it('chi non è titolare di un archivio non ha la pagina', async () => {
+  it('chi non ha archivi dei riepiloghi (sostituto, amministratore) non ha la pagina', async () => {
     window.history.pushState({}, '', '/archivio/riepiloghi');
     const calls = stubFetch({
       '/api/io': ok({
         ...OWNER,
-        ruoli: [{ codice: 'secretary', nome: 'Segreteria' }],
+        ruoli: [{ codice: 'substitute_doctor', nome: 'Sostituto' }],
         archivio: null,
       }),
+      '/api/riepiloghi/archivi': ok({ archivi: [] }),
     });
     render(<App />);
     await waitFor(() => expect(window.location.pathname).toBe('/'));
-    expect(calls.some((c) => c.path.includes('/riepiloghi'))).toBe(false);
+    expect(calls.some((c) => c.path.startsWith('/api/archivi/'))).toBe(false);
+    // Nel menu niente «Riepiloghi»: non è la segreteria.
+    expect(screen.queryByRole('link', { name: 'Riepiloghi' })).toBeNull();
+  });
+
+  it('la segreteria (D204): dal menu, con la scelta fra gli archivi che l’hanno confermata', async () => {
+    window.history.pushState({}, '', '/');
+    const calls = stubFetch({
+      '/api/io': ok({
+        ...OWNER,
+        nome: 'Segreteria inventata',
+        ruoli: [{ codice: 'secretary', nome: 'Segreteria' }],
+        archivio: null,
+      }),
+      '/api/riepiloghi/archivi': ok({
+        archivi: [
+          { id: 'a1', nome: 'Archivio di prova' },
+          { id: 'a2', nome: 'Archivio del collega' },
+        ],
+      }),
+      '/api/archivi/a1/riepiloghi': (search) => ok(summary(...period(search)))(),
+      '/api/archivi/a2/riepiloghi': (search) => ok(summary(...period(search), false))(),
+    });
+    render(<App />);
+    fireEvent.click(await screen.findByRole('link', { name: 'Riepiloghi' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Riepiloghi' })).toBeTruthy();
+    // Nessun percorso verso «Archivio», che non è della segreteria.
+    expect(screen.queryByRole('link', { name: 'Archivio' })).toBeNull();
+    const select = await screen.findByLabelText('Archivio');
+    expect(screen.getByRole('link', { name: 'Scarica in CSV' }).getAttribute('href')).toMatch(
+      /^\/api\/archivi\/a1\/riepiloghi\/esportazione\?/,
+    );
+    fireEvent.change(select, { target: { value: 'a2' } });
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get('archivio')).toBe('a2'),
+    );
+    await waitFor(() =>
+      expect(calls.some((c) => c.path === '/api/archivi/a2/riepiloghi')).toBe(true),
+    );
+    expect(await screen.findByText('Nessuna vaccinazione nel periodo.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Scarica in CSV' }).getAttribute('href')).toMatch(
+      /^\/api\/archivi\/a2\/riepiloghi\/esportazione\?/,
+    );
   });
 });

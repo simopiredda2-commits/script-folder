@@ -267,6 +267,20 @@
       "when": 1795125296654,
       "tag": "0037_aifa_trasparenza_carenti",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1795133940860,
+      "tag": "0038_aifa_stato_confezioni",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795135374284,
+      "tag": "0039_aifa_registri",
+      "breakpoints": true
     }
   ]
 }

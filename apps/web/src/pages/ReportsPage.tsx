@@ -64,26 +64,38 @@ function byDoctor(s: Summary) {
 
 /**
  * Riepiloghi dell'archivio per periodo (requisiti, «Riepiloghi»; D201): visite e contatti dal
- * diario, ricette inviate, cartacee e annullate, vaccinazioni; con l'esportazione in CSV. Solo il
- * titolare, come l'esportazione completa. Il periodo resta nell'indirizzo.
+ * diario, ricette inviate, cartacee e annullate, vaccinazioni; con l'esportazione in CSV. Il
+ * titolare sul suo archivio, la segreteria sugli archivi che l'hanno confermata (D204). Periodo
+ * e archivio restano nell'indirizzo.
  */
 export function ReportsPage() {
   const { state } = useSession();
-  const own = state.status === 'ready' ? state.me.archivio : null;
+  // Il percorso «Archivio / Riepiloghi» solo per chi ha un archivio suo: la segreteria arriva dal
+  // menu, e la pagina «Archivio» non è sua.
+  const ownsArchive = state.status === 'ready' && !!state.me.archivio;
+  const archives = useApi<{ archivi: { id: string; nome: string }[] }>('/api/riepiloghi/archivi');
   const [params, setParams] = useSearchParams();
   const fallback = thisMonth();
   const dal = ISO.test(params.get('dal') ?? '') ? params.get('dal')! : fallback.dal;
   const al = ISO.test(params.get('al') ?? '') ? params.get('al')! : fallback.al;
   const [from, setFrom] = useState(dal);
   const [to, setTo] = useState(al);
+  const list = archives.data?.archivi ?? [];
+  // L'archivio dell'indirizzo, se è fra quelli di chi guarda; se no il primo.
+  const own = list.find((a) => a.id === params.get('archivio')) ?? list[0] ?? null;
   const query = `dal=${dal}&al=${al}`;
   const r = useApi<Summary>(own ? `/api/archivi/${own.id}/riepiloghi?${query}` : null);
 
-  if (!own) return <Navigate to="/" replace />;
+  if (archives.loading && !archives.data) return <Loading what="archivi" />;
+  if (archives.data && !own) return <Navigate to="/" replace />;
+  if (!own) return <ErrorMessage error={archives.error} />;
 
   function show(e: FormEvent) {
     e.preventDefault();
-    setParams({ dal: from, al: to }, { replace: true });
+    setParams(
+      { dal: from, al: to, ...(list.length > 1 && own ? { archivio: own.id } : {}) },
+      { replace: true },
+    );
   }
 
   const s = r.data;
@@ -93,14 +105,32 @@ export function ReportsPage() {
       <PageHeader
         title="Riepiloghi"
         trail={
-          <>
-            <Link to="/archivio">Archivio</Link> <span aria-hidden="true">/</span>{' '}
-            <span>Riepiloghi</span>
-          </>
+          ownsArchive ? (
+            <>
+              <Link to="/archivio">Archivio</Link> <span aria-hidden="true">/</span>{' '}
+              <span>Riepiloghi</span>
+            </>
+          ) : undefined
         }
       />
       <form className="riquadro" onSubmit={show} aria-labelledby="titolo-periodo">
         <h2 id="titolo-periodo">Periodo</h2>
+        {list.length > 1 && (
+          <div className="campo">
+            <label htmlFor="riepilogo-archivio">Archivio</label>
+            <select
+              id="riepilogo-archivio"
+              value={own.id}
+              onChange={(e) => setParams({ dal, al, archivio: e.target.value }, { replace: true })}
+            >
+              {list.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="campi-in-riga">
           <div className="campo">
             <label htmlFor="riepilogo-dal">Dal</label>

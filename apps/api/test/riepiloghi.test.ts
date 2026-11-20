@@ -2,11 +2,13 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   accessLog,
+  archiveSecretary,
   clinicalEntry,
   diaryDetail,
   patient,
   prescription,
   prescriptionLine,
+  therapy,
   vaccinationDetail,
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
@@ -367,8 +369,36 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
     });
   });
 
-  it('solo il titolare, sul suo archivio: il collega, la segreteria, il sostituto e l’amministratore no, e il no resta nel registro', async () => {
-    for (const who of ['collega', 'segreteria', 'sostituto', 'amministratore'] as const) {
+  it('il titolare e la segreteria confermata (D204); il collega, il sostituto e l’amministratore no, e il no resta nel registro', async () => {
+    // La segreteria che il titolare ha confermato legge e scarica, come il titolare (D204); il
+    // CSV resta nel registro paziente per paziente.
+    const counts = await get(
+      'segreteria',
+      `/api/archivi/${s.archives.titolare}/riepiloghi${MARCH}`,
+    );
+    expect(counts.statusCode, counts.body).toBe(200);
+    const csv = await get(
+      'segreteria',
+      `/api/archivi/${s.archives.titolare}/riepiloghi/esportazione${MARCH}`,
+    );
+    expect(csv.statusCode, csv.body).toBe(200);
+    expect(csv.body).toContain(first.fiscalCode);
+    expect(await lastLog(s.users.segreteria.id, 'esportazione_riepiloghi')).toMatchObject({
+      outcome: 'riuscito',
+      details: { archivio: s.archives.titolare },
+    });
+    const ofPatient = await t.db
+      .select()
+      .from(accessLog)
+      .where(
+        and(
+          eq(accessLog.userId, s.users.segreteria.id),
+          eq(accessLog.patientId, first.id),
+          eq(accessLog.action, 'esportazione_riepiloghi'),
+        ),
+      );
+    expect(ofPatient).toHaveLength(1);
+    for (const who of ['collega', 'sostituto', 'amministratore'] as const) {
       for (const path of ['riepiloghi', 'riepiloghi/esportazione']) {
         const res = await get(who, `/api/archivi/${s.archives.titolare}/${path}${MARCH}`);
         expect(res.statusCode, `${who} ${path}`).toBe(403);
@@ -411,5 +441,113 @@ describe('riepiloghi dell’archivio per periodo (D201)', () => {
     const one = await get('titolare', `${base}?dal=2001-03-21&al=2001-03-21`);
     expect(one.statusCode).toBe(200);
     expect(one.json<Summary>().ricette.totale.inviate).toBe(1);
+  });
+
+  it('le voci riservate contano per il titolare, non per la segreteria, né nei conteggi né nel CSV (D209)', async () => {
+    const { titolare } = s.users;
+    const base = `/api/archivi/${s.archives.titolare}/riepiloghi`;
+    const counts = async (who: Who) => (await get(who, `${base}${MARCH}`)).json<Summary>();
+    const csv = async (who: Who) => (await get(who, `${base}/esportazione${MARCH}`)).body;
+    const before = { titolare: await counts('titolare'), segreteria: await counts('segreteria') };
+    // A marzo, segnate «Riservata» dal titolare: una nota del diario, una vaccinazione e una
+    // ricetta inviata con la riga di una terapia riservata.
+    await withActor(t.db, titolare.id, async (tx) => {
+      const reservedEntry = async (kind: 'diary' | 'vaccination', occurredOn: string) =>
+        (
+          await tx
+            .insert(clinicalEntry)
+            .values({
+              patientId: first.id,
+              kind,
+              occurredOn,
+              authorUserId: titolare.id,
+              reserved: true,
+            })
+            .returning({ id: clinicalEntry.id })
+        )[0]!.id;
+      await tx.insert(diaryDetail).values({
+        entryId: await reservedEntry('diary', '2001-03-13'),
+        contactType: 'office',
+        text: SECRET_TEXT,
+      });
+      await tx.insert(vaccinationDetail).values({
+        entryId: await reservedEntry('vaccination', '2001-03-14'),
+        vaccine: 'Vaccino riservato',
+        doseNumber: 1,
+        campaign: null,
+        lot: 'LOTTO-RISERVATO',
+      });
+      const [th] = await tx
+        .insert(therapy)
+        .values({
+          patientId: first.id,
+          drugName: 'Farmaco riservato',
+          kind: 'chronic',
+          startOn: '2001-01-01',
+          createdBy: titolare.id,
+          reserved: true,
+        })
+        .returning({ id: therapy.id });
+      const [r] = await tx
+        .insert(prescription)
+        .values({
+          archiveId: s.archives.titolare,
+          patientId: first.id,
+          kind: 'pharma_ssn',
+          status: 'sent',
+          preparedBy: titolare.id,
+          signedBy: titolare.id,
+          nre: 'NRE-RISERVATA',
+          sentAt: new Date('2001-03-16T10:00:00Z'),
+        })
+        .returning({ id: prescription.id });
+      await tx.insert(prescriptionLine).values({
+        prescriptionId: r!.id,
+        position: 1,
+        drugName: 'Farmaco riservato',
+        activeIngredient: 'principio di prova',
+        quantity: 1,
+        therapyId: th!.id,
+      });
+    });
+    const after = { titolare: await counts('titolare'), segreteria: await counts('segreteria') };
+    expect(after.titolare.visite.totale).toBe(before.titolare.visite.totale + 1);
+    expect(after.titolare.vaccinazioni.totale).toBe(before.titolare.vaccinazioni.totale + 1);
+    expect(after.titolare.ricette.totale.inviate).toBe(before.titolare.ricette.totale.inviate + 1);
+    expect(after.segreteria).toEqual(before.segreteria);
+    const mine = await csv('titolare');
+    const secretary = await csv('segreteria');
+    for (const secret of ['NRE-RISERVATA', 'LOTTO-RISERVATO', 'Vaccino riservato']) {
+      expect(mine, secret).toContain(secret);
+      expect(secretary, secret).not.toContain(secret);
+    }
+  });
+
+  // Ultima del file: toglie alla segreteria la conferma sull'archivio del collega.
+  it('la segreteria che un titolare non ha confermato non ha i riepiloghi del suo archivio (D204)', async () => {
+    await t.db.insert(archiveSecretary).values({
+      archiveId: s.archives.collega,
+      userId: s.users.segreteria.id,
+      decision: 'rifiutata',
+      decidedBy: s.users.collega.id,
+      decidedAt: s.clock.now(),
+    });
+    for (const path of ['riepiloghi', 'riepiloghi/esportazione']) {
+      const res = await get('segreteria', `/api/archivi/${s.archives.collega}/${path}${MARCH}`);
+      expect(res.statusCode, path).toBe(403);
+      expect(res.json().errore).toBe(
+        'I riepiloghi dell’archivio li leggono ed esportano il medico titolare e la segreteria che ha confermato',
+      );
+    }
+    // L'elenco degli archivi dei riepiloghi: la segreteria vede quello che l'ha confermata, il
+    // titolare il suo, il sostituto e l'amministratore nessuno.
+    const archives = async (who: Who) =>
+      (await get(who, '/api/riepiloghi/archivi'))
+        .json<{ archivi: { id: string }[] }>()
+        .archivi.map((a) => a.id);
+    expect(await archives('segreteria')).toEqual([s.archives.titolare]);
+    expect(await archives('titolare')).toEqual([s.archives.titolare]);
+    expect(await archives('sostituto')).toEqual([]);
+    expect(await archives('amministratore')).toEqual([]);
   });
 });

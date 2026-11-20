@@ -33,6 +33,12 @@ const mappingSchema = z.object({
    */
   zeriDavanti: z.record(z.string(), z.number().int().positive()).default({}),
   /**
+   * Campi senza i quali una riga si salta invece di renderla non valida: solo dove il file vero ha
+   * righe che non sono dati (la coda vuota o quasi dell'elenco dei registri AIFA), con il motivo
+   * nella nota della mappatura (D206). Le righe saltate si contano nel rapporto.
+   */
+  saltaRigheSenza: z.array(z.string()).default([]),
+  /**
    * Oltre quanti giorni dal download la versione in uso è più vecchia del previsto (A6). Solo
    * dove la fonte dichiara una cadenza regolare; null = nessuna soglia d'età, vale il controllo di
    * ogni notte (D156).
@@ -65,6 +71,7 @@ export function parseMappings(data: unknown): MappingSet {
       ...Object.keys(m.costanti),
       ...Object.keys(m.nessunValore),
       ...Object.keys(m.zeriDavanti),
+      ...m.saltaRigheSenza,
     ]) {
       if (!(f in fields))
         throw new Error(`Mappatura ${m.id}: il tipo ${m.tipo} non ha il campo ${f}`);
@@ -148,6 +155,8 @@ export interface Extraction {
   noValue: Record<string, number>;
   /** Per campo, quante celle hanno ricevuto gli zeri davanti secondo la mappatura (D202). */
   padded: Record<string, number>;
+  /** Righe saltate perché senza uno dei campi di `saltaRigheSenza` (D206). */
+  skipped: number;
 }
 
 /** Quante righe guardare per trovare l'intestazione (titoli sopra la tabella). */
@@ -176,6 +185,7 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
       headerLine: best.line >= 0 ? best.line + 1 : null,
       noValue: {},
       padded: {},
+      skipped: 0,
     };
   }
   const empty = Object.fromEntries(
@@ -188,9 +198,19 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
   const padded: Record<string, number> = {};
   const records: DataRecord[] = [];
   const problems: RowProblem[] = [];
+  let skipped = 0;
   for (let i = best.line + 1; i < rows.length; i++) {
     const row = rows[i]!;
     if (!row.some((c) => c.trim() !== '')) continue;
+    if (
+      m.saltaRigheSenza.some((f) => {
+        const idx = best.found.get(f);
+        return idx === undefined || (row[idx] ?? '').trim() === '';
+      })
+    ) {
+      skipped++;
+      continue;
+    }
     const record: DataRecord = {};
     let ok = true;
     for (const [field, spec] of Object.entries(fields)) {
@@ -213,5 +233,13 @@ export function extractRecords(m: Mapping, rows: string[][]): Extraction {
     }
     if (ok) records.push(record);
   }
-  return { records, problems, missingColumns: [], headerLine: best.line + 1, noValue, padded };
+  return {
+    records,
+    problems,
+    missingColumns: [],
+    headerLine: best.line + 1,
+    noValue,
+    padded,
+    skipped,
+  };
 }

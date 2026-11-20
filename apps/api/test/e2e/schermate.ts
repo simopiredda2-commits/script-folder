@@ -989,6 +989,39 @@ try {
   });
   await shot(page, '69-farmaci-carenti-in-oggi');
 
+  // D205: lo stesso paziente prende anche la ranitidina, in una confezione che l'anagrafica AIFA
+  // d'esempio dà «Sospesa» (riga vera del 20/11/2026); in Oggi la variazione è fra le cose da fare.
+  // Per la documentazione, non per il sito: la confezione porta il nome della ditta (D149).
+  await withActor(db, me.id, (tx) =>
+    tx.execute(sql`
+      insert into therapy (patient_id, drug_aic, drug_name, active_ingredient, atc, kind, start_on,
+        created_by)
+      select patient_id, '034471021',
+        'RANITIDINA DOC GENERICI 300 MG COMPRESSE RIVESTITE CON FILM- 20 COMPRESSE',
+        'RANITIDINA CLORIDRATO', 'A02BA02', 'chronic', start_on, ${me.id}
+      from therapy where id = ${amlodipine.id}`),
+  );
+  await page.goto(base);
+  const changesHeading = page.getByRole('heading', {
+    name: 'Variazioni AIFA sui farmaci in terapia',
+  });
+  await changesHeading.waitFor();
+  await changesHeading.evaluate((el) => {
+    el.scrollIntoView({ block: 'start' });
+    window.scrollBy(0, -120);
+  });
+  await shot(page, '70-variazioni-aifa-in-oggi');
+
+  // D206: i registri e i piani terapeutici AIFA nei dati del farmaco (righe vere dell'elenco).
+  await page.goto(`${base}/banche-dati`);
+  await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('entresto');
+  await page
+    .locator('.risultato')
+    .filter({ hasText: 'ENTRESTO' })
+    .getByRole('link', { name: 'scheda di ENTRESTO sul sito di AIFA' })
+    .waitFor();
+  await shot(page, '71-registri-aifa', true);
+
   await browser.close();
   await new Promise((ok) => web.close(ok));
   console.log(`Schermate in ${OUT}`);

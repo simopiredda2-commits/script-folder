@@ -28,7 +28,7 @@ import { importError } from '../src/import/errors';
 import { studioDate } from '../src/prescriptions/rules-check';
 import { buildXlsx, column } from './helpers/importazione-xlsx';
 import { createScenario, login, type Scenario } from './helpers/scenario';
-import { studioDayFrom } from './helpers/dates';
+import { middayOf, studioDayFrom } from './helpers/dates';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
 /**
@@ -102,12 +102,16 @@ describe('importazione da altri programmi', () => {
   let s: Scenario;
   let doctor: string;
   let colleague: string;
-  const today = studioDate(new Date());
-  const tomorrow = studioDayFrom(new Date(), 1);
+  // Un orologio solo per la prova e per il servizio, fermo a mezzogiorno di oggi: le righe con
+  // «domani» si scrivono prima dello scenario, e a mezzanotte «domani» della prova diventava
+  // «oggi» del servizio (prove su GitHub del 19/11/2026).
+  const NOW = middayOf(new Date());
+  const today = studioDate(NOW);
+  const tomorrow = studioDayFrom(NOW, 1);
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    s = await createScenario(t.db);
+    s = await createScenario(t.db, {}, { clockAt: NOW });
     doctor = await login(s, 'titolare');
     colleague = await login(s, 'collega');
   });

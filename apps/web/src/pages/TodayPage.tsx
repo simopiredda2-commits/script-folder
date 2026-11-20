@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
+import { AIFA_CHANGE_LABEL, type AifaChange } from '../components/Shortage';
 import { credentialAlerts, CREDENTIALS_PATH, type CredentialsStatus } from '../lib/credentials';
 import { age, APPOINTMENT_KIND, date, longDate, plural, time } from '../lib/format';
 import { useSession } from '../lib/session';
@@ -36,6 +37,14 @@ interface Today {
     farmaciCarenti?: {
       aic: string;
       farmaco: string;
+      testo: string;
+      pazienti: { id: string; nome: string; cognome: string }[];
+    }[];
+    /** Le altre variazioni AIFA sui farmaci delle terapie in corso, con i pazienti (A7, D205). */
+    variazioniAifa?: {
+      aic: string;
+      farmaco: string;
+      tipo: AifaChange['kind'];
       testo: string;
       pazienti: { id: string; nome: string; cognome: string }[];
     }[];
@@ -145,6 +154,38 @@ export function TodayPage() {
                   <ul
                     className="elenco-semplice"
                     aria-label={`Pazienti con ${d.farmaco} in terapia`}
+                  >
+                    {d.pazienti.map((p) => (
+                      <li key={p.id}>
+                        <Link to={`/pazienti/${p.id}`}>
+                          {p.nome} {p.cognome}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </>
+          )}
+          {(code.variazioniAifa ?? []).length > 0 && (
+            <>
+              <h3>Variazioni AIFA sui farmaci in terapia</h3>
+              <p className="tenue">
+                Terapie in corso con un farmaco che le banche dati AIFA in vigore oggi danno
+                sospeso, fuori dall’anagrafica, o con la classe, la nota o il piano cambiati. La
+                voce resta finché la terapia non è aggiornata o conclusa.
+              </p>
+              {code.variazioniAifa!.map((d) => (
+                <div key={`${d.aic}-${d.tipo}-${d.testo}`} className="carenza-oggi">
+                  <p className="carenza">
+                    <Icon name="avviso" />
+                    <span>
+                      <strong>{d.farmaco}</strong>: {d.testo}.
+                    </span>
+                  </p>
+                  <ul
+                    className="elenco-semplice"
+                    aria-label={`Pazienti con ${d.farmaco} in terapia: ${AIFA_CHANGE_LABEL[d.tipo]}`}
                   >
                     {d.pazienti.map((p) => (
                       <li key={p.id}>

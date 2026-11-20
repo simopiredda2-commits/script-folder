@@ -2,11 +2,12 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadMappings, readSyncState, sha256 } from '@mmg/reference';
-import { eq, sql } from 'drizzle-orm';
+import { eq, getTableName, sql } from 'drizzle-orm';
 import { strToU8, zipSync } from 'fflate';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   exemption,
+  REFERENCE_TABLES,
   refDrugShortage,
   refDrugTransparency,
   referenceDataset,
@@ -19,7 +20,12 @@ import {
   type ExampleSite,
 } from '../src/reference/example-site';
 import { importReferenceData, type ImportLine } from '../src/reference/importer';
-import { compareEquivalents, ReferenceData, shortageAt } from '../src/reference/lookup';
+import {
+  compareEquivalents,
+  ReferenceData,
+  safeAifaUrl,
+  shortageAt,
+} from '../src/reference/lookup';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -35,6 +41,28 @@ async function rejectsWith(promise: Promise<unknown>, pattern: RegExp): Promise<
 }
 
 const byFile = (report: ImportLine[]) => Object.fromEntries(report.map((r) => [r.file, r]));
+
+describe('scheda di un registro AIFA (D206): solo https su aifa.gov.it', () => {
+  it('l’indirizzo dell’elenco resta com’è se è sicuro; altrimenti nessun collegamento', () => {
+    const ok = 'https://www.aifa.gov.it/documents/20142/2152764/Scheda_ENTRESTO_HF_07.12.2023.zip';
+    expect(safeAifaUrl(ok)).toBe(ok);
+    // Un a capo davanti, come in una riga vera dell'elenco del 19/11/2026.
+    expect(safeAifaUrl(`\n${ok} `)).toBe(ok);
+    expect(safeAifaUrl('https://aifa.gov.it/x.zip')).toBe('https://aifa.gov.it/x.zip');
+    for (const bad of [
+      'http://www.aifa.gov.it/sites/default/files/Lixiana_TVP_EP_2018.zip',
+      'http://www.agenziafarmaco.gov.it/sites/default/files/PRADAXA_TVP_EP_20150420.zip',
+      'https://www.aifa.gov.it.esempio.com/x.zip',
+      'https://esempioaifa.gov.it/x.zip',
+      'javascript:alert(1)',
+      'scheda',
+      '',
+      null,
+    ]) {
+      expect(safeAifaUrl(bad), String(bad)).toBeNull();
+    }
+  });
+});
 
 describe('banche dati pubbliche: dall’output di sync al database', () => {
   let t: TestDatabase;
@@ -71,6 +99,7 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
   it('sync, lanciato davvero sul sito d’esempio, registra i file nello stato che si importa', () => {
     const keys = readSyncState(syncDir).map((e) => `${e.fonte}/${e.chiave}`);
     expect(keys.sort()).toEqual([
+      'aifa_liste/3258518_Elenco_Registri_PT_attivi.csv',
       'aifa_liste/3815901_Classe-A_per_principio-attivo.csv',
       'aifa_liste/3815901_Classe-H_per_principio-attivo.csv',
       'aifa_liste/825643_Lista_farmaci_equivalenti.csv',
@@ -91,7 +120,7 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     });
     expect(r['aifa_liste/confezioni_fornitura.csv']).toMatchObject({
       outcome: 'importato',
-      rows: 11,
+      rows: 13,
     });
     expect(r['aifa_liste/3815901_Classe-A_per_principio-attivo.csv']).toMatchObject({
       outcome: 'importato',
@@ -115,6 +144,12 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       outcome: 'importato',
       rows: 1,
     });
+    // Registri AIFA (D206): le righe in fondo senza farmaco si saltano, e il rapporto lo dice.
+    const reg = r['aifa_liste/3258518_Elenco_Registri_PT_attivi.csv']!;
+    expect(reg).toMatchObject({ outcome: 'importato', rows: 4 });
+    expect(reg.notes).toContain(
+      '2 righe saltate perché senza name secondo la mappatura aifa-registri',
+    );
   });
 
   it('una mappatura da completare ferma il file e il rapporto mostra le intestazioni vere', async () => {
@@ -412,6 +447,23 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     await rejectsWith(t.db.execute(sql`truncate ref_municipality cascade`), /non si svuotano/);
   });
 
+  it('ogni tabella delle banche dati ha le due protezioni (anche quelle nuove, come i registri)', async () => {
+    const tables = Object.values(REFERENCE_TABLES).map((x) => getTableName(x));
+    expect(tables).toContain('ref_drug_registry');
+    const { rows } = await t.pool.query<{ table: string; trigger: string }>(
+      `select c.relname as table, g.tgname as trigger from pg_trigger g
+       join pg_class c on c.oid = g.tgrelid where not g.tgisinternal`,
+    );
+    for (const table of tables) {
+      const mine = rows.filter((r) => r.table === table).map((r) => r.trigger);
+      expect(mine, table).toEqual(
+        expect.arrayContaining([`${table}_immutable`, `${table}_no_truncate`]),
+      );
+    }
+    await rejectsWith(t.db.execute(sql`delete from ref_drug_registry`), /non si modificano/);
+    await rejectsWith(t.db.execute(sql`truncate ref_drug_registry`), /non si svuotano/);
+  });
+
   it('un file in uso che non ha l’impronta registrata da sync non si importa', async () => {
     const copy = join(work, 'manomesso');
     cpSync(syncDir, copy, { recursive: true });
@@ -688,10 +740,46 @@ describe('banche dati via HTTP e nelle regole', () => {
       'farmaci_classe',
       'farmaci_dpc',
       'farmaci_trasparenza',
+      'registri_aifa',
     ]);
     const one = (await get('/api/farmaci/038092019')).json();
     expect(one.farmaco.name).toBe('AMLODIPINA DOC GENERICI');
+    expect(one.farmaco.adminState).toBe('Autorizzata');
     expect(one.equivalenti).toHaveLength(3);
+    // Lo stato amministrativo dall'anagrafica (D205): la confezione sospesa del sito d'esempio.
+    const suspended = (await get('/api/farmaci?q=ranitidina')).json().farmaci;
+    expect(
+      suspended.map((d: { aic: string; adminState: string }) => [d.aic, d.adminState]),
+    ).toEqual([['034471021', 'Sospesa']]);
+    // Registri e piani AIFA (D206) per lo stesso ATC: i più recenti prima; nessuno per l'amlodipina.
+    expect(one.farmaco.registries).toEqual([]);
+    const entresto = (await get('/api/farmaci/044558031')).json().farmaco;
+    expect(entresto.atc).toBe('C09DX04');
+    expect(entresto.registries).toEqual([
+      {
+        name: 'ENTRESTO PEDIATRICO',
+        activeIngredient: 'Sacubitril valsartan',
+        atc: 'C09DX04',
+        type: 'Piano Terapeutico',
+        state: 'Attivo',
+        condition: 'INSUFFICIENZA CARDIACA CRONICA SINTOMATICA',
+        indication: expect.stringMatching(/^Entresto è indicato in bambini ed adolescenti/),
+        since: '2025-09-04',
+        sheetUrl:
+          'https://www.aifa.gov.it/documents/20142/3041382/PT_Entresto_pediatrico_04.09.2025.zip',
+      },
+      expect.objectContaining({ name: 'ENTRESTO', since: '2017-03-12' }),
+    ]);
+    // Più farmaci insieme (come nella ricerca e negli equivalenti): ognuno con i registri del suo ATC.
+    const both = await new ReferenceData(t.db).drugs(
+      ['038092019', '044558031'],
+      studioDate(new Date()),
+    );
+    expect(both.get('038092019')!.registries).toEqual([]);
+    expect(both.get('044558031')!.registries.map((r) => r.name)).toEqual([
+      'ENTRESTO PEDIATRICO',
+      'ENTRESTO',
+    ]);
     const old = (await get('/api/prestazioni?q=visita&data=2026-10-29')).json();
     expect(old.prestazioni[0].description).toBe('Visita di prova (catalogo precedente)');
     expect((await get('/api/esenzioni?q=T0')).json().esenzioni).toHaveLength(2);

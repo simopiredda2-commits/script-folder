@@ -47,6 +47,34 @@ export const KINDS = {
       supplyRegime: { type: 'text' },
       /** Ditta titolare dell'AIC: per i generici, il nome del fornitore (D151). */
       holder: { type: 'text' },
+      /**
+       * Stato amministrativo della confezione (D205): nel file del 20/11/2026 «Autorizzata» o
+       * «Sospesa». Le confezioni revocate nel file non ci sono.
+       */
+      adminState: { type: 'text' },
+    },
+  },
+  /**
+   * Registri di monitoraggio e piani terapeutici AIFA attivi (D206): una riga per farmaco e
+   * indicazione. Il file non ha l'AIC: i registri si collegano ai farmaci per ATC.
+   */
+  registri_aifa: {
+    label: 'Registri e piani terapeutici AIFA',
+    fields: {
+      /** Il farmaco del registro, come lo scrive AIFA. */
+      name: { type: 'text', required: true },
+      activeIngredient: { type: 'text' },
+      atc: ATC,
+      /** «Indicazione rimborsata», con le parole dell'elenco. */
+      reimbursedIndication: { type: 'text' },
+      condition: { type: 'text' },
+      /** «Tipologia di Monitoraggio»: Registro, Piano Terapeutico, Registro semplificato… */
+      monitoringType: { type: 'text' },
+      monitoringState: { type: 'text' },
+      therapeuticArea: { type: 'text' },
+      monitoringStart: { type: 'date' },
+      /** Indirizzo della scheda sul sito di AIFA, come lo scrive l'elenco. */
+      sheetUrl: { type: 'text' },
     },
   },
   /** Elenchi AIFA dei farmaci di classe A e H, con prezzo e gruppo di equivalenza. */
