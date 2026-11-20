@@ -35,7 +35,7 @@ _A. Aspetta la Regione Piemonte, CSI Piemonte o un altro ente_
 1. **SAR (SIRPED) e Sistema TS**: specifiche e credenziali di collaudo, piano di test della Regione; registrazione del programma (codice del gestionale, `client_id`, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103). Con queste: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo di stampa della ricetta rossa, specifiche di stampa del promemoria del 1/3/2016 e frase regionale (D97).
 2. **AURA vera** (oggi un simulatore, D197–D200): servizio, campi, codici degli eventi e credenziali, chiesti con la PEC di Simone al CSI del 19/11/2026.
 3. **Certificati INPS veri**: credenziali del Sistema TS (D100–D103).
-4. **Fascicolo Sanitario Elettronico**: accreditamento del programma e valori delle tabelle (D133); licenza dei file ufficiali del Ministero (D131).
+4. **Fascicolo Sanitario Elettronico**: accreditamento del programma e valori delle tabelle (D133); licenza dei file ufficiali del Ministero (D131). Per aprire il Fascicolo del paziente dalla cartella, il CSI ha un «modulo di accesso semplificato» del 2019 con le credenziali RUPAR del medico (`docs/fse.md`): da chiedere al CSI se vale ancora con l'autenticazione forte; non costruito.
 5. **SPID e CIE**: accreditamento come fornitore di servizi (D109).
 6. **PPIP, come si manda la distinta** (D212, D213). Registrazione in cartella, distinta del mese e CSV ci sono. Mancano quattro cose da Regione e ASL; ognuna si aggiunge come dato o con l'interfaccia già pronta (`docs/ppip.md`):
    - il canale: l'AIR 2024 nomina il portale regionale per i medici ad attività oraria (art. 30) e uno strumento su supporto digitale dell'ASL (art. 36, comma 6);
@@ -883,6 +883,7 @@ Richiesta di Simone del 20/11/2026: «Dimmi tu cosa devo scaricare e chiudi, se 
 **Fatto**
 
 - **Che cosa scaricare**: l'elenco è in «Che cosa resta aperto», C2, ed è stato mandato a Simone.
+- **Riassunto di Google sui documenti piemontesi, controllato** (domanda di Simone): ricetta, collaudo e autocertificazione corrispondono ai documenti SIRPED già letti; il «modulo di accesso semplificato dalle CCE» esiste (CSI, 2019) ma serve ad aprire il Fascicolo dalla cartella, non a inviare il PSS; la «modifica» di una ricetta inviata non c'è nelle specifiche lette. Il modulo è annotato in `docs/fse.md` e in A4.
 - **Modifiche del 2026 ai LEA verificate sulla Gazzetta (D216)**, come chiedeva D124. GU n. 227 del 30/9/2026: DPCM 7/8/2026 e DM 3/8/2026, in vigore dal 30/10/2026. Il DM cambia gli articoli 11 e 14 e l'allegato 2 dei presidi; l'art. 13 e l'allegato 3 restano quelli del 2017. Gli allegati dei decreti sono solo sulla pagina del Ministero.
 
 **Prossimo passo**: allegato 3 dalla Gazzetta del 2017; promemoria secondo le specifiche di stampa del Sistema TS.
