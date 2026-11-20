@@ -1429,3 +1429,27 @@ Non provati nella dimostrazione: «Non spostare»; l'attività svolta registrata
 1. la lettura dei tipi del servizio (D226) diventa una prova fissa, per i percorsi che le prove non percorrono;
 2. le prove che mancano: «Non spostare» e l'attività svolta nell'AFT nella dimostrazione, due registrazioni dello stesso codice fiscale nello stesso istante;
 3. le prove lanciate più volte, per trovare altre prove instabili come le due corrette nella #23.
+
+**D229 · Le prove che mancano.** Risposta di Simone alla fermata (D228), nello stesso branch ripartito da `main`.
+
+1. **La lettura dei tipi è una prova fissa** (`apps/api/test/controllo-transazioni-tipi.test.ts`). Con il compilatore di TypeScript legge tutto `src/` del servizio e cerca, dentro i callback di `withActor` e di `db.transaction`:
+   - un valore di tipo `Database`, o `Database | Tx`: per esempio `createPatient(db, …)`;
+   - la chiamata a un servizio fatto come classe che tiene un `Database`, come `ReferenceData`;
+   - la chiamata a una funzione del servizio che usa un `Database` preso da fuori, anche attraverso altre funzioni, fino a quattro passi: per esempio una funzione dell'ambiente delle rotte.
+
+   Oggi non trova niente. Le uscite volute vanno in `ALLOWED`, con il motivo. Guarda anche i percorsi che le prove non percorrono, e completa il controllo che gira nelle prove (D226). Non segue i servizi fatti di funzioni che tengono `db` dentro di sé, come `createAuraService({ db })`: quelli li vede il controllo nelle prove. Tre sabotaggi.
+
+2. **Due registrazioni dello stesso codice fiscale nello stesso istante.** Tutte e due passano il controllo del doppione, perché nessuna ha ancora finito; l'indice unico dello studio ferma la seconda.
+   - Prima la seconda riceveva «Il codice fiscale è appena stato registrato per un altro paziente», e il suo rifiuto non entrava nel registro degli accessi.
+   - Adesso, dopo il ritorno indietro, riceve la risposta del doppione di sempre: il paziente, con il collegamento alla cartella, o «in un archivio che non puoi vedere». Il rifiuto entra nel registro di quel paziente, come gli altri (D226). Scelta presa da sé: il registro tiene ogni rifiuto (regola 5), e chi arriva secondo ha bisogno dello stesso aiuto di chi arriva dopo.
+   - Vale per «Nuovo paziente», per «Registra» di AURA (l'assistito esce dall'elenco, come con il doppione di sempre) e per la correzione del codice fiscale.
+   - Conta come doppione solo l'indice del codice fiscale dello studio (`patient_studio_fiscal_code_key`). Un altro errore di unicità resta un errore del servizio.
+   - Le prove usano un cancello (`apps/api/test/helpers/cancello.ts`). Un trigger ferma la scrittura di quel codice fiscale, dopo il controllo, su un blocco che la prova tiene; la prova fa scrivere le richieste una dopo l'altra, nell'ordine scelto, e l'esito è sempre lo stesso.
+   - Cinque gare: nello stesso archivio, in due archivi, la correzione dopo un paziente nuovo e il contrario, «Registra» dopo «Nuovo paziente». Sei sabotaggi.
+
+3. **Nella dimostrazione**, 19 prove invece di 17:
+   - in AURA simulata due pazienti della Dott.ssa Marchi scelgono la collega. Uno passa a lei con «Sposta»; l'altro resta con «Non spostare» e non si ripropone, né alla Dott.ssa Marchi né alla collega;
+   - la Dott.ssa Marchi registra l'attività svolta per il paziente dell'altro studio dell'AFT. Il Dott. Rinaldi la vede in Strumenti › AFT e nella cronologia della cartella, con il nome della collega;
+   - quattro sabotaggi.
+
+Non provati: tre richieste o più sullo stesso codice fiscale; due correzioni insieme dello stesso codice fiscale su due pazienti (stessa strada del codice, senza una prova sua); nella dimostrazione, la consultazione al contrario nell'AFT, del Dott. Rinaldi sui pazienti della Dott.ssa Marchi.
