@@ -1470,3 +1470,18 @@ Non provati nella dimostrazione: «Non spostare»; l'attività svolta registrata
      - La prova non si è cambiata, per non nascondere la causa. Ora, se la ricetta non parte, dice le risposte d'errore del servizio e che cosa mostra il pannello dell'invio (provato a mano, togliendo il quesito: «422 … R14: Manca il quesito diagnostico»).
 
 Non provati: tre richieste o più sullo stesso codice fiscale; due correzioni insieme dello stesso codice fiscale su due pazienti (stessa strada del codice, senza una prova sua); nella dimostrazione, la consultazione al contrario nell'AFT, del Dott. Rinaldi sui pazienti della Dott.ssa Marchi; la causa della ricetta specialistica non partita con WebKit.
+
+**D230 · Risposte della fermata dopo l'unione della #23.** Via alla #24, unita con le verifiche su GitHub verdi. Per il dopo Simone ha scritto a mano «Ciò che resta». Scelta presa da sé: vuol dire tutto quello che restava da fare da qui, cioè i punti B e C della domanda; il punto A era la pausa.
+
+1. «Firma e invia» a controllo finito: il medico vede sempre i controlli prima di firmare.
+2. Le prove che restano: tre richieste insieme sullo stesso codice fiscale; due correzioni insieme dello stesso codice fiscale su due pazienti; nella dimostrazione, la consultazione al contrario nell'AFT.
+
+Come si è fatto il punto 1: il controllo prima dell'invio parte da sé quando il pannello si apre; finché non ha finito «Firma e invia», «Manda alla firma del medico» e «Controlla di nuovo» restano spenti, e il pannello dice «Controllo in corso: si firma quando è finito.» (per la segreteria, «si manda alla firma»). Se il controllo non riesce i pulsanti si riaccendono: il servizio controlla di nuovo all'invio, e un errore del controllo non deve fermare il lavoro.
+
+Come si è fatto il punto 2:
+
+- con il cancello (D229), tre «Nuovo paziente» insieme sullo stesso codice fiscale, di tre utenti: la prima entra, le altre due ricevono la risposta del doppione, ognuna con la sua riga nel registro; la collega, che non vede l'archivio del titolare, non sa di chi è;
+- due correzioni insieme dello stesso codice fiscale su due pazienti: la prima riesce; la seconda è un doppione del primo paziente, con la sua riga nel registro, e il secondo paziente resta com'era;
+- nella dimostrazione, la consultazione al contrario nell'AFT, tutta dall'interfaccia: la Dott.ssa Marchi accende la condivisione e registra il consenso di una sua paziente in «Privacy»; il Dott. Rinaldi consulta la scheda con il codice fiscale e il motivo; lei vede la consultazione nel suo registro.
+
+Sabotaggi: quattro per la firma a controllo finito, due per le gare, due per la dimostrazione.

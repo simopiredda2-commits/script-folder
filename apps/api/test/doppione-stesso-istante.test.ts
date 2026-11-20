@@ -177,4 +177,54 @@ describe('due registrazioni dello stesso codice fiscale nello stesso istante (D2
       details: { ...DUPLICATE, visibile: true },
     });
   });
+
+  it('tre insieme: la prima entra; le altre due ricevono la risposta del doppione, ognuna con la sua riga nel registro', async () => {
+    const p = person(7);
+    const [first, second, third] = await inOrderAtTheGate(monitor, p.codiceFiscale, [
+      newPatient('titolare', s.archives.titolare, p),
+      newPatient('segreteria', s.archives.titolare, p),
+      newPatient('collega', s.archives.collega, p),
+    ]);
+    expect(first!.statusCode, first!.body).toBe(201);
+    const id = first!.json<{ id: string }>().id;
+    expect(second!.statusCode, second!.body).toBe(409);
+    expect(second!.json()).toMatchObject({ dettagli: { paziente: { id } } });
+    // La collega non vede l'archivio del titolare: la risposta non dice di chi è.
+    expect(third!.statusCode, third!.body).toBe(409);
+    expect(third!.json()).toMatchObject({ dettagli: { paziente: null } });
+    expect((await withCode(p.codiceFiscale)).map((r) => r.id)).toEqual([id]);
+    const log = await logRows(id, 'nuovo_paziente');
+    expect(log).toContainEqual({
+      userId: s.users.segreteria.id,
+      outcome: 'negato',
+      details: { ...DUPLICATE, visibile: true },
+    });
+    expect(log).toContainEqual({
+      userId: s.users.collega.id,
+      outcome: 'negato',
+      details: { ...DUPLICATE, visibile: false },
+    });
+  });
+
+  it('due correzioni insieme dello stesso codice fiscale su due pazienti: la prima riesce, la seconda è un doppione del primo', async () => {
+    const a = await registered(8);
+    const b = await registered(9);
+    const p = person(10);
+    const [fixA, fixB] = await inOrderAtTheGate(monitor, p.codiceFiscale, [
+      correction('titolare', a, p.codiceFiscale),
+      correction('segreteria', b, p.codiceFiscale),
+    ]);
+    expect(fixA!.statusCode, fixA!.body).toBe(200);
+    expect(fixB!.statusCode, fixB!.body).toBe(409);
+    expect(fixB!.json()).toMatchObject({ dettagli: { paziente: { id: a } } });
+    expect((await withCode(p.codiceFiscale)).map((r) => r.id)).toEqual([a]);
+    // Il secondo paziente resta com'era.
+    const [other] = await t.db.select().from(patient).where(eq(patient.id, b));
+    expect(other!.fiscalCode).not.toBe(p.codiceFiscale);
+    expect(await logRows(a, 'correzione_identita')).toContainEqual({
+      userId: s.users.segreteria.id,
+      outcome: 'negato',
+      details: { ...DUPLICATE, visibile: true },
+    });
+  });
 });

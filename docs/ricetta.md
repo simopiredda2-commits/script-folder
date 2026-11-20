@@ -20,6 +20,7 @@ Da verificare con la Dr.ssa Rocca alla seconda fermata. Fonte: «Prescrizioni e 
 - **Bozza**: la prepara il medico, oppure la segreteria per le terapie croniche richieste dal paziente.
 - **Da firmare**: la coda del medico, raggruppata per paziente (`GET /api/ricette/da-firmare`). Le ripetizioni preparate dalla segreteria arrivano qui direttamente.
 - **In invio**: stato tecnico di pochi istanti. Il passaggio è atomico, così la stessa ricetta non parte due volte anche con due clic contemporanei.
+- **Controlli prima dell'invio**: partono da sé quando la ricetta è pronta. «Firma e invia», e per la segreteria «Manda alla firma del medico», si accendono a controllo finito: chi firma vede sempre i controlli prima (D230). Se il controllo non riesce si può andare avanti, perché il servizio controlla di nuovo all'invio.
 - **Inviata**: il SAR (o il Sistema TS per la ricetta bianca) ha accettato e ha dato l'NRE (l'NRBE per la bianca).
 - **Errore**, con il motivo in chiaro e la coda «Invii non riusciti» (`GET /api/ricette/non-inviate`). Tre casi:
   - **rifiutata**: il sistema ha risposto di no. La ricetta si riporta in bozza, si corregge e si reinvia.

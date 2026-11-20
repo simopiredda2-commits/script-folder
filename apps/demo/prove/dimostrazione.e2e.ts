@@ -710,6 +710,62 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     expect(await item.innerText()).toMatch(/Marchi/);
   });
 
+  it('AFT al contrario: la Dott.ssa Marchi condivide e registra il consenso di una paziente; il medico dell’altro studio la consulta, e lei lo vede nel registro', async () => {
+    await login('medico');
+    // Una paziente in carico della Dott.ssa Marchi, dal suo elenco.
+    const p = await f.evaluate(async () => {
+      const list = (await (await fetch('/api/pazienti')).json()) as {
+        pazienti: {
+          id: string;
+          nome: string;
+          cognome: string;
+          codiceFiscale: string;
+          stato: string;
+        }[];
+      };
+      return list.pazienti.find((x) => x.stato === 'active')!;
+    });
+    // Condivide con i medici dell'AFT (nella dimostrazione, per difetto, no).
+    await go('/strumenti?sezione=aft');
+    const share = f.getByLabel(
+      'Condivido con i medici dell’AFT la scheda dei miei pazienti che hanno dato il consenso',
+    );
+    await share.check();
+    await expect
+      .poll(() =>
+        f.evaluate(async () => {
+          const o = (await (await fetch('/api/aft')).json()) as { aft: { condivido: boolean } };
+          return o.aft.condivido;
+        }),
+      )
+      .toBe(true);
+    // Il consenso della paziente, nella sua cartella.
+    await go(`/pazienti/${p.id}/privacy`);
+    await f.getByLabel('Consenso', { exact: true }).selectOption({
+      label: 'Condivisione della scheda sanitaria con i medici dell’AFT (senza le voci riservate)',
+    });
+    await f.getByLabel('Dà il consenso').check();
+    await f.getByRole('button', { name: 'Registra il consenso' }).click();
+    await f.getByText('Consenso registrato.').waitFor();
+    // Il medico dell'altro studio consulta la scheda, con il motivo.
+    await login('medico.aft');
+    await go('/strumenti?sezione=aft');
+    await f.getByLabel('Codice fiscale del paziente').fill(p.codiceFiscale);
+    await f.getByLabel('Motivo dell’accesso').fill('Visita in continuità assistenziale nell’AFT');
+    await f.getByRole('button', { name: 'Mostra la scheda' }).click();
+    await f.getByText(/Scheda condivisa con il consenso del paziente/).waitFor();
+    await f.getByText(`${p.cognome} ${p.nome}`).first().waitFor();
+    // La Dott.ssa Marchi vede chi ha consultato, quando e perché.
+    await login('medico');
+    await go('/strumenti?sezione=aft');
+    const log = f.getByRole('region', { name: 'Consultazioni dei colleghi sui miei pazienti' });
+    await log.getByText('Visita in continuità assistenziale nell’AFT').waitFor();
+    await log
+      .getByText(/Rinaldi/)
+      .first()
+      .waitFor();
+  });
+
   it('strumenti: l’amministratore salva lo studio e crea un utente; il medico lo conferma nella pagina', async () => {
     await login('amministratore');
     await go('/strumenti?sezione=studio');
