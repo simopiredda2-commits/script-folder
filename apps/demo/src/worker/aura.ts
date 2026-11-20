@@ -6,17 +6,18 @@
  * - un'anagrafica diversa (l'ASL), da confermare;
  * - un decesso segnalato, da confermare;
  * - una scelta cessata, che fa revocato il paziente;
+ * - la scelta della collega dello studio (colleghi.ts): il cambio di medico dentro lo studio (D200);
  * - un nuovo assistito che ha scelto il medico.
  *
  * Le variazioni dei pazienti si applicano prima che il servizio ascolti AURA, con due giri in fila
  * (il primo collega, il secondo porta le variazioni): PGlite ha una sola sessione, e più notifiche
  * insieme si sovrapporrebbero (`database.ts`). Il nuovo assistito arriva dopo, con una notifica
- * sola. Persone, date e codici fiscali sono inventati (regola 1). Il cambio di medico dentro lo
- * studio (D200) non c'è: lo studio dimostrativo ha un solo medico titolare.
+ * sola. Persone, date e codici fiscali sono inventati (regola 1). In AURA ci sono solo i pazienti
+ * dello studio dimostrativo, non quelli dell'altro studio dell'AFT.
  */
 import { generatePatients } from '@mmg/fixtures';
 import { SimulatedAura } from '@mmg/integrations';
-import { count, eq, inArray, like } from 'drizzle-orm';
+import { and, count, eq, inArray, like } from 'drizzle-orm';
 import { createAuraService } from '../../../api/src/aura/service';
 import type { Database } from '../../../api/src/db/client';
 import {
@@ -25,10 +26,13 @@ import {
   clinicalEntry,
   doctorProfile,
   patient,
+  prescription,
   problemDetail,
+  sickLeaveCertificate,
 } from '../../../api/src/db/schema';
 import { studioDate } from '../../../api/src/prescriptions/rules-check';
 import type { AuraHints } from '../protocol';
+import type { Colleagues } from './colleghi';
 
 /** ASL diversa da quella dei pazienti dimostrativi: mostra l'anagrafica da confermare. */
 export const AURA_DEMO_ASL = 'ASL dimostrativa est';
@@ -39,7 +43,10 @@ const NEW_PATIENT_SEED = 'nuovo-assistito-della-dimostrazione';
 export interface AuraDemo {
   gateway: SimulatedAura;
   /** Prima di buildApp: iscrive e collega i pazienti, poi applica le loro variazioni. */
-  beforeStart(db: Database): Promise<Omit<AuraHints, 'newPatient'>>;
+  beforeStart(
+    db: Database,
+    colleagues: Pick<Colleagues, 'colleagueFiscalCode' | 'colleagueName'>,
+  ): Promise<Omit<AuraHints, 'newPatient'>>;
   /** Dopo app.ready, con l'ascolto attivo: il nuovo assistito, con la sua notifica. */
   afterStart(db: Database, idle: () => Promise<void>): Promise<Pick<AuraHints, 'newPatient'>>;
 }
@@ -55,12 +62,29 @@ async function doctorFiscalCode(db: Database) {
   return owner!.fiscalCode!;
 }
 
+/** Pazienti con ricette o certificati ancora aperti: lo spostamento li fermerebbe (D200). */
+async function withOpenItems(db: Database): Promise<Set<string>> {
+  const rx = await db
+    .select({ id: prescription.patientId })
+    .from(prescription)
+    .where(inArray(prescription.status, ['draft', 'to_sign', 'sending', 'error']));
+  const certs = await db
+    .select({ id: sickLeaveCertificate.patientId })
+    .from(sickLeaveCertificate)
+    .where(inArray(sickLeaveCertificate.status, ['draft', 'sending', 'error']));
+  return new Set([...rx, ...certs].map((r) => r.id));
+}
+
 export function createAuraDemo(): AuraDemo {
   const gateway = new SimulatedAura();
   return {
     gateway,
 
-    async beforeStart(db) {
+    async beforeStart(db, colleagues) {
+      const [owner] = await db
+        .select({ studioId: appUser.studioId })
+        .from(appUser)
+        .where(eq(appUser.username, 'medico'));
       const rows = await db
         .select({
           id: patient.id,
@@ -70,7 +94,12 @@ export function createAuraDemo(): AuraDemo {
           birthDate: patient.birthDate,
         })
         .from(patient)
-        .where(inArray(patient.status, ['active', 'temporary']))
+        .where(
+          and(
+            inArray(patient.status, ['active', 'temporary']),
+            eq(patient.studioId, owner!.studioId),
+          ),
+        )
         .orderBy(patient.birthDate, patient.lastName);
       // In AURA come nel programma: nessuna esenzione o scelta di AURA, così il primo giro collega
       // tutti senza variazioni.
@@ -142,6 +171,18 @@ export function createAuraDemo(): AuraDemo {
       const registry = pick(byAge);
       if (registry) gateway.setRegistry(auraIds.get(registry)!, { asl: AURA_DEMO_ASL });
 
+      // Il più giovane senza ricette né certificati aperti sceglie la collega dello studio.
+      const open = await withOpenItems(db);
+      const moving = pick([...byAge].reverse().filter((id) => !open.has(id)));
+      if (moving)
+        gateway.setChoice(auraIds.get(moving)!, {
+          doctorFiscalCode: colleagues.colleagueFiscalCode,
+          chosenOn: day(-3),
+          expiresOn: null,
+          endedOn: null,
+          endReason: null,
+        });
+
       // Il secondo giro porta le variazioni, una alla volta.
       await setup.syncAll('comando');
       return {
@@ -149,6 +190,8 @@ export function createAuraDemo(): AuraDemo {
         registry: name(registry),
         deceased: name(deceased),
         revoked: name(revoked),
+        doctorChange: name(moving),
+        colleague: colleagues.colleagueName,
       };
     },
 

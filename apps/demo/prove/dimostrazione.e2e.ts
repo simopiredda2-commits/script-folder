@@ -16,7 +16,15 @@ import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { extname, join, resolve, sep } from 'node:path';
 import { generatePatients } from '@mmg/fixtures';
-import { chromium, firefox, webkit, type Browser, type Frame, type Page } from 'playwright';
+import {
+  chromium,
+  firefox,
+  webkit,
+  type Browser,
+  type Frame,
+  type Locator,
+  type Page,
+} from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const ROOT = resolve(import.meta.dirname, '..', 'dist', 'artifact');
@@ -150,8 +158,23 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     throw new Error(`Nessun codice nuovo per ${username}`);
   }
 
+  /**
+   * Legge nel riquadro della dimostrazione, che dopo l'accesso si riduce da sé: lo apre, legge, e lo
+   * riduce di nuovo, perché aperto copre la pagina.
+   */
+  async function fromPanel<T>(read: (panel: Locator) => Promise<T>): Promise<T> {
+    const opener = f.locator('button.dimo-apri');
+    if (await opener.count()) await opener.click();
+    const panel = f.locator('#dimostrazione');
+    await panel.getByRole('heading', { level: 2, name: 'Dimostrazione' }).waitFor();
+    const value = await read(panel);
+    await panel.getByRole('button', { name: 'Riduci il riquadro della dimostrazione' }).click();
+    await opener.waitFor();
+    return value;
+  }
+
   async function login(username: string) {
-    const exit = f.getByRole('button', { name: 'Esci' });
+    const exit = f.getByRole('button', { name: 'Esci', exact: true });
     if (await exit.count()) {
       await exit.click();
       await f.getByLabel('Nome utente').waitFor();
@@ -238,8 +261,19 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   it('avvio: il programma parte nella cornice, con utenti e AURA simulata nel riquadro', async () => {
     expect(startMs).toBeLessThan(90_000);
     const panel = f.locator('#dimostrazione');
-    for (const u of ['medico', 'segreteria', 'sostituto', 'amministratore'])
+    for (const u of [
+      'medico',
+      'segreteria',
+      'sostituto',
+      'amministratore',
+      'collega',
+      'medico.aft',
+    ])
       await panel.getByRole('cell', { name: u, exact: true }).waitFor();
+    await panel
+      .getByRole('region', { name: 'AFT', exact: true })
+      .getByText(/che ha dato il consenso: codice fiscale/)
+      .waitFor();
     const aura = panel.getByRole('region', { name: 'AURA simulata' });
     await aura.getByText(/un nuovo assistito, .+, da registrare\./).waitFor();
     await expectAccessible('pagina di accesso con il riquadro');
@@ -538,6 +572,47 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await f.getByRole('button', { name: 'Importa', exact: true }).click();
     await f.getByText('Importazione finita.').waitFor({ timeout: 30_000 });
     expect(await patientId(`${nuovi[0]!.firstName} ${nuovi[0]!.lastName}`)).not.toBeNull();
+  });
+
+  it('cambio di medico dentro lo studio: in Oggi «Sposta», e il paziente passa alla collega', async () => {
+    const [, moving, colleague] = /la scelta di (.+) per la collega (.+): il cambio di medico/.exec(
+      await fromPanel((p) => p.getByRole('region', { name: 'AURA simulata' }).innerText()),
+    )!;
+    await login('medico');
+    const changes = f.getByRole('region', { name: 'Cambi di medico nello studio' });
+    await changes
+      .getByRole('button', { name: `Sposta ${moving!} nell’archivio di ${colleague!}` })
+      .click();
+    await changes.getByText(`${moving!}: spostato nell’archivio di ${colleague!}.`).waitFor();
+    expect(await patientId(moving!)).toBeNull();
+    // La collega lo trova nel suo archivio.
+    await login('collega');
+    expect(await patientId(moving!)).not.toBeNull();
+  });
+
+  it('AFT: la scheda del paziente dell’altro studio, con il motivo; la consultazione nel registro del suo medico', async () => {
+    const fiscalCode = (
+      await fromPanel((p) =>
+        p.getByRole('region', { name: 'AFT', exact: true }).locator('code').innerText(),
+      )
+    ).trim();
+    await login('medico');
+    await go('/strumenti?sezione=aft');
+    await f.getByLabel('Codice fiscale del paziente').fill(fiscalCode);
+    await f.getByLabel('Motivo dell’accesso').fill('Visita nell’ambulatorio serale dell’AFT');
+    await f.getByRole('button', { name: 'Mostra la scheda' }).click();
+    await f.getByText('Penicillina').first().waitFor();
+    await f.getByText('Ipertensione arteriosa essenziale').first().waitFor();
+    await expectAccessible('scheda di un paziente dell’AFT');
+    // Il medico curante, nell'altro studio, vede chi ha consultato, quando e perché.
+    await login('medico.aft');
+    await go('/strumenti?sezione=aft');
+    const log = f.getByRole('region', { name: 'Consultazioni dei colleghi sui miei pazienti' });
+    await log.getByText('Visita nell’ambulatorio serale dell’AFT').waitFor();
+    await log
+      .getByText(/Marchi/)
+      .first()
+      .waitFor();
   });
 
   it('strumenti: l’amministratore salva lo studio e crea un utente; il medico lo conferma nella pagina', async () => {

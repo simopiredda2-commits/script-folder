@@ -79,7 +79,10 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
                 <td>
                   <code>{u.username}</code>
                 </td>
-                <td>{u.roles.join(', ')}</td>
+                <td>
+                  {u.roles.join(', ')}
+                  {u.note && <span className="dimo-tenue"> ({u.note})</span>}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -102,8 +105,26 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           {ready.aura.registry && <li>un’ASL diversa per {ready.aura.registry}, da confermare;</li>}
           {ready.aura.deceased && <li>il decesso di {ready.aura.deceased}, da confermare;</li>}
           {ready.aura.revoked && <li>la revoca di {ready.aura.revoked};</li>}
+          {ready.aura.doctorChange && (
+            <li>
+              la scelta di {ready.aura.doctorChange} per la collega {ready.aura.colleague}: il
+              cambio di medico, da decidere;
+            </li>
+          )}
           <li>un nuovo assistito, {ready.aura.newPatient}, da registrare.</li>
         </ul>
+      </section>
+      <section aria-labelledby="dimo-aft">
+        <h3 id="dimo-aft">AFT</h3>
+        <p>
+          La Dott.ssa Marchi è nell’{ready.aft.name} insieme a un medico di un altro studio,{' '}
+          {ready.aft.colleague} ({ready.aft.studio}), che condivide i suoi pazienti.
+        </p>
+        <p>
+          In <strong>Strumenti › AFT</strong> si consulta la scheda di {ready.aft.patient}, che ha
+          dato il consenso: codice fiscale <code>{ready.aft.fiscalCode}</code>, con il motivo
+          dell’accesso.
+        </p>
       </section>
       <section aria-labelledby="dimo-codice" aria-live="polite">
         <h3 id="dimo-codice">Secondo fattore</h3>
