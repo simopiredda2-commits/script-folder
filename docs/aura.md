@@ -75,7 +75,7 @@ Ogni cambio di stato è una variazione in parole.
 - **«Non registrare».** L'assistito esce dall'elenco e non si ripropone finché AURA non manda una scelta nuova (altro medico o altra data).
 - **Esce dall'elenco da solo** quando la scelta non vale più, o AURA dice il decesso.
 
-**Cambio di medico dentro lo studio** (D200). Il paziente sceglie in AURA un altro medico dello studio, titolare di un altro archivio.
+**Cambio di medico dentro lo studio** (D200). Il paziente sceglie in AURA un altro medico dello studio, titolare di un altro archivio. Si prova anche nella dimostrazione, con la collega dello studio dimostrativo (D227).
 
 - **Quando.** A ogni controllo con AURA, dopo l'allineamento dello stato: conta la scelta di AURA che vale oggi, la più recente. Nell'archivio di prima il paziente risulta revocato (D198) finché non si decide.
 - **Chi decide.** Solo il titolare dell'archivio dove il paziente sta (permesso `archive.transfer`): non il sostituto né il collega di gruppo con l'autorizzazione, non la segreteria, non l'amministratore. Ogni no si registra.

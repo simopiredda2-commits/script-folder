@@ -1409,3 +1409,17 @@ Non provati nella dimostrazione: AFT (servono due studi), esportazione completa 
 - Nella dimostrazione resta la sessione sola di `database.ts` (D224), come protezione.
 
 Non provati: i percorsi che le prove non percorrono, guardati solo dalla lettura dei tipi, che non vede un servizio che tiene `db` dentro una funzione; due registrazioni dello stesso codice fiscale nello stesso istante (il 409 «appena stato registrato» non ha una prova, né prima né ora).
+
+**D227 · AFT e cambio di medico nella dimostrazione.** Secondo punto della risposta di Simone alla fermata (D225). Tutto in `apps/demo/src/worker/colleghi.ts` e in AURA simulata (`aura.ts`), con i servizi del programma: i dati dimostrativi di `seedDemo`, che usano anche `pnpm db:seed` e le prove, non cambiano.
+
+- **Una collega titolare nello studio dimostrativo**, la Dott.ssa Sara Galli, con il suo archivio. Con due titolari attivi lo studio è una medicina di gruppo, come vuole Strumenti › Studio.
+  - In AURA simulata un paziente della Dott.ssa Marchi sceglie la collega. È il più giovane senza ricette né certificati aperti, perché quelli fermano lo spostamento (D200).
+  - In «Oggi», «Cambi di medico nello studio», la Dott.ssa Marchi lo sposta, e la collega lo trova nel suo archivio.
+- **Un altro studio nella stessa AFT**, con il Dott. Luca Rinaldi e un suo paziente inventato. Il paziente ha dato il consenso alla condivisione, anche dei dati precedenti.
+  - Il Dott. Rinaldi condivide i suoi pazienti. La Dott.ssa Marchi, come per difetto, no: chi prova può accendere la condivisione e registrare il consenso di un suo paziente.
+  - In Strumenti › AFT la Dott.ssa Marchi consulta la scheda con il codice fiscale e il motivo. Il Dott. Rinaldi vede la consultazione nel suo registro.
+- Il riquadro della dimostrazione elenca i due utenti nuovi, `collega` e `medico.aft`, con la stessa password. Dice anche chi ha scelto la collega e quale codice fiscale consultare.
+- In AURA simulata ci sono solo i pazienti dello studio dimostrativo.
+- Prove: due nuove nella cornice, 17 in tutto, e quattro sabotaggi.
+
+Non provati nella dimostrazione: «Non spostare»; l'attività svolta registrata da un collega dell'AFT; la consultazione al contrario, del Dott. Rinaldi sui pazienti della Dott.ssa Marchi, che vuole prima la condivisione e un consenso.

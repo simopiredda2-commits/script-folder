@@ -27,6 +27,7 @@ Documento per la revisione della tappa 12: che cosa vede un collega dell'AFT, a 
 | Cronologia della cartella                    | `apps/api/src/patients/timeline.ts`: le attività dei colleghi, «Collega dell'AFT: …»                                |
 | Interfaccia                                  | Strumenti › AFT (`apps/web/src/pages/AftSection.tsx`); cartella › Privacy (`PrivacyPage.tsx`)                       |
 | Prove                                        | `apps/api/test/aft.test.ts` (due studi diversi), una prova nel browser in `test/e2e/interfaccia.test.ts`            |
+| Dimostrazione                                | `apps/demo/src/worker/colleghi.ts`: un altro studio dell'AFT, con un paziente che ha dato il consenso (D227)        |
 
 ## Regole, una per una
 
