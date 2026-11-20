@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { accessLog } from '../db/schema';
 import type { Tx } from '../db/tx';
+import type { HttpError } from '../http/errors';
 
 /** Azioni registrate. Le parole sono in italiano: il registro lo legge il medico. */
 export type AccessAction =
@@ -158,6 +159,29 @@ export async function logAccess(db: Database | Tx, entry: AccessEntry): Promise<
     workstation: entry.workstation ?? null,
     details: entry.details ?? {},
   });
+}
+
+/**
+ * Un rifiuto con la sua riga del registro (D225). Dentro una transazione la riga non si scrive:
+ * tornerebbe indietro con la transazione, e su un'altra connessione aspetterebbe la fine della
+ * transazione, se questa ha già scritto nel registro (la catena delle righe si blocca fino alla fine,
+ * migrazione 0002). Chi ha aperto la transazione, dopo il ritorno indietro, la scrive con
+ * `settleRefusal` e risponde con l'errore.
+ */
+export class Refusal extends Error {
+  constructor(
+    readonly error: HttpError,
+    readonly entry: AccessEntry,
+  ) {
+    super(error.message);
+  }
+}
+
+/** Fuori da ogni transazione: la riga del rifiuto nel registro, poi il suo errore. Gli altri errori come sono. */
+export async function settleRefusal(db: Database, err: unknown): Promise<unknown> {
+  if (!(err instanceof Refusal)) return err;
+  await logAccess(db, err.entry);
+  return err.error;
 }
 
 /**

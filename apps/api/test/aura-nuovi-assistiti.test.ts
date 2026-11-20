@@ -1,7 +1,7 @@
 import { generatePatients } from '@mmg/fixtures';
 import { EMPTY_AURA_REGISTRY, SimulatedAura, type AuraChoice } from '@mmg/integrations';
-import { and, desc, eq, sql } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   accessLog,
   appUser,
@@ -13,6 +13,7 @@ import {
   patientChoice,
 } from '../src/db/schema';
 import { studioDate } from '../src/prescriptions/rules-check';
+import { ReferenceData } from '../src/reference/lookup';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -403,5 +404,78 @@ describe('AURA: nuovi assistiti (D199)', () => {
     expect(res.json().dettagli.paziente.id).toBe(manual.json().id);
     const [c] = await t.db.select().from(auraNewPatient).where(eq(auraNewPatient.id, candidateId));
     expect(c!.status).toBe('superato');
+    // Il tentativo resta nel registro di quel paziente, anche se la transazione è tornata indietro.
+    const tried = await t.db
+      .select()
+      .from(accessLog)
+      .where(
+        and(
+          eq(accessLog.patientId, manual.json().id as string),
+          eq(accessLog.action, 'nuovo_paziente'),
+          eq(accessLog.outcome, 'negato'),
+        ),
+      );
+    expect(tried.map((r) => (r.details as { motivo?: string }).motivo)).toEqual([
+      'codice fiscale già registrato per questo paziente',
+    ]);
+  });
+
+  it('AURA cambia il codice fiscale mentre si registra (D225): 409, si ricarica, e nessun paziente', async () => {
+    const { p, candidateId } = await chooses('n');
+    const changed = `${p.fiscalCode.slice(0, -1)}${p.fiscalCode.endsWith('A') ? 'B' : 'A'}`;
+    // Il comune di nascita si cerca prima della transazione: in quel momento AURA corregge il codice.
+    const lookup = vi
+      .spyOn(ReferenceData.prototype, 'municipality')
+      .mockImplementationOnce(async () => {
+        await t.db
+          .update(auraNewPatient)
+          .set({ fiscalCode: changed })
+          .where(eq(auraNewPatient.id, candidateId));
+        return null;
+      });
+    try {
+      const res = await post(`/api/aura/nuovi/${candidateId}/registra`);
+      expect(res.statusCode, res.body).toBe(409);
+      expect(res.json().errore).toBe('AURA ha cambiato il codice fiscale: ricarica la pagina');
+      expect(lookup).toHaveBeenCalledTimes(1);
+    } finally {
+      lookup.mockRestore();
+    }
+    expect(
+      await t.db
+        .select()
+        .from(patient)
+        .where(inArray(patient.fiscalCode, [p.fiscalCode, changed])),
+    ).toEqual([]);
+    const [c] = await t.db.select().from(auraNewPatient).where(eq(auraNewPatient.id, candidateId));
+    expect(c!.status).toBe('da_registrare');
+  });
+
+  it('una transazione sola (D225): se l’ultimo passo non riesce, il paziente non resta e l’assistito si registra dopo', async () => {
+    const { p, candidateId } = await chooses('m');
+    // Un guasto apposta all'ultimo passo: l'assistito che diventa «registrato».
+    await t.pool.query(
+      `create function guasto_di_prova() returns trigger language plpgsql as $$ begin raise exception 'guasto di prova'; end $$`,
+    );
+    await t.pool.query(
+      `create trigger guasto_di_prova before update on aura_new_patient for each row when (new.status = 'registrato') execute function guasto_di_prova()`,
+    );
+    try {
+      const failed = await post(`/api/aura/nuovi/${candidateId}/registra`);
+      expect(failed.statusCode, failed.body).toBe(500);
+    } finally {
+      await t.pool.query('drop trigger guasto_di_prova on aura_new_patient');
+      await t.pool.query('drop function guasto_di_prova()');
+    }
+    expect(await t.db.select().from(patient).where(eq(patient.fiscalCode, p.fiscalCode))).toEqual(
+      [],
+    );
+    const [c] = await t.db.select().from(auraNewPatient).where(eq(auraNewPatient.id, candidateId));
+    expect(c!.status).toBe('da_registrare');
+    const again = await post(`/api/aura/nuovi/${candidateId}/registra`);
+    expect(again.statusCode, again.body).toBe(201);
+    expect(
+      await t.db.select().from(patient).where(eq(patient.fiscalCode, p.fiscalCode)),
+    ).toHaveLength(1);
   });
 });
