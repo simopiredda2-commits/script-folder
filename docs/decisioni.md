@@ -1224,3 +1224,5 @@ Prove (`packages/brand/test/logo-scelto.test.ts`):
 - la favicon cambia nel tema scuro.
 
 Sei sabotaggi. Guardato a vista nei due temi a 16, 32 e 64 px. Non provato: l'icona su un tablet vero, e le favicon in Safari.
+
+**D215 · Risposte della fermata dopo l'unione della #18.** Via alla #19, unita. Il controllo delle 17 voci trascritte delle PPIP e il modo in cui la Dr.ssa Rocca manda oggi la distinta si fanno alla fine, con le altre verifiche (`docs/avanzamento.md`, «Che cosa resta aperto», B2). Fino al controllo, il catalogo vero delle PPIP resta spento (A8). Il resto aspetta i file di Simone (allegati 2 e 3 dei LEA) e le risposte di Regione, ASL e CSI.

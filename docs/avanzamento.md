@@ -26,7 +26,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
 - **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
-- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214).
+- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Ora si aspettano i file di Simone e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -55,7 +55,7 @@ _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 
 _C. Decisioni o materiali di Simone_
 
-1. **PPIP**: costruite, predisposte per le istruzioni di Regione e ASL (D212, D213). Resta da dire chi controlla le 17 voci trascritte: senza il controllo il catalogo non si usa.
+1. **PPIP**: costruite e unite (#19, D212, D213). Sono verifiche per la fine, in B2: il controllo delle 17 voci trascritte, senza il quale il catalogo non si usa, e come la Dr.ssa Rocca manda oggi la distinta. Risposta del 20/11/2026.
 2. **Allegati 2 e 3 del DPCM LEA** (presidi) nella versione in vigore, dalla pagina LEA del Ministero: da qui risponde un controllo anti-robot («Gcore», 20/11/2026). Simone li manda (D212); con quelli, le modifiche del 2026 ai LEA (D124).
 3. **Ready!** e la versione «Full» (D78), poi l'Agenda.
 4. **Un file d'esempio dell'esportazione del programma di oggi**, senza dati veri, per l'importazione.
@@ -867,7 +867,7 @@ Risposta di Simone alla fermata del 20/11/2026: «Ok adesso ma predisponiamo il 
 - le condizioni delle voci (ADI, frigorifero, impianti fissi), che il programma non controlla;
 - WebKit e Firefox su questa macchina (li prova la CI).
 
-**Prossimo passo**: pull request #19 e fermata.
+**Prossimo passo**: fatto: pull request #19 unita con il via di Simone. Poi si aspettano i file di Simone (allegati 2 e 3 dei LEA) e le risposte di Regione, ASL e CSI.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -1100,11 +1100,27 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Dopo le PPIP (D212, D213), con il pulsante:
+Nessuna per ora. Si aspettano i file di Simone (allegati 2 e 3 dei LEA) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
+
+## Risposte della fermata dopo l'unione della #18 (20/11/2026)
+
+Simone ha risposto con il pulsante il 20/11/2026.
+
+- **Via**: «Via: unisci». Pull request #19 unita in `main` il 20/11/2026 (commit 218369b), con le prove verdi su GitHub dell'ultimo commit (TypeScript, WebKit, Firefox e `sync/`).
+- **Controllo delle 17 voci delle PPIP**: «Tienilo a mente per la fine». È fra le verifiche per la fine (B2). Finché nessuno le controlla, il catalogo vero resta spento; la dimostrazione usa quello d'esempio.
+- **Come la Dr.ssa Rocca manda oggi la distinta**: «Anche questo, tienilo a mente per la fine». Anche questo è in B2; intanto resta il CSV con i campi dell'ACN.
+
+Durante il blocco, sul logo:
+
+- alla domanda se il logo giallo si leggerebbe, la risposta è stata l'icona gialla con il segno blu scuro per le versioni su fondo scuro;
+- dopo il confronto con com'era prima, Simone ha confermato: «va benissimo il quadratino arrotondato giallo»;
+- su sua richiesta è stato controllato l'allineamento, e il segno ora sta al centro ottico (D214).
+
+## Domande della fermata dopo l'unione della #18 (chiuse)
 
 1. **Via** all'unione della #19: A. Via: unisci (consigliata); B. prima delle modifiche; C. fermati qui.
-2. **Chi controlla le 17 voci trascritte delle PPIP** (allegato 6 dell'ACN, pagine 146 e 147 del supplemento, e AIR, art. 35, comma 4)? Senza il controllo il catalogo non si usa. A. la Dr.ssa Rocca, che le usa (consigliata); B. Simone; C. più avanti.
-3. **Come manda oggi la distinta la Dr.ssa Rocca** (portale, file, carta)? A. Simone glielo chiede e manda il modulo o una schermata del portale (consigliata); B. lo chiediamo per scritto all'ASL; C. più avanti, intanto resta il CSV.
+2. **Chi controlla le 17 voci trascritte delle PPIP**: A. la Dr.ssa Rocca, che le usa (consigliata); B. Simone; C. più avanti.
+3. **Come manda oggi la distinta la Dr.ssa Rocca** (portale, file, carta): A. Simone glielo chiede e manda il modulo o una schermata del portale (consigliata); B. lo chiediamo per scritto all'ASL; C. più avanti, intanto resta il CSV.
 
 ## Risposte della fermata dopo l'unione della #17 (20/11/2026)
 
