@@ -1470,3 +1470,8 @@ Non provati nella dimostrazione: «Non spostare»; l'attività svolta registrata
      - La prova non si è cambiata, per non nascondere la causa. Ora, se la ricetta non parte, dice le risposte d'errore del servizio e che cosa mostra il pannello dell'invio (provato a mano, togliendo il quesito: «422 … R14: Manca il quesito diagnostico»).
 
 Non provati: tre richieste o più sullo stesso codice fiscale; due correzioni insieme dello stesso codice fiscale su due pazienti (stessa strada del codice, senza una prova sua); nella dimostrazione, la consultazione al contrario nell'AFT, del Dott. Rinaldi sui pazienti della Dott.ssa Marchi; la causa della ricetta specialistica non partita con WebKit.
+
+**D230 · Risposte della fermata dopo l'unione della #23.** Via alla #24, unita con le verifiche su GitHub verdi. Per il dopo Simone ha scritto a mano «Ciò che resta». Scelta presa da sé: vuol dire tutto quello che restava da fare da qui, cioè i punti B e C della domanda; il punto A era la pausa.
+
+1. «Firma e invia» a controllo finito: il medico vede sempre i controlli prima di firmare.
+2. Le prove che restano: tre richieste insieme sullo stesso codice fiscale; due correzioni insieme dello stesso codice fiscale su due pazienti; nella dimostrazione, la consultazione al contrario nell'AFT.
