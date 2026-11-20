@@ -25,7 +25,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199). Fermata fatta: via, pull request #14 unita (risposte in «Risposte della fermata dopo l'unione della #13»).
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
-- **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206). Sezione «Dopo l'unione della #16». Pull request #17 e fermata, con le domande pronte per la mattina del 20/11/2026.
+- **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Pull request #17 e fermata, con le domande pronte per la mattina del 20/11/2026.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -725,7 +725,7 @@ Richiesta di Simone del 19/11/2026. Stesso branch.
 
 **Prossimo passo**: pull request #16 e fermata.
 
-### Dopo l'unione della #16 – Mezzanotte, riepiloghi alla segreteria, variazioni e registri AIFA (D203–)
+### Dopo l'unione della #16 – Mezzanotte, riepiloghi alla segreteria, variazioni e registri AIFA (D203–D207)
 
 Il blocco che segue dalle risposte della fermata, nello stesso branch ripartito da `main` dopo l'unione della #16. Lavoro della notte fra il 19 e il 20/11/2026, con il via di Simone («se c'è margine per andare avanti, vai!»).
 
@@ -755,7 +755,11 @@ Il blocco che segue dalle risposte della fermata, nello stesso branch ripartito 
   - **Dove**: una riga informativa nella ricerca dei farmaci (ricetta, terapia, banche dati); i dettagli nei dati del farmaco. Nessuna regola nuova.
   - Prove: `packages/reference/test/mappature.test.ts`, `apps/api/test/banche-dati.test.ts`, `apps/web/test/registri-aifa.test.tsx`, browser con il controllo di accessibilità.
 
-**Prossimo passo**: schermate, documenti, prove complete, pull request e domande della fermata.
+**Prove complete**: 140 file e 1644 prove TypeScript, più `sync/`, tutto verde; lint verde. Su GitHub, il giro della D206 è verde in tutti i lavori (TypeScript, WebKit, Firefox, `sync/`).
+
+**Non provato**: WebKit e Firefox su questa macchina (li prova la CI); due versioni vere dell'anagrafica o delle liste AIFA, una dopo l'altra; le schede zip dei registri; un riavvio vero di Postgres con il servizio acceso.
+
+**Prossimo passo**: pull request #17 e domande della fermata (sotto, «Domande per la prossima fermata»).
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
