@@ -32,6 +32,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 _A. Aspetta la Regione Piemonte, CSI Piemonte o un altro ente_
 
+Contatto per le applicazioni sanitarie della Regione gestite dal CSI (AURA, SAR, Fascicolo): servizio tecnico 011 3168050, sanita.regione@csi.it. Il numero e l'indirizzo sono nelle pagine pubbliche di RUPAR Piemonte (SVAS) e Salute Piemonte (PROTES, DMRP), lette il 20/11/2026. Il 011 2279966 è l'assistenza applicativa del portale Sistema Piemonte (nelle pagine lette, servizi dell'agricoltura): non serve per queste richieste.
+
 1. **SAR (SIRPED) e Sistema TS**: specifiche e credenziali di collaudo, piano di test della Regione; registrazione del programma (codice del gestionale, `client_id`, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103). Con queste: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo di stampa della ricetta rossa. Per il promemoria, che segue già le specifiche di stampa del 28/02/2024 (D217): frase regionale e frase sui farmaci in DPC come le dà il SAC vero, un'eventuale validità minore di 180 giorni, i tipi di ricetta diversi da «Assist. SSN», il codice regionale nel campo 27.
 2. **AURA vera** (oggi un simulatore, D197–D200): servizio, campi, codici degli eventi e credenziali, chiesti con la PEC di Simone al CSI del 19/11/2026.
 3. **Certificati INPS veri**: credenziali del Sistema TS (D100–D103).
