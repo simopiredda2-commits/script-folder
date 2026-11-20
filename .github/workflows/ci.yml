@@ -90,6 +90,33 @@ jobs:
       - name: Prova dell'interfaccia
         run: pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts
 
+  # La dimostrazione nel browser (D221, D223): costruita e provata dentro una cornice con la
+  # sandbox dell'artifact, con i tre motori.
+  dimostrazione:
+    name: Dimostrazione con ${{ matrix.browser }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, webkit, firefox]
+    env:
+      TZ: Europe/Rome
+      DEMO_BROWSER: ${{ matrix.browser }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Browser per la prova
+        run: pnpm --filter @mmg/demo exec playwright install --with-deps ${{ matrix.browser }}
+      - name: Costruzione della dimostrazione
+        run: pnpm --filter @mmg/demo build
+      - name: Prova della dimostrazione
+        run: pnpm --filter @mmg/demo test:browser
+
   sync:
     name: Prove di sync/ (Python)
     runs-on: ubuntu-24.04
