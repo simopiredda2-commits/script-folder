@@ -10,19 +10,20 @@ sync/banche_dati.py  →  dati-pubblici/correnti/…, stato.json  →  importazi
 
 ## Che cosa si importa
 
-| Tipo                    | Da dove                                                             | Come            | Serve per                                 |
-| ----------------------- | ------------------------------------------------------------------- | --------------- | ----------------------------------------- |
-| `farmaci`               | AIFA, anagrafica delle confezioni (CSV)                             | file di `sync/` | ricerca farmaci, R22 (D210)               |
-| `farmaci_classe`        | AIFA, classe A e H per principio attivo (CSV)                       | file di `sync/` | R8, prezzo, equivalenti                   |
-| `farmaci_trasparenza`   | AIFA, lista di trasparenza dei farmaci equivalenti (CSV)            | file di `sync/` | prezzo di riferimento, equivalenti (D202) |
-| `farmaci_carenti`       | AIFA, elenco dei medicinali carenti (CSV)                           | file di `sync/` | R21, carenze in terapia e in Oggi (D202)  |
-| `registri_aifa`         | AIFA, registri di monitoraggio e piani terapeutici attivi (CSV)     | file di `sync/` | dati del farmaco, per ATC (D206)          |
-| `farmaci_dpc`           | Regione Piemonte, farmaci PHT in DPC (PDF)                          | trascrizione    | R5, R7, indicazione DPC                   |
-| `comuni`                | ISTAT, elenco dei comuni (XLSX)                                     | file di `sync/` | anagrafica, codice fiscale, D12           |
-| `prestazioni`           | Regione Piemonte, catalogo delle prestazioni (PDF)                  | trascrizione    | ricerca prestazioni, R14                  |
-| `esenzioni`             | DPCM LEA e atti regionali (PDF)                                     | trascrizione    | R9                                        |
-| `esenzioni_prestazioni` | Regione Piemonte, D.D. 1167/2022 (PDF)                              | trascrizione    | R17                                       |
-| `diagnosi`              | Ministero della salute, manuale ICD-9-CM 2007 (PDF) e DM 28/10/2020 | trascrizione    | ricerca delle diagnosi (D186)             |
+| Tipo                     | Da dove                                                             | Come            | Serve per                                 |
+| ------------------------ | ------------------------------------------------------------------- | --------------- | ----------------------------------------- |
+| `farmaci`                | AIFA, anagrafica delle confezioni (CSV)                             | file di `sync/` | ricerca farmaci, R22 (D210)               |
+| `farmaci_classe`         | AIFA, classe A e H per principio attivo (CSV)                       | file di `sync/` | R8, prezzo, equivalenti                   |
+| `farmaci_trasparenza`    | AIFA, lista di trasparenza dei farmaci equivalenti (CSV)            | file di `sync/` | prezzo di riferimento, equivalenti (D202) |
+| `farmaci_carenti`        | AIFA, elenco dei medicinali carenti (CSV)                           | file di `sync/` | R21, carenze in terapia e in Oggi (D202)  |
+| `registri_aifa`          | AIFA, registri di monitoraggio e piani terapeutici attivi (CSV)     | file di `sync/` | dati del farmaco, per ATC (D206)          |
+| `farmaci_dpc`            | Regione Piemonte, farmaci PHT in DPC (PDF)                          | trascrizione    | R5, R7, indicazione DPC                   |
+| `comuni`                 | ISTAT, elenco dei comuni (XLSX)                                     | file di `sync/` | anagrafica, codice fiscale, D12           |
+| `prestazioni`            | Regione Piemonte, catalogo delle prestazioni (PDF)                  | trascrizione    | ricerca prestazioni, R14                  |
+| `esenzioni`              | DPCM LEA e atti regionali (PDF)                                     | trascrizione    | R9                                        |
+| `esenzioni_prestazioni`  | Regione Piemonte, D.D. 1167/2022 (PDF)                              | trascrizione    | R17                                       |
+| `diagnosi`               | Ministero della salute, manuale ICD-9-CM 2007 (PDF) e DM 28/10/2020 | trascrizione    | ricerca delle diagnosi (D186)             |
+| `prestazioni_aggiuntive` | ACN 2022-2024, allegato 6, e AIR del Piemonte 2024 (PDF)            | trascrizione    | prestazioni aggiuntive e distinta (D212)  |
 
 Non importati per ora: l'elenco dei registri AIFA chiusi, ICD-10-IM. Si aggiungono con un tipo e una mappatura nuovi. Le diagnosi ICD-9-CM: `docs/icd9cm.md`.
 
@@ -90,7 +91,7 @@ I PDF non si estraggono da soli. Una persona copia i dati in un CSV (UTF-8, sepa
 
 ### Trascrizioni che il programma porta con sé (D159)
 
-`packages/reference/data/trascrizioni/` contiene le trascrizioni degli atti regionali e delle diagnosi ICD-9-CM, ed è la cartella delle trascrizioni per difetto (`BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` la sostituiscono). Oggi:
+`packages/reference/data/trascrizioni/` contiene le trascrizioni degli atti regionali e nazionali (catalogo, esenzioni, diagnosi ICD-9-CM, prestazioni aggiuntive), ed è la cartella delle trascrizioni per difetto (`BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` la sostituiscono). Oggi:
 
 | File (in `piemonte_catalogo/`) | Atto                                     | In vigore dal | Voci in vigore |
 | ------------------------------ | ---------------------------------------- | ------------- | -------------- |
@@ -112,6 +113,13 @@ Estratte dal manuale da Simone, con un controllo esterno e le correzioni della s
 | `allegato-8-malattie-croniche` | DPCM LEA, allegato 8: codici delle malattie croniche (D190) | 30/10/2026    | 247            |
 
 Estratta in automatico dal PDF della pagina del Ministero (versione del 29/9/2026) e **da controllare** (sotto, «Esenzioni del DPCM LEA»).
+
+| File (in `ppip/`)          | Atto                                                                | In vigore dal | Voci |
+| -------------------------- | ------------------------------------------------------------------- | ------------- | ---- |
+| `acn-2022-2024-allegato-6` | ACN della medicina generale 2022-2024, allegato 6 (serie nazionale) | 15/01/2026    | 16   |
+| `air-piemonte-2024`        | AIR del Piemonte 2024, art. 35, comma 4 (serie regionale)           | 01/01/2025    | 1    |
+
+Trascritte qui dalle pagine 146 e 147 del supplemento della Gazzetta (lettura ottica, controllata a vista voce per voce) e dal PDF della delibera; restano **da controllare**. Il catalogo di un giorno unisce le serie in vigore; a parità di codice vale la serie più recente, così un accordo aziendale si aggiunge come serie nuova (D213). Colonne: `codice`, `sezione`, `descrizione`, `autorizzazione` (sì/no), `compenso` (euro, con la virgola), `note`. Che cosa è diverso dagli atti e che cosa controllare: `docs/ppip.md`.
 
 ### Esenzioni del DPCM LEA (D190)
 

@@ -1177,6 +1177,27 @@ Prove: il PDF incorpora l'OCR-A e non più il Courier (`apps/api/test/promemoria
 
 - **Elenco delle prestazioni come dato con versione e data di efficacia**, come le altre banche dati: l'allegato 6 dell'ACN in vigore, l'AIR del Piemonte e, quando l'ASL lo dirà, l'accordo aziendale. Un accordo nuovo è un file nuovo da importare, senza cambiare il codice.
 - **Riepilogo del mese costruito dai dati registrati**, con un'esportazione il cui formato è anch'esso un dato. Quando Regione e ASL diranno come vogliono il riepilogo, si aggiunge il loro formato.
-- **Invio predisposto**: un'interfaccia con un simulatore, come per SAR, Sistema TS e AURA. Il collegamento vero al portale regionale si scrive quando arrivano le specifiche.
+- **Invio predisposto**: un'interfaccia con un simulatore, come per SAR, Sistema TS e AURA. Il collegamento vero (portale regionale o strumento dell'ASL) si scrive quando arrivano le specifiche.
 
 Allegati 2 e 3 del DPCM LEA: li manda Simone. Dicitura del tipo di accesso: «Lasciamo dicitura sistema ts»; vale quella del Sistema TS, già nel programma (D79), e il documento vivo dei requisiti non si tocca.
+
+**D213 · Prestazioni aggiuntive: come sono costruite (D212).** Le scelte di dettaglio. Dove gli atti tacciono, la scelta è fatta qui e lo dice. Documento: `docs/ppip.md`.
+
+- **Catalogo per giorno.** Vale il catalogo del giorno dell'esecuzione, con tutte le serie in vigore insieme: ACN, AIR e, quando ci sarà, l'accordo aziendale. Se lo stesso codice è in due serie, vale quella con la data di efficacia più recente: un accordo aziendale che cambia un compenso vale dalla sua data, e il passato resta com'era. Ogni prestazione registrata porta voce, compenso e versione della banca dati del suo giorno.
+- **Codici scelti qui.** Lettera della sezione più numero della voce dell'allegato (A1–A12, B1–B4); `AIR35.4` per la trasfusione dell'AIR. Al posto degli asterischi c'è il testo delle note.
+- **Controlli solo formali (regola 3).** La voce dev'essere nel catalogo di quel giorno; per la sezione B servono gli estremi dell'autorizzazione (comma 5); la data non può essere futura né dopo il decesso; luogo in studio o a domicilio (comma 2). La quantità va da 1 a 99: è un limite di formato, come D93, perché l'allegato non ne pone. Le condizioni di una voce (ADI, frigorifero, impianti fissi, autorizzazione complessiva delle vaccinazioni) non si controllano: le note della voce le ricordano.
+- **Chi fa che cosa.** Registrano e annullano i medici con accesso all'archivio e la segreteria confermata (D185). La distinta la manda solo il titolare (`ppip.send`), come la firma. Restano nel registro degli accessi, paziente per paziente, le letture e le registrazioni, gli annullamenti, la distinta, il CSV e gli invii.
+- **Niente si cancella.** Una prestazione si annulla con un motivo finché non è partita; dopo, la correzione si chiede all'ASL. Gli invii restano come sono partiti, con il contenuto mandato.
+- **Distinta del mese.** Contiene le prestazioni non annullate dei pazienti dell'archivio. Scade il 15 del mese dopo (comma 4) e si manda dal primo giorno del mese dopo. Partono solo le prestazioni non ancora inviate; un invio non accolto, o un'ASL non raggiungibile, le lascia da inviare. L'indirizzo è quello di residenza, come sul promemoria. Il totale resta vuoto se una voce non ha il compenso.
+- **CSV.** Il formato è un dato, in `apps/api/distinte/ppip-formati.json`. Oggi c'è il formato con i campi del comma 4, più codice, prestazione, quantità, luogo, autorizzazione e compenso. Il formato dell'ASL si aggiunge lì.
+- **Invio.** C'è l'interfaccia `AdditionalServicesPortal` con il simulatore. In produzione, con il simulatore, l'invio è spento e resta il CSV.
+- **Trascrizioni vere da controllare.** Hanno `controllato_da` vuoto, quindi non si usano finché una seconda persona non le confronta con gli atti (A8, D159). Chi le controlla è una domanda per la fermata.
+- **Testi fedeli agli atti.** Per le prestazioni aggiuntive, l'AIR 2024 nomina il portale regionale solo fra i compiti dei medici ad attività oraria (art. 30, comma 1). Altrove rimanda a uno strumento su supporto digitale dell'ASL, «come previsto per le prestazioni di cui all'Allegato 6» (art. 36, comma 6, sulle visite occasionali). L'interfaccia dice soltanto questo.
+
+Prove:
+
+- servizio, `apps/api/test/ppip.test.ts` (13). Comprende un accordo aziendale inventato che cambia un compenso da una data;
+- interfaccia, `apps/web/test/ppip.test.tsx` (4);
+- browser, «prestazioni aggiuntive (D212)» in `apps/api/test/e2e/interfaccia.test.ts`.
+
+31 sabotaggi, uno anche nel browser. Non provato: invio vero, formato dell'ASL, modulo regionale delle prestazioni multiple, controllo della trascrizione da parte di una seconda persona.

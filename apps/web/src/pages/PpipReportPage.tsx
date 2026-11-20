@@ -192,7 +192,8 @@ export function PpipReportPage() {
           medicina generale 2022-2024, allegato 6, comma 4). Per le prestazioni soggette ad
           autorizzazione vanno con la distinta anche l’autorizzazione e il modulo regionale delle
           prestazioni multiple autorizzate (comma 5). In Piemonte l’accordo regionale prevede la
-          rendicontazione su supporto digitale (AIR 2024, art. 30): come, lo diranno Regione e ASL.
+          rendicontazione su supporto digitale (AIR 2024, artt. 30 e 36): come, lo diranno Regione e
+          ASL.
         </p>
       </form>
 
