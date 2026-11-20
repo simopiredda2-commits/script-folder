@@ -1485,3 +1485,11 @@ Come si è fatto il punto 2:
 - nella dimostrazione, la consultazione al contrario nell'AFT, tutta dall'interfaccia: la Dott.ssa Marchi accende la condivisione e registra il consenso di una sua paziente in «Privacy»; il Dott. Rinaldi consulta la scheda con il codice fiscale e il motivo; lei vede la consultazione nel suo registro.
 
 Sabotaggi: quattro per la firma a controllo finito, due per le gare, due per la dimostrazione.
+
+**D231 · Risposte della fermata dopo l'unione della #24: revisione indipendente dalla #18 alla #25.** Via alla #25, unita con le verifiche su GitHub verdi. Per il dopo Simone ha chiesto se c'erano state altre revisioni. Sì, prima di questo giro: quella della #17 (D209), le tre dei poteri dell'amministratore nella tappa 14, quella del piano delle tappe 14 e 15 e il controllo esterno del catalogo ICD-9-CM (D186). Il codice unito dopo la #17, dalla #18 alla #25 (D210–D230), non ne aveva avute. Scelta di Simone: la revisione di tutto quel codice, come per la #17.
+
+Come si fa:
+
+- quattro revisori separati, uno per area: pazienti, registro degli accessi, transazioni e firma; prestazioni aggiuntive; promemoria, R22, presidi, Fascicolo regionale e logo; dimostrazione nel browser;
+- ognuno riceve il codice, le decisioni che dicono il comportamento voluto e che cosa cercare (correttezza, permessi e riservatezza, integrità e gare, tempi che crescono, robustezza, regole di CLAUDE.md), non le conclusioni di chi l'ha scritto. Le prove contano come codice: una prova che resterebbe verde con il difetto è un difetto;
+- ogni difetto segnalato si verifica sul codice prima di correggerlo. Quelli veri si correggono con prove e sabotaggi; gli altri si annotano con il motivo. Gli esiti sono nella decisione che segue.
