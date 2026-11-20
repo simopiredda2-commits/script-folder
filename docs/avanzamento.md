@@ -26,7 +26,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
 - **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
-- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Poi, nello stesso branch ripartito da `main`: fonti dei LEA verificate (D216), promemoria secondo le specifiche di stampa del Sistema TS del 28/02/2024 (D217), nomenclatore dei presidi dell'allegato 3 (D218); sezione «Dopo l'unione della #19». Fermata fatta il 20/11/2026: via, pull request #20 unita (risposte in «Risposte della fermata dopo l'unione della #19»). Poi, nello stesso branch: l'apertura del Fascicolo dalla cartella con un simulatore (D220, fatta), la dimostrazione nel browser chiesta da Simone (D221, pubblicata come artifact) e il promemoria in A5 chiesto da Simone (fatto, D222); sezione «Dopo l'unione della #20». Fermata fatta il 20/11/2026: via, pull request #21 unita (risposte in «Risposte della fermata dopo l'unione della #20»). Poi, nello stesso branch ripartito da `main`, la dimostrazione completa: tutto il programma provabile nell'artifact, con prove automatiche anche su Safari e Firefox (D223, D224); sezione «Dopo l'unione della #21», pull request #22. Si aspettano i file dei LEA e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
+- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Poi, nello stesso branch ripartito da `main`: fonti dei LEA verificate (D216), promemoria secondo le specifiche di stampa del Sistema TS del 28/02/2024 (D217), nomenclatore dei presidi dell'allegato 3 (D218); sezione «Dopo l'unione della #19». Fermata fatta il 20/11/2026: via, pull request #20 unita (risposte in «Risposte della fermata dopo l'unione della #19»). Poi, nello stesso branch: l'apertura del Fascicolo dalla cartella con un simulatore (D220, fatta), la dimostrazione nel browser chiesta da Simone (D221, pubblicata come artifact) e il promemoria in A5 chiesto da Simone (fatto, D222); sezione «Dopo l'unione della #20». Fermata fatta il 20/11/2026: via, pull request #21 unita (risposte in «Risposte della fermata dopo l'unione della #20»). Poi, nello stesso branch ripartito da `main`, la dimostrazione completa: tutto il programma provabile nell'artifact, con prove automatiche anche su Safari e Firefox (D223, D224); sezione «Dopo l'unione della #21». Fermata fatta il 20/11/2026: via, pull request #22 unita (risposte in «Risposte della fermata dopo l'unione della #21»). Poi, nello stesso branch ripartito da `main`: le transazioni del servizio e, nella dimostrazione, AFT e cambio di medico dentro lo studio (D225); sezione «Dopo l'unione della #22». Si aspettano i file dei LEA e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -975,7 +975,16 @@ Nello stesso branch, ripartito da `main`. Risposta di Simone alla fermata: «Dim
 
 Dimostrazione ripubblicata nello stesso artifact (versione 4). Prove complete verdi: 1732 prove in 149 file e quelle di `sync/`; lint verde. Prove della dimostrazione: 15 verdi in Chromium qui; WebKit e Firefox nella CI.
 
-**Prossimo passo**: pull request #22 e fermata.
+**Prossimo passo**: fatto. Pull request #22 unita dopo la fermata (D225); si continua in «Dopo l'unione della #22».
+
+### Dopo l'unione della #22 – Transazioni del servizio, AFT e cambio di medico nella dimostrazione (D225)
+
+Nello stesso branch, ripartito da `main`. Risposta di Simone alla fermata: «Sia punto 1 che 2».
+
+1. **Transazioni del servizio** (in corso). «Registra» un nuovo assistito da AURA crea il paziente fuori dalla transazione della registrazione. Si porta dentro, e un controllo nelle prove cerca gli altri punti del servizio che usano il database fuori dalla transazione aperta.
+2. **AFT e cambio di medico nella dimostrazione** (da fare). Un secondo studio e un secondo medico titolare, per provare la condivisione nell'AFT (D161) e il cambio di medico dentro lo studio (D200).
+
+**Prossimo passo**: il controllo nelle prove e quello che trova.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -1208,7 +1217,19 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Nessuna per ora. Si rende provabile tutta la dimostrazione (D223); si aspettano i file dei LEA (C2) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
+Nessuna per ora. Si fanno le transazioni del servizio e, nella dimostrazione, AFT e cambio di medico (D225); si aspettano i file dei LEA (C2) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
+
+## Risposte della fermata dopo l'unione della #21 (20/11/2026)
+
+Simone ha risposto con il pulsante il 20/11/2026.
+
+- **Via**: «Via, unisci». Pull request #22 unita in `main` (commit 35cf677), con le verifiche su GitHub verdi: TypeScript, interfaccia e dimostrazione con Chromium, WebKit e Firefox, `sync/`.
+- **Dopo l'unione**: «Sia punto 1 che 2» (D225): le transazioni del servizio e, nella dimostrazione, AFT e cambio di medico. Sezione «Dopo l'unione della #22».
+
+## Domande della fermata dopo l'unione della #21 (chiuse)
+
+1. **Via alla #22**: A. unisci (consigliata); B. prima provo la dimostrazione.
+2. **Dopo l'unione**: A. transazioni del servizio, con «Registra» di AURA dentro una transazione sola e gli altri punti che scrivono fuori dalla transazione aperta (consigliata); B. AFT e cambio di medico nella dimostrazione, con un secondo studio e un secondo medico; C. pausa. Risposta: A e B.
 
 ## Risposte della fermata dopo l'unione della #20 (20/11/2026)
 

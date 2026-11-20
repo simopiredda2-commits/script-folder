@@ -1389,3 +1389,8 @@ Prove:
   - Restano fuori da `pnpm test`, perché vogliono la dimostrazione costruita.
 
 Non provati nella dimostrazione: AFT (servono due studi), esportazione completa (un archivio che il visore non apre), «Aggiorna adesso» delle banche dati (nel browser non c'è `sync/`), cambio di medico dentro lo studio. La dimostrazione dentro la cornice vera di claude.ai e sul tablet resta da provare a mano.
+
+**D225 · Risposte della fermata dopo l'unione della #21.** Via alla #22, unita con le verifiche su GitHub verdi. Dopo l'unione Simone ha scelto «Sia punto 1 che 2».
+
+1. **Transazioni del servizio.** «Registra» un nuovo assistito da AURA crea il paziente fuori dalla transazione della registrazione. Lo ha mostrato la dimostrazione, dove PGlite ha una sola sessione (D224). Si porta dentro, e un controllo nelle prove cerca nel servizio gli altri punti che usano il database fuori dalla transazione aperta.
+2. **AFT e cambio di medico nella dimostrazione.** Un secondo studio e un secondo medico titolare, per provare la condivisione nell'AFT (D161) e il cambio di medico dentro lo studio (D200).
