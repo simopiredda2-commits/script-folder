@@ -1172,3 +1172,11 @@ Prove: regole (`packages/rules/test/regole.test.ts`), servizio con la ranitidina
 - **Non verificato.** La corrispondenza con la forma chiesta dal decreto («OCR-A, ECMA, tipo 1») e la lettura con un lettore ottico: servono una stampa vera e la verifica in farmacia. Le posizioni sulla pagina restano quelle di oggi, in attesa delle specifiche di stampa del 1/3/2016 (D97).
 
 Prove: il PDF incorpora l'OCR-A e non più il Courier (`apps/api/test/promemoria.test.ts`); il file ha l'impronta registrata e tutti i caratteri dell'NRE e del codice fiscale (`apps/api/test/carattere-ocr-a.test.ts`); due sabotaggi. Guardato a vista su un promemoria con dati inventati.
+
+**D212 · Risposte della fermata dopo l'unione della #17.** Via alla #18, unita. Per le PPIP Simone ha risposto: «Ok adesso ma predisponiamo il tutto in modo che venga aggiornato dopo che regione e asl ci dicono come procedere». Interpretata così:
+
+- **Elenco delle prestazioni come dato con versione e data di efficacia**, come le altre banche dati: l'allegato 6 dell'ACN in vigore, l'AIR del Piemonte e, quando l'ASL lo dirà, l'accordo aziendale. Un accordo nuovo è un file nuovo da importare, senza cambiare il codice.
+- **Riepilogo del mese costruito dai dati registrati**, con un'esportazione il cui formato è anch'esso un dato. Quando Regione e ASL diranno come vogliono il riepilogo, si aggiunge il loro formato.
+- **Invio predisposto**: un'interfaccia con un simulatore, come per SAR, Sistema TS e AURA. Il collegamento vero al portale regionale si scrive quando arrivano le specifiche.
+
+Allegati 2 e 3 del DPCM LEA: li manda Simone. Dicitura del tipo di accesso: «Lasciamo dicitura sistema ts»; vale quella del Sistema TS, già nel programma (D79), e il documento vivo dei requisiti non si tocca.

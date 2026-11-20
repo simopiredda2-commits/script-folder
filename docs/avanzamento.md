@@ -26,7 +26,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
 - **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
-- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Pull request #18.
+- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL (D212).
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -51,14 +51,13 @@ _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 
 _C. Decisioni o materiali di Simone_
 
-1. **PPIP**: costruire adesso la registrazione e il riepilogo del mese, o aspettare la Regione (domanda della fermata).
-2. **Allegati 2 e 3 del DPCM LEA** (presidi) nella versione in vigore, dalla pagina LEA del Ministero: da qui risponde un controllo anti-robot («Gcore», 20/11/2026). Con quelli, le modifiche del 2026 ai LEA (D124).
+1. **PPIP**: si costruiscono adesso, predisposte per le istruzioni di Regione e ASL (risposta del 20/11/2026, D212).
+2. **Allegati 2 e 3 del DPCM LEA** (presidi) nella versione in vigore, dalla pagina LEA del Ministero: da qui risponde un controllo anti-robot («Gcore», 20/11/2026). Simone li manda (D212); con quelli, le modifiche del 2026 ai LEA (D124).
 3. **Ready!** e la versione «Full» (D78), poi l'Agenda.
 4. **Un file d'esempio dell'esportazione del programma di oggi**, senza dati veri, per l'importazione.
 5. **Banca dati farmaci con licenza** (per esempio Farmadati): note AIFA per AIC e i fatti oggi non noti (R3, R4, R8, R11).
 6. **Fornitore vero di email e SMS**; dove ospitare il servizio, con i salvataggi cifrati (D166).
-7. **Dicitura del tipo di accesso** nella versione viva dei requisiti (D79).
-8. Revisione di un avvocato prima del lancio.
+7. Revisione di un avvocato prima del lancio.
 
 ## Come provarlo
 
@@ -813,7 +812,9 @@ Alla ripresa del 20/11/2026, con la richiesta di Simone di chiudere in fretta e 
 
 **Non provato**: la R22 nel browser, perché la ricetta mostra i problemi delle regole tutti allo stesso modo; un'anagrafica vera con una confezione che passa da «Autorizzata» a «Sospesa»; la stampa vera e la lettura ottica dell'OCR-A; WebKit e Firefox su questa macchina (li prova la CI).
 
-**Prossimo passo**: pull request #18 e fermata.
+**Su GitHub**: il primo giro della #18 è caduto al controllo della formattazione. Un riallineamento di prettier su `docs/banche-dati.md` era rimasto fuori dal commit: le prove su questa macchina leggevano il file sul disco. Corretto con un commit a parte; poi tutto verde (TypeScript, WebKit, Firefox, `sync/`).
+
+**Prossimo passo**: fatto: pull request #18 unita con il via di Simone. Poi le PPIP (D212).
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -1046,14 +1047,23 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Fermata dopo il blocco D210–D211 (pull request #18):
+Si scrivono alla fine del blocco delle PPIP (D212).
 
-1. **Via** all'unione della #18.
-2. **PPIP**: costruire adesso la registrazione in cartella e il riepilogo del mese, dall'ACN in vigore e dall'AIR Piemonte 2024, lasciando l'invio al portale regionale a quando la Regione dirà come; oppure aspettare la Regione e l'ASL.
-3. **Allegati 2 e 3 del DPCM LEA** (presidi): da qui il sito del Ministero non si legge. Simone può mandarli, come gli altri allegati.
-4. **Versione viva dei requisiti**: aggiornare la dicitura del tipo di accesso (D79).
+## Risposte della fermata dopo l'unione della #17 (20/11/2026)
 
-Restano le verifiche alla fine della Dr.ssa Rocca, nell'elenco «Che cosa resta aperto».
+Simone ha risposto con il pulsante il 20/11/2026, dopo il riavvio della sessione.
+
+- **Via**: «Via: unisci». Pull request #18 unita in `main` il 20/11/2026 (commit c4badef), con le prove verdi su GitHub dell'ultimo commit (TypeScript, WebKit, Firefox e `sync/`).
+- **PPIP**: «Ok adesso ma predisponiamo il tutto in modo che venga aggiornato dopo che regione e asl ci dicono come procedere». Da fare adesso, in modo che le istruzioni di Regione e ASL si aggiungano senza rifare il lavoro (D212).
+- **Allegati 2 e 3 del DPCM LEA**: «Te li mando». Si trascrivono quando arrivano, come gli allegati 7 e 8.
+- **Dicitura del tipo di accesso**: «Lasciamo dicitura sistema ts». Vale la dicitura del Sistema TS, che il programma usa già (D79); il documento vivo dei requisiti non si tocca.
+
+## Domande della fermata dopo l'unione della #17 (chiuse)
+
+1. **Via** all'unione della #18: A. Via: unisci (consigliata); B. prima delle modifiche; C. fermati qui.
+2. **PPIP**: A. adesso, l'invio al portale regionale quando la Regione dirà come (consigliata); B. aspettiamo Regione e ASL; C. fuori dalla prima versione.
+3. **Allegati 2 e 3 del DPCM LEA**: A. Simone li manda (consigliata); B. non servono adesso.
+4. **Dicitura del tipo di accesso nei requisiti vivi**: A. una proposta di modifica nel documento (consigliata); B. la cambia Simone; C. resta com'è.
 
 ## Risposte della fermata dopo l'unione della #16 (20/11/2026)
 
