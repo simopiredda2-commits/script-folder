@@ -8,6 +8,7 @@ import {
 } from '../components/common';
 import { Icon } from '../components/Icon';
 import { ServiceResultText } from '../components/ServiceResult';
+import { RegistryDetails } from '../components/Registries';
 import { isSuspended, ShortageNote, SuspendedNote } from '../components/Shortage';
 import { query } from '../lib/api';
 import { money } from '../lib/format';
@@ -172,6 +173,7 @@ export function DataSearchPage() {
                     </div>
                     {isSuspended(d.adminState) && <SuspendedNote />}
                     {d.shortage && <ShortageNote shortage={d.shortage} details />}
+                    <RegistryDetails registries={d.registries ?? []} />
                   </div>
                   <button
                     type="button"

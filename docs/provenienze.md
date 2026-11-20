@@ -31,7 +31,7 @@ Da dove viene ogni contenuto del repository e del programma. Serve a mostrare du
 
 ### Da dove vengono gli estratti delle banche dati d'esempio
 
-File interi letti il 18/11/2026; per la lista di trasparenza e i farmaci carenti il 19/11/2026; per la confezione sospesa dell'anagrafica (ranitidina, D205) il 20/11/2026. Nel repository ci sono solo le righe scelte (D148, D202, D205). Una verifica una tantum ha confrontato ogni riga degli estratti con il file intero da cui viene: tutte identiche, byte per byte.
+File interi letti il 18/11/2026; per la lista di trasparenza e i farmaci carenti il 19/11/2026; per due confezioni dell'anagrafica (ranitidina sospesa, D205; ENTRESTO, D206) e per l'elenco dei registri e piani attivi (D206) il 20/11/2026. Nel repository ci sono solo le righe scelte (D148, D202, D205, D206). Una verifica una tantum ha confrontato ogni riga degli estratti con il file intero da cui viene: tutte identiche, byte per byte.
 
 | File                                                        | Indirizzo                                                    | Byte       | SHA-256                                                            |
 | ----------------------------------------------------------- | ------------------------------------------------------------ | ---------- | ------------------------------------------------------------------ |
@@ -41,6 +41,7 @@ File interi letti il 18/11/2026; per la lista di trasparenza e i farmaci carenti
 | AIFA, `Classe-H_per_principio-attivo_30-6-2026.csv`         | `https://www.aifa.gov.it/documents/20142/3815901/…`          | 396.740    | `8422e0a55e2cd5cd1bcdb053e9832fc69cc9b128e585925be135771fb1426bae` |
 | AIFA, `Lista_farmaci_equivalenti.csv` (16 novembre 2026)    | `https://www.aifa.gov.it/documents/20142/825643/…`           | 1.764.425  | `f95aff340397114274f03eab5d3600d9607a1ade12baacdb7572fa74eff4a712` |
 | AIFA, `elenco_medicinali_carenti.csv` (17/11/2026)          | `https://www.aifa.gov.it/documents/20142/847339/…`           | 900.804    | `a75dfb3d29ea282dcf6c48a9bdcb989b12bd3cdeaa6e3eeede19890dd0997092` |
+| AIFA, `Elenco_Registri_PT_attivi_19.11.2026.csv`            | `https://www.aifa.gov.it/documents/20142/3258518/…`          | 297.634    | `7e860e1061889a81e9f03f75b2cc8367857b37683c91abde647d2e8b081273e4` |
 | Regione Piemonte, «Farmaci PHT – oggetto di DPC» (9/7/2026) | `https://www.regione.piemonte.it/web/media/57684/download`   | 530.105    | `8c7d006876a2b953cf09dd4738a1f7198cdc87d7b392eb55a05512c60d9e1fed` |
 
 Licenza dei dati AIFA: CC BY 4.0 con l'obbligo di citare la fonte (https://www.aifa.gov.it/open-data). Il PDF della Regione non è nel repository: c'è solo la riga trascritta (principio attivo, ATC, nota, piano).

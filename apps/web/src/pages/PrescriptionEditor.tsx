@@ -10,6 +10,7 @@ import {
 } from '../components/common';
 import { Icon } from '../components/Icon';
 import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
+import { RegistryNote, type DrugRegistry } from '../components/Registries';
 import {
   isSuspended,
   ShortageNote,
@@ -55,6 +56,8 @@ export interface Drug {
   shortage?: DrugShortage | null;
   /** Stato amministrativo della confezione nell'anagrafica AIFA in vigore (D205). */
   adminState?: string | null;
+  /** Registri e piani terapeutici AIFA attivi per lo stesso ATC (D206). */
+  registries?: DrugRegistry[];
 }
 
 export type Service = ServiceResultData;
@@ -382,6 +385,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   <div className="codice tenue">AIC {d.aic}</div>
                   {isSuspended(d.adminState) && <SuspendedNote />}
                   {d.shortage && <ShortageNote shortage={d.shortage} />}
+                  <RegistryNote registries={d.registries ?? []} />
                 </div>
                 <button
                   type="button"

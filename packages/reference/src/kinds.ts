@@ -54,6 +54,29 @@ export const KINDS = {
       adminState: { type: 'text' },
     },
   },
+  /**
+   * Registri di monitoraggio e piani terapeutici AIFA attivi (D206): una riga per farmaco e
+   * indicazione. Il file non ha l'AIC: i registri si collegano ai farmaci per ATC.
+   */
+  registri_aifa: {
+    label: 'Registri e piani terapeutici AIFA',
+    fields: {
+      /** Il farmaco del registro, come lo scrive AIFA. */
+      name: { type: 'text', required: true },
+      activeIngredient: { type: 'text' },
+      atc: ATC,
+      /** «Indicazione rimborsata», con le parole dell'elenco. */
+      reimbursedIndication: { type: 'text' },
+      condition: { type: 'text' },
+      /** «Tipologia di Monitoraggio»: Registro, Piano Terapeutico, Registro semplificato… */
+      monitoringType: { type: 'text' },
+      monitoringState: { type: 'text' },
+      therapeuticArea: { type: 'text' },
+      monitoringStart: { type: 'date' },
+      /** Indirizzo della scheda sul sito di AIFA, come lo scrive l'elenco. */
+      sheetUrl: { type: 'text' },
+    },
+  },
   /** Elenchi AIFA dei farmaci di classe A e H, con prezzo e gruppo di equivalenza. */
   farmaci_classe: {
     label: 'Farmaci per classe (A e H)',

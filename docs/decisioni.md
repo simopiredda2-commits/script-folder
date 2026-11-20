@@ -1106,3 +1106,29 @@ Prove (permessi, servizio, interfaccia, browser con accessibilità anche su tabl
 - **Fonti.** L'anagrafica e le liste di classe di AIFA, già importate; l'elenco DPC della Regione (trascrizione). La nota AIFA non ha ancora una fonte per AIC (D202): le variazioni di nota valgono per i farmaci dell'elenco DPC.
 
 Prove nel servizio con versioni scritte a mano, nell'interfaccia e nel browser, con 17 sabotaggi. Non provato: due versioni vere dell'anagrafica o delle liste, una dopo l'altra (le prove usano versioni scritte a mano); quanto spesso AIFA sospende o toglie le confezioni.
+
+**D206 · Registri di monitoraggio e piani terapeutici AIFA nei dati del farmaco.** È la seconda parte della scelta di Simone alla fermata dopo l'unione della #15 («Sia altre variazioni AIFA che registri AIFA»). La fonte è la pagina AIFA «Liste dei farmaci», che `sync/` già scarica per intero: l'elenco dei registri e dei piani attivi (`Elenco_Registri_PT_attivi_19.11.2026.csv`, letto il 20/11/2026). Scelte:
+
+- **Che cosa si importa.** L'elenco dei registri attivi. Per ogni farmaco e indicazione:
+  - il tipo di monitoraggio: «Registro» 327, «Registro semplificato» 23, «Piano Terapeutico» 19, «Registro 648/96» 4, «Registro - Legge 326/2003 (fondo 5%)» 1;
+  - lo stato, la patologia, l'indicazione rimborsata, la data d'inizio e l'indirizzo della scheda.
+
+  Non si importano l'indicazione autorizzata e le colonne MEA (gli accordi di rimborso fra AIFA e le ditte): per la prescrizione conta l'indicazione rimborsata. Non si importa nemmeno l'elenco dei registri chiusi.
+
+- **Come si collega ai farmaci: per ATC.** Il file non ha l'AIC. Il principio attivo è scritto in modi diversi da un file all'altro: «Sacubitril e Valsartan» nei registri, «VALSARTAN/SACUBITRIL» nell'anagrafica. L'ATC invece è un codice, uguale nei due file. Così il registro di un farmaco di marca vale anche per gli equivalenti con lo stesso ATC. Il testo dice «per lo stesso ATC» e nomina il farmaco del registro; decide il medico (regola 3).
+- **Le righe in fondo al file.** Il file vero finisce con 33 righe vuote o quasi. Due hanno un valore spurio («Nessuno» fra le colonne MEA, «quan» nel principio attivo) e non hanno il farmaco. Una riga senza un campo obbligatorio fermerebbe il file (D61), e l'aggiornamento di ogni notte non entrerebbe mai.
+  - Opzione nuova delle mappature, `saltaRigheSenza`: le righe senza il farmaco si saltano, e il rapporto le conta («2 righe saltate perché senza name»).
+  - Sul file vero intero: 374 registri, nessun problema, 2 righe saltate.
+- **La scheda AIFA.** L'elenco dà l'indirizzo della scheda del registro o del piano (un archivio zip).
+  - Il collegamento si mostra solo se l'indirizzo è in https su aifa.gov.it o su un suo sottodominio: un file importato non può mettere nel programma un collegamento verso un altro sito.
+  - Nel file vero 361 indirizzi su 374 si collegano. Gli altri 13 sono in http: 12 su www.aifa.gov.it e uno sul vecchio agenziafarmaco.gov.it. Per quelli il collegamento non c'è, ma il resto della voce sì.
+  - Il collegamento si apre in una scheda nuova, senza l'indirizzo della cartella.
+- **Dove si vede.** Nella ricerca dei farmaci (ricetta, terapia, banche dati), una riga informativa in blu con il simbolo: «Registri e piani AIFA per lo stesso ATC: …». Nei dati del farmaco (Banche dati), ogni registro con tipo, stato, data, patologia, indicazione rimborsata e scheda. Nessuna regola nuova alla ricetta.
+- **Sito d'esempio.** Righe vere del file del 19/11/2026: i due piani di ENTRESTO (adulti e pediatrico), LEQVIO (indicazione su più righe), NEMLUVIO (ATC fra spazi) e tre righe della coda. Nell'anagrafica d'esempio c'è anche una confezione vera di ENTRESTO, dal file del 20/11/2026.
+
+Prove: lettura e mappatura, importazione e consultazione, indirizzo della scheda, interfaccia e browser, con 12 sabotaggi. Non provato:
+
+- lo scaricamento con `sync/` dal computer dello studio (la pagina è la stessa delle altre liste AIFA);
+- le schede zip, che non sono state aperte;
+- gli indirizzi in http, che non sono stati provati né trasformati in https;
+- se il collegamento per ATC basta per i farmaci in associazione che hanno un ATC di gruppo.

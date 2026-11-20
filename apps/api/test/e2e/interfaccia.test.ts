@@ -2452,6 +2452,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByText('Confezione sospesa secondo l’anagrafica AIFA delle confezioni.')
       .waitFor();
     await check(page, 'ricerca dei farmaci con una confezione sospesa', true);
+    // Registri e piani AIFA (D206): ENTRESTO ha due piani terapeutici nell'elenco d'esempio (righe vere).
+    await page.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('entresto');
+    const entresto = page.locator('.risultato').filter({ hasText: 'ENTRESTO' });
+    const sheet = entresto.getByRole('link', { name: 'scheda di ENTRESTO sul sito di AIFA' });
+    await sheet.waitFor();
+    expect(await sheet.getAttribute('href')).toBe(
+      'https://www.aifa.gov.it/documents/20142/2152764/Scheda_ENTRESTO_HF_07.12.2023.zip',
+    );
+    expect(await sheet.getAttribute('rel')).toBe('noreferrer');
+    await entresto
+      .getByText(/^ENTRESTO PEDIATRICO: Piano Terapeutico, attivo dal 04\/09\/2025\./)
+      .waitFor();
+    await check(page, 'ricerca dei farmaci con i registri AIFA', true);
     await withActor(t.db, s.users.titolare.id, (tx) =>
       tx
         .update(therapy)

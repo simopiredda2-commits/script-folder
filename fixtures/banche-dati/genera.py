@@ -10,8 +10,8 @@ servizio, così la prova non legge file scritti dallo stesso codice che li legge
 Che cosa è vero e che cosa è inventato (docs/provenienze.md):
 - AIFA: intestazioni e righe copiate senza cambiare un byte dai file AIFA letti il 18/11/2026
   (anagrafica delle confezioni e liste di classe A e H del 30/6/2026), il 19/11/2026 (lista di
-  trasparenza del 16 novembre 2026, farmaci carenti aggiornati al 17/11/2026) e il 20/11/2026 (una
-  confezione sospesa dell'anagrafica). Fonte: AIFA, dati aperti con licenza CC BY 4.0
+  trasparenza del 16 novembre 2026, farmaci carenti aggiornati al 17/11/2026) e il 20/11/2026 (due
+  confezioni dell'anagrafica e l'elenco dei registri e piani terapeutici attivi del 19/11/2026). Fonte: AIFA, dati aperti con licenza CC BY 4.0
   (https://www.aifa.gov.it/open-data). Le pagine HTML sono nostre.
 - Regione Piemonte, DPC: la riga di DULAGLUTIDE è quella dell'elenco «Farmaci PHT - oggetto di
   DPC» aggiornato al 9/7/2026; il PDF del sito d'esempio è un estratto di prova scritto qui.
@@ -122,8 +122,9 @@ def genera_istat() -> None:
 # nella classe H l'intestazione «Codice AIC» va a capo dentro le virgolette. Scelte: amlodipina,
 # metformina e atorvastatina con un equivalente di marca; dulaglutide (in DPC, nota 100, piano);
 # ceftriaxone in classe H; paracetamolo, che non è nelle liste di classe A e H; nella classe H due
-# prezzi che non sono numeri («-» e il prezzo dell'ossigeno a metro cubo). L'ultima riga, una
-# confezione di ranitidina «Sospesa», viene dal file scaricato il 20/11/2026 (D205).
+# prezzi che non sono numeri («-» e il prezzo dell'ossigeno a metro cubo). Le ultime due righe
+# vengono dal file scaricato il 20/11/2026: una confezione di ranitidina «Sospesa» (D205) e una di
+# ENTRESTO (sacubitril/valsartan), che ha i piani terapeutici AIFA dell'elenco dei registri (D206).
 ANAGRAFICA = [
     '"CODICE_AIC";"COD_FARMACO";"COD_CONFEZIONE";"DENOMINAZIONE";"DESCRIZIONE";"CODICE_DITTA";"RAGIONE_SOCIALE";"STATO_AMMINISTRATIVO";"TIPO_PROCEDURA";"FORMA";"CODICE_ATC";"PA_ASSOCIATI";"FORNITURA";"LINK_FI";"LINK_RCP"',
     '"038092019";"038092";"019";"AMLODIPINA DOC GENERICI";"5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC";898;"DOC GENERICI SRL";"Autorizzata";"Procedura Mutuo riconoscimento o Decentrata";"Compressa";"C08CA01";"AMLODIPINA BESILATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/38092/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/38092/stampati?ts=RCP"',
@@ -138,6 +139,7 @@ ANAGRAFICA = [
     '"025202096";"025202";"096";"ROCEFIN";"1 G/10 ML POLVERE E SOLVENTE PER SOLUZIONE INIETTABILE PER USO ENDOVENOSO- 1 FLACONCINO POLVERE + 1 FIALA SOLVENTE DA 10 ML";108;"ROCHE S.P.A.";"Autorizzata";"Procedura Nazionale";"Polvere e solvente per soluzione iniettabile";"J01DD04";"CEFTRIAXONE SODICO";"Medicinali soggetti a prescrizione medica limitativa, da rinnovare volta per volta, vendibili al pubblico su prescrizione di centri ospedalieri o di specialisti";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/108/farmaci/25202/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/108/farmaci/25202/stampati?ts=RCP"',
     '"012745093";"012745";"093";"TACHIPIRINA";"500 MG COMPRESSE-20 COMPRESSE";219;"AZIENDE CHIMICHE RIUNITE ANGELINI FRANCESCO A.C.R.A.F. S.P.A.";"Autorizzata";"Procedura Nazionale";"Compressa";"N02BE01";"PARACETAMOLO";"Medicinali non soggetti a prescrizione medica ma non da banco";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/219/farmaci/12745/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/219/farmaci/12745/stampati?ts=RCP"',
     '"034471021";"034471";"021";"RANITIDINA DOC GENERICI";"300 MG COMPRESSE RIVESTITE CON FILM- 20 COMPRESSE";898;"DOC GENERICI SRL";"Sospesa";"Procedura Nazionale";"Compressa rivestita con film";"A02BA02";"RANITIDINA CLORIDRATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/34471/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/34471/stampati?ts=RCP"',
+    '"044558031";"044558";"031";"ENTRESTO";"49 MG/51 MG - COMPRESSA RIVESTITA CON FILM - USO ORALE - BLISTER (PVC/PVDC) - 56 COMPRESSE";4789;"NOVARTIS EUROPHARM LIMITED";"Autorizzata";"Procedura Centralizzata";"Compressa rivestita con film";"C09DX04";"VALSARTAN/SACUBITRIL";"Medicinali soggetti a prescrizione medica limitativa, vendibili al pubblico su prescrizione di centri ospedalieri o di specialisti";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/4789/farmaci/44558/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/4789/farmaci/44558/stampati?ts=RCP"',
 ]
 
 CLASSE_A = [
@@ -185,6 +187,23 @@ CARENTI = [
 ]
 
 
+# Registri di monitoraggio e piani terapeutici AIFA attivi (D206): righe copiate dal file
+# Elenco_Registri_PT_attivi_19.11.2026.csv letto il 20/11/2026, in utf-8 con BOM e \r\n come il file
+# vero. L'intestazione; i due piani di ENTRESTO (adulti e pediatrico, ATC C09DX04); LEQVIO, con
+# l'indicazione che va a capo dentro le virgolette; NEMLUVIO, con l'ATC scritto fra spazi; e tre
+# righe della coda del file, vuote o quasi, che l'importazione salta.
+REGISTRI = [
+    '\ufeffScheda;Farmaco;Principio attivo;Codice ATC;Indicazione autorizzata;Indicazione rimborsata;Patologia;Tipologia di Monitoraggio;Stato del Monitoraggio;Area terapeutica;Data inizio monitoraggio;Tipologia MEA;Stato MEA;Data inizio MEA;Data fine validità MEA',
+    'https://www.aifa.gov.it/documents/20142/3041382/PT_Entresto_pediatrico_04.09.2025.zip;ENTRESTO PEDIATRICO;Sacubitril valsartan;C09DX04;Entresto è indicato in bambini ed adolescenti da un anno di età in poi per il trattamento dell’insufficienza cardiaca sintomatica cronica con disfunzione sistolica ventricolare sinistra.;Entresto è indicato in bambini ed adolescenti da un anno di età in poi per il trattamento dell’insufficienza cardiaca sintomatica cronica con disfunzione sistolica ventricolare sinistra.;INSUFFICIENZA CARDIACA CRONICA SINTOMATICA;Piano Terapeutico;Attivo;Malattie del sistema circolatorio;04/09/2025;Nessuno;;;',
+    'https://www.aifa.gov.it/documents/20142/2152764/Scheda_ENTRESTO_HF_07.12.2023.zip;ENTRESTO;Sacubitril e Valsartan;C09DX04;Entresto è indicato in pazienti adulti per il trattamento dell’insufficienza cardiaca sintomatica cronica con ridotta frazione di eiezione.;Entresto è indicato in pazienti adulti per il trattamento dell’insufficienza cardiaca sintomatica cronica con ridotta frazione di eiezione.;INSUFFICIENZA CARDIACA CRONICA SINTOMATICA;Piano Terapeutico;Attivo;Malattie del sistema circolatorio;12/03/2017;Nessuno;;;',
+    'https://www.aifa.gov.it/documents/20142/3041382/LEQVIO-inclisiran_PTwb_semplificato_04.09.2025.zip;LEQVIO;inclisiran;C10AX16;"Leqvio è indicato in adulti con ipercolesterolemia primaria (eterozigote familiare e non familiare) o dislipidemia mista,\nin aggiunta alla dieta:\n· in associazione ad una statina o una statina con altre terapie ipolipemizzanti in pazienti non in grado di raggiungere gli obiettivi per l\'LDL-C con la dose massima tollerata di una statina, oppure\n- in monoterapia o in associazione ad altre terapie ipolipemizzanti in pazienti intolleranti alle statine o per i quali una statina è controindicata.";"Leqvio è indicato in adulti \n- in prevenzione primaria in pazienti di età ≤80 aa con ipercolesterolemia familiare eterozigote e livelli di LDL-C ≥130 mg/dL nonostante terapia da almeno 6 mesi con statina ad alta potenza alla massima dose tollerata + ezetimibe oppure con dimostrata intolleranza alle statine (vedere successivamente la definizione di intolleranza) e/o all\'ezetimibe;\n- in prevenzione secondaria in pazienti di età ≤80 aa con ipercolesterolemia familiare eterozigote o ipercolesterolemia non familiare o dislipidemia mista e livelli di LDL-C ≥70 mg/dL nonostante terapia da almeno 6 mesi con statina ad alta potenza alla massima dose tollerata + ezetimibe oppure dopo una sola rilevazione di C-LDL in caso di IMA recente (ultimi 12 mesi) o eventi CV multipli oppure con dimostrata intolleranza alle statine (vedere successivamente la definizione di intolleranza) e/o all\'ezetimibe.";IPERCOLESTEROLEMIA;Piano Terapeutico;Attivo;Malattie del sistema endocrino e disordini metabolici e nutrizionali;04/09/2025;Nessuno;;;',
+    'https://www.aifa.gov.it/documents/20142/3730605/PT_web_NEMLUVIO_29.05.2026.zip;NEMLUVIO;Nemolizumab; D11AH12 ;Nemluvio è indicato per il trattamento di adulti con prurigo nodulare da moderata a grave eleggibili per la terapia sistemica;Nemluvio è indicato per il trattamento di adulti con prurigo nodulare (PN) grave eleggibili per la terapia sistemica che presentano tutte le seguenti caratteristiche:- valutazione Numerica del Picco di Prurito (Peak pruritus numeric rating scale -PP NRS) ≥ 7- numero di lesioni nodulari superiore o uguale a 20- Investigator’s global assessment (IGA) = 4 (SEVERE);PRURIGO NODULARE;Piano Terapeutico;Attivo;Malattie della pelle e del tessuto subcutaneo;29/05/2026;Nessuno;;;',
+    ';;;;;;;;;;;;;;',
+    ';;;;;;;;;;;Nessuno;;;',
+    ';;quan;;;;;;;;;;;;',
+]
+
+
 def genera_aifa() -> None:
     pagina = """<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Liste dei farmaci (esempio)</title></head>
 <body><h1>Liste dei farmaci (pagina d'esempio)</h1><ul>
@@ -193,6 +212,7 @@ def genera_aifa() -> None:
 <li><a href="/aifa/documents/20142/3815901/Classe-H_per_principio-attivo_30-6-2026.csv">Classe H (estratto)</a></li>
 <li><a href="/aifa/documents/20142/825643/Lista_farmaci_equivalenti.csv">Lista di trasparenza (estratto)</a></li>
 <li><a href="/aifa/documents/20142/847339/elenco_medicinali_carenti.csv">Farmaci carenti (estratto)</a></li>
+<li><a href="/aifa/documents/20142/3258518/Elenco_Registri_PT_attivi_19.11.2026.csv">Registri e piani terapeutici attivi (estratto)</a></li>
 </ul></body></html>
 """
     scrivi(SITO / "aifa" / "liste-dei-farmaci.html", pagina.encode("utf-8"))
@@ -203,6 +223,7 @@ def genera_aifa() -> None:
     documenti = SITO / "aifa" / "documents" / "20142"
     scrivi(documenti / "825643" / "Lista_farmaci_equivalenti.csv", ("\r\n".join(TRASPARENZA) + "\r\n").encode("cp1252"))
     scrivi(documenti / "847339" / "elenco_medicinali_carenti.csv", ("\r\n".join(CARENTI) + "\r\n").encode("cp1252"))
+    scrivi(documenti / "3258518" / "Elenco_Registri_PT_attivi_19.11.2026.csv", ("\r\n".join(REGISTRI) + "\r\n").encode("utf-8"))
 
 
 # --------------------------------------------------------------------------- Regione Piemonte (PDF di prova)

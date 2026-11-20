@@ -9,6 +9,7 @@ import {
   type DatasetVersion,
 } from '../components/common';
 import { Icon } from '../components/Icon';
+import { RegistryNote } from '../components/Registries';
 import { isSuspended, ShortageNote, SuspendedNote } from '../components/Shortage';
 import { api, ApiError, query } from '../lib/api';
 import { date, studioToday, THERAPY_KIND } from '../lib/format';
@@ -373,6 +374,7 @@ function DrugChooser({
               <div className="codice tenue">AIC {d.aic}</div>
               {isSuspended(d.adminState) && <SuspendedNote />}
               {d.shortage && <ShortageNote shortage={d.shortage} />}
+              <RegistryNote registries={d.registries ?? []} />
             </div>
             <button type="button" className="pulsante" onClick={() => onChoose(drugPatch(d))}>
               <Icon name="fatto" /> <span>Scegli</span>

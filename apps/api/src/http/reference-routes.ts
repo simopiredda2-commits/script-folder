@@ -20,6 +20,7 @@ const DRUG_KINDS: DatasetKind[] = [
   'farmaci_dpc',
   'farmaci_trasparenza',
   'farmaci_carenti',
+  'registri_aifa',
 ];
 
 /**

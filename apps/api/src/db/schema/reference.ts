@@ -149,6 +149,29 @@ export const refDrugShortage = pgTable(
   (t) => [index().on(t.datasetId, t.aic)],
 );
 
+/**
+ * Registri di monitoraggio e piani terapeutici AIFA attivi (D206): una riga per farmaco e
+ * indicazione, senza AIC. Si collegano ai farmaci per ATC.
+ */
+export const refDrugRegistry = pgTable(
+  'ref_drug_registry',
+  {
+    id: rowId(),
+    datasetId: datasetId(),
+    name: text().notNull(),
+    activeIngredient: text(),
+    atc: text(),
+    reimbursedIndication: text(),
+    condition: text(),
+    monitoringType: text(),
+    monitoringState: text(),
+    therapeuticArea: text(),
+    monitoringStart: date(),
+    sheetUrl: text(),
+  },
+  (t) => [index().on(t.datasetId, t.atc)],
+);
+
 export const refDpcDrug = pgTable(
   'ref_dpc_drug',
   {
@@ -240,6 +263,7 @@ export const REFERENCE_TABLES = {
   farmaci_dpc: refDpcDrug,
   farmaci_trasparenza: refDrugTransparency,
   farmaci_carenti: refDrugShortage,
+  registri_aifa: refDrugRegistry,
   comuni: refMunicipality,
   prestazioni: refService,
   esenzioni: refExemption,

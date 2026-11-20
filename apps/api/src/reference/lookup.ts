@@ -15,13 +15,14 @@ import {
   type ServiceIndex,
 } from '@mmg/reference';
 import { shortageText, type DrugFacts } from '@mmg/rules';
-import { and, desc, eq, ilike, inArray, isNotNull, lte, or, type SQL } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
   refDiagnosis,
   refDpcDrug,
   refDrug,
   refDrugClass,
+  refDrugRegistry,
   refDrugShortage,
   refDrugTransparency,
   refExemption,
@@ -102,6 +103,11 @@ export interface DrugInfo {
    * «Sospesa»; D205); null se l'anagrafica non lo dice.
    */
   adminState: string | null;
+  /**
+   * Registri di monitoraggio e piani terapeutici AIFA attivi per lo stesso ATC (D206): il file non
+   * ha l'AIC. Vuoto se l'elenco non è importato o non ne ha.
+   */
+  registries: DrugRegistry[];
   /** I fatti che le regole guardano; i campi senza una fonte restano assenti (= non noti). */
   facts: DrugFacts;
 }
@@ -118,6 +124,41 @@ export interface DrugShortage {
   aifaNote: string | null;
   /** La carenza in parole alla data della consultazione, come nella R21. */
   text: string;
+}
+
+/** Un registro o un piano terapeutico AIFA, come lo dice l'elenco dei registri attivi (D206). */
+export interface DrugRegistry {
+  name: string;
+  activeIngredient: string | null;
+  atc: string | null;
+  /** «Tipologia di Monitoraggio» dell'elenco: Registro, Piano Terapeutico, Registro semplificato… */
+  type: string | null;
+  state: string | null;
+  condition: string | null;
+  /** «Indicazione rimborsata», con le parole dell'elenco. */
+  indication: string | null;
+  since: string | null;
+  /** La scheda sul sito di AIFA; null se l'indirizzo dell'elenco non è in https su aifa.gov.it. */
+  sheetUrl: string | null;
+}
+
+/**
+ * L'indirizzo di una scheda AIFA, solo se è in https su aifa.gov.it o un suo sottodominio: un
+ * collegamento in una pagina del programma non porta altrove, anche se un file importato lo
+ * dicesse (D206). Gli spazi e gli a capo intorno si tolgono; il resto resta com'è.
+ */
+export function safeAifaUrl(raw: string | null | undefined): string | null {
+  const text = (raw ?? '').trim();
+  if (!text) return null;
+  try {
+    const url = new URL(text);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === 'https:' && (host === 'aifa.gov.it' || host.endsWith('.aifa.gov.it'))
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Una terapia come la guarda A7: il farmaco e i fatti che la scheda ha registrato (D205). */
@@ -457,10 +498,53 @@ export class ReferenceData {
         transparencyRemark: pick(t.map((x) => x.remark)),
         shortage: shortage ? toShortage(shortage, date) : null,
         adminState: pick(d.map((x) => x.adminState)),
+        registries: [],
         facts,
       });
     }
+    await this.attachRegistries(out, date);
     return out;
+  }
+
+  /**
+   * I registri AIFA in vigore alla data, per ATC (D206). Il collegamento è per ATC e non per
+   * principio attivo: l'ATC dell'elenco è un codice, il nome del principio attivo è scritto in
+   * modi diversi nei file AIFA («Sacubitril e Valsartan», «VALSARTAN/SACUBITRIL»).
+   */
+  private async attachRegistries(drugs: Map<string, DrugInfo>, date: string) {
+    const atcs = [
+      ...new Set([...drugs.values()].map((d) => d.atc?.trim().toUpperCase()).filter(Boolean)),
+    ] as string[];
+    if (!atcs.length) return;
+    const ids = await this.ids('registri_aifa', date);
+    if (!ids.length) return;
+    const rows = await this.db
+      .select()
+      .from(refDrugRegistry)
+      .where(and(inArray(refDrugRegistry.datasetId, ids), inArray(refDrugRegistry.atc, atcs)))
+      // I più recenti prima; a parità di data, per nome e patologia: lo stesso ordine ogni volta.
+      .orderBy(
+        sql`${refDrugRegistry.monitoringStart} desc nulls last`,
+        refDrugRegistry.name,
+        refDrugRegistry.condition,
+        refDrugRegistry.id,
+      );
+    for (const info of drugs.values()) {
+      const atc = info.atc?.trim().toUpperCase();
+      info.registries = rows
+        .filter((r) => r.atc === atc)
+        .map((r) => ({
+          name: r.name,
+          activeIngredient: r.activeIngredient,
+          atc: r.atc,
+          type: r.monitoringType,
+          state: r.monitoringState,
+          condition: r.condition,
+          indication: r.reimbursedIndication,
+          since: r.monitoringStart,
+          sheetUrl: safeAifaUrl(r.sheetUrl),
+        }));
+    }
   }
 
   /**
