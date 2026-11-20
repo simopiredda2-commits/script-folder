@@ -286,6 +286,9 @@ export function RecordPage() {
         <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/presidi`}>
           <Icon name="terapia" /> <span>Presidi</span>
         </Link>
+        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/prestazioni-aggiuntive`}>
+          <Icon name="firma" /> <span>Prestazioni aggiuntive</span>
+        </Link>
         <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/seguito`}>
           <Icon name="specialistica" /> <span>Seguito delle prestazioni</span>
         </Link>

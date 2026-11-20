@@ -1172,3 +1172,55 @@ Prove: regole (`packages/rules/test/regole.test.ts`), servizio con la ranitidina
 - **Non verificato.** La corrispondenza con la forma chiesta dal decreto («OCR-A, ECMA, tipo 1») e la lettura con un lettore ottico: servono una stampa vera e la verifica in farmacia. Le posizioni sulla pagina restano quelle di oggi, in attesa delle specifiche di stampa del 1/3/2016 (D97).
 
 Prove: il PDF incorpora l'OCR-A e non più il Courier (`apps/api/test/promemoria.test.ts`); il file ha l'impronta registrata e tutti i caratteri dell'NRE e del codice fiscale (`apps/api/test/carattere-ocr-a.test.ts`); due sabotaggi. Guardato a vista su un promemoria con dati inventati.
+
+**D212 · Risposte della fermata dopo l'unione della #17.** Via alla #18, unita. Per le PPIP Simone ha risposto: «Ok adesso ma predisponiamo il tutto in modo che venga aggiornato dopo che regione e asl ci dicono come procedere». Interpretata così:
+
+- **Elenco delle prestazioni come dato con versione e data di efficacia**, come le altre banche dati: l'allegato 6 dell'ACN in vigore, l'AIR del Piemonte e, quando l'ASL lo dirà, l'accordo aziendale. Un accordo nuovo è un file nuovo da importare, senza cambiare il codice.
+- **Riepilogo del mese costruito dai dati registrati**, con un'esportazione il cui formato è anch'esso un dato. Quando Regione e ASL diranno come vogliono il riepilogo, si aggiunge il loro formato.
+- **Invio predisposto**: un'interfaccia con un simulatore, come per SAR, Sistema TS e AURA. Il collegamento vero (portale regionale o strumento dell'ASL) si scrive quando arrivano le specifiche.
+
+Allegati 2 e 3 del DPCM LEA: li manda Simone. Dicitura del tipo di accesso: «Lasciamo dicitura sistema ts»; vale quella del Sistema TS, già nel programma (D79), e il documento vivo dei requisiti non si tocca.
+
+**D213 · Prestazioni aggiuntive: come sono costruite (D212).** Le scelte di dettaglio. Dove gli atti tacciono, la scelta è fatta qui e lo dice. Documento: `docs/ppip.md`.
+
+- **Catalogo per giorno.** Vale il catalogo del giorno dell'esecuzione, con tutte le serie in vigore insieme: ACN, AIR e, quando ci sarà, l'accordo aziendale. Se lo stesso codice è in due serie, vale quella con la data di efficacia più recente: un accordo aziendale che cambia un compenso vale dalla sua data, e il passato resta com'era. Ogni prestazione registrata porta voce, compenso e versione della banca dati del suo giorno.
+- **Codici scelti qui.** Lettera della sezione più numero della voce dell'allegato (A1–A12, B1–B4); `AIR35.4` per la trasfusione dell'AIR. Al posto degli asterischi c'è il testo delle note.
+- **Controlli solo formali (regola 3).** La voce dev'essere nel catalogo di quel giorno; per la sezione B servono gli estremi dell'autorizzazione (comma 5); la data non può essere futura né dopo il decesso; luogo in studio o a domicilio (comma 2). La quantità va da 1 a 99: è un limite di formato, come D93, perché l'allegato non ne pone. Le condizioni di una voce (ADI, frigorifero, impianti fissi, autorizzazione complessiva delle vaccinazioni) non si controllano: le note della voce le ricordano.
+- **Chi fa che cosa.** Registrano e annullano i medici con accesso all'archivio e la segreteria confermata (D185). La distinta la manda solo il titolare (`ppip.send`), come la firma. Restano nel registro degli accessi, paziente per paziente, le letture e le registrazioni, gli annullamenti, la distinta, il CSV e gli invii.
+- **Niente si cancella.** Una prestazione si annulla con un motivo finché non è partita; dopo, la correzione si chiede all'ASL. Gli invii restano come sono partiti, con il contenuto mandato.
+- **Distinta del mese.** Contiene le prestazioni non annullate dei pazienti dell'archivio. Scade il 15 del mese dopo (comma 4) e si manda dal primo giorno del mese dopo. Partono solo le prestazioni non ancora inviate; un invio non accolto, o un'ASL non raggiungibile, le lascia da inviare. L'indirizzo è quello di residenza, come sul promemoria. Il totale resta vuoto se una voce non ha il compenso.
+- **CSV.** Il formato è un dato, in `apps/api/distinte/ppip-formati.json`. Oggi c'è il formato con i campi del comma 4, più codice, prestazione, quantità, luogo, autorizzazione e compenso. Il formato dell'ASL si aggiunge lì.
+- **Invio.** C'è l'interfaccia `AdditionalServicesPortal` con il simulatore. In produzione, con il simulatore, l'invio è spento e resta il CSV.
+- **Trascrizioni vere da controllare.** Hanno `controllato_da` vuoto, quindi non si usano finché una seconda persona non le confronta con gli atti (A8, D159). Chi le controlla è una domanda per la fermata.
+- **Testi fedeli agli atti.** Per le prestazioni aggiuntive, l'AIR 2024 nomina il portale regionale solo fra i compiti dei medici ad attività oraria (art. 30, comma 1). Altrove rimanda a uno strumento su supporto digitale dell'ASL, «come previsto per le prestazioni di cui all'Allegato 6» (art. 36, comma 6, sulle visite occasionali). L'interfaccia dice soltanto questo.
+
+Prove:
+
+- servizio, `apps/api/test/ppip.test.ts` (13). Comprende un accordo aziendale inventato che cambia un compenso da una data;
+- interfaccia, `apps/web/test/ppip.test.tsx` (4);
+- browser, «prestazioni aggiuntive (D212)» in `apps/api/test/e2e/interfaccia.test.ts`.
+
+31 sabotaggi, uno anche nel browser. Non provato: invio vero, formato dell'ASL, modulo regionale delle prestazioni multiple, controllo della trascrizione da parte di una seconda persona.
+
+**D214 · Logo su fondo scuro: icona gialla con il segno blu scuro.** Domanda di Simone del 20/11/2026: il logo giallo si leggerebbe? Il giallo dell'evidenziatore (`#FFE45C`) dà questi contrasti:
+
+- sul bianco, circa 1,3:1, quindi non si legge, e sulla carta sparisce;
+- sul blu notte di SCRIPT, circa 14:1;
+- come fondo, sotto il blu scuro, circa 10:1.
+
+Proposta: il giallo come fondo di un'icona, con il segno blu scuro sopra; sul chiaro resta il segno blu. Simone: «ok, allora icona gialla col segno blu scuro per le versioni su fondo scuro».
+
+- **Su fondo scuro** il segno è un quadratino giallo `#FFE45C` (angoli arrotondati) con al centro il segno nell'ombra di SCRIPT (`#1B237A`), che occupa tre quarti del lato. È la regola del giallo della palette (D69): solo come fondo, con sopra il blu scuro. Nella versione con il nome, il nome resta bianco.
+- **Allineamento** (verifica chiesta da Simone). Il segno era centrato come ingombro (6,6 unità di margine su 32 da ogni lato), ma sembrava basso: il corpo della cartella pesa in basso e la punta è sottile. Il baricentro del tratto stava 1,76 unità sotto il centro, misurato su un disegno a 1024 px; di lato solo 0,3 unità, cioè centrato. Il segno ora sale di 0,9 unità, metà dello scarto (`productMark.onDark.raise`): sembra al centro, e la punta resta lontana dal bordo. Confrontati a vista quattro spostamenti (0; 0,9; 1,3; 1,76) a 16, 32, 64 e 128 px: con tutto lo scarto il segno sembra alto.
+- **Su fondo chiaro** non cambia niente: il segno resta nella luce di SCRIPT (`#4D6BFE`), anche nell'interfaccia, che ha solo il tema chiaro (D11).
+- **Favicon**: nel tema chiaro del browser resta il segno blu; nel tema scuro diventa l'icona gialla (`prefers-color-scheme` dentro l'SVG). Chrome, Edge e Firefox la seguono; Safari non mostra le favicon SVG nelle schede.
+- **File**: `segno-su-scuro.svg`, `con-nome-su-scuro.svg` e la tavola `tavola-su-scuro.svg` in `packages/brand/assets/logo/`, generati da `pnpm --filter @mmg/brand logo:proposte` con i valori di `productMark.onDark` (`packages/brand/mark.ts`). Le proposte della prima fermata restano com'erano, come traccia.
+
+Prove (`packages/brand/test/logo-scelto.test.ts`):
+
+- i file su scuro hanno l'icona gialla e il segno blu scuro;
+- il segno sul giallo e il giallo sul fondo scuro superano 7:1;
+- nell'icona il segno è centrato di lato e alzato di `raise`, con la punta ad almeno tre quarti del margine di lato;
+- la favicon cambia nel tema scuro.
+
+Sei sabotaggi. Guardato a vista nei due temi a 16, 32 e 64 px. Non provato: l'icona su un tablet vero, e le favicon in Safari.

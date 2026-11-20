@@ -189,6 +189,19 @@ export function ArchivePage() {
             <Icon name="storico" /> <span>Apri i riepiloghi</span>
           </Link>
         </section>
+
+        <section className="riquadro" aria-labelledby="titolo-ppip-archivio">
+          <h2 id="titolo-ppip-archivio">
+            <Icon name="firma" /> Prestazioni aggiuntive
+          </h2>
+          <p>
+            La distinta del mese per l’ASL, con il CSV e l’invio (ACN, allegato 6): da mandare entro
+            il 15 del mese dopo.
+          </p>
+          <Link className="pulsante" to="/archivio/prestazioni-aggiuntive">
+            <Icon name="firma" /> <span>Apri la distinta</span>
+          </Link>
+        </section>
       </div>
       <GrantsSection archiveId={own.id} />
       <AlertsSection archiveId={own.id} />

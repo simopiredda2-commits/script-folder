@@ -26,7 +26,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
 - **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
-- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Pull request #18.
+- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214).
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -37,28 +37,31 @@ _A. Aspetta la Regione Piemonte, CSI Piemonte o un altro ente_
 3. **Certificati INPS veri**: credenziali del Sistema TS (D100–D103).
 4. **Fascicolo Sanitario Elettronico**: accreditamento del programma e valori delle tabelle (D133); licenza dei file ufficiali del Ministero (D131).
 5. **SPID e CIE**: accreditamento come fornitore di servizi (D109).
-6. **PPIP, l'invio**: l'AIR 2024 del Piemonte (DGR del 27/5/2024) le fa rendicontare «attraverso portale regionale», con lo strumento che predispone l'ASL; le prestazioni aggiunte dagli accordi aziendali sono dell'ASL. La registrazione in cartella è una domanda della fermata.
+6. **PPIP, come si manda la distinta** (D212, D213). Registrazione in cartella, distinta del mese e CSV ci sono. Mancano quattro cose da Regione e ASL; ognuna si aggiunge come dato o con l'interfaccia già pronta (`docs/ppip.md`):
+   - il canale: l'AIR 2024 nomina il portale regionale per i medici ad attività oraria (art. 30) e uno strumento su supporto digitale dell'ASL (art. 36, comma 6);
+   - il formato;
+   - il modulo regionale delle prestazioni multiple autorizzate;
+   - l'eventuale accordo aziendale con le prestazioni della sezione C.
 7. **Presidi**: modulo da consegnare all'ASL e percorsi dematerializzati (D123).
 8. **Flussi regionali** (diabete, vaccinazioni, PPIP): nei requisiti sono per la seconda versione.
 
 _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 
 1. Validazione clinica di tutte le regole (R1–R22) e verifica dei riferimenti normativi con un consulente: oggi «Validata: no».
-2. Le verifiche già annotate: ICD-9-CM, catalogo regionale con l'ASL, allegati 8 e 7, modello della patente, R19–R22, testi delle variazioni e dei registri AIFA.
+2. Le verifiche già annotate: ICD-9-CM, catalogo regionale con l'ASL, allegati 8 e 7, modello della patente, R19–R22, testi delle variazioni e dei registri AIFA, le 17 voci delle PPIP (D213), e come la Dr.ssa Rocca manda oggi la distinta.
 3. Primo giro di `sync/` dal computer dello studio, con le intestazioni ISTAT (D55, D56); due versioni vere dell'anagrafica AIFA una dopo l'altra.
 4. Stampa vera: promemoria con l'OCR-A e codici a barre letti da un lettore (D211); ricetta rossa sui moduli veri.
 5. Lettori di schermo e tablet veri; WebKit e Firefox anche fuori dalla CI; un riavvio vero di Postgres con il servizio acceso (D207); una giornata di lavoro con la Dr.ssa Rocca.
 
 _C. Decisioni o materiali di Simone_
 
-1. **PPIP**: costruire adesso la registrazione e il riepilogo del mese, o aspettare la Regione (domanda della fermata).
-2. **Allegati 2 e 3 del DPCM LEA** (presidi) nella versione in vigore, dalla pagina LEA del Ministero: da qui risponde un controllo anti-robot («Gcore», 20/11/2026). Con quelli, le modifiche del 2026 ai LEA (D124).
+1. **PPIP**: costruite, predisposte per le istruzioni di Regione e ASL (D212, D213). Resta da dire chi controlla le 17 voci trascritte: senza il controllo il catalogo non si usa.
+2. **Allegati 2 e 3 del DPCM LEA** (presidi) nella versione in vigore, dalla pagina LEA del Ministero: da qui risponde un controllo anti-robot («Gcore», 20/11/2026). Simone li manda (D212); con quelli, le modifiche del 2026 ai LEA (D124).
 3. **Ready!** e la versione «Full» (D78), poi l'Agenda.
 4. **Un file d'esempio dell'esportazione del programma di oggi**, senza dati veri, per l'importazione.
 5. **Banca dati farmaci con licenza** (per esempio Farmadati): note AIFA per AIC e i fatti oggi non noti (R3, R4, R8, R11).
 6. **Fornitore vero di email e SMS**; dove ospitare il servizio, con i salvataggi cifrati (D166).
-7. **Dicitura del tipo di accesso** nella versione viva dei requisiti (D79).
-8. Revisione di un avvocato prima del lancio.
+7. Revisione di un avvocato prima del lancio.
 
 ## Come provarlo
 
@@ -813,7 +816,58 @@ Alla ripresa del 20/11/2026, con la richiesta di Simone di chiudere in fretta e 
 
 **Non provato**: la R22 nel browser, perché la ricetta mostra i problemi delle regole tutti allo stesso modo; un'anagrafica vera con una confezione che passa da «Autorizzata» a «Sospesa»; la stampa vera e la lettura ottica dell'OCR-A; WebKit e Firefox su questa macchina (li prova la CI).
 
-**Prossimo passo**: pull request #18 e fermata.
+**Su GitHub**: il primo giro della #18 è caduto al controllo della formattazione. Un riallineamento di prettier su `docs/banche-dati.md` era rimasto fuori dal commit: le prove su questa macchina leggevano il file sul disco. Corretto con un commit a parte; poi tutto verde (TypeScript, WebKit, Firefox, `sync/`).
+
+**Prossimo passo**: fatto: pull request #18 unita con il via di Simone. Poi le PPIP (D212).
+
+### Dopo l'unione della #18 – Prestazioni aggiuntive (D212, D213)
+
+Risposta di Simone alla fermata del 20/11/2026: «Ok adesso ma predisponiamo il tutto in modo che venga aggiornato dopo che regione e asl ci dicono come procedere». Stesso branch, ripartito da `main` dopo l'unione della #18. Documento: `docs/ppip.md`.
+
+**Fatto**
+
+- **Fonti lette**, PDF scaricati il 20/11/2026 e registrati in `docs/provenienze.md`:
+  - l'allegato 6 dell'ACN 2022-2024 nella Gazzetta (S.O. n. 5 alla GU n. 24 del 30/1/2026, pagine 146 e 147, immagini lette con la lettura ottica e controllate a vista);
+  - l'accordo del 26/6/2026, che non cambia l'allegato 6;
+  - l'AIR 2024 del Piemonte (DGR 31-8647 del 27/5/2024).
+- **Catalogo come banca dati versionata**: tipo `prestazioni_aggiuntive`, una serie per livello.
+  - Trascrizioni: allegato 6 (16 voci) e AIR, art. 35, comma 4 (trasfusione in ADI o ADR, 55 €). Restano da controllare (A8).
+  - Vale il catalogo del giorno dell'esecuzione. Se un codice è in due serie, vale la più recente: un accordo aziendale si aggiunge come file, senza cambiare il codice. La prova lo fa con un accordo inventato che cambia un compenso da una data.
+- **In cartella**, «Prestazioni aggiuntive»:
+  - voci per sezione con il compenso, note e atto;
+  - per la sezione B gli estremi dell'autorizzazione;
+  - controlli formali su data, decesso, voce del giorno e quantità;
+  - annullamento con un motivo, finché la prestazione non è partita.
+  - Registrano i medici e la segreteria; tutto resta nel registro degli accessi.
+- **Distinta del mese** nell'archivio (da «Apri la distinta» e dai Riepiloghi):
+  - i campi del comma 4, per voce, con il totale e la scadenza del 15;
+  - CSV nel formato descritto in `apps/api/distinte/ppip-formati.json`;
+  - invio del titolare al simulatore, dopo il controllo, con esito e protocollo; spento in produzione con il simulatore.
+- **Dati del medico**: `ppip_record` e `ppip_report` nell'esportazione completa; prestazioni non cancellabili, invii non modificabili.
+- **Trovato dalla prova nel browser**: il collegamento del paziente nella distinta era più basso di 44 px; corretto come nelle tabelle delle prestazioni prescritte.
+- **Testi corretti sugli atti**: l'aiuto non dice più che le PPIP del medico a ciclo di scelta passano dal portale regionale; l'AIR lo dice solo per i medici ad attività oraria.
+- **Logo su fondo scuro (D214)**, chiesto da Simone durante il blocco.
+  - Su fondo scuro il segno diventa un'icona gialla con il segno blu scuro. Il giallo da solo sul bianco non si legge: circa 1,3:1.
+  - La favicon diventa l'icona gialla quando il browser è in tema scuro.
+  - Dopo la verifica dell'allineamento chiesta da Simone, il segno sale di 0,9 unità su 32 nell'icona. Centrato come ingombro, sembrava basso.
+  - Sul chiaro non cambia niente.
+- **Prove**:
+  - servizio: `apps/api/test/ppip.test.ts` (13);
+  - interfaccia: `apps/web/test/ppip.test.tsx` (4);
+  - browser: «prestazioni aggiuntive (D212)» in `apps/api/test/e2e/interfaccia.test.ts`, con accessibilità, bersagli e tablet;
+  - schermate 72 e 73;
+  - 31 sabotaggi, uno anche nel browser, più 6 per il logo su fondo scuro (D214).
+
+**Prove complete**: 144 file e 1687 prove TypeScript, più `sync/`, tutto verde; lint verde. Dopo la correzione dell'allineamento dell'icona: prove del marchio (174) e lint di nuovo verdi.
+
+**Non provato**:
+
+- l'invio vero, il formato dell'ASL e il modulo delle prestazioni multiple, che non si conoscono;
+- il controllo delle 17 voci da parte di una seconda persona;
+- le condizioni delle voci (ADI, frigorifero, impianti fissi), che il programma non controlla;
+- WebKit e Firefox su questa macchina (li prova la CI).
+
+**Prossimo passo**: pull request #19 e fermata.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -1046,14 +1100,27 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Fermata dopo il blocco D210–D211 (pull request #18):
+Dopo le PPIP (D212, D213), con il pulsante:
 
-1. **Via** all'unione della #18.
-2. **PPIP**: costruire adesso la registrazione in cartella e il riepilogo del mese, dall'ACN in vigore e dall'AIR Piemonte 2024, lasciando l'invio al portale regionale a quando la Regione dirà come; oppure aspettare la Regione e l'ASL.
-3. **Allegati 2 e 3 del DPCM LEA** (presidi): da qui il sito del Ministero non si legge. Simone può mandarli, come gli altri allegati.
-4. **Versione viva dei requisiti**: aggiornare la dicitura del tipo di accesso (D79).
+1. **Via** all'unione della #19: A. Via: unisci (consigliata); B. prima delle modifiche; C. fermati qui.
+2. **Chi controlla le 17 voci trascritte delle PPIP** (allegato 6 dell'ACN, pagine 146 e 147 del supplemento, e AIR, art. 35, comma 4)? Senza il controllo il catalogo non si usa. A. la Dr.ssa Rocca, che le usa (consigliata); B. Simone; C. più avanti.
+3. **Come manda oggi la distinta la Dr.ssa Rocca** (portale, file, carta)? A. Simone glielo chiede e manda il modulo o una schermata del portale (consigliata); B. lo chiediamo per scritto all'ASL; C. più avanti, intanto resta il CSV.
 
-Restano le verifiche alla fine della Dr.ssa Rocca, nell'elenco «Che cosa resta aperto».
+## Risposte della fermata dopo l'unione della #17 (20/11/2026)
+
+Simone ha risposto con il pulsante il 20/11/2026, dopo il riavvio della sessione.
+
+- **Via**: «Via: unisci». Pull request #18 unita in `main` il 20/11/2026 (commit c4badef), con le prove verdi su GitHub dell'ultimo commit (TypeScript, WebKit, Firefox e `sync/`).
+- **PPIP**: «Ok adesso ma predisponiamo il tutto in modo che venga aggiornato dopo che regione e asl ci dicono come procedere». Da fare adesso, in modo che le istruzioni di Regione e ASL si aggiungano senza rifare il lavoro (D212).
+- **Allegati 2 e 3 del DPCM LEA**: «Te li mando». Si trascrivono quando arrivano, come gli allegati 7 e 8.
+- **Dicitura del tipo di accesso**: «Lasciamo dicitura sistema ts». Vale la dicitura del Sistema TS, che il programma usa già (D79); il documento vivo dei requisiti non si tocca.
+
+## Domande della fermata dopo l'unione della #17 (chiuse)
+
+1. **Via** all'unione della #18: A. Via: unisci (consigliata); B. prima delle modifiche; C. fermati qui.
+2. **PPIP**: A. adesso, l'invio al portale regionale quando la Regione dirà come (consigliata); B. aspettiamo Regione e ASL; C. fuori dalla prima versione.
+3. **Allegati 2 e 3 del DPCM LEA**: A. Simone li manda (consigliata); B. non servono adesso.
+4. **Dicitura del tipo di accesso nei requisiti vivi**: A. una proposta di modifica nel documento (consigliata); B. la cambia Simone; C. resta com'è.
 
 ## Risposte della fermata dopo l'unione della #16 (20/11/2026)
 
@@ -2457,3 +2524,40 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D210 nell'interfaccia: il simbolo dell'informazione                                                           | common.tsx: simbolo dell'avviso                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D211: l'NRE in chiaro è in OCR-A                                                                              | pdf.ts: di nuovo il Courier                                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D211: il carattere è il file registrato                                                                       | SHA256SUMS: impronta cambiata                                                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: data dell'esecuzione non nel futuro                                                                     | service.ts: confronto con una data lontana                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: nessuna prestazione dopo il decesso                                                                     | service.ts: decesso ignorato                                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: catalogo del giorno dell'esecuzione                                                                     | service.ts: catalogo di oggi                                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: solo le voci del catalogo                                                                               | service.ts: voce sconosciuta presa come la prima                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: sezione B con gli estremi dell'autorizzazione (comma 5)                                                 | service.ts: controllo spento                                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: un annullamento solo                                                                                    | service.ts: controllo tolto                                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: una prestazione inviata non si annulla                                                                  | service.ts: invio ignorato                                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: le annullate escono dalla distinta                                                                      | service.ts: filtro tolto                                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: totale vuoto se manca un compenso                                                                       | service.ts: controllo tolto                                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: scadenza il 15 del mese dopo (comma 4)                                                                  | service.ts: il 16                                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: in produzione il simulatore non manda                                                                   | service.ts: controllo spento                                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: si manda solo un mese finito                                                                            | service.ts: controllo spento                                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: partono solo le prestazioni non inviate                                                                 | service.ts: partono tutte                                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: un invio non accolto le lascia da inviare                                                               | service.ts: segnate anche se rifiutate                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D213: a parità di codice vale la serie più recente                                                            | lookup.ts: vale la più vecchia                                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: la segreteria non manda la distinta                                                                     | permissions.ts: `ppip.send` alla segreteria                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: il medico con autorizzazione non manda la distinta                                                      | permissions.ts: `ppip.send` al sostituto                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: «può inviare» secondo il permesso                                                                       | ppip-routes.ts: sempre sì                                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: la distinta nel registro degli accessi, paziente per paziente                                           | ppip-routes.ts: azione sbagliata                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: le prestazioni non si cancellano                                                                        | migrazione 0040: trigger tolto                                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: gli invii non si modificano                                                                             | migrazione 0040: vietata solo la cancellazione                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: prestazioni nell'esportazione completa                                                                  | export.ts: tabella tolta                                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: invii nell'esportazione completa                                                                        | export.ts: tabella sotto un altro nome                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: date del CSV come nel formato                                                                           | ppip-formati.json: date AAAA-MM-GG                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: CSV con il codice fiscale (comma 4)                                                                     | ppip-formati.json: colonna tolta                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212: ogni colonna del formato usa un campo che esiste                                                        | ppip-formati.json: campo sbagliato                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212 nell'interfaccia: autorizzazione obbligatoria per la sezione B                                           | PpipPage.tsx: mai obbligatoria                                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212 nell'interfaccia: niente «Annulla» per le inviate                                                        | PpipPage.tsx: «Annulla» anche per le inviate                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212 nell'interfaccia: invio solo dopo il controllo della distinta                                            | PpipReportPage.tsx: pulsante sempre attivo                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212 nell'interfaccia: la segreteria non vede l'invio                                                         | PpipReportPage.tsx: invio a chiunque abbia prestazioni da inviare                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D212 nel browser: collegamenti della distinta alti 44 px                                                      | global.css: regola tolta                                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: il segno sul giallo è blu scuro e si legge                                                              | mark.ts: segno azzurro chiaro sul giallo                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: i file su fondo scuro hanno l'icona gialla                                                              | segno-su-scuro.svg: fondo dell'icona tolto                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: la favicon passa all'icona gialla nel tema scuro                                                        | favicon.svg (marchio e interfaccia): regola del tema scuro tolta                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: nell'icona il segno sale al centro ottico                                                               | segno-su-scuro.svg: segno al centro geometrico                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: la punta resta lontana dal bordo                                                                        | mark.ts e segno-su-scuro.svg: segno alzato di tutto lo scarto                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: il segno è centrato di lato                                                                             | segno-su-scuro.svg: segno spostato a destra                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

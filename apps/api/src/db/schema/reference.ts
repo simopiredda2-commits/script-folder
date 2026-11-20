@@ -225,6 +225,25 @@ export const refExemption = pgTable(
   (t) => [index().on(t.datasetId, t.code)],
 );
 
+/**
+ * Prestazioni aggiuntive (PPIP) con il compenso, per livello di accordo: allegato 6 dell'ACN,
+ * accordo integrativo regionale e, quando l'ASL lo dirà, accordo aziendale (D212).
+ */
+export const refAdditionalService = pgTable(
+  'ref_additional_service',
+  {
+    id: rowId(),
+    datasetId: datasetId(),
+    code: text().notNull(),
+    section: text().notNull(),
+    description: text().notNull(),
+    authorization: boolean().notNull(),
+    compensation: numeric({ precision: 12, scale: 2 }),
+    notes: text(),
+  },
+  (t) => [index().on(t.datasetId, t.code)],
+);
+
 export const refExemptionService = pgTable(
   'ref_exemption_service',
   {
@@ -269,6 +288,7 @@ export const REFERENCE_TABLES = {
   esenzioni: refExemption,
   esenzioni_prestazioni: refExemptionService,
   diagnosi: refDiagnosis,
+  prestazioni_aggiuntive: refAdditionalService,
 } as const;
 
 /**

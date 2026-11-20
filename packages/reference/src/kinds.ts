@@ -206,6 +206,28 @@ export const KINDS = {
     },
   },
   /** Esenzioni e prestazioni associate per il controllo del SAR (R17), da una trascrizione. */
+  /**
+   * Prestazioni aggiuntive (PPIP) con il loro compenso: l'allegato 6 dell'ACN della medicina
+   * generale in vigore, le aggiunte dell'accordo integrativo regionale e, quando l'ASL lo dirà,
+   * quelle dell'accordo aziendale. Una serie per livello, ognuna con la sua data di efficacia (D212).
+   */
+  prestazioni_aggiuntive: {
+    label: 'Prestazioni aggiuntive (PPIP)',
+    /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */
+    changeKey: ['code'],
+    fields: {
+      /** Lettera e numero del nomenclatore (A1, B4) o riferimento all'accordo regionale. */
+      code: { type: 'text', required: true },
+      /** Sezione del nomenclatore: A, B, oppure l'accordo che la aggiunge. */
+      section: { type: 'text', required: true },
+      description: { type: 'text', required: true },
+      /** Prestazione soggetta ad autorizzazione (sezione B dell'allegato 6). */
+      authorization: { type: 'boolean', required: true },
+      /** Compenso in euro come lo dice l'atto. */
+      compensation: { type: 'number' },
+      notes: { type: 'text' },
+    },
+  },
   esenzioni_prestazioni: {
     label: 'Esenzioni e prestazioni associate',
     /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */

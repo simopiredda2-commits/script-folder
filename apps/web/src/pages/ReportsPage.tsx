@@ -172,6 +172,11 @@ export function ReportsPage() {
           vaccinazione, con i nomi dei pazienti e senza testi clinici: ogni esportazione resta nel
           registro degli accessi, paziente per paziente.
         </p>
+        <p>
+          <Link to="/archivio/prestazioni-aggiuntive">
+            Prestazioni aggiuntive (PPIP): la distinta del mese per l’ASL
+          </Link>
+        </p>
       </form>
 
       {r.loading && !s && <Loading what="riepilogo" />}

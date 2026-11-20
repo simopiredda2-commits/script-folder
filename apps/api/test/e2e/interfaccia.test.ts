@@ -2472,4 +2472,95 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .where(eq(therapy.id, row!.id)),
     );
   });
+
+  it('prestazioni aggiuntive (D212): dalla cartella, distinta del mese con il CSV, invio simulato all’ASL', async () => {
+    // La distinta si manda per il mese finito: la prestazione è del 10 del mese scorso.
+    const [y, m] = studioDate(s.clock.now()).split('-').map(Number) as [number, number];
+    const month = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+    const performed = `${month}-10`;
+    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}`);
+    await page.getByRole('link', { name: 'Prestazioni aggiuntive', exact: true }).click();
+    await page.getByRole('heading', { level: 1, name: 'Prestazioni aggiuntive' }).waitFor();
+    await page.getByLabel('Data dell’esecuzione').fill(performed);
+    // B2 dell'allegato 6 (trascrizione d'esempio): con autorizzazione, 6,16 € per iniezione.
+    await page.getByLabel('Prestazione', { exact: true }).selectOption('B2');
+    const auth = page.getByLabel(/^Estremi dell’autorizzazione/);
+    await expect.poll(() => auth.evaluate((el) => (el as HTMLInputElement).required)).toBe(true);
+    await auth.fill('Distretto di prova, autorizzazione n. 1');
+    await page.getByLabel('Quantità').fill('3');
+    await page.getByLabel('A domicilio').check();
+    await page.getByText(/^Fonte: Accordo collettivo nazionale/).waitFor();
+    await check(page, 'nuova prestazione aggiuntiva', true);
+    await page.getByRole('button', { name: 'Registra la prestazione' }).click();
+    await page.getByText('Prestazione registrata.').waitFor();
+    const registered = page
+      .getByRole('region', { name: 'Prestazioni registrate' })
+      .getByRole('listitem')
+      .filter({ hasText: 'Ciclo curativo di iniezioni endovenose' });
+    await registered.getByText('Da inviare', { exact: true }).waitFor();
+    await check(page, 'prestazioni aggiuntive in cartella', true);
+
+    // Dall'archivio, la distinta del mese finito.
+    await gotoNewPage(page, `${base}/archivio`);
+    await page.getByRole('link', { name: 'Apri la distinta' }).click();
+    await page.getByRole('heading', { level: 1, name: 'Prestazioni aggiuntive' }).waitFor();
+    await page
+      .getByRole('status')
+      .getByText(
+        /^Distinta di .+: 1 prestazione, 18,48\s€; da inviare entro il 15\/\d{2}\/\d{4}\. 1 prestazione ancora da inviare\.$/,
+      )
+      .waitFor();
+    const distinta = page.getByRole('table', { name: /, una riga per prestazione$/ });
+    await distinta
+      .getByRole('row', { name: new RegExp(`${lastName} ${firstName}.*Autorizzazione:`) })
+      .waitFor();
+    await page
+      .getByRole('table', { name: 'Quantità e importo per voce del catalogo' })
+      .getByRole('row', { name: /^Totale 3 18,48\s€$/ })
+      .waitFor();
+    await check(page, 'distinta del mese delle prestazioni aggiuntive', true);
+    // Il CSV con i campi dell'allegato 6, con la sessione di chi guarda.
+    const href = await page
+      .getByRole('link', { name: 'Scarica la distinta in CSV' })
+      .getAttribute('href');
+    expect(href).toBe(
+      `/api/archivi/${s.archives.titolare}/ppip/esportazione?mese=${month}&formato=acn-allegato-6`,
+    );
+    const csv = await page.request.get(`${base}${href}`);
+    expect(csv.status()).toBe(200);
+    expect(csv.headers()['content-type']).toMatch(/^text\/csv/);
+    const lines = (await csv.text()).split('\r\n');
+    expect(lines[0]).toBe(
+      '﻿Data di effettuazione;Cognome;Nome;Indirizzo;Codice fiscale;Codice prestazione;Prestazione;Quantità;Luogo;Autorizzazione;Compenso unitario (euro);Importo (euro)',
+    );
+    expect(lines[1]).toMatch(
+      new RegExp(
+        `^10/${month.slice(5)}/${month.slice(0, 4)};${lastName};${firstName};.*;B2;Ciclo curativo di iniezioni endovenose \\(per ogni iniezione\\);3;A domicilio;Distretto di prova, autorizzazione n\\. 1;6,16;18,48$`,
+      ),
+    );
+
+    // L'invio, simulato, dopo il controllo della distinta.
+    const send = page.getByRole('button', { name: 'Invia all’ASL 1 prestazione' });
+    expect(await send.isDisabled()).toBe(true);
+    await page
+      .getByText(/^Invio simulato: il collegamento vero si scrive quando Regione e ASL/)
+      .waitFor();
+    await page.getByLabel(/^Ho controllato la distinta/).check();
+    await send.click();
+    await page
+      .getByText(/^Distinta inviata: 1 prestazione, protocollo SIM-PPIP-\d{4}-\d{2}-0001\.$/)
+      .waitFor();
+    await page
+      .getByRole('status')
+      .getByText(/0 prestazioni ancora da inviare\.$/)
+      .waitFor();
+    expect(await page.getByRole('button', { name: /^Invia all’ASL/ }).count()).toBe(0);
+    await check(page, 'distinta inviata all’ASL', true);
+
+    // In cartella la prestazione è inviata, con il protocollo, e non si annulla più.
+    await distinta.getByRole('link', { name: `${lastName} ${firstName}` }).click();
+    await page.getByRole('heading', { level: 1, name: 'Prestazioni aggiuntive' }).waitFor();
+    await registered.getByText(/^Inviata all’ASL \(SIM-PPIP-\d{4}-\d{2}-0001\)$/).waitFor();
+    expect(await registered.getByRole('button', { name: /^Annulla/ }).count()).toBe(0);
+  });
 });

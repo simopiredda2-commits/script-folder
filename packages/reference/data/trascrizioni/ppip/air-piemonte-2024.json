@@ -1,0 +1,13 @@
+{
+  "tipo": "prestazioni_aggiuntive",
+  "serie": "piemonte-prestazioni-aggiuntive",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "Accordo integrativo regionale del Piemonte per la medicina generale (pre-intesa del 21/5/2024, recepita con la DGR 27 maggio 2024, n. 31-8647, BU n. 22 del 30/5/2024), art. 35, comma 4",
+  "in_vigore_dal": "2025-01-01",
+  "trascritto_da": "Claude Code, dal testo del PDF della delibera",
+  "trascritto_il": "2026-11-20",
+  "controllato_da": null,
+  "nota": "PDF della delibera scaricato dal sito della Regione Piemonte il 20/11/2026, SHA-256 in docs/provenienze.md. L'accordo vale dal 1° gennaio 2025, come dice la delibera. Delle attività che l'accordo paga a prestazione, è l'unica legata alle prestazioni aggiuntive dell'allegato 6 dell'ACN («ad integrazione delle suddette prestazioni», art. 35, comma 4). Screening oncologici, ADP-PID e accessi in ADI hanno compensi e portali propri e non sono qui. Per la campagna antinfluenzale l'accordo rimanda alla tariffa delle vaccinazioni dell'allegato 6 (B4). Codice scelto qui (articolo e comma). Che cosa controllare: docs/ppip.md."
+}

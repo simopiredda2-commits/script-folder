@@ -109,6 +109,16 @@ Letti, non trascritti: l'elenco è precedente al nuovo nomenclatore (`docs/banch
 | D.D. 30/6/2022, n. 1167 (BU 28 del 14/7/2022), con l'allegato 1                             | `https://www.regione.piemonte.it/governo/bollettino/abbonati/2022/28/attach/dda1410001167_10100.pdf` | 536.690   | `85edd72aa9a2400c82d2e49e79c562538087eb6e6c4a7eb90c88bbdf1390c7a2` |
 | D.D. 6/7/2023, n. 1452 (BU 28 del 13/7/2023), con l'allegato C che sostituisce l'allegato 1 | `https://www.regione.piemonte.it/governo/bollettino/abbonati/2023/28/attach/dda1410001452_11200.pdf` | 1.365.280 | `817ae8f927c0d15c902ff57a013ab4e9b0d85796617e813018a7af0716c119b0` |
 
+### Prestazioni aggiuntive (D212)
+
+Le trascrizioni in `packages/reference/data/trascrizioni/ppip/` vengono dai PDF qui sotto, scaricati il 20/11/2026: le pagine 146 e 147 del supplemento con l'allegato 6 dell'ACN (pagine fatte di immagini, lette con la lettura ottica e controllate a vista voce per voce) e l'art. 35, comma 4, dell'AIR. Il PDF della GU n. 149 è servito solo a vedere che l'accordo del 26/6/2026 non cambia l'allegato 6. Sono testi di atti ufficiali (art. 5 della legge 633/1941) e i PDF restano fuori dal repository. Che cosa è diverso dagli atti: `docs/ppip.md`.
+
+| Documento                                                                                                   | Indirizzo                                                                                                | Byte       | SHA-256                                                            |
+| ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------ |
+| ACN della medicina generale 2022-2024, GU n. 24 del 30/1/2026, S.O. n. 5 (allegato 6 alle pagine 146 e 147) | `https://www.gazzettaufficiale.it/eli/gu/2026/01/30/24/so/5/sg/pdf`                                      | 11.908.960 | `299f781fc6d04d957e5609a921eac8542df248db3f716d75c8c39a559e66ab1a` |
+| ACN del 26/6/2026, GU n. 149 del 30/6/2026                                                                  | `https://www.gazzettaufficiale.it/eli/gu/2026/06/30/149/sg/pdf`                                          | 5.729.781  | `67a5ed74a7b923e1ac7e233cc5fb20888052f3cc5c2306483058f697fe705464` |
+| Regione Piemonte, DGR 27/5/2024, n. 31-8647 (BU n. 22 del 30/5/2024): AIR della medicina generale           | `https://www.regione.piemonte.it/governo/bollettino/abbonati/2024/22/attach/dgr_08647_1050_27052024.pdf` | 948.622    | `0fe98d47eaca48c1f33273e35824045f8f90f0197f5b5a00ac5cb5c7857e91d6` |
+
 ### Modelli ufficiali dei certificati (D158)
 
 Il testo dei file in `apps/api/modelli/` è copiato dagli atti, con la fonte in ogni file. Le pagine della Gazzetta sono state lette il 18/11/2026 e i PDF restano fuori dal repository.

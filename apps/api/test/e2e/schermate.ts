@@ -1022,6 +1022,46 @@ try {
     .waitFor();
   await shot(page, '71-registri-aifa', true);
 
+  // D212: prestazioni aggiuntive del mese scorso per due pazienti dimostrativi dell'archivio del
+  // medico, registrate dalla cartella; la distinta del mese è pronta da controllare e mandare.
+  const [yearNow, monthNow] = studioDate(new Date()).split('-').map(Number) as [number, number];
+  const ppipMonth =
+    monthNow === 1 ? `${yearNow - 1}-12` : `${yearNow}-${String(monthNow - 1).padStart(2, '0')}`;
+  const ppipPatients = (
+    await db.execute<{ id: string }>(sql`
+      select p.id from patient p join archive a on a.id = p.archive_id
+      where a.owner_user_id = ${me.id} and p.status = 'active' and p.deceased_on is null
+      order by p.last_name, p.first_name limit 2`)
+  ).rows;
+  if (ppipPatients.length < 2) throw new Error('Servono due pazienti dimostrativi attivi');
+  const ppipRows = [
+    { patient: ppipPatients[1]!.id, day: '06', code: 'A1', quantity: '1', home: false },
+    { patient: ppipPatients[1]!.id, day: '07', code: 'A2', quantity: '1', home: false },
+    { patient: ppipPatients[0]!.id, day: '12', code: 'B2', quantity: '5', home: true },
+    { patient: ppipPatients[0]!.id, day: '19', code: 'A4', quantity: '1', home: true },
+  ];
+  for (const r of ppipRows) {
+    await page.goto(`${base}/pazienti/${r.patient}/prestazioni-aggiuntive`);
+    await page.getByLabel('Data dell’esecuzione').fill(`${ppipMonth}-${r.day}`);
+    await page.getByLabel('Prestazione', { exact: true }).selectOption(r.code);
+    if (r.code.startsWith('B')) {
+      await page
+        .getByLabel(/^Estremi dell’autorizzazione/)
+        .fill('Distretto di prova, autorizzazione n. 12');
+    }
+    await page.getByLabel('Quantità').fill(r.quantity);
+    if (r.home) await page.getByLabel('A domicilio').check();
+    await page.getByRole('button', { name: 'Registra la prestazione' }).click();
+    await page.getByText('Prestazione registrata.').waitFor();
+  }
+  // In cartella: una vaccinazione della campagna in corso di registrazione, con la nota della voce.
+  await page.getByLabel('Prestazione', { exact: true }).selectOption('B4');
+  await page.getByText(/^Eseguibili con autorizzazione complessiva/).waitFor();
+  await shot(page, '72-prestazioni-aggiuntive-in-cartella', true);
+  await page.goto(`${base}/archivio/prestazioni-aggiuntive?mese=${ppipMonth}`);
+  await page.getByRole('table', { name: /, una riga per prestazione$/ }).waitFor();
+  await shot(page, '73-distinta-prestazioni-aggiuntive', true);
+
   await browser.close();
   await new Promise((ok) => web.close(ok));
   console.log(`Schermate in ${OUT}`);

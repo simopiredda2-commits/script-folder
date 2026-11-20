@@ -16,3 +16,4 @@ export * from './fse/x509';
 export * from './fse/jwt';
 export * from './fse/signer';
 export * from './aura';
+export * from './additional-services-portal';

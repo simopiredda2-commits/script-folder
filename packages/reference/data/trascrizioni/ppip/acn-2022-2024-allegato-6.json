@@ -1,0 +1,13 @@
+{
+  "tipo": "prestazioni_aggiuntive",
+  "serie": "acn-prestazioni-aggiuntive",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "Accordo collettivo nazionale per la disciplina dei rapporti con i medici di medicina generale, triennio 2022-2024 (intesa della Conferenza Stato-Regioni del 15/1/2026, Rep. atti n. 1/CSR; GU n. 24 del 30/1/2026, S.O. n. 5), allegato 6: nomenclatore tariffario delle prestazioni aggiuntive",
+  "in_vigore_dal": "2026-01-15",
+  "trascritto_da": "Claude Code, lettura ottica delle pagine 146 e 147 del supplemento, controllata a vista voce per voce",
+  "trascritto_il": "2026-11-20",
+  "controllato_da": null,
+  "nota": "PDF del supplemento scaricato dalla Gazzetta Ufficiale il 20/11/2026, SHA-256 in docs/provenienze.md; le pagine dell'accordo sono immagini. L'accordo vale dalla data dell'intesa (art. 2, comma 4) e l'allegato 6 non è cambiato con l'accordo del 26/6/2026 (GU n. 149 del 30/6/2026, che modifica gli articoli 1, 31, 43 e 47). Codici: lettera della sezione e numero della voce (A1–A12, B1–B4); gli asterischi delle note sono sostituiti dal testo della nota nella colonna note. La sezione C non elenca prestazioni: le prevedono gli accordi regionali e aziendali. Compensi in euro come nella colonna dell'allegato, che non ha intestazione. Che cosa controllare: docs/ppip.md."
+}

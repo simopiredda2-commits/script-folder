@@ -25,6 +25,7 @@ import {
   refDrugRegistry,
   refDrugShortage,
   refDrugTransparency,
+  refAdditionalService,
   refExemption,
   refExemptionService,
   refMunicipality,
@@ -271,6 +272,29 @@ export function compareEquivalents(
  * Banche dati alla data: per ogni serie vale la versione con la data di inizio più recente non
  * successiva alla data chiesta; a parità di data, l'ultima importata (A5).
  */
+/** Una voce del catalogo delle prestazioni aggiuntive (PPIP) in vigore a una data (D212). */
+export interface AdditionalServiceItem {
+  code: string;
+  section: string;
+  description: string;
+  /** Soggetta ad autorizzazione (sezione B dell'allegato 6): servono gli estremi. */
+  authorization: boolean;
+  /** Compenso in euro, se l'atto lo dice. */
+  compensation: number | null;
+  notes: string | null;
+  datasetId: string;
+  series: string;
+  /** L'atto da cui viene la voce, come lo dice la trascrizione. */
+  act: string | null;
+  validFrom: string;
+}
+
+/** Sezioni del nomenclatore prima (A, B), poi gli accordi che aggiungono voci; i numeri in ordine. */
+const sectionRank = (section: string) => (section === 'A' ? 0 : section === 'B' ? 1 : 2);
+export const compareAdditionalServices = (a: AdditionalServiceItem, b: AdditionalServiceItem) =>
+  sectionRank(a.section) - sectionRank(b.section) ||
+  a.code.localeCompare(b.code, 'it', { numeric: true });
+
 export class ReferenceData {
   constructor(
     private readonly db: Database,
@@ -1092,6 +1116,39 @@ export class ReferenceData {
    * Catalogo delle esenzioni e associazioni esenzione–prestazioni alla data, come funzioni
    * sincrone per le regole. Senza la banca dati le funzioni restituiscono undefined (= non noto).
    */
+  /**
+   * Le prestazioni aggiuntive in vigore alla data, di tutte le serie: accordo nazionale, regionale
+   * e, quando ci sarà, aziendale. Se lo stesso codice è in più serie vale l'atto più recente (D212).
+   */
+  async additionalServices(date: string): Promise<AdditionalServiceItem[]> {
+    const sets = await this.inEffect('prestazioni_aggiuntive', date);
+    if (!sets.length) return [];
+    const byId = new Map(sets.map((d) => [d.id, d]));
+    const rows = await this.db
+      .select()
+      .from(refAdditionalService)
+      .where(inArray(refAdditionalService.datasetId, [...byId.keys()]));
+    const best = new Map<string, AdditionalServiceItem>();
+    for (const r of rows) {
+      const d = byId.get(r.datasetId)!;
+      const item: AdditionalServiceItem = {
+        code: r.code,
+        section: r.section,
+        description: r.description,
+        authorization: r.authorization,
+        compensation: r.compensation === null ? null : Number(r.compensation),
+        notes: r.notes,
+        datasetId: r.datasetId,
+        series: d.series,
+        act: d.act,
+        validFrom: d.validFrom,
+      };
+      const prev = best.get(r.code);
+      if (!prev || prev.validFrom < item.validFrom) best.set(r.code, item);
+    }
+    return [...best.values()].sort(compareAdditionalServices);
+  }
+
   async exemptionLookups(date: string): Promise<{
     /** C'è un catalogo delle esenzioni in vigore alla data. */
     catalogLoaded: boolean;

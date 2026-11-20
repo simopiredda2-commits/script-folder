@@ -21,6 +21,7 @@ import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerIdentityRoutes } from './http/identity-routes';
 import { registerAuraRoutes } from './http/aura-routes';
 import { registerReportRoutes } from './http/report-routes';
+import { registerPpipRoutes } from './http/ppip-routes';
 import { createAuraService } from './aura/service';
 import { ReferenceUpdateScheduler } from './reference/scheduler';
 import { registerIdentitySimulatorRoutes } from './http/identity-simulator-routes';
@@ -77,6 +78,8 @@ import {
   type SickLeaveGateway,
   SimulatedAura,
   type AuraGateway,
+  SimulatedAdditionalServicesPortal,
+  type AdditionalServicesPortal,
 } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
@@ -157,6 +160,12 @@ export interface AppDeps {
    * simulatore, in produzione, AURA è spenta.
    */
   aura?: { gateway?: AuraGateway; time?: string | null };
+  /**
+   * Portale regionale per la distinta delle prestazioni aggiuntive (D212). Per difetto il
+   * simulatore: il collegamento vero si scrive quando Regione e ASL diranno come; con il
+   * simulatore, in produzione, l'invio è spento.
+   */
+  ppipPortal?: AdditionalServicesPortal;
 }
 
 export function buildApp({
@@ -183,6 +192,7 @@ export function buildApp({
   loginSources,
   identity = { gateway: new SimulatedDigitalIdentity({ now }), clientId: 'SIMULATORE_IDENTITA' },
   aura = {},
+  ppipPortal = new SimulatedAdditionalServicesPortal(),
 }: AppDeps): FastifyInstance {
   // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
   // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
@@ -374,6 +384,14 @@ export function buildApp({
   registerPrintRoutes(app, adminDeps);
   registerArchiveAdminRoutes(app, adminDeps);
   registerReportRoutes(app, { db, now: now ?? (() => new Date()) });
+  // Prestazioni aggiuntive (D212): catalogo, cartella, distinta del mese e invio predisposto.
+  registerPpipRoutes(app, {
+    db,
+    now: now ?? (() => new Date()),
+    reference,
+    portal: ppipPortal,
+    environment: config.environment ?? 'prova',
+  });
   registerStudioListRoutes(app, adminDeps);
   // Pannello amministrativo del paziente e importazione da altri programmi (tappa 15).
   registerPatientAdminRoutes(app, adminDeps);
