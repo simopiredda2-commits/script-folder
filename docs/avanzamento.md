@@ -943,11 +943,9 @@ Nello stesso branch, ripartito da `main`.
   - Prove: `apps/api/test/promemoria-modello.test.ts`, `apps/api/test/promemoria.test.ts`, `apps/api/test/stampa.test.ts`, `packages/domain/test/printing.test.ts`, `apps/web/test/stampa.test.tsx`; 6 sabotaggi.
 - **Prima prova di Simone sulla dimostrazione** (20/11/2026): «non ci sono pazienti… come faccio a prescrivere un farmaco ad un paziente?». Era entrato come amministratore dello studio, che per i ruoli non apre le cartelle; la pagina però non lo diceva. Ora il servizio restituisce con l'elenco quanti archivi vede chi chiede, e con nessun archivio la pagina Pazienti spiega chi apre le cartelle. Il riquadro della dimostrazione dice da dove partire e quali farmaci d'esempio cercare. Prove: `apps/web/test/pazienti.test.tsx` e `apps/api/test/permessi-http.test.ts`; 2 sabotaggi. Dimostrazione ripubblicata (versione 2).
 
-**Da fare**
+- **Dimostrazione ripubblicata** (versione 3), con il promemoria su A5 e il Fascicolo regionale. Provata in Chromium con la versione costruita: accesso, SPID simulato, codice del Sistema TS, firma e invio, promemoria nel visore su A5 orizzontale, Fascicolo dalla cartella con la pagina simulata nel visore.
 
-- Dimostrazione ripubblicata con il promemoria in A5 e il Fascicolo.
-
-**Prossimo passo**: dimostrazione, prove complete, pull request #21 e fermata.
+**Prossimo passo**: prove complete, pull request #21 e fermata.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
