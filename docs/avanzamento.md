@@ -26,7 +26,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
 - **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
-- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Ora si aspettano i file di Simone e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
+- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Poi, nello stesso branch ripartito da `main`: fonti dei LEA verificate (D216), promemoria secondo le specifiche di stampa del Sistema TS del 28/02/2024 (D217), nomenclatore dei presidi dell'allegato 3 (D218); sezione «Dopo l'unione della #19». Fermata fatta il 20/11/2026: via, pull request #20 unita (risposte in «Risposte della fermata dopo l'unione della #19»). Poi l'apertura del Fascicolo dalla cartella con un simulatore (D220). Si aspettano i file dei LEA e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -1141,13 +1141,21 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Dopo l'unione della #19 (pull request del blocco D216–D218):
+Nessuna per ora. Si costruisce l'apertura del Fascicolo dalla cartella con un simulatore (D220); poi si aspettano i file dei LEA (C2) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
+
+## Risposte della fermata dopo l'unione della #19 (20/11/2026)
+
+Simone ha risposto con il pulsante il 20/11/2026.
+
+- **Via**: «Via: unisci». Pull request #20 unita in `main` con le prove della pull request verdi.
+- **Promemoria, campo 27**: «Codice regionale e nome». Resta la scelta di D217, da confermare al collaudo con il CSI.
+- **Aprire il Fascicolo dalla cartella**: «predisponilo subito ma poi chiediamo al CSI». Si costruisce con un simulatore (D220); la domanda per il CSI è in «Che cosa resta aperto», A4.
+
+## Domande della fermata dopo l'unione della #19 (chiuse)
 
 1. **Via**: A. unisci (consigliata); B. modifiche prima.
 2. **Promemoria, campo 27 in Piemonte** (D217): A. codice regionale davanti al nome, come chiede il documento regionale SIRPE (consigliata, da confermare al collaudo); B. solo cognome e nome, come il modello nazionale.
 3. **Aprire il Fascicolo dalla cartella** (modulo regionale del CSI del 2019): A. prima chiedo al CSI se vale ancora con l'autenticazione forte (consigliata); B. lo predispongo subito con un simulatore.
-
-Si aspettano poi i file dei LEA (C2) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
 
 ## Risposte della fermata dopo l'unione della #18 (20/11/2026)
 

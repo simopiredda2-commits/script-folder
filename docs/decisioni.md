@@ -1308,3 +1308,5 @@ Prove:
 - interfaccia (`apps/web/test/presidi.test.tsx`, 3).
 
 15 sabotaggi. Non provato: nel browser e nelle schermate, perché i dati dimostrativi non hanno il nomenclatore.
+
+**D219 · Risposte della fermata dopo l'unione della #19.** Via alla #20, unita. Nel campo 27 del promemoria resta il codice regionale davanti al nome (D217), da confermare al collaudo con il CSI. Per aprire il Fascicolo dalla cartella Simone ha risposto: «predisponilo subito ma poi chiediamo al CSI». Si costruisce con un simulatore sul modulo regionale del 2019 (D220); se valga ancora con l'autenticazione forte è una domanda per il CSI (`docs/avanzamento.md`, «Che cosa resta aperto», A4).
