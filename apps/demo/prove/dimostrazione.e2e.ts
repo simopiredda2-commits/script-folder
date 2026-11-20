@@ -198,13 +198,49 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   }
 
   /** Un paziente del medico per nome e cognome, dall'elenco del servizio. */
-  async function patientId(name: string) {
+  async function patientOf(name: string) {
     return f.evaluate(async (wanted) => {
       const list = (await (await fetch('/api/pazienti')).json()) as {
         pazienti: { id: string; nome: string; cognome: string }[];
       };
-      return list.pazienti.find((p) => `${p.nome} ${p.cognome}` === wanted)?.id ?? null;
+      return list.pazienti.find((p) => `${p.nome} ${p.cognome}` === wanted) ?? null;
     }, name);
+  }
+
+  async function patientId(name: string) {
+    return (await patientOf(name))?.id ?? null;
+  }
+
+  /** I due cambi di medico che AURA simulata ha mandato (D227, D229): uno da spostare, uno no. */
+  async function doctorChanges() {
+    const [, moving, kept, colleague] =
+      /la scelta di (.+) e di (.+) per la collega (.+): il cambio di medico/.exec(
+        await fromPanel((p) => p.getByRole('region', { name: 'AURA simulata' }).innerText()),
+      )!;
+    return { moving: moving!, kept: kept!, colleague: colleague! };
+  }
+
+  /** I cambi di medico ancora da decidere e in arrivo, per l'utente entrato, dal servizio. */
+  async function pendingChanges() {
+    return f.evaluate(async () => {
+      type Change = { paziente: { nome: string; cognome: string } };
+      const r = (await (await fetch('/api/aura/cambi-medico')).json()) as {
+        daDecidere: Change[];
+        inArrivo: Change[];
+      };
+      const names = (l: Change[]) => l.map((c) => `${c.paziente.nome} ${c.paziente.cognome}`);
+      return { daDecidere: names(r.daDecidere), inArrivo: names(r.inArrivo) };
+    });
+  }
+
+  /** Il paziente dell'altro studio dell'AFT e il suo codice fiscale, dal riquadro. */
+  async function aftPatient() {
+    return fromPanel(async (p) => {
+      const region = p.getByRole('region', { name: 'AFT', exact: true });
+      const text = await region.innerText();
+      const [, name] = /si consulta la scheda di (.+), che ha/.exec(text)!;
+      return { name: name!, fiscalCode: (await region.locator('code').innerText()).trim() };
+    });
   }
 
   /** Nessuna violazione WCAG 2.2 A e AA trovata da axe-core, nel documento della dimostrazione. */
@@ -575,27 +611,44 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   });
 
   it('cambio di medico dentro lo studio: in Oggi «Sposta», e il paziente passa alla collega', async () => {
-    const [, moving, colleague] = /la scelta di (.+) per la collega (.+): il cambio di medico/.exec(
-      await fromPanel((p) => p.getByRole('region', { name: 'AURA simulata' }).innerText()),
-    )!;
+    const { moving, colleague } = await doctorChanges();
     await login('medico');
     const changes = f.getByRole('region', { name: 'Cambi di medico nello studio' });
     await changes
-      .getByRole('button', { name: `Sposta ${moving!} nell’archivio di ${colleague!}` })
+      .getByRole('button', { name: `Sposta ${moving} nell’archivio di ${colleague}` })
       .click();
-    await changes.getByText(`${moving!}: spostato nell’archivio di ${colleague!}.`).waitFor();
-    expect(await patientId(moving!)).toBeNull();
+    await changes.getByText(`${moving}: spostato nell’archivio di ${colleague}.`).waitFor();
+    expect(await patientId(moving)).toBeNull();
     // La collega lo trova nel suo archivio.
     await login('collega');
-    expect(await patientId(moving!)).not.toBeNull();
+    expect(await patientId(moving)).not.toBeNull();
+  });
+
+  it('cambio di medico: «Non spostare», e il paziente resta nell’archivio senza riproporsi', async () => {
+    const { kept } = await doctorChanges();
+    // La collega scelta lo vede in arrivo, finché il medico non decide.
+    await login('collega');
+    expect((await pendingChanges()).inArrivo).toContain(kept);
+    await login('medico');
+    const changes = f.getByRole('region', { name: 'Cambi di medico nello studio' });
+    await changes.getByRole('button', { name: `Non spostare ${kept}` }).click();
+    await changes
+      .getByText(
+        `${kept}: resta nel tuo archivio. Non si ripropone finché AURA non manda una scelta nuova.`,
+      )
+      .waitFor();
+    expect(await patientId(kept)).not.toBeNull();
+    expect((await pendingChanges()).daDecidere).not.toContain(kept);
+    // Non si ripropone né al medico, dopo un nuovo accesso, né alla collega.
+    await login('medico');
+    expect((await pendingChanges()).daDecidere).not.toContain(kept);
+    await login('collega');
+    expect((await pendingChanges()).inArrivo).not.toContain(kept);
+    expect(await patientId(kept)).toBeNull();
   });
 
   it('AFT: la scheda del paziente dell’altro studio, con il motivo; la consultazione nel registro del suo medico', async () => {
-    const fiscalCode = (
-      await fromPanel((p) =>
-        p.getByRole('region', { name: 'AFT', exact: true }).locator('code').innerText(),
-      )
-    ).trim();
+    const { fiscalCode } = await aftPatient();
     await login('medico');
     await go('/strumenti?sezione=aft');
     await f.getByLabel('Codice fiscale del paziente').fill(fiscalCode);
@@ -613,6 +666,48 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .getByText(/Marchi/)
       .first()
       .waitFor();
+  });
+
+  it('AFT: l’attività svolta per il paziente dell’altro studio arriva al suo medico, nell’elenco e nella cronologia', async () => {
+    const { name, fiscalCode } = await aftPatient();
+    await login('medico');
+    await go('/strumenti?sezione=aft');
+    await f.getByLabel('Codice fiscale del paziente').fill(fiscalCode);
+    await f.getByLabel('Motivo dell’accesso').fill('Controllo della pressione nell’AFT');
+    await f.getByRole('button', { name: 'Mostra la scheda' }).click();
+    const form = f.getByRole('form', { name: 'Registra l’attività svolta' });
+    await form.getByLabel('Tipologia').selectOption({ label: 'Visita in ambulatorio' });
+    await form.getByLabel('Esito').fill('Pressione nei limiti, terapia invariata');
+    await form
+      .getByLabel('Note per il medico curante (facoltative)')
+      .fill('Da rivedere fra un mese');
+    await form.getByRole('button', { name: 'Registra l’attività' }).click();
+    await form
+      .getByText('Attività registrata: il medico curante la vede nella cronologia.')
+      .waitFor();
+    // Il medico curante, nell'altro studio: nell'elenco delle attività dei colleghi…
+    await login('medico.aft');
+    await go('/strumenti?sezione=aft');
+    const row = f
+      .getByRole('region', { name: 'Attività dei colleghi sui miei pazienti' })
+      .getByRole('row')
+      .filter({ hasText: 'Pressione nei limiti, terapia invariata' });
+    await row.waitFor();
+    const p = (await patientOf(name))!;
+    const cells = await row.innerText();
+    expect(cells).toContain(`${p.cognome} ${p.nome}`);
+    expect(cells).toMatch(/Marchi/);
+    expect(cells).toContain('Visita in ambulatorio');
+    expect(cells).toContain('Da rivedere fra un mese');
+    // … e nella cronologia della cartella, con il nome della collega.
+    await go(`/pazienti/${p.id}`);
+    const item = f
+      .getByRole('region', { name: 'Cronologia' })
+      .getByRole('listitem')
+      .filter({ hasText: 'Collega dell’AFT: Visita in ambulatorio' });
+    await item.waitFor();
+    expect(await item.innerText()).toContain('Pressione nei limiti, terapia invariata');
+    expect(await item.innerText()).toMatch(/Marchi/);
   });
 
   it('strumenti: l’amministratore salva lo studio e crea un utente; il medico lo conferma nella pagina', async () => {

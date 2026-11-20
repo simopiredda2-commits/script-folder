@@ -1,6 +1,7 @@
 import { generatePatients } from '@mmg/fixtures';
 import { EMPTY_AURA_REGISTRY, SimulatedAura, type AuraChoice } from '@mmg/integrations';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   accessLog,
@@ -14,6 +15,7 @@ import {
 } from '../src/db/schema';
 import { studioDate } from '../src/prescriptions/rules-check';
 import { ReferenceData } from '../src/reference/lookup';
+import { inOrderAtTheGate } from './helpers/cancello';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -477,5 +479,63 @@ describe('AURA: nuovi assistiti (D199)', () => {
     expect(
       await t.db.select().from(patient).where(eq(patient.fiscalCode, p.fiscalCode)),
     ).toHaveLength(1);
+  });
+
+  it('«Nuovo paziente» e «Registra» nello stesso istante (D229): «Registra», arrivato dopo, dice il paziente, l’assistito esce dall’elenco e il rifiuto è nel registro', async () => {
+    const { p, candidateId } = await chooses('o');
+    const monitor = new pg.Client({ connectionString: t.url });
+    await monitor.connect();
+    let manual: Awaited<ReturnType<typeof post>>;
+    let res: Awaited<ReturnType<typeof post>>;
+    try {
+      // Tutte e due passano il controllo del doppione; la segreteria scrive per prima.
+      [manual, res] = (await inOrderAtTheGate(monitor, p.fiscalCode, [
+        {
+          userId: s.users.segreteria.id,
+          send: () =>
+            post('/api/pazienti', 'segreteria', {
+              archivioId: s.archives.titolare,
+              identita: {
+                cognome: p.lastName,
+                nome: p.firstName,
+                sesso: p.sex,
+                nascita: p.birthDate,
+                luogoNascitaCodice: p.birthPlace.code,
+                codiceFiscale: p.fiscalCode,
+              },
+            }),
+        },
+        {
+          userId: s.users.titolare.id,
+          send: () => post(`/api/aura/nuovi/${candidateId}/registra`),
+        },
+      ])) as [typeof manual, typeof res];
+    } finally {
+      await monitor.end();
+    }
+    expect(manual.statusCode, manual.body).toBe(201);
+    const id = manual.json<{ id: string }>().id;
+    expect(res.statusCode, res.body).toBe(409);
+    expect(res.json().dettagli.paziente.id).toBe(id);
+    const [c] = await t.db.select().from(auraNewPatient).where(eq(auraNewPatient.id, candidateId));
+    expect(c!.status).toBe('superato');
+    expect(
+      (await t.db.select().from(patient).where(eq(patient.fiscalCode, p.fiscalCode))).map(
+        (r) => r.id,
+      ),
+    ).toEqual([id]);
+    const tried = await t.db
+      .select()
+      .from(accessLog)
+      .where(
+        and(
+          eq(accessLog.patientId, id),
+          eq(accessLog.action, 'nuovo_paziente'),
+          eq(accessLog.outcome, 'negato'),
+        ),
+      );
+    expect(tried.map((r) => [r.userId, (r.details as { motivo?: string }).motivo])).toEqual([
+      [s.users.titolare.id, 'codice fiscale già registrato per questo paziente'],
+    ]);
   });
 });

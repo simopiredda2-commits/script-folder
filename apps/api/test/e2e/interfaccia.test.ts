@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildFiscalCode } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
 import { EMPTY_AURA_REGISTRY, SimulatedAura } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
@@ -20,6 +21,7 @@ import {
   type Browser,
   type BrowserContext,
   type Page,
+  type Response as PlaywrightResponse,
 } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -220,6 +222,43 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
     await p.goto(url);
     await p.waitForFunction(() => !(window as Window & { paginaDiPrima?: boolean }).paginaDiPrima);
+  }
+
+  /**
+   * «Firma e invia», poi «Ricetta inviata». Se la ricetta non parte, l'errore dice le risposte
+   * d'errore del servizio e che cosa mostra la pagina: con WebKit la ricetta specialistica non è
+   * partita una volta, e la prova diceva solo che l'attesa era scaduta (prove su GitHub del
+   * 20/11/2026, giro 325).
+   */
+  async function signAndSend(p: Page) {
+    const failed: Promise<string>[] = [];
+    const listen = (r: PlaywrightResponse) => {
+      if (r.status() >= 400 && new URL(r.url()).pathname.startsWith('/api/'))
+        failed.push(
+          r
+            .text()
+            .catch(() => '')
+            .then((t) => `${r.status()} ${new URL(r.url()).pathname} ${t.slice(0, 300)}`),
+        );
+    };
+    p.on('response', listen);
+    try {
+      await p.getByRole('button', { name: 'Firma e invia' }).click();
+      await p.getByText('Ricetta inviata').waitFor();
+    } catch (err) {
+      const answers = (await Promise.all(failed)).join(' | ') || 'nessuna';
+      // Il pannello dell'invio, se c'è: lì sono gli errori e i controlli; altrimenti la pagina.
+      const panel = p.locator('.pannello-invio');
+      const shown = await ((await panel.count()) ? panel : p.locator('main'))
+        .innerText()
+        .catch(() => '(pagina non leggibile)');
+      throw new Error(
+        `La ricetta non è partita. Risposte d'errore del servizio: ${answers}. Nella pagina: ${shown.slice(0, 2000)}`,
+        { cause: err },
+      );
+    } finally {
+      p.off('response', listen);
+    }
   }
 
   /**
@@ -426,8 +465,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await page.getByText(/Regole di prescrizione, versione/).waitFor();
     await check(page, 'ricetta con i controlli');
-    await page.getByRole('button', { name: 'Firma e invia' }).click();
-    await page.getByText('Ricetta inviata').waitFor();
+    await signAndSend(page);
   });
 
   it('promemoria dopo l’invio: PDF del modello, solo NRE, email al paziente (tappa 7)', async () => {
@@ -507,8 +545,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .click();
     await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
     await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
-    await page.getByRole('button', { name: 'Firma e invia' }).click();
-    await page.getByText('Ricetta inviata').waitFor();
+    await signAndSend(page);
     await page.goto(`${base}/pazienti/${s.richPatient}`);
     await page.getByRole('link', { name: 'Visita di prova' }).click();
     await page.getByRole('heading', { name: 'Storico delle prescrizioni' }).waitFor();
@@ -596,8 +633,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page
       .getByLabel('Motivo per procedere nonostante l’avviso R18')
       .fill('Codice nuovo, il catalogo del programma non è ancora aggiornato');
-    await page.getByRole('button', { name: 'Firma e invia' }).click();
-    await page.getByText('Ricetta inviata').waitFor();
+    await signAndSend(page);
   });
 
   it('la stessa prestazione già prescritta: l’editor lo dice subito, con data e NRE', async () => {
@@ -1889,20 +1925,36 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('molte cartelle aperte (D68): venti schede, la ventunesima chiude la meno usata; pagine nuove e scritti ricordati per paziente', async () => {
-    // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20. Senza
-    // omonimi: il seme cambia a ogni giro, e due «Neri Ada» farebbero cercare la scheda sbagliata.
-    const used = new Set(
-      (await t.db.select().from(patient)).map((p) => `${p.lastName} ${p.firstName}`),
+    // Pazienti inventati in più nell'archivio del titolare, per superare il massimo di 20. Il primo
+    // è omonimo del primo paziente, apposta: le schede degli omonimi si distinguono con la data di
+    // nascita (D68). Le schede si cercano per cartella, non per nome: i nomi inventati cambiano a
+    // ogni giro, e due pazienti dello scenario con lo stesso nome facevano cadere la prova (prove su
+    // GitHub del 20/11/2026, con Firefox e con WebKit).
+    const [first] = await t.db
+      .select()
+      .from(patient)
+      .where(eq(patient.id, s.patients.titolare[0]!));
+    const extra = generatePatients({ seed: `molte-cartelle-${s.studioId}`, count: 18 }).map(
+      (p, i) => {
+        if (i > 0) return p;
+        const birthDate = p.birthDate === first!.birthDate ? '1950-01-01' : p.birthDate;
+        const fiscalCode = buildFiscalCode({
+          surname: first!.lastName,
+          name: first!.firstName,
+          birthDate,
+          sex: first!.sex,
+          placeCode: p.birthPlace.code,
+        });
+        return {
+          ...p,
+          firstName: first!.firstName,
+          lastName: first!.lastName,
+          sex: first!.sex,
+          birthDate,
+          fiscalCode,
+        };
+      },
     );
-    const extra = generatePatients({ seed: `molte-cartelle-${s.studioId}`, count: 60 })
-      .filter((p) => {
-        const name = `${p.lastName} ${p.firstName}`;
-        if (used.has(name)) return false;
-        used.add(name);
-        return true;
-      })
-      .slice(0, 18);
-    expect(extra).toHaveLength(18);
     const added = await withActor(t.db, s.users.titolare.id, (tx) =>
       tx
         .insert(patient)
@@ -1923,15 +1975,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .returning({ id: patient.id }),
     );
     const ids = [...s.patients.titolare, ...added.map((r) => r.id)];
-    const names = new Map(
-      (await t.db.select().from(patient)).map((p) => [p.id, `${p.lastName} ${p.firstName}`]),
-    );
-    const escape = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const all = await t.db.select().from(patient);
+    const names = new Map(all.map((p) => [p.id, `${p.lastName} ${p.firstName}`]));
+    const births = new Map(all.map((p) => [p.id, p.birthDate.split('-').reverse().join('/')]));
     const bar = page.getByRole('navigation', { name: 'Cartelle aperte' });
+    /** La scheda della cartella, dal suo indirizzo, con il nome del paziente. */
     const tab = (id: string) =>
-      bar.getByRole('link', {
-        name: new RegExp(`^${escape(names.get(id)!)}(?![\\p{L}'])`, 'u'),
-      });
+      bar.locator(`a[href^="/pazienti/${id}"]`).filter({ hasText: names.get(id)! });
     /** La scheda attiva si vede tutta nella barra, anche quando la barra scorre. */
     const activeVisible = () =>
       page.evaluate(() => {
@@ -1945,8 +1995,12 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
     await page.goto(`${base}/pazienti`);
     await page.getByRole('heading', { level: 1, name: 'Pazienti' }).waitFor();
+    // Le schede rimaste dalle prove di prima: «Chiudi tutte» c'è solo da due in su.
     const closeAll = page.getByRole('button', { name: 'Chiudi tutte' });
     if (await closeAll.count()) await closeAll.click();
+    const closeOne = bar.getByRole('button', { name: /^Chiudi la cartella di / });
+    if (await closeOne.count()) await closeOne.click();
+    await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(0);
     for (const id of ids.slice(0, 20)) {
       await page.goto(`${base}/pazienti/${id}`);
       await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
@@ -1958,6 +2012,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     // La barra si aggiorna dopo la pagina: con i motori più lenti (WebKit) si aspetta un attimo.
     await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
     await expect.poll(activeVisible, { timeout: 5000 }).toBe(true);
+    // Due omonimi aperti insieme: ognuno con la sua data di nascita.
+    for (const id of [ids[0]!, added[0]!.id])
+      await tab(id)
+        .getByText(`${names.get(id)} (${births.get(id)})`)
+        .waitFor();
     await check(page, 'venti cartelle aperte', true);
 
     // La ventunesima: si chiude quella usata meno di recente, con l'avviso.

@@ -27,8 +27,11 @@ export interface AuraHints {
   deceased: string | null;
   revoked: string | null;
   newPatient: string;
-  /** Il paziente che ha scelto la collega dello studio: il cambio di medico in «Oggi» (D227). */
-  doctorChange: string | null;
+  /**
+   * I pazienti che hanno scelto la collega dello studio: i cambi di medico in «Oggi» (D227). Due, per
+   * provare «Sposta» e «Non spostare» (D229).
+   */
+  doctorChanges: string[];
   colleague: string;
 }
 

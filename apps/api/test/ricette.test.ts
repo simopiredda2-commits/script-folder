@@ -417,6 +417,42 @@ describe('controlli prima dell’invio', () => {
     await s.app.close();
   });
 
+  it('controllo e firma insieme (D229): la firma non aspetta il controllo, la ricetta parte una volta e il controllo risponde', async () => {
+    // Il controllo che parte con il pannello dell'invio e la firma premuta subito dopo: con una
+    // barriera, tutte e due sono nei controlli prima dell'invio nello stesso momento.
+    let arrived = 0;
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((r) => (release = r));
+    const sar = new SimulatedGateway('sar');
+    const s = await createScenario(
+      t.db,
+      {},
+      {
+        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        preSendChecks: async () => {
+          arrived += 1;
+          if (arrived === 2) release();
+          await gate;
+          return { issues: [], rulesVersion: 'prova-insieme' };
+        },
+      },
+    );
+    const cookie = await login(s, 'titolare');
+    const post = (action: string) =>
+      s.app.inject({
+        method: 'POST',
+        url: `/api/ricette/${s.draftPrescription}/${action}`,
+        headers: { cookie },
+      });
+    const [checked, signed] = await Promise.all([post('controlla'), post('firma-e-invia')]);
+    expect(checked.statusCode, checked.body).toBe(200);
+    expect(checked.json()).toMatchObject({ versioneRegole: 'prova-insieme', bloccanti: 0 });
+    expect(signed.statusCode, signed.body).toBe(200);
+    expect(signed.json().esito).toBe('accepted');
+    expect(sar.received).toHaveLength(1);
+    await s.app.close();
+  });
+
   it('con i controlli superati, la ricetta registra la versione delle regole', async () => {
     const s = await createScenario(
       t.db,
