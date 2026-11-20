@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-20.2",
+  "versione": "2026-11-20.3",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -225,6 +225,22 @@
       },
       "vecchiaDopoGiorni": null,
       "nota": "Formato della trascrizione definito in docs/banche-dati.md; che cosa è diverso dal PDF in docs/icd9cm.md (D186). Nessuna soglia di vecchiaia: la classificazione cambia solo con un decreto."
+    },
+    {
+      "id": "trascrizione-prestazioni-aggiuntive",
+      "titolo": "Prestazioni aggiuntive (PPIP): accordo nazionale, regionale e aziendale (trascrizione)",
+      "tipo": "prestazioni_aggiuntive",
+      "origine": "trascrizione",
+      "colonne": {
+        "code": "codice",
+        "section": "sezione",
+        "description": "descrizione",
+        "authorization": "autorizzazione",
+        "compensation": "compenso",
+        "notes": "note"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md; fonti e che cosa è diverso dagli atti in docs/ppip.md (D212). Nessuna soglia di vecchiaia: l'elenco cambia solo con un accordo nuovo."
     }
   ]
 }

@@ -1,0 +1,26 @@
+{
+  "versione": "2026-11-20.1",
+  "formati": [
+    {
+      "id": "acn-allegato-6",
+      "titolo": "Distinta con i campi dell'allegato 6 dell'ACN",
+      "fonte": "ACN della medicina generale 2022-2024, allegato 6, comma 4: per ciascuna prestazione data di effettuazione, nome, cognome, indirizzo e codice fiscale dell'assistito. Le altre colonne servono a riconoscere la prestazione e il compenso.",
+      "formatoData": "gg/mm/aaaa",
+      "decimali": "virgola",
+      "colonne": [
+        { "intestazione": "Data di effettuazione", "campo": "data" },
+        { "intestazione": "Cognome", "campo": "cognome" },
+        { "intestazione": "Nome", "campo": "nome" },
+        { "intestazione": "Indirizzo", "campo": "indirizzo" },
+        { "intestazione": "Codice fiscale", "campo": "codiceFiscale" },
+        { "intestazione": "Codice prestazione", "campo": "codice" },
+        { "intestazione": "Prestazione", "campo": "descrizione" },
+        { "intestazione": "Quantità", "campo": "quantita" },
+        { "intestazione": "Luogo", "campo": "luogo" },
+        { "intestazione": "Autorizzazione", "campo": "autorizzazione" },
+        { "intestazione": "Compenso unitario (euro)", "campo": "compensoUnitario" },
+        { "intestazione": "Importo (euro)", "campo": "importo" }
+      ]
+    }
+  ]
+}

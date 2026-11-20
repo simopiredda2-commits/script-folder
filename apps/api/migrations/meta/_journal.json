@@ -281,6 +281,13 @@
       "when": 1795135374284,
       "tag": "0039_aifa_registri",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795178128562,
+      "tag": "0040_prestazioni_aggiuntive",
+      "breakpoints": true
     }
   ]
 }

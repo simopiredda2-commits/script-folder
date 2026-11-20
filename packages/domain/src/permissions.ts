@@ -53,6 +53,12 @@ export const ACTIONS = [
   'data.import',
   /** Riepiloghi dell'archivio per periodo, con l'esportazione (requisiti, «Riepiloghi»). */
   'reports.read',
+  /** Prestazioni aggiuntive (PPIP) dei pazienti e distinta del mese (D212). */
+  'ppip.read',
+  /** Registrare e annullare le prestazioni aggiuntive: le prepara anche la segreteria (D212). */
+  'ppip.write',
+  /** Inviare all'ASL la distinta del mese: la firma e la manda il titolare (regola 5, D212). */
+  'ppip.send',
   /** Impostazioni dell'archivio: che cosa vede la segreteria. */
   'archive.settings',
   /** Autorizzazioni sull'archivio: sostituto e colleghi di medicina di gruppo (tappa 14). */
@@ -107,6 +113,9 @@ export const ACTION_LABELS: Record<Action, string> = {
   'data.export': 'Esportare tutti i dati dell’archivio',
   'data.import': 'Importare dati da altri programmi nell’archivio',
   'reports.read': 'Leggere ed esportare i riepiloghi dell’archivio per periodo',
+  'ppip.read': 'Leggere le prestazioni aggiuntive (PPIP) e la distinta del mese',
+  'ppip.write': 'Registrare e annullare le prestazioni aggiuntive (PPIP)',
+  'ppip.send': 'Inviare all’ASL la distinta mensile delle prestazioni aggiuntive',
   'archive.settings': 'Decidere che cosa vede la segreteria dell’archivio',
   'archive.grants': 'Autorizzare un sostituto o un collega di gruppo sull’archivio',
   'archive.transfer': 'Spostare un paziente nell’archivio del medico scelto in AURA',
@@ -158,6 +167,9 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'data.export',
   'data.import',
   'reports.read',
+  'ppip.read',
+  'ppip.write',
+  'ppip.send',
   'archive.settings',
   'archive.grants',
   'archive.transfer',
@@ -173,6 +185,8 @@ const DOCTOR_ON_GRANTED_ARCHIVE: Action[] = DOCTOR_ON_OWN_ARCHIVE.filter(
     a !== 'data.export' &&
     a !== 'data.import' &&
     a !== 'reports.read' &&
+    // La distinta delle prestazioni aggiuntive la manda il titolare: il sostituto le registra (D212).
+    a !== 'ppip.send' &&
     a !== 'access_log.read' &&
     a !== 'archive.settings' &&
     a !== 'archive.grants' &&
@@ -190,6 +204,9 @@ const SECRETARY: Action[] = [
   'reminder.print',
   // Riepiloghi per periodo, anche in CSV, sugli archivi che l'hanno confermata (D204).
   'reports.read',
+  // Prestazioni aggiuntive: la segreteria le registra e prepara la distinta; la manda il medico (D212).
+  'ppip.read',
+  'ppip.write',
 ];
 
 const ADMINISTRATOR: Action[] = [

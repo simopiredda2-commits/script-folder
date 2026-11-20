@@ -26,6 +26,7 @@ export const PATIENT_TABLES = [
   'sick_leave_certificate',
   'service_execution',
   'supply_prescription',
+  'ppip_record',
   'pss_document',
   'template_certificate',
   'aft_activity',
@@ -169,6 +170,11 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
   tables.aura_new_patient = await rows(
     db,
     sql`select * from aura_new_patient where archive_id = ${archiveId} order by id`,
+  );
+  // Invii della distinta delle prestazioni aggiuntive (D212), con la distinta come è partita.
+  tables.ppip_report = await rows(
+    db,
+    sql`select * from ppip_report where archive_id = ${archiveId} order by sent_at, id`,
   );
   // Segreteria confermata o tolta dal titolare per questo archivio (D181): tutte le decisioni.
   tables.archive_secretary = await rows(

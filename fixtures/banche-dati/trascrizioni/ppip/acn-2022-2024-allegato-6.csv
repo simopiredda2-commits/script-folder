@@ -1,0 +1,17 @@
+codice;sezione;descrizione;autorizzazione;compenso;note
+A1;A;Prima medicazione;no;12,32;Per la prima medicazione va intesa quella eseguita su ferita non precedentemente medicata. In caso di sutura si aggiunge la relativa tariffa.
+A2;A;Sutura di ferita superficiale;no;3,32;
+A3;A;Successive medicazioni;no;6,16;
+A4;A;Rimozione di punti di sutura e medicazione;no;12,32;
+A5;A;Cateterismo uretrale nell'uomo;no;9,66;
+A6;A;Cateterismo uretrale nella donna;no;3,59;
+A7;A;Tamponamento nasale anteriore;no;5,62;
+A8;A;Fleboclisi (unica eseguibile in caso di urgenza);no;12,32;
+A9;A;Lavanda gastrica;no;12,32;
+A10;A;Iniezione di gammaglobulina o vaccinazione antitetanica;no;6,16;
+A11;A;Iniezione sottocutanea desensibilizzante;no;9,21;Praticabile solo negli studi dotati di frigorifero.
+A12;A;Tampone faringeo, prelievo per esame batteriologico (solo su pazienti non ambulabili);no;0,64;
+B1;B;Ciclo di fleboclisi;sì;9,21;
+B2;B;Ciclo curativo di iniezioni endovenose (per ogni iniezione);sì;6,16;
+B3;B;Ciclo aerosol o inalazioni caldo-umide nello studio professionale del medico (per prestazione singola);sì;1,23;Per l'esecuzione di tale prestazione lo studio del medico deve essere dotato di idonei impianti fissi.
+B4;B;Vaccinazioni;sì;6,16;Eseguibili con autorizzazione complessiva nell'ambito di programmi di vaccinazioni disposti in sede regionale o di Azienda. Per la conservazione del vaccino che è fornito dall'Azienda, lo studio medico deve essere dotato di idoneo frigorifero. Sui risultati della propria collaborazione alla campagna di vaccinazione il medico invia apposita relazione all'Azienda. La vaccinazione è compensata con la tariffa di cui al presente Allegato.

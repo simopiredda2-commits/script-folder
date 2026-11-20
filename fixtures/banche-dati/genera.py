@@ -293,6 +293,16 @@ def genera_trascrizioni(impronte: dict[str, str]) -> None:
         "T02;Altra esenzione di prova",
     ], {"tipo": "esenzioni", "fonte": None, "chiave": None, "sha256_origine": None,
         "atto": "Elenco di prova delle esenzioni", "in_vigore_dal": "2026-01-01"})
+    # Prestazioni aggiuntive (D212): le righe vere delle trascrizioni dell'ACN e dell'AIR, copiate
+    # senza cambiarle; nell'esempio la scheda dice persone di prova come le altre.
+    vere = QUI.parent.parent / "packages" / "reference" / "data" / "trascrizioni" / "ppip"
+    for nome, serie in (("acn-2022-2024-allegato-6", "acn-prestazioni-aggiuntive"),
+                        ("air-piemonte-2024", "piemonte-prestazioni-aggiuntive")):
+        scheda = json.loads((vere / f"{nome}.json").read_text("utf-8"))
+        righe = (vere / f"{nome}.csv").read_text("utf-8").splitlines()
+        trascrizione(f"ppip/{nome}", righe, {
+            "tipo": "prestazioni_aggiuntive", "serie": serie, "fonte": None, "chiave": None,
+            "sha256_origine": None, "atto": scheda["atto"], "in_vigore_dal": scheda["in_vigore_dal"]})
     trascrizione("piemonte_esenzioni_prestazioni/esenzioni_prestazioni_prova", [
         "esenzione;prestazione",
         "T01;89.7",
