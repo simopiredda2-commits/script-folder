@@ -14,7 +14,8 @@ import type { AdditionalServiceItem, ReferenceData } from '../reference/lookup';
 /**
  * Prestazioni aggiuntive (PPIP, D212). Fonti: ACN della medicina generale 2022-2024, allegato 6
  * (prestazioni, compensi, distinta del comma 4, autorizzazione del comma 5); AIR del Piemonte 2024
- * (rendicontazione dal portale regionale). I controlli sono solo formali (regola 3): la voce deve
+ * (art. 35, comma 4: trasfusioni in ADI; art. 30: rendicontazione su supporto digitale, il cui
+ * modo diranno Regione e ASL). I controlli sono solo formali (regola 3): la voce deve
  * essere nel catalogo in vigore il giorno dell'esecuzione, la sezione B vuole gli estremi
  * dell'autorizzazione, la data non è futura né dopo il decesso.
  */

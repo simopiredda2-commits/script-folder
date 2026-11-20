@@ -283,7 +283,10 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
       `/api/archivi/${s.archives.titolare}/ppip/esportazione?mese=2026-10`,
     );
     expect(res.statusCode, res.body).toBe(200);
-    const lines = res.body.replace(/^\uFEFF/, '').trim().split('\r\n');
+    const lines = res.body
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .split('\r\n');
     expect(lines[0]).toBe(
       'Data di effettuazione;Cognome;Nome;Indirizzo;Codice fiscale;Codice prestazione;Prestazione;Quantità;Luogo;Autorizzazione;Compenso unitario (euro);Importo (euro)',
     );
@@ -399,6 +402,61 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
     expect(await refused('delete from ppip_report')).toMatch(/non si modificano/);
     const counted = await t.db.select().from(ppipRecord);
     expect(counted.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('un accordo aziendale nuovo è un file da importare: vale dalla sua data, il passato resta', async () => {
+    // Accordo dell'ASL inventato, in vigore dal 1/11/2026: A1 pagata di più e una voce sua.
+    const dir = join(work, 'trascrizioni-asl', 'ppip');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'asl-di-prova-2026.json'),
+      JSON.stringify({
+        tipo: 'prestazioni_aggiuntive',
+        serie: 'asl-di-prova-prestazioni-aggiuntive',
+        fonte: null,
+        chiave: null,
+        sha256_origine: null,
+        atto: 'Accordo aziendale di prova',
+        in_vigore_dal: '2026-11-01',
+        trascritto_da: 'Persona di prova',
+        trascritto_il: '2026-11-20',
+        controllato_da: 'Seconda persona di prova',
+      }),
+    );
+    writeFileSync(
+      join(dir, 'asl-di-prova-2026.csv'),
+      'codice;sezione;descrizione;autorizzazione;compenso;note\n' +
+        'A1;A;Prima medicazione;no;15,00;\n' +
+        'ASL1;C;Prestazione di prova dell’accordo aziendale;no;10,00;\n',
+    );
+    const report = await importReferenceData({
+      db: t.db,
+      syncDir: join(work, 'dati-pubblici'),
+      transcriptionsDir: join(work, 'trascrizioni-asl'),
+      mappings: loadMappings(),
+      importedBy: 'prova',
+    });
+    expect(report.map((r) => r.outcome)).toEqual(['importato']);
+    const at = async (data: string) =>
+      (await req('titolare', 'GET', `/api/prestazioni-aggiuntive/catalogo?data=${data}`)).json()
+        .voci as Voce[];
+    const before = await at('2026-10-31');
+    expect(before.find((v) => v.codice === 'A1')?.compenso).toBe(12.32);
+    expect(before.some((v) => v.codice === 'ASL1')).toBe(false);
+    const after = await at('2026-11-10');
+    expect(after.find((v) => v.codice === 'A1')?.compenso).toBe(15);
+    expect(after.filter((v) => v.codice === 'A1')).toHaveLength(1);
+    expect(after.map((v) => v.codice).slice(-2)).toEqual(['AIR35.4', 'ASL1']);
+    // Registrata dopo, la prima medicazione ha il compenso nuovo; quella di ottobre resta com'era.
+    expect(
+      (await register('titolare', pt.id, { codice: 'A1', data: '2026-11-10' })).statusCode,
+    ).toBe(201);
+    const list = (await req('titolare', 'GET', `/api/pazienti/${pt.id}/ppip`)).json()
+      .prestazioni as { codice: string; data: string; compensoUnitario: number }[];
+    expect(list.filter((p) => p.codice === 'A1').map((p) => [p.data, p.compensoUnitario])).toEqual([
+      ['2026-11-10', 15],
+      ['2026-10-05', 12.32],
+    ]);
   });
 
   it('formati della distinta come dati: ogni colonna usa un campo che esiste', () => {
