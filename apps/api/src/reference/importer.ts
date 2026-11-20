@@ -98,6 +98,9 @@ interface DatasetMeta {
   downloadedAt: Date | null;
   validFrom: string;
   validFromBasis: 'scaricamento' | 'atto';
+  /** Regione e ASL dove la versione vale, se non in tutta Italia (D232). */
+  scopeRegion?: string | null;
+  scopeAsl?: string | null;
   act: string | null;
   transcribedBy: string | null;
   transcribedOn: string | null;
@@ -523,6 +526,8 @@ export async function importReferenceData(opts: ImportOptions): Promise<ImportLi
         downloadedAt: null,
         validFrom: s.in_vigore_dal,
         validFromBasis: 'atto',
+        scopeRegion: s.ambito?.regione ?? null,
+        scopeAsl: s.ambito?.asl ?? null,
         act: s.atto,
         transcribedBy: s.trascritto_da,
         transcribedOn: s.trascritto_il,

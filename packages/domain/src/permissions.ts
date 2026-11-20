@@ -58,8 +58,13 @@ export const ACTIONS = [
   'data.import',
   /** Riepiloghi dell'archivio per periodo, con l'esportazione (requisiti, «Riepiloghi»). */
   'reports.read',
-  /** Prestazioni aggiuntive (PPIP) dei pazienti e distinta del mese (D212). */
+  /** Prestazioni aggiuntive (PPIP) del paziente, nella sua cartella (D212). */
   'ppip.read',
+  /**
+   * Distinta del mese delle prestazioni aggiuntive dell'archivio, con il CSV: come i riepiloghi,
+   * al titolare e alla segreteria confermata (D204, D232).
+   */
+  'ppip.report',
   /** Registrare e annullare le prestazioni aggiuntive: le prepara anche la segreteria (D212). */
   'ppip.write',
   /** Inviare all'ASL la distinta del mese: la firma e la manda il titolare (regola 5, D212). */
@@ -119,7 +124,8 @@ export const ACTION_LABELS: Record<Action, string> = {
   'data.export': 'Esportare tutti i dati dell’archivio',
   'data.import': 'Importare dati da altri programmi nell’archivio',
   'reports.read': 'Leggere ed esportare i riepiloghi dell’archivio per periodo',
-  'ppip.read': 'Leggere le prestazioni aggiuntive (PPIP) e la distinta del mese',
+  'ppip.read': 'Leggere le prestazioni aggiuntive (PPIP) del paziente',
+  'ppip.report': 'Leggere e scaricare la distinta mensile delle prestazioni aggiuntive',
   'ppip.write': 'Registrare e annullare le prestazioni aggiuntive (PPIP)',
   'ppip.send': 'Inviare all’ASL la distinta mensile delle prestazioni aggiuntive',
   'archive.settings': 'Decidere che cosa vede la segreteria dell’archivio',
@@ -175,6 +181,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'data.import',
   'reports.read',
   'ppip.read',
+  'ppip.report',
   'ppip.write',
   'ppip.send',
   'archive.settings',
@@ -192,7 +199,9 @@ const DOCTOR_ON_GRANTED_ARCHIVE: Action[] = DOCTOR_ON_OWN_ARCHIVE.filter(
     a !== 'data.export' &&
     a !== 'data.import' &&
     a !== 'reports.read' &&
-    // La distinta delle prestazioni aggiuntive la manda il titolare: il sostituto le registra (D212).
+    // La distinta delle prestazioni aggiuntive la legge e la manda il titolare: il sostituto le
+    // registra (D212). La distinta è un riepilogo dell'archivio, come i riepiloghi (D232).
+    a !== 'ppip.report' &&
     a !== 'ppip.send' &&
     a !== 'access_log.read' &&
     a !== 'archive.settings' &&
@@ -213,6 +222,7 @@ const SECRETARY: Action[] = [
   'reports.read',
   // Prestazioni aggiuntive: la segreteria le registra e prepara la distinta; la manda il medico (D212).
   'ppip.read',
+  'ppip.report',
   'ppip.write',
 ];
 

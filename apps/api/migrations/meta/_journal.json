@@ -295,6 +295,20 @@
       "when": 1795185938367,
       "tag": "0041_nomenclatore_presidi",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1795216687120,
+      "tag": "0042_prestazioni_aggiuntive_archivio",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1795217482618,
+      "tag": "0043_ambito_delle_banche_dati",
+      "breakpoints": true
     }
   ]
 }

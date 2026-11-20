@@ -2,14 +2,25 @@ import type {
   AdditionalServiceLine,
   AdditionalServicesPortal,
   AdditionalServicesReport,
+  AdditionalServicesResult,
 } from '@mmg/integrations';
-import { and, asc, desc, eq, gte, inArray, isNull, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
 import { z } from 'zod';
+import { logAccessForPatients } from '../audit/access-log';
+import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
-import { appUser, archive, doctorProfile, patient, ppipRecord, ppipReport } from '../db/schema';
+import {
+  appUser,
+  archive,
+  doctorProfile,
+  patient,
+  ppipRecord,
+  ppipReport,
+  studio,
+} from '../db/schema';
 import { withActor, type Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
-import type { AdditionalServiceItem, ReferenceData } from '../reference/lookup';
+import type { AdditionalServiceItem, ReferenceData, ReferenceScope } from '../reference/lookup';
 
 /**
  * Prestazioni aggiuntive (PPIP, D212). Fonti: ACN della medicina generale 2022-2024, allegato 6
@@ -60,12 +71,27 @@ export function reportDeadline(month: string): string {
 
 const dayIt = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
+/**
+ * La regione dello studio e l'ASL del titolare dell'archivio: dove valgono l'accordo regionale e
+ * quello aziendale (D232).
+ */
+export async function archiveScope(db: Database, archiveId: string): Promise<ReferenceScope> {
+  const [row] = await db
+    .select({ region: studio.regionName, asl: doctorProfile.asl })
+    .from(archive)
+    .innerJoin(studio, eq(studio.id, archive.studioId))
+    .leftJoin(doctorProfile, eq(doctorProfile.userId, archive.ownerUserId))
+    .where(eq(archive.id, archiveId));
+  return { region: row?.region ?? null, asl: row?.asl ?? null };
+}
+
 /** La voce del catalogo in vigore il giorno dell'esecuzione, con i controlli formali. */
 export async function catalogItem(
   reference: ReferenceData,
   body: PpipBody,
   today: string,
   deceasedOn: string | null,
+  scope: ReferenceScope,
 ): Promise<AdditionalServiceItem> {
   if (body.data > today) throw new HttpError(400, 'La data dell’esecuzione è nel futuro');
   if (deceasedOn && body.data > deceasedOn)
@@ -73,7 +99,7 @@ export async function catalogItem(
       400,
       `La data dell’esecuzione viene dopo il decesso del paziente (${dayIt(deceasedOn)})`,
     );
-  const catalog = await reference.additionalServices(body.data);
+  const catalog = await reference.additionalServices(body.data, scope);
   if (!catalog.length)
     throw new HttpError(
       409,
@@ -93,9 +119,13 @@ export async function catalogItem(
   return item;
 }
 
+/**
+ * La prestazione nasce nell'archivio dove il paziente sta quando la si registra, e lì resta: la
+ * distinta è del titolare di quell'archivio anche se poi il paziente cambia medico (D232).
+ */
 export async function insertPpip(
   tx: Tx,
-  patientId: string,
+  target: { patientId: string; archiveId: string },
   userId: string,
   body: PpipBody,
   item: AdditionalServiceItem,
@@ -103,7 +133,8 @@ export async function insertPpip(
   const [row] = await tx
     .insert(ppipRecord)
     .values({
-      patientId,
+      patientId: target.patientId,
+      archiveId: target.archiveId,
       performedOn: body.data,
       code: item.code,
       section: item.section,
@@ -121,12 +152,27 @@ export async function insertPpip(
   return row!.id;
 }
 
-/** La prestazione del paziente; altrimenti 404. */
-export async function loadPpip(db: Database | Tx, patientId: string, recordId: string) {
-  const [r] = await db
+/**
+ * La prestazione, bloccata fino alla fine della transazione: un annullamento e un invio della
+ * distinta non si incrociano, e due annullamenti nemmeno (D232). Altrimenti 404.
+ */
+export async function lockPpip(
+  tx: Tx,
+  recordId: string,
+  where: { patientId: string } | { archiveId: string },
+) {
+  const [r] = await tx
     .select()
     .from(ppipRecord)
-    .where(and(eq(ppipRecord.id, recordId), eq(ppipRecord.patientId, patientId)));
+    .where(
+      and(
+        eq(ppipRecord.id, recordId),
+        'patientId' in where
+          ? eq(ppipRecord.patientId, where.patientId)
+          : eq(ppipRecord.archiveId, where.archiveId),
+      ),
+    )
+    .for('update');
   if (!r) throw new HttpError(404, 'Prestazione non trovata');
   return r;
 }
@@ -149,6 +195,11 @@ export async function annulPpip(
       `La prestazione è già partita con la distinta${rep?.protocol ? ` ${rep.protocol}` : ''}: la correzione si chiede all’ASL`,
     );
   }
+  if (r.sendingSince)
+    throw new HttpError(
+      409,
+      'La prestazione sta partendo con la distinta: si annulla solo se l’invio non va a buon fine',
+    );
   await tx
     .update(ppipRecord)
     .set({ status: 'annulled', annulledAt: at, annulledBy: userId, annulReason: reason })
@@ -159,15 +210,25 @@ const money = (v: string | null) => (v === null ? null : Number(v));
 const amount = (unit: number | null, qty: number) =>
   unit === null ? null : Math.round(unit * qty * 100) / 100;
 
-export async function listPpip(db: Database, patientId: string) {
+/**
+ * Le prestazioni del paziente. Quelle registrate in un altro archivio, prima che il paziente
+ * cambiasse medico, restano nella distinta di quell'archivio: qui si leggono e basta (D232).
+ */
+export async function listPpip(db: Database, patientId: string, currentArchiveId: string) {
   const rows = await db
-    .select({ r: ppipRecord, by: appUser.displayName, protocol: ppipReport.protocol })
+    .select({
+      r: ppipRecord,
+      by: appUser.displayName,
+      protocol: ppipReport.protocol,
+      archiveName: archive.name,
+    })
     .from(ppipRecord)
     .innerJoin(appUser, eq(appUser.id, ppipRecord.createdBy))
+    .innerJoin(archive, eq(archive.id, ppipRecord.archiveId))
     .leftJoin(ppipReport, eq(ppipReport.id, ppipRecord.reportId))
     .where(eq(ppipRecord.patientId, patientId))
     .orderBy(desc(ppipRecord.performedOn), desc(ppipRecord.createdAt));
-  return rows.map(({ r, by, protocol }) => ({
+  return rows.map(({ r, by, protocol, archiveName }) => ({
     id: r.id,
     data: r.performedOn,
     codice: r.code,
@@ -183,8 +244,11 @@ export async function listPpip(db: Database, patientId: string) {
     stato: r.status === 'annulled' ? 'annullata' : 'registrata',
     motivoAnnullamento: r.annulReason,
     inviata: r.reportId !== null,
+    inInvio: r.sendingSince !== null,
     protocolloInvio: protocol,
     registrataDa: by,
+    /** Il nome dell'archivio solo se non è quello di adesso: la prestazione è nella sua distinta. */
+    altroArchivio: r.archiveId === currentArchiveId ? null : archiveName,
   }));
 }
 
@@ -204,6 +268,8 @@ export function residenceAddress(pt: typeof patient.$inferSelect): string | null
 export interface DistintaRow {
   id: string;
   patientId: string;
+  /** Il paziente sta ancora in questo archivio: altrimenti la sua cartella è di un altro medico. */
+  pazienteNellArchivio: boolean;
   data: string;
   cognome: string;
   nome: string;
@@ -218,20 +284,31 @@ export interface DistintaRow {
   compensoUnitario: number | null;
   importo: number | null;
   inviata: boolean;
+  /** Da quando la prestazione sta partendo con un invio della distinta (D232). */
+  inInvioDal: string | null;
   protocolloInvio: string | null;
 }
 
-/** Le prestazioni registrate (non annullate) del mese, per i pazienti dell'archivio. */
-export async function monthRows(db: Database, archiveId: string, month: string) {
+/**
+ * Le prestazioni registrate (non annullate) del mese nell'archivio, cioè quelle registrate lì,
+ * anche di pazienti passati poi a un altro medico (D232). Con `lock` restano bloccate fino alla
+ * fine della transazione.
+ */
+export async function monthRows(
+  db: Database | Tx,
+  archiveId: string,
+  month: string,
+  opts: { lock?: boolean } = {},
+) {
   const { from, to } = monthBounds(month);
-  const rows = await db
+  const query = db
     .select({ r: ppipRecord, pt: patient, protocol: ppipReport.protocol })
     .from(ppipRecord)
     .innerJoin(patient, eq(patient.id, ppipRecord.patientId))
     .leftJoin(ppipReport, eq(ppipReport.id, ppipRecord.reportId))
     .where(
       and(
-        eq(patient.archiveId, archiveId),
+        eq(ppipRecord.archiveId, archiveId),
         eq(ppipRecord.status, 'active'),
         gte(ppipRecord.performedOn, from),
         lte(ppipRecord.performedOn, to),
@@ -242,10 +319,13 @@ export async function monthRows(db: Database, archiveId: string, month: string) 
       asc(patient.lastName),
       asc(patient.firstName),
       asc(ppipRecord.createdAt),
+      asc(ppipRecord.id),
     );
+  const rows = await (opts.lock ? query.for('update', { of: ppipRecord }) : query);
   return rows.map(({ r, pt, protocol }): DistintaRow => ({
     id: r.id,
     patientId: pt.id,
+    pazienteNellArchivio: pt.archiveId === archiveId,
     data: r.performedOn,
     cognome: pt.lastName,
     nome: pt.firstName,
@@ -260,6 +340,7 @@ export async function monthRows(db: Database, archiveId: string, month: string) 
     compensoUnitario: money(r.unitCompensation),
     importo: amount(money(r.unitCompensation), r.quantity),
     inviata: r.reportId !== null,
+    inInvioDal: r.sendingSince ? r.sendingSince.toISOString() : null,
     protocolloInvio: protocol,
   }));
 }
@@ -299,7 +380,7 @@ export async function reportsOf(db: Database, archiveId: string, month: string) 
     .from(ppipReport)
     .innerJoin(appUser, eq(appUser.id, ppipReport.sentBy))
     .where(and(eq(ppipReport.archiveId, archiveId), eq(ppipReport.month, month)))
-    .orderBy(desc(ppipReport.sentAt));
+    .orderBy(desc(ppipReport.sentAt), desc(ppipReport.id));
   return rows.map(({ r, by }) => ({
     id: r.id,
     esito: r.outcome,
@@ -314,41 +395,47 @@ export async function reportsOf(db: Database, archiveId: string, month: string) 
 }
 
 /**
- * Manda all'ASL le prestazioni del mese non ancora partite. Il mese dev'essere finito (la
- * distinta è delle prestazioni «eseguite nel corso del mese precedente»). Con il simulatore in
- * produzione non parte nulla: il collegamento vero è da completare con Regione e ASL (D212).
+ * Dopo quanto un invio senza risposta si considera interrotto: il servizio si è fermato a metà, o
+ * il portale non ha risposto in modo chiaro. Prima, l'invio potrebbe essere ancora in corso.
  */
-export async function sendMonth(params: {
-  db: Database;
-  portal: AdditionalServicesPortal;
-  environment: 'prova' | 'produzione';
-  archiveId: string;
-  month: string;
-  today: string;
-  userId: string;
-  at: Date;
-}) {
-  const { db, portal, environment, archiveId, month, today, userId, at } = params;
-  if (portal.environment === 'simulator' && environment === 'produzione')
-    throw new HttpError(
-      409,
-      'L’invio della distinta all’ASL non è ancora collegato: si completa quando Regione e ASL diranno come (D212)',
-    );
-  if (monthBounds(month).to >= today)
-    throw new HttpError(
-      409,
-      'Il mese non è finito: la distinta si manda dal primo giorno del mese dopo',
-    );
-  const pending = (await monthRows(db, archiveId, month)).filter((r) => !r.inviata);
-  if (!pending.length) throw new HttpError(409, 'Nessuna prestazione da inviare per il mese');
+export const INTERRUPTED_AFTER_MINUTES = 15;
 
-  const [doc] = await db
+/** Ambiente degli esiti segnati dal titolare: consegna fuori dal programma o esito chiesto all'ASL. */
+export const MANUAL_ENVIRONMENT = 'manuale';
+
+/** L'invio dal programma c'è: con il simulatore, in produzione, no (D212). */
+export const sendingAvailable = (
+  portal: AdditionalServicesPortal,
+  environment: 'prova' | 'produzione',
+) => !(portal.environment === 'simulator' && environment === 'produzione');
+
+/** Le stesse prestazioni, ognuna una volta sola. */
+const sameIds = (a: readonly string[], b: readonly string[]) => {
+  const set = new Set(a);
+  return (
+    a.length === b.length &&
+    set.size === a.length &&
+    new Set(b).size === b.length &&
+    b.every((x) => set.has(x))
+  );
+};
+
+const patientsOf = (rows: readonly DistintaRow[]) => [...new Set(rows.map((r) => r.patientId))];
+
+/** La distinta come parte: il mese, il medico titolare dell'archivio, le righe, il totale. */
+async function reportOf(
+  tx: Tx,
+  archiveId: string,
+  month: string,
+  rows: readonly DistintaRow[],
+): Promise<AdditionalServicesReport> {
+  const [doc] = await tx
     .select({ name: appUser.displayName, profile: doctorProfile })
     .from(archive)
     .innerJoin(appUser, eq(appUser.id, archive.ownerUserId))
     .leftJoin(doctorProfile, eq(doctorProfile.userId, archive.ownerUserId))
     .where(eq(archive.id, archiveId));
-  const lines: AdditionalServiceLine[] = pending.map((r) => ({
+  const lines: AdditionalServiceLine[] = rows.map((r) => ({
     performedOn: r.data,
     patient: {
       fiscalCode: r.codiceFiscale,
@@ -363,7 +450,7 @@ export async function sendMonth(params: {
     authorizationRef: r.autorizzazione,
     unitCompensation: r.compensoUnitario,
   }));
-  const report: AdditionalServicesReport = {
+  return {
     month,
     doctor: {
       fiscalCode: doc?.profile?.fiscalCode ?? null,
@@ -371,50 +458,303 @@ export async function sendMonth(params: {
       name: doc?.name ?? '',
     },
     lines,
-    total: totalOf(pending),
+    total: totalOf(rows),
   };
-  const result = await portal.submit(report);
-  // A nome di chi manda: il segno dell'invio sulle prestazioni va nello storico delle modifiche.
-  return withActor(db, userId, async (tx) => {
-    const [rep] = await tx
-      .insert(ppipReport)
-      .values({
-        archiveId,
-        month,
-        outcome: result.outcome,
-        protocol: result.outcome === 'accepted' ? result.protocol : null,
-        message: result.outcome === 'accepted' ? null : result.message,
-        environment: portal.environment,
-        lines: lines.length,
-        total: report.total === null ? null : report.total.toFixed(2),
-        content: report,
-        sentBy: userId,
-        sentAt: at,
+}
+
+async function insertReport(
+  tx: Tx,
+  v: {
+    archiveId: string;
+    month: string;
+    result: AdditionalServicesResult;
+    environment: string;
+    report: AdditionalServicesReport;
+    userId: string;
+    at: Date;
+  },
+) {
+  const [rep] = await tx
+    .insert(ppipReport)
+    .values({
+      archiveId: v.archiveId,
+      month: v.month,
+      outcome: v.result.outcome,
+      protocol: v.result.outcome === 'accepted' ? v.result.protocol || null : null,
+      message: v.result.outcome === 'accepted' ? null : v.result.message,
+      environment: v.environment,
+      lines: v.report.lines.length,
+      total: v.report.total === null ? null : v.report.total.toFixed(2),
+      content: v.report,
+      sentBy: v.userId,
+      sentAt: v.at,
+    })
+    .returning({ id: ppipReport.id });
+  return rep!.id;
+}
+
+/**
+ * Le prestazioni da inviare del mese, bloccate fino alla fine della transazione. Devono essere
+ * proprio quelle che il titolare ha controllato: se nel frattempo se n'è aggiunta o annullata
+ * una, la distinta va ricontrollata (regola 5, D232). Con un invio in corso non se ne comincia un
+ * altro: le prestazioni partirebbero due volte.
+ */
+async function lockPending(tx: Tx, archiveId: string, month: string, seen: readonly string[]) {
+  const rows = await monthRows(tx, archiveId, month, { lock: true });
+  if (rows.some((r) => r.inInvioDal))
+    throw new HttpError(
+      409,
+      'Un invio della distinta del mese è già in corso, o è rimasto senza risposta: aspetta l’esito, o segnalo nella distinta',
+    );
+  const pending = rows.filter((r) => !r.inviata);
+  if (
+    !sameIds(
+      pending.map((r) => r.id),
+      seen,
+    )
+  )
+    throw new HttpError(
+      409,
+      'La distinta è cambiata dopo il controllo: ricontrollala prima di mandarla',
+    );
+  if (!pending.length) throw new HttpError(409, 'Nessuna prestazione da inviare per il mese');
+  return pending;
+}
+
+function monthEnded(month: string, today: string) {
+  if (monthBounds(month).to >= today)
+    throw new HttpError(
+      409,
+      'Il mese non è finito: la distinta si manda dal primo giorno del mese dopo',
+    );
+}
+
+interface MonthAction {
+  db: Database;
+  actor: Actor;
+  archiveId: string;
+  month: string;
+  at: Date;
+}
+
+/**
+ * Manda all'ASL le prestazioni del mese non ancora partite, quelle che il titolare ha controllato
+ * (`seen`). Il mese dev'essere finito (la distinta è delle prestazioni «eseguite nel corso del
+ * mese precedente»). Con il simulatore in produzione non parte nulla: il collegamento vero è da
+ * completare con Regione e ASL (D212).
+ *
+ * Tre passi (D232): le prestazioni passano «in invio», tutte insieme, e nessun altro invio o
+ * annullamento le tocca; il portale, fuori da ogni transazione; l'esito, il segno sulle
+ * prestazioni e il registro degli accessi, insieme. Se il servizio si ferma a metà, le prestazioni
+ * restano «in invio» e l'esito lo segna il titolare, dopo averlo chiesto all'ASL: rimandarle da
+ * sole potrebbe farle arrivare due volte.
+ */
+export async function sendMonth(
+  params: MonthAction & {
+    portal: AdditionalServicesPortal;
+    environment: 'prova' | 'produzione';
+    seen: readonly string[];
+    today: string;
+  },
+) {
+  const { db, portal, environment, actor, archiveId, month, seen, today, at } = params;
+  if (!sendingAvailable(portal, environment))
+    throw new HttpError(
+      409,
+      'L’invio della distinta all’ASL non è ancora collegato: si completa quando Regione e ASL diranno come (D212)',
+    );
+  monthEnded(month, today);
+  const { pending, report } = await withActor(db, actor.userId, async (tx) => {
+    const pending = await lockPending(tx, archiveId, month, seen);
+    await tx
+      .update(ppipRecord)
+      .set({ sendingSince: at, sendingBy: actor.userId })
+      .where(
+        inArray(
+          ppipRecord.id,
+          pending.map((r) => r.id),
+        ),
+      );
+    return { pending, report: await reportOf(tx, archiveId, month, pending) };
+  });
+  const entry = {
+    studioId: actor.studioId,
+    userId: actor.userId,
+    action: 'invio_distinta_ppip' as const,
+    workstation: actor.workstation,
+  };
+
+  let result: AdditionalServicesResult;
+  try {
+    result = await portal.submit(report);
+  } catch {
+    // Non si sa se la distinta è arrivata: le prestazioni restano «in invio». I dati sono forse
+    // partiti, quindi restano nel registro.
+    await withActor(db, actor.userId, (tx) =>
+      logAccessForPatients(tx, patientsOf(pending), {
+        ...entry,
+        outcome: 'fallito',
+        details: {
+          archivio: archiveId,
+          mese: month,
+          esito: 'senza_risposta',
+          righe: pending.length,
+        },
+      }),
+    );
+    throw new HttpError(
+      502,
+      'Il portale non ha risposto in modo chiaro: le prestazioni restano «in invio». Chiedi all’ASL se la distinta è arrivata, poi segna l’esito nella distinta',
+    );
+  }
+
+  return withActor(db, actor.userId, async (tx) => {
+    const id = await insertReport(tx, {
+      archiveId,
+      month,
+      result,
+      environment: portal.environment,
+      report,
+      userId: actor.userId,
+      at,
+    });
+    // Solo le prestazioni ancora in invio da questo invio: se intanto il titolare ha segnato
+    // l'esito a mano, quello vale.
+    await tx
+      .update(ppipRecord)
+      .set({
+        sendingSince: null,
+        sendingBy: null,
+        ...(result.outcome === 'accepted' ? { reportId: id } : {}),
       })
-      .returning({ id: ppipReport.id });
-    if (result.outcome === 'accepted') {
-      await tx
-        .update(ppipRecord)
-        .set({ reportId: rep!.id })
-        .where(
-          and(
-            inArray(
-              ppipRecord.id,
-              pending.map((r) => r.id),
-            ),
-            isNull(ppipRecord.reportId),
-            eq(ppipRecord.status, 'active'),
+      .where(
+        and(
+          inArray(
+            ppipRecord.id,
+            pending.map((r) => r.id),
           ),
-        );
-    }
+          eq(ppipRecord.sendingSince, at),
+          eq(ppipRecord.sendingBy, actor.userId),
+        ),
+      );
+    await logAccessForPatients(tx, patientsOf(pending), {
+      ...entry,
+      outcome: result.outcome === 'accepted' ? 'riuscito' : 'fallito',
+      details: { archivio: archiveId, mese: month, esito: result.outcome, righe: pending.length },
+    });
     return {
-      id: rep!.id,
+      id,
       esito: result.outcome,
       protocollo: result.outcome === 'accepted' ? result.protocol : null,
       messaggio: result.outcome === 'accepted' ? null : result.message,
-      righe: lines.length,
+      righe: pending.length,
       totale: report.total,
-      pazienti: [...new Set(pending.map((r) => r.patientId))],
     };
+  });
+}
+
+/**
+ * La distinta consegnata all'ASL fuori dal programma, per esempio con il CSV sul portale o nello
+ * strumento dell'ASL: le prestazioni controllate (`seen`) risultano partite, con il riferimento
+ * della consegna se c'è, e non si annullano più (D232). È la strada di oggi in produzione.
+ */
+export async function deliverMonth(
+  params: MonthAction & { seen: readonly string[]; reference: string | null; today: string },
+) {
+  const { db, actor, archiveId, month, seen, reference, today, at } = params;
+  monthEnded(month, today);
+  return withActor(db, actor.userId, async (tx) => {
+    const pending = await lockPending(tx, archiveId, month, seen);
+    const report = await reportOf(tx, archiveId, month, pending);
+    const id = await insertReport(tx, {
+      archiveId,
+      month,
+      result: { outcome: 'accepted', protocol: reference ?? '' },
+      environment: MANUAL_ENVIRONMENT,
+      report,
+      userId: actor.userId,
+      at,
+    });
+    await tx
+      .update(ppipRecord)
+      .set({ reportId: id })
+      .where(
+        inArray(
+          ppipRecord.id,
+          pending.map((r) => r.id),
+        ),
+      );
+    await logAccessForPatients(tx, patientsOf(pending), {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      action: 'consegna_distinta_ppip',
+      outcome: 'riuscito',
+      workstation: actor.workstation,
+      details: { archivio: archiveId, mese: month, righe: pending.length },
+    });
+    return { id, righe: pending.length, totale: report.total };
+  });
+}
+
+/**
+ * L'esito di un invio rimasto senza risposta, segnato dal titolare dopo averlo chiesto all'ASL
+ * (D232): arrivata, e le prestazioni risultano partite; non arrivata, e tornano da inviare. Non
+ * prima di INTERRUPTED_AFTER_MINUTES dall'inizio: l'invio potrebbe essere ancora in corso.
+ */
+export async function settleInterrupted(
+  params: MonthAction & { arrived: boolean; reference: string | null },
+) {
+  const { db, actor, archiveId, month, arrived, reference, at } = params;
+  return withActor(db, actor.userId, async (tx) => {
+    const rows = await monthRows(tx, archiveId, month, { lock: true });
+    const sending = rows.filter((r) => r.inInvioDal);
+    if (!sending.length) throw new HttpError(409, 'Nessun invio senza risposta per il mese');
+    const since = Math.max(...sending.map((r) => Date.parse(r.inInvioDal!)));
+    if (at.getTime() - since < INTERRUPTED_AFTER_MINUTES * 60_000)
+      throw new HttpError(
+        409,
+        `L’invio è cominciato da meno di ${INTERRUPTED_AFTER_MINUTES} minuti: potrebbe essere ancora in corso`,
+      );
+    const report = await reportOf(tx, archiveId, month, sending);
+    const id = await insertReport(tx, {
+      archiveId,
+      month,
+      result: arrived
+        ? { outcome: 'accepted', protocol: reference ?? '' }
+        : {
+            outcome: 'unreachable',
+            message: 'Non arrivata all’ASL, secondo l’ASL: le prestazioni tornano da inviare',
+          },
+      environment: MANUAL_ENVIRONMENT,
+      report,
+      userId: actor.userId,
+      at,
+    });
+    await tx
+      .update(ppipRecord)
+      .set({ sendingSince: null, sendingBy: null, ...(arrived ? { reportId: id } : {}) })
+      .where(
+        and(
+          inArray(
+            ppipRecord.id,
+            sending.map((r) => r.id),
+          ),
+          isNotNull(ppipRecord.sendingSince),
+        ),
+      );
+    await logAccessForPatients(tx, patientsOf(sending), {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      action: 'esito_distinta_ppip',
+      outcome: 'riuscito',
+      workstation: actor.workstation,
+      details: {
+        archivio: archiveId,
+        mese: month,
+        esito: arrived ? 'arrivata' : 'non_arrivata',
+        righe: sending.length,
+      },
+    });
+    return { id, righe: sending.length, esito: arrived ? 'arrivata' : 'non_arrivata' };
   });
 }

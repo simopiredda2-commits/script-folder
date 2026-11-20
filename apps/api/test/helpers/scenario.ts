@@ -107,6 +107,8 @@ export async function createScenario(
      * giro passa dalla mezzanotte.
      */
     clockAt?: Date;
+    /** «prova» per difetto; «produzione» per le prove di ciò che lì cambia (D232). */
+    environment?: 'prova' | 'produzione';
   } = {},
 ): Promise<Scenario> {
   const clock = new Clock(appOptions.clockAt);
@@ -248,12 +250,16 @@ export async function createScenario(
     },
   ]);
   const day = 86_400_000;
+  // Attiva con l'orologio vero e con quello della prova: alcune guardie leggono l'uno, altre
+  // l'altro. Con l'orologio fermo a un altro giorno, il sostituto non riceverebbe un «no» per
+  // il ruolo ma per l'autorizzazione scaduta, e una prova del ruolo resterebbe verde per sbaglio.
+  const anchors = [Date.now(), clock.now().getTime()];
   await db.insert(archiveGrant).values({
     archiveId: a1!.id,
     granteeUserId: users.sostituto.id,
     kind: 'substitution',
-    validFrom: new Date(Date.now() - day),
-    validTo: new Date(Date.now() + day),
+    validFrom: new Date(Math.min(...anchors) - day),
+    validTo: new Date(Math.max(...anchors) + day),
     reason: 'Ferie del titolare',
     grantedBy: users.titolare.id,
   });
@@ -400,11 +406,16 @@ export async function createScenario(
   );
 
   // L'ora di partenza è già nell'orologio: al servizio vanno le altre opzioni.
-  const { referenceUpdates, clockAt, ...deps } = appOptions;
+  const { referenceUpdates, clockAt, environment, ...deps } = appOptions;
   void clockAt;
   const app = buildApp({
     db,
-    config: { encryptionKey, sessionMaxHours: 12, cookieSecure: false },
+    config: {
+      encryptionKey,
+      sessionMaxHours: 12,
+      cookieSecure: false,
+      ...(environment ? { environment } : {}),
+    },
     now: clock.now,
     ...deps,
     ...(referenceUpdates ? { referenceUpdates: referenceUpdates(clock.now) } : {}),

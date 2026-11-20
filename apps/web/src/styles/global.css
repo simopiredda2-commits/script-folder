@@ -1598,8 +1598,14 @@ textarea[aria-invalid='true'] {
   margin: 0.5rem 0;
 }
 
+/* Distinta consegnata all'ASL fuori dal programma (D232). */
+.consegna-distinta {
+  margin-top: 1rem;
+}
+
 .consegne summary,
-.malattie-rare summary {
+.malattie-rare summary,
+.consegna-distinta summary {
   display: flex;
   align-items: center;
   min-height: var(--size-min-target);
