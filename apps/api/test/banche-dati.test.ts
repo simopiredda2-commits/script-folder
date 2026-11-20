@@ -911,4 +911,40 @@ describe('banche dati via HTTP e nelle regole', () => {
     const sent = await post(`/api/ricette/${res.json().id}/firma-e-invia`);
     expect(sent.statusCode, sent.body).toBe(200);
   });
+
+  it('R22 dall’anagrafica AIFA (D210): la confezione «Sospesa» informa, senza fermare né chiedere un motivo', async () => {
+    const res = await post(`/api/pazienti/${s.richPatient}/ricette`, {
+      kind: 'pharma_ssn',
+      lines: [
+        {
+          drugAic: '034471021',
+          drugName: 'RANITIDINA DOC GENERICI',
+          activeIngredient: 'RANITIDINA CLORIDRATO',
+          quantity: 1,
+        },
+        {
+          drugAic: '038092019',
+          drugName: 'AMLODIPINA DOC GENERICI',
+          activeIngredient: 'AMLODIPINA BESILATO',
+          quantity: 1,
+        },
+      ],
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const check = (await post(`/api/ricette/${res.json().id}/controlla`)).json();
+    expect(check.versioneRegole).toBe('2026-11-20.1');
+    const r22 = check.problemi.filter((p: { ruleId: string }) => p.ruleId === 'R22');
+    // Solo la ranitidina: l'amlodipina è «Autorizzata» nella stessa anagrafica.
+    expect(r22).toEqual([
+      expect.objectContaining({
+        severity: 'info',
+        message:
+          'RANITIDINA DOC GENERICI: confezione sospesa secondo l’anagrafica AIFA delle confezioni',
+        source: expect.stringMatching(/STATO_AMMINISTRATIVO/),
+      }),
+    ]);
+    expect(r22[0].needs).toBeUndefined();
+    const sent = await post(`/api/ricette/${res.json().id}/firma-e-invia`);
+    expect(sent.statusCode, sent.body).toBe(200);
+  });
 });

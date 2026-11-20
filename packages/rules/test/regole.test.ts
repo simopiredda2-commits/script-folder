@@ -83,7 +83,7 @@ const blocks = (c: RuleContext, id: string) =>
 describe('dati delle regole', () => {
   const [ruleset] = loadRulesets();
 
-  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3', () => {
+  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3, R22 dalla 2026-11-20.1', () => {
     const all = loadRulesets();
     expect(all.map((r) => r.version)).toEqual([
       '2026-11-18.1',
@@ -92,8 +92,9 @@ describe('dati delle regole', () => {
       '2026-11-19.1',
       '2026-11-19.2',
       '2026-11-19.3',
+      '2026-11-20.1',
     ]);
-    const upTo17 = RULE_IDS.filter((id) => !['R18', 'R19', 'R20', 'R21'].includes(id));
+    const upTo17 = RULE_IDS.filter((id) => !['R18', 'R19', 'R20', 'R21', 'R22'].includes(id));
     for (const rs of all.slice(0, 2)) {
       expect(rs.rules.map((r) => r.id).sort()).toEqual([...upTo17].sort());
     }
@@ -101,7 +102,10 @@ describe('dati delle regole', () => {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...upTo17, 'R18'].sort());
     }
     expect(all[4]!.rules.map((r) => r.id).sort()).toEqual([...upTo17, 'R18', 'R19', 'R20'].sort());
-    for (const rs of all.slice(5)) {
+    expect(all[5]!.rules.map((r) => r.id).sort()).toEqual(
+      [...upTo17, 'R18', 'R19', 'R20', 'R21'].sort(),
+    );
+    for (const rs of all.slice(6)) {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...RULE_IDS].sort());
     }
   });
@@ -156,6 +160,12 @@ describe('dati delle regole', () => {
     const v6 = all.find((r) => r.version === '2026-11-19.3')!;
     expect(v6.effectiveFrom).toBe('2026-11-19');
     expect(rulesetAt('2026-11-19').version).toBe('2026-11-19.3');
+    expect(
+      rulesetAt(
+        '2026-11-20',
+        all.filter((r) => r.version !== '2026-11-20.1'),
+      ).version,
+    ).toBe('2026-11-19.3');
     for (const r of v6.rules) {
       if (r.id === 'R21') {
         expect(r.behavior).toBe('inform');
@@ -163,6 +173,26 @@ describe('dati delle regole', () => {
         expect(r.sources.at(-1)!.title).toMatch(/D202/);
       } else {
         expect(r, r.id).toEqual(v5.rules.find((x) => x.id === r.id));
+      }
+    }
+  });
+
+  it('dalla 2026-11-20.1 R22 informa sulla confezione sospesa (D210); il resto come la 2026-11-19.3', () => {
+    const all = loadRulesets();
+    const v6 = all.find((r) => r.version === '2026-11-19.3')!;
+    const v7 = all.find((r) => r.version === '2026-11-20.1')!;
+    expect(v7.effectiveFrom).toBe('2026-11-20');
+    expect(rulesetAt('2026-11-20').version).toBe('2026-11-20.1');
+    expect(v7.rules).toHaveLength(v6.rules.length + 1);
+    for (const r of v7.rules) {
+      if (r.id === 'R22') {
+        expect(r.behavior).toBe('inform');
+        expect(r.status).toBe('active');
+        expect(r.sources[0]!.url).toBe('https://www.aifa.gov.it/liste-dei-farmaci');
+        expect(r.sources[0]!.title).toMatch(/STATO_AMMINISTRATIVO/);
+        expect(r.sources.at(-1)!.title).toMatch(/D210/);
+      } else {
+        expect(r, r.id).toEqual(v6.rules.find((x) => x.id === r.id));
       }
     }
   });
@@ -388,8 +418,8 @@ describe('R5, R6 · piano terapeutico', () => {
       sentLines: sent,
       prescription: { lines: [line({ quantity: 2 })] },
     });
-    // In vigore il 25/11/2026: la 2026-11-19.3, con R6 come nella 2026-11-19.1 (D181).
-    expect(run(c).rulesVersion).toBe('2026-11-19.3');
+    // In vigore il 25/11/2026: la 2026-11-20.1, con R6 come nella 2026-11-19.1 (D181).
+    expect(run(c).rulesVersion).toBe('2026-11-20.1');
     expect(blocks(c, 'R6')).toBe(true);
     expect(of(c, 'R6')[0]!.message).toBe(
       'Farmaco di prova 5 mg: il piano autorizza 4 confezioni, già prescritte 3, di cui 2 con un altro programma; residuo 1',
@@ -927,7 +957,7 @@ describe('R19 e R20 · stato del paziente alla ricetta (D199)', () => {
 
   it('le ricette controllate con la versione precedente restano com’erano', () => {
     const before = loadRulesets().filter(
-      (r) => !['2026-11-19.2', '2026-11-19.3'].includes(r.version),
+      (r) => !['2026-11-19.2', '2026-11-19.3', '2026-11-20.1'].includes(r.version),
     );
     const dead = withStatus('deceased');
     expect(checkPrescription(dead, before).issues.some((i) => i.ruleId === 'R19')).toBe(false);
@@ -986,8 +1016,73 @@ describe('R21 · farmaco carente secondo l’elenco AIFA (D202)', () => {
   });
 
   it('le ricette controllate con le versioni di prima non hanno la R21', () => {
-    const before = loadRulesets().filter((r) => r.version !== '2026-11-19.3');
+    const before = loadRulesets().filter(
+      (r) => !['2026-11-19.3', '2026-11-20.1'].includes(r.version),
+    );
     const c = ctx({ date: '2026-11-20', facts: shortage() });
     expect(checkPrescription(c, before).issues.some((i) => i.ruleId === 'R21')).toBe(false);
+  });
+});
+
+describe('R22 · confezione sospesa secondo l’anagrafica AIFA (D210)', () => {
+  it('confezione sospesa: informazione sulla riga con le parole dell’anagrafica, senza fermare né chiedere un motivo', () => {
+    const c = ctx({ date: '2026-11-20', facts: { suspended: true } });
+    const [i, ...more] = of(c, 'R22');
+    expect(more).toEqual([]);
+    expect(i).toEqual({
+      ruleId: 'R22',
+      severity: 'info',
+      lineId: 'l1',
+      message:
+        'Farmaco di prova 5 mg: confezione sospesa secondo l’anagrafica AIFA delle confezioni',
+      source: expect.stringMatching(/^AIFA, anagrafica delle confezioni .*STATO_AMMINISTRATIVO/),
+    });
+    expect(run(c).blocking.some((x) => x.ruleId === 'R22')).toBe(false);
+    expect(run(c).issues.some((x) => x.ruleId === 'R22' && x.needs === 'reason')).toBe(false);
+  });
+
+  it('una informazione per ogni riga sospesa; senza nome del farmaco la riga si chiama con l’AIC', () => {
+    const c = ctx({
+      date: '2026-11-20',
+      drugFacts: (aic) => (aic === '012345678' || aic === '011111111' ? { suspended: true } : {}),
+      prescription: {
+        lines: [
+          line({ id: 'l1', drugAic: '012345678', drugName: null }),
+          line({ id: 'l2', drugAic: '087654321' }),
+          line({ id: 'l3', drugAic: '011111111', drugName: 'Altro farmaco di prova' }),
+        ],
+      },
+    });
+    expect(of(c, 'R22').map((i) => [i.lineId, i.message])).toEqual([
+      ['l1', '012345678: confezione sospesa secondo l’anagrafica AIFA delle confezioni'],
+      [
+        'l3',
+        'Altro farmaco di prova: confezione sospesa secondo l’anagrafica AIFA delle confezioni',
+      ],
+    ]);
+  });
+
+  it('vale anche per la ricetta bianca; nulla se l’anagrafica non dice «Sospesa»', () => {
+    expect(
+      of(
+        ctx({ date: '2026-11-20', facts: { suspended: true }, prescription: { kind: 'white' } }),
+        'R22',
+      ),
+    ).toHaveLength(1);
+    expect(of(ctx({ date: '2026-11-20', facts: { suspended: false } }), 'R22')).toEqual([]);
+    expect(of(ctx({ date: '2026-11-20', facts: {} }), 'R22')).toEqual([]);
+    expect(of(ctx({ date: '2026-11-20', facts: undefined }), 'R22')).toEqual([]);
+  });
+
+  it('le ricette controllate con le versioni di prima non hanno la R22', () => {
+    const before = loadRulesets().filter((r) => r.version !== '2026-11-20.1');
+    const c = ctx({ date: '2026-11-20', facts: { suspended: true } });
+    expect(checkPrescription(c, before).rulesVersion).toBe('2026-11-19.3');
+    expect(checkPrescription(c, before).issues.some((i) => i.ruleId === 'R22')).toBe(false);
+    expect(
+      run(ctx({ date: '2026-11-19', facts: { suspended: true } })).issues.some(
+        (i) => i.ruleId === 'R22',
+      ),
+    ).toBe(false);
   });
 });

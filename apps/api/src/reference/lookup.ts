@@ -466,6 +466,9 @@ export class ReferenceData {
           reason: shortage.reason,
         };
       }
+      // L'anagrafica in vigore dice «Sospesa»: la R22 informa (D210). «Autorizzata», nessuno stato
+      // o nessuna riga non sono una sospensione, come nelle variazioni sui farmaci in terapia.
+      if (d.some((x) => lower(x.adminState) === 'sospesa')) facts.suspended = true;
       out.set(aic, {
         aic,
         name: pick([...d.map((x) => x.name), ...t.map((x) => x.name), ...s.map((x) => x.name)]),
