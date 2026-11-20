@@ -313,7 +313,7 @@ describe('distinta del mese nell’archivio (D212)', () => {
       '/api/archivi/a1/ppip/esportazione?mese=2026-10&formato=acn-allegato-6',
     );
     expect(
-      screen.getByText(/Invio simulato: il collegamento con il portale regionale/),
+      screen.getByText(/Invio simulato: il collegamento vero si scrive quando Regione e ASL/),
     ).toBeTruthy();
     const send = screen.getByRole('button', { name: 'Invia all’ASL 2 prestazioni' });
     expect((send as HTMLButtonElement).disabled).toBe(true);

@@ -87,7 +87,13 @@ export function PpipReportPage() {
   const mese = MONTH.test(params.get('mese') ?? '') ? params.get('mese')! : lastMonth();
   const [monthInput, setMonthInput] = useState(mese);
   const list = archives.data?.archivi ?? [];
-  const own = list.find((a) => a.id === params.get('archivio')) ?? list[0] ?? null;
+  // L'archivio dell'indirizzo; se non c'è, il proprio (in medicina di gruppo se ne vedono altri).
+  const mine = state.status === 'ready' ? state.me.archivio?.id : undefined;
+  const own =
+    list.find((a) => a.id === params.get('archivio')) ??
+    list.find((a) => a.id === mine) ??
+    list[0] ??
+    null;
   const d = useApi<Distinta>(own ? `/api/archivi/${own.id}/ppip?mese=${mese}` : null);
   const [format, setFormat] = useState('acn-allegato-6');
   const [checked, setChecked] = useState(false);
@@ -183,8 +189,10 @@ export function PpipReportPage() {
         <p className="aiuto">
           Il medico manda all’ASL, entro il 15 di ogni mese, la distinta delle prestazioni del mese
           prima, con data, nome, cognome, indirizzo e codice fiscale dell’assistito (ACN della
-          medicina generale 2022-2024, allegato 6, comma 4). In Piemonte passa dal portale regionale
-          (AIR 2024).
+          medicina generale 2022-2024, allegato 6, comma 4). Per le prestazioni soggette ad
+          autorizzazione vanno con la distinta anche l’autorizzazione e il modulo regionale delle
+          prestazioni multiple autorizzate (comma 5). In Piemonte l’accordo regionale prevede la
+          rendicontazione su supporto digitale (AIR 2024, art. 30): come, lo diranno Regione e ASL.
         </p>
       </form>
 
@@ -204,7 +212,7 @@ export function PpipReportPage() {
               <p className="tenue">Nessuna prestazione aggiuntiva registrata nel mese.</p>
             ) : (
               <div className="tabella-scorrevole">
-                <table className="tabella">
+                <table className="tabella tabella-distinta">
                   <caption>Distinta di {monthName(x.mese)}, una riga per prestazione</caption>
                   <thead>
                     <tr>
@@ -345,8 +353,8 @@ export function PpipReportPage() {
               <>
                 {x.invioSimulato && (
                   <Notice kind="info">
-                    Invio simulato: il collegamento con il portale regionale si completa quando
-                    Regione e ASL diranno come (D212). Intanto la distinta si scarica in CSV.
+                    Invio simulato: il collegamento vero si scrive quando Regione e ASL diranno come
+                    si manda la distinta (D212). Intanto la distinta si scarica in CSV.
                   </Notice>
                 )}
                 {x.daInviare > 0 && (

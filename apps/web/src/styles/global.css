@@ -1140,8 +1140,10 @@ a.coda:hover {
   display: block;
 }
 
-/* Collegamenti nelle tabelle delle prestazioni prescritte: bersaglio alto 44 px. */
-.tabella-prescritte a {
+/* Collegamenti nelle tabelle delle prestazioni prescritte e della distinta delle PPIP: bersaglio
+   alto 44 px. */
+.tabella-prescritte a,
+.tabella-distinta a {
   display: inline-flex;
   align-items: center;
   min-height: var(--size-min-target);
