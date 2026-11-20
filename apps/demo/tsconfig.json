@@ -6,5 +6,5 @@
     "types": ["vite/client", "node"],
     "noEmit": true
   },
-  "include": ["src", "scripts", "vite.config.ts"]
+  "include": ["src", "scripts", "prove", "vite.config.ts", "vitest.browser.config.ts"]
 }

@@ -94,6 +94,17 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           metformina. L’amministratore dello studio non apre le cartelle.
         </p>
       </section>
+      <section aria-labelledby="dimo-aura">
+        <h3 id="dimo-aura">AURA simulata</h3>
+        <p>All’avvio l’anagrafe regionale simulata ha mandato, da vedere in «Oggi»:</p>
+        <ul>
+          {ready.aura.exemption && <li>un’esenzione nuova per {ready.aura.exemption};</li>}
+          {ready.aura.registry && <li>un’ASL diversa per {ready.aura.registry}, da confermare;</li>}
+          {ready.aura.deceased && <li>il decesso di {ready.aura.deceased}, da confermare;</li>}
+          {ready.aura.revoked && <li>la revoca di {ready.aura.revoked};</li>}
+          <li>un nuovo assistito, {ready.aura.newPatient}, da registrare.</li>
+        </ul>
+      </section>
       <section aria-labelledby="dimo-codice" aria-live="polite">
         <h3 id="dimo-codice">Secondo fattore</h3>
         {code ? (

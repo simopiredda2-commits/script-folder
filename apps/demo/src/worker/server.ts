@@ -13,8 +13,10 @@ import { DEMO_USERS, seedDemo } from '../../../api/src/db/demo-seed';
 import * as schema from '../../../api/src/db/schema';
 import { base32Decode } from '../../../api/src/security/base32';
 import { totp, TOTP_STEP_SECONDS } from '../../../api/src/security/totp';
+import { createAuraDemo } from './aura';
+import { singleSession, type SingleSession } from './database';
 import { getRequestHandler, IncomingMessage, ServerResponse } from './shims/http';
-import type { DemoUser, WireRequest, WireResponse } from '../protocol';
+import type { AuraHints, DemoUser, WireRequest, WireResponse } from '../protocol';
 
 /** Password di tutti gli utenti dimostrativi: la mostra la pagina, non è un segreto. */
 export const DEMO_PASSWORD = 'dimostrazione';
@@ -26,6 +28,8 @@ const cookies = new Map<string, string>();
 /** Segreti del secondo fattore, letti all'attivazione: per mostrare il codice a chi prova. */
 const secrets = new Map<string, string>();
 let pendingUser: string | null = null;
+/** La sessione unica con il database (D223): le richieste passano una alla volta. */
+let session: SingleSession | null = null;
 
 async function download(base: string, name: string): Promise<Response> {
   const res = await fetch(new URL(name, base));
@@ -48,7 +52,7 @@ async function fetchBase64(base: string, name: string, gunzip: boolean): Promise
 export async function start(
   base: string,
   progress: (message: string) => void,
-): Promise<DemoUser[]> {
+): Promise<{ users: DemoUser[]; aura: AuraHints }> {
   progress(
     'Scarico il database e il programma (circa 20 MB, solo la prima volta che il browser li vede)…',
   );
@@ -71,23 +75,33 @@ export async function start(
     fsBundle: new Blob([data]),
     loadDataDir: new Blob([dump], { type: gzip ? 'application/gzip' : 'application/x-tar' }),
   });
-  const db = drizzle(pg, { schema, casing: 'snake_case' }) as unknown as Database;
+  session = singleSession(pg);
+  const db = drizzle(session.client, { schema, casing: 'snake_case' }) as unknown as Database;
 
   progress('Creo lo studio dimostrativo e i pazienti inventati…');
   const encryptionKey = randomBytes(32);
   await seedDemo(db, { encryptionKey, passwordFor: () => DEMO_PASSWORD });
 
+  // AURA simulata con i pazienti dimostrativi (D223): collegati e con le loro variazioni prima che
+  // il servizio la ascolti; il nuovo assistito arriva dopo, come una notifica.
+  progress('Collego i pazienti con AURA simulata…');
+  const auraDemo = createAuraDemo();
+  const before = await auraDemo.beforeStart(db);
   progress('Avvio il servizio…');
   const app = buildApp({
     db,
     config: { encryptionKey, sessionMaxHours: 12, cookieSecure: false, environment: 'prova' },
+    aura: { gateway: auraDemo.gateway },
   });
   await app.ready();
-  return DEMO_USERS.map((u) => ({
+  const after = await auraDemo.afterStart(db, () => session!.idle());
+  const aura: AuraHints = { ...before, ...after };
+  const users = DEMO_USERS.map((u) => ({
     username: u.username,
     name: u.displayName,
     roles: u.roles.map((r) => ROLE_LABELS[r]),
   }));
+  return { users, aura };
 }
 
 function remember(setCookie: string) {
@@ -107,6 +121,11 @@ function remember(setCookie: string) {
 
 /** Una richiesta dell'interfaccia passa dal gestore di Fastify, con i cookie del barattolo. */
 export function handle(request: WireRequest): Promise<WireResponse> {
+  if (!session) return Promise.reject(new Error('Il servizio non è ancora avviato'));
+  return session.queue(() => handleNow(request));
+}
+
+function handleNow(request: WireRequest): Promise<WireResponse> {
   const handler = getRequestHandler();
   if (!handler) return Promise.reject(new Error('Il servizio non è ancora avviato'));
   const headers: Record<string, string> = { host: 'dimostrazione.invalid', ...request.headers };

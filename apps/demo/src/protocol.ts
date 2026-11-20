@@ -18,6 +18,15 @@ export interface DemoUser {
   roles: string[];
 }
 
+/** Che cosa ha mandato AURA simulata all'avvio (D223): i nomi dei pazienti inventati. */
+export interface AuraHints {
+  exemption: string | null;
+  registry: string | null;
+  deceased: string | null;
+  revoked: string | null;
+  newPatient: string;
+}
+
 export type ToWorker =
   | { type: 'start'; base: string }
   | { type: 'request'; id: number; request: WireRequest }
@@ -25,7 +34,7 @@ export type ToWorker =
 
 export type FromWorker =
   | { type: 'progress'; message: string }
-  | { type: 'ready'; users: DemoUser[]; password: string; ms: number }
+  | { type: 'ready'; users: DemoUser[]; aura: AuraHints; password: string; ms: number }
   | { type: 'failed'; message: string }
   | { type: 'response'; id: number; response: WireResponse }
   | { type: 'request-failed'; id: number; message: string }
