@@ -24,7 +24,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #12 (19/11/2026)**, nello stesso branch: revoca automatica e anagrafica da AURA da confermare (D198), con la correzione dei controlli in parallelo; sezione «Dopo l'unione della #12 – Revoca e anagrafica da AURA». Fermata fatta: via, pull request #13 unita (risposte in «Risposte della fermata dopo l'unione della #12»).
 - **Dopo l'unione della #13 (19/11/2026)**, nello stesso branch ripartito da `main`: nuovi assistiti da AURA, paziente temporaneo registrato in un passo solo e stato del paziente alla ricetta (D199). Fermata fatta: via, pull request #14 unita (risposte in «Risposte della fermata dopo l'unione della #13»).
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
-- **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Pull request #16 e fermata.
+- **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
+- **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206). Sezione «Dopo l'unione della #16». Pull request #17 e fermata, con le domande pronte per la mattina del 20/11/2026.
 
 **Fuori dal secondo giro, da fare dopo** (nessuno avviato):
 
@@ -32,7 +33,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 2. Specifiche e credenziali di collaudo di SAR, Sistema TS e AURA: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo della ricetta rossa e del promemoria. Insieme: registrazione del programma presso la Regione (codice del gestionale, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103).
 3. Decisione su Ready! e sulla versione «Full» (D78).
 4. Agenda (dopo la decisione su Ready!), AURA vera (oggi con il simulatore, D197) e FSE, importazione dei dati dal software attuale (serve il formato dell'esportazione di Next² con un file d'esempio senza dati veri). Riepiloghi: fatti (D201), senza PPIP e fatture.
-5. A7 per nota, classe, piano e ritiro, e i registri AIFA. Lista di trasparenza e farmaci carenti: fatti (D202), con A7 per le carenze. La lista di trasparenza non porta la nota AIFA (correzione di D148): una fonte delle note per AIC manca ancora. Soglie di vecchiaia: fatte (D156).
+5. A7 per nota, classe, piano e ritiro: fatti (D205), come i registri AIFA (D206). Lista di trasparenza e farmaci carenti: fatti (D202), con A7 per le carenze. La lista di trasparenza non porta la nota AIFA (correzione di D148): una fonte delle note per AIC manca ancora. Soglie di vecchiaia: fatte (D156).
 6. Dicitura del tipo di accesso nella versione viva dei requisiti (D79). Collegamento alla segnalazione di farmacovigilanza: fatto (D202).
 7. Prove con lettori di schermo e tablet veri, e una giornata di lavoro con la Dr.ssa Rocca.
 
@@ -986,7 +987,20 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Da scrivere alla fine del blocco dopo l'unione della #16 (riepiloghi alla segreteria, altre variazioni AIFA, registri AIFA, prove indipendenti dalla mezzanotte). Simone le guarda la mattina del 20/11/2026, prima delle 9:15. Restano le verifiche alla fine della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7), più R19, R20 e R21.
+Fermata dopo il blocco della notte fra il 19 e il 20/11/2026 (pull request #17). Simone le guarda la mattina del 20/11/2026, prima delle 9:15. Che cosa guardare, in parole semplici:
+
+- **Variazioni AIFA** (schermata 70): se i testi sono chiari per un medico e se il modo in cui la voce si chiude va bene. Oggi la voce resta finché la terapia non è aggiornata o conclusa.
+- **Registri AIFA** (schermata 71): se le informazioni sono quelle che servono quando si prescrive, e se il collegamento per ATC (anche agli equivalenti) va bene.
+- **Riepiloghi alla segreteria** (D204): come ha scelto Simone, con il CSV, sugli archivi che l'hanno confermata.
+
+Domande:
+
+1. **Via** all'unione della pull request #17: A. Via: unisci (consigliata); B. prima delle modifiche; C. fermati qui.
+2. **Variazioni AIFA, quando la voce sparisce**: A. finché la terapia non è aggiornata o conclusa, come ora (consigliata); B. anche con un pulsante «Visto» del medico; C. dopo 30 giorni dall'aggiornamento.
+3. **Confezione sospesa alla ricetta**: oggi lo dicono la ricerca, la terapia e Oggi, non la ricetta. A. una regola che informa, come la carenza (R21) (consigliata); B. un avviso che chiede il motivo; C. nessuna regola.
+4. **Dopo**: A. pausa dopo l'unione (consigliata, come ha detto Simone); B. i registri anche nella scheda della terapia e in Oggi; C. le verifiche finali con la Dr.ssa Rocca.
+
+Restano le verifiche alla fine della Dr.ssa Rocca: ICD-9-CM, catalogo regionale, allegati 8 e 7, R19, R20, R21 e ora i testi delle variazioni e dei registri AIFA.
 
 ## Risposte della fermata dopo l'unione della #15 (19–20/11/2026)
 
