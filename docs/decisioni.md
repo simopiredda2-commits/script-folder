@@ -1423,3 +1423,9 @@ Non provati: i percorsi che le prove non percorrono, guardati solo dalla lettura
 - Prove: due nuove nella cornice, 17 in tutto, e quattro sabotaggi.
 
 Non provati nella dimostrazione: «Non spostare»; l'attività svolta registrata da un collega dell'AFT; la consultazione al contrario, del Dott. Rinaldi sui pazienti della Dott.ssa Marchi, che vuole prima la condivisione e un consenso.
+
+**D228 · Risposte della fermata dopo l'unione della #22.** Via alla #23, unita con le verifiche su GitHub verdi. Dopo l'unione Simone ha scelto «Prove che mancano»:
+
+1. la lettura dei tipi del servizio (D226) diventa una prova fissa, per i percorsi che le prove non percorrono;
+2. le prove che mancano: «Non spostare» e l'attività svolta nell'AFT nella dimostrazione, due registrazioni dello stesso codice fiscale nello stesso istante;
+3. le prove lanciate più volte, per trovare altre prove instabili come le due corrette nella #23.
