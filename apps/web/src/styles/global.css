@@ -1598,7 +1598,8 @@ textarea[aria-invalid='true'] {
   margin: 0.5rem 0;
 }
 
-.consegne summary {
+.consegne summary,
+.malattie-rare summary {
   display: flex;
   align-items: center;
   min-height: var(--size-min-target);

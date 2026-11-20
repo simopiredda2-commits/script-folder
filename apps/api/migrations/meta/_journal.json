@@ -288,6 +288,13 @@
       "when": 1795178128562,
       "tag": "0040_prestazioni_aggiuntive",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795185938367,
+      "tag": "0041_nomenclatore_presidi",
+      "breakpoints": true
     }
   ]
 }

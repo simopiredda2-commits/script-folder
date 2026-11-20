@@ -150,6 +150,84 @@ describe('allegato 7 del DPCM LEA: codici di esenzione delle malattie rare (D195
   });
 });
 
+/**
+ * Allegato 3 del DPCM LEA (D218): il nomenclatore dei presidi per persone affette da patologia
+ * diabetica e da malattie rare, dalla Gazzetta del 2017 (i decreti del 2026 non lo toccano, D216).
+ * Da controllare prima dell'uso (A8).
+ */
+describe('allegato 3 del DPCM LEA: presidi per diabete e malattie rare (D218)', () => {
+  const sheet3 = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+    (f) => f.path === 'lea/allegato-3-presidi.json',
+  )!;
+  const table3 = readTable(readFileSync(sheet3.csvPath), 'allegato-3-presidi.csv');
+  const read3 = extractRecords(mappingForTranscription(loadMappings(), 'presidi')!, table3);
+  const of = (type: string) => read3.records.filter((r) => r.entryType === type);
+
+  it('una scheda intera, da controllare, in vigore dal giorno dopo la Gazzetta del 2017', () => {
+    expect(sheet3.sheet).toMatchObject({
+      tipo: 'presidi',
+      serie: 'lea-presidi-diabete-malattie-rare',
+      in_vigore_dal: '2017-03-19',
+      controllato_da: null,
+    });
+    expect(sheet3.sheet.solo_modifiche ?? false).toBe(false);
+  });
+
+  it('18 presidi in 10 gruppi e le 12 malattie rare dell’art. 13, tutti dell’allegato 3', () => {
+    expect(read3.missingColumns).toEqual([]);
+    expect(read3.problems).toEqual([]);
+    expect(read3.records).toHaveLength(30);
+    expect(of('presidio')).toHaveLength(18);
+    expect(new Set(read3.records.map((r) => r.annex))).toEqual(new Set(['3']));
+    expect([...new Set(of('presidio').map((r) => r.group))]).toEqual([
+      'Strisce reattive per la determinazione del glucosio e dei corpi chetonici nelle urine',
+      'Strisce reattive per la determinazione della glicemia nel sangue',
+      'Strisce reattive per la determinazione della chetonemia',
+      'Compresse reattive',
+      'Lancette pungidito',
+      'Penna pungidito',
+      'Siringhe',
+      'Aghi',
+      'Apparecchi per la misurazione della glicemia',
+      'Microinfusori per la somministrazione programmata dell’insulina',
+    ]);
+    expect(of('malattia_rara').map((r) => r.code)).toEqual([
+      'RCG060',
+      'RCG074',
+      'RN1080',
+      'RN0710',
+      'RCG162',
+      'RN0730',
+      'RN1380',
+      'RN1290',
+      'RN1370',
+      'RCG061',
+      'RNG092',
+      'RCG040',
+    ]);
+    for (const r of of('malattia_rara')) expect(exemptionFamily(String(r.code))).toBe('rare');
+  });
+
+  it('i codici come nell’allegato: lo stesso per più presidi, due nella stessa cella', () => {
+    const code = (description: string) =>
+      of('presidio').find((r) => r.description === description)?.code;
+    expect(of('presidio').filter((r) => r.code === 'W0101060201')).toHaveLength(4);
+    expect(code('Strisce reattive per determinazione glicemia')).toBe('W0101060101');
+    expect(code('Ago per penna da insulina')).toBe('A01010102');
+    expect(code('Ago a farfalla per microinfusori')).toBe('A010102');
+    expect(code('Apparecchio per la misurazione della glicemia')).toBe('W0201060102 / Z12040115');
+    expect(code('Apparecchio per la misurazione della chetonemia')).toBe('W020106019099');
+    expect(code('Microinfusori')).toBe('Z1204021601');
+  });
+
+  it('il testo come stampato, compresa la parentesi non chiusa di RCG074', () => {
+    const rare = (c: string) => of('malattia_rara').find((r) => r.code === c)?.description;
+    expect(rare('RCG074')).toMatch(/\(es\. Deficit di 3 Idrossiacil Coa Deidrogenasi a catena$/);
+    expect(rare('RN1370')).toBe('ALSTRÖM, SINDROME DI');
+    expect(rare('RCG162')).toBe('SINDROMI DA NEOPLASIE ENDOCRINE MULTIPLE (es MEN2)');
+  });
+});
+
 describe('famiglie dei codici di esenzione (D190)', () => {
   it('cronici con le cifre, rari con R e una lettera, gli altri per le lettere iniziali', () => {
     expect(

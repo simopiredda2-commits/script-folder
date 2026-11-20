@@ -1286,3 +1286,25 @@ Prove (`apps/api/test/promemoria-modello.test.ts`, `apps/api/test/promemoria.tes
 - SUGG.
 
 28 sabotaggi. Guardati a vista quattro promemoria con dati inventati: farmaci, specialistica con otto righe lunghe, dati oscurati con assicurato estero, solo NRE. I tre codici a barre letti con un lettore indipendente (ZXing, solo per la prova, fuori dal repository) a 300 e 600 punti per pollice. Non provato: la stampa vera e la lettura in farmacia.
+
+**D218 · Nomenclatore dei presidi: l'allegato 3 del DPCM LEA come banca dati.** D123 aveva lasciato «da completare» i codici del nomenclatore dei presidi (allegati 2 e 3). Simone doveva mandare i due allegati dalla pagina del Ministero, che da qui non si legge. La Gazzetta del 2026 dice però che i decreti di agosto non toccano né l'art. 13 né l'allegato 3 (D216). Quindi l'allegato 3 si prende dalla Gazzetta del 2017, che da qui si scarica: supplemento ordinario n. 15 alla GU n. 65 del 18/3/2017, pagine 52 e 53.
+
+- **Tipo di banca dati nuovo**, `presidi`, con tabella `ref_supply` (migrazione 0041, non si modifica e non si svuota). Una voce è un presidio con il suo codice, oppure una delle malattie rare che danno diritto ai presidi dell'allegato. Ogni voce ha il titolo del suo gruppo e il numero dell'allegato. L'allegato 2 (ausili monouso, con le modifiche del DM 3/8/2026) entrerà come serie dello stesso tipo.
+- **La trascrizione** (`lea/allegato-3-presidi`): 18 presidi in 10 gruppi e 12 malattie rare, in vigore dal 19/3/2017, il giorno dopo la Gazzetta. Testo e codici come stampati. Controllata così:
+  - ogni cella si ritrova nel testo del PDF;
+  - ogni codice sta sulla riga della sua descrizione;
+  - le due pagine sono state guardate come immagine.
+
+  Resta **da controllare** da una persona, e fino ad allora non si usa (A8).
+
+- **Nel programma**: nella prescrizione dei presidi per diabetici si sceglie la voce dal nomenclatore in vigore, e prodotto e codice si riempiono da soli. Si può sempre scrivere a mano, come prima. Sotto la scelta c'è l'elenco delle malattie rare dell'art. 13, solo come informazione: il diritto lo accertano le Regioni (art. 13, comma 2), e il programma non lo controlla.
+- **Le categorie dicono il loro allegato**: per diabetici il 3, monouso il 2. Una categoria senza nomenclatore trascritto resta a testo libero.
+- **Rotta** `GET /api/presidi/nomenclatore`: dati pubblici, come le categorie. Se una voce è in due serie, vale la più recente.
+
+Prove:
+
+- trascrizione (`packages/reference/test/lea.test.ts`, 4);
+- servizio, con tre serie inventate: una vecchia, una più recente e una di domani (`apps/api/test/seguito-presidi.test.ts`);
+- interfaccia (`apps/web/test/presidi.test.tsx`, 3).
+
+15 sabotaggi. Non provato: nel browser e nelle schermate, perché i dati dimostrativi non hanno il nomenclatore.

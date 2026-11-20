@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-20.3",
+  "versione": "2026-11-20.4",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -241,6 +241,21 @@
       },
       "vecchiaDopoGiorni": null,
       "nota": "Formato della trascrizione definito in docs/banche-dati.md; fonti e che cosa è diverso dagli atti in docs/ppip.md (D212). Nessuna soglia di vecchiaia: l'elenco cambia solo con un accordo nuovo."
+    },
+    {
+      "id": "trascrizione-presidi",
+      "titolo": "DPCM LEA: nomenclatore dei presidi dell'assistenza integrativa (trascrizione)",
+      "tipo": "presidi",
+      "origine": "trascrizione",
+      "colonne": {
+        "entryType": "tipo",
+        "code": "codice",
+        "description": "descrizione",
+        "group": "gruppo",
+        "annex": "allegato"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md, «Presidi del DPCM LEA» (D218). Nessuna soglia di vecchiaia: il nomenclatore cambia solo con un decreto."
     }
   ]
 }

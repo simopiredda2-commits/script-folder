@@ -24,6 +24,7 @@ sync/banche_dati.py  →  dati-pubblici/correnti/…, stato.json  →  importazi
 | `esenzioni_prestazioni`  | Regione Piemonte, D.D. 1167/2022 (PDF)                              | trascrizione    | R17                                       |
 | `diagnosi`               | Ministero della salute, manuale ICD-9-CM 2007 (PDF) e DM 28/10/2020 | trascrizione    | ricerca delle diagnosi (D186)             |
 | `prestazioni_aggiuntive` | ACN 2022-2024, allegato 6, e AIR del Piemonte 2024 (PDF)            | trascrizione    | prestazioni aggiuntive e distinta (D212)  |
+| `presidi`                | DPCM LEA, allegato 3 (Gazzetta del 2017); poi l'allegato 2          | trascrizione    | scelta del presidio con il codice (D218)  |
 
 Non importati per ora: l'elenco dei registri AIFA chiusi, ICD-10-IM. Si aggiungono con un tipo e una mappatura nuovi. Le diagnosi ICD-9-CM: `docs/icd9cm.md`.
 
@@ -108,9 +109,10 @@ Sono estratte in automatico dai PDF e restano **da controllare**. Che cosa è di
 
 Estratte dal manuale da Simone, con un controllo esterno e le correzioni della simulazione del controllo; restano **da controllare** (le controlla la Dr.ssa Rocca). Che cosa è diverso dal PDF e che cosa controllare: `docs/icd9cm.md`.
 
-| File (in `lea/`)               | Atto                                                        | In vigore dal | Voci in vigore |
-| ------------------------------ | ----------------------------------------------------------- | ------------- | -------------- |
-| `allegato-8-malattie-croniche` | DPCM LEA, allegato 8: codici delle malattie croniche (D190) | 30/10/2026    | 247            |
+| File (in `lea/`)               | Atto                                                             | In vigore dal | Voci in vigore |
+| ------------------------------ | ---------------------------------------------------------------- | ------------- | -------------- |
+| `allegato-8-malattie-croniche` | DPCM LEA, allegato 8: codici delle malattie croniche (D190)      | 30/10/2026    | 247            |
+| `allegato-3-presidi`           | DPCM LEA, allegato 3: presidi per diabete e malattie rare (D218) | 19/03/2017    | 30             |
 
 Estratta in automatico dal PDF della pagina del Ministero (versione del 29/9/2026) e **da controllare** (sotto, «Esenzioni del DPCM LEA»).
 
@@ -143,6 +145,21 @@ Che cosa resta fuori, e perché:
 **Allegato 7, malattie rare (D195).** Trascritto anche questo, da controllare: 370 codici (116 gruppi e 254 malattie) nella serie `lea-esenzioni-malattie-rare`, dal 30/10/2026. Il PDF si legge cella per cella: nome della malattia o del gruppo, esempi di malattie afferenti, sinonimi, malattie del gruppo con un codice proprio («… (codice RN1200)»), sezione e sottosezione. Dal testo impaginato, invece, nomi ed esempi si mescolavano (98 nomi su 370 erano sbagliati nella prima prova). Con i due allegati il catalogo copre le famiglie delle croniche e delle rare. Che cosa controllare: un campione di codici e nomi contro il PDF, i gruppi con molte righe (per esempio RCG071, RCG078, RNG262) e la riga di RNG262, dove le lettere spaziate «D I S G E N E S I A …» sono ricomposte.
 
 **Elenco esenzioni–prestazioni per R17 (D196).** Il SAR blocca le prestazioni non associate all'esenzione dal 28/06/2022 (D.D. 1167/2022). Il suo elenco è stato sostituito dall'allegato C della D.D. 1452/2023, in vigore dal 20/07/2023: 9871 righe, 48 esenzioni. È però precedente al nuovo nomenclatore, in vigore dal 30/12/2024: dei 1170 codici di prestazione distinti, solo 437 (37%) esistono nel catalogo regionale 2026, pari al 78% delle righe. Gli atti successivi letti (D.D. 868/2024, 990/2024, 444/2025, 590/2026, 710/2026) aggiornano il catalogo, non l'elenco. Per questo non si importa: usato per bloccare, fermerebbe ricette giuste. R17 resta «non verificabile» finché la Regione o il CSI Piemonte non danno l'elenco in uso nel SAR.
+
+### Presidi del DPCM LEA (D218)
+
+L'allegato 3 del DPCM 12/1/2017 è il nomenclatore dei presidi per persone affette da patologia diabetica e da malattie rare (art. 13). I decreti del 2026 non lo toccano (D216), quindi si trascrive dal supplemento ordinario n. 15 alla GU n. 65 del 18/3/2017, pagine 52 e 53. Il DPCM vale dal giorno dopo la pubblicazione, 19/3/2017.
+
+Che cosa c'è nella trascrizione (`lea/allegato-3-presidi`), 30 righe:
+
+- 18 presidi (`tipo` = `presidio`), ognuno con il suo codice e il titolo del gruppo dell'allegato («Lancette pungidito», «Aghi»…);
+- le 12 malattie rare che danno diritto a questi presidi (`tipo` = `malattia_rara`, gruppo «Malattie rare»), con il loro codice di esenzione;
+- il testo come stampato, compresa la parentesi non chiusa di RCG074. «Penna pungidito» ha nel PDF due spazi, qui uno;
+- il codice come lo scrive l'allegato. Lo stesso codice può valere per più presidi (W0101060201 per quattro). L'apparecchio per la glicemia ha due codici nella stessa cella, scritti «W0201060102 / Z12040115». L'allegato chiama la colonna «Codice», senza dire di quale classificazione: qui si chiama così.
+
+Come si è controllata la trascrizione: ogni cella si ritrova nel testo del PDF e ogni codice sta sulla riga della sua descrizione nel testo impaginato; le due pagine sono state guardate anche come immagine. Che cosa controllare: un confronto a vista delle 30 righe con le pagine 52 e 53, che sono poche.
+
+Nel programma, quando la trascrizione è controllata e importata (A8): nella prescrizione dei presidi per diabetici si sceglie la voce dal nomenclatore, e prodotto e codice si riempiono da soli; sotto, l'elenco delle malattie rare dell'art. 13. Si può sempre scrivere a mano. L'allegato 2 (ausili monouso, con le modifiche del DM 3/8/2026) si aggiunge come serie dello stesso tipo quando arriva il file di Simone.
 
 ### Atti che modificano una tabella (D157)
 
@@ -278,18 +295,19 @@ Con un fatto non noto le regole si comportano come senza banca dati (D42): non b
 
 Servono una sessione; non sono dati dei pazienti, quindi niente registro degli accessi alla cartella. Parametro facoltativo `data=AAAA-MM-GG` per consultare le banche dati a una data (A5).
 
-| Rotta                                 | Risposta                                                                                                            |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/banche-dati`                | versioni in uso                                                                                                     |
-| `GET /api/farmaci?q=`                 | farmaci per nome, principio attivo, AIC o ATC, con versioni                                                         |
-| `GET /api/farmaci/:aic`               | il farmaco e gli equivalenti del suo gruppo, dalle liste di classe e dalla lista di trasparenza (D202)              |
-| `GET /api/prestazioni?q=`             | prestazioni per descrizione, branca, codice regionale o nazionale                                                   |
-| `GET /api/esenzioni?q=`               | esenzioni per codice o descrizione                                                                                  |
-| `GET /api/comuni/:codice`             | comune per codice catastale                                                                                         |
-| `GET /api/diagnosi?q=`                | diagnosi ICD-9-CM per parole o codice, con i padri, se è una categoria, quante voci in tutto e le versioni (D186)   |
-| `GET /api/diagnosi/:codice`           | la voce di un codice (con o senza punto); `disponibile: false` se nessun catalogo è in uso                          |
-| `GET /api/banche-dati/aggiornamenti`  | ora e prossimo aggiornamento, giro in corso, ultimo giro con le cose da controllare, ultimi dieci giri              |
-| `POST /api/banche-dati/aggiornamenti` | avvia subito un giro (solo l'amministratore dello studio); 409 se uno è in corso o se il servizio non è configurato |
+| Rotta                                 | Risposta                                                                                                                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/banche-dati`                | versioni in uso                                                                                                          |
+| `GET /api/farmaci?q=`                 | farmaci per nome, principio attivo, AIC o ATC, con versioni                                                              |
+| `GET /api/farmaci/:aic`               | il farmaco e gli equivalenti del suo gruppo, dalle liste di classe e dalla lista di trasparenza (D202)                   |
+| `GET /api/prestazioni?q=`             | prestazioni per descrizione, branca, codice regionale o nazionale                                                        |
+| `GET /api/esenzioni?q=`               | esenzioni per codice o descrizione                                                                                       |
+| `GET /api/comuni/:codice`             | comune per codice catastale                                                                                              |
+| `GET /api/diagnosi?q=`                | diagnosi ICD-9-CM per parole o codice, con i padri, se è una categoria, quante voci in tutto e le versioni (D186)        |
+| `GET /api/diagnosi/:codice`           | la voce di un codice (con o senza punto); `disponibile: false` se nessun catalogo è in uso                               |
+| `GET /api/presidi/nomenclatore`       | presidi del nomenclatore con il codice e malattie rare che danno diritto a quelli dell'allegato 3, in vigore oggi (D218) |
+| `GET /api/banche-dati/aggiornamenti`  | ora e prossimo aggiornamento, giro in corso, ultimo giro con le cose da controllare, ultimi dieci giri                   |
+| `POST /api/banche-dati/aggiornamenti` | avvia subito un giro (solo l'amministratore dello studio); 409 se uno è in corso o se il servizio non è configurato      |
 
 Le banche dati pubbliche non sono dati del medico: non entrano nella sua esportazione.
 

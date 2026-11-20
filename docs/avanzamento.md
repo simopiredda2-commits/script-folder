@@ -48,7 +48,7 @@ _A. Aspetta la Regione Piemonte, CSI Piemonte o un altro ente_
 _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 
 1. Validazione clinica di tutte le regole (R1–R22) e verifica dei riferimenti normativi con un consulente: oggi «Validata: no».
-2. Le verifiche già annotate: ICD-9-CM, catalogo regionale con l'ASL, allegati 8 e 7, modello della patente, R19–R22, testi delle variazioni e dei registri AIFA, le 17 voci delle PPIP (D213), e come la Dr.ssa Rocca manda oggi la distinta.
+2. Le verifiche già annotate: ICD-9-CM, catalogo regionale con l'ASL, allegati 8, 7 e 3 (le 30 righe dei presidi, D218), modello della patente, R19–R22, testi delle variazioni e dei registri AIFA, le 17 voci delle PPIP (D213), e come la Dr.ssa Rocca manda oggi la distinta.
 3. Primo giro di `sync/` dal computer dello studio, con le intestazioni ISTAT (D55, D56); due versioni vere dell'anagrafica AIFA una dopo l'altra.
 4. Stampa vera: promemoria del modello del 2024 con l'OCR-A, codici a barre letti in farmacia (D211, D217); ricetta rossa sui moduli veri.
 5. Lettori di schermo e tablet veri; WebKit e Firefox anche fuori dalla CI; un riavvio vero di Postgres con il servizio acceso (D207); una giornata di lavoro con la Dr.ssa Rocca.
@@ -62,7 +62,7 @@ _C. Decisioni o materiali di Simone_
    - l'allegato 1 del DM, che cambia gli articoli 11 e 14 (e 17, 18, 27, 33, 35, 38);
    - per controllare gli allegati 7 e 8 già trascritti: gli allegati R e D del DM e l'allegato D del DPCM 7/8/2026.
 
-   L'allegato 3 non serve: i decreti del 2026 non lo toccano, si prende dalla Gazzetta del 2017.
+   L'allegato 3 non serve: i decreti del 2026 non lo toccano. È trascritto dalla Gazzetta del 2017 (D218) e resta da controllare (B2).
 
 3. **Ready!** e la versione «Full» (D78), poi l'Agenda.
 4. **Un file d'esempio dell'esportazione del programma di oggi**, senza dati veri, per l'importazione.
@@ -876,7 +876,7 @@ Risposta di Simone alla fermata del 20/11/2026: «Ok adesso ma predisponiamo il 
 
 **Prossimo passo**: fatto: pull request #19 unita con il via di Simone. Poi si aspettano i file di Simone (allegati 2 e 3 dei LEA) e le risposte di Regione, ASL e CSI.
 
-### Dopo l'unione della #19 – Fonti dei LEA e promemoria (D216, D217)
+### Dopo l'unione della #19 – Fonti dei LEA, promemoria e presidi (D216–D218)
 
 Richiesta di Simone del 20/11/2026: «Dimmi tu cosa devo scaricare e chiudi, se puoi, altri punti che eventualmente puoi chiudere». Nello stesso branch, ripartito da `main`.
 
@@ -903,7 +903,12 @@ Richiesta di Simone del 20/11/2026: «Dimmi tu cosa devo scaricare e chiudi, se 
 - Frase regionale e frase DPC come le manda il SAC vero.
 - Tipi di ricetta diversi da «Assist. SSN».
 
-**Prossimo passo**: allegato 3 dalla Gazzetta del 2017, come banca dati dei presidi per diabetici.
+- **Nomenclatore dei presidi, allegato 3 del DPCM LEA (D218)**, dalla Gazzetta del 2017: i decreti del 2026 non lo toccano.
+  - Tipo di banca dati nuovo, `presidi`. Trascrizione di 18 presidi con il codice e delle 12 malattie rare dell'art. 13, confrontata con il PDF cella per cella e riga per riga; da controllare.
+  - Nella prescrizione dei presidi per diabetici, la voce scelta dal nomenclatore riempie prodotto e codice.
+  - Prove della trascrizione, del servizio e dell'interfaccia; 15 sabotaggi.
+
+**Prossimo passo**: prove complete, pull request e fermata.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -1136,7 +1141,13 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Nessuna per ora. Si aspettano i file di Simone (allegati 2 e 3 dei LEA) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
+Dopo l'unione della #19 (pull request del blocco D216–D218):
+
+1. **Via**: A. unisci (consigliata); B. modifiche prima.
+2. **Promemoria, campo 27 in Piemonte** (D217): A. codice regionale davanti al nome, come chiede il documento regionale SIRPE (consigliata, da confermare al collaudo); B. solo cognome e nome, come il modello nazionale.
+3. **Aprire il Fascicolo dalla cartella** (modulo regionale del CSI del 2019): A. prima chiedo al CSI se vale ancora con l'autenticazione forte (consigliata); B. lo predispongo subito con un simulatore.
+
+Si aspettano poi i file dei LEA (C2) e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
 
 ## Risposte della fermata dopo l'unione della #18 (20/11/2026)
 
@@ -2641,3 +2652,18 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D217: tipologia per ricetta se tutte le prescrizioni la hanno                                                 | promemoria.ts: tipologia mai stampata                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D217: tipologia di accesso nel campo 18A                                                                      | promemoria.ts: campo vuoto                                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D217: nota AIFA nel campo 20                                                                                  | promemoria.ts: sempre «---»                                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: codici della trascrizione come nell'allegato 3                                                          | allegato-3-presidi.csv: codice dell'ago per penna sbagliato                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: due codici nella stessa cella restano insieme                                                           | allegato-3-presidi.csv: solo il primo codice dell'apparecchio                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: testo come stampato                                                                                     | allegato-3-presidi.csv: parentesi di RCG074 chiusa a mano                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: le 12 malattie rare dell'art. 13                                                                        | allegato-3-presidi.csv: una malattia tolta                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: in vigore dal giorno dopo la Gazzetta                                                                   | allegato-3-presidi.json: data del giorno della Gazzetta                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: da controllare prima dell'uso (A8)                                                                      | allegato-3-presidi.json: controllato_da scritto                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: colonne della mappatura                                                                                 | mappature.json: colonna dell'allegato sbagliata                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: se una voce è in due serie vale la più recente                                                          | lookup.ts: vince la più vecchia                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: le serie che cominciano domani oggi non valgono                                                         | lookup.ts: tutte le serie, anche future                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: malattie rare separate dai presidi                                                                      | followup-routes.ts: nessun filtro per tipo                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: le categorie dicono il loro allegato                                                                    | supplies.ts: allegato 3 tolto ai presidi per diabetici                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: il nomenclatore importato non si modifica                                                               | migrazione 0041: trigger di immutabilità tolto                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: la scelta riempie anche il codice                                                                       | SuppliesPage.tsx: solo il prodotto                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: il nomenclatore solo per la categoria del suo allegato                                                  | SuppliesPage.tsx: per ogni categoria                                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D218: elenco delle malattie rare sotto la scelta                                                              | SuppliesPage.tsx: elenco nascosto                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

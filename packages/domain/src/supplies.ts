@@ -9,13 +9,16 @@
  *   avanzate e bendaggio specialistico: la prima volta lo specialista, poi il medico di famiglia
  *   per al massimo 6 mesi; per i diabetici il piano di automonitoraggio glicemico (PAG).
  *
- * Solo controlli formali. I codici del nomenclatore non sono nel programma: da completare.
+ * Solo controlli formali. Il nomenclatore dell'allegato 3 è una banca dati trascritta (D218), in uso
+ * dopo il controllo; quello dell'allegato 2 arriva con i file di Simone.
  */
 
 export interface SupplyCategoryInfo {
   key: string;
   label: string;
   source: string | null;
+  /** Allegato del DPCM con il nomenclatore della categoria, se c'è (D218). */
+  annex?: string;
 }
 
 const LEA = 'DPCM 12/1/2017 (LEA)';
@@ -26,11 +29,13 @@ export const SUPPLY_CATEGORIES = [
     key: 'monouso',
     label: 'Dispositivi medici monouso (stomie, cateteri, incontinenza, lesioni da decubito)',
     source: `${LEA}, art. 11 e allegato 2`,
+    annex: '2',
   },
   {
     key: 'diabetici',
     label: 'Presidi per diabetici (autocontrollo della glicemia, somministrazione di insulina)',
     source: `${LEA}, art. 13 e allegato 3; ${VADEMECUM}: piano di automonitoraggio glicemico`,
+    annex: '3',
   },
   {
     key: 'medicazione_tradizionale',

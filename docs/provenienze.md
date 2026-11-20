@@ -117,6 +117,14 @@ Letta il 20/11/2026 per sapere che cosa cambiano il DPCM 7 agosto 2026 e il DM 3
 | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
 | GU n. 227 del 30/9/2026, serie generale: DPCM 7/8/2026 (pp. 20–22) e DM 3/8/2026 (pp. 43–47) | `https://www.gazzettaufficiale.it/eli/gu/2026/09/30/227/sg/pdf` | 3.379.374 | `5b57a2f001b3d2bc2687f62b9ed46eb610d4760ce32b727ebad4b3a17d6a6974` |
 
+### Presidi del DPCM LEA (D218)
+
+La trascrizione in `packages/reference/data/trascrizioni/lea/allegato-3-presidi.csv` viene dalle pagine 52 e 53 del supplemento qui sotto, scaricato il 20/11/2026. È testo di un atto ufficiale (art. 5 della legge 633/1941); il PDF resta fuori dal repository. Che cosa è diverso dal PDF: `docs/banche-dati.md`, «Presidi del DPCM LEA».
+
+| Documento                                                                                     | Indirizzo                                                            | Byte      | SHA-256                                                            |
+| --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
+| DPCM 12/1/2017 (LEA), S.O. n. 15 alla GU n. 65 del 18/3/2017 (allegato 3 alle pagine 52 e 53) | `https://www.gazzettaufficiale.it/eli/gu/2017/03/18/65/so/15/sg/pdf` | 8.414.349 | `a489b86ee9a222af1cea2be946515a34feb3149120d69fa1cbbf7a3899ebaab9` |
+
 ### Promemoria della ricetta (D217)
 
 Letto il 20/11/2026 per impaginare il promemoria; nel repository non entra niente, solo le diciture brevi delle specifiche nel codice e nelle prove, con la fonte accanto. Documento tecnico pubblicato sul portale del Sistema TS; il PDF resta fuori dal repository.

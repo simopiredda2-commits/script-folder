@@ -1,0 +1,13 @@
+{
+  "tipo": "presidi",
+  "serie": "lea-presidi-diabete-malattie-rare",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "DPCM 12 gennaio 2017 (livelli essenziali di assistenza), allegato 3: presidi per persone affette da patologia diabetica e da malattie rare (S.O. n. 15 alla GU n. 65 del 18/3/2017, pagine 52 e 53)",
+  "in_vigore_dal": "2017-03-19",
+  "trascritto_da": "Claude Code, dal testo del PDF della Gazzetta, confrontato con le pagine viste come immagine",
+  "trascritto_il": "2026-11-20",
+  "controllato_da": null,
+  "nota": "PDF della Gazzetta con la SHA-256 in docs/provenienze.md. Due parti: le 12 malattie rare di cui all'art. 13 (tipo malattia_rara, gruppo «Malattie rare») e i 18 presidi del nomenclatore con il loro codice (tipo presidio), ciascuno con il titolo del suo gruppo. Il testo è come stampato, compresa la parentesi non chiusa di RCG074; «Penna  pungidito» ha nel PDF due spazi, qui uno. Il codice dell'apparecchio per la glicemia sono due codici nella stessa cella, scritti «W0201060102 / Z12040115». Lo stesso codice può valere per più presidi (W0101060201 per quattro). I decreti del 2026 non toccano né l'art. 13 né l'allegato 3 (D216): vale dal giorno dopo la pubblicazione del DPCM. Che cosa controllare: docs/banche-dati.md, «Presidi del DPCM LEA»."
+}
