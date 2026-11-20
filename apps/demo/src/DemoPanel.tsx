@@ -88,6 +88,11 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           Password di tutti: <code>{ready.password}</code>. Postazione: un nome qualsiasi, per
           esempio <code>Ambulatorio</code>.
         </p>
+        <p>
+          Per le ricette entra come <code>medico</code>: <strong>Pazienti</strong>, apri un
+          paziente, <strong>Nuova ricetta</strong>. Farmaci d’esempio: amlodipina, atorvastatina,
+          metformina. L’amministratore dello studio non apre le cartelle.
+        </p>
       </section>
       <section aria-labelledby="dimo-codice" aria-live="polite">
         <h3 id="dimo-codice">Secondo fattore</h3>

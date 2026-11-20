@@ -96,7 +96,9 @@ export function registerPatientRoutes(
       .parse(req.query)
       .q?.trim();
     const archives = await visibleArchives(db, actor, 'registry.read');
-    if (archives.length === 0) return { pazienti: [] };
+    // Quanti archivi vede chi chiede: con nessuno, l'interfaccia spiega il perché (l'amministratore
+    // dello studio non apre le cartelle; un sostituto vede solo con un'autorizzazione in corso).
+    if (archives.length === 0) return { pazienti: [], archivi: 0 };
     const like = q ? `%${q}%` : undefined;
     const rows = await db
       .select({
@@ -126,7 +128,7 @@ export function registerPatientRoutes(
       )
       .orderBy(patient.lastName, patient.firstName)
       .limit(100);
-    return { pazienti: rows };
+    return { pazienti: rows, archivi: archives.length };
   });
 
   /** Apertura della cartella: anagrafica e, per chi può, il riepilogo clinico. */

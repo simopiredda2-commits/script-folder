@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { ErrorMessage, Loading, PageHeader } from '../components/common';
+import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { query } from '../lib/api';
 import { age, date, maskedFiscalCode } from '../lib/format';
@@ -28,7 +28,7 @@ export function PatientsPage() {
     setParams(value ? { q: value } : {}, { replace: true });
   };
   const q = useDebounced(text);
-  const { data, error, loading } = useApi<{ pazienti: PatientRow[] }>(
+  const { data, error, loading } = useApi<{ pazienti: PatientRow[]; archivi?: number }>(
     `/api/pazienti${query({ q })}`,
   );
   // «Nuovo paziente» solo per chi può registrarne in almeno un archivio (registry.write).
@@ -62,7 +62,14 @@ export function PatientsPage() {
       </div>
       <ErrorMessage error={error} />
       {loading && !data && <Loading what="pazienti" />}
-      {data && (
+      {data?.archivi === 0 && (
+        <Notice kind="info">
+          Non vedi le cartelle di nessun archivio. Le aprono i medici titolari, i sostituti durante
+          un’autorizzazione in corso e la segreteria confermata dal titolare; l’amministratore dello
+          studio no, a meno che non sia anche medico.
+        </Notice>
+      )}
+      {data && data.archivi !== 0 && (
         <>
           <p role="status" className="tenue">
             {data.pazienti.length === 0

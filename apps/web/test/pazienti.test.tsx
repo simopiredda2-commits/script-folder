@@ -86,4 +86,24 @@ describe('elenco dei pazienti: ricerca e indirizzo', () => {
     fireEvent.change(screen.getByLabelText('Cerca un paziente'), { target: { value: '' } });
     expect(screen.getByTestId('dove').textContent).toBe('/pazienti');
   });
+
+  it('senza archivi visibili spiega perché non ci sono pazienti, invece di «nessun paziente trovato»', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(
+              url === '/api/pazienti/nuovo' ? { archivi: [] } : { pazienti: [], archivi: 0 },
+            ),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+        ),
+      ),
+    );
+    renderPatients([]);
+    expect(await screen.findByText(/Non vedi le cartelle di nessun archivio/)).toBeTruthy();
+    expect(screen.getByText(/l’amministratore dello\s+studio no/)).toBeTruthy();
+    expect(screen.queryByText('Nessun paziente trovato.')).toBeNull();
+  });
 });
