@@ -492,6 +492,30 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
     expect(before.some((v) => v.codice === 'ASL1')).toBe(false);
     // Stessa data dell'ACN: vale l'accordo dell'ASL, non l'ordine delle righe.
     expect(before.find((v) => v.codice === 'A2')?.compenso).toBe(9.99);
+    // Nemmeno un atto di tutta Italia con la stessa data, importato dopo, lo cambia: vale il più
+    // vicino, poi l'ultimo importato.
+    const later = join(work, 'trascrizioni-nazionali', 'ppip');
+    mkdirSync(later, { recursive: true });
+    writeFileSync(
+      join(later, 'nazionale-di-prova.json'),
+      JSON.stringify({
+        ...sheet('nazionale-di-prova', 'Atto nazionale di prova', '2026-01-15', 'x'),
+        ambito: undefined,
+      }),
+    );
+    writeFileSync(join(later, 'nazionale-di-prova.csv'), header + 'A2;A;Seconda voce;no;1,00;\n');
+    expect(
+      (
+        await importReferenceData({
+          db: t.db,
+          syncDir: join(work, 'dati-pubblici'),
+          transcriptionsDir: join(work, 'trascrizioni-nazionali'),
+          mappings: loadMappings(),
+          importedBy: 'prova',
+        })
+      ).map((r) => r.outcome),
+    ).toEqual(['importato']);
+    expect((await at('2026-10-31')).find((v) => v.codice === 'A2')?.compenso).toBe(9.99);
     const after = await at('2026-11-10');
     expect(after.find((v) => v.codice === 'A1')?.compenso).toBe(15);
     expect(after.filter((v) => v.codice === 'A1')).toHaveLength(1);

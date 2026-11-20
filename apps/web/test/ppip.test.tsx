@@ -110,8 +110,10 @@ const record = (over: Record<string, unknown>) => ({
   stato: 'registrata',
   motivoAnnullamento: null,
   inviata: false,
+  inInvio: false,
   protocolloInvio: null,
   registrataDa: 'Dott.ssa Titolare Inventata',
+  altroArchivio: null,
   ...over,
 });
 
@@ -135,6 +137,7 @@ describe('prestazioni aggiuntive in cartella (D212)', () => {
               status: 200,
               body: {
                 puoScrivere: true,
+                archivio: 'a1',
                 prestazioni: [
                   record({}),
                   record({
@@ -156,6 +159,10 @@ describe('prestazioni aggiuntive in cartella (D212)', () => {
     render(<App />);
     const select = await screen.findByLabelText('Prestazione');
     await within(select).findByRole('option', { name: /A1 · Prima medicazione/ });
+    // Il catalogo con gli accordi della regione e dell'ASL dell'archivio (D232).
+    expect(calls.find((c) => c.path === '/api/prestazioni-aggiuntive/catalogo')?.search).toMatch(
+      /(^|&)archivio=a1(&|$)/,
+    );
     expect([...select.querySelectorAll('optgroup')].map((g) => g.getAttribute('label'))).toEqual([
       'A · eseguibili senza autorizzazione',
       'B · eseguibili con autorizzazione sanitaria',
@@ -190,6 +197,34 @@ describe('prestazioni aggiuntive in cartella (D212)', () => {
     expect(within(list).getByText('Da inviare')).toBeTruthy();
     expect(within(list).getByText('Inviata all’ASL (SIM-PPIP-2026-10-0001)')).toBeTruthy();
     expect(within(list).getAllByRole('button', { name: /^Annulla/ })).toHaveLength(1);
+  });
+
+  it('una prestazione di un altro archivio o in invio si legge e basta (D232)', async () => {
+    stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/oggi': ok({ data: '2026-11-20', appuntamenti: [], code: { daFirmare: 0 } }),
+      '/api/pazienti/p1': ok(PATIENT),
+      '/api/pazienti/p1/ppip': ok({
+        puoScrivere: true,
+        archivio: 'a1',
+        prestazioni: [
+          record({ id: 'r1', altroArchivio: 'Archivio della dottoressa di prima' }),
+          record({ id: 'r2', codice: 'A3', descrizione: 'Rimozione di punti', inInvio: true }),
+          record({ id: 'r3', codice: 'A4', descrizione: 'Cateterismo uretrale' }),
+        ],
+      }),
+      '/api/prestazioni-aggiuntive/catalogo': ok(CATALOG),
+    });
+    window.history.pushState({}, '', '/pazienti/p1/prestazioni-aggiuntive');
+    render(<App />);
+    const list = (await screen.findByRole('heading', { name: 'Prestazioni registrate' }))
+      .parentElement!;
+    await within(list).findByText(/Registrata nell’archivio «Archivio della dottoressa di prima»/);
+    expect(within(list).getByText('In invio con la distinta')).toBeTruthy();
+    // Si annulla solo la terza: le altre sono nella distinta di un altro archivio o partono.
+    const buttons = within(list).getAllByRole('button', { name: /^Annulla/ });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]!.textContent).toMatch(/A4/);
   });
 
   it('senza catalogo in vigore lo dice, con simbolo e parola', async () => {
