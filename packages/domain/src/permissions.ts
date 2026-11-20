@@ -44,6 +44,11 @@ export const ACTIONS = [
   'certificate.sign_send',
   /** Profilo Sanitario Sintetico: validarlo, firmarlo e pubblicarlo nel Fascicolo (tappa 11). */
   'fse.publish',
+  /**
+   * Aprire il Fascicolo regionale del paziente dalla cartella, con il modulo di accesso del CSI
+   * (D220): il Fascicolo controlla poi il consenso del paziente alla consultazione.
+   */
+  'fse.consult',
   'reminder.print',
   /** Registro degli accessi dell'archivio. */
   'access_log.read',
@@ -108,6 +113,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'prescription.sign_send': 'Firmare e inviare le ricette',
   'certificate.sign_send': 'Firmare e inviare i certificati',
   'fse.publish': 'Firmare e pubblicare il Profilo Sanitario Sintetico nel Fascicolo',
+  'fse.consult': 'Aprire il Fascicolo regionale del paziente dalla cartella',
   'reminder.print': 'Stampare i promemoria',
   'access_log.read': 'Leggere il registro degli accessi',
   'data.export': 'Esportare tutti i dati dell’archivio',
@@ -162,6 +168,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'prescription.sign_send',
   'certificate.sign_send',
   'fse.publish',
+  'fse.consult',
   'reminder.print',
   'access_log.read',
   'data.export',

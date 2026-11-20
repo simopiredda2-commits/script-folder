@@ -96,6 +96,7 @@ export async function createScenario(
     | 'loginSources'
     | 'aura'
     | 'ppipPortal'
+    | 'fseAccess'
   > & {
     /** Aggiornamento delle banche dati (D156), costruito con l'orologio della prova. */
     referenceUpdates?: (now: () => Date) => NonNullable<AppDeps['referenceUpdates']>;
