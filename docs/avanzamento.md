@@ -997,9 +997,10 @@ Nello stesso branch, ripartito da `main`. Risposta di Simone alla fermata: «Sia
 
 Dimostrazione ripubblicata nello stesso artifact (versione 5). Prove complete verdi: 1739 prove in 150 file e quelle di `sync/`; lint verde; 17 prove della dimostrazione in Chromium qui, WebKit e Firefox nella CI.
 
-3. **Una prova instabile dell'interfaccia**, trovata dalla CI sulla #23 (giro 313): `apps/web/test/aura.test.tsx`, cambio di medico in Oggi (D200).
-   - Controllava che l'elenco si ricaricasse subito dopo il messaggio «spostato». La lettura nuova però parte un momento dopo, dall'effetto della pagina: qui la prova era rossa 2 volte su 25.
-   - Ora aspetta la lettura: 40 verdi su 40. Il programma non cambia.
+3. **Due prove instabili dell'interfaccia**, in `apps/web/test/aura.test.tsx`. La prima l'ha trovata la CI sulla #23 (giro 313).
+   - Cambio di medico in Oggi (D200): controllava che l'elenco si ricaricasse subito dopo il messaggio «spostato». La lettura nuova però parte un momento dopo, dall'effetto della pagina: qui era rossa 2 volte su 25.
+   - Nuovi assistiti in Oggi (D199): la stessa forma, dopo «registrato». Era rossa 1 volta su 25.
+   - Ora tutte e due aspettano la lettura: 40 verdi su 40 ciascuna. Il programma non cambia.
 
 **Prossimo passo**: pull request #23 e fermata.
 
@@ -2836,3 +2837,4 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D227: il cambio di medico arriva da AURA                                                                      | aura.ts: il paziente non sceglie la collega                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D227: con due titolari lo studio è una medicina di gruppo                                                     | colleghi.ts: lo studio resta singolo                                                                                      | Rosso, poi verde: i dati dello studio non si salvano                                                                                                                                                                                                                                                             |
 | D200: dopo «Sposta» l'elenco dei cambi di medico si ricarica (prova corretta, aspetta la lettura)             | AuraSection.tsx: elenco non ricaricato                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D199: dopo «Registra» l'elenco dei nuovi assistiti si ricarica (prova corretta, aspetta la lettura)           | AuraSection.tsx: elenco non ricaricato                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
