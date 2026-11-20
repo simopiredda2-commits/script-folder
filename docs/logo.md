@@ -80,6 +80,8 @@ Dopo la scelta, su fondo scuro il segno diventa un'icona gialla (`#FFE45C`, il g
 
 <img src="../packages/brand/assets/logo/tavola-su-scuro.svg" alt="Icona gialla con il segno blu scuro, a 16, 32 e 64 px e con il nome, sul fondo scuro di SCRIPT">
 
+Nell'icona il segno è centrato di lato e alzato di 0,9 unità su 32 rispetto al centro geometrico. Centrato come ingombro sembrava basso, perché il corpo della cartella pesa in basso. L'altezza giusta si è misurata dal baricentro del tratto e poi confrontata a vista (D214).
+
 La favicon segue il tema del browser: segno blu nel tema chiaro, icona gialla nel tema scuro.
 
 ## Dopo la scelta

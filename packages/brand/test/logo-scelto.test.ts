@@ -48,6 +48,45 @@ describe('logo scelto alla prima fermata', () => {
     expect(productMark.onDark.scale).toBeLessThanOrEqual(0.85);
   });
 
+  it('nell’icona il segno è centrato di lato e alzato al centro ottico (D214)', () => {
+    const svg = read('segno-su-scuro.svg');
+    const size = Number(/<rect [^>]*width="([\d.]+)"/.exec(svg)![1]);
+    const [tx, ty, s] = /<g transform="translate\(([-\d.]+) ([-\d.]+)\) scale\(([\d.]+)\)">/
+      .exec(svg)!
+      .slice(1)
+      .map(Number) as [number, number, number];
+    // Ingombro del tratto nelle coordinate del segno: i vertici più mezzo spessore (giunzioni tonde).
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const d of productMark.paths) {
+      let x = 0;
+      let y = 0;
+      for (const [, cmd, args] of d.matchAll(/([MLHVZ])([^MLHVZ]*)/g)) {
+        const n = args!
+          .trim()
+          .split(/[\s,]+/)
+          .filter(Boolean)
+          .map(Number);
+        if (cmd === 'M' || cmd === 'L') [x, y] = n as [number, number];
+        else if (cmd === 'H') x = n[0]!;
+        else if (cmd === 'V') y = n[0]!;
+        xs.push(x);
+        ys.push(y);
+      }
+    }
+    const half = productMark.strokeWidth / 2;
+    const left = tx + (Math.min(...xs) - half) * s;
+    const right = size - (tx + (Math.max(...xs) + half) * s);
+    const top = ty + (Math.min(...ys) - half) * s;
+    const bottom = size - (ty + (Math.max(...ys) + half) * s);
+    expect(Math.abs(left - right)).toBeLessThan(0.01);
+    // Alzato di `raise`: sotto resta più spazio che sopra, proprio del doppio dello spostamento.
+    expect(productMark.onDark.raise).toBeGreaterThan(0);
+    expect(bottom - top).toBeCloseTo((2 * productMark.onDark.raise * size) / 32, 2);
+    // La punta non si avvicina al bordo: sopra resta almeno tre quarti del margine di lato.
+    expect(top).toBeGreaterThanOrEqual(0.75 * left);
+  });
+
   it('la favicon passa all’icona gialla quando il browser è in tema scuro (D214)', () => {
     const svg = read('favicon.svg');
     expect(svg).toContain('@media (prefers-color-scheme: dark)');

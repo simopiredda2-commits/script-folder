@@ -1211,8 +1211,16 @@ Prove:
 Proposta: il giallo come fondo di un'icona, con il segno blu scuro sopra; sul chiaro resta il segno blu. Simone: «ok, allora icona gialla col segno blu scuro per le versioni su fondo scuro».
 
 - **Su fondo scuro** il segno è un quadratino giallo `#FFE45C` (angoli arrotondati) con al centro il segno nell'ombra di SCRIPT (`#1B237A`), che occupa tre quarti del lato. È la regola del giallo della palette (D69): solo come fondo, con sopra il blu scuro. Nella versione con il nome, il nome resta bianco.
+- **Allineamento** (verifica chiesta da Simone). Il segno era centrato come ingombro (6,6 unità di margine su 32 da ogni lato), ma sembrava basso: il corpo della cartella pesa in basso e la punta è sottile. Il baricentro del tratto stava 1,76 unità sotto il centro, misurato su un disegno a 1024 px; di lato solo 0,3 unità, cioè centrato. Il segno ora sale di 0,9 unità, metà dello scarto (`productMark.onDark.raise`): sembra al centro, e la punta resta lontana dal bordo. Confrontati a vista quattro spostamenti (0; 0,9; 1,3; 1,76) a 16, 32, 64 e 128 px: con tutto lo scarto il segno sembra alto.
 - **Su fondo chiaro** non cambia niente: il segno resta nella luce di SCRIPT (`#4D6BFE`), anche nell'interfaccia, che ha solo il tema chiaro (D11).
 - **Favicon**: nel tema chiaro del browser resta il segno blu; nel tema scuro diventa l'icona gialla (`prefers-color-scheme` dentro l'SVG). Chrome, Edge e Firefox la seguono; Safari non mostra le favicon SVG nelle schede.
 - **File**: `segno-su-scuro.svg`, `con-nome-su-scuro.svg` e la tavola `tavola-su-scuro.svg` in `packages/brand/assets/logo/`, generati da `pnpm --filter @mmg/brand logo:proposte` con i valori di `productMark.onDark` (`packages/brand/mark.ts`). Le proposte della prima fermata restano com'erano, come traccia.
 
-Prove (`packages/brand/test/logo-scelto.test.ts`): i file su scuro hanno l'icona gialla e il segno blu scuro; il segno sul giallo e il giallo sul fondo scuro superano 7:1; la favicon cambia nel tema scuro. Tre sabotaggi. Guardato a vista nei due temi a 16, 32 e 64 px. Non provato: l'icona su un tablet vero, e le favicon in Safari.
+Prove (`packages/brand/test/logo-scelto.test.ts`):
+
+- i file su scuro hanno l'icona gialla e il segno blu scuro;
+- il segno sul giallo e il giallo sul fondo scuro superano 7:1;
+- nell'icona il segno è centrato di lato e alzato di `raise`, con la punta ad almeno tre quarti del margine di lato;
+- la favicon cambia nel tema scuro.
+
+Sei sabotaggi. Guardato a vista nei due temi a 16, 32 e 64 px. Non provato: l'icona su un tablet vero, e le favicon in Safari.

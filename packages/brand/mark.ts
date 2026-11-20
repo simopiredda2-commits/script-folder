@@ -27,5 +27,13 @@ export const productMark = {
     radius: 7,
     /** Lato del segno dentro l'icona, in proporzione al lato dell'icona. */
     scale: 0.75,
+    /**
+     * Quanto sale il segno dal centro geometrico dell'icona, in unità della viewBox (su 32).
+     * Centrato come ingombro, il segno sembra basso: il corpo della cartella pesa in basso e la
+     * punta è sottile. Il baricentro del tratto sta 1,76 unità sotto il centro (misurato su un
+     * disegno a 1024 px); il segno sale di metà di quello scarto, così la punta resta lontana
+     * dal bordo (D214).
+     */
+    raise: 0.9,
   },
 } as const;

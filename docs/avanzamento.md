@@ -849,15 +849,16 @@ Risposta di Simone alla fermata del 20/11/2026: «Ok adesso ma predisponiamo il 
 - **Logo su fondo scuro (D214)**, chiesto da Simone durante il blocco.
   - Su fondo scuro il segno diventa un'icona gialla con il segno blu scuro. Il giallo da solo sul bianco non si legge: circa 1,3:1.
   - La favicon diventa l'icona gialla quando il browser è in tema scuro.
+  - Dopo la verifica dell'allineamento chiesta da Simone, il segno sale di 0,9 unità su 32 nell'icona. Centrato come ingombro, sembrava basso.
   - Sul chiaro non cambia niente.
 - **Prove**:
   - servizio: `apps/api/test/ppip.test.ts` (13);
   - interfaccia: `apps/web/test/ppip.test.tsx` (4);
   - browser: «prestazioni aggiuntive (D212)» in `apps/api/test/e2e/interfaccia.test.ts`, con accessibilità, bersagli e tablet;
   - schermate 72 e 73;
-  - 31 sabotaggi, uno anche nel browser, più 3 per il logo su fondo scuro (D214).
+  - 31 sabotaggi, uno anche nel browser, più 6 per il logo su fondo scuro (D214).
 
-**Prove complete**: lint verde (ESLint, Prettier, tipi); pacchetti verdi (43 file, 771 prove); il giro completo con servizio e interfaccia è in corso.
+**Prove complete**: 144 file e 1687 prove TypeScript, più `sync/`, tutto verde; lint verde. Dopo la correzione dell'allineamento dell'icona: prove del marchio (174) e lint di nuovo verdi.
 
 **Non provato**:
 
@@ -2557,3 +2558,6 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D214: il segno sul giallo è blu scuro e si legge                                                              | mark.ts: segno azzurro chiaro sul giallo                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D214: i file su fondo scuro hanno l'icona gialla                                                              | segno-su-scuro.svg: fondo dell'icona tolto                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D214: la favicon passa all'icona gialla nel tema scuro                                                        | favicon.svg (marchio e interfaccia): regola del tema scuro tolta                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: nell'icona il segno sale al centro ottico                                                               | segno-su-scuro.svg: segno al centro geometrico                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: la punta resta lontana dal bordo                                                                        | mark.ts e segno-su-scuro.svg: segno alzato di tutto lo scarto                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D214: il segno è centrato di lato                                                                             | segno-su-scuro.svg: segno spostato a destra                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

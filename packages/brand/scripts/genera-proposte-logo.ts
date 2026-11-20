@@ -76,13 +76,14 @@ function markGroup(m: MarkDesign, color: string, x: number, y: number, size: num
  * al centro. Il giallo è un fondo pieno, senza bordo né sfumature.
  */
 function tileGroup(m: MarkDesign, x: number, y: number, size: number): string {
-  const { tile, color, radius, scale } = productMark.onDark;
+  const { tile, color, radius, scale, raise } = productMark.onDark;
   const inner = size * scale;
   const offset = (size - inner) / 2;
-  const rx = (radius * size) / m.viewBox;
+  const unit = size / m.viewBox;
   return (
-    `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(size)}" height="${fmt(size)}" rx="${fmt(rx)}" fill="${tile}"/>` +
-    markGroup(m, color, x + offset, y + offset, inner)
+    `<rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(size)}" height="${fmt(size)}" rx="${fmt(radius * unit)}" fill="${tile}"/>` +
+    // Centro ottico: il segno sale un poco dal centro geometrico (vedi productMark.onDark.raise).
+    markGroup(m, color, x + offset, y + offset - raise * unit, inner)
   );
 }
 
