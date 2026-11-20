@@ -27,7 +27,9 @@ export interface SendPanelProps {
 
 /**
  * Controlli prima dell'invio, conferme e motivi, poi firma e invio (medico) o passaggio alla
- * firma (segreteria). Le regole decidono; qui si raccoglie solo ciò che chiedono.
+ * firma (segreteria). Le regole decidono; qui si raccoglie solo ciò che chiedono. Si firma, o si
+ * manda alla firma, a controllo finito: chi firma vede sempre i controlli prima (D230). Se il
+ * controllo non riesce si può andare avanti: il servizio controlla di nuovo all'invio.
  */
 export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendPanelProps) {
   const { isDoctor } = useSession();
@@ -38,12 +40,16 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
   const [outcome, setOutcome] = useState<SendOutcome | null>(null);
   const [busy, setBusy] = useState(false);
   const [paper, setPaper] = useState<string | null>(null);
+  // Il controllo parte da sé per le ricette che si possono ancora firmare (effetto qui sotto).
+  const checkable = status === 'draft' || status === 'to_sign' || status === 'error';
+  const [checking, setChecking] = useState(checkable);
 
   const body = { confermeNote: [...confirmed], motivi: reasons };
   // Il controllo legge le conferme e i motivi del momento, senza ripartire a ogni tasto.
   const latest = useRef(body);
   latest.current = body;
   const runCheck = useCallback(async () => {
+    setChecking(true);
     try {
       setCheck(
         await api<CheckResult>(`/api/ricette/${prescriptionId}/controlla`, {
@@ -53,12 +59,14 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
       );
     } catch (e) {
       setError(e instanceof ApiError ? e : null);
+    } finally {
+      setChecking(false);
     }
   }, [prescriptionId]);
 
   useEffect(() => {
-    if (status === 'draft' || status === 'to_sign' || status === 'error') void runCheck();
-  }, [status, runCheck]);
+    if (checkable) void runCheck();
+  }, [checkable, runCheck]);
 
   const aifa = (check?.problemi ?? []).filter((p) => p.needs === 'aifa_confirmation' && p.lineId);
   const warns = [
@@ -131,16 +139,19 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
   return (
     <div className="pannello-invio">
       <h3>Controlli prima dell’invio</h3>
-      {check ? (
+      {check && (
         <>
           <IssueList issues={check.problemi} />
           {check.versioneRegole && (
             <p className="tenue">Regole di prescrizione, versione {check.versioneRegole}</p>
           )}
         </>
-      ) : (
-        <p role="status">Controllo in corso…</p>
       )}
+      <p role="status" className={check ? 'stato-controllo tenue' : 'stato-controllo'}>
+        {checking
+          ? `Controllo in corso: si ${isDoctor ? 'firma' : 'manda alla firma'} quando è finito.`
+          : ''}
+      </p>
       {isDoctor && aifa.length > 0 && (
         <fieldset className="conferme">
           <legend>Note AIFA (R7)</legend>
@@ -206,7 +217,12 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
       )}
       {paper && <Notice kind="fatto">Ricetta rossa pronta per la stampa. {paper}.</Notice>}
       <div className="azioni">
-        <button type="button" className="pulsante" onClick={() => void runCheck()}>
+        <button
+          type="button"
+          className="pulsante"
+          onClick={() => void runCheck()}
+          disabled={checking}
+        >
           <Icon name="ripeti" /> <span>Controlla di nuovo</span>
         </button>
         {isDoctor ? (
@@ -214,7 +230,7 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
             type="button"
             className="pulsante pulsante-primario"
             onClick={() => void sign()}
-            disabled={busy}
+            disabled={busy || checking}
           >
             <Icon name="firma" /> <span>Firma e invia</span>
           </button>
@@ -224,7 +240,7 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
               type="button"
               className="pulsante pulsante-primario"
               onClick={() => void toSign()}
-              disabled={busy}
+              disabled={busy || checking}
             >
               <Icon name="firma" /> <span>Manda alla firma del medico</span>
             </button>

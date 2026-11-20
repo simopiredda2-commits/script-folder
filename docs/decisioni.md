@@ -1475,3 +1475,5 @@ Non provati: tre richieste o più sullo stesso codice fiscale; due correzioni in
 
 1. «Firma e invia» a controllo finito: il medico vede sempre i controlli prima di firmare.
 2. Le prove che restano: tre richieste insieme sullo stesso codice fiscale; due correzioni insieme dello stesso codice fiscale su due pazienti; nella dimostrazione, la consultazione al contrario nell'AFT.
+
+Come si è fatto il punto 1: il controllo prima dell'invio parte da sé quando il pannello si apre; finché non ha finito «Firma e invia», «Manda alla firma del medico» e «Controlla di nuovo» restano spenti, e il pannello dice «Controllo in corso: si firma quando è finito.» (per la segreteria, «si manda alla firma»). Se il controllo non riesce i pulsanti si riaccendono: il servizio controlla di nuovo all'invio, e un errore del controllo non deve fermare il lavoro.
