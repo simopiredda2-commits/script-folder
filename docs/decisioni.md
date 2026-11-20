@@ -1201,3 +1201,18 @@ Prove:
 - browser, «prestazioni aggiuntive (D212)» in `apps/api/test/e2e/interfaccia.test.ts`.
 
 31 sabotaggi, uno anche nel browser. Non provato: invio vero, formato dell'ASL, modulo regionale delle prestazioni multiple, controllo della trascrizione da parte di una seconda persona.
+
+**D214 · Logo su fondo scuro: icona gialla con il segno blu scuro.** Domanda di Simone del 20/11/2026: il logo giallo si leggerebbe? Il giallo dell'evidenziatore (`#FFE45C`) dà questi contrasti:
+
+- sul bianco, circa 1,3:1, quindi non si legge, e sulla carta sparisce;
+- sul blu notte di SCRIPT, circa 14:1;
+- come fondo, sotto il blu scuro, circa 10:1.
+
+Proposta: il giallo come fondo di un'icona, con il segno blu scuro sopra; sul chiaro resta il segno blu. Simone: «ok, allora icona gialla col segno blu scuro per le versioni su fondo scuro».
+
+- **Su fondo scuro** il segno è un quadratino giallo `#FFE45C` (angoli arrotondati) con al centro il segno nell'ombra di SCRIPT (`#1B237A`), che occupa tre quarti del lato. È la regola del giallo della palette (D69): solo come fondo, con sopra il blu scuro. Nella versione con il nome, il nome resta bianco.
+- **Su fondo chiaro** non cambia niente: il segno resta nella luce di SCRIPT (`#4D6BFE`), anche nell'interfaccia, che ha solo il tema chiaro (D11).
+- **Favicon**: nel tema chiaro del browser resta il segno blu; nel tema scuro diventa l'icona gialla (`prefers-color-scheme` dentro l'SVG). Chrome, Edge e Firefox la seguono; Safari non mostra le favicon SVG nelle schede.
+- **File**: `segno-su-scuro.svg`, `con-nome-su-scuro.svg` e la tavola `tavola-su-scuro.svg` in `packages/brand/assets/logo/`, generati da `pnpm --filter @mmg/brand logo:proposte` con i valori di `productMark.onDark` (`packages/brand/mark.ts`). Le proposte della prima fermata restano com'erano, come traccia.
+
+Prove (`packages/brand/test/logo-scelto.test.ts`): i file su scuro hanno l'icona gialla e il segno blu scuro; il segno sul giallo e il giallo sul fondo scuro superano 7:1; la favicon cambia nel tema scuro. Tre sabotaggi. Guardato a vista nei due temi a 16, 32 e 64 px. Non provato: l'icona su un tablet vero, e le favicon in Safari.

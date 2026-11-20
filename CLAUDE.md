@@ -31,6 +31,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 - Carattere del segno: linea continua, spessore costante, estremi arrotondati, ritmo piatto–su–giù–piatto riconoscibile. Marchio piatto, nessuna sfumatura. Leggibile a 16 e 32 px, su fondo chiaro e scuro. Nella versione col nome, il nome è in Special Gothic Expanded One convertito in tracciati, non testo.
 - Il simbolo di SCRIPT non entra nel logo di Folder: resta separato, accanto a «by SCRIPT».
 - **Logo scelto: B, linguetta a picco** (prima fermata). Segno in `packages/brand/mark.ts` (`productMark`), file in `packages/brand/assets/logo/`, nome sempre da `PRODUCT_NAME`. Il segno di oggi resta solo come riferimento (`previousMark`).
+- **Su fondo scuro** (D214): icona gialla `#FFE45C` con il segno blu scuro `#1B237A` (`productMark.onDark`); sul chiaro il segno resta blu. La favicon passa all'icona gialla quando il browser è in tema scuro.
 
 ## Regole che non si discutono
 

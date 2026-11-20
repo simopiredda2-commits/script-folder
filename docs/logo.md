@@ -74,6 +74,14 @@ Il simbolo di SCRIPT non entra in nessuna proposta: nell'interfaccia resta separ
 
 Tutto è generato da `packages/brand/scripts/genera-proposte-logo.ts` (`pnpm --filter @mmg/brand logo:proposte`), con il nome preso da `packages/brand/brand.ts`. Una prova controlla che gli SVG non abbiano testo, sfumature o filtri, che gli estremi siano arrotondati e che i colori siano quelli ammessi.
 
+## Su fondo scuro (D214)
+
+Dopo la scelta, su fondo scuro il segno diventa un'icona gialla (`#FFE45C`, il giallo dell'evidenziatore dell'interfaccia) con il segno blu scuro (`#1B237A`, l'ombra di SCRIPT); il nome resta bianco. Sul chiaro resta il segno blu. Il giallo da solo non va: sul bianco ha un contrasto di circa 1,3:1. Come fondo, sotto il blu scuro, è circa 10:1, e l'icona sul blu notte di SCRIPT circa 14:1.
+
+<img src="../packages/brand/assets/logo/tavola-su-scuro.svg" alt="Icona gialla con il segno blu scuro, a 16, 32 e 64 px e con il nome, sul fondo scuro di SCRIPT">
+
+La favicon segue il tema del browser: segno blu nel tema chiaro, icona gialla nel tema scuro.
+
 ## Dopo la scelta
 
 1. Fatto: `packages/brand/mark.ts` usa la geometria della B (da `logo-proposals.ts`) e il componente `Logo` dell'interfaccia la disegna, con il nome da `PRODUCT_NAME`.
