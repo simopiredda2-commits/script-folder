@@ -316,15 +316,10 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   });
 
   it('certificato di malattia: controllato, inviato, copia per il lavoratore nel visore', async () => {
-    const id = await f.evaluate(async () => {
-      const list = (await (await fetch('/api/pazienti')).json()) as {
-        pazienti: { id: string; dataNascita: string }[];
-      };
-      // Un adulto in età da lavoro.
-      return list.pazienti.find(
-        (p) => p.dataNascita >= '1966-01-01' && p.dataNascita <= '1996-12-31',
-      )!.id;
-    });
+    // Un adulto in età da lavoro.
+    const id = (await patients()).find(
+      (p) => p.dataNascita >= '1966-01-01' && p.dataNascita <= '1996-12-31',
+    )!.id;
     await go(`/pazienti/${id}/certificati`);
     await f.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
     await f.getByRole('button', { name: 'Nuovo certificato' }).click();
@@ -342,11 +337,151 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await closeViewer();
   });
 
-  it('Fascicolo regionale: la scheda nuova non si apre, il collegamento porta al visore', async () => {
-    const id = await f.evaluate(async () => {
-      const list = (await (await fetch('/api/pazienti')).json()) as { pazienti: { id: string }[] };
-      return list.pazienti[0]!.id;
+  /** Una lettura dal servizio, come la fa l'interfaccia: con la sessione di chi è entrato. */
+  const read = (path: string) =>
+    f.evaluate(async (p) => {
+      const res = await fetch(p);
+      return res.ok ? ((await res.json()) as unknown) : null;
+    }, path);
+
+  /** I pazienti che l'utente vede, nell'ordine dell'elenco. */
+  const patients = async () =>
+    ((await read('/api/pazienti')) as { pazienti: { id: string; dataNascita: string }[] }).pazienti;
+
+  /** Il primo paziente per cui la lettura di `path(id)` soddisfa `test`. */
+  async function firstPatient(path: (id: string) => string, test: (body: unknown) => boolean) {
+    for (const p of await patients()) if (test(await read(path(p.id)))) return p.id;
+    return null;
+  }
+
+  it('nuova ricetta dalla banca dati: amlodipina, controlli, firma e invio', async () => {
+    const id = await firstPatient(
+      (id) => `/api/pazienti/${id}/terapie`,
+      (t) => t !== null && !JSON.stringify(t).toLowerCase().includes('amlodipina'),
+    );
+    expect(id).not.toBeNull();
+    await go(`/pazienti/${id}/ricetta`);
+    const restart = f.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    await f.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
+    const result = f
+      .locator('.risultato')
+      .filter({ hasText: /AMLODIPINA/i })
+      .first();
+    await result.getByRole('button', { name: 'Aggiungi' }).click();
+    await f.locator('.riga-ricetta').first().waitFor();
+    await f.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    await f.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
+    await f.getByRole('button', { name: 'Firma e invia' }).click();
+    await f
+      .getByText(/Ricetta inviata/)
+      .first()
+      .waitFor({ timeout: 30_000 });
+  });
+
+  it('voci cliniche e Profilo sanitario: preparato, validato, firmato e pubblicato; PDF nel visore', async () => {
+    const id = (await patients())[0]!.id;
+    await go(`/pazienti/${id}/voci`);
+    await f.getByRole('heading', { level: 1, name: 'Voci cliniche' }).waitFor();
+    await f.getByLabel('Descrizione').fill('Ipertensione arteriosa (dimostrazione)');
+    await f.getByLabel('Codice ICD-9-CM').fill('401.9');
+    await f.getByLabel(/Patologia cronica/).check();
+    await f.getByRole('button', { name: 'Registra', exact: true }).click();
+    await f.getByText('Voce registrata.').waitFor();
+
+    await go(`/pazienti/${id}/profilo-sanitario`);
+    await f.getByRole('heading', { level: 1, name: 'Profilo sanitario sintetico' }).waitFor();
+    await f.getByRole('button', { name: 'Prepara il Profilo dalla cartella' }).click();
+    await f.getByText('Bozza preparata dalla cartella.').waitFor();
+    await f.getByLabel('Ho controllato il contenuto del Profilo, voce per voce').check();
+    await f.getByRole('button', { name: 'Valida con il Gateway' }).click();
+    await f.getByText('Validato dal Gateway. Ora puoi firmarlo e pubblicarlo.').waitFor({
+      timeout: 30_000,
     });
+    await f.getByRole('button', { name: 'Firma e pubblica' }).click();
+    await f.getByText('Profilo firmato e pubblicato nel Fascicolo.').waitFor({ timeout: 30_000 });
+    await f.getByRole('link', { name: 'PDF firmato della versione 1' }).click();
+    await viewer().locator('canvas').first().waitFor({ timeout: 30_000 });
+    await closeViewer();
+  });
+
+  it('specialistica e seguito: visita dal catalogo inviata, poi l’esecuzione con il referto nel visore', async () => {
+    const id = (await patients())[1]!.id;
+    await go(`/pazienti/${id}/specialistica`);
+    const restart = f.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    await f.getByLabel('Prestazione, branca o codice').fill('visita');
+    await f.locator('.risultato').first().getByRole('button', { name: 'Aggiungi' }).click();
+    await f.getByLabel('Quesito diagnostico').fill('Quesito dimostrativo');
+    await f.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    await f.getByRole('button', { name: 'Firma e invia' }).click();
+    await f
+      .getByText(/Ricetta inviata/)
+      .first()
+      .waitFor({ timeout: 30_000 });
+
+    await go(`/pazienti/${id}/seguito`);
+    await f.getByRole('heading', { level: 1, name: 'Seguito delle prestazioni' }).waitFor();
+    await f
+      .getByRole('button', { name: /Registra (l’esecuzione|una seduta)/ })
+      .first()
+      .click();
+    await f.getByLabel('Struttura').fill('Struttura dimostrativa');
+    await f.getByLabel('Esito').fill('Esito dimostrativo, paziente inventato.');
+    await f.getByLabel(/Referto \(PDF o immagine/).setInputFiles({
+      name: 'referto-dimostrativo.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n% referto dimostrativo\n%%EOF\n', 'latin1'),
+    });
+    await f.getByRole('button', { name: 'Registra', exact: true }).click();
+    await f.getByText('Esecuzione registrata.').waitFor();
+    await f
+      .getByRole('link', { name: /Referto/ })
+      .first()
+      .click();
+    await viewer().waitFor();
+    await closeViewer();
+  });
+
+  it('prestazioni aggiuntive: registrata in cartella, con il compenso del catalogo', async () => {
+    const id = (await patients())[0]!.id;
+    await go(`/pazienti/${id}/prestazioni-aggiuntive`);
+    await f.getByRole('heading', { level: 1, name: 'Prestazioni aggiuntive' }).waitFor();
+    const today = new Date().toISOString().slice(0, 10);
+    await f.getByLabel('Data dell’esecuzione').fill(today);
+    await f.getByLabel('Prestazione', { exact: true }).selectOption({ index: 1 });
+    const auth = f.getByLabel(/^Estremi dell’autorizzazione/);
+    if (await auth.evaluate((el) => (el as HTMLInputElement).required))
+      await auth.fill('Autorizzazione dimostrativa n. 1');
+    await f.getByRole('button', { name: 'Registra la prestazione' }).click();
+    await f.getByText('Prestazione registrata.').waitFor();
+  });
+
+  it('la segreteria prepara la ripetizione; il medico la trova da firmare e la manda', async () => {
+    await login('segreteria');
+    const id = await firstPatient(
+      (id) => `/api/pazienti/${id}/terapie`,
+      (j) =>
+        ((j as { terapie?: { status: string }[] } | null)?.terapie ?? []).some(
+          (t) => t.status === 'active',
+        ),
+    );
+    await go(`/pazienti/${id}`);
+    const pick = f.getByLabel(/^Seleziona .+ da ripetere$/).first();
+    await pick.check();
+    await f.getByRole('button', { name: /Ripeti 1 terapia/ }).click();
+    await f.getByText(/coda «da firmare» del medico/).waitFor();
+    await login('medico');
+    await go('/ricette');
+    await f.getByRole('button', { name: 'Firma e invia' }).first().click();
+    await f
+      .getByText(/Ricetta inviata per/)
+      .first()
+      .waitFor({ timeout: 30_000 });
+  });
+
+  it('Fascicolo regionale: la scheda nuova non si apre, il collegamento porta al visore', async () => {
+    const id = (await patients())[0]!.id;
     await go(`/pazienti/${id}/fascicolo-regionale`);
     await f.getByRole('heading', { level: 1, name: 'Fascicolo regionale' }).waitFor();
     await f.getByRole('button', { name: 'Apri il Fascicolo' }).click();
@@ -358,10 +493,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   });
 
   it('schema orario: la stampa non parte e la pagina lo dice', async () => {
-    const id = await f.evaluate(async () => {
-      const list = (await (await fetch('/api/pazienti')).json()) as { pazienti: { id: string }[] };
-      return list.pazienti[0]!.id;
-    });
+    const id = (await patients())[0]!.id;
     await go(`/pazienti/${id}/schema-orario`);
     await f.getByRole('button', { name: 'Stampa' }).click();
     await f
