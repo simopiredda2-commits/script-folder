@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
+import { PDFDocument } from 'pdf-lib';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { describe, expect, it } from 'vitest';
 import { code39Bars } from '../src/reminders/code39';
 import {
   BARCODE_HEIGHT_MM_2024,
   BARCODE_MODULE_MM_2024,
+  DEFAULT_REMINDER_PAPER,
   HALF_A4_MM,
   nreParts,
   renderPromemoria,
@@ -132,6 +134,12 @@ async function placed(bytes: Uint8Array) {
   return items;
 }
 
+/** Larghezza e altezza della prima pagina, in millimetri. */
+async function pageMm(bytes: Uint8Array) {
+  const { width, height } = (await PDFDocument.load(bytes)).getPage(0).getSize();
+  return { width: (width * 25.4) / 72, height: (height * 25.4) / 72 };
+}
+
 describe('promemoria: versioni del modello (D217)', () => {
   it('versione 1: un promemoria fissato prima si ristampa uguale, byte per byte', async () => {
     // Impronte dei PDF prodotti dal programma prima delle specifiche del 2024.
@@ -187,6 +195,39 @@ describe('promemoria: versioni del modello (D217)', () => {
       expect(a, label).toBeDefined();
       expect(b!.top, label).toBeCloseTo(a!.top, 3);
     }
+  });
+
+  it('carta: A5 orizzontale per difetto, con tutto il modello dentro la pagina (D222)', async () => {
+    expect(DEFAULT_REMINDER_PAPER).toBe('A5');
+    for (const render of [renderPromemoria, renderSoloNre]) {
+      const bytes = await render(v2);
+      const { width, height } = await pageMm(bytes);
+      expect(width).toBeCloseTo(210, 1);
+      expect(height).toBeCloseTo(148, 1);
+      // Nessuna scritta oltre il fondo della pagina A5.
+      const tops = (await placed(bytes)).map((x) => x.top);
+      expect(Math.min(...tops)).toBeGreaterThan(0);
+      expect(Math.max(...tops)).toBeLessThanOrEqual(148);
+    }
+  });
+
+  it('carta: su A4 lo stesso promemoria nella metà alta, alle stesse distanze dall’alto', async () => {
+    for (const render of [renderPromemoria, renderSoloNre]) {
+      const a4 = await render(v2, 'A4');
+      const { width, height } = await pageMm(a4);
+      expect(width).toBeCloseTo(210, 1);
+      expect(height).toBeCloseTo(297, 1);
+      const onA4 = await placed(a4);
+      const onA5 = await placed(await render(v2, 'A5'));
+      expect(onA4.map((x) => x.text)).toEqual(onA5.map((x) => x.text));
+      onA4.forEach((x, i) => expect(x.top, x.text).toBeCloseTo(onA5[i]!.top, 3));
+      expect(Math.max(...onA4.map((x) => x.top))).toBeLessThanOrEqual(HALF_A4_MM);
+    }
+  });
+
+  it('carta: un promemoria della versione 1 si ristampa su A4 com’era, qualunque sia la scelta', async () => {
+    expect(sha256(await renderPromemoria(v1, 'A5'))).toBe(sha256(await renderPromemoria(v1, 'A4')));
+    expect((await pageMm(await renderSoloNre(v1, 'A5'))).height).toBeCloseTo(297, 1);
   });
 
   it('diciture e valori come nel testo delle specifiche del 28/02/2024', () => {

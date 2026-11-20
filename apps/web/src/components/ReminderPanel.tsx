@@ -158,6 +158,18 @@ export function ReminderPanel({
         )}
       </div>
       <PrintHint kind={white ? 'promemoria_bianca' : 'promemoria'} id={hintId} />
+      {!white && (
+        // Mezzo foglio A4 (D217): A5 per difetto, A4 se scelto in Strumenti › Stampa (D222).
+        <p className="aiuto">
+          {printing?.carta === 'A4'
+            ? 'Carta A4, con il promemoria nella metà alta. '
+            : printing?.carta === 'A5'
+              ? 'Carta A5 orizzontale. '
+              : ''}
+          Stampa al 100% («dimensioni effettive»), senza adattare alla pagina: i codici a barre
+          restano delle misure delle specifiche.
+        </p>
+      )}
       {white && (
         <p className="aiuto">
           Per la ricetta bianca vale solo il promemoria prodotto dal SAC: il programma lo consegna

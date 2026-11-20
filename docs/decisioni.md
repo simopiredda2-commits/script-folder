@@ -1321,3 +1321,28 @@ Prove:
 - Nessun dato esce dal browser; ricaricando la pagina si riparte da capo.
 
 `apps/demo` è uno strumento di prova, non parte del prodotto: le sue dipendenze sono di sviluppo (la prova delle licenze guarda quelle di produzione). Pagina di 1,9 MB e file accanto per circa 25 MB. Quando il programma cambia si ricostruisce (`pnpm --filter @mmg/demo build`) e si ripubblica sullo stesso indirizzo.
+
+**D222 · Promemoria su carta A5 per difetto.** Richiesta di Simone del 20/11/2026: «le ricette dematerializzate (al netto di alcune tipologie) vengono stampate di solito su carta A5 o sbaglio? direi di predisporre pdf di stampa direttamente su A5 per evitare margini di carta bianca inutili». Le specifiche del 28/02/2024 vogliono il promemoria grande metà foglio A4 (D217): è un A5 orizzontale, 210 × 148 mm.
+
+- **Per difetto, A5 orizzontale.** Il promemoria completo e il foglio «solo NRE» escono su una pagina A5 orizzontale. Misure e campi sono quelli di D217, alle stesse distanze dal bordo alto e da quello sinistro.
+- **A4 resta una scelta**, per le stampanti senza cassetto A5: in Strumenti › Stampa, per lo studio o per una postazione. Il promemoria sta allora nella metà alta della pagina, come prima.
+- **Chi decide la carta**: le preferenze di stampa (D180), nell'ordine postazione, studio, A5. Vale anche per l'email al paziente: l'allegato ha la carta della postazione di chi lo invia.
+- **Supera il punto «Mezzo foglio A4» di D217.** Lì la pagina restava A4 perché molte stampanti, con l'A4 nel cassetto, ingrandiscono una pagina più piccola. Il rischio resta per chi stampa l'A5 su carta A4 con «adatta alla pagina»: i codici a barre escono 1,41 volte più grandi delle misure del decreto. Per questo c'è la scelta A4, e il PDF si stampa al 100% («dimensioni effettive»).
+- **Margini sull'A5**: 8 mm a sinistra e a destra. La base della prima riga è a 7 mm dal bordo alto, quella della dicitura finale a 141,2 mm, cioè 6,8 mm sopra il bordo basso. La frase regionale (campo 28) avrebbe la base a 144,8 mm, 3,2 mm sopra il bordo basso, dentro la striscia che molte stampanti non stampano. Oggi è sempre vuota (D217): se il Piemonte la chiederà, va guardata su carta.
+- **Che cosa non cambia**:
+  - i promemoria fissati prima del 20/11/2026 (versione 1) si ristampano su A4, uguali byte per byte;
+  - il promemoria della ricetta bianca elettronica è il PDF del Sistema TS, consegnato com'è (D93);
+  - il certificato INPS resta A4, sui fac-simile del DM 26/2/2010;
+  - i certificati dai modelli avevano già la scelta tra A4 e A5;
+  - la ricetta rossa non ha ancora il suo modulo di stampa («da completare»): si stampa sul modulo ufficiale, con la sua misura.
+- **Nel pannello del promemoria**, sotto i pulsanti: la carta che vale alla postazione e «Stampa al 100% («dimensioni effettive»), senza adattare alla pagina».
+- **Una sola fonte per la carta predefinita**: il tipo di documento `promemoria` in `packages/domain/src/printing.ts`. Il PDF (`apps/api/src/reminders/pdf.ts`) la legge da lì.
+
+Prove:
+
+- `apps/api/test/promemoria-modello.test.ts`: pagina A5 per difetto con tutte le scritte dentro; su A4 le stesse scritte alle stesse distanze dall'alto, nella metà alta; la versione 1 sempre su A4;
+- `apps/api/test/promemoria.test.ts`: dal servizio A5, poi A4 quando lo studio sceglie A4, anche per l'allegato dell'email, poi di nuovo A5;
+- `packages/domain/test/printing.test.ts` e `apps/api/test/stampa.test.ts`: per il promemoria si sceglie A5 o A4, mai altro;
+- `apps/web/test/stampa.test.tsx`: il pannello del promemoria dice la carta che vale alla postazione e di stampare al 100% («dimensioni effettive»).
+
+6 sabotaggi. Non provato: la stampa vera su A5 e su A4 con stampanti diverse, e la lettura dei codici in farmacia.

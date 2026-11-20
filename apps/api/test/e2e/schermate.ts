@@ -150,7 +150,8 @@ try {
   await reminder.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await shot(page, '17-promemoria');
   // Il PDF del promemoria come lo riceve il paziente, in immagine (serve pdftoppm, di poppler):
-  // la metà alta della pagina A4, che è il promemoria (specifiche del 28/02/2024, D217).
+  // mezzo foglio A4 (specifiche del 28/02/2024, D217), la pagina A5 orizzontale per difetto
+  // (D222); con la carta A4 lo stesso riquadro prende la metà alta della pagina.
   const href = await reminder.getByRole('link', { name: 'Promemoria (PDF)' }).getAttribute('href');
   const pdfPath = join(work, 'promemoria.pdf');
   writeFileSync(pdfPath, await (await page.request.get(`${base}${href}`)).body());
