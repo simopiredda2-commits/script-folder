@@ -949,16 +949,31 @@ Nello stesso branch, ripartito da `main`.
 
 **Prossimo passo**: fatto. Prove complete verdi, pull request #21 unita dopo la fermata (D223); si continua in «Dopo l'unione della #21».
 
-### Dopo l'unione della #21 – Dimostrazione completa (D223)
+### Dopo l'unione della #21 – Dimostrazione completa (D223, D224)
 
 Nello stesso branch, ripartito da `main`. Risposta di Simone alla fermata: «Dimostrazione completa».
 
-**Da fare**
+**Fatto** (D224)
 
-- Rendere provabile nell'artifact tutto il programma: certificati, importazione, strumenti e AURA, oltre a ricette, promemoria e Fascicolo.
-- Prove automatiche della dimostrazione costruita, anche con WebKit (Safari) e Firefox.
+- **AURA simulata con i pazienti dimostrativi.** All'avvio, in «Oggi», arrivano:
+  - un'esenzione nuova;
+  - un'ASL diversa e un decesso, da confermare;
+  - una revoca;
+  - un nuovo assistito, da registrare.
 
-**Prossimo passo**: provare nella dimostrazione ogni parte del programma e correggere quello che non va.
+  Il riquadro della dimostrazione dice chi sono.
+
+- **Conferme e stampa nella cornice dell'artifact.** Nella cornice la domanda compare subito in un riquadro della pagina, senza provare la finestra del browser, e con «Conferma» il clic si ripete. La stampa dice che nella dimostrazione non parte. La prima prova su WebKit ha trovato che Safari segnala come errore la conferma tentata nella cornice: ora non si tenta, e la prova non lascia passare nessun messaggio d'errore della console.
+- **Una sessione sola con il database.** Mentre una transazione è aperta, ciò che arriva entra in quella transazione, e le richieste passano una alla volta. Prima «Registra» un nuovo assistito fermava la dimostrazione: il servizio, scritto per Postgres con più connessioni, in quel punto usa `db` dentro una transazione.
+- **Prove della dimostrazione costruita**, dentro un iframe con la sandbox dell'artifact: `apps/demo/prove/dimostrazione.e2e.ts`, 15 prove, `pnpm --filter @mmg/demo test:browser`. Nella CI c'è una parte nuova, «Dimostrazione con chromium/webkit/firefox».
+
+**Non provato**
+
+- La cornice vera di claude.ai: le prove usano un iframe con la stessa sandbox, ma i permessi esatti della cornice vera non sono pubblicati. Va provata a mano anche sul tablet.
+- Nella dimostrazione: AFT (servono due studi), esportazione completa, «Aggiorna adesso» delle banche dati, cambio di medico dentro lo studio.
+- Da valutare nel servizio: «Registra» un nuovo assistito crea il paziente con una transazione sua, fuori da quella della registrazione. Con Postgres funziona; se l'ultimo passo non riuscisse, il paziente resterebbe creato e l'assistito ancora «da registrare».
+
+**Prossimo passo**: ripubblicare la dimostrazione, prove complete, pull request #22 e fermata.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -2761,3 +2776,9 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D220: la pagina dice che il collegamento è simulato                                                           | FseAccessPage.tsx: avviso tolto                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D220: i tipi delle specifiche scritti come una frase                                                          | FseAccessPage.tsx: nomi in maiuscolo                                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D220: nella cartella il collegamento solo per i medici                                                        | RecordPage.tsx: collegamento a tutti                                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D224: dentro una transazione aperta le query entrano in quella transazione                                    | database.ts: query sempre fuori dalla transazione                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D224: le variazioni di AURA dell'avvio arrivano in Oggi                                                       | aura.ts: secondo giro tolto                                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D224: il riquadro dice che cosa ha mandato AURA                                                               | DemoPanel.tsx: sezione «AURA simulata» rinominata                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D224: nella cornice la conferma compare nella pagina                                                          | dialogs.ts: nessun riquadro                                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D224: nella cornice la stampa mostra l'avviso                                                                 | dialogs.ts: avviso tolto                                                                                                  | Rosso, poi verde. La prima volta la prova, lanciata da sola, partiva senza accesso ed era rossa anche dopo il ripristino: rifatta con l'accesso della prova di AURA                                                                                                                                              |
+| D224: nella cornice non si prova la finestra del browser                                                      | dialogs.ts: cornice non riconosciuta                                                                                      | Rosso, poi verde: Chromium scrive nella console che la conferma è stata ignorata                                                                                                                                                                                                                                 |

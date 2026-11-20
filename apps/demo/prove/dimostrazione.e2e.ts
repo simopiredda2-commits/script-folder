@@ -44,9 +44,6 @@ const FRAME_PAGE =
   '<body style="margin:0"><iframe title="Dimostrazione" sandbox="allow-scripts allow-same-origin allow-forms" ' +
   'src="/index.html" style="border:0;display:block;width:100vw;height:100vh"></iframe></body></html>';
 
-/** Messaggi del browser attesi nella cornice: le finestre bloccate, la sandbox stessa. */
-const EXPECTED_CONSOLE = [/allow-modals/, /sandbox/i, /Blocked (opening|script execution)/i];
-
 function serve(): Promise<Server> {
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
@@ -93,10 +90,10 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     });
     page = await context.newPage();
     page.on('pageerror', (e) => problems.push(`errore della pagina: ${e.message}`));
+    // Nessun messaggio d'errore è atteso, nemmeno quelli del browser sulle finestre bloccate:
+    // nella cornice la dimostrazione non prova ad aprirle (dialogs.ts).
     page.on('console', (m) => {
-      if (m.type() !== 'error') return;
-      if (EXPECTED_CONSOLE.some((re) => re.test(m.text()))) return;
-      problems.push(`console: ${m.text().slice(0, 300)}`);
+      if (m.type() === 'error') problems.push(`console: ${m.text().slice(0, 300)}`);
     });
     const port = (server.address() as AddressInfo).port;
     const t0 = Date.now();

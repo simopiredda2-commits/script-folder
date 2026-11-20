@@ -1,15 +1,17 @@
 /**
- * Conferme e stampa nella cornice dell'artifact (D223). Dentro un artifact il browser non apre le
- * sue finestre: `window.confirm` risponde subito «no» e `window.print` non fa nulla. Il programma
+ * Conferme e stampa nella cornice dell'artifact (D223, D224). Dentro un artifact il browser non apre
+ * le sue finestre: `window.confirm` risponde subito «no» e `window.print` non fa nulla. Il programma
  * chiede conferma con `window.confirm` (archiviare, confermare un utente, uscire dall'AFT…) e
  * stampa lo schema orario con `window.print`.
  *
- * - Conferma: se il browser risponde «no» prima che una persona possa leggere la domanda, la
- *   finestra era bloccata. La stessa domanda compare in un riquadro della pagina; con «Conferma» il
- *   clic che l'aveva chiesta si ripete, e questa volta la risposta è «sì».
- * - Stampa: un avviso dice che nella dimostrazione non si stampa.
+ * - Conferma: nella cornice la domanda compare subito in un riquadro della pagina, senza provare la
+ *   finestra del browser (Safari, che non la apre, lo segnala come errore). Con «Conferma» il clic
+ *   che l'aveva chiesta si ripete, e questa volta la risposta è «sì».
+ * - Stampa: nella cornice un avviso dice che nella dimostrazione non si stampa.
  *
- * Fuori dalla cornice (la pagina aperta da sola) le finestre del browser funzionano come sempre.
+ * Fuori dalla cornice (la pagina aperta da sola) le finestre del browser funzionano come sempre. Se
+ * anche lì la conferma risponde «no» prima che una persona possa leggere la domanda, la finestra
+ * era bloccata: la domanda passa nel riquadro.
  */
 
 /** Sotto questo tempo nessuno ha letto la domanda: la finestra non si è aperta. */
@@ -90,6 +92,9 @@ function askInPage(message: string, origin: HTMLElement | null) {
 }
 
 export function installDialogs() {
+  // Dentro una cornice, come nell'artifact: le finestre del browser non si aprono.
+  const framed = window.self !== window.top;
+
   // Il pulsante premuto per ultimo: è quello da ripetere dopo la conferma nella pagina.
   document.addEventListener(
     'click',
@@ -108,27 +113,24 @@ export function installDialogs() {
       approved.delete(text);
       if (until >= Date.now()) return true;
     }
-    const started = performance.now();
-    let answer: boolean;
-    try {
-      answer = originalConfirm(text);
-    } catch {
-      answer = false;
+    if (!framed) {
+      const started = performance.now();
+      let answer: boolean;
+      try {
+        answer = originalConfirm(text);
+      } catch {
+        answer = false;
+      }
+      if (answer || performance.now() - started >= BLOCKED_WITHIN_MS) return answer;
     }
-    if (answer || performance.now() - started >= BLOCKED_WITHIN_MS) return answer;
     askInPage(text, lastClicked);
     return false;
   };
 
-  const originalPrint = window.print.bind(window);
-  window.print = () => {
-    try {
-      originalPrint();
-    } catch {
-      // Nella cornice la stampa può anche dare errore: l'avviso sotto basta.
-    }
-    notice(
-      'Nella dimostrazione la stampa non parte: nel programma vero qui si apre la finestra di stampa del browser.',
-    );
-  };
+  if (framed)
+    window.print = () => {
+      notice(
+        'Nella dimostrazione la stampa non parte: nel programma vero qui si apre la finestra di stampa del browser.',
+      );
+    };
 }
