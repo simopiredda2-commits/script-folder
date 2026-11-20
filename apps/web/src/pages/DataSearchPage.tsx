@@ -8,7 +8,7 @@ import {
 } from '../components/common';
 import { Icon } from '../components/Icon';
 import { ServiceResultText } from '../components/ServiceResult';
-import { ShortageNote } from '../components/Shortage';
+import { isSuspended, ShortageNote, SuspendedNote } from '../components/Shortage';
 import { query } from '../lib/api';
 import { money } from '../lib/format';
 import { useApi } from '../lib/useApi';
@@ -170,6 +170,7 @@ export function DataSearchPage() {
                       AIC {d.aic}
                       {d.atc ? ` · ATC ${d.atc}` : ''}
                     </div>
+                    {isSuspended(d.adminState) && <SuspendedNote />}
                     {d.shortage && <ShortageNote shortage={d.shortage} details />}
                   </div>
                   <button

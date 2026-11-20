@@ -31,11 +31,12 @@ Da dove viene ogni contenuto del repository e del programma. Serve a mostrare du
 
 ### Da dove vengono gli estratti delle banche dati d'esempio
 
-File interi letti il 18/11/2026 e, per la lista di trasparenza e i farmaci carenti, il 19/11/2026; nel repository ci sono solo le righe scelte (D148, D202). Una verifica una tantum ha confrontato ogni riga degli estratti con il file intero: tutte identiche, byte per byte.
+File interi letti il 18/11/2026; per la lista di trasparenza e i farmaci carenti il 19/11/2026; per la confezione sospesa dell'anagrafica (ranitidina, D205) il 20/11/2026. Nel repository ci sono solo le righe scelte (D148, D202, D205). Una verifica una tantum ha confrontato ogni riga degli estratti con il file intero da cui viene: tutte identiche, byte per byte.
 
 | File                                                        | Indirizzo                                                    | Byte       | SHA-256                                                            |
 | ----------------------------------------------------------- | ------------------------------------------------------------ | ---------- | ------------------------------------------------------------------ |
 | AIFA, `confezioni_fornitura.csv`                            | `https://drive.aifa.gov.it/farmaci/confezioni_fornitura.csv` | 82.541.593 | `33fa577fe6b635507b8b757b94a7a8b342ed01784fee64f577d27883d1350fa9` |
+| AIFA, `confezioni_fornitura.csv` (20/11/2026)               | `https://drive.aifa.gov.it/farmaci/confezioni_fornitura.csv` | 82.541.055 | `7c6f00ec461f0f67300b2607a4eff924a7156d20d51d5517c2dbc96122a97ff6` |
 | AIFA, `Classe-A_per_principio-attivo_30-6-2026.csv`         | `https://www.aifa.gov.it/documents/20142/3815901/…`          | 1.520.349  | `d167ef333306be7d3e70ed5b7d13f840a35d00ee11fb320f6601981deefd3832` |
 | AIFA, `Classe-H_per_principio-attivo_30-6-2026.csv`         | `https://www.aifa.gov.it/documents/20142/3815901/…`          | 396.740    | `8422e0a55e2cd5cd1bcdb053e9832fc69cc9b128e585925be135771fb1426bae` |
 | AIFA, `Lista_farmaci_equivalenti.csv` (16 novembre 2026)    | `https://www.aifa.gov.it/documents/20142/825643/…`           | 1.764.425  | `f95aff340397114274f03eab5d3600d9607a1ade12baacdb7572fa74eff4a712` |

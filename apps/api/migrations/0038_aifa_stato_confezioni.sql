@@ -1,0 +1,1 @@
+ALTER TABLE "ref_drug" ADD COLUMN "admin_state" text;

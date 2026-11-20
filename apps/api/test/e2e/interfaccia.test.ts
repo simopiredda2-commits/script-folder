@@ -2402,4 +2402,61 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .where(eq(therapy.id, row!.id)),
     );
   });
+
+  it('variazioni AIFA (D205): la confezione sospesa in Oggi, in cartella, nella scheda e nella ricerca', async () => {
+    // RANITIDINA DOC GENERICI è «Sospesa» nell'anagrafica del sito d'esempio (riga vera del 20/11/2026).
+    const [row] = await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .insert(therapy)
+        .values({
+          patientId: s.richPatient,
+          drugAic: '034471021',
+          drugName: 'RANITIDINA DOC GENERICI 300 MG COMPRESSE',
+          activeIngredient: 'RANITIDINA CLORIDRATO',
+          atc: 'A02BA02',
+          kind: 'chronic',
+          startOn: '2026-01-01',
+          createdBy: s.users.titolare.id,
+        })
+        .returning({ id: therapy.id }),
+    );
+    await gotoNewPage(page, `${base}/`);
+    await page.getByRole('heading', { name: 'Variazioni AIFA sui farmaci in terapia' }).waitFor();
+    const patients = page.getByRole('list', {
+      name: 'Pazienti con RANITIDINA DOC GENERICI 300 MG COMPRESSE in terapia: confezione sospesa',
+    });
+    await patients.getByRole('link').first().waitFor();
+    await check(page, 'Oggi con una variazione AIFA', true);
+    await patients.getByRole('link').first().click();
+    await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
+    await page
+      .locator('.terapia-riga')
+      .filter({ hasText: 'RANITIDINA DOC GENERICI' })
+      .getByText(
+        /^Variazione AIFA: confezione sospesa secondo l’anagrafica AIFA delle confezioni \(versione del \d{2}\/\d{2}\/\d{4}\)\.$/,
+      )
+      .waitFor();
+    await check(page, 'cartella con una variazione AIFA', true);
+    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}/terapie/${row!.id}`);
+    await page
+      .getByText(/Si chiude quando la terapia passa a un’altra confezione o è conclusa\.$/)
+      .waitFor();
+    await check(page, 'scheda della terapia con una variazione AIFA', true);
+    await gotoNewPage(page, `${base}/banche-dati`);
+    await page
+      .getByLabel('Nome commerciale, principio attivo, codice AIC o ATC')
+      .fill('ranitidina');
+    await page
+      .locator('.risultato')
+      .filter({ hasText: 'RANITIDINA DOC GENERICI' })
+      .getByText('Confezione sospesa secondo l’anagrafica AIFA delle confezioni.')
+      .waitFor();
+    await check(page, 'ricerca dei farmaci con una confezione sospesa', true);
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .update(therapy)
+        .set({ status: 'ended', endOn: studioDate(s.clock.now()) })
+        .where(eq(therapy.id, row!.id)),
+    );
+  });
 });

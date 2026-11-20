@@ -800,6 +800,11 @@ legend {
   white-space: pre-line;
 }
 
+.variazioni-aifa {
+  display: grid;
+  gap: 0.5rem;
+}
+
 .esito-info {
   color: var(--color-info);
 }

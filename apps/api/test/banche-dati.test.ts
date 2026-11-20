@@ -91,7 +91,7 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     });
     expect(r['aifa_liste/confezioni_fornitura.csv']).toMatchObject({
       outcome: 'importato',
-      rows: 11,
+      rows: 12,
     });
     expect(r['aifa_liste/3815901_Classe-A_per_principio-attivo.csv']).toMatchObject({
       outcome: 'importato',
@@ -691,7 +691,13 @@ describe('banche dati via HTTP e nelle regole', () => {
     ]);
     const one = (await get('/api/farmaci/038092019')).json();
     expect(one.farmaco.name).toBe('AMLODIPINA DOC GENERICI');
+    expect(one.farmaco.adminState).toBe('Autorizzata');
     expect(one.equivalenti).toHaveLength(3);
+    // Lo stato amministrativo dall'anagrafica (D205): la confezione sospesa del sito d'esempio.
+    const suspended = (await get('/api/farmaci?q=ranitidina')).json().farmaci;
+    expect(
+      suspended.map((d: { aic: string; adminState: string }) => [d.aic, d.adminState]),
+    ).toEqual([['034471021', 'Sospesa']]);
     const old = (await get('/api/prestazioni?q=visita&data=2026-10-29')).json();
     expect(old.prestazioni[0].description).toBe('Visita di prova (catalogo precedente)');
     expect((await get('/api/esenzioni?q=T0')).json().esenzioni).toHaveLength(2);

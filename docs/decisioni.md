@@ -1089,3 +1089,20 @@ Scelte:
 - **Il registro** è quello di D201: la lettura dei conteggi una riga, l'esportazione una riga per paziente, a nome della segreteria.
 
 Prove (permessi, servizio, interfaccia, browser con accessibilità anche su tablet) e sabotaggi.
+
+**D205 · Variazioni AIFA sui farmaci in terapia (A7): confezione sospesa o uscita dall'anagrafica, classe, nota, piano.** Alla fermata dopo l'unione della #15 Simone ha scelto «Sia altre variazioni AIFA che registri AIFA». Requisito A7: «Un aggiornamento che tocca un farmaco in terapia (carenza, nota, classe, piano, ritiro) arriva in Da fare, con i pazienti interessati» (avvisa). Le carenze erano fatte (D202). Scelte:
+
+- **Stato amministrativo dall'anagrafica.** Il file AIFA `confezioni_fornitura.csv` ha la colonna «STATO_AMMINISTRATIVO»: nel file scaricato il 20/11/2026, 160.067 confezioni «Autorizzata» e 33 «Sospesa»; le confezioni revocate non ci sono. Campo nuovo `adminState` (mappature 2026-11-20.1, migrazione 0038). Nel sito d'esempio c'è una riga vera di ranitidina «Sospesa», copiata senza cambiare un byte.
+- **Che cosa è una variazione**, per le terapie in corso con l'AIC, alla data e con le versioni in vigore:
+  - _confezione sospesa_: l'anagrafica in vigore la dà «Sospesa»;
+  - _uscita dall'anagrafica_: non c'è nell'anagrafica in vigore e c'era in una versione superata. Il testo dice «non è più nell'anagrafica», mai «revocata»: l'assenza non dice il motivo (D59);
+  - _classe_: la scheda della terapia ha la classe A o H; la confezione era in quell'elenco in una versione superata e non c'è più nella versione in vigore della stessa serie. Se è nell'altro elenco, il testo dice la classe nuova;
+  - _nota_: la nota della scheda era quella dell'elenco DPC in una versione superata, e l'elenco in vigore ne dice un'altra, o nessuna;
+  - _piano_: l'elenco DPC in vigore chiede il piano, la terapia non ne ha uno collegato e una versione superata dell'elenco non lo chiedeva.
+- **Perché il confronto con la scheda e con una versione superata.** Quando si sceglie il farmaco, la scheda della terapia registra classe e nota dalla banca dati. Confrontarle con i dati in vigore dice che cosa è cambiato per quella terapia. Chiedere che il dato della scheda si ritrovi in una versione superata evita di chiamare «variazione» una scheda scritta a mano o importata da un altro programma.
+- **Quanto resta.** Nessuna soglia di giorni da inventare: la voce resta finché la terapia non è aggiornata o conclusa. Per classe e nota basta scegliere di nuovo il farmaco nella scheda, che riporta i dati in vigore; per il piano, collegarlo; per la confezione sospesa o uscita, passare a un'altra confezione.
+- **Dove si vede.** In Oggi, «Variazioni AIFA sui farmaci in terapia»: una voce per farmaco e variazione, con i pazienti e il collegamento alla cartella. Poi nella cartella, sotto la terapia, e nella scheda, con come si chiude. La visibilità è quella delle carenze (D202): chi legge le terapie dell'archivio; le riservate, solo chi le legge.
+- **Nella ricerca dei farmaci** la confezione sospesa si dice con simbolo e parola: «Confezione sospesa secondo l'anagrafica AIFA delle confezioni». Nessuna regola nuova alla ricetta: le regole vengono dai requisiti. Se serve un avviso alla ricetta, è una domanda per la fermata.
+- **Fonti.** L'anagrafica e le liste di classe di AIFA, già importate; l'elenco DPC della Regione (trascrizione). La nota AIFA non ha ancora una fonte per AIC (D202): le variazioni di nota valgono per i farmaci dell'elenco DPC.
+
+Prove nel servizio con versioni scritte a mano, nell'interfaccia e nel browser, con 17 sabotaggi. Non provato: due versioni vere dell'anagrafica o delle liste, una dopo l'altra (le prove usano versioni scritte a mano); quanto spesso AIFA sospende o toglie le confezioni.

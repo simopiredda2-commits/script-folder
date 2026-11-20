@@ -9,7 +9,7 @@ File per provare l'importazione delle banche dati pubbliche senza raggiungere si
 
 Che cosa è vero:
 
-- **AIFA**: intestazioni e righe copiate senza cambiare un byte dai file AIFA letti il 18/11/2026 (anagrafica delle confezioni; liste di classe A e H del 30/6/2026). Fonte: AIFA, dati aperti con licenza CC BY 4.0 (https://www.aifa.gov.it/open-data). Amlodipina, metformina e atorvastatina con un equivalente di marca, dulaglutide, ceftriaxone in classe H, paracetamolo fuori dalle liste di classe, e due prezzi della classe H che non sono numeri. Valgono le mappature del repository (`packages/reference/data/mappature.json`).
+- **AIFA**: intestazioni e righe copiate senza cambiare un byte dai file AIFA letti il 18/11/2026 (anagrafica delle confezioni; liste di classe A e H del 30/6/2026) e il 20/11/2026 (una confezione di ranitidina «Sospesa» dell'anagrafica, D205). Fonte: AIFA, dati aperti con licenza CC BY 4.0 (https://www.aifa.gov.it/open-data). Amlodipina, metformina e atorvastatina con un equivalente di marca, dulaglutide, ceftriaxone in classe H, paracetamolo fuori dalle liste di classe, e due prezzi della classe H che non sono numeri. Valgono le mappature del repository (`packages/reference/data/mappature.json`).
 - **DPC**: la riga di DULAGLUTIDE della trascrizione è quella dell'elenco della Regione Piemonte aggiornato al 9/7/2026; il PDF del sito d'esempio è un estratto di prova.
 - **ISTAT**: le intestazioni e le due righe di Agliè e Airasca, lette il 18/11/2026 dal file aggiornato al 21/02/2026.
 

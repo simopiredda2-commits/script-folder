@@ -93,7 +93,7 @@ describe('estrazione dei record', () => {
     const m = mappingForSyncFile(repo, 'aifa_liste', 'confezioni_fornitura.csv')!;
     const out = extractRecords(m, table('aifa', 'farmaci', 'confezioni_fornitura.csv'));
     expect(out.problems).toEqual([]);
-    expect(out.records).toHaveLength(11);
+    expect(out.records).toHaveLength(12);
     expect(out.records[0]).toEqual({
       aic: '038092019',
       name: 'AMLODIPINA DOC GENERICI',
@@ -103,6 +103,13 @@ describe('estrazione dei record', () => {
       form: 'Compressa',
       supplyRegime: 'Medicinali soggetti a prescrizione medica',
       holder: 'DOC GENERICI SRL',
+      adminState: 'Autorizzata',
+    });
+    // Lo stato amministrativo (D205): la riga vera di una confezione sospesa.
+    expect(out.records.at(-1)).toMatchObject({
+      aic: '034471021',
+      name: 'RANITIDINA DOC GENERICI',
+      adminState: 'Sospesa',
     });
   });
 

@@ -26,7 +26,7 @@ import { buildExport } from '../export/export';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
 import { labResults, latestMeasurements, timeline } from '../patients/timeline';
 import { studioDate } from '../prescriptions/rules-check';
-import type { DrugShortage, ReferenceData } from '../reference/lookup';
+import type { AifaChange, DrugShortage, ReferenceData } from '../reference/lookup';
 import { HttpError } from './errors';
 
 const idParams = z.object({ id: z.uuid() });
@@ -250,10 +250,28 @@ export function registerPatientRoutes(
           studioDate(now()),
         )
       : new Map<string, DrugShortage>();
+    // Le altre variazioni AIFA (A7, D205), per le stesse terapie.
+    const changes = deps.reference
+      ? await deps.reference.aifaChanges(
+          rows
+            .filter((r) => r.status !== 'ended' && r.drugAic)
+            .map((r) => ({
+              id: r.id,
+              drugAic: r.drugAic,
+              drugClass: r.drugClass,
+              aifaNote: r.aifaNote,
+              activeIngredient: r.activeIngredient,
+              atc: r.atc,
+              hasPlan: r.therapeuticPlanId !== null,
+            })),
+          studioDate(now()),
+        )
+      : new Map<string, AifaChange[]>();
     return {
       terapie: rows.map((r) => ({
         ...r,
         shortage: (r.status !== 'ended' && r.drugAic && shortages.get(r.drugAic)) || null,
+        aifaChanges: changes.get(r.id) ?? [],
       })),
     };
   });

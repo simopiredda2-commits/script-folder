@@ -39,3 +39,70 @@ export function ShortageNote({
     </span>
   );
 }
+
+/** Una variazione AIFA su un farmaco in terapia, come la dà il servizio (A7, D205). */
+export interface AifaChange {
+  kind: 'sospesa' | 'anagrafica' | 'classe' | 'nota' | 'piano';
+  /** La data della versione che la mostra. */
+  since: string;
+  /** In parole, con la fonte e la versione. */
+  text: string;
+}
+
+/** Il tipo di variazione in poche parole, per gli elenchi. */
+export const AIFA_CHANGE_LABEL: Record<AifaChange['kind'], string> = {
+  sospesa: 'confezione sospesa',
+  anagrafica: 'uscita dall’anagrafica',
+  classe: 'classe cambiata',
+  nota: 'nota cambiata',
+  piano: 'piano richiesto',
+};
+
+/** Come si chiude la variazione: con la terapia aggiornata, o conclusa (D205). */
+const HOW_TO: Record<AifaChange['kind'], string> = {
+  sospesa: 'si chiude quando la terapia passa a un’altra confezione o è conclusa',
+  anagrafica: 'si chiude quando la terapia passa a un’altra confezione o è conclusa',
+  classe: 'per aggiornare la scheda, scegli di nuovo il farmaco e salva',
+  nota: 'per aggiornare la scheda, scegli di nuovo il farmaco (la nota viene dalla banca dati) e salva',
+  piano: 'si chiude collegando il piano terapeutico alla terapia',
+};
+
+/**
+ * Una variazione AIFA sul farmaco in terapia (A7, D205): simbolo, parola e testo con la fonte,
+ * come la carenza. Con `details`, anche come si chiude.
+ */
+export function AifaChangeNote({
+  change,
+  details = false,
+}: {
+  change: AifaChange;
+  details?: boolean;
+}) {
+  return (
+    <span className="carenza">
+      <Icon name="avviso" />
+      <span>
+        <strong>Variazione AIFA:</strong> {change.text}.
+        {details && <> {cap(HOW_TO[change.kind])}.</>}
+      </span>
+    </span>
+  );
+}
+
+/** Confezione sospesa secondo l'anagrafica AIFA in vigore, nei risultati della ricerca (D205). */
+export function SuspendedNote() {
+  return (
+    <span className="carenza">
+      <Icon name="avviso" />
+      <span>
+        <strong>Confezione sospesa</strong> secondo l’anagrafica AIFA delle confezioni.
+      </span>
+    </span>
+  );
+}
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Vero se l'anagrafica dice che la confezione è sospesa. */
+export const isSuspended = (adminState: string | null | undefined) =>
+  (adminState ?? '').trim().toLowerCase() === 'sospesa';

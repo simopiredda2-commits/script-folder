@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-19.2",
+  "versione": "2026-11-20.1",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -33,10 +33,11 @@
         "atc": "CODICE_ATC",
         "form": "FORMA",
         "supplyRegime": "FORNITURA",
-        "holder": "RAGIONE_SOCIALE"
+        "holder": "RAGIONE_SOCIALE",
+        "adminState": "STATO_AMMINISTRATIVO"
       },
       "vecchiaDopoGiorni": null,
-      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA confezioni_fornitura.csv (drive.aifa.gov.it/farmaci/, collegato dalla pagina «Liste dei farmaci»): 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Nessuna soglia di vecchiaia (D156): AIFA pubblica ogni giorno, ma il contenuto può restare uguale e una soglia d'età darebbe avvisi falsi; vale il controllo di ogni notte."
+      "nota": "Intestazioni lette il 18/11/2026 dal file AIFA confezioni_fornitura.csv (drive.aifa.gov.it/farmaci/, collegato dalla pagina «Liste dei farmaci»): 160.101 righe, tutti gli AIC di 9 cifre e tutti gli ATC nella forma attesa. Nessuna soglia di vecchiaia (D156): AIFA pubblica ogni giorno, ma il contenuto può restare uguale e una soglia d'età darebbe avvisi falsi; vale il controllo di ogni notte. Stato amministrativo (D205) letto il 20/11/2026 dal file scaricato quel giorno: 160.067 confezioni «Autorizzata» e 33 «Sospesa»; le confezioni revocate non ci sono."
     },
     {
       "id": "aifa-classe-a",

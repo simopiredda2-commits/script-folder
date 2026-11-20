@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader, type RuleIssue } from '../components/common';
 import { Icon } from '../components/Icon';
-import { ShortageNote } from '../components/Shortage';
+import { AifaChangeNote, ShortageNote } from '../components/Shortage';
 import { PastPrescriptionsList } from '../components/PastPrescriptions';
 import type { PastPrescription } from '../components/Prescribed';
 import { ReminderPanel } from '../components/ReminderPanel';
@@ -613,6 +613,13 @@ export function TherapyPage() {
       {t.shortage && (
         <div className="riquadro">
           <ShortageNote shortage={t.shortage} details />
+        </div>
+      )}
+      {(t.aifaChanges ?? []).length > 0 && (
+        <div className="riquadro variazioni-aifa">
+          {t.aifaChanges!.map((c) => (
+            <AifaChangeNote key={`${c.kind}-${c.text}`} change={c} details />
+          ))}
         </div>
       )}
       {ended && (

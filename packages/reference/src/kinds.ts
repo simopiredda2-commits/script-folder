@@ -47,6 +47,11 @@ export const KINDS = {
       supplyRegime: { type: 'text' },
       /** Ditta titolare dell'AIC: per i generici, il nome del fornitore (D151). */
       holder: { type: 'text' },
+      /**
+       * Stato amministrativo della confezione (D205): nel file del 20/11/2026 «Autorizzata» o
+       * «Sospesa». Le confezioni revocate nel file non ci sono.
+       */
+      adminState: { type: 'text' },
     },
   },
   /** Elenchi AIFA dei farmaci di classe A e H, con prezzo e gruppo di equivalenza. */

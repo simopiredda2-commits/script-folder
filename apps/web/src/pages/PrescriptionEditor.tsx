@@ -10,7 +10,12 @@ import {
 } from '../components/common';
 import { Icon } from '../components/Icon';
 import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
-import { ShortageNote, type DrugShortage } from '../components/Shortage';
+import {
+  isSuspended,
+  ShortageNote,
+  SuspendedNote,
+  type DrugShortage,
+} from '../components/Shortage';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
@@ -48,6 +53,8 @@ export interface Drug {
   transparencyRemark?: string | null;
   /** Carenza secondo l'elenco AIFA in vigore (D202). */
   shortage?: DrugShortage | null;
+  /** Stato amministrativo della confezione nell'anagrafica AIFA in vigore (D205). */
+  adminState?: string | null;
 }
 
 export type Service = ServiceResultData;
@@ -373,6 +380,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   <strong>{d.name ?? d.activeIngredient}</strong>
                   <div className="tenue">{drugFacts(d).join(' · ')}</div>
                   <div className="codice tenue">AIC {d.aic}</div>
+                  {isSuspended(d.adminState) && <SuspendedNote />}
                   {d.shortage && <ShortageNote shortage={d.shortage} />}
                 </div>
                 <button

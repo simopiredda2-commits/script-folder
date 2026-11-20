@@ -97,6 +97,11 @@ export interface DrugInfo {
   transparencyRemark: string | null;
   /** Carenza secondo l'elenco AIFA in vigore (D202); null se il farmaco non c'è. */
   shortage: DrugShortage | null;
+  /**
+   * Stato amministrativo della confezione nell'anagrafica AIFA in vigore («Autorizzata»,
+   * «Sospesa»; D205); null se l'anagrafica non lo dice.
+   */
+  adminState: string | null;
   /** I fatti che le regole guardano; i campi senza una fonte restano assenti (= non noti). */
   facts: DrugFacts;
 }
@@ -112,6 +117,27 @@ export interface DrugShortage {
   /** «Nota AIFA» dell'elenco: un testo in parole, non il numero di una nota AIFA. */
   aifaNote: string | null;
   /** La carenza in parole alla data della consultazione, come nella R21. */
+  text: string;
+}
+
+/** Una terapia come la guarda A7: il farmaco e i fatti che la scheda ha registrato (D205). */
+export interface TherapyFacts {
+  id: string;
+  drugAic: string | null;
+  drugClass: string | null;
+  aifaNote: string | null;
+  activeIngredient: string | null;
+  atc: string | null;
+  /** La scheda ha un piano terapeutico collegato. */
+  hasPlan: boolean;
+}
+
+/** Una variazione AIFA su un farmaco in terapia (A7, D205). */
+export interface AifaChange {
+  kind: 'sospesa' | 'anagrafica' | 'classe' | 'nota' | 'piano';
+  /** La data della versione che la mostra. */
+  since: string;
+  /** In parole, con la fonte e la versione. */
   text: string;
 }
 
@@ -430,6 +456,7 @@ export class ReferenceData {
         priceDifference: pick(t.map((x) => x.priceDifference)),
         transparencyRemark: pick(t.map((x) => x.remark)),
         shortage: shortage ? toShortage(shortage, date) : null,
+        adminState: pick(d.map((x) => x.adminState)),
         facts,
       });
     }
@@ -456,6 +483,187 @@ export class ReferenceData {
         date,
       );
       if (row) out.set(aic, toShortage(row, date));
+    }
+    return out;
+  }
+
+  /** Le versioni di un tipo superate alla data: in vigore prima, o importate prima nello stesso giorno. */
+  private async superseded(kind: DatasetKind, date: string, current: readonly { id: string }[]) {
+    const now = new Set(current.map((d) => d.id));
+    const all = await this.db
+      .select({
+        id: referenceDataset.id,
+        series: referenceDataset.series,
+        validFrom: referenceDataset.validFrom,
+      })
+      .from(referenceDataset)
+      .where(and(eq(referenceDataset.kind, kind), lte(referenceDataset.validFrom, date)));
+    return all.filter((d) => !now.has(d.id));
+  }
+
+  /**
+   * Le variazioni AIFA che toccano i farmaci in terapia alla data (A7, D205): la confezione sospesa
+   * o uscita dall'anagrafica, la classe, la nota e il piano. Classe e nota si confrontano con quelle
+   * che la scheda della terapia ha registrato dalla banca dati: c'è una variazione se i dati in
+   * vigore dicono altro e quelli registrati si ritrovano in una versione superata (così non si
+   * scambia per una variazione una scheda scritta a mano). Il piano: l'elenco DPC in vigore lo
+   * chiede, la terapia non ne ha uno e una versione superata dell'elenco non lo chiedeva. Mai un
+   * «no» per assenza (D59): una confezione che non c'è più è «uscita dall'anagrafica», non
+   * «revocata». Senza le versioni che servono, nessuna variazione.
+   */
+  async aifaChanges(
+    therapies: readonly TherapyFacts[],
+    date: string,
+  ): Promise<Map<string, AifaChange[]>> {
+    const out = new Map<string, AifaChange[]>();
+    const add = (id: string, change: AifaChange) => out.set(id, [...(out.get(id) ?? []), change]);
+    const aics = [...new Set(therapies.map((t) => t.drugAic).filter((a): a is string => !!a))];
+    if (!aics.length) return out;
+    const [drugNow, classNow, dpcNow] = await Promise.all([
+      this.inEffect('farmaci', date),
+      this.inEffect('farmaci_classe', date),
+      this.inEffect('farmaci_dpc', date),
+    ]);
+    const [drugOld, classOld, dpcOld] = await Promise.all([
+      this.superseded('farmaci', date, drugNow),
+      this.superseded('farmaci_classe', date, classNow),
+      this.superseded('farmaci_dpc', date, dpcNow),
+    ]);
+    const validFrom = new Map(
+      [...drugNow, ...drugOld, ...classNow, ...classOld, ...dpcNow, ...dpcOld].map((d) => [
+        d.id,
+        d.validFrom,
+      ]),
+    );
+    const day = (datasetId: string) => dayIt(validFrom.get(datasetId)!);
+    const latest = (ids: readonly string[]) =>
+      ids.reduce((a, b) => (validFrom.get(b)! > validFrom.get(a)! ? b : a));
+
+    // Anagrafica delle confezioni: sospesa, o non più presente.
+    const drugRows = (ids: string[], wanted: string[]) =>
+      ids.length && wanted.length
+        ? this.db
+            .select({
+              aic: refDrug.aic,
+              datasetId: refDrug.datasetId,
+              adminState: refDrug.adminState,
+            })
+            .from(refDrug)
+            .where(and(inArray(refDrug.datasetId, ids), inArray(refDrug.aic, wanted)))
+        : Promise.resolve([]);
+    const drugsNow = await drugRows(
+      drugNow.map((d) => d.id),
+      aics,
+    );
+    const missing = drugNow.length ? aics.filter((a) => !drugsNow.some((r) => r.aic === a)) : [];
+    const drugsOld = await drugRows(
+      drugOld.map((d) => d.id),
+      missing,
+    );
+    // Classe: le righe delle liste di classe per gli AIC in terapia.
+    const classRows = (ids: string[]) =>
+      ids.length
+        ? this.db
+            .select({
+              aic: refDrugClass.aic,
+              datasetId: refDrugClass.datasetId,
+              drugClass: refDrugClass.drugClass,
+            })
+            .from(refDrugClass)
+            .where(and(inArray(refDrugClass.datasetId, ids), inArray(refDrugClass.aic, aics)))
+        : Promise.resolve([]);
+    const classesNow = await classRows(classNow.map((d) => d.id));
+    const classesOld = await classRows(classOld.map((d) => d.id));
+    // Elenco DPC: per principio attivo o ATC, come nei dati del farmaco.
+    const dpcRows = (ids: string[]) =>
+      ids.length
+        ? this.db.select().from(refDpcDrug).where(inArray(refDpcDrug.datasetId, ids))
+        : Promise.resolve([]);
+    const dpcsNow = await dpcRows(dpcNow.map((d) => d.id));
+    const dpcsOld = await dpcRows(dpcOld.map((d) => d.id));
+    const note = (v: string | null | undefined) => (v ?? '').trim() || null;
+
+    for (const t of therapies) {
+      if (!t.drugAic) continue;
+      const aic = t.drugAic;
+      const mine = drugsNow.filter((r) => r.aic === aic);
+      const suspended = mine.find((r) => lower(r.adminState) === 'sospesa');
+      if (suspended) {
+        add(t.id, {
+          kind: 'sospesa',
+          since: validFrom.get(suspended.datasetId)!,
+          text: `confezione sospesa secondo l’anagrafica AIFA delle confezioni (versione del ${day(suspended.datasetId)})`,
+        });
+      } else if (!mine.length && drugNow.length) {
+        const before = drugsOld.filter((r) => r.aic === aic).map((r) => r.datasetId);
+        if (before.length) {
+          const now = latest(drugNow.map((d) => d.id));
+          add(t.id, {
+            kind: 'anagrafica',
+            since: validFrom.get(now)!,
+            text: `non è più nell’anagrafica AIFA delle confezioni (versione del ${day(now)}); c’era in quella del ${day(latest(before))}`,
+          });
+        }
+      }
+
+      const recorded = (t.drugClass ?? '').trim().toUpperCase();
+      if (recorded === 'A' || recorded === 'H') {
+        const now = classesNow.filter((r) => r.aic === aic);
+        const before = classesOld.filter((r) => r.aic === aic && r.drugClass === recorded);
+        if (before.length && !now.some((r) => r.drugClass === recorded)) {
+          // La versione in vigore della stessa serie, che non lo ha più in quella classe.
+          const series = new Set(
+            classOld.filter((d) => before.some((r) => r.datasetId === d.id)).map((d) => d.series),
+          );
+          const nowIds = classNow.filter((d) => series.has(d.series)).map((d) => d.id);
+          const other = now.find((r) => r.drugClass !== recorded)?.drugClass ?? null;
+          if (nowIds.length) {
+            const v = latest(nowIds);
+            add(t.id, {
+              kind: 'classe',
+              since: validFrom.get(v)!,
+              text: other
+                ? `negli elenchi AIFA è passato dalla classe ${recorded} alla classe ${other} (versione del ${day(v)}); nella terapia è segnato in classe ${recorded}`
+                : `non è più nell’elenco AIFA dei farmaci di classe ${recorded} (versione del ${day(v)}); nella terapia è segnato in classe ${recorded}`,
+            });
+          }
+        }
+      }
+
+      const matches = (r: { activeIngredient: string; atc: string | null }) =>
+        (t.atc !== null && r.atc !== null && r.atc === t.atc) ||
+        (t.activeIngredient !== null && lower(r.activeIngredient) === lower(t.activeIngredient));
+      const dpcNowRow = dpcsNow.find(matches);
+      const recordedNote = note(t.aifaNote);
+      if (recordedNote && dpcNowRow && note(dpcNowRow.aifaNote) !== recordedNote) {
+        const before = dpcsOld.some((r) => matches(r) && note(r.aifaNote) === recordedNote);
+        if (before) {
+          const current = note(dpcNowRow.aifaNote);
+          add(t.id, {
+            kind: 'nota',
+            since: validFrom.get(dpcNowRow.datasetId)!,
+            text: current
+              ? `nell’elenco DPC la nota AIFA è ora la ${current} (versione del ${day(dpcNowRow.datasetId)}); nella terapia è segnata la ${recordedNote}`
+              : `nell’elenco DPC la nota AIFA non c’è più (versione del ${day(dpcNowRow.datasetId)}); nella terapia è segnata la ${recordedNote}`,
+          });
+        }
+      }
+      const planNow = dpcsNow.find((r) => matches(r) && r.planRequired === true);
+      if (planNow && !t.hasPlan) {
+        // Una versione superata dell'elenco che non lo chiedeva: con il farmaco senza piano, o senza
+        // il farmaco.
+        const before = dpcOld.some(
+          (d) =>
+            !dpcsOld.some((r) => r.datasetId === d.id && matches(r) && r.planRequired === true),
+        );
+        if (before) {
+          add(t.id, {
+            kind: 'piano',
+            since: validFrom.get(planNow.datasetId)!,
+            text: `l’elenco DPC chiede il piano terapeutico (versione del ${day(planNow.datasetId)}); la terapia non ha un piano collegato`,
+          });
+        }
+      }
     }
     return out;
   }

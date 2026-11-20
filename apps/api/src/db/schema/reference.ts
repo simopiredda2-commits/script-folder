@@ -80,6 +80,8 @@ export const refDrug = pgTable(
     supplyRegime: text(),
     /** Ditta titolare dell'AIC (D151). */
     holder: text(),
+    /** Stato amministrativo della confezione, come lo scrive AIFA («Autorizzata», «Sospesa»; D205). */
+    adminState: text(),
   },
   (t) => [index().on(t.datasetId, t.aic)],
 );

@@ -9,9 +9,10 @@ servizio, così la prova non legge file scritti dallo stesso codice che li legge
 
 Che cosa è vero e che cosa è inventato (docs/provenienze.md):
 - AIFA: intestazioni e righe copiate senza cambiare un byte dai file AIFA letti il 18/11/2026
-  (anagrafica delle confezioni e liste di classe A e H del 30/6/2026) e il 19/11/2026 (lista di
-  trasparenza del 16 novembre 2026, farmaci carenti aggiornati al 17/11/2026). Fonte: AIFA, dati
-  aperti con licenza CC BY 4.0 (https://www.aifa.gov.it/open-data). Le pagine HTML sono nostre.
+  (anagrafica delle confezioni e liste di classe A e H del 30/6/2026), il 19/11/2026 (lista di
+  trasparenza del 16 novembre 2026, farmaci carenti aggiornati al 17/11/2026) e il 20/11/2026 (una
+  confezione sospesa dell'anagrafica). Fonte: AIFA, dati aperti con licenza CC BY 4.0
+  (https://www.aifa.gov.it/open-data). Le pagine HTML sono nostre.
 - Regione Piemonte, DPC: la riga di DULAGLUTIDE è quella dell'elenco «Farmaci PHT - oggetto di
   DPC» aggiornato al 9/7/2026; il PDF del sito d'esempio è un estratto di prova scritto qui.
 - ISTAT: le intestazioni e le due righe di Agliè e Airasca, lette il 18/11/2026 dal file ISTAT
@@ -121,7 +122,8 @@ def genera_istat() -> None:
 # nella classe H l'intestazione «Codice AIC» va a capo dentro le virgolette. Scelte: amlodipina,
 # metformina e atorvastatina con un equivalente di marca; dulaglutide (in DPC, nota 100, piano);
 # ceftriaxone in classe H; paracetamolo, che non è nelle liste di classe A e H; nella classe H due
-# prezzi che non sono numeri («-» e il prezzo dell'ossigeno a metro cubo).
+# prezzi che non sono numeri («-» e il prezzo dell'ossigeno a metro cubo). L'ultima riga, una
+# confezione di ranitidina «Sospesa», viene dal file scaricato il 20/11/2026 (D205).
 ANAGRAFICA = [
     '"CODICE_AIC";"COD_FARMACO";"COD_CONFEZIONE";"DENOMINAZIONE";"DESCRIZIONE";"CODICE_DITTA";"RAGIONE_SOCIALE";"STATO_AMMINISTRATIVO";"TIPO_PROCEDURA";"FORMA";"CODICE_ATC";"PA_ASSOCIATI";"FORNITURA";"LINK_FI";"LINK_RCP"',
     '"038092019";"038092";"019";"AMLODIPINA DOC GENERICI";"5 MG COMPRESSE- 28 COMPRESSE IN BLISTER AL/PVC/PVDC";898;"DOC GENERICI SRL";"Autorizzata";"Procedura Mutuo riconoscimento o Decentrata";"Compressa";"C08CA01";"AMLODIPINA BESILATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/38092/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/38092/stampati?ts=RCP"',
@@ -135,6 +137,7 @@ ANAGRAFICA = [
     '"043783075";"043783";"075";"TRULICITY";"1,5 MG  SOLUZIONE INIETTABILE - USO SOTTOCUTANEO - SIRINGA DI VETRO IN PENNA PRERIEMPITA - 4 PENNE";1230;"ELI LILLY NEDERLAND B.V.";"Autorizzata";"Procedura Centralizzata";"Soluzione iniettabile";"A10BJ05";"DULAGLUTIDE";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/1230/farmaci/43783/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/1230/farmaci/43783/stampati?ts=RCP"',
     '"025202096";"025202";"096";"ROCEFIN";"1 G/10 ML POLVERE E SOLVENTE PER SOLUZIONE INIETTABILE PER USO ENDOVENOSO- 1 FLACONCINO POLVERE + 1 FIALA SOLVENTE DA 10 ML";108;"ROCHE S.P.A.";"Autorizzata";"Procedura Nazionale";"Polvere e solvente per soluzione iniettabile";"J01DD04";"CEFTRIAXONE SODICO";"Medicinali soggetti a prescrizione medica limitativa, da rinnovare volta per volta, vendibili al pubblico su prescrizione di centri ospedalieri o di specialisti";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/108/farmaci/25202/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/108/farmaci/25202/stampati?ts=RCP"',
     '"012745093";"012745";"093";"TACHIPIRINA";"500 MG COMPRESSE-20 COMPRESSE";219;"AZIENDE CHIMICHE RIUNITE ANGELINI FRANCESCO A.C.R.A.F. S.P.A.";"Autorizzata";"Procedura Nazionale";"Compressa";"N02BE01";"PARACETAMOLO";"Medicinali non soggetti a prescrizione medica ma non da banco";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/219/farmaci/12745/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/219/farmaci/12745/stampati?ts=RCP"',
+    '"034471021";"034471";"021";"RANITIDINA DOC GENERICI";"300 MG COMPRESSE RIVESTITE CON FILM- 20 COMPRESSE";898;"DOC GENERICI SRL";"Sospesa";"Procedura Nazionale";"Compressa rivestita con film";"A02BA02";"RANITIDINA CLORIDRATO";"Medicinali soggetti a prescrizione medica";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/34471/stampati?ts=FI";"https://api.aifa.gov.it/aifa-bdf-eif-be/1.0.0/organizzazione/898/farmaci/34471/stampati?ts=RCP"',
 ]
 
 CLASSE_A = [

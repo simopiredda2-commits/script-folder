@@ -12,7 +12,7 @@ import {
 } from '../db/schema';
 import { visibleArchives } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
-import type { DrugShortage, ReferenceData } from '../reference/lookup';
+import type { AifaChange, DrugShortage, ReferenceData } from '../reference/lookup';
 
 /** Un farmaco carente in terapia, con i pazienti che lo prendono (A7, D202). */
 interface ShortDrug {
@@ -20,6 +20,11 @@ interface ShortDrug {
   farmaco: string;
   testo: string;
   pazienti: { id: string; nome: string; cognome: string }[];
+}
+
+/** Una variazione AIFA su un farmaco in terapia, con i pazienti interessati (A7, D205). */
+interface ChangedDrug extends ShortDrug {
+  tipo: AifaChange['kind'];
 }
 
 const MS_PER_DAY = 86_400_000;
@@ -160,8 +165,14 @@ export function registerTodayRoutes(
       reference && therapyArchives.length
         ? await db
             .select({
+              id: therapy.id,
               aic: therapy.drugAic,
               farmaco: therapy.drugName,
+              drugClass: therapy.drugClass,
+              aifaNote: therapy.aifaNote,
+              activeIngredient: therapy.activeIngredient,
+              atc: therapy.atc,
+              planId: therapy.therapeuticPlanId,
               pazienteId: patient.id,
               nome: patient.firstName,
               cognome: patient.lastName,
@@ -202,6 +213,38 @@ export function registerTodayRoutes(
         entry.pazienti.push({ id: t.pazienteId, nome: t.nome, cognome: t.cognome });
       shortDrugs.set(t.aic!, entry);
     }
+    // Le altre variazioni di A7 (D205): confezione sospesa o uscita dall'anagrafica, classe, nota
+    // e piano. Una voce per farmaco e variazione, con i pazienti.
+    const changes = reference
+      ? await reference.aifaChanges(
+          inTherapy.map((t) => ({
+            id: t.id,
+            drugAic: t.aic,
+            drugClass: t.drugClass,
+            aifaNote: t.aifaNote,
+            activeIngredient: t.activeIngredient,
+            atc: t.atc,
+            hasPlan: t.planId !== null,
+          })),
+          date,
+        )
+      : new Map<string, AifaChange[]>();
+    const changedDrugs = new Map<string, ChangedDrug>();
+    for (const t of inTherapy) {
+      for (const c of changes.get(t.id) ?? []) {
+        const key = `${t.aic}\u0000${c.kind}\u0000${c.text}`;
+        const entry: ChangedDrug = changedDrugs.get(key) ?? {
+          aic: t.aic!,
+          farmaco: t.farmaco,
+          tipo: c.kind,
+          testo: c.text,
+          pazienti: [],
+        };
+        if (!entry.pazienti.some((p) => p.id === t.pazienteId))
+          entry.pazienti.push({ id: t.pazienteId, nome: t.nome, cognome: t.cognome });
+        changedDrugs.set(key, entry);
+      }
+    }
 
     return {
       data: date,
@@ -216,6 +259,12 @@ export function registerTodayRoutes(
         giorniAvvisoPiani: warnDays,
         farmaciCarenti: [...shortDrugs.values()].sort((a, b) =>
           a.farmaco.localeCompare(b.farmaco, 'it'),
+        ),
+        variazioniAifa: [...changedDrugs.values()].sort(
+          (a, b) =>
+            a.farmaco.localeCompare(b.farmaco, 'it') ||
+            a.tipo.localeCompare(b.tipo) ||
+            a.testo.localeCompare(b.testo, 'it'),
         ),
       },
     };

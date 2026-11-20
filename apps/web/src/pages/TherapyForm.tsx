@@ -9,7 +9,7 @@ import {
   type DatasetVersion,
 } from '../components/common';
 import { Icon } from '../components/Icon';
-import { ShortageNote } from '../components/Shortage';
+import { isSuspended, ShortageNote, SuspendedNote } from '../components/Shortage';
 import { api, ApiError, query } from '../lib/api';
 import { date, studioToday, THERAPY_KIND } from '../lib/format';
 import { usePersistentState } from '../lib/storage';
@@ -371,6 +371,7 @@ function DrugChooser({
               <strong>{d.name ?? d.activeIngredient}</strong>
               <div className="tenue">{drugFacts(d).join(' · ')}</div>
               <div className="codice tenue">AIC {d.aic}</div>
+              {isSuspended(d.adminState) && <SuspendedNote />}
               {d.shortage && <ShortageNote shortage={d.shortage} />}
             </div>
             <button type="button" className="pulsante" onClick={() => onChoose(drugPatch(d))}>
