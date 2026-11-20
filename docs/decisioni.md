@@ -1062,3 +1062,21 @@ Prove (servizio, interfaccia, browser con accessibilità) e sabotaggi.
   - «Segnala online (AIFA)»: https://servizionline.aifa.gov.it/schedasegnalazioni/#/, l'indirizzo scritto in quella pagina («Segnala online una reazione avversa a farmaci e/o vaccini»). Il modulo non è stato aperto da qui: la rete di questo ambiente non raggiunge servizionline.aifa.gov.it (rifiuto del proxy). Il programma non chiama nessuno dei due siti (regola 7): sono collegamenti che apre il medico.
 
 Prove (lettura dei file, importazione, regole, servizio, interfaccia, browser con accessibilità) e sabotaggi.
+
+**D203 · Prove indipendenti dalla mezzanotte; il cookie della sessione dice quanto dura.** Il primo giro delle prove su GitHub della #16 è partito alle 23:57 ora di Roma ed è finito dopo la mezzanotte. Sono cadute prove che c'erano già: quattro dell'importazione, e nel browser l'accesso, l'archivio e i blocchi del conto. La causa erano gli orologi diversi, che a mezzanotte non segnano più lo stesso giorno:
+
+- l'orologio vero, con cui le prove scrivono i dati «di oggi» o «di domani»;
+- quello dello scenario, che usa il servizio e che avanza di 30 secondi a ogni accesso con il codice;
+- quello del browser.
+
+Scelte:
+
+- **Un orologio solo, fermo a mezzogiorno.** Lo scenario delle prove accetta l'ora di partenza (`clockAt`), e `middayOf` dà il mezzogiorno del giorno dello studio. L'importazione e le prove nel browser calcolano le loro date dallo stesso istante. Lontano dalla mezzanotte, i minuti che l'orologio avanza non cambiano la data, anche se l'ora vera passa dalla mezzanotte durante il giro.
+- **Nel browser la stessa data.** Ogni contesto del browser ha la data fissata con lo strumento di Playwright (`clock.setFixedTime`); i timer continuano a girare. Così le date proposte dai moduli (per esempio «Dal» di un'autorizzazione) sono quelle del servizio.
+- **Il cookie della sessione dice quanto dura (Max-Age), non a che ora scade.** Prima portava l'ora di scadenza calcolata dall'orologio del servizio, e il browser la confronta con il suo. In una prova con l'orologio fermo a mezzogiorno e sessioni di 12 ore, il cookie sarebbe scaduto proprio alla mezzanotte vera. Lo stesso vale per un computer dello studio con l'ora sbagliata: perderebbe la sessione prima del tempo, o la terrebbe dopo. La durata il browser la conta con il suo orologio; la scadenza vera resta quella del servizio, che la controlla a ogni richiesta.
+- **Come è provato.**
+  - Simulazione nella prova dell'importazione, con la prova caricata un istante prima della mezzanotte di ieri. Col vecchio modo cadono le stesse 4 prove di GitHub; con l'orologio unico passano tutte e 31.
+  - Nel browser, 52 prove su 52 con l'orologio a mezzogiorno di oggi.
+  - Ancora nel browser, una simulazione più dura: il servizio fermo a mezzogiorno di ieri. Passano accesso, archivio e blocchi del conto. Cadono solo le 12 prove dei farmaci: le banche dati d'esempio sono importate con la data vera di oggi, quindi per il servizio non sono ancora in vigore. In un giro vero non capita, perché l'orologio si ferma dopo l'importazione.
+  - Una prova nuova sul cookie (`apps/api/test/cookie-sessione.test.ts`), con il suo sabotaggio.
+- **Che cosa non è provato.** Un giro su GitHub che passi davvero dalla mezzanotte. Le altre prove del servizio usano ancora l'orologio vero dove non preparano dati «di oggi» da guardare dopo; se un giro a mezzanotte ne fa cadere altre, si correggono allo stesso modo.

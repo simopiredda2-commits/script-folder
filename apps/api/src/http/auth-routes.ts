@@ -23,15 +23,19 @@ const passwordBody = z
 export function registerAuthRoutes(
   app: FastifyInstance,
   auth: AuthService,
-  opts: { cookieSecure: boolean },
+  opts: { cookieSecure: boolean; now?: () => Date },
 ) {
+  const now = opts.now ?? (() => new Date());
+  // Il cookie dice quanto dura (Max-Age), non a che ora scade: il browser conta la durata con il
+  // suo orologio, quindi un computer con l'ora sbagliata non perde la sessione prima del tempo né
+  // la tiene dopo. La scadenza vera resta quella del servizio, che la controlla a ogni richiesta.
   const setSession = (reply: FastifyReply, token: string, expiresAt: Date) =>
     reply.setCookie(SESSION_COOKIE, token, {
       httpOnly: true,
       sameSite: 'strict',
       secure: opts.cookieSecure,
       path: '/',
-      expires: expiresAt,
+      maxAge: Math.max(0, Math.round((expiresAt.getTime() - now().getTime()) / 1000)),
     });
 
   app.post('/api/accesso', { config: { public: true } }, async (req, reply) => {

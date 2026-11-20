@@ -259,7 +259,10 @@ export function buildApp({
     return { stato: 'ok' };
   });
 
-  registerAuthRoutes(app, auth, { cookieSecure: config.cookieSecure });
+  registerAuthRoutes(app, auth, {
+    cookieSecure: config.cookieSecure,
+    now: now ?? (() => new Date()),
+  });
   registerLockRoutes(app, db, now ?? (() => new Date()));
   const credentials = createCredentialService({
     db,

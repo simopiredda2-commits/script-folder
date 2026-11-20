@@ -955,14 +955,31 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Fermata dopo il blocco dei riepiloghi e delle liste AIFA, con il pulsante:
+Da scrivere alla fine del blocco dopo l'unione della #16 (riepiloghi alla segreteria, altre variazioni AIFA, registri AIFA, prove indipendenti dalla mezzanotte). Simone le guarda la mattina del 20/11/2026, prima delle 9:15. Restano le verifiche alla fine della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7), più R19, R20 e R21.
 
-1. Via all'unione della pull request #16 (consigliata), oppure non ancora.
-2. Riepiloghi: solo il titolare (consigliata, come l'esportazione completa), anche la segreteria per i soli conteggi, oppure anche la segreteria con il CSV.
-3. R21, farmaco carente: solo informazione (consigliata: la ricetta resta valida), oppure un avviso che chiede un motivo.
-4. Che cosa fare dopo: A7 per le altre variazioni che le liste importate mostrano fra una versione e l'altra (classe cambiata, stato amministrativo della confezione nell'anagrafica AIFA), con i pazienti in Oggi (consigliata); i registri AIFA; oppure fermarsi fino alle specifiche del CSI e alle verifiche.
+## Risposte della fermata dopo l'unione della #15 (19–20/11/2026)
 
-Restano le verifiche alla fine della Dr.ssa Rocca (ICD-9-CM, catalogo regionale, allegati 8 e 7), più R19, R20 e R21.
+Simone ha risposto con il pulsante. Alla prima domanda ha scritto «Scrivi in italiano e rifammi le domande pulsante»: il riassunto della fermata era uscito in inglese. È stato rifatto in italiano, con le stesse domande.
+
+- **Via**: «A. Via: unisci». Pull request #16 unita in `main` il 20/11/2026, con tutte le prove verdi su GitHub (TypeScript, Firefox, WebKit e `sync/`).
+  - Il primo giro era stato rosso, e c'era un difetto vero: la prova dei riepiloghi guardava il cognome di un paziente, che può essere uguale a quello di un medico. Corretta, con un sabotaggio.
+  - Le altre prove rosse erano cadute a cavallo della mezzanotte (sezione del blocco).
+- **Riepiloghi**: «C. Segreteria, anche il CSV». Da fare: la segreteria vede i riepiloghi degli archivi che l'hanno confermata, con il CSV.
+- **R21**: «A. Solo informazione». Resta com'è.
+- **Dopo**: «Sia altre variazioni AIFA che registri AIFA».
+- **Poi**: «Sino a domattina non sarò operativo, vai avanti solo se nel frattempo non c'è qualcosa di vincolante da lavorare che richiede il mio intervento o comunque uno stop», «se ritieni di poter andare avanti, domattina risponderò alle domande. Verso le 9:15 dovrò spegnere». E: «Domani facilmente faremo una pausa, abbiamo già fatto tantissimo».
+- **Che cosa ne segue**: un blocco nuovo nello stesso branch, ripartito da `main`, con le domande della fermata pronte per la mattina. Dentro:
+  - le prove indipendenti dalla mezzanotte;
+  - i riepiloghi alla segreteria;
+  - le altre variazioni AIFA in Oggi;
+  - i registri AIFA.
+
+## Domande della fermata dopo l'unione della #15 (chiuse)
+
+1. Via all'unione della pull request #16.
+2. Riepiloghi: solo il titolare (consigliata), anche la segreteria per i soli conteggi, oppure anche la segreteria con il CSV.
+3. R21, farmaco carente: solo informazione (consigliata), oppure un avviso che chiede un motivo.
+4. Che cosa fare dopo: altre variazioni AIFA in Oggi (consigliata), registri AIFA, oppure fermarsi.
 
 ## Risposte della fermata dopo l'unione della #14 (19/11/2026)
 
@@ -2258,3 +2275,4 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D202 nel browser: la differenza negli equivalenti                                                             | DataSearchPage.tsx: colonna vuota                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D202: le versioni in uso dei farmaci nominano le due liste nuove (A6)                                         | reference-routes.ts: liste tolte                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D201: i conteggi senza dati dei pazienti (codice fiscale, identificativo)                                     | report-routes.ts: codici fiscali nella risposta                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D203: il cookie della sessione dice quanto dura (Max-Age)                                                     | auth-routes.ts: torna l'ora di scadenza                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

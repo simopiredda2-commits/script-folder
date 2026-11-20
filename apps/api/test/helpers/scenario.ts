@@ -31,9 +31,12 @@ import { base32Decode } from '../../src/security/base32';
 import { hashPassword } from '../../src/security/password';
 import { totp } from '../../src/security/totp';
 
-/** Orologio delle prove: parte da adesso e si sposta a mano. */
+/** Orologio delle prove: parte da adesso, o dall'istante dato, e si sposta a mano. */
 export class Clock {
-  private t = Date.now();
+  private t: number;
+  constructor(start: Date = new Date()) {
+    this.t = start.getTime();
+  }
   now = () => new Date(this.t);
   advance(ms: number) {
     this.t += ms;
@@ -95,9 +98,16 @@ export async function createScenario(
   > & {
     /** Aggiornamento delle banche dati (D156), costruito con l'orologio della prova. */
     referenceUpdates?: (now: () => Date) => NonNullable<AppDeps['referenceUpdates']>;
+    /**
+     * Da dove parte l'orologio del servizio. Le prove che preparano dati «di oggi» e li guardano
+     * più tardi passano `middayOf(new Date())` e usano lo stesso istante: a mezzogiorno, i minuti
+     * che l'orologio avanza (accessi con il codice, sessioni) non cambiano la data, nemmeno se il
+     * giro passa dalla mezzanotte.
+     */
+    clockAt?: Date;
   } = {},
 ): Promise<Scenario> {
-  const clock = new Clock();
+  const clock = new Clock(appOptions.clockAt);
   const encryptionKey = randomBytes(32);
   const secondFactor = appOptions.secondFactor ?? {
     sistema_ts: new SimulatedSecondFactor('sistema_ts', { now: clock.now }),
@@ -387,7 +397,9 @@ export async function createScenario(
       .returning({ id: sickLeaveCertificate.id }),
   );
 
-  const { referenceUpdates, ...deps } = appOptions;
+  // L'ora di partenza è già nell'orologio: al servizio vanno le altre opzioni.
+  const { referenceUpdates, clockAt, ...deps } = appOptions;
+  void clockAt;
   const app = buildApp({
     db,
     config: { encryptionKey, sessionMaxHours: 12, cookieSecure: false },
