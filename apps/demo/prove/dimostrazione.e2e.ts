@@ -741,12 +741,9 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .toBe(true);
     // Il consenso della paziente, nella sua cartella.
     await go(`/pazienti/${p.id}/privacy`);
-    await f
-      .getByLabel('Consenso', { exact: true })
-      .selectOption({
-        label:
-          'Condivisione della scheda sanitaria con i medici dell’AFT (senza le voci riservate)',
-      });
+    await f.getByLabel('Consenso', { exact: true }).selectOption({
+      label: 'Condivisione della scheda sanitaria con i medici dell’AFT (senza le voci riservate)',
+    });
     await f.getByLabel('Dà il consenso').check();
     await f.getByRole('button', { name: 'Registra il consenso' }).click();
     await f.getByText('Consenso registrato.').waitFor();
