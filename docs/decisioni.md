@@ -1132,3 +1132,10 @@ Prove: lettura e mappatura, importazione e consultazione, indirizzo della scheda
 - le schede zip, che non sono state aperte;
 - gli indirizzi in http, che non sono stati provati né trasformati in https;
 - se il collegamento per ATC basta per i farmaci in associazione che hanno un ATC di gruppo.
+
+**D207 · Connessioni inattive chiuse da Postgres: si avvisa, il servizio non si ferma.** Il giro completo delle prove del 20/11/2026, notte, ha superato tutte le 1643 prove ma è uscito con un errore non gestito: «terminating connection due to administrator command», mentre una prova cancellava il suo database.
+
+- **Causa.** Quando il gruppo di connessioni si chiude, pg-pool lo dà per chiuso prima che le connessioni lo siano davvero. Il `DROP DATABASE … WITH (FORCE)` della prova manda allora la chiusura a una connessione ancora aperta, e il gruppo la segnala con un evento «error» che nessuno ascoltava.
+- **Lo stesso nel servizio.** Se Postgres si riavvia o la rete si interrompe, le connessioni inattive ricevono lo stesso errore, e un evento «error» senza ascoltatore ferma il processo.
+- **Scelta.** Il gruppo ascolta l'evento e scrive un avviso con il messaggio di Postgres, che non contiene dati dei pazienti. Le richieste dopo aprono una connessione nuova.
+- **Prova.** Una connessione inattiva chiusa con `pg_terminate_backend`: si avvisa e la richiesta dopo va. Un sabotaggio toglie l'ascoltatore e la prova diventa rossa.

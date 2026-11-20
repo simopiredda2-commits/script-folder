@@ -17,11 +17,19 @@ export function createPool(
   databaseUrl: string,
   options: { max?: number; connectionTimeoutMillis?: number } = {},
 ): pg.Pool {
-  return new pg.Pool({
+  const pool = new pg.Pool({
     connectionString: databaseUrl,
     max: options.max ?? 10,
     connectionTimeoutMillis: options.connectionTimeoutMillis ?? POOL_CONNECTION_TIMEOUT_MS,
   });
+  // Una connessione inattiva può essere chiusa da Postgres (riavvio, rete interrotta, database
+  // cancellato con FORCE): pg-pool la toglie dal gruppo e lo dice con un evento «error». Senza
+  // chi lo ascolta, l'evento fermerebbe il processo; le richieste dopo aprono una connessione
+  // nuova. Il messaggio di Postgres non contiene dati dei pazienti.
+  pool.on('error', (err) => {
+    process.emitWarning(`Connessione inattiva al database chiusa: ${err.message}`);
+  });
+  return pool;
 }
 
 /** L'errore è l'attesa scaduta di una connessione del gruppo (anche dentro un errore di drizzle). */
