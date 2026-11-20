@@ -15,7 +15,8 @@ type Pending = { resolve: (r: WireResponse) => void; reject: (e: Error) => void 
 let worker: Worker | null = null;
 let nextId = 0;
 const pending = new Map<number, Pending>();
-let codeWaiter: ((c: Extract<FromWorker, { type: 'code' }>['code']) => void) | null = null;
+type CodeMessage = Extract<FromWorker, { type: 'code' }>;
+let codeWaiter: ((c: Omit<CodeMessage, 'type'>) => void) | null = null;
 
 const send = (message: ToWorker, transfer: Transferable[] = []) =>
   worker!.postMessage(message, transfer);
@@ -50,7 +51,7 @@ export function startService(
         pending.get(m.id)?.reject(new Error(m.message));
         pending.delete(m.id);
       } else if (m.type === 'code') {
-        codeWaiter?.(m.code);
+        codeWaiter?.({ code: m.code, loggedIn: m.loggedIn });
         codeWaiter = null;
       }
     };
@@ -60,7 +61,7 @@ export function startService(
 }
 
 /** Il codice del secondo fattore di chi sta entrando, se si conosce. */
-export function secondFactorCode(): Promise<Extract<FromWorker, { type: 'code' }>['code']> {
+export function secondFactorCode(): Promise<Omit<CodeMessage, 'type'>> {
   return new Promise((resolve) => {
     codeWaiter = resolve;
     send({ type: 'code' });

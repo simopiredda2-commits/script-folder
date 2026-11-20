@@ -26,7 +26,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dopo l'unione della #14 (19/11/2026)**, nello stesso branch: simulazione del paziente deceduto nel browser, chiesta da Simone, e cambio di medico dentro lo studio (D200). Fermata fatta: via, pull request #15 unita (risposte in «Risposte della fermata dopo l'unione della #14»).
 - **Dopo l'unione della #15 (19/11/2026)**, nello stesso branch: riepiloghi per periodo (D201) e liste AIFA che mancano, con le carenze sui farmaci in terapia e il collegamento alla farmacovigilanza (D202), come ha scelto Simone alla fermata. Sezione «Dopo l'unione della #15 – Riepiloghi per periodo e liste AIFA». Fermata fatta: via, pull request #16 unita (risposte in «Risposte della fermata dopo l'unione della #15»).
 - **Dopo l'unione della #16 (notte fra il 19 e il 20/11/2026)**, nello stesso branch ripartito da `main`: prove indipendenti dalla mezzanotte e cookie della sessione con la durata (D203), riepiloghi anche alla segreteria (D204), variazioni AIFA sui farmaci in terapia (D205), registri e piani terapeutici AIFA (D206), connessioni inattive chiuse da Postgres (D207). Sezione «Dopo l'unione della #16». Fermata fatta la mattina del 20/11/2026: via, pull request #17 unita (risposte in «Risposte della fermata dopo l'unione della #16»). Pausa fino al pomeriggio o alla sera; alla ripresa, la regola che informa sulla confezione sospesa.
-- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Poi, nello stesso branch ripartito da `main`: fonti dei LEA verificate (D216), promemoria secondo le specifiche di stampa del Sistema TS del 28/02/2024 (D217), nomenclatore dei presidi dell'allegato 3 (D218); sezione «Dopo l'unione della #19». Fermata fatta il 20/11/2026: via, pull request #20 unita (risposte in «Risposte della fermata dopo l'unione della #19»). Poi l'apertura del Fascicolo dalla cartella con un simulatore (D220). Si aspettano i file dei LEA e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
+- **Dopo l'unione della #17 (20/11/2026)**, nello stesso branch ripartito da `main`, con la richiesta di Simone: «vai avanti con la regola sulla confezione sospesa e con il resto, vorrei poter chiudere in fretta e lasciare in sospeso solo i controlli reali che faremo una volta ottenute le info dalla Regione e da CSI Piemonte». R22 sulla confezione sospesa (D210), OCR-A per l'NRE del promemoria (D211), note superate allineate alle scelte già prese, ed elenco di che cosa resta aperto e per chi (qui sotto). Sezione «Dopo l'unione della #17». Fermata fatta il 20/11/2026: via, pull request #18 unita (risposte in «Risposte della fermata dopo l'unione della #17»). Poi, nello stesso branch ripartito da `main`, le PPIP predisposte per le istruzioni di Regione e ASL: fatte (D212, D213), sezione «Dopo l'unione della #18 – Prestazioni aggiuntive», pull request #19, con il logo su fondo scuro chiesto da Simone nel frattempo (D214). Fermata fatta il 20/11/2026: via, pull request #19 unita (risposte in «Risposte della fermata dopo l'unione della #18»). Poi, nello stesso branch ripartito da `main`: fonti dei LEA verificate (D216), promemoria secondo le specifiche di stampa del Sistema TS del 28/02/2024 (D217), nomenclatore dei presidi dell'allegato 3 (D218); sezione «Dopo l'unione della #19». Fermata fatta il 20/11/2026: via, pull request #20 unita (risposte in «Risposte della fermata dopo l'unione della #19»). Poi, nello stesso branch: l'apertura del Fascicolo dalla cartella con un simulatore (D220, il servizio è fatto), la dimostrazione nel browser chiesta da Simone (D221, pubblicata come artifact) e il promemoria in A5 chiesto da Simone (da fare); sezione «Dopo l'unione della #20». Si aspettano i file dei LEA e le risposte di Regione, ASL e CSI; le verifiche per la fine sono nell'elenco qui sotto.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -909,6 +909,33 @@ Richiesta di Simone del 20/11/2026: «Dimmi tu cosa devo scaricare e chiudi, se 
   - Prove della trascrizione, del servizio e dell'interfaccia; 15 sabotaggi.
 
 **Prossimo passo**: prove complete, pull request e fermata.
+
+### Dopo l'unione della #20 – Fascicolo dalla cartella e dimostrazione nel browser (D220, D221)
+
+Nello stesso branch, ripartito da `main`.
+
+**Fatto**
+
+- **Fascicolo regionale dalla cartella (D220), parte del servizio**, sul modulo di accesso semplificato del CSI del 2019:
+  - simulatore del servizio e della pagina regionale, con il token che vale una volta e solo dall'IP di chi l'ha chiesto;
+  - permesso per il medico sul suo archivio e su quelli autorizzati, richiesta nel registro degli accessi, credenziali RUPAR;
+  - con il simulatore, in produzione, l'apertura è spenta;
+  - prove: `packages/integrations/test/fascicolo-regionale.test.ts` (5) e `apps/api/test/fascicolo-regionale.test.ts` (8).
+- **Dimostrazione nel browser (D221)**, chiesta da Simone: «per iniziare a testare il programma mi restituisci un artifact?». Pubblicata: https://claude.ai/artifact/Md4KFYrVagjLdnNewSMzCQ (privata: si condivide dal menu Condividi della pagina).
+  - Si ricostruisce con `pnpm --filter @mmg/demo build`. Poi si pubblica `apps/demo/dist/artifact/pagina.html` con i file accanto elencati in `file.json`, sullo stesso indirizzo.
+  - Provato qui in Chromium, con la versione pubblicata: avvio in 2–3 secondi, accesso con il secondo fattore, Oggi, pazienti, accesso regionale con SPID simulato, codice di sessione del Sistema TS, firma e invio di una ricetta, promemoria nel visore con la filigrana.
+
+**Non provato**
+
+- La dimostrazione dentro la cornice di claude.ai (WebAssembly e Web Worker), in Safari, in Firefox e sul tablet.
+- Nella dimostrazione, le funzioni fuori dal percorso provato: certificati, importazione, strumenti, Fascicolo.
+
+**Da fare**
+
+- **Promemoria in A5**, chiesto da Simone il 20/11/2026: «direi di predisporre pdf di stampa direttamente su A5 per evitare margini di carta bianca inutili».
+- **Fascicolo**: interfaccia, sabotaggi e documenti.
+
+**Prossimo passo**: promemoria in A5; poi il Fascicolo; poi prove complete, pull request #21 e fermata.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 

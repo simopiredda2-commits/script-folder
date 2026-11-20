@@ -16,6 +16,11 @@
   color: var(--color-primary);
   margin: 0;
 }
+.avvio-azienda {
+  font-family: var(--font-text);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
 .avvio-titolo {
   font-size: 1.125rem;
   margin: 0.25rem 0 1.5rem;

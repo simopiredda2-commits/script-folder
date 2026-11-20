@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { secondFactorCode, type Ready } from './bridge';
 
-type Code = Awaited<ReturnType<typeof secondFactorCode>>;
+type Code = Awaited<ReturnType<typeof secondFactorCode>>['code'];
 
 const group = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 
@@ -12,12 +12,17 @@ const group = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number }) {
   const [open, setOpen] = useState(true);
   const [code, setCode] = useState<Code>(null);
+  const wasLoggedIn = useRef(false);
 
   useEffect(() => {
     let alive = true;
     const tick = () =>
-      void secondFactorCode().then((c) => {
-        if (alive) setCode(c);
+      void secondFactorCode().then((state) => {
+        if (!alive) return;
+        setCode(state.code);
+        // Dopo l'accesso il riquadro si riduce da sé: resta il pulsante con il codice.
+        if (state.loggedIn && !wasLoggedIn.current) setOpen(false);
+        wasLoggedIn.current = state.loggedIn;
       });
     tick();
     const timer = window.setInterval(tick, 1000);

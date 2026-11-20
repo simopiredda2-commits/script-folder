@@ -29,4 +29,8 @@ export type FromWorker =
   | { type: 'failed'; message: string }
   | { type: 'response'; id: number; response: WireResponse }
   | { type: 'request-failed'; id: number; message: string }
-  | { type: 'code'; code: { username: string; code: string; secondsLeft: number } | null };
+  | {
+      type: 'code';
+      code: { username: string; code: string; secondsLeft: number } | null;
+      loggedIn: boolean;
+    };

@@ -10,7 +10,7 @@ import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 // Import relativo: la configurazione di Vite gira in Node e deve includere il file nel suo bundle.
-import { PRODUCT_FULL_NAME } from '../../packages/brand/brand';
+import { COMPANY_BRAND, PRODUCT_NAME } from '../../packages/brand/brand';
 
 const HERE = import.meta.dirname;
 const REPO = resolve(HERE, '..', '..');
@@ -31,9 +31,11 @@ const BINARY = new Set(['.ttf', '.otf', '.woff', '.woff2', '.pdf', '.png', '.jpg
 const TEST_KEYS = 4;
 
 const shim = (name: string) => join(HERE, 'src', 'worker', 'shims', `${name}.ts`);
+/** Sostituti in CommonJS: chi fa require() riceve il valore, non lo spazio dei nomi. */
+const cjs = (name: string) => join(HERE, 'src', 'worker', 'shims', `${name}.cjs`);
 const NODE_MODULES: Record<string, string> = {
-  assert: shim('assert'),
-  'assert/strict': shim('assert'),
+  assert: cjs('assert'),
+  'assert/strict': cjs('assert'),
   async_hooks: shim('async-hooks'),
   buffer: require.resolve('buffer/'),
   child_process: shim('child-process'),
@@ -52,7 +54,7 @@ const NODE_MODULES: Record<string, string> = {
   path: require.resolve('path-browserify'),
   perf_hooks: shim('perf-hooks'),
   pg: shim('pg'),
-  process: shim('process'),
+  process: cjs('process'),
   stream: join(dirname(require.resolve('readable-stream')), 'browser.js'),
   string_decoder: require.resolve('string_decoder/'),
   tls: shim('empty'),
@@ -129,18 +131,41 @@ function virtualModules(): Plugin {
   };
 }
 
-/** Il titolo della pagina dal marchio, come in apps/web (regola 6). */
+/**
+ * Nell'interfaccia i cambi di pagina (window.location.assign) passano dal navigatore della
+ * dimostrazione (src/navigation.ts): nell'artifact un cambio di pagina la farebbe perdere.
+ */
+function demoNavigation(): Plugin {
+  const web = join(REPO, 'apps', 'web', 'src') + sep;
+  return {
+    name: 'dimostrazione-navigazione',
+    enforce: 'pre',
+    transform(code, id) {
+      const file = id.split('?')[0]!;
+      if (!file.startsWith(web) || !code.includes('window.location.assign(')) return;
+      return {
+        code: code.replaceAll('window.location.assign(', 'globalThis.__dimostrazioneVai!('),
+        map: null,
+      };
+    },
+  };
+}
+
+/** Nome del prodotto e marchio dalla pagina del marchio, come in apps/web (regola 6). */
 function productTitle(): Plugin {
   return {
     name: 'titolo-prodotto',
-    transformIndexHtml: (html) => html.replaceAll('%TITOLO_PRODOTTO%', PRODUCT_FULL_NAME),
+    transformIndexHtml: (html) =>
+      html
+        .replaceAll('%NOME_PRODOTTO%', PRODUCT_NAME)
+        .replaceAll('%MARCHIO_AZIENDA%', COMPANY_BRAND),
   };
 }
 
 export default defineConfig({
   root: HERE,
   base: './',
-  plugins: [repositoryPaths(), virtualModules(), react(), productTitle()],
+  plugins: [repositoryPaths(), virtualModules(), demoNavigation(), react(), productTitle()],
   resolve: { alias: aliases, dedupe: ['react', 'react-dom', 'react-router'] },
   worker: {
     format: 'es',

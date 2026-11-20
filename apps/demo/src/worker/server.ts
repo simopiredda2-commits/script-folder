@@ -27,10 +27,22 @@ const cookies = new Map<string, string>();
 const secrets = new Map<string, string>();
 let pendingUser: string | null = null;
 
-async function fetchBytes(base: string, name: string): Promise<ArrayBuffer> {
+async function download(base: string, name: string): Promise<Response> {
   const res = await fetch(new URL(name, base));
   if (!res.ok) throw new Error(`File ${name} non scaricato (${res.status})`);
-  return res.arrayBuffer();
+  return res;
+}
+const fetchBytes = async (base: string, name: string) => (await download(base, name)).arrayBuffer();
+
+/** I dati binari arrivano come testo in base64 (l'artifact serve solo tipi noti), forse compressi. */
+async function fetchBase64(base: string, name: string, gunzip: boolean): Promise<ArrayBuffer> {
+  const text = await (await download(base, name)).text();
+  const binary = atob(text);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  if (!gunzip) return bytes.buffer;
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Response(stream).arrayBuffer();
 }
 
 export async function start(
@@ -40,21 +52,24 @@ export async function start(
   progress(
     'Scarico il database e il programma (circa 20 MB, solo la prima volta che il browser li vede)…',
   );
-  const [wasm, initdb, data, dump] = await Promise.all(
-    ['pglite.wasm', 'initdb.wasm', 'pglite.data', 'database.bin'].map((n) => fetchBytes(base, n)),
-  );
+  const [wasm, initdb, data, dump] = await Promise.all([
+    fetchBytes(base, 'pglite.wasm'),
+    fetchBytes(base, 'initdb.wasm'),
+    fetchBase64(base, 'pglite-dati.txt', true),
+    fetchBase64(base, 'database.txt', false),
+  ]);
   progress('Avvio il database nel browser…');
   const [pgliteWasmModule, initdbWasmModule] = await Promise.all([
-    WebAssembly.compile(wasm!),
-    WebAssembly.compile(initdb!),
+    WebAssembly.compile(wasm),
+    WebAssembly.compile(initdb),
   ]);
-  const head = new Uint8Array(dump!, 0, 2);
+  const head = new Uint8Array(dump, 0, 2);
   const gzip = head[0] === 0x1f && head[1] === 0x8b;
   const pg = await PGlite.create({
     pgliteWasmModule,
     initdbWasmModule,
-    fsBundle: new Blob([data!]),
-    loadDataDir: new Blob([dump!], { type: gzip ? 'application/gzip' : 'application/x-tar' }),
+    fsBundle: new Blob([data]),
+    loadDataDir: new Blob([dump], { type: gzip ? 'application/gzip' : 'application/x-tar' }),
   });
   const db = drizzle(pg, { schema, casing: 'snake_case' }) as unknown as Database;
 
@@ -145,6 +160,9 @@ function watchLogin(body: Record<string, unknown>, response: Uint8Array) {
   pendingUser = username;
   if (typeof r.segreto === 'string') secrets.set(username, r.segreto);
 }
+
+/** C'è una sessione aperta nel barattolo dei cookie. */
+export const loggedIn = () => cookies.has(SESSION_COOKIE_NAME);
 
 /** Il codice del secondo fattore di chi sta entrando, come lo mostrerebbe la sua app. */
 export function currentCode(): { username: string; code: string; secondsLeft: number } | null {

@@ -4,12 +4,13 @@
  * dal browser. Prima si avvia il servizio, poi l'interfaccia.
  */
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, type Root } from 'react-dom/client';
 import { App } from '../../web/src/App';
 import '../../web/src/styles/global.css';
 import './demo.css';
 import { installFetch, startService } from './bridge';
 import { DemoPanel } from './DemoPanel';
+import { installNavigation } from './navigation';
 import { installDocumentViewer } from './viewer';
 import workerUrl from './worker/index.ts?worker&url';
 
@@ -32,18 +33,26 @@ function fail(message: string) {
   }
 }
 
+let appRoot: Root | null = null;
+let generation = 0;
+/** Disegna l'interfaccia; di nuovo da zero quando il programma vero ricaricherebbe la pagina. */
+function renderApp() {
+  appRoot?.render(
+    <StrictMode>
+      <App key={generation++} />
+    </StrictMode>,
+  );
+}
+
 installFetch();
 installDocumentViewer();
+installNavigation(renderApp);
 
 startService(workerUrl, show).then(
   (ready) => {
     document.getElementById('avvio')?.remove();
-    const root = document.getElementById('root')!;
-    createRoot(root).render(
-      <StrictMode>
-        <App />
-      </StrictMode>,
-    );
+    appRoot = createRoot(document.getElementById('root')!);
+    renderApp();
     const panel = document.getElementById('dimostrazione')!;
     createRoot(panel).render(
       <DemoPanel ready={ready} seconds={Math.round((performance.now() - startedAt) / 1000)} />,

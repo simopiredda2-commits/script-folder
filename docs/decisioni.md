@@ -1310,3 +1310,14 @@ Prove:
 15 sabotaggi. Non provato: nel browser e nelle schermate, perché i dati dimostrativi non hanno il nomenclatore.
 
 **D219 · Risposte della fermata dopo l'unione della #19.** Via alla #20, unita. Nel campo 27 del promemoria resta il codice regionale davanti al nome (D217), da confermare al collaudo con il CSI. Per aprire il Fascicolo dalla cartella Simone ha risposto: «predisponilo subito ma poi chiediamo al CSI». Si costruisce con un simulatore sul modulo regionale del 2019 (D220); se valga ancora con l'autenticazione forte è una domanda per il CSI (`docs/avanzamento.md`, «Che cosa resta aperto», A4).
+
+**D221 · Dimostrazione nel browser.** Richiesta di Simone del 20/11/2026: «per iniziare a testare il programma mi restituisci un artifact?». Un artifact è una pagina su claude.ai, senza servizio e senza database. Per provare il programma vero e non un'imitazione, gira tutto nel browser (pacchetto `apps/demo`):
+
+- **Interfaccia** di `apps/web` senza modifiche; **servizio** di `apps/api` in un Web Worker, con `buildApp` e i simulatori di sempre (regola 7).
+- **Database**: PGlite, cioè Postgres compilato in WebAssembly (licenze Apache-2.0 e PostgreSQL, permissive). Le 43 migrazioni e le banche dati d'esempio di `sync/` si preparano in Node durante la costruzione. I dati dimostrativi si creano nel browser all'avvio, con le date di quel giorno: `seedDemo` (`apps/api/src/db/demo-seed.ts`), separato da `pnpm db:seed` senza cambiarlo.
+- **Moduli di Node che il browser non ha**: sostituti in `apps/demo/src/worker/shims`. Crypto con @noble/hashes e @noble/ciphers (MIT); RSA dei certificati di prova del Fascicolo con i BigInt e una scorta di chiavi nuove a ogni costruzione; un disco in memoria con i file che il servizio legge; un server HTTP finto che passa le richieste al gestore di Fastify.
+- **Limiti della cornice**: dentro un artifact non si aprono schede, non si scarica e non si stampa. PDF e file si aprono in un visore della pagina (pdf.js, Apache-2.0) con la filigrana «DIMOSTRAZIONE – DOCUMENTO NON VALIDO»: i numeri sono inventati ma i moduli somigliano a quelli veri. Le pagine dei simulatori di SPID e CIE si aprono nel visore; il ritorno al programma fa ripartire l'interfaccia, come farebbe il ricaricamento della pagina.
+- **Riquadro della dimostrazione**: utenti, password unica `dimostrazione` (non è un segreto: la mostra la pagina), codice del secondo fattore di chi sta entrando, ripartenza da capo.
+- Nessun dato esce dal browser; ricaricando la pagina si riparte da capo.
+
+`apps/demo` è uno strumento di prova, non parte del prodotto: le sue dipendenze sono di sviluppo (la prova delle licenze guarda quelle di produzione). Pagina di 1,9 MB e file accanto per circa 25 MB. Quando il programma cambia si ricostruisce (`pnpm --filter @mmg/demo build`) e si ripubblica sullo stesso indirizzo.
