@@ -14,12 +14,13 @@ self.onmessage = (event: MessageEvent<ToWorker>) => {
   if (m.type === 'start') {
     const t0 = performance.now();
     start(m.base, (message) => post({ type: 'progress', message })).then(
-      ({ users, aura, aft }) =>
+      ({ users, aura, aft, interrupted }) =>
         post({
           type: 'ready',
           users,
           aura,
           aft,
+          interrupted,
           password: DEMO_PASSWORD,
           ms: Math.round(performance.now() - t0),
         }),

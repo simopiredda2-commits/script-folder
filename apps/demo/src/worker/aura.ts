@@ -64,7 +64,7 @@ async function doctorFiscalCode(db: Database) {
 }
 
 /** Pazienti con ricette o certificati ancora aperti: lo spostamento li fermerebbe (D200). */
-async function withOpenItems(db: Database): Promise<Set<string>> {
+export async function withOpenItems(db: Database): Promise<Set<string>> {
   const rx = await db
     .select({ id: prescription.patientId })
     .from(prescription)

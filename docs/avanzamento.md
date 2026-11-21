@@ -1113,14 +1113,15 @@ Nello stesso branch, ripartito da `main`. Alla fermata Simone ha scelto di chiud
 
 2. **Certificato di malattia fermo «in invio»** (fatto, D233): stesso ciclo e stessa chiusura, nella scheda del certificato, con il protocollo dell'INPS; come data di ricezione vale l'ora dell'invio. 6 prove del servizio, 3 dell'interfaccia; 12 sabotaggi.
 3. La soglia dei 15 minuti è una sola, nel dominio, per ricette, certificati e distinte delle PPIP.
+4. **Nella dimostrazione** (fatto, D233), dove si prova tutto il programma (D224). All'avvio una ricetta e un certificato di malattia di un paziente inventato sono «in invio» da 20 minuti, firmati dalla Dott.ssa Marchi, come dopo un arresto del servizio. Il riquadro della dimostrazione, in «Invii senza risposta», dice di chi sono e dove si chiudono. Una prova della dimostrazione; 5 sabotaggi.
 
-**Come provarlo**: `pnpm test` e `pnpm lint`. Le prove nuove sono `apps/api/test/invio-interrotto.test.ts` e `apps/api/test/certificato-interrotto.test.ts`. Fermano la risposta del SAR o dell'INPS finché la prova non apre, e spostano l'orologio.
+**Come provarlo**: `pnpm test` e `pnpm lint`. Le prove nuove sono `apps/api/test/invio-interrotto.test.ts` e `apps/api/test/certificato-interrotto.test.ts`. Fermano la risposta del SAR o dell'INPS finché la prova non apre, e spostano l'orologio. Nella dimostrazione: entra come `medico`; il riquadro dice il paziente; la ricetta si chiude in Ricette › Invii senza risposta, il certificato nei Certificati del paziente. La prova automatica è in `pnpm --filter @mmg/demo test:browser`.
 
 **Non provato**:
 
 - un arresto vero del servizio: le prove mettono la pratica «in invio» direttamente nel database, o tengono ferma la risposta;
 - il SAR e l'INPS veri, e come il medico chiede loro l'esito;
-- nella dimostrazione non si simula un servizio che si ferma: lì gli invii non restano «in invio»;
+- nella dimostrazione le due pratiche sono scritte «in invio» all'avvio: il servizio non si ferma davvero;
 - WebKit e Firefox girano solo nella CI.
 
 **Prossimo passo**: pull request e fermata; poi pausa, come ha scelto Simone.
@@ -1356,9 +1357,11 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Fermata dopo la ricetta e il certificato fermi «in invio» (D233): si scrivono alla fine del blocco, con la pull request.
+Fermata dopo la ricetta e il certificato fermi «in invio» (D233), con la pull request #27:
 
-Le verifiche per la fine sono in «Che cosa resta aperto», B.
+1. **Via alla #27**: A. unisci (consigliata); B. prima provo la dimostrazione.
+
+Dopo l'unione, la pausa già scelta da Simone («Ricetta, poi pausa»): si aspettano i file dei LEA e le risposte di Regione, ASL e CSI. Le verifiche per la fine sono in «Che cosa resta aperto», B.
 
 ## Risposte della fermata dopo l'unione della #25 (21/11/2026)
 

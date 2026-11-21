@@ -451,6 +451,38 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await closeViewer();
   });
 
+  // Dopo le credenziali dei servizi (accesso regionale e codice del Sistema TS): il certificato si
+  // rimanda all'INPS.
+  it('invii senza risposta: la ricetta arrivata con il promemoria; il certificato non arrivato, rimandato', async () => {
+    const name = await fromPanel(async (p) => {
+      const text = await p.getByRole('region', { name: 'Invii senza risposta' }).innerText();
+      return /certificato di malattia di (.+), firmati da/.exec(text)![1]!;
+    });
+    // In Oggi il conto, che porta alla coda nella pagina Ricette.
+    await go('/');
+    await f.getByRole('link', { name: /^Invii senza risposta\s*1$/ }).click();
+    const section = f.getByRole('region', { name: 'Invii senza risposta' });
+    const group = section.locator('li.riquadro', {
+      has: f.getByRole('link', { name, exact: true }),
+    });
+    const form = group.getByRole('form', { name: 'La ricetta è arrivata' });
+    await form.getByLabel(/Numero di ricetta/).fill('DIMO00000000001');
+    await form.getByLabel(/Codice di autenticazione/).fill('DIMOAUT01');
+    await form.getByRole('button', { name: /È arrivata/ }).click();
+    await section.getByText('Ricetta segnata come arrivata. NRE DIMO00000000001').waitFor();
+    await section.getByRole('link', { name: 'Promemoria (PDF)' }).click();
+    await viewer().locator('canvas').first().waitFor({ timeout: 30_000 });
+    await closeViewer();
+
+    await go(`/pazienti/${await patientId(name)}/certificati`);
+    await f.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
+    await f.getByRole('button', { name: 'Non è arrivato: torna da inviare' }).click();
+    const failed = f.locator('.scheda-certificato').filter({ hasText: /Non arrivato all’INPS/ });
+    await failed.getByRole('button', { name: 'Riprova l’invio' }).click();
+    const sent = f.locator('.scheda-certificato').filter({ hasText: 'Inviato' }).first();
+    await sent.getByText(/protocollo SIM\d+/).waitFor({ timeout: 30_000 });
+  });
+
   /** Una lettura dal servizio, come la fa l'interfaccia: con la sessione di chi è entrato. */
   const read = (path: string) =>
     f.evaluate(async (p) => {
