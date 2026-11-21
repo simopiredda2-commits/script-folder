@@ -58,7 +58,7 @@ export function ReminderPanel({
   kind: string;
 }) {
   const contacts = useApi<Contacts>(`/api/pazienti/${patientId}/recapiti-promemoria`);
-  const deliveries = useApi<{ consegne: Delivery[] }>(
+  const deliveries = useApi<{ consegne: Delivery[]; carta: 'A4' | 'A5' | null }>(
     `/api/ricette/${prescriptionId}/promemoria/consegne`,
   );
   const [channel, setChannel] = useState<'email' | 'sms'>('email');
@@ -159,11 +159,12 @@ export function ReminderPanel({
       </div>
       <PrintHint kind={white ? 'promemoria_bianca' : 'promemoria'} id={hintId} />
       {!white && (
-        // Mezzo foglio A4 (D217): A5 per difetto, A4 se scelto in Strumenti › Stampa (D222).
+        // Mezzo foglio A4 (D217): A5 per difetto, A4 se scelto in Strumenti › Stampa (D222). La
+        // carta la dice il servizio: un promemoria del modello di prima esce sempre su A4 (D232).
         <p className="aiuto">
-          {printing?.carta === 'A4'
+          {deliveries.data?.carta === 'A4'
             ? 'Carta A4, con il promemoria nella metà alta. '
-            : printing?.carta === 'A5'
+            : deliveries.data?.carta === 'A5'
               ? 'Carta A5 orizzontale. '
               : ''}
           Stampa al 100% («dimensioni effettive»), senza adattare alla pagina: i codici a barre

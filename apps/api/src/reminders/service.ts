@@ -121,7 +121,7 @@ export function createReminderService(deps: ReminderDeps) {
     const doc = await document(p.id, 'promemoria_dati');
     if (!doc) throw new HttpError(409, 'Mancano i dati del promemoria fissati all’invio');
     const data = JSON.parse(doc.content) as PromemoriaData;
-    const paper = (await printSettingsFor(db, actor, 'promemoria')).paper ?? DEFAULT_REMINDER_PAPER;
+    const paper = await chosenPaper(actor);
     const bytes =
       format === 'nre' ? await renderSoloNre(data, paper) : await renderPromemoria(data, paper);
     return { bytes, name: `${format === 'nre' ? 'nre' : 'promemoria'}-${p.nre}.pdf` };
@@ -234,7 +234,24 @@ export function createReminderService(deps: ReminderDeps) {
     return { esito: outcome, recapito: to.to, destinatario: to.kind };
   }
 
-  /** Le consegne di una ricetta, dalla più recente. */
+  /** La carta scelta per il promemoria nella postazione e nello studio di chi stampa (D222). */
+  async function chosenPaper(actor: Actor) {
+    return (await printSettingsFor(db, actor, 'promemoria')).paper ?? DEFAULT_REMINDER_PAPER;
+  }
+
+  /**
+   * La carta su cui esce il promemoria di questa ricetta: quella scelta per il modello del 2024,
+   * sempre A4 per i dati della versione 1, che si ristampano com'erano (D217, D232).
+   */
+  async function paperOf(actor: Actor, p: typeof prescription.$inferSelect) {
+    if (p.kind === 'white' || !p.authCode) return null;
+    const doc = await document(p.id, 'promemoria_dati');
+    if (!doc) return null;
+    const data = JSON.parse(doc.content) as PromemoriaData;
+    return data.versione === 1 ? 'A4' : await chosenPaper(actor);
+  }
+
+  /** Le consegne di una ricetta, dalla più recente, e la carta del suo promemoria. */
   async function deliveries(actor: Actor, id: string) {
     const { p } = await guarded(actor, id, 'lettura_consegne_promemoria');
     const rows = await db
@@ -251,7 +268,7 @@ export function createReminderService(deps: ReminderDeps) {
       .innerJoin(appUser, eq(appUser.id, reminderDelivery.userId))
       .where(eq(reminderDelivery.prescriptionId, p.id))
       .orderBy(desc(reminderDelivery.id));
-    return { consegne: rows };
+    return { consegne: rows, carta: await paperOf(actor, p) };
   }
 
   /** Recapiti per il promemoria: quelli del paziente e le deleghe, con la validità di oggi (R16). */

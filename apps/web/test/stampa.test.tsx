@@ -234,7 +234,10 @@ describe('preferenze di stampa (tappa 14)', () => {
         status: 200,
         body: { paziente: { email: null, telefono: null }, deleghe: [] },
       }),
-      '/api/ricette/r1/promemoria/consegne': () => ({ status: 200, body: { consegne: [] } }),
+      '/api/ricette/r1/promemoria/consegne': () => ({
+        status: 200,
+        body: { consegne: [], carta: 'A4' },
+      }),
       '/api/stampa/preferenze': () => ({
         status: 200,
         body: effective({
@@ -282,7 +285,10 @@ describe('preferenze di stampa (tappa 14)', () => {
         status: 200,
         body: { paziente: { email: null, telefono: null }, deleghe: [] },
       }),
-      '/api/ricette/r1/promemoria/consegne': () => ({ status: 200, body: { consegne: [] } }),
+      '/api/ricette/r1/promemoria/consegne': () => ({
+        status: 200,
+        body: { consegne: [], carta: 'A5' },
+      }),
       '/api/stampa/preferenze': () => ({ status: 200, body: effective() }),
     });
     render(
@@ -299,5 +305,30 @@ describe('preferenze di stampa (tappa 14)', () => {
     expect(within(panel).queryByText(/finestra di stampa/)).toBeNull();
     // Senza preferenze: A5 orizzontale (D222).
     expect(await within(panel).findByText(/Carta A5 orizzontale\./)).toBeTruthy();
+  });
+
+  it('la carta la dice il servizio: un promemoria del modello di prima esce su A4 anche con A5 scelto (D232)', async () => {
+    stubFetch({
+      '/api/io': () => ({ status: 200, body: DOCTOR }),
+      '/api/pazienti/p1/recapiti-promemoria': () => ({
+        status: 200,
+        body: { paziente: { email: null, telefono: null }, deleghe: [] },
+      }),
+      '/api/ricette/r1/promemoria/consegne': () => ({
+        status: 200,
+        body: { consegne: [], carta: 'A4' },
+      }),
+      '/api/stampa/preferenze': () => ({ status: 200, body: effective() }),
+    });
+    render(
+      <SessionProvider>
+        <ReminderPanel prescriptionId="r1" patientId="p1" kind="pharma_ssn" />
+      </SessionProvider>,
+    );
+    const panel = await screen.findByRole('region', { name: 'Promemoria della ricetta' });
+    expect(
+      await within(panel).findByText(/Carta A4, con il promemoria nella metà alta\./),
+    ).toBeTruthy();
+    expect(within(panel).queryByText(/Carta A5/)).toBeNull();
   });
 });

@@ -332,6 +332,17 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     }
   });
 
+  it('farmaco con l’AIC e senza il nome: sul promemoria l’AIC partito al SAR, mai una riga vuota (D232)', async () => {
+    const id = await sent({ kind: 'pharma_ssn', lines: [{ drugAic: '012345678', quantity: 1 }] });
+    const [doc] = await docs(id);
+    const data = JSON.parse(doc!.content) as PromemoriaDataV2;
+    expect(data.righe.map((r) => r.prescrizione)).toEqual([['012345678']]);
+    const text = norm(
+      await pdfText((await req('GET', `/api/ricette/${id}/promemoria`)).rawPayload),
+    );
+    expect(text).toContain('012345678');
+  });
+
   it('terapia suggerita dallo specialista: campo 14 «SUGG», una volta per ricetta', async () => {
     const [th] = await t.db
       .select()
@@ -517,10 +528,15 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
       expect(res.statusCode, res.body).toBe(200);
     };
     const id = await sent(pharma());
+    // La carta che il pannello annuncia è quella su cui il promemoria esce (D232).
+    const announced = async () =>
+      (await req('GET', `/api/ricette/${id}/promemoria/consegne`)).json<{ carta: string }>().carta;
+    expect(await announced()).toBe('A5');
     expect(await size(await reminder(id))).toEqual(A5_LANDSCAPE);
     expect(await size(await reminder(id, '?formato=nre'))).toEqual(A5_LANDSCAPE);
     try {
       await setPaper('A4');
+      expect(await announced()).toBe('A4');
       expect(await size(await reminder(id))).toEqual(A4);
       expect(await size(await reminder(id, '?formato=nre'))).toEqual(A4);
       const before = sender.emails.length;

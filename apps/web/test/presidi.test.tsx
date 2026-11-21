@@ -146,6 +146,35 @@ describe('presidi: scelta dal nomenclatore del DPCM LEA (D218)', () => {
     );
   });
 
+  it('tornare a «scrivi a mano» svuota prodotto e codice, non sceglie la prima voce (D232)', async () => {
+    const calls = routes(CATALOG);
+    window.history.pushState({}, '', '/pazienti/p1/presidi');
+    render(<App />);
+    const select = await screen.findByLabelText<HTMLSelectElement>('Dal nomenclatore (allegato 3)');
+    fireEvent.change(select, {
+      target: {
+        value: within(select)
+          .getByRole('option', { name: 'Apparecchio di prova · W0201060102 / Z12040115' })
+          .getAttribute('value'),
+      },
+    });
+    fireEvent.change(select, { target: { value: '' } });
+    expect(screen.getByLabelText<HTMLInputElement>('Prodotto').value).toBe('');
+    expect(screen.getByLabelText<HTMLInputElement>('Codice del nomenclatore').value).toBe('');
+    expect(select.value).toBe('');
+    // Scritto a mano, il prodotto parte senza il codice di un'altra voce.
+    fireEvent.change(screen.getByLabelText('Prodotto'), {
+      target: { value: 'Prodotto scritto a mano' },
+    });
+    fireEvent.change(screen.getByLabelText('Fabbisogno al mese'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('Unità'), { target: { value: 'pezzi' } });
+    fireEvent.click(screen.getByRole('button', { name: /Registra la prescrizione/ }));
+    await waitFor(() => expect(calls.find((c) => c.method === 'POST')).toBeTruthy());
+    const body = calls.find((c) => c.method === 'POST')!.body as Record<string, unknown>;
+    expect(body.prodotto).toBe('Prodotto scritto a mano');
+    expect(body.codice).toBeUndefined();
+  });
+
   it('nessuna scelta per le categorie senza nomenclatore o con il nomenclatore vuoto', async () => {
     routes(CATALOG);
     window.history.pushState({}, '', '/pazienti/p1/presidi');

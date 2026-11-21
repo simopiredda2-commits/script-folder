@@ -173,6 +173,17 @@ describe('allegato 3 del DPCM LEA: presidi per diabete e malattie rare (D218)', 
     expect(sheet3.sheet.solo_modifiche ?? false).toBe(false);
   });
 
+  it('il tipo della voce è «presidio» o «malattia_rara»: un altro valore è un problema (D232)', () => {
+    const header = 'tipo;codice;descrizione;gruppo;allegato';
+    const bad = readTable(
+      Buffer.from(`${header}\nmalattia rara;RCG060;Malattia di prova;Malattie rare;3\n`, 'utf8'),
+      'prova.csv',
+    );
+    const read = extractRecords(mappingForTranscription(loadMappings(), 'presidi')!, bad);
+    expect(read.records).toEqual([]);
+    expect(JSON.stringify(read.problems)).toMatch(/«presidio» o «malattia_rara»/);
+  });
+
   it('18 presidi in 10 gruppi e le 12 malattie rare dell’art. 13, tutti dell’allegato 3', () => {
     expect(read3.missingColumns).toEqual([]);
     expect(read3.problems).toEqual([]);

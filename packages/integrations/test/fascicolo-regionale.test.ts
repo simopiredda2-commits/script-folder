@@ -4,6 +4,7 @@ import {
   FSE_ACCESS_ERRORS,
   FSE_ACCESS_ROLE,
   FSE_DOCUMENT_TYPES,
+  MAX_TOKENS,
   SimulatedRegionalFseAccess,
   type FseAccessRequest,
 } from '../src';
@@ -63,6 +64,10 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220)', () =>
     expect(await fse.authenticate(request({ documentType: 'XYZ' }), auth)).toMatchObject({
       code: 'FSE_ER_504',
     });
+    for (const documentType of ['constructor', 'toString', '__proto__'])
+      expect(await fse.authenticate(request({ documentType }), auth), documentType).toMatchObject({
+        code: 'FSE_ER_504',
+      });
   });
 
   it('gli esiti scelti nelle prove: consenso mancante, paziente non trovato, servizio giù', async () => {
@@ -99,5 +104,20 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220)', () =>
     expect(Object.keys(FSE_DOCUMENT_TYPES)).toHaveLength(16);
     expect(FSE_DOCUMENT_TYPES['60591-5']).toBe('PROFILO SANITARIO SINTETICO / PATIENT SUMMARY');
     expect(FSE_DOCUMENT_TYPES['11502-2']).toBe('REFERTO DI LABORATORIO');
+  });
+
+  it('il simulatore non tiene i token senza limite: usati escono, i più vecchi oltre il limite pure (D232)', async () => {
+    const fse = new SimulatedRegionalFseAccess();
+    const tokenOf = async () => {
+      const r = await fse.authenticate(request(), auth);
+      if (r.outcome !== 'success') throw new Error(r.outcome);
+      return new URL(r.url, 'http://prova').searchParams.get('token')!;
+    };
+    const first = await tokenOf();
+    for (let i = 0; i < MAX_TOKENS; i++) await tokenOf();
+    expect(fse.open(first, '192.0.2.10')).toMatchObject({ outcome: 'error', code: 'WEB_001' });
+    const last = await tokenOf();
+    expect(fse.open(last, '192.0.2.10')).toMatchObject({ outcome: 'opened' });
+    expect(fse.open(last, '192.0.2.10')).toMatchObject({ outcome: 'error', code: 'WEB_001' });
   });
 });

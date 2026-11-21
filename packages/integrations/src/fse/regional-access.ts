@@ -47,6 +47,12 @@ export const FSE_DOCUMENT_TYPES: Readonly<Record<string, string>> = {
 };
 
 /**
+ * Un tipo di documento delle specifiche: solo le chiavi dell'elenco, non quelle che ogni oggetto
+ * ha dal suo prototipo («constructor», «toString», «__proto__»…), D232.
+ */
+export const isFseDocumentType = (code: string): boolean => Object.hasOwn(FSE_DOCUMENT_TYPES, code);
+
+/**
  * Errori del servizio `getAuthentication` (tabella 1 delle specifiche) e della pagina del
  * Fascicolo (tabella 3, «errori web-application»), con le loro parole.
  */
@@ -97,6 +103,9 @@ export interface SimulatedRegionalFseAccessOptions {
   pageUrl?: string;
 }
 
+/** Token in attesa di essere usati, al più: il simulatore non cresce senza limite (D232). */
+export const MAX_TOKENS = 1000;
+
 /** Il token che la pagina simulata riceve: per chi, da quale IP, se già usato. */
 interface IssuedToken {
   patientFiscalCode: string;
@@ -126,7 +135,7 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
     this.received.push({ ...request, role: FSE_ACCESS_ROLE, application: FSE_ACCESS_APPLICATION });
     // Le specifiche chiedono utente e password RUPAR; il PIN è facoltativo (3.3).
     if (!auth.username?.trim() || !auth.password) return Promise.resolve(failure('AUTH_ER_501'));
-    if (request.documentType !== null && !(request.documentType in FSE_DOCUMENT_TYPES))
+    if (request.documentType !== null && !isFseDocumentType(request.documentType))
       return Promise.resolve(failure('FSE_ER_504'));
     const decision = this.options.decide?.(request) ?? 'success';
     if (decision === 'unreachable')
@@ -136,6 +145,8 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
       });
     if (decision !== 'success') return Promise.resolve(failure(decision));
     const token = randomUUID();
+    // Al più MAX_TOKENS in memoria: il più vecchio esce, come un token scaduto (D232).
+    while (this.tokens.size >= MAX_TOKENS) this.tokens.delete(this.tokens.keys().next().value!);
     this.tokens.set(token, {
       patientFiscalCode: request.patientFiscalCode,
       clientIp: request.clientIp,
@@ -157,6 +168,8 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
       return { outcome: 'error', code: 'WEB_001', message: FSE_ACCESS_ERRORS.WEB_001 };
     if (t.clientIp !== null && t.clientIp !== clientIp)
       return { outcome: 'error', code: 'WEB_002', message: FSE_ACCESS_ERRORS.WEB_002 };
+    // Usato, non serve più: una seconda apertura non lo trova e dà WEB_001 lo stesso.
+    this.tokens.delete(token);
     t.used = true;
     return {
       outcome: 'opened',
