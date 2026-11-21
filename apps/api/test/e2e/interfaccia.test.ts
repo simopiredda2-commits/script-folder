@@ -180,6 +180,29 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect(small, where).toEqual([]);
   }
 
+  /**
+   * Nessun pulsante è più stretto del suo contenuto (D242). Accanto a un testo lungo, «Aggiungi» si
+   * stringeva sotto la sua misura e il «+» usciva dal bordo: il bersaglio restava di 44 px, quindi la
+   * prova dei bersagli non lo vedeva.
+   */
+  async function expectNoClippedButtons(p: Page, where: string) {
+    const clipped = await p.evaluate(() =>
+      [...document.querySelectorAll('button, a.pulsante, summary')]
+        .filter((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          if (getComputedStyle(el).display === 'inline') return false;
+          return el.scrollWidth > el.clientWidth + 1;
+        })
+        .slice(0, 5)
+        .map(
+          (el) =>
+            `${el.tagName.toLowerCase()} «${(el.textContent ?? '').trim().slice(0, 40)}»: contenuto di ${el.scrollWidth} px in ${el.clientWidth} px`,
+        ),
+    );
+    expect(clipped, where).toEqual([]);
+  }
+
   /** Su tablet, in verticale e in orizzontale, la pagina non scorre di lato. */
   async function expectTabletLayout(p: Page, where: string) {
     for (const v of TABLETS) {
@@ -197,6 +220,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       );
       expect(wide, `${where} a ${v.width}×${v.height}: elementi oltre il bordo`).toEqual([]);
       await expectTargets(p, `${where} a ${v.width}×${v.height}`);
+      await expectNoClippedButtons(p, `${where} a ${v.width}×${v.height}`);
     }
     await p.setViewportSize({ width: 1280, height: 900 });
   }
@@ -204,6 +228,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   const check = async (p: Page, where: string, tablet = false) => {
     await expectAccessible(p, where);
     await expectTargets(p, where);
+    await expectNoClippedButtons(p, where);
     if (tablet) await expectTabletLayout(p, where);
   };
 

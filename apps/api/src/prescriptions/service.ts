@@ -1210,12 +1210,22 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return queue(actor, 'sending', { signer: true });
   }
 
+  /**
+   * Le ricette di una coda, raggruppate per paziente. Chi firma le vede negli archivi dove firma;
+   * chi legge la terapia dell'archivio senza firmare, la segreteria, le vede in sola lettura
+   * (`firmabile` falso), senza quelle con una terapia riservata, come nella cartella (D242).
+   */
   async function queue(actor: Actor, status: PrescriptionStatus, opts: { signer?: boolean } = {}) {
-    const archives = await visibleArchives(db, actor, 'prescription.sign_send');
+    const signable = new Set(await visibleArchives(db, actor, 'prescription.sign_send'));
+    const archives = [
+      ...new Set([...signable, ...(await visibleArchives(db, actor, 'therapy.read'))]),
+    ];
     if (archives.length === 0) return [];
-    const rows = await db
+    const reservedAllowed = new Set(await visibleArchives(db, actor, 'reserved.read'));
+    const found = await db
       .select({
         id: prescription.id,
+        archiveId: prescription.archiveId,
         patientId: patient.id,
         nome: patient.firstName,
         cognome: patient.lastName,
@@ -1236,6 +1246,22 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       .innerJoin(appUser, eq(appUser.id, prescription.preparedBy))
       .where(and(inArray(prescription.archiveId, archives), eq(prescription.status, status)))
       .orderBy(patient.lastName, patient.firstName, prescription.preparedAt);
+    // Le ricette con una terapia riservata non si vedono dove le riservate non si leggono.
+    const unsure = found.filter((r) => !reservedAllowed.has(r.archiveId)).map((r) => r.id);
+    const reserved = new Set(
+      unsure.length
+        ? (
+            await db
+              .selectDistinct({ id: prescriptionLine.prescriptionId })
+              .from(prescriptionLine)
+              .innerJoin(therapy, eq(therapy.id, prescriptionLine.therapyId))
+              .where(
+                and(eq(therapy.reserved, true), inArray(prescriptionLine.prescriptionId, unsure)),
+              )
+          ).map((r) => r.id)
+        : [],
+    );
+    const rows = found.filter((r) => !reserved.has(r.id));
     const groups = new Map<
       string,
       {
@@ -1261,6 +1287,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         righe: r.righe,
         errore: r.errore,
         tipoErrore: r.tipoErrore,
+        firmabile: signable.has(r.archiveId),
         ...(opts.signer
           ? {
               firmataIl: r.firmataIl,

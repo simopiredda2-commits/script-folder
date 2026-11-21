@@ -375,6 +375,12 @@ legend {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  /*
+   * Mai più stretto del suo contenuto (D242). La larghezza minima di 44 px toglie il minimo
+   * automatico degli elementi flessibili: accanto a un testo lungo il pulsante si stringeva e il
+   * «+» di «Aggiungi» usciva dal bordo. Si stringe il testo vicino, che va a capo.
+   */
+  flex-shrink: 0;
   min-height: var(--size-min-target);
   min-width: var(--size-min-target);
   padding: 0 1rem;
@@ -718,6 +724,13 @@ legend {
   gap: 1rem;
   padding: 0.625rem 0;
   border-bottom: 1px solid var(--color-divider);
+}
+
+/* Il testo del risultato si stringe e va a capo, anche nei codici lunghi; il pulsante no (D242). */
+.risultato > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .risultato-colonna {
