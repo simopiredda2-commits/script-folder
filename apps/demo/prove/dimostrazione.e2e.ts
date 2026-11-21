@@ -466,9 +466,33 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       has: f.getByRole('link', { name, exact: true }),
     });
     const form = group.getByRole('form', { name: 'La ricetta è arrivata' });
+    // Se il modulo non compare, l'errore dice che cosa mostra la sezione, che cosa risponde il
+    // servizio e che ora è nella pagina (D234): con WebKit una volta non è comparso, senza dire
+    // perché (D239).
+    await form.waitFor({ timeout: 30_000 }).catch(async (err: unknown) => {
+      const shown = await section
+        .innerText({ timeout: 2_000 })
+        .catch(() => '(sezione non trovata)');
+      const answer = await f
+        .evaluate(async () => {
+          const res = await fetch('/api/ricette/senza-risposta');
+          return `${res.status} ${await res.text()}`;
+        })
+        .catch((e: unknown) => String(e));
+      const now = await f.evaluate(() => new Date().toISOString()).catch(() => '?');
+      throw new Error(
+        `Il modulo «La ricetta è arrivata» non è comparso per ${name}. Ora nella pagina: ${now}.\nLa sezione mostra:\n${shown}\nIl servizio risponde:\n${answer}`,
+        { cause: err },
+      );
+    });
     await form.getByLabel(/Numero di ricetta/).fill('DIMO00000000001');
     await form.getByLabel(/Codice di autenticazione/).fill('DIMOAUT01');
     await form.getByRole('button', { name: /È arrivata/ }).click();
+    // L'esito non si cambia dopo: si conferma prima di segnarlo (D239).
+    await group
+      .getByRole('group', { name: 'Conferma dell’esito' })
+      .getByRole('button', { name: 'Sì, confermo' })
+      .click();
     await section.getByText('Ricetta segnata come arrivata. NRE DIMO00000000001').waitFor();
     await section.getByRole('link', { name: 'Promemoria (PDF)' }).click();
     await viewer().locator('canvas').first().waitFor({ timeout: 30_000 });
@@ -477,6 +501,11 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await go(`/pazienti/${await patientId(name)}/certificati`);
     await f.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
     await f.getByRole('button', { name: 'Non è arrivato: torna da inviare' }).click();
+    await f
+      .getByRole('group', { name: 'Conferma dell’esito' })
+      .getByRole('button', { name: 'Sì, confermo' })
+      .click();
+    await f.getByText('Certificato di nuovo da inviare: si può rimandare all’INPS.').waitFor();
     const failed = f.locator('.scheda-certificato').filter({ hasText: /Non arrivato all’INPS/ });
     await failed.getByRole('button', { name: 'Riprova l’invio' }).click();
     const sent = f.locator('.scheda-certificato').filter({ hasText: 'Inviato' }).first();
@@ -631,6 +660,8 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await f.getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' }).waitFor();
     await f.getByLabel('Categoria').selectOption('monouso');
     const select = f.getByLabel('Dal nomenclatore (allegato 2)');
+    // Prima che si contino, le voci devono essere arrivate dal servizio (D239).
+    await select.locator('option', { hasText: '· 09.30.24.063' }).waitFor({ state: 'attached' });
     // 87 voci in 21 gruppi, più la voce «scrivi a mano».
     expect(await select.locator('optgroup').count()).toBe(21);
     expect(await select.locator('option').count()).toBe(88);
@@ -641,12 +672,51 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     expect(chosen).toMatch(/^mutanda pannolone \(tipo pull-on \)/);
     expect(chosen).toHaveLength(401);
     expect(await f.getByLabel('Codice del nomenclatore').inputValue()).toBe('09.30.24.063');
+    // La quantità dell'allegato, con l'intestazione della sua colonna (D237).
+    expect(await f.getByText(/^Quantità nel nomenclatore/).innerText()).toBe(
+      'Quantità nel nomenclatore: 120 («quantità massima erogabile»). Il fabbisogno lo decide il medico.',
+    );
     await f.getByLabel('Fabbisogno al mese').fill('120');
     await f.getByLabel('Unità').fill('pezzi');
     await f.getByRole('button', { name: /Registra la prescrizione/ }).click();
     await f.getByText('Prescrizione registrata.').waitFor();
     // Nell'elenco il prodotto intero, con il codice.
     await f.getByRole('region', { name: 'Prescrizioni' }).getByText(chosen).first().waitFor();
+  });
+
+  it('medicazioni avanzate: il titolare sceglie l’alginato; poi si prescrive solo lì, con lo specialista (D237)', async () => {
+    await go('/archivio');
+    const section = f.getByRole('region', { name: 'Medicazioni avanzate' });
+    await section.getByLabel(/cm 15 x 15 .* 04\.49\.03\.103/).check();
+    await section.getByRole('button', { name: 'Salva le medicazioni avanzate' }).click();
+    await section.getByText('Medicazioni avanzate salvate: 1.').waitFor();
+
+    const id = (await patients())[0]!.id;
+    await go(`/pazienti/${id}/presidi`);
+    await f.getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' }).waitFor();
+    await f.getByLabel('Categoria').selectOption('monouso');
+    const monouso = f.getByLabel('Dal nomenclatore (allegato 2)');
+    await monouso.locator('option', { hasText: '· 09.30.24.063' }).waitFor({ state: 'attached' });
+    // L'alginato 15 x 15 non è più fra i monouso: 86 voci, più «scrivi a mano».
+    expect(await monouso.locator('option').count()).toBe(87);
+    expect(await monouso.locator('option', { hasText: '· 04.49.03.103' }).count()).toBe(0);
+    await f.getByLabel('Categoria').selectOption('medicazione_avanzata');
+    const advanced = f.getByLabel('Dal nomenclatore (allegato 2)');
+    await advanced.locator('option', { hasText: '· 04.49.03.103' }).waitFor({ state: 'attached' });
+    expect(await advanced.locator('option').count()).toBe(2);
+    await advanced.selectOption(
+      await advanced.locator('option', { hasText: '· 04.49.03.103' }).getAttribute('value'),
+    );
+    await f.getByLabel('Fabbisogno al mese').fill('10');
+    await f.getByLabel('Unità').fill('pezzi');
+    // La regola delle medicazioni avanzate: la prima prescrizione dello specialista è obbligatoria.
+    for (const label of ['Prima prescrizione: specialista', 'Prima prescrizione: data'])
+      expect(await f.getByLabel(label).getAttribute('required'), label).not.toBeNull();
+    const month = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    await f.getByLabel('Prima prescrizione: specialista').fill('Dr. Vulnologo di prova');
+    await f.getByLabel('Prima prescrizione: data').fill(month);
+    await f.getByRole('button', { name: /Registra la prescrizione/ }).click();
+    await f.getByText('Prescrizione registrata.').waitFor();
   });
 
   it('la segreteria prepara la ripetizione; il medico la trova da firmare e la manda', async () => {
@@ -953,9 +1023,11 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     // maiuscole, e il codice c'è ancora. Così la prova non dipende da quelle di prima.
     await login('medico');
     await login('medico', 'Medico');
-    // Il codice si annuncia quando cambia; il conto alla rovescia di ogni secondo no.
-    const live = await f.locator('#dimostrazione [aria-live]').allInnerTexts();
-    expect(live.join(' ')).not.toMatch(/Cambia fra/);
+    // Il codice si annuncia quando cambia; il conto alla rovescia di ogni secondo no. Si legge con
+    // il riquadro aperto: ridotto, non ci sarebbe niente da leggere (D239).
+    const live = (await fromPanel((p) => p.locator('[aria-live]').allInnerTexts())).join(' ');
+    expect(live).toMatch(/Codice per medico:/);
+    expect(live).not.toMatch(/Cambia fra/);
   });
 
   it('un documento del servizio che non arriva: il visore lo dice, senza errori non gestiti (D232)', async () => {

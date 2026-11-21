@@ -8,7 +8,7 @@ import { loadMappings } from '@mmg/reference';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Actor } from '../src/auth/service';
-import { accessLog, patient, ppipRecord } from '../src/db/schema';
+import { accessLog, doctorProfile, patient, ppipRecord, referenceDataset } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
 import { buildExport } from '../src/export/export';
 import { DISTINTA_FIELDS, formatById, loadFormats } from '../src/ppip/formats';
@@ -381,6 +381,7 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
         seen: [],
         today: '2026-11-20',
         at: new Date('2026-11-20T11:00:00Z'),
+        timeoutMs: 8_000,
       }),
     ).rejects.toThrow(/non è ancora collegato/);
   });
@@ -541,6 +542,142 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
       ['2026-11-10', 15],
       ['2026-10-05', 12.32],
     ]);
+  });
+
+  it('una serie vale in un solo ambito: un atto con un altro ambito si ferma, le modifiche ereditano, l’ambito sbagliato si corregge (D239)', async () => {
+    // Il collega lavora in un'altra ASL, inventata come l'altra.
+    await t.db
+      .update(doctorProfile)
+      .set({ asl: 'ASL altra di prova' })
+      .where(eq(doctorProfile.userId, s.users.collega.id));
+    let n = 0;
+    const importSheet = async (sheet: Record<string, unknown>, csv: string) => {
+      const dir = join(work, `trascrizioni-ambito-${++n}`, 'ppip');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(
+        join(dir, 'atto.json'),
+        JSON.stringify({
+          tipo: 'prestazioni_aggiuntive',
+          fonte: null,
+          chiave: null,
+          sha256_origine: null,
+          trascritto_da: 'Persona di prova',
+          trascritto_il: '2026-11-20',
+          controllato_da: 'Seconda persona di prova',
+          ...sheet,
+        }),
+      );
+      writeFileSync(join(dir, 'atto.csv'), csv);
+      const [line] = await importReferenceData({
+        db: t.db,
+        syncDir: join(work, 'dati-pubblici'),
+        transcriptionsDir: join(work, `trascrizioni-ambito-${n}`),
+        mappings: loadMappings(),
+        importedBy: 'prova',
+      });
+      return line!;
+    };
+    const codes = async (who: 'titolare' | 'collega', data: string) =>
+      (
+        (
+          await req(
+            who,
+            'GET',
+            `/api/prestazioni-aggiuntive/catalogo?data=${data}&archivio=${s.archives[who]}`,
+          )
+        ).json().voci as Voce[]
+      ).map((v) => `${v.codice}:${v.compenso}`);
+    const changes = 'operazione;codice;sezione;descrizione;autorizzazione;compenso;note\n';
+    const header = 'codice;sezione;descrizione;autorizzazione;compenso;note\n';
+    try {
+      // 1. Un atto dell'ASL scritto come modifica dell'ACN: l'ACN vale in tutta Italia, si ferma.
+      const asl = await importSheet(
+        {
+          serie: 'acn-prestazioni-aggiuntive',
+          atto: 'Accordo aziendale inventato che cambia A3',
+          in_vigore_dal: '2026-12-01',
+          solo_modifiche: true,
+          ambito: { regione: 'Piemonte', asl: 'ASL di prova' },
+        },
+        changes + 'aggiunge;A3;A;Terza voce;no;7,77;\n',
+      );
+      expect(asl.outcome).toBe('ambito_diverso');
+      expect(asl.notes.join(' ')).toMatch(/una serie vale in un solo ambito/);
+      // L'altra ASL ha ancora tutto l'ACN.
+      const other = await codes('collega', '2026-12-10');
+      expect(other).toContain('A3:6.16');
+      expect(other.length).toBeGreaterThan(10);
+
+      // 2. Una modifica dell'AIR che non ripete l'ambito lo eredita: resta del Piemonte.
+      const air = await importSheet(
+        {
+          serie: 'piemonte-prestazioni-aggiuntive',
+          atto: 'Modifica inventata dell’AIR del Piemonte',
+          in_vigore_dal: '2026-12-01',
+          solo_modifiche: true,
+        },
+        changes + 'aggiunge;AIR35.4;C;Trasfusione in ADI;no;60,00;\n',
+      );
+      expect(air.outcome, air.notes.join(' ')).toBe('importato');
+      expect(air.notes.join(' ')).toMatch(
+        /ambito della versione che l’atto modifica: regione Piemonte/,
+      );
+      const [last] = await t.db
+        .select({ region: referenceDataset.scopeRegion, asl: referenceDataset.scopeAsl })
+        .from(referenceDataset)
+        .where(eq(referenceDataset.series, 'piemonte-prestazioni-aggiuntive'))
+        .orderBy(sql`${referenceDataset.validFrom} desc`)
+        .limit(1);
+      expect(last).toEqual({ region: 'Piemonte', asl: null });
+
+      // 3. Un accordo dell'ASL importato senza ambito per sbaglio vale ovunque; lo stesso CSV alla
+      // stessa data con l'ambito lo corregge, e un atto nuovo senza ambito si ferma.
+      const tre = header + 'TRE1;C;Voce dell’accordo inventato;no;10,00;\n';
+      const wrong = {
+        serie: 'asl-tre-prestazioni-aggiuntive',
+        atto: 'Accordo inventato',
+        in_vigore_dal: '2026-12-01',
+      };
+      expect((await importSheet(wrong, tre)).outcome).toBe('importato');
+      expect(await codes('collega', '2026-12-10')).toContain('TRE1:10');
+      const fixed = await importSheet(
+        { ...wrong, ambito: { regione: 'Piemonte', asl: 'ASL di prova' } },
+        tre,
+      );
+      expect(fixed.outcome, fixed.notes.join(' ')).toBe('importato');
+      expect(fixed.notes.join(' ')).toMatch(/corregge l’ambito della versione del 2026-12-01/);
+      expect(await codes('collega', '2026-12-10')).not.toContain('TRE1:10');
+      expect(await codes('titolare', '2026-12-10')).toContain('TRE1:10');
+      // Reimportata ancora con l'ambito giusto: è la stessa, già importata.
+      expect(
+        (await importSheet({ ...wrong, ambito: { regione: 'Piemonte', asl: 'ASL di prova' } }, tre))
+          .outcome,
+      ).toBe('gia_importato');
+      const next = await importSheet(
+        { ...wrong, in_vigore_dal: '2027-01-01', atto: 'Rinnovo inventato senza ambito' },
+        header + 'TRE1;C;Voce dell’accordo inventato;no;11,00;\n',
+      );
+      expect(next.outcome).toBe('ambito_diverso');
+
+      // 4. Lo stesso codice due volte nella stessa tabella: si ferma, invece di valerne uno a caso.
+      const twice = await importSheet(
+        {
+          serie: 'asl-due-prestazioni-aggiuntive',
+          atto: 'Atto inventato con un doppione',
+          in_vigore_dal: '2026-12-01',
+          ambito: { regione: 'Piemonte', asl: 'ASL di prova' },
+        },
+        header + 'DUE1;C;Voce inventata;no;10,00;\nDUE1;C;Voce inventata;no;99,00;\n',
+      );
+      expect(twice.outcome).toBe('righe_non_valide');
+      expect(twice.notes.join(' ')).toMatch(/DUE1: codice ripetuto/);
+      expect(await codes('titolare', '2026-12-10')).not.toContain('DUE1:10');
+    } finally {
+      await t.db
+        .update(doctorProfile)
+        .set({ asl: 'ASL di prova' })
+        .where(eq(doctorProfile.userId, s.users.collega.id));
+    }
   });
 
   it('totale: vuoto se una voce non ha il compenso, non contata come zero', () => {

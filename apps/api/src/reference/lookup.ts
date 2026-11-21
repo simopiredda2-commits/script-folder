@@ -11,6 +11,7 @@ import {
   type MappingSet,
   SERVICE_SEARCH_DATA,
   searchDiagnoses,
+  scopeKey,
   searchServices,
   type ServiceIndex,
 } from '@mmg/reference';
@@ -299,13 +300,6 @@ export interface ReferenceScope {
   asl?: string | null;
 }
 
-/** Senza maiuscole, spazi e segni: «ASL TO3», «Asl To 3» e «ASL-TO3» sono la stessa ASL. */
-const scopeKey = (v: string | null | undefined) =>
-  (v ?? '')
-    .normalize('NFD')
-    .replace(/[^\p{L}\p{N}]/gu, '')
-    .toUpperCase();
-
 /** La versione vale dove la si guarda: nessun ambito, oppure la stessa regione e la stessa ASL. */
 function inScope(
   d: { scopeRegion: string | null; scopeAsl: string | null },
@@ -355,6 +349,9 @@ export interface SupplyCatalogItem {
   group: string;
   /** Allegato del DPCM: «2» o «3». */
   annex: string;
+  /** La quantità stampata nell'allegato e l'intestazione della sua colonna, se ci sono (D237). */
+  quantity: string | null;
+  quantityHeading: string | null;
   series: string;
   act: string | null;
   validFrom: string;
@@ -1251,6 +1248,8 @@ export class ReferenceData {
         description: r.description,
         group: r.group,
         annex: r.annex,
+        quantity: r.quantity || null,
+        quantityHeading: r.quantityHeading || null,
         series: d.series,
         act: d.act,
         validFrom: d.validFrom,

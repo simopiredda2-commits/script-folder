@@ -128,7 +128,8 @@ export const ACTION_LABELS: Record<Action, string> = {
   'ppip.report': 'Leggere e scaricare la distinta mensile delle prestazioni aggiuntive',
   'ppip.write': 'Registrare e annullare le prestazioni aggiuntive (PPIP)',
   'ppip.send': 'Inviare all’ASL la distinta mensile delle prestazioni aggiuntive',
-  'archive.settings': 'Decidere che cosa vede la segreteria dell’archivio',
+  'archive.settings':
+    'Decidere che cosa vede la segreteria dell’archivio e quali sono le medicazioni avanzate',
   'archive.grants': 'Autorizzare un sostituto o un collega di gruppo sull’archivio',
   'archive.transfer': 'Spostare un paziente nell’archivio del medico scelto in AURA',
   'admin.studio': 'Modificare i dati e le impostazioni dello studio',

@@ -3,6 +3,7 @@ import type { AdditionalServicesPortal } from '@mmg/integrations';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { studioSendTimeoutMs } from '../admin/studio-service';
 import { logAccess, logAccessForPatients, type AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import { annulBody } from '../clinical/entries';
@@ -72,6 +73,8 @@ export function registerPpipRoutes(
     reference?: ReferenceData;
     portal: AdditionalServicesPortal;
     environment: 'prova' | 'produzione';
+    /** Tempo massimo di attesa del portale; per difetto quello dello studio (D94, D239). */
+    sendTimeoutMs?: number;
   },
 ): void {
   const { db, now, reference, portal, environment } = deps;
@@ -288,6 +291,7 @@ export function registerPpipRoutes(
       seen: righe,
       today: studioDate(now()),
       at: now(),
+      timeoutMs: deps.sendTimeoutMs ?? (await studioSendTimeoutMs(db, actor.studioId)),
     });
     return result;
   });

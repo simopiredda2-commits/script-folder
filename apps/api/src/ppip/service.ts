@@ -17,8 +17,10 @@ import {
   patient,
   ppipRecord,
   ppipReport,
+  ppipSending,
   studio,
 } from '../db/schema';
+import { secondsText } from '../admin/studio-service';
 import { withActor, type Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
 import type { AdditionalServiceItem, ReferenceData, ReferenceScope } from '../reference/lookup';
@@ -473,8 +475,13 @@ async function insertReport(
     report: AdditionalServicesReport;
     userId: string;
     at: Date;
+    /** La risposta del portale è arrivata dopo l'esito segnato a mano: resta, e lo dice (D239). */
+    late?: boolean;
   },
 ) {
+  const late = v.late
+    ? 'Risposta del portale arrivata dopo l’esito segnato a mano: le prestazioni restano come segnate. Chiedi all’ASL prima di mandarle di nuovo'
+    : null;
   const [rep] = await tx
     .insert(ppipReport)
     .values({
@@ -482,7 +489,10 @@ async function insertReport(
       month: v.month,
       outcome: v.result.outcome,
       protocol: v.result.outcome === 'accepted' ? v.result.protocol || null : null,
-      message: v.result.outcome === 'accepted' ? null : v.result.message,
+      message:
+        v.result.outcome === 'accepted'
+          ? late
+          : [v.result.message, late].filter(Boolean).join('. '),
       environment: v.environment,
       lines: v.report.lines.length,
       total: v.report.total === null ? null : v.report.total.toFixed(2),
@@ -556,13 +566,15 @@ export async function sendMonth(
     environment: 'prova' | 'produzione';
     seen: readonly string[];
     today: string;
+    /** Quanto si aspetta il portale (D239): poi l'esito è incerto, come senza risposta. */
+    timeoutMs: number;
   },
 ) {
-  const { db, portal, environment, actor, archiveId, month, seen, today, at } = params;
+  const { db, portal, environment, actor, archiveId, month, seen, today, at, timeoutMs } = params;
   if (!sendingAvailable(portal, environment))
     throw new HttpError(
       409,
-      'L’invio della distinta all’ASL non è ancora collegato: si completa quando Regione e ASL diranno come (D212)',
+      'L’invio della distinta all’ASL non è ancora collegato: si completa quando Regione e ASL diranno come',
     );
   monthEnded(month, today);
   const { pending, report } = await withActor(db, actor.userId, async (tx) => {
@@ -576,7 +588,17 @@ export async function sendMonth(
           pending.map((r) => r.id),
         ),
       );
-    return { pending, report: await reportOf(tx, archiveId, month, pending) };
+    // La distinta come parte: resta finché l'invio non ha un esito, per quello segnato a mano se
+    // il servizio si ferma o il portale non risponde (D239).
+    const report = await reportOf(tx, archiveId, month, pending);
+    await tx.insert(ppipSending).values({
+      archiveId,
+      month,
+      startedAt: at,
+      startedBy: actor.userId,
+      content: report,
+    });
+    return { pending, report };
   });
   const entry = {
     studioId: actor.studioId,
@@ -586,8 +608,17 @@ export async function sendMonth(
   };
 
   let result: AdditionalServicesResult;
+  let timer: NodeJS.Timeout | undefined;
   try {
-    result = await portal.submit(report);
+    result = await Promise.race([
+      portal.submit(report),
+      new Promise<never>((_, fail) => {
+        timer = setTimeout(
+          () => fail(new Error(`Nessuna risposta entro ${secondsText(timeoutMs)}`)),
+          timeoutMs,
+        );
+      }),
+    ]);
   } catch {
     // Non si sa se la distinta è arrivata: le prestazioni restano «in invio». I dati sono forse
     // partiti, quindi restano nel registro.
@@ -607,9 +638,25 @@ export async function sendMonth(
       502,
       'Il portale non ha risposto in modo chiaro: le prestazioni restano «in invio». Chiedi all’ASL se la distinta è arrivata, poi segna l’esito nella distinta',
     );
+  } finally {
+    clearTimeout(timer);
   }
 
-  return withActor(db, actor.userId, async (tx) => {
+  const done = await withActor(db, actor.userId, async (tx) => {
+    // Se intanto il titolare ha segnato l'esito a mano, quello vale: la risposta arrivata ora resta
+    // fra gli invii, con il suo esito, e non cambia le prestazioni (D233, D239).
+    const sending = await tx
+      .delete(ppipSending)
+      .where(
+        and(
+          eq(ppipSending.archiveId, archiveId),
+          eq(ppipSending.month, month),
+          eq(ppipSending.startedAt, at),
+          eq(ppipSending.startedBy, actor.userId),
+        ),
+      )
+      .returning({ id: ppipSending.id });
+    const late = sending.length === 0;
     const id = await insertReport(tx, {
       archiveId,
       month,
@@ -618,31 +665,37 @@ export async function sendMonth(
       report,
       userId: actor.userId,
       at,
+      late,
     });
-    // Solo le prestazioni ancora in invio da questo invio: se intanto il titolare ha segnato
-    // l'esito a mano, quello vale.
-    await tx
-      .update(ppipRecord)
-      .set({
-        sendingSince: null,
-        sendingBy: null,
-        ...(result.outcome === 'accepted' ? { reportId: id } : {}),
-      })
-      .where(
-        and(
-          inArray(
-            ppipRecord.id,
-            pending.map((r) => r.id),
+    if (!late)
+      await tx
+        .update(ppipRecord)
+        .set({
+          sendingSince: null,
+          sendingBy: null,
+          ...(result.outcome === 'accepted' ? { reportId: id } : {}),
+        })
+        .where(
+          and(
+            inArray(
+              ppipRecord.id,
+              pending.map((r) => r.id),
+            ),
+            eq(ppipRecord.sendingSince, at),
+            eq(ppipRecord.sendingBy, actor.userId),
           ),
-          eq(ppipRecord.sendingSince, at),
-          eq(ppipRecord.sendingBy, actor.userId),
-        ),
-      );
+        );
     await logAccessForPatients(tx, patientsOf(pending), {
       ...entry,
-      outcome: result.outcome === 'accepted' ? 'riuscito' : 'fallito',
-      details: { archivio: archiveId, mese: month, esito: result.outcome, righe: pending.length },
+      outcome: result.outcome === 'accepted' && !late ? 'riuscito' : 'fallito',
+      details: {
+        archivio: archiveId,
+        mese: month,
+        esito: late ? 'risposta_dopo_esito_a_mano' : result.outcome,
+        righe: pending.length,
+      },
     });
+    if (late) return null;
     return {
       id,
       esito: result.outcome,
@@ -652,6 +705,12 @@ export async function sendMonth(
       totale: report.total,
     };
   });
+  if (!done)
+    throw new HttpError(
+      409,
+      'Nel frattempo l’esito di questo invio è stato segnato a mano: la risposta del portale arrivata ora resta fra gli invii della distinta. Ricarica la pagina',
+    );
+  return done;
 }
 
 /**
@@ -716,7 +775,21 @@ export async function settleInterrupted(
         409,
         `L’invio è cominciato da meno di ${INTERRUPTED_AFTER_MINUTES} minuti: potrebbe essere ancora in corso`,
       );
-    const report = await reportOf(tx, archiveId, month, sending);
+    // La distinta come è partita con quell'invio (D239); per un invio cominciato prima della
+    // fotografia, com'è adesso.
+    const [started] = await tx
+      .delete(ppipSending)
+      .where(
+        and(
+          eq(ppipSending.archiveId, archiveId),
+          eq(ppipSending.month, month),
+          eq(ppipSending.startedAt, new Date(since)),
+        ),
+      )
+      .returning({ content: ppipSending.content });
+    const report =
+      (started?.content as AdditionalServicesReport | undefined) ??
+      (await reportOf(tx, archiveId, month, sending));
     const id = await insertReport(tx, {
       archiveId,
       month,

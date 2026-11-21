@@ -1,0 +1,2 @@
+ALTER TABLE "reference_dataset" DROP CONSTRAINT "reference_dataset_series_sha256_unique";--> statement-breakpoint
+ALTER TABLE "reference_dataset" ADD CONSTRAINT "reference_dataset_series_sha256_scopeRegion_scopeAsl_unique" UNIQUE NULLS NOT DISTINCT("series","sha256","scope_region","scope_asl");

@@ -1,4 +1,4 @@
-import { SUPPLY_CATEGORIES, can } from '@mmg/domain';
+import { SUPPLY_CATEGORIES, advancedDressingIssues, can } from '@mmg/domain';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { annulBody, assertNoIssues } from '../clinical/entries';
@@ -14,6 +14,7 @@ import {
   serviceFollowUp,
 } from '../clinical/followup';
 import {
+  advancedCodesOf,
   annulSupply,
   bodyIssues,
   checkIndication,
@@ -129,6 +130,8 @@ export function registerFollowUpRoutes(app: FastifyInstance, db: Database, now: 
           descrizione: i.description,
           gruppo: i.group,
           allegato: i.annex,
+          quantita: i.quantity,
+          intestazioneQuantita: i.quantityHeading,
           atto: i.act,
         }));
     return { presidi: out('presidio'), malattieRare: out('malattia_rara') };
@@ -137,25 +140,41 @@ export function registerFollowUpRoutes(app: FastifyInstance, db: Database, now: 
   app.get('/api/pazienti/:id/presidi', scoped, async (req) => {
     const actor = req.actor!;
     const { id } = params.parse(req.params);
-    const { context } = await guardPatient(db, actor, id, 'therapy.read', 'lettura_presidi');
+    const { patient: p, context } = await guardPatient(
+      db,
+      actor,
+      id,
+      'therapy.read',
+      'lettura_presidi',
+    );
     const at = { ...context, now: now() };
+    // Le voci che il titolare considera medicazioni avanzate (D237).
+    const advanced = await advancedCodesOf(db, p.archiveId);
     return {
       presidi: await listSupplies(
         db,
         id,
         can(actor, 'reserved.read', at).allowed,
         studioDate(now()),
+        advanced,
       ),
       puoScrivere: can(actor, 'therapy.write', at).allowed,
+      medicazioniAvanzate: advanced,
     };
   });
 
   app.post('/api/pazienti/:id/presidi', scoped, async (req, reply) => {
     const actor = req.actor!;
     const { id } = params.parse(req.params);
-    await guardPatient(db, actor, id, 'therapy.write', 'nuovo_presidio');
+    const { patient: p } = await guardPatient(db, actor, id, 'therapy.write', 'nuovo_presidio');
     const body = supplyBody.parse(req.body);
-    assertNoIssues(bodyIssues(body));
+    assertNoIssues([
+      ...bodyIssues(body),
+      ...advancedDressingIssues(
+        { category: body.categoria, code: body.codice },
+        await advancedCodesOf(db, p.archiveId),
+      ),
+    ]);
     await checkIndication(db, id, body.indicazione);
     const supplyId = await withActor(db, actor.userId, (tx) =>
       insertSupply(tx, id, actor.userId, body),
@@ -166,14 +185,28 @@ export function registerFollowUpRoutes(app: FastifyInstance, db: Database, now: 
   app.post('/api/pazienti/:id/presidi/:presidioId/rinnova', scoped, async (req, reply) => {
     const actor = req.actor!;
     const { id } = params.parse(req.params);
-    const { context } = await guardPatient(db, actor, id, 'therapy.write', 'rinnovo_presidio');
+    const { patient: p, context } = await guardPatient(
+      db,
+      actor,
+      id,
+      'therapy.write',
+      'rinnovo_presidio',
+    );
     const { presidioId } = supplyParams.parse(req.params);
     const r = renewBody.parse(req.body ?? {});
     const reservedAllowed = can(actor, 'reserved.read', { ...context, now: now() }).allowed;
     const newId = await withActor(db, actor.userId, async (tx) => {
       const s = await loadSupply(tx, id, presidioId, reservedAllowed);
       const body = renewalOf(s, r);
-      assertNoIssues(bodyIssues(body));
+      // Anche il rinnovo: una voce scelta come medicazione avanzata dopo la prima prescrizione si
+      // prescrive di nuovo in quella categoria (D237).
+      assertNoIssues([
+        ...bodyIssues(body),
+        ...advancedDressingIssues(
+          { category: body.categoria, code: body.codice },
+          await advancedCodesOf(tx, p.archiveId),
+        ),
+      ]);
       return renewSupply(tx, s, actor.userId, body, now());
     });
     return reply.status(201).send({ id: newId });

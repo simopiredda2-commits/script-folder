@@ -115,7 +115,17 @@ describe('certificato rimasto «in invio» (D233)', () => {
       /è rimasto senza risposta: il servizio si è fermato mentre aspettava l’INPS/,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Non è arrivato: torna da inviare' }));
+    // Prima si conferma (WCAG 3.3.4, D239): niente parte finché non si dice sì.
+    screen.getByText(/Confermi che il certificato/);
+    expect(bodies).toEqual([]);
+    await userEvent.click(screen.getByRole('button', { name: 'Sì, confermo' }));
     await vi.waitFor(() => expect(bodies).toEqual([{ esito: 'non_arrivato' }]));
+    // Il messaggio resta nella scheda e prende il fuoco, non la pagina (WCAG 2.4.3).
+    await screen.findByText('Certificato di nuovo da inviare: si può rimandare all’INPS.');
+    const focused = document.activeElement as HTMLElement;
+    expect(focused).not.toBe(document.body);
+    expect(focused.tabIndex).toBe(-1);
+    expect(focused.textContent).toMatch(/Certificato di nuovo da inviare/);
   });
 
   it('dopo: «È arrivato» manda il protocollo scritto, senza spazi', async () => {
@@ -127,6 +137,10 @@ describe('certificato rimasto «in invio» (D233)', () => {
       ' MAN000000001 ',
     );
     await userEvent.click(within(form).getByRole('button', { name: /È arrivato/ }));
+    expect(screen.getByText(/Confermi che il certificato è arrivato/).textContent).toMatch(
+      /MAN000000001/,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Sì, confermo' }));
     await vi.waitFor(() =>
       expect(bodies).toEqual([{ esito: 'arrivato', protocollo: 'MAN000000001' }]),
     );

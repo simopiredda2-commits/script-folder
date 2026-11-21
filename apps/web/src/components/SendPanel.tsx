@@ -20,6 +20,11 @@ type SendOutcome =
 export interface SendPanelProps {
   prescriptionId: string;
   status: string;
+  /**
+   * Il motivo dell'ultimo invio non riuscito: con l'ente che non risponde la ricetta rossa si può
+   * stampare anche riaprendo la pagina, non solo subito dopo l'invio (D239).
+   */
+  lastErrorKind?: string | null;
   /** Nomi delle righe, per le conferme delle note AIFA. */
   lineNames: Record<string, string>;
   /** Nuovo stato della ricetta dopo un'azione, con l'NRE se è stata inviata. */
@@ -32,7 +37,17 @@ export interface SendPanelProps {
  * manda alla firma, a controllo finito: chi firma vede sempre i controlli prima (D230). Se il
  * controllo non riesce si può andare avanti: il servizio controlla di nuovo all'invio.
  */
-export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendPanelProps) {
+/** Un errore senza risposta del servizio (rete, pagina d'errore del proxy), detto a parole (D239). */
+const failure = (e: unknown, message: string) =>
+  e instanceof ApiError ? e : new ApiError(0, message);
+
+export function SendPanel({
+  prescriptionId,
+  status,
+  lastErrorKind,
+  lineNames,
+  onChange,
+}: SendPanelProps) {
   const { isDoctor } = useSession();
   const [check, setCheck] = useState<CheckResult | null>(null);
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
@@ -58,16 +73,13 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
           body: latest.current,
         }),
       );
+      // Il controllo è riuscito: l'errore di prima non vale più (D239).
+      setError(null);
     } catch (e) {
       // Anche senza risposta del servizio (rete, pagina d'errore del proxy) lo si dice: chi firma
       // sa che i controlli non li ha visti (D230, D232).
       setError(
-        e instanceof ApiError
-          ? e
-          : new ApiError(
-              0,
-              'Controllo non riuscito: il servizio non ha risposto. Controlla di nuovo',
-            ),
+        failure(e, 'Controllo non riuscito: il servizio non ha risposto. Controlla di nuovo'),
       );
     } finally {
       setChecking(false);
@@ -78,6 +90,10 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
     if (checkable) void runCheck();
   }, [checkable, runCheck]);
 
+  // L'ente non ha risposto: all'invio appena fatto, o all'ultimo invio della ricetta (D239).
+  const unreachable = outcome
+    ? outcome.esito === 'unreachable'
+    : status === 'error' && lastErrorKind === 'unreachable';
   const aifa = (check?.problemi ?? []).filter((p) => p.needs === 'aifa_confirmation' && p.lineId);
   const warns = [
     ...new Set((check?.problemi ?? []).filter((p) => p.severity === 'warn').map((p) => p.ruleId)),
@@ -104,12 +120,10 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
         });
       }
       setError(
-        e instanceof ApiError
-          ? e
-          : new ApiError(
-              0,
-              'Il servizio non ha risposto: non si sa se la ricetta è partita. Ricarica la pagina per vederne lo stato',
-            ),
+        failure(
+          e,
+          'Il servizio non ha risposto: non si sa se la ricetta è partita. Ricarica la pagina per vederne lo stato',
+        ),
       );
     } finally {
       setBusy(false);
@@ -123,7 +137,12 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
       await api(`/api/ricette/${prescriptionId}/da-firmare`, { method: 'POST', body: {} });
       onChange?.('to_sign');
     } catch (e) {
-      setError(e instanceof ApiError ? e : null);
+      setError(
+        failure(
+          e,
+          'Il servizio non ha risposto: ricarica la pagina per vedere se la ricetta è nella coda del medico',
+        ),
+      );
     } finally {
       setBusy(false);
     }
@@ -138,7 +157,12 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
       setPaper(r.avviso);
       onChange?.('paper');
     } catch (e) {
-      setError(e instanceof ApiError ? e : null);
+      setError(
+        failure(
+          e,
+          'Il servizio non ha risposto: ricarica la pagina per vedere se la ricetta rossa è pronta',
+        ),
+      );
     }
   }
 
@@ -212,7 +236,7 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
           </div>
         ))}
       <ErrorMessage error={error} />
-      {outcome?.esito === 'unreachable' && (
+      {unreachable && (
         <Notice kind="avviso">
           Il servizio regionale non risponde. Si può riprovare l’invio, oppure stampare la ricetta
           rossa.
@@ -266,7 +290,7 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
             </button>
           )
         )}
-        {isDoctor && outcome?.esito === 'unreachable' && (
+        {isDoctor && unreachable && !paper && (
           <button type="button" className="pulsante" onClick={() => void printPaper()}>
             <Icon name="stampa" /> <span>Stampa la ricetta rossa</span>
           </button>

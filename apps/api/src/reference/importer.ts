@@ -16,8 +16,12 @@ import {
   missingFields,
   readSyncState,
   readTable,
+  sameScope,
+  scopeText,
   sha256,
   structureProblems,
+  type DatasetScope,
+  type Transcription,
 } from '@mmg/reference';
 import { and, desc, eq, lt } from 'drizzle-orm';
 import type { Database } from '../db/client';
@@ -38,6 +42,7 @@ export type ImportOutcome =
   | 'trascrizione_non_valida'
   | 'origine_non_trovata'
   | 'base_mancante'
+  | 'ambito_diverso'
   | 'trascrizione_da_controllare';
 
 export interface ImportLine {
@@ -71,6 +76,7 @@ export const NEEDS_ATTENTION: ReadonlySet<ImportOutcome> = new Set([
   'colonne_mancanti',
   'trascrizione_superata',
   'base_mancante',
+  'ambito_diverso',
   'trascrizione_da_controllare',
 ]);
 /** Esiti che sono errori veri e propri. */
@@ -107,12 +113,85 @@ interface DatasetMeta {
   checkedBy: string | null;
 }
 
-async function alreadyImported(db: Database, series: string, hash: string) {
-  const [row] = await db
-    .select({ importedAt: referenceDataset.importedAt })
+/**
+ * La stessa tabella già importata nella serie, con lo stesso ambito. Con un ambito diverso non è un
+ * doppione: è la correzione dell'ambito (D239), che scopeFor ha già controllato.
+ */
+async function alreadyImported(db: Database, meta: DatasetMeta) {
+  const rows = await db
+    .select({
+      importedAt: referenceDataset.importedAt,
+      scopeRegion: referenceDataset.scopeRegion,
+      scopeAsl: referenceDataset.scopeAsl,
+    })
     .from(referenceDataset)
-    .where(and(eq(referenceDataset.series, series), eq(referenceDataset.sha256, hash)));
-  return row;
+    .where(and(eq(referenceDataset.series, meta.series), eq(referenceDataset.sha256, meta.sha256)));
+  const scope = { region: meta.scopeRegion ?? null, asl: meta.scopeAsl ?? null };
+  return rows.find((r) => sameScope({ region: r.scopeRegion, asl: r.scopeAsl }, scope));
+}
+
+/**
+ * Una serie vale in un solo ambito (D239): una versione nuova dice lo stesso ambito delle versioni
+ * di prima, altrimenti per un'altra regione o ASL la serie sparirebbe (vale una versione per serie)
+ * o un atto locale varrebbe ovunque. Un atto che modifica la serie, se non ripete l'ambito, lo
+ * eredita dalla versione su cui è scritto. Lo stesso CSV alla stessa data con un ambito diverso
+ * corregge la versione importata con l'ambito sbagliato: la nuova la sostituisce (vale l'ultima
+ * importata), la vecchia resta nello storico.
+ */
+async function scopeFor(
+  db: Database,
+  series: string,
+  sheet: Transcription,
+  hash: string,
+): Promise<(DatasetScope & { notes: string[] }) | { problem: string }> {
+  const versions = await db
+    .select({
+      validFrom: referenceDataset.validFrom,
+      importedAt: referenceDataset.importedAt,
+      sha256: referenceDataset.sha256,
+      scopeRegion: referenceDataset.scopeRegion,
+      scopeAsl: referenceDataset.scopeAsl,
+    })
+    .from(referenceDataset)
+    .where(eq(referenceDataset.series, series))
+    .orderBy(
+      desc(referenceDataset.validFrom),
+      desc(referenceDataset.importedAt),
+      desc(referenceDataset.id),
+    );
+  const of = (v: (typeof versions)[number]): DatasetScope => ({
+    region: v.scopeRegion,
+    asl: v.scopeAsl,
+  });
+  const notes: string[] = [];
+  let scope: DatasetScope = {
+    region: sheet.ambito?.regione ?? null,
+    asl: sheet.ambito?.asl ?? null,
+  };
+  if (sheet.solo_modifiche && !sheet.ambito) {
+    const base = versions.find((v) => v.validFrom < sheet.in_vigore_dal);
+    if (base) {
+      scope = of(base);
+      if (scope.region || scope.asl)
+        notes.push(`ambito della versione che l’atto modifica: ${scopeText(scope)}`);
+    }
+  }
+  // Già importata con questo ambito: l'importazione lo dirà («già importato»).
+  if (versions.some((v) => v.sha256 === hash && sameScope(of(v), scope)))
+    return { ...scope, notes };
+  const wrong = versions.find((v) => v.sha256 === hash && v.validFrom === sheet.in_vigore_dal);
+  if (wrong) {
+    notes.push(
+      `corregge l’ambito della versione del ${wrong.validFrom} importata il ${wrong.importedAt.toISOString()}: era ${scopeText(of(wrong))}, ora ${scopeText(scope)}`,
+    );
+    return { ...scope, notes };
+  }
+  const latest = versions[0];
+  if (latest && !sameScope(of(latest), scope))
+    return {
+      problem: `la serie ${series} vale in ${scopeText(of(latest))} e la scheda dice ${scopeText(scope)}: una serie vale in un solo ambito. L’atto di un’altra regione o di un’ASL va in una serie sua (campo «serie» della scheda); una versione importata con l’ambito sbagliato si corregge reimportando lo stesso CSV, alla stessa data, con l’ambito giusto`,
+    };
+  return { ...scope, notes };
 }
 
 /** Controlli sui dati, oltre alla forma dei campi. */
@@ -124,7 +203,7 @@ function warningsFor(kind: string, records: DataRecord[]): string[] {
   );
   return clashing.length
     ? [
-        `${clashing.length} comuni hanno un codice catastale che inizia con ${FICTITIOUS_PLACE_LETTER}, la lettera riservata ai luoghi di nascita inventati (D12): da rivedere`,
+        `${clashing.length} comuni hanno un codice catastale che inizia con ${FICTITIOUS_PLACE_LETTER}, la lettera riservata ai luoghi di nascita inventati: da rivedere`,
       ]
     : [];
 }
@@ -188,7 +267,7 @@ async function importRecords(
   fileName: string,
   meta: DatasetMeta,
 ): Promise<ImportLine> {
-  const previous = await alreadyImported(opts.db, meta.series, meta.sha256);
+  const previous = await alreadyImported(opts.db, meta);
   if (previous) {
     return {
       ...line,
@@ -270,7 +349,7 @@ async function importChanges(
   fileName: string,
   meta: DatasetMeta,
 ): Promise<ImportLine> {
-  const previous = await alreadyImported(opts.db, meta.series, meta.sha256);
+  const previous = await alreadyImported(opts.db, meta);
   if (previous) {
     return {
       ...line,
@@ -509,11 +588,18 @@ export async function importReferenceData(opts: ImportOptions): Promise<ImportLi
       );
     }
     const bytes = new Uint8Array(readFileSync(t.csvPath));
+    const series = s.serie ?? mapping.id;
+    const scope = await scopeFor(opts.db, series, s, sha256(bytes));
+    if ('problem' in scope) {
+      report.push({ ...line, outcome: 'ambito_diverso', notes: [...line.notes, scope.problem] });
+      continue;
+    }
+    line.notes.push(...scope.notes);
     const load = s.solo_modifiche ? importChanges : importRecords;
     report.push(
       await load(opts, line, mapping, bytes, t.csvPath, {
         kind: s.tipo,
-        series: s.serie ?? mapping.id,
+        series,
         title: mapping.titolo,
         origin: 'trascrizione',
         source: s.fonte,
@@ -526,8 +612,8 @@ export async function importReferenceData(opts: ImportOptions): Promise<ImportLi
         downloadedAt: null,
         validFrom: s.in_vigore_dal,
         validFromBasis: 'atto',
-        scopeRegion: s.ambito?.regione ?? null,
-        scopeAsl: s.ambito?.asl ?? null,
+        scopeRegion: scope.region,
+        scopeAsl: scope.asl,
         act: s.atto,
         transcribedBy: s.trascritto_da,
         transcribedOn: s.trascritto_il,

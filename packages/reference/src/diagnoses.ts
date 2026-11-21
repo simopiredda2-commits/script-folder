@@ -58,14 +58,32 @@ export interface StructureProblem {
 }
 
 /**
+ * Ogni codice una volta sola: con due righe dello stesso codice ne varrebbe una a caso, quella che
+ * il database legge per prima (D239).
+ */
+function repeatedCodes(records: readonly DataRecord[]): StructureProblem[] {
+  const seen = new Set<string>();
+  const problems: StructureProblem[] = [];
+  records.forEach((r, index) => {
+    const code = String(r.code);
+    if (seen.has(code))
+      problems.push({ index, field: 'code', problem: `${code}: codice ripetuto` });
+    seen.add(code);
+  });
+  return problems;
+}
+
+/**
  * Controlli che guardano l'elenco intero, oltre alla forma di ogni campo: per le diagnosi ogni
  * codice una volta sola, e il padre di ogni sottocodice è il codice senza l'ultima cifra e c'è
- * nell'elenco. Per gli altri tipi nessun controllo.
+ * nell'elenco; per le prestazioni aggiuntive ogni codice una volta sola (D239). Per gli altri tipi
+ * nessun controllo.
  */
 export function structureProblems(
   kind: DatasetKind,
   records: readonly DataRecord[],
 ): StructureProblem[] {
+  if (kind === 'prestazioni_aggiuntive') return repeatedCodes(records);
   if (kind !== 'diagnosi') return [];
   const codes = new Set(records.map((r) => String(r.code)));
   const seen = new Set<string>();

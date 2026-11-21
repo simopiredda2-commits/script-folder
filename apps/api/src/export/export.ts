@@ -78,7 +78,7 @@ export const HANDLED_SEPARATELY: Record<string, string> = {
   pss_file:
     'i PDF del Profilo Sanitario Sintetico: sezione documenti_profilo del JSON, cartella profilo-sanitario/ nello ZIP',
   aura_new_patient:
-    'esportata per archivio: i nuovi assistiti segnalati da AURA (D199), anche quelli non registrati',
+    'esportata per archivio: i nuovi assistiti segnalati da AURA, anche quelli non registrati',
 };
 
 type Row = Record<string, unknown>;
@@ -176,6 +176,11 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     db,
     sql`select * from ppip_report where archive_id = ${archiveId} order by sent_at, id`,
   );
+  // Invii della distinta ancora senza esito, con la distinta come è partita (D239).
+  tables.ppip_sending = await rows(
+    db,
+    sql`select * from ppip_sending where archive_id = ${archiveId} order by started_at, id`,
+  );
   // Segreteria confermata o tolta dal titolare per questo archivio (D181): tutte le decisioni.
   tables.archive_secretary = await rows(
     db,
@@ -269,7 +274,17 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
       indirizzo: a.studio.address,
       tipo: a.studio.kind,
     },
-    archivio: { id: a.archive.id, nome: a.archive.name },
+    archivio: {
+      id: a.archive.id,
+      nome: a.archive.name,
+      // Le scelte del titolare sul suo archivio: che cosa vede la segreteria (D30) e quali voci
+      // del nomenclatore sono medicazioni avanzate (D238).
+      impostazioni: {
+        segreteria_legge_diario: a.archive.secretaryCanReadDiary,
+        segreteria_legge_riepilogo: a.archive.secretaryCanReadSummary,
+        medicazioni_avanzate: a.archive.advancedDressingCodes,
+      },
+    },
     medico: {
       id: a.owner.id,
       nome: a.owner.displayName,

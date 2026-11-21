@@ -160,6 +160,11 @@ export const archive = pgTable('archive', {
    */
   secretaryCanReadDiary: boolean().notNull().default(false),
   secretaryCanReadSummary: boolean().notNull().default(false),
+  /**
+   * Le voci del nomenclatore dei presidi (allegato 2, gruppo 04.49) che il titolare considera
+   * medicazioni avanzate: per quelle vale la regola dello specialista (D123, D237).
+   */
+  advancedDressingCodes: text().array().notNull().default([]),
 });
 
 export const grantKind = pgEnum('grant_kind', ['substitution', 'group_colleague']);

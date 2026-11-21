@@ -58,6 +58,29 @@ export const ppipReport = pgTable(
 );
 
 /**
+ * Distinta in invio (D239): il contenuto mandato al portale, com'era alla partenza. Se il portale
+ * non risponde, l'esito segnato a mano registra questo, non la distinta rifatta con i dati di
+ * dopo. Si toglie con l'esito.
+ */
+export const ppipSending = pgTable(
+  'ppip_sending',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    archiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
+    /** Mese delle prestazioni, AAAA-MM. */
+    month: text().notNull(),
+    startedAt: timestamp({ withTimezone: true }).notNull(),
+    startedBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    content: jsonb().notNull(),
+  },
+  (t) => [index().on(t.archiveId, t.month)],
+);
+
+/**
  * Prestazione aggiuntiva eseguita (requisiti, «Certificati e moduli»: «PPIP: registrazione delle
  * prestazioni di particolare impegno professionale e riepilogo mensile»; D212). Voce, sezione e
  * compenso vengono dal catalogo in vigore il giorno dell'esecuzione e restano come erano anche

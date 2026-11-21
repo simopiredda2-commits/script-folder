@@ -6,8 +6,11 @@ import type {
 import { and, eq, sql } from 'drizzle-orm';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { accessLog, patient, ppipRecord, ppipReport } from '../src/db/schema';
+import type { Actor } from '../src/auth/service';
+import { accessLog, patient, ppipRecord, ppipReport, ppipSending } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
+import { buildExport } from '../src/export/export';
+import { sendMonth } from '../src/ppip/service';
 import { importPpipCatalog } from './helpers/ppip';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -116,7 +119,8 @@ describe('distinta delle prestazioni aggiuntive senza gare (D232)', () => {
     s = await createScenario(
       t.db,
       { idleLockMinutes: null },
-      { clockAt: new Date('2026-11-20T11:00:00Z'), ppipPortal: portal },
+      // Un minuto di attesa del portale, in tempo vero: le risposte tenute ferme non scadono prima.
+      { clockAt: new Date('2026-11-20T11:00:00Z'), ppipPortal: portal, sendTimeoutMs: 60_000 },
     );
     for (const who of Object.keys(cookies) as Who[]) cookies[who] = await login(s, who);
     const imported = await importPpipCatalog(t.db);
@@ -323,6 +327,143 @@ describe('distinta delle prestazioni aggiuntive senza gare (D232)', () => {
     expect((await send('titolare', '2026-08')).json().errore).toBe(
       'Nessuna prestazione da inviare per il mese',
     );
+  });
+
+  it('l’esito a mano registra la distinta come è partita, non com’è adesso (D239)', async () => {
+    const pt = mine[0]!;
+    await register('titolare', pt.id, '2026-01-20');
+    portal.mode = 'throw';
+    expect((await send('titolare', '2026-01')).statusCode).toBe(502);
+    portal.mode = 'accept';
+    // La distinta partita resta con l'invio, finché non ha un esito.
+    const [started] = await t.db
+      .select()
+      .from(ppipSending)
+      .where(
+        and(eq(ppipSending.archiveId, archiveOf('titolare')), eq(ppipSending.month, '2026-01')),
+      );
+    const sentContent = started!.content as AdditionalServicesReport;
+    expect(sentContent.lines).toHaveLength(1);
+    // È un dato del medico: nell'esportazione completa, finché non ha un esito (regola 4).
+    const exported = (await buildExport(t.db, archiveOf('titolare'), s.clock.now())) as unknown as {
+      tabelle: Record<string, { id: string }[]>;
+    };
+    expect(exported.tabelle.ppip_sending!.map((r) => r.id)).toEqual([started!.id]);
+    // Intanto la segreteria corregge l'indirizzo del paziente.
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .update(patient)
+        .set({ residenceStreet: 'Via Cambiata di prova' })
+        .where(eq(patient.id, pt.id)),
+    );
+    try {
+      s.clock.advance(15 * 60_000);
+      const res = await req(
+        'titolare',
+        'POST',
+        `/api/archivi/${archiveOf('titolare')}/ppip/esito`,
+        {
+          mese: '2026-01',
+          esito: 'arrivata',
+          riferimento: 'Ricevuta ASL 01',
+        },
+      );
+      expect(res.statusCode, res.body).toBe(200);
+      const [report] = (await reportsOfMonth('2026-01')).filter((r) => r.environment === 'manuale');
+      expect(report!.content).toEqual(sentContent);
+      expect(JSON.stringify(report!.content)).not.toContain('Via Cambiata di prova');
+      // Con l'esito la distinta in corso non c'è più.
+      expect(await t.db.select().from(ppipSending).where(eq(ppipSending.month, '2026-01'))).toEqual(
+        [],
+      );
+    } finally {
+      await withActor(t.db, s.users.titolare.id, (tx) =>
+        tx
+          .update(patient)
+          .set({ residenceStreet: pt.residenceStreet })
+          .where(eq(patient.id, pt.id)),
+      );
+    }
+  });
+
+  it('la risposta del portale dopo l’esito segnato a mano non cambia la distinta: 409, e resta fra gli invii (D239)', async () => {
+    await register('titolare', mine[1]!.id, '2026-02-05');
+    portal.hold();
+    const before = portal.calls.length;
+    const sending = send('titolare', '2026-02');
+    await waitFor(() => portal.calls.length > before);
+    s.clock.advance(16 * 60_000);
+    const settled = await req(
+      'titolare',
+      'POST',
+      `/api/archivi/${archiveOf('titolare')}/ppip/esito`,
+      {
+        mese: '2026-02',
+        esito: 'non_arrivata',
+      },
+    );
+    expect(settled.statusCode, settled.body).toBe(200);
+    portal.release();
+    const late = await sending;
+    expect(late.statusCode, late.body).toBe(409);
+    expect(late.json().errore).toMatch(/l’esito di questo invio è stato segnato a mano/);
+    const d = (await distinta('titolare', '2026-02')).json();
+    expect(d).toMatchObject({ inInvio: null, daInviare: 1 });
+    // Fra gli invii: l'esito a mano e, con l'ora in cui era partito, la risposta arrivata dopo,
+    // che lo dice.
+    const invii = d.invii as { esito: string; ambiente: string; messaggio: string | null }[];
+    expect(invii.map((i) => [i.esito, i.ambiente])).toEqual([
+      ['unreachable', 'manuale'],
+      ['accepted', 'simulator'],
+    ]);
+    expect(invii[1]!.messaggio).toMatch(/dopo l’esito segnato a mano/);
+    const logged = await t.db
+      .select()
+      .from(accessLog)
+      .where(
+        and(eq(accessLog.action, 'invio_distinta_ppip'), eq(accessLog.patientId, mine[1]!.id)),
+      );
+    expect(logged.map((l) => [l.outcome, (l.details as { esito: string }).esito])).toContainEqual([
+      'fallito',
+      'risposta_dopo_esito_a_mano',
+    ]);
+  });
+
+  it('il portale che non risponde entro il tempo massimo: le prestazioni restano «in invio» (D239)', async () => {
+    const actor = {
+      userId: s.users.titolare.id,
+      studioId: s.studioId,
+      roles: s.users.titolare.roles,
+      workstation: null,
+    } as unknown as Actor;
+    portal.hold();
+    try {
+      await expect(
+        sendMonth({
+          db: t.db,
+          portal,
+          environment: 'prova',
+          actor,
+          archiveId: archiveOf('titolare'),
+          month: '2026-02',
+          seen: await seen('2026-02'),
+          today: '2026-11-20',
+          at: s.clock.now(),
+          timeoutMs: 50,
+        }),
+      ).rejects.toThrow(/restano «in invio»/);
+    } finally {
+      portal.release();
+    }
+    await new Promise((r) => setTimeout(r, 50));
+    // La risposta arrivata dopo il tempo massimo non cambia niente: l'esito lo segna il titolare.
+    expect((await distinta('titolare', '2026-02')).json().inInvio).toMatchObject({ righe: 1 });
+    s.clock.advance(16 * 60_000);
+    const res = await req('titolare', 'POST', `/api/archivi/${archiveOf('titolare')}/ppip/esito`, {
+      mese: '2026-02',
+      esito: 'non_arrivata',
+    });
+    expect(res.statusCode, res.body).toBe(200);
   });
 
   it('consegna fuori dal programma: le prestazioni risultano partite e non si annullano più', async () => {

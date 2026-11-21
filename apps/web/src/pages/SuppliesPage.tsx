@@ -25,6 +25,9 @@ interface CatalogItem {
   gruppo: string;
   allegato: string;
   atto: string | null;
+  /** La quantità stampata nell'allegato e l'intestazione della sua colonna, se ci sono (D237). */
+  quantita?: string | null;
+  intestazioneQuantita?: string | null;
 }
 
 interface Catalog {
@@ -52,6 +55,15 @@ interface Supply {
   stato: 'in_corso' | 'scaduta' | 'conclusa' | 'annullata';
   motivoAnnullamento: string | null;
   registrataDa: string;
+  /**
+   * Che cosa chiede il rinnovo (D239): la categoria «Medicazioni avanzate» per una voce che il
+   * titolare ha scelto dopo, la prima prescrizione dello specialista se manca, i mesi massimi.
+   */
+  rinnovo?: {
+    categoria: 'medicazione_avanzata' | null;
+    chiedeSpecialista: boolean;
+    mesiMassimi: number | null;
+  };
 }
 
 const STATE: Record<Supply['stato'], string> = {
@@ -73,9 +85,12 @@ export function SuppliesPage() {
   const { id } = useParams<{ id: string }>();
   const { isDoctor } = useSession();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
-  const supplies = useApi<{ presidi: Supply[]; puoScrivere: boolean }>(
-    `/api/pazienti/${id}/presidi`,
-  );
+  const supplies = useApi<{
+    presidi: Supply[];
+    puoScrivere: boolean;
+    /** Le voci dell'allegato 2 che il titolare considera medicazioni avanzate (D237). */
+    medicazioniAvanzate?: string[];
+  }>(`/api/pazienti/${id}/presidi`);
   const categories = useApi<{ categorie: Category[] }>('/api/presidi/categorie');
   const catalog = useApi<Catalog>('/api/presidi/nomenclatore');
   const problems = useApi<EntryList>(
@@ -110,6 +125,7 @@ export function SuppliesPage() {
           patientId={id!}
           categories={categories.data.categorie}
           catalog={catalog.data ?? { presidi: [], malattieRare: [] }}
+          advancedCodes={supplies.data?.medicazioniAvanzate ?? []}
           problems={(problems.data?.voci ?? []).map((v) => ({
             id: v.id,
             nome: String(v.dettaglio?.descrizione ?? ''),
@@ -159,12 +175,27 @@ function SupplyItem({
   const [error, setError] = useState<ApiError | null>(null);
   const base = `/api/pazienti/${patientId}/presidi/${s.id}`;
   const closed = s.stato === 'annullata' || s.stato === 'conclusa';
+  // Il rinnovo che chiede qualcosa (D239) si conferma in un modulo; gli altri con un clic.
+  const needs = s.rinnovo;
+  const maxMonths = needs?.mesiMassimi ?? null;
+  const asks =
+    !!needs &&
+    (needs.categoria !== null ||
+      needs.chiedeSpecialista ||
+      (maxMonths !== null && s.mesi > maxMonths));
+  const [renewing, setRenewing] = useState(false);
+  const [renewal, setRenewal] = useState({
+    specialista: s.primoSpecialista ?? '',
+    il: s.primoSpecialistaIl ?? '',
+    mesi: String(maxMonths !== null ? Math.min(s.mesi, maxMonths) : s.mesi),
+  });
 
   async function run(fn: () => Promise<unknown>, message: string) {
     setError(null);
     try {
       await fn();
       setAnnulling(false);
+      setRenewing(false);
       onChanged(message);
     } catch (err) {
       setError(failure(err));
@@ -203,8 +234,11 @@ function SupplyItem({
           <button
             type="button"
             className="pulsante pulsante-piatto"
+            aria-expanded={asks ? renewing : undefined}
             onClick={() =>
-              void run(() => api(`${base}/rinnova`, { method: 'POST', body: {} }), 'Rinnovata.')
+              asks
+                ? setRenewing((v) => !v)
+                : void run(() => api(`${base}/rinnova`, { method: 'POST', body: {} }), 'Rinnovata.')
             }
           >
             <Icon name="ripeti" /> <span>Rinnova</span>
@@ -220,6 +254,76 @@ function SupplyItem({
             <span className="visivamente-nascosto"> {s.prodotto}</span>
           </button>
         </div>
+      )}
+      {renewing && needs && (
+        <form
+          className="modulo-in-riga"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void run(
+              () =>
+                api(`${base}/rinnova`, {
+                  method: 'POST',
+                  body: {
+                    ...(needs.categoria ? { categoria: needs.categoria } : {}),
+                    ...(needs.chiedeSpecialista
+                      ? { primoSpecialista: renewal.specialista, primoSpecialistaIl: renewal.il }
+                      : {}),
+                    mesi: Number(renewal.mesi),
+                  },
+                }),
+              needs.categoria ? 'Rinnovata fra le medicazioni avanzate.' : 'Rinnovata.',
+            );
+          }}
+        >
+          <p className="aiuto" id={`rinnovo-aiuto-${s.id}`}>
+            {needs.categoria
+              ? 'La voce è fra le medicazioni avanzate scelte dal titolare: il rinnovo passa nella categoria «Medicazioni avanzate», dove la prima prescrizione è dello specialista e il medico di famiglia prescrive per al massimo 6 mesi.'
+              : 'Fra le medicazioni avanzate la prima prescrizione è dello specialista e il medico di famiglia prescrive per al massimo 6 mesi.'}
+          </p>
+          {needs.chiedeSpecialista && (
+            <>
+              <div className="campo">
+                <label htmlFor={`rinnovo-specialista-${s.id}`}>
+                  Rinnovo: specialista della prima prescrizione
+                </label>
+                <input
+                  id={`rinnovo-specialista-${s.id}`}
+                  required
+                  maxLength={200}
+                  value={renewal.specialista}
+                  aria-describedby={`rinnovo-aiuto-${s.id}`}
+                  onChange={(e) => setRenewal((r) => ({ ...r, specialista: e.target.value }))}
+                />
+              </div>
+              <div className="campo">
+                <label htmlFor={`rinnovo-il-${s.id}`}>Rinnovo: data della prima prescrizione</label>
+                <input
+                  id={`rinnovo-il-${s.id}`}
+                  type="date"
+                  required
+                  max={studioToday()}
+                  value={renewal.il}
+                  onChange={(e) => setRenewal((r) => ({ ...r, il: e.target.value }))}
+                />
+              </div>
+            </>
+          )}
+          <div className="campo">
+            <label htmlFor={`rinnovo-mesi-${s.id}`}>Rinnovo: mesi</label>
+            <input
+              id={`rinnovo-mesi-${s.id}`}
+              required
+              inputMode="numeric"
+              pattern={maxMonths !== null ? `[1-${maxMonths}]` : '[0-9]{1,2}'}
+              value={renewal.mesi}
+              onChange={(e) => setRenewal((r) => ({ ...r, mesi: e.target.value }))}
+            />
+          </div>
+          <button type="submit" className="pulsante pulsante-primario">
+            <Icon name="ripeti" /> <span>Conferma il rinnovo</span>
+          </button>
+        </form>
       )}
       {annulling && (
         <form
@@ -256,12 +360,14 @@ function SupplyForm({
   patientId,
   categories,
   catalog,
+  advancedCodes,
   problems,
   onSaved,
 }: {
   patientId: string;
   categories: Category[];
   catalog: Catalog;
+  advancedCodes: string[];
   problems: { id: string; nome: string }[];
   onSaved: () => void;
 }) {
@@ -292,12 +398,21 @@ function SupplyForm({
     setF((x) => ({ ...x, [k]: e.target.value }));
   const category = categories.find((c) => c.chiave === f.categoria);
   const advanced = f.categoria === 'medicazione_avanzata';
-  // Il nomenclatore dell'allegato della categoria, se trascritto e controllato (D218).
-  const annex = category?.allegato ?? null;
-  const items = annex ? catalog.presidi.filter((i) => i.allegato === annex) : [];
+  // Il nomenclatore dell'allegato della categoria, se trascritto e controllato (D218). Le voci
+  // dell'allegato 2 che il titolare considera medicazioni avanzate stanno solo in quella categoria,
+  // dove vale la regola dello specialista (D237).
+  const advancedSet = new Set(advancedCodes);
+  const isAdvanced = (i: CatalogItem) => i.allegato === '2' && advancedSet.has(i.codice);
+  const annex = advanced ? '2' : (category?.allegato ?? null);
+  const items = annex
+    ? catalog.presidi.filter(
+        (i) => i.allegato === annex && (advanced ? isAdvanced(i) : !isAdvanced(i)),
+      )
+    : [];
   const groups = [...new Set(items.map((i) => i.gruppo))];
   const rare = annex ? catalog.malattieRare.filter((i) => i.allegato === annex) : [];
   const chosen = items.findIndex((i) => i.descrizione === f.prodotto && i.codice === f.codice);
+  const chosenItem = chosen >= 0 ? items[chosen] : undefined;
   // La voce vuota è «scrivi a mano»: prodotto e codice si svuotano, e non diventano quelli della
   // prima voce (Number('') è 0). Un codice rimasto da un'altra voce sarebbe sbagliato (D232).
   const pick = (index: string) => {
@@ -370,7 +485,15 @@ function SupplyForm({
             id="presidio-categoria"
             value={f.categoria}
             aria-describedby="presidio-fonte"
-            onChange={set('categoria')}
+            onChange={(e) => {
+              const categoria = e.target.value;
+              // Una voce scelta dal nomenclatore vale per la sua categoria: cambiando categoria
+              // prodotto e codice si svuotano, come con «scrivi a mano» (D239). Quelli scritti a
+              // mano restano.
+              setF((x) =>
+                chosen >= 0 ? { ...x, categoria, prodotto: '', codice: '' } : { ...x, categoria },
+              );
+            }}
           >
             {categories.map((c) => (
               <option key={c.chiave} value={c.chiave}>
@@ -388,7 +511,11 @@ function SupplyForm({
             <select
               id="presidio-nomenclatore"
               value={chosen >= 0 ? String(chosen) : ''}
-              aria-describedby="presidio-nomenclatore-aiuto"
+              aria-describedby={
+                chosenItem?.quantita
+                  ? 'presidio-nomenclatore-aiuto presidio-nomenclatore-quantita'
+                  : 'presidio-nomenclatore-aiuto'
+              }
               onChange={(e) => pick(e.target.value)}
             >
               <option value="">Scrivi il prodotto o scegli dal nomenclatore</option>
@@ -407,6 +534,14 @@ function SupplyForm({
             <p className="aiuto" id="presidio-nomenclatore-aiuto">
               Riempie prodotto e codice. Fonte: {items[0]!.atto ?? `allegato ${annex}`}.
             </p>
+            {chosenItem?.quantita && (
+              // La quantità come la stampa l'allegato, senza controlli sul fabbisogno (D237).
+              <p className="aiuto" id="presidio-nomenclatore-quantita">
+                Quantità nel nomenclatore: <strong>{chosenItem.quantita}</strong>
+                {chosenItem.intestazioneQuantita ? ` («${chosenItem.intestazioneQuantita}»)` : ''}.
+                Il fabbisogno lo decide il medico.
+              </p>
+            )}
             {rare.length > 0 && (
               <details className="malattie-rare">
                 <summary>Malattie rare che danno diritto a questi presidi (art. 13)</summary>

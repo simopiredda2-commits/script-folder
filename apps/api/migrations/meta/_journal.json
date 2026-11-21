@@ -309,6 +309,27 @@
       "when": 1795217482618,
       "tag": "0043_ambito_delle_banche_dati",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1795254940696,
+      "tag": "0044_quantita_e_medicazioni_avanzate",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1795259755571,
+      "tag": "0045_invii_fotografati",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1795262256594,
+      "tag": "0046_versioni_per_ambito",
+      "breakpoints": true
     }
   ]
 }

@@ -88,7 +88,11 @@ describe('ruoli e permessi attraverso il servizio', () => {
       segreteriaLeggeRiepilogo: true,
       segreteriaLeggeDiario: true,
     });
-    expect(on.json()).toEqual({ segreteriaLeggeDiario: true, segreteriaLeggeRiepilogo: true });
+    expect(on.json()).toEqual({
+      segreteriaLeggeDiario: true,
+      segreteriaLeggeRiepilogo: true,
+      medicazioniAvanzate: [],
+    });
 
     // Un'allergia riservata: la vede il medico, non la segreteria.
     const [e] = await s.db
@@ -117,7 +121,11 @@ describe('ruoli e permessi attraverso il servizio', () => {
       segreteriaLeggeRiepilogo: false,
       segreteriaLeggeDiario: false,
     });
-    expect(off.json()).toEqual({ segreteriaLeggeDiario: false, segreteriaLeggeRiepilogo: false });
+    expect(off.json()).toEqual({
+      segreteriaLeggeDiario: false,
+      segreteriaLeggeRiepilogo: false,
+      medicazioniAvanzate: [],
+    });
     expect((await get('segreteria', `/api/pazienti/${s.richPatient}`)).json().riepilogo).toBeNull();
     expect((await get('titolare', url)).json().segreteriaLeggeRiepilogo).toBe(false);
   });

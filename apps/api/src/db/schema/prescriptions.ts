@@ -102,6 +102,12 @@ export const prescription = pgTable(
     pinNrbe: text(),
     /** Su richiesta del paziente: cognome, nome e indirizzo oscurati (oscuramDati). */
     obscured: boolean().notNull().default(false),
+    /**
+     * Invio in corso (D239): il messaggio mandato all'ente e i dati del paziente per il promemoria,
+     * com'erano alla firma. Se il servizio si ferma prima della risposta, l'esito segnato a mano
+     * registra la richiesta partita davvero. Si toglie con l'esito.
+     */
+    sendingSnapshot: jsonb(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.archiveId, t.status), index().on(t.patientId)],

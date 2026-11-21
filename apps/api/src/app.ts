@@ -404,6 +404,7 @@ export function buildApp({
     reference,
     portal: ppipPortal,
     environment: config.environment ?? 'prova',
+    sendTimeoutMs,
   });
   registerStudioListRoutes(app, adminDeps);
   // Pannello amministrativo del paziente e importazione da altri programmi (tappa 15).

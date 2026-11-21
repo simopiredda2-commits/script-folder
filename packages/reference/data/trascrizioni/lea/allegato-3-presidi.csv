@@ -1,31 +1,31 @@
-tipo;codice;descrizione;gruppo;allegato;pagina_gu
-malattia_rara;RCG060;DIFETTI CONGENITI DEL METABOLISMO E DEL TRASPORTO DEI CARBOIDRATI (Escluso: Diabete Mellito) (es. Deficit di Glut1);Malattie rare;3;52
-malattia_rara;RCG074;DIFETTI CONGENITI DELLA OSSIDAZIONE MITOCONDRIALE DEGLI ACIDI GRASSI (ESCLUSO: SINDROME DI ZELLWEGER codice RN1760) (es. Deficit di 3 Idrossiacil Coa Deidrogenasi a catena;Malattie rare;3;52
-malattia_rara;RN1080;RUSSELL-SILVER, SINDROME DI;Malattie rare;3;52
-malattia_rara;RN0710;SINDROME MELAS;Malattie rare;3;52
-malattia_rara;RCG162;SINDROMI DA NEOPLASIE ENDOCRINE MULTIPLE (es MEN2);Malattie rare;3;52
-malattia_rara;RN0730;SHORT SINDROME;Malattie rare;3;52
-malattia_rara;RN1380;BARDET-BIEDL, SINDROME DI;Malattie rare;3;52
-malattia_rara;RN1290;WOLFRAM, SINDROME DI;Malattie rare;3;52
-malattia_rara;RN1370;ALSTRÖM, SINDROME DI;Malattie rare;3;52
-malattia_rara;RCG061;IPERINSULINISMI CONGENITI;Malattie rare;3;52
-malattia_rara;RNG092;NANISMO OSTEODISPLASTICO MICROCEFALICO PRIMITIVO (MOPD);Malattie rare;3;52
-malattia_rara;RCG040;DIFETTI CONGENITI DEL METABOLISMO E DEL TRASPORTO DEGLI AMINOACIDI (es. Fenilchetonuria, Leucinosi);Malattie rare;3;52
-presidio;W0101060201;Strisce reattive per determinazione glicosuria;Strisce reattive per la determinazione del glucosio e dei corpi chetonici nelle urine;3;53
-presidio;W0101060201;Strisce reattive per determinazione corpi chetonici;Strisce reattive per la determinazione del glucosio e dei corpi chetonici nelle urine;3;53
-presidio;W0101060202;Strisce reattive per determinazione glicosuria + corpi chetonici;Strisce reattive per la determinazione del glucosio e dei corpi chetonici nelle urine;3;53
-presidio;W0101060101;Strisce reattive per determinazione glicemia;Strisce reattive per la determinazione della glicemia nel sangue;3;53
-presidio;W0101060199;Strisce reattive per determinazione chetonemia;Strisce reattive per la determinazione della chetonemia;3;53
-presidio;W0101060201;Compresse reattive per determinazione glicosuria;Compresse reattive;3;53
-presidio;W0101060201;Compresse reattive per determinazione corpi chetonici;Compresse reattive;3;53
-presidio;V0104;Lancette pungidito;Lancette pungidito;3;53
-presidio;V0104;Minilancette pungidito;Lancette pungidito;3;53
-presidio;V9009;Penna pungidito;Penna pungidito;3;53
-presidio;A02010204;Siringa insulina monouso senza spazio morto 100 U.I.;Siringhe;3;53
-presidio;A02010204;Siringa insulina monouso senza spazio morto con ago 30 G 100 U.I.;Siringhe;3;53
-presidio;A010102;Ago a farfalla per microinfusori;Aghi;3;53
-presidio;A01010102;Ago per penna da insulina;Aghi;3;53
-presidio;W0201060102 / Z12040115;Apparecchio per la misurazione della glicemia;Apparecchi per la misurazione della glicemia;3;53
-presidio;W020106019099;Apparecchio per la misurazione della chetonemia;Apparecchi per la misurazione della glicemia;3;53
-presidio;Z1204021601;Microinfusori;Microinfusori per la somministrazione programmata dell’insulina;3;53
-presidio;A030401;Set per la somministrazione dell’insulina con il microinfusore;Microinfusori per la somministrazione programmata dell’insulina;3;53
+tipo;codice;descrizione;gruppo;allegato;quantita;intestazione_quantita;pagina_gu
+malattia_rara;RCG060;DIFETTI CONGENITI DEL METABOLISMO E DEL TRASPORTO DEI CARBOIDRATI (Escluso: Diabete Mellito) (es. Deficit di Glut1);Malattie rare;3;;;52
+malattia_rara;RCG074;DIFETTI CONGENITI DELLA OSSIDAZIONE MITOCONDRIALE DEGLI ACIDI GRASSI (ESCLUSO: SINDROME DI ZELLWEGER codice RN1760) (es. Deficit di 3 Idrossiacil Coa Deidrogenasi a catena;Malattie rare;3;;;52
+malattia_rara;RN1080;RUSSELL-SILVER, SINDROME DI;Malattie rare;3;;;52
+malattia_rara;RN0710;SINDROME MELAS;Malattie rare;3;;;52
+malattia_rara;RCG162;SINDROMI DA NEOPLASIE ENDOCRINE MULTIPLE (es MEN2);Malattie rare;3;;;52
+malattia_rara;RN0730;SHORT SINDROME;Malattie rare;3;;;52
+malattia_rara;RN1380;BARDET-BIEDL, SINDROME DI;Malattie rare;3;;;52
+malattia_rara;RN1290;WOLFRAM, SINDROME DI;Malattie rare;3;;;52
+malattia_rara;RN1370;ALSTRÖM, SINDROME DI;Malattie rare;3;;;52
+malattia_rara;RCG061;IPERINSULINISMI CONGENITI;Malattie rare;3;;;52
+malattia_rara;RNG092;NANISMO OSTEODISPLASTICO MICROCEFALICO PRIMITIVO (MOPD);Malattie rare;3;;;52
+malattia_rara;RCG040;DIFETTI CONGENITI DEL METABOLISMO E DEL TRASPORTO DEGLI AMINOACIDI (es. Fenilchetonuria, Leucinosi);Malattie rare;3;;;52
+presidio;W0101060201;Strisce reattive per determinazione glicosuria;Strisce reattive per la determinazione del glucosio e dei corpi chetonici nelle urine;3;;;53
+presidio;W0101060201;Strisce reattive per determinazione corpi chetonici;Strisce reattive per la determinazione del glucosio e dei corpi chetonici nelle urine;3;;;53
+presidio;W0101060202;Strisce reattive per determinazione glicosuria + corpi chetonici;Strisce reattive per la determinazione del glucosio e dei corpi chetonici nelle urine;3;;;53
+presidio;W0101060101;Strisce reattive per determinazione glicemia;Strisce reattive per la determinazione della glicemia nel sangue;3;;;53
+presidio;W0101060199;Strisce reattive per determinazione chetonemia;Strisce reattive per la determinazione della chetonemia;3;;;53
+presidio;W0101060201;Compresse reattive per determinazione glicosuria;Compresse reattive;3;;;53
+presidio;W0101060201;Compresse reattive per determinazione corpi chetonici;Compresse reattive;3;;;53
+presidio;V0104;Lancette pungidito;Lancette pungidito;3;;;53
+presidio;V0104;Minilancette pungidito;Lancette pungidito;3;;;53
+presidio;V9009;Penna pungidito;Penna pungidito;3;;;53
+presidio;A02010204;Siringa insulina monouso senza spazio morto 100 U.I.;Siringhe;3;;;53
+presidio;A02010204;Siringa insulina monouso senza spazio morto con ago 30 G 100 U.I.;Siringhe;3;;;53
+presidio;A010102;Ago a farfalla per microinfusori;Aghi;3;;;53
+presidio;A01010102;Ago per penna da insulina;Aghi;3;;;53
+presidio;W0201060102 / Z12040115;Apparecchio per la misurazione della glicemia;Apparecchi per la misurazione della glicemia;3;;;53
+presidio;W020106019099;Apparecchio per la misurazione della chetonemia;Apparecchi per la misurazione della glicemia;3;;;53
+presidio;Z1204021601;Microinfusori;Microinfusori per la somministrazione programmata dell’insulina;3;;;53
+presidio;A030401;Set per la somministrazione dell’insulina con il microinfusore;Microinfusori per la somministrazione programmata dell’insulina;3;;;53

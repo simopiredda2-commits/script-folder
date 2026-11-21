@@ -254,6 +254,38 @@ async function equivalenceGroups(
  * della ricevuta. Le righe della specialistica usano i codici proprio come sono partiti (`sent`):
  * il codice del nomenclatore può venire dal catalogo regionale al momento dell'invio (D154).
  */
+/** I dati del paziente che vanno sul promemoria: fotografati alla firma per l'esito a mano (D239). */
+export type PromemoriaPatient = Pick<
+  typeof patient.$inferSelect,
+  | 'fiscalCode'
+  | 'lastName'
+  | 'firstName'
+  | 'residenceStreet'
+  | 'residenceNumber'
+  | 'residencePostalCode'
+  | 'residenceTown'
+  | 'residenceProvince'
+  | 'asl'
+  | 'foreignHealthCard'
+  | 'foreignInstitution'
+>;
+
+export function promemoriaPatientOf(pt: typeof patient.$inferSelect): PromemoriaPatient {
+  return {
+    fiscalCode: pt.fiscalCode,
+    lastName: pt.lastName,
+    firstName: pt.firstName,
+    residenceStreet: pt.residenceStreet,
+    residenceNumber: pt.residenceNumber,
+    residencePostalCode: pt.residencePostalCode,
+    residenceTown: pt.residenceTown,
+    residenceProvince: pt.residenceProvince,
+    asl: pt.asl,
+    foreignHealthCard: pt.foreignHealthCard,
+    foreignInstitution: pt.foreignInstitution,
+  };
+}
+
 export async function buildPromemoriaData(
   db: Database,
   prescriptionId: string,
@@ -265,6 +297,8 @@ export async function buildPromemoriaData(
     messages?: readonly ReceiptMessage[] | null;
   },
   sent?: readonly PrescriptionLineMessage[],
+  /** Il paziente com'era alla firma, per l'esito segnato a mano (D239); altrimenti com'è ora. */
+  patientAt?: PromemoriaPatient | null,
 ): Promise<PromemoriaDataV2> {
   const [row] = await db
     .select({ p: prescription, pt: patient, st: studio })
@@ -273,7 +307,8 @@ export async function buildPromemoriaData(
     .innerJoin(studio, eq(studio.id, patient.studioId))
     .where(eq(prescription.id, prescriptionId));
   if (!row) throw new HttpError(404, 'Ricetta non trovata');
-  const { p, pt, st } = row;
+  const { p, st } = row;
+  const pt = patientAt ? { ...row.pt, ...patientAt } : row.pt;
   if (p.kind !== 'pharma_ssn' && p.kind !== 'specialist_ssn')
     throw new HttpError(409, 'Il promemoria del modello SSN vale per le ricette SSN');
   if (!st.regionName)

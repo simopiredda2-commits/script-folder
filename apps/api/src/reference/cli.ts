@@ -38,6 +38,7 @@ const LABELS: Record<ImportLine['outcome'], string> = {
   trascrizione_non_valida: 'ERRORE: trascrizione non valida',
   origine_non_trovata: 'ERRORE: PDF d’origine non trovato',
   base_mancante: 'manca la versione su cui l’atto è scritto',
+  ambito_diverso: 'ambito diverso da quello della serie',
   trascrizione_da_controllare: 'trascrizione da controllare: non ancora in uso',
 };
 

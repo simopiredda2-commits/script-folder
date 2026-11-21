@@ -30,6 +30,7 @@ function service(
   roles: string[],
   check: () => Promise<Response>,
   signed: object = { esito: 'accepted', nre: '0101A0000000001', messaggio: null },
+  toSignFails = false,
 ) {
   const calls: string[] = [];
   vi.stubGlobal(
@@ -41,7 +42,9 @@ function service(
       if (path === '/api/ricette/r1/controlla') return check();
       if (path === '/api/ricette/r1/firma-e-invia') return Promise.resolve(json(200, signed));
       if (path === '/api/ricette/r1/da-firmare')
-        return Promise.resolve(json(200, { stato: 'to_sign' }));
+        return toSignFails
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : Promise.resolve(json(200, { stato: 'to_sign' }));
       return Promise.resolve(json(404, { errore: 'Non trovato' }));
     }),
   );
@@ -50,11 +53,16 @@ function service(
 
 const checked = () => json(200, { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 });
 
-function panel() {
+function panel(status = 'draft', lastErrorKind: string | null = null) {
   render(
     <SessionProvider>
       <MemoryRouter>
-        <SendPanel prescriptionId="r1" status="draft" lineNames={{}} />
+        <SendPanel
+          prescriptionId="r1"
+          status={status}
+          lastErrorKind={lastErrorKind}
+          lineNames={{}}
+        />
       </MemoryRouter>
     </SessionProvider>,
   );
@@ -148,5 +156,44 @@ describe('firma e invio a controllo finito (D230)', () => {
     await screen.findByText(/Ricetta inviata\. NRE/);
     const warning = await screen.findByText(/il promemoria non si stampa/);
     expect(warning.closest('[class*="avviso"]')).toBeTruthy();
+  });
+
+  it('un controllo riuscito toglie l’errore di quello di prima (D239)', async () => {
+    let first = true;
+    service(['owner_doctor'], () => {
+      if (first) {
+        first = false;
+        return Promise.reject(new TypeError('Failed to fetch'));
+      }
+      return Promise.resolve(checked());
+    });
+    panel();
+    await screen.findByText(/Controllo non riuscito: il servizio non ha risposto/);
+    await userEvent.click(screen.getByRole('button', { name: 'Controlla di nuovo' }));
+    await waitFor(() => expect(screen.queryByText(/Controllo non riuscito/)).toBeNull());
+    await screen.findByText(/Regole di prescrizione, versione prova-1/);
+  });
+
+  it('la segreteria che manda alla firma senza risposta del servizio lo sa (D239)', async () => {
+    service(['secretary'], () => Promise.resolve(checked()), undefined, true);
+    panel();
+    const send = await screen.findByRole('button', { name: 'Manda alla firma del medico' });
+    await waitFor(() => expect(disabled(send)).toBe(false));
+    await userEvent.click(send);
+    await screen.findByText(/Il servizio non ha risposto: ricarica la pagina/);
+  });
+
+  it('fra gli invii non riusciti, con l’ente che non rispondeva, si stampa la ricetta rossa (D239)', async () => {
+    service(['owner_doctor'], () => Promise.resolve(checked()));
+    panel('error', 'unreachable');
+    await screen.findByRole('button', { name: 'Stampa la ricetta rossa' });
+    expect(screen.getByText(/Il servizio regionale non risponde/)).toBeTruthy();
+  });
+
+  it('con un esito incerto la ricetta rossa non c’è', async () => {
+    service(['owner_doctor'], () => Promise.resolve(checked()));
+    panel('error', 'timeout');
+    await screen.findByRole('button', { name: 'Firma e invia' });
+    expect(screen.queryByRole('button', { name: 'Stampa la ricetta rossa' })).toBeNull();
   });
 });

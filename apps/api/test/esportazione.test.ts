@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { accessLog } from '../src/db/schema';
+import { accessLog, archive } from '../src/db/schema';
 import {
   CERTIFICATE_TABLES,
   ENTRY_TABLES,
@@ -53,6 +53,11 @@ describe('esportazione completa dei dati del medico', () => {
       payload: { tipo: 'contatto', dati: { nome: 'Laboratorio di prova', tipo: 'laboratorio' } },
     });
     expect(voce.statusCode, voce.body).toBe(201);
+    // Le scelte del titolare sull'archivio (D30, D238), scritte qui come le avrebbe salvate.
+    await t.db
+      .update(archive)
+      .set({ secretaryCanReadSummary: true, advancedDressingCodes: ['04.49.03.103'] })
+      .where(eq(archive.id, s.archives.titolare));
     const res = await s.app.inject({
       method: 'GET',
       url: '/api/esportazione',
@@ -71,6 +76,18 @@ describe('esportazione completa dei dati del medico', () => {
   it('è JSON con formato e versione dichiarati', () => {
     expect(doc.formato).toBe('mmg-esportazione');
     expect(doc.versione).toBe(1);
+  });
+
+  it('contiene le impostazioni dell’archivio scelte dal titolare (D30, D238)', () => {
+    expect(doc.archivio).toEqual({
+      id: s.archives.titolare,
+      nome: 'Archivio Marchi',
+      impostazioni: {
+        segreteria_legge_diario: false,
+        segreteria_legge_riepilogo: true,
+        medicazioni_avanzate: ['04.49.03.103'],
+      },
+    });
   });
 
   it('contiene tutti e soli i pazienti dell’archivio del titolare', () => {

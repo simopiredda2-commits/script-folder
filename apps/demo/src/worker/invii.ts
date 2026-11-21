@@ -9,6 +9,7 @@
  * non riceve il cambio di medico, che lo spostamento fermerebbe (D200). Paziente inventato
  * (regola 1), nessun invio vero (regola 7).
  */
+import { rulesetAt } from '@mmg/rules';
 import { and, desc, eq, like } from 'drizzle-orm';
 import type { Database } from '../../../api/src/db/client';
 import {
@@ -17,6 +18,7 @@ import {
   clinicalEntry,
   patient,
   prescription,
+  prescriptionCheck,
   prescriptionLine,
   problemDetail,
   sickLeaveCertificate,
@@ -71,6 +73,10 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
   const { p, t } = chosen;
 
   const signedAt = new Date(Date.now() - STUCK_FOR_MINUTES * 60_000);
+  // Preparati e controllati prima della firma, come nel servizio (D239): l'ordine delle ore è
+  // quello di un invio vero.
+  const preparedAt = new Date(signedAt.getTime() - 10 * 60_000);
+  const checkedAt = new Date(signedAt.getTime() - 60_000);
   const day = studioDate(signedAt);
   await withActor(db, doctor!.id, async (tx) => {
     const [rx] = await tx
@@ -81,10 +87,23 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
         kind: 'pharma_ssn',
         status: 'sending',
         preparedBy: doctor!.id,
+        preparedAt,
         signedBy: doctor!.id,
         signedAt,
       })
       .returning({ id: prescription.id });
+    // Il controllo delle regole prima dell'invio, con la versione in vigore quel giorno: la
+    // ricetta segnata come arrivata la porta con sé.
+    await tx.insert(prescriptionCheck).values({
+      prescriptionId: rx!.id,
+      userId: doctor!.id,
+      at: checkedAt,
+      rulesVersion: rulesetAt(day).version,
+      outcome: 'superato',
+      issues: [],
+      reasons: {},
+      confirmedAifaNotes: [],
+    });
     await tx.insert(prescriptionLine).values({
       prescriptionId: rx!.id,
       position: 1,
@@ -116,6 +135,7 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
       preparedBy: doctor!.id,
       signedBy: doctor!.id,
       signedAt,
+      createdAt: preparedAt,
     });
   });
   return { patient: `${p.firstName} ${p.lastName}`, doctor: doctor!.displayName };

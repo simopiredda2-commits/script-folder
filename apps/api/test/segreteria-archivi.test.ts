@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { latestSecretaryDecisions } from '../src/admin/secretary-archives';
 import { createDatabase } from '../src/db/client';
 import { migrationsDir, runMigrations } from '../src/db/migrate';
-import { archive, archiveSecretary } from '../src/db/schema';
+import { archiveSecretary } from '../src/db/schema';
 import { loadArchiveContext } from '../src/patients/access';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -117,8 +117,8 @@ describe('migrazione 0028: chi lavorava già resta su tutti gli archivi (D181)',
       writeFileSync(journalFile, JSON.stringify(journal));
       await runMigrations(t.pool, dir);
       const db = createDatabase(t.pool);
-      // Studio e utenti si scrivono a mano: lo schema di oggi ha colonne nate dopo la 0028
-      // (per esempio le soglie dei tentativi della 0030).
+      // Studio, utenti e archivi si scrivono a mano: lo schema di oggi ha colonne nate dopo la 0028
+      // (per esempio le soglie dei tentativi della 0030 e le medicazioni avanzate della 0044).
       const [st] = (
         await t.pool.query<{ id: string }>(
           "insert into studio (name) values ('Studio di prova 0028') returning id",
@@ -140,13 +140,13 @@ describe('migrazione 0028: chi lavorava già resta su tutti gli archivi (D181)',
       const b = await user('titolare.b', ['owner_doctor']);
       const working = await user('segreteria.lavora', ['secretary']);
       const waiting = await user('segreteria.attesa', ['secretary'], true);
-      const archives = await db
-        .insert(archive)
-        .values([
-          { studioId: st!.id, ownerUserId: a.id, name: 'Archivio A' },
-          { studioId: st!.id, ownerUserId: b.id, name: 'Archivio B' },
-        ])
-        .returning();
+      const archives = (
+        await t.pool.query<{ id: string }>(
+          `insert into archive (studio_id, owner_user_id, name)
+           values ($1, $2, 'Archivio A'), ($1, $3, 'Archivio B') returning id`,
+          [st!.id, a.id, b.id],
+        )
+      ).rows;
       // Ora la 0028, con le altre.
       await runMigrations(t.pool);
       const rows = await db.select().from(archiveSecretary);

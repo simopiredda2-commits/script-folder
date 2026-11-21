@@ -96,12 +96,12 @@ Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al f
 - **Menu**: Oggi, Pazienti, Ricette (con il numero da firmare), Farmaci e prestazioni; Archivio per il medico titolare (D84). Simbolo accanto al nome, mai al suo posto (D67).
 - **Cartelle aperte insieme**: fino a 20, una scheda per paziente; ogni scheda riporta all'ultima pagina vista e la ricetta in corso resta ricordata (D68).
 - **Colori**: i blu di SCRIPT per struttura e informazioni; l'evidenziatore giallo per contatori, cartella attiva e selezioni; arancio bruciato per gli avvisi, rosso per errori e blocchi, verde per gli esiti (D69). Ogni messaggio ha anche simbolo e parola.
-- **Ricette**: la segreteria prepara e manda alla firma; il medico controlla, conferma le note, scrive i motivi e firma. Se l'ente non risponde, la ricetta rossa; se l'esito è incerto, niente ricetta rossa finché non è chiaro.
+- **Ricette**: la segreteria prepara e manda alla firma; il medico controlla, conferma le note, scrive i motivi e firma. Se l'ente non risponde, la ricetta rossa, anche riaprendo la pagina; se l'esito è incerto, niente ricetta rossa finché non è chiaro. Un invio rimasto senza risposta si vede con le sue righe; l'esito si segna dopo averlo confermato, e il promemoria resta con il paziente (D239).
 - **Storico** di ogni farmaco e prestazione: confezioni degli ultimi 12 mesi, autori, controlli, passaggi con l'ente; annullamento solo se l'ente non ha ancora lavorato la ricetta, e le annullate restano (D70).
 - **Terapia**: nuova, modifica, sospensione con motivo (la reazione avversa va tra le allergie), ripresa, schema orario da stampare (D80–D83). I controlli formali si vedono prima di salvare, vicino al campo, e il servizio li ripete.
-- **Promemoria** (tappa 7): dopo l’invio, nell’editor, nella coda delle ricette e nello storico. La ricetta bianca consegna solo il PDF del SAC (D93).
+- **Promemoria** (tappa 7): dopo l’invio, nell’editor, nella coda delle ricette e nello storico. La ricetta bianca consegna solo il PDF del SAC (D93). Il riquadro offre solo le consegne che il servizio accetta e dice perché manca il resto (D239).
 - **Voci cliniche** (tappa 9): dalla cartella, sotto la testata, «Voci cliniche», «Parametri», «Piani terapeutici», «Privacy». Le voci le scrive il medico; non si cancellano, si annullano con un motivo e restano in elenco, barrate. Nessun giudizio sui valori e nessun calcolo (regola 3, R12).
-- **Seguito e presidi** (tappa 10): dalla cartella, «Seguito delle prestazioni» e «Presidi». Il referto si allega dal computer (PDF o immagine) e si apre in una scheda nuova, senza script.
+- **Seguito e presidi** (tappa 10): dalla cartella, «Seguito delle prestazioni» e «Presidi». Il referto si allega dal computer (PDF o immagine) e si apre in una scheda nuova, senza script. Con le trascrizioni controllate, la voce si sceglie dal nomenclatore degli allegati 2 e 3 e riempie prodotto e codice; per l'allegato 2 sotto la scelta c'è la quantità dell'allegato, con l'intestazione della sua colonna (D238). Le voci che il titolare sceglie come medicazioni avanzate, nella pagina **Archivio** (riquadro «Medicazioni avanzate», che la schermata 16 non ha ancora), stanno solo in quella categoria.
 - **Grafico dei parametri**: una scala per grafico; colori validati per il contrasto e per chi confonde i colori, forma del punto come seconda codifica, valore in fondo alla linea; il cursore si muove anche con le frecce (il grafico si raggiunge con il tasto Tab) e annuncia i valori; la tabella sotto ha gli stessi numeri (D118).
 - **Accesso**: password e secondo fattore; dopo 5 minuti senza attività la sessione si blocca e si sblocca con il codice. All'uscita il browser non conserva dati dei pazienti.
 
@@ -114,14 +114,14 @@ La prova nel browser (`apps/api/test/e2e/interfaccia.test.ts`) apre ogni scherma
 - su tablet, in verticale (768×1024) e in orizzontale (1024×768), la pagina non scorre di lato;
 - contrasti dei colori calcolati da una prova del marchio (testo almeno 4,5:1, elementi grafici almeno 3:1).
 
-Le pagine hanno il salto al contenuto, titoli in ordine, etichette per ogni campo, annunci per i risultati che cambiano e il fuoco sempre visibile.
+Le pagine hanno il salto al contenuto, titoli in ordine, etichette per ogni campo, annunci per i risultati che cambiano e il fuoco sempre visibile. Gli esiti che non si cambiano dopo (invio senza risposta di ricetta, certificato e distinta) si confermano prima di segnarli (WCAG 3.3.4). Dopo un'azione che toglie il pulsante premuto il fuoco va al risultato (WCAG 2.4.3). I collegamenti di Oggi portano il fuoco al titolo della sezione (D239).
 
 Negli avvisi il collegamento sta in una frase: lo controlla `apps/web/test/avvisi.test.ts` su tutti i sorgenti, anche per gli avvisi che la prova nel browser non apre. La simulazione del paziente deceduto ha trovato l'avviso di Oggi «AURA segnala il decesso di …» con il nome del paziente scritto fuori da una frase: un bersaglio a sé alto 22 px. Corretto lì e negli altri cinque avvisi scritti allo stesso modo.
 
 ## Che cosa non c'è ancora
 
 - Agenda e prenotazione (proposta: da Ready!). Nei riepiloghi, PPIP e fatture (D201).
-- Stampa della prescrizione dei presidi nel modulo dell'ASL e codici del nomenclatore (D123).
+- Stampa della prescrizione dei presidi nel modulo dell'ASL (D123). I codici del nomenclatore degli allegati 2 e 3 ci sono, da controllare (D218, D236).
 - Dettatura vocale del diario: non c'è, per le regole 7 e 8 (D119, domanda per la fermata finale).
 - Elenco ufficiale dei vaccini: i vaccini hanno un nome libero (D176). Le diagnosi ICD-9-CM si cercano per descrizione dalla tappa 17 (D186). Gli elenchi dello studio (posologie, pacchetti di prestazioni, medici suggeritori, contatti) ci sono (D175).
 - Schede UVG regionali, percorsi (diabete, BPCO, scompenso): nel modello dei dati, non nell'interfaccia.

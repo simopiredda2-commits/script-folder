@@ -1628,3 +1628,110 @@ Scelte prese da me:
 Prove: trascrizione (`packages/reference/test/lea.test.ts`), importazione nel database con il servizio e la registrazione della voce più lunga (`apps/api/test/nomenclatore-presidi.test.ts`), scheda dei presidi (`apps/web/test/presidi.test.tsx`), dimostrazione nel browser. 14 sabotaggi, nel registro di `docs/avanzamento.md`.
 
 Non provato: il controllo di una persona sulle 87 righe e sul confronto con i decreti; le quantità massime nella prescrizione; WebKit e Firefox solo nella CI.
+
+**D237 · Risposte della fermata dopo l'unione della #27.** Via alla #28, unita con le verifiche su GitHub verdi (D236). Le altre risposte di Simone:
+
+- **Quantità dell'allegato 2**: «Mostrarla accanto alla voce». Quando si sceglie una voce dal nomenclatore, il programma scrive la quantità stampata nell'allegato, con l'intestazione della sua colonna, senza controlli sul fabbisogno.
+- **Medicazioni del gruppo 04.49**: Simone ha scritto «decide il medico (che nel ns caso sarà la Dr.ssa Rocca, in altri sarà il titolare dell'ambulatorio)». Quindi quali voci sono medicazioni avanzate lo sceglie il medico titolare, per il suo archivio. Per quelle vale la regola dello specialista (D123): prima prescrizione dello specialista, poi il medico di famiglia per al massimo 6 mesi.
+- **Dopo l'unione**: «Revisione dalla #26 alla #28». Una revisione indipendente del codice unito dalla #26 alla #28, come quella della #25 (D231), con le correzioni dei difetti veri.
+
+Si fanno nello stesso branch, ripartito da `main`: prima le due modifiche, poi la revisione. La revisione guarda anche il codice nuovo di questo blocco, che andrà nella stessa pull request.
+
+**D238 · Quantità accanto alla voce e medicazioni avanzate scelte dal titolare.** Le due modifiche chieste alla fermata (D237):
+
+- **Quantità dell'allegato 2**: si importano con la trascrizione e si mostrano sotto la scelta dal nomenclatore, nella scheda dei presidi: «Quantità nel nomenclatore: 120 («quantità massima erogabile»). Il fabbisogno lo decide il medico.» Nessun controllo sul fabbisogno.
+- **Medicazioni avanzate**: nella pagina dell'archivio il medico titolare sceglie quali voci del gruppo 04.49 dell'allegato 2 sono medicazioni avanzate. Quelle voci si prescrivono solo nella categoria «Medicazioni avanzate», con la regola dello specialista (D123).
+
+Scelte prese da me:
+
+1. **Intestazione della quantità**: quella stampata sulla colonna, perché il numero da solo non dice se è al mese o all'anno, erogabile o massimo. Per 09.30.12, 09.30.21 e 09.30.24, che non hanno un'intestazione loro, quella più vicina sopra la voce, della classe 09.30 («quantità massima erogabile»). Dove la tabella non ha la colonna (09.18.24, 09.18.30, 04.49, lubrificante) niente quantità e niente riga. Le quantità restano testo come stampato («20 + 60», «2/anno»).
+2. **Allegato 3**: le stesse due colonne, vuote, perché l'allegato 3 non stampa quantità.
+3. **L'elenco sta nell'archivio**, vuoto per difetto: finché il titolare non sceglie, le voci 04.49 restano fra i dispositivi monouso, come prima (D236). Lo sceglie solo il titolare (permesso `archive.settings`, come «Che cosa vede la segreteria»). In medicina di gruppo ognuno per il suo archivio.
+4. **Solo voci del gruppo 04.49 del nomenclatore in uso**: il servizio rifiuta un codice di altra forma e uno che il nomenclatore controllato non ha. Doppioni tolti, codici in ordine.
+5. **La regola sta nel servizio, non solo nell'interfaccia**: una voce scelta non si prescrive in un'altra categoria. Vale anche per il rinnovo di una prescrizione fatta prima della scelta. Altrimenti la regola dello specialista si aggirerebbe con l'altra categoria. Un prodotto scritto a mano, senza codice, non si controlla: il programma non sa che cosa sia.
+6. **Registro**: la modifica delle impostazioni dell'archivio prende il nome dei campi che cambia. «Che cosa vede la segreteria: modifica», «Medicazioni avanzate: modifica», «Impostazioni dell’archivio: modifica» se cambiano insieme; la lettura «Impostazioni dell’archivio: consultazione». Mai i valori (D30).
+7. **Dopo il salvataggio** le caselle mostrano l'elenco come l'ha salvato il servizio, anche se le impostazioni non si ricaricano.
+8. **Dimostrazione**: nel database di partenza nessuna scelta, così Simone la prova dall'archivio. La prova automatica sceglie l'alginato 15 x 15 e lo prescrive con lo specialista.
+9. **Esportazione completa** (regola 4): l'archivio esportato porta le impostazioni del titolare, che cosa vede la segreteria e le medicazioni avanzate. Prima non c'erano nemmeno quelle della segreteria. Il permesso `archive.settings` ora si chiama «Decidere che cosa vede la segreteria dell’archivio e quali sono le medicazioni avanzate» (`docs/ruoli-permessi.md`).
+
+Prove: trascrizione e mappatura (`packages/reference/test/lea.test.ts`), regola (`packages/domain/test/presidi.test.ts`), servizio (`apps/api/test/nomenclatore-presidi.test.ts`), registro (`apps/api/test/archivio-autorizzazioni.test.ts`), interfaccia (`apps/web/test/medicazioni-avanzate.test.tsx`), dimostrazione nel browser. I sabotaggi sono nel registro di `docs/avanzamento.md`.
+
+Non provato: il controllo di una persona su quantità e intestazioni (con le 87 righe, A8); quali medicazioni la Dr.ssa Rocca sceglierà; WebKit e Firefox solo nella CI.
+
+**D239 · Revisione dalla #26 alla #28 e correzioni.** Come chiesto alla fermata (D237), quattro revisori indipendenti hanno letto il codice unito dalla #26 alla #28 e quello nuovo di D238: invii fermi «in invio» (A), servizio (B), interfaccia e dimostrazione (C), presidi (D). I revisori erano quattro agenti che hanno solo letto il codice; le correzioni le ho fatte io. Gli agenti li ho decisi io, senza un via esplicito di Simone: alla sua domanda del 21/11/2026 («chi ha autorizzato gli agenti?») la regola di `CLAUDE.md` è diventata «agenti e workflow solo con il via di Simone». Ho verificato ogni segnalazione sul codice e, dove serviva, con una prova. V vuol dire vera e corretta; N non è un difetto o non si corregge, con il motivo; F è una domanda per la fermata.
+
+Invii fermi di ricetta e certificato (#27, D233):
+
+- A1 V: un NRE segnato a mano in minuscolo entrava così, e il codice a barre del promemoria non lo accetta. Ora si scrive in maiuscolo, nel servizio e nella pagina.
+- A2 V: la ricetta bianca segnata come arrivata perdeva il PIN e i testi parlavano del SAR. Ora vuole NRBE e PIN, dati dal Sistema TS, e lo dice.
+- A3 F: una SSN segnata come arrivata senza il codice di autenticazione: oggi il codice è facoltativo (D233), ma le specifiche del Sistema TS dicono che senza codice la ricetta non è valida. È una domanda per la fermata.
+- A4 V: l'esito a mano ricostruiva l'invio con i dati di adesso (per esempio un codice fiscale corretto nel frattempo). Ora ricetta e certificato si fotografano alla firma.
+- A5 V: un formato sbagliato si vedeva solo come «Dati non validi». Ora il messaggio dice anche i motivi dei campi.
+- A6 V: «senza il codice» anche quando il codice c'era ma i dati del promemoria non si erano fissati. Ora i due casi hanno ognuno il suo testo.
+- A7 V: «Non è arrivata» prometteva la ricetta rossa, che la pagina non offriva. Ora la ricetta rossa si offre anche riaprendo la pagina, se l'ente non rispondeva.
+- A8 V: dopo «Non è arrivata» la coda «Invii non riusciti» non si ricaricava. Ora si ricarica.
+- A9 V: nei primi 15 minuti la ricetta ferma non compariva da nessuna parte. Ora si vede, con l'ora da cui l'esito si segna.
+- A10 V: la coda non diceva che cosa c'era nella ricetta, e il promemoria compariva in fondo senza il paziente. Ora ci sono le righe, e il promemoria sta con il paziente.
+- A11 V: gli esiti si segnavano al primo clic (WCAG 3.3.4). Ora si confermano, anche nella distinta delle prestazioni aggiuntive. La lunghezza dell'NRE resta da 1 a 30 caratteri: il formato non è nelle specifiche che abbiamo (A1).
+- A12 V: nella dimostrazione la ricetta ferma risultava preparata dopo l'invio e senza la versione delle regole. Ora le ore sono in ordine e il controllo delle regole è registrato.
+- A13 V: i collegamenti di Oggi non portavano alla sezione. Ora portano il fuoco al suo titolo.
+- A14 V: «Sposta» insieme a una ricetta nuova poteva lasciare una ricetta aperta nell'archivio di prima. Ora la bozza tiene fermo il paziente fino alla fine.
+
+Servizio (#26, D232):
+
+- B1 V: per ogni serie vale una versione sola, scelta prima di guardare l'ambito. Un atto dell'ASL scritto nella serie dell'ACN faceva sparire l'ACN alle altre ASL; una modifica dell'AIR senza ambito valeva in tutta Italia. Ora una serie vale in un solo ambito, e le modifiche lo ereditano.
+- B2 V: l'esito a mano della distinta la ricostruiva con i dati di adesso. Ora la distinta si fissa all'inizio dell'invio.
+- B3 V: la risposta del portale arrivata dopo l'esito a mano risultava riuscita, e il portale si aspettava senza limite. Ora c'è il tempo massimo dello studio, e la risposta tardiva ha 409, come per ricetta e certificato.
+- B4 N: la migrazione 0042 dava alle prestazioni già partite l'archivio di oggi del paziente. Vale solo per i database di prima della #26: nessuno è in produzione, e la dimostrazione parte da zero. Non si corregge.
+- B5 V: lo stesso CSV con l'ambito aggiunto risultava «già importato», e l'atto restava valido ovunque. Ora corregge la versione sbagliata.
+- B6 V: lo stesso codice due volte in una tabella entrava, e valeva una riga a caso. Ora la tabella si ferma.
+- B7 V: «Non registrare» decideva sull'archivio letto prima della transazione. Ora archivio e medico sono nella condizione.
+- B8 V: la trascrizione d'esempio dell'AIR non aveva l'ambito. Ora ce l'ha.
+- B-F F: una prestazione aggiuntiva eseguita dal medico di prima e registrata dopo «Sposta»: va nella distinta di quale archivio? È una domanda per la fermata. Consiglio l'archivio del paziente alla data dell'esecuzione.
+
+Interfaccia e dimostrazione:
+
+- C1 V: «Ho controllato» e «Ho consegnato» restavano spuntate anche se la distinta cambiava. Ora valgono per le prestazioni viste.
+- C2 V: il promemoria offriva consegne che il servizio rifiuta. Ora offre solo quelle possibili, con il motivo.
+- C4 V: nell'invio restava l'errore di un controllo vecchio, e gli errori di rete erano muti. Ora l'errore vecchio sparisce e quelli di rete si dicono.
+- C5 V: dopo un esito i pulsanti si riaccendevano prima che la distinta si ricaricasse, e l'annullamento poteva partire due volte. Ora restano spenti fino al ricaricamento, e l'annullamento parte una volta.
+- C8 V (presidi): cambiando categoria restavano prodotto e codice scelti. Ora si svuotano.
+- C10 V: la prova dell'annuncio del secondo fattore poteva leggere un riquadro chiuso, quindi vuoto. Ora lo legge aperto e cerca il codice.
+- C11 V: due prove della dimostrazione contavano le voci prima che arrivassero. Ora le aspettano.
+- C13 V: nei testi della pagina c'erano i codici delle decisioni, come «(D212)». Ora non ci sono, e una prova li cerca.
+- C14 V: dopo un'azione il fuoco restava su un pulsante che non c'era più. Ora va al risultato.
+
+C3, C6, C7, C9 e C12 sono le stesse segnalazioni di A8, D1, A10, A12 e A13.
+
+Presidi (D238):
+
+- D1 V: una medicazione avanzata scelta e poi tolta dal nomenclatore bloccava il salvataggio. Ora resta, si vede nell'archivio e si toglie.
+- D2 F: i 6 mesi del medico di famiglia per le medicazioni avanzate (D123): per ogni prescrizione o in tutto dalla prima prescrizione dello specialista? Il sito della Regione non si raggiunge da qui (connessione interrotta), quindi la fonte non l'ho letta. È una domanda per la fermata.
+- D3 V: una modifica rifiutata delle impostazioni risultava fatta nel registro. Ora è «fallito», con il motivo.
+- D4 V: il rinnovo di una trascrizione dello specialista non riusciva mai. Ora chiede chi e quando, e li porta con sé.
+- D5 V: un codice scritto in un'altra forma (spazi, punti) passava il controllo. Ora si confronta per cifre.
+- D6 V: un monouso prescritto prima della scelta risultava «Scaduta: da rinnovare» per sempre. Ora il rinnovo lo porta fra le medicazioni avanzate.
+- D7 V: una richiesta vuota delle impostazioni dava 500. Ora dà 400.
+
+Scelte prese da me:
+
+1. **Fotografia alla firma.** La ricetta tiene il messaggio partito e il paziente in `sending_snapshot`. Il certificato scrive alla firma i dati di copia e attestato, che prima scriveva alla risposta. La fotografia si cancella con l'esito. Una ricetta firmata prima di questa versione si ricostruisce come prima.
+2. **Ricetta bianca segnata come arrivata**: NRBE e PIN obbligatori. Il promemoria del Sistema TS non c'è, perché la risposta non è arrivata: al paziente si dettano NRBE e PIN, o gli si mandano per SMS.
+3. **Consegne del promemoria.** Il servizio dice che cosa si può consegnare (PDF, solo NRE, email, SMS), con il motivo di ciò che manca, e la pagina mostra solo quello. L'SMS di una bianca senza PIN si rifiuta.
+4. **Coda degli invii senza risposta**: compaiono anche nei primi 15 minuti, con l'ora da cui l'esito si segna. Il conto di Oggi resta per quelli da chiudere.
+5. **La bozza di una ricetta blocca il paziente** fino alla fine. «Sposta» che arriva insieme aspetta, e trova la ricetta aperta. Se invece lo spostamento è già fatto, la ricetta si ferma con 409.
+6. **Banche dati: una serie, un ambito.** Una versione nuova deve dire lo stesso ambito della serie. Altrimenti «ambito_diverso», con il motivo: l'atto di un'altra regione o di un'ASL va in una serie sua. Un atto che modifica la serie senza ripetere l'ambito lo eredita dalla versione che modifica. Lo stesso CSV alla stessa data con l'ambito giusto corregge una versione sbagliata: vale l'ultima importata, la vecchia resta nello storico. Per questo l'unicità delle versioni ora comprende regione e ASL (migrazione 0046).
+7. **Distinta delle prestazioni aggiuntive.**
+   - Il contenuto si fissa all'inizio dell'invio, nella tabella `ppip_sending`, che è anche nell'esportazione finché l'invio non ha un esito.
+   - Il portale si aspetta per il tempo massimo dello studio (D94). Dopo, le prestazioni restano «in invio», come senza risposta.
+   - Una risposta arrivata dopo l'esito a mano ha 409. Resta fra gli invii, con la frase che lo dice, e nel registro come «fallito».
+8. **Codici delle decisioni** tolti dai testi che arrivano alla pagina, servizio compreso. Una prova li cerca.
+9. **Dimostrazione**: ricetta e certificato fermi «in invio» sono preparati 10 minuti prima della firma, con il controllo delle regole un minuto prima, nella versione in vigore quel giorno. Non hanno righe del registro degli accessi per la firma, come gli altri dati di partenza della dimostrazione.
+
+Prove nuove o rafforzate, nelle cartelle `apps/api/test`, `apps/web/test` e `apps/demo/prove`. I sabotaggi sono nel registro di `docs/avanzamento.md`. Due prove che non vedevano il loro sabotaggio sono state rafforzate: il blocco del paziente e il fuoco dopo l'esito.
+
+Non provato:
+
+- il portale vero dell'ASL e il SAR vero;
+- la regola dei 6 mesi sulla fonte regionale (D2);
+- WebKit e Firefox solo nella CI.

@@ -258,4 +258,41 @@ describe('certificato rimasto «in invio» (D233)', () => {
       'invio:accepted',
     ]);
   });
+
+  it('copia e attestato con i dati partiti alla firma, anche se il lavoratore cambia intanto (D239)', async () => {
+    const id = await draft();
+    inps.hold();
+    const before = inps.calls;
+    const sending = req('titolare', 'POST', `/api/certificati/${id}/invia`, {});
+    for (let i = 0; inps.calls === before; i++) {
+      if (i > 500) throw new Error('L’INPS non è stato chiamato');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    const [pt] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    // Fotografato alla firma, prima della chiamata all'INPS.
+    const atClaim = (await row(id)).snapshot as { worker: { lastName: string } } | null;
+    expect(atClaim?.worker.lastName).toBe(pt!.lastName);
+    // Intanto il cognome cambia; poi il servizio resta fermo e il medico segna l'esito.
+    await t.db
+      .update(patient)
+      .set({ lastName: 'Cognomecambiato' })
+      .where(eq(patient.id, s.richPatient));
+    try {
+      s.clock.advance(16 * 60_000);
+      const res = await settle('titolare', id, { esito: 'arrivato', protocollo: 'MAN000000009' });
+      expect(res.statusCode, res.body).toBe(200);
+      const copy = await req('titolare', 'GET', `/api/certificati/${id}/copia`);
+      expect(copy.statusCode, copy.body.slice(0, 200)).toBe(200);
+      const text = norm(await pdfText(copy.rawPayload)).toLowerCase();
+      expect(text).toContain(pt!.lastName.toLowerCase());
+      expect(text).not.toContain('cognomecambiato');
+    } finally {
+      await t.db
+        .update(patient)
+        .set({ lastName: pt!.lastName })
+        .where(eq(patient.id, s.richPatient));
+      inps.release();
+    }
+    expect((await sending).statusCode).toBe(409);
+  });
 });
