@@ -13,7 +13,8 @@ interface CheckResult {
 }
 
 type SendOutcome =
-  | { esito: 'accepted'; nre: string; messaggio: null }
+  /** Con il messaggio quando il promemoria non si è potuto fissare (D232). */
+  | { esito: 'accepted'; nre: string; messaggio: string | null }
   | { esito: 'rejected' | 'unreachable' | 'timeout' | 'auth'; nre: null; messaggio: string };
 
 export interface SendPanelProps {
@@ -58,7 +59,16 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
         }),
       );
     } catch (e) {
-      setError(e instanceof ApiError ? e : null);
+      // Anche senza risposta del servizio (rete, pagina d'errore del proxy) lo si dice: chi firma
+      // sa che i controlli non li ha visti (D230, D232).
+      setError(
+        e instanceof ApiError
+          ? e
+          : new ApiError(
+              0,
+              'Controllo non riuscito: il servizio non ha risposto. Controlla di nuovo',
+            ),
+      );
     } finally {
       setChecking(false);
     }
@@ -93,7 +103,14 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
           bloccanti: 1,
         });
       }
-      setError(e instanceof ApiError ? e : null);
+      setError(
+        e instanceof ApiError
+          ? e
+          : new ApiError(
+              0,
+              'Il servizio non ha risposto: non si sa se la ricetta è partita. Ricarica la pagina per vederne lo stato',
+            ),
+      );
     } finally {
       setBusy(false);
     }
@@ -130,9 +147,12 @@ export function SendPanel({ prescriptionId, status, lineNames, onChange }: SendP
   }
   if (outcome?.esito === 'accepted') {
     return (
-      <Notice kind="fatto">
-        Ricetta inviata. NRE <span className="codice">{outcome.nre}</span>
-      </Notice>
+      <>
+        <Notice kind="fatto">
+          Ricetta inviata. NRE <span className="codice">{outcome.nre}</span>
+        </Notice>
+        {outcome.messaggio && <Notice kind="avviso">{outcome.messaggio}</Notice>}
+      </>
     );
   }
 

@@ -89,6 +89,7 @@ export async function createScenario(
     | 'preSendChecks'
     | 'reminderSender'
     | 'sendTimeoutMs'
+    | 'buildPromemoria'
     | 'secondFactor'
     | 'sickLeaveGateway'
     | 'regional'

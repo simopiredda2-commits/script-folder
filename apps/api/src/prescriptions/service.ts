@@ -145,6 +145,8 @@ export interface PrescriptionDeps {
   serviceCatalog?: (
     date: string,
   ) => Promise<((code: string) => { nationalCode: string | null } | null) | undefined>;
+  /** Come si fissano i dati del promemoria all'invio: le prove ci mettono un guasto (D232). */
+  buildPromemoria?: typeof buildPromemoriaData;
 }
 
 /** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
@@ -597,22 +599,29 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
             ? 'rejected'
             : result.outcome;
     // Dati del promemoria fissati ora, con il codice di autenticazione: ogni ristampa è identica.
+    // Se non si riesce a fissarli, la ricetta è comunque partita: NRE e codice si scrivono lo
+    // stesso, invece di lasciarla «in invio» senza numero; manca solo il promemoria (D232).
     const accepted = result.outcome === 'accepted' ? result : null;
-    const promemoria =
-      accepted && ssn
-        ? await buildPromemoriaData(
-            db,
-            p.id,
-            {
-              nre: accepted.nre,
-              authCode: accepted.authCode!,
-              sacDoctorName: accepted.doctorName ?? null,
-              compiledAt: message.compiledAt,
-              messages: accepted.messages ?? null,
-            },
-            message.lines,
-          )
-        : null;
+    let promemoria: Awaited<ReturnType<typeof buildPromemoriaData>> | null = null;
+    let promemoriaMissing = false;
+    if (accepted && ssn) {
+      try {
+        promemoria = await (deps.buildPromemoria ?? buildPromemoriaData)(
+          db,
+          p.id,
+          {
+            nre: accepted.nre,
+            authCode: accepted.authCode!,
+            sacDoctorName: accepted.doctorName ?? null,
+            compiledAt: message.compiledAt,
+            messages: accepted.messages ?? null,
+          },
+          message.lines,
+        );
+      } catch {
+        promemoriaMissing = true;
+      }
+    }
 
     await withActor(db, actor.userId, async (tx) => {
       await tx.insert(externalSubmission).values({
@@ -678,7 +687,12 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return {
       outcome: errorKind === 'auth' ? ('auth' as const) : result.outcome,
       nre: result.outcome === 'accepted' ? result.nre : null,
-      messaggio: result.outcome === 'accepted' ? null : result.message,
+      messaggio:
+        result.outcome === 'accepted'
+          ? promemoriaMissing
+            ? `Ricetta partita, NRE ${result.nre}: i dati del promemoria non si sono potuti fissare, quindi il promemoria non si stampa. Al paziente bastano il numero di ricetta e il codice fiscale.`
+            : null
+          : result.message,
     };
   }
 

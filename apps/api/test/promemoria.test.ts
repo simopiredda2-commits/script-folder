@@ -18,6 +18,7 @@ import {
 import { withActor } from '../src/db/tx';
 import { nreParts } from '../src/reminders/pdf';
 import {
+  buildPromemoriaData,
   NO_NOTE,
   OBSCURED_TEXT_2024,
   RELEASE_TEXT_2024,
@@ -39,6 +40,8 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
   let omitAuthCode = false;
   let dpcPhrase: string | null = null;
   let deliveryOutcome: DeliveryResult['outcome'] = 'sent';
+  /** Un guasto dove si fissano i dati del promemoria, dopo che il SAR ha accettato (D232). */
+  let failPromemoria = false;
   const sar = new SimulatedGateway('sar', {
     omitAuthCode: () => omitAuthCode,
     receiptMessages: () => (dpcPhrase ? [{ code: '0196', text: dpcPhrase }] : []),
@@ -52,7 +55,15 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     s = await createScenario(
       t.db,
       {},
-      { gateways: { sar, sistema_ts: ts }, preSendChecks: noRules, reminderSender: sender },
+      {
+        gateways: { sar, sistema_ts: ts },
+        preSendChecks: noRules,
+        reminderSender: sender,
+        buildPromemoria: (...args) =>
+          failPromemoria
+            ? Promise.reject(new Error('guasto di prova'))
+            : buildPromemoriaData(...args),
+      },
     );
     for (const who of ['titolare', 'segreteria', 'amministratore'] as const)
       c[who] = await login(s, who);
@@ -223,6 +234,27 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     const second = (await req('GET', `/api/ricette/${id}/promemoria`)).rawPayload;
     expect(second.equals(first)).toBe(true);
     expect(await pdfText(second)).not.toContain('Via cambiata dopo');
+  });
+
+  it('se i dati del promemoria non si fissano, la ricetta partita ha il suo NRE e non resta «in invio» (D232)', async () => {
+    failPromemoria = true;
+    try {
+      const id = await draft(pharma());
+      const res = await req('POST', `/api/ricette/${id}/firma-e-invia`, 'titolare', {});
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json()).toMatchObject({
+        esito: 'accepted',
+        messaggio: expect.stringMatching(/il promemoria non si stampa/),
+      });
+      const p = await row(id);
+      expect(p.status).toBe('sent');
+      expect(p.nre).toBeTruthy();
+      expect(p.authCode).toBeTruthy();
+      expect(await docs(id)).toEqual([]);
+      expect((await req('GET', `/api/ricette/${id}/promemoria`)).statusCode).toBe(409);
+    } finally {
+      failPromemoria = false;
+    }
   });
 
   it('senza codice di autenticazione la ricetta non vale e il promemoria non esce', async () => {
