@@ -1735,3 +1735,32 @@ Non provato:
 - il portale vero dell'ASL e il SAR vero;
 - la regola dei 6 mesi sulla fonte regionale (D2);
 - WebKit e Firefox solo nella CI.
+
+**D240 · Risposte della fermata dopo la #29.** Simone ha risposto il 21/11/2026, con il pulsante:
+
+1. **Via alla #29**: unita a `main` con le verifiche su GitHub verdi.
+2. **I 6 mesi delle medicazioni avanzate** (D2): «Lo verifichiamo noi». Resta come oggi: ogni prescrizione del medico di famiglia dura al più 6 mesi (D123). È fra le verifiche di Simone e della Dr.ssa Rocca, in `docs/avanzamento.md` («Che cosa resta aperto»).
+3. **Prestazioni aggiuntive dopo «Sposta»** (B-F): «Secondo le regole». Ho letto le fonti:
+   - ACN della medicina generale 2022-2024, allegato 6, comma 4: il medico manda «il riepilogo delle prestazioni eseguite nel corso del mese precedente»; comma 6: «per le prestazioni rese, al medico spettano compensi»;
+   - ACN, art. 40, comma 1: la nuova scelta del cittadino «ai fini assistenziali, ha effetto immediato». L'art. 42 riguarda le quote per assistiti, non le prestazioni aggiuntive;
+   - AIR del Piemonte 2024: nulla sul cambio di medico per le prestazioni aggiuntive.
+
+   Il compenso quindi è del medico che ha eseguito la prestazione. Nel programma, fino a «Sposta», il paziente sta nell'archivio di prima, e lì lavorano il titolare, chi lo sostituisce e la segreteria. La prestazione va quindi nella distinta dell'archivio in cui il paziente stava il giorno dell'esecuzione. Scelte prese da me:
+   - **storico degli spostamenti**: ogni «Sposta» resta nella tabella `patient_archive_move`, di sola aggiunta. Il cambio di medico di AURA ha una riga per paziente, e un secondo cambio cancellava il primo. La migrazione 0047 ricostruisce gli spostamenti di prima dal registro degli accessi;
+   - **la distinta segue la data**: una prestazione eseguita prima del giorno dello spostamento va nella distinta dell'archivio di prima, anche se la si registra dopo; dal giorno dopo, in quella dell'archivio nuovo. Le prestazioni già registrate restano dove sono;
+   - **il giorno dello spostamento sceglie chi registra**: la data non dice l'ora, quindi la pagina chiede fra l'archivio di prima e quello di dopo. Il servizio rifiuta la registrazione senza la scelta, e negli altri giorni rifiuta un archivio diverso da quello del giorno;
+   - **chi registra** è chi ha accesso alla cartella, come prima. Dopo lo spostamento è chi lavora nell'archivio nuovo: il nuovo medico, la sua segreteria, il medico di prima se ha accesso a quell'archivio. La prestazione compare nella distinta del medico di prima, che la controlla prima di mandarla e da lì la può annullare;
+   - **la pagina lo dice prima**: «Va nella distinta dell'archivio «…»: il … il paziente era nel suo archivio». Il catalogo è quello della regione e dell'ASL di quell'archivio;
+   - **il paziente resta fermo** durante la registrazione. Uno spostamento a metà la ferma con 409;
+   - **esportazione** (regola 4): l'archivio porta con sé anche le prestazioni della sua distinta di pazienti passati a un altro medico, e gli spostamenti dall'archivio o verso. Non porta l'identità di quei pazienti, che ora stanno nell'archivio nuovo; nelle distinte già partite c'è.
+
+4. **Codice di autenticazione del SAC** (A3): «Obbligatorio». Per segnare come arrivata una ricetta SSN, farmaceutica o specialistica, serve il codice. Senza, la ricetta non è valida, come nell'invio normale, che tratta come rifiutata una ricetta accettata senza codice. Si chiede il codice all'ente; se l'ente non lo dà, si segna «Non è arrivata». Per i presidi il codice resta facoltativo, come nell'invio. Per la ricetta bianca servono NRBE e PIN, come prima (D239).
+
+Prove nuove: `apps/api/test/ppip-spostamenti.test.ts`, `packages/domain/test/spostamenti.test.ts`, `apps/web/test/spostamenti.test.ts`; rafforzate `invio-interrotto.test.ts`, `invio-senza-risposta.test.tsx`, `ppip.test.tsx`, `esportazione.test.ts`, `registro.test.ts` e la prova di «Sposta» della dimostrazione. 26 sabotaggi, nel registro di `docs/avanzamento.md`. Una prova che non vedeva il suo sabotaggio è stata rafforzata: il paziente fermo durante la registrazione.
+
+Non provato:
+
+- come l'ASL tratta una prestazione eseguita dal medico di prima dopo la nuova scelta del paziente in AURA, che vale subito (art. 40), e prima di «Sposta». Nel programma va nella distinta del medico che l'ha eseguita; le fonti non dicono come l'ASL la controlla;
+- il catalogo dell'archivio della distinta quando i due archivi hanno ASL diverse: nella prova i due archivi hanno lo stesso catalogo;
+- il SAR vero e il Sistema TS veri;
+- WebKit e Firefox solo nella CI.

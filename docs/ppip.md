@@ -52,7 +52,14 @@ Pagina «Prestazioni aggiuntive» della cartella, `/pazienti/:id/prestazioni-agg
 
 Il servizio rifiuta una voce che non è nel catalogo di quel giorno. Le prestazioni non si cancellano: si annullano con un motivo, finché non sono partite con la distinta. Dopo l'invio la correzione si chiede all'ASL. Mentre la distinta sta partendo («in invio») una prestazione non si annulla: si annulla solo se l'invio non va a buon fine.
 
-**Una prestazione è dell'archivio in cui è registrata** (D232), come le ricette e i certificati (D200). Se il paziente passa a un altro medico dello studio con «Sposta», le sue prestazioni restano nella distinta di chi le ha registrate. Nella cartella il nuovo medico le vede con il nome dell'archivio dove sono nate e senza «Annulla»: si annullano da quella distinta.
+**Una prestazione va nella distinta di chi aveva il paziente il giorno dell'esecuzione** (D240). Il compenso è del medico che l'ha eseguita: il comma 4 parla del «riepilogo delle prestazioni eseguite», il comma 6 dice «per le prestazioni rese, al medico spettano compensi». Fino a «Sposta» (D200) il paziente sta nell'archivio di prima, quindi:
+
+- una prestazione eseguita prima del giorno dello spostamento va nella distinta dell'archivio di prima, anche se la si registra dopo. La pagina lo dice prima di registrare, e usa il catalogo di quell'archivio;
+- dal giorno dopo lo spostamento va nella distinta dell'archivio nuovo;
+- il giorno dello spostamento la data non basta: chi registra sceglie fra l'archivio di prima e quello di dopo, secondo chi aveva il paziente quando la prestazione è stata eseguita. Senza la scelta il servizio non la registra;
+- una prestazione registrata resta nella sua distinta, anche se poi il paziente cambia di nuovo medico. Nella cartella il nuovo medico la vede con il nome di quell'archivio e senza «Annulla»: si annulla da quella distinta.
+
+Gli spostamenti restano nella tabella `patient_archive_move`, che non si modifica e non si cancella. Durante la registrazione il paziente resta fermo: uno spostamento a metà la ferma, e si ricarica la pagina.
 
 Chi può fare che cosa:
 
@@ -154,9 +161,16 @@ Senza il controllo il catalogo non si usa.
   - annullamento durante l'invio, due annullamenti insieme, annullamento a metà di un invio;
   - una prestazione arrivata dopo il controllo fa ricontrollare la distinta;
   - invio senza risposta, poi «arrivata» o «non arrivata»; consegna fuori dal programma;
-  - paziente spostato a un altro medico: la prestazione resta nella distinta di prima;
+  - paziente spostato a un altro medico: la prestazione registrata resta nella distinta di prima;
   - i dati fermi nel database; chi legge distinta e CSV; produzione con il simulatore.
-- Interfaccia: `apps/web/test/ppip.test.tsx`, 9 prove.
+- Servizio, dopo «Sposta»: `apps/api/test/ppip-spostamenti.test.ts`, 7 prove (D240). Usano lo spostamento vero:
+  - lo storico degli spostamenti, che non si modifica;
+  - una prestazione eseguita prima, registrata dopo: nella distinta di prima, e lì si annulla;
+  - il giorno dello spostamento si sceglie; dopo, la distinta del medico nuovo;
+  - l'esportazione dei due archivi;
+  - il paziente fermo durante la registrazione, e uno spostamento a metà che la ferma.
+- Archivi di un giorno: `packages/domain/test/spostamenti.test.ts` e, per la copia nella pagina, `apps/web/test/spostamenti.test.ts`.
+- Interfaccia: `apps/web/test/ppip.test.tsx`, 14 prove.
 - Browser: `apps/api/test/e2e/interfaccia.test.ts`, «prestazioni aggiuntive (D212)». La prova registra dalla cartella una B2 con l'autorizzazione, apre la distinta dall'Archivio, scarica il CSV e manda la distinta al simulatore; poi controlla in cartella lo stato «Inviata all'ASL». Controlla anche accessibilità, bersagli e tablet.
 - Schermate: 72 (cartella) e 73 (distinta), in `docs/interfaccia.md`.
 
