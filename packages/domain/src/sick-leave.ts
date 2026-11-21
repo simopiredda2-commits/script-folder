@@ -156,7 +156,9 @@ export function canCancelSickLeave(
 /**
  * Ciclo del certificato nel programma: bozza → in invio → inviato, oppure errore. Inviato →
  * annullato (entro il giorno dopo il rilascio) o rettificato (entro la fine della prognosi, con un
- * certificato nuovo e un protocollo nuovo). Gli stati sono del prodotto; i tempi sono del DM.
+ * certificato nuovo e un protocollo nuovo). Gli stati sono del prodotto; i tempi sono del DM. Un
+ * certificato rimasto «in invio» per un arresto del servizio si chiude con l'esito chiesto
+ * all'INPS, come la ricetta (D233).
  */
 export const CERTIFICATE_STATUSES = [
   'draft',
@@ -178,7 +180,18 @@ export const CERTIFICATE_STATUS_LABELS: Record<CertificateStatus, string> = {
 };
 
 export type CertificateEvent =
-  'edit' | 'start_sending' | 'send_succeeded' | 'send_failed' | 'cancel' | 'rectify';
+  | 'edit'
+  | 'start_sending'
+  | 'send_succeeded'
+  | 'send_failed'
+  | 'cancel'
+  | 'rectify'
+  /**
+   * Esito di un invio rimasto senza risposta, segnato dal medico dopo averlo chiesto all'INPS
+   * (D233): arrivato, con il protocollo, oppure non arrivato.
+   */
+  | 'settle_arrived'
+  | 'settle_not_arrived';
 
 /** Perché l'ultimo invio non è andato: come per le ricette (rifiuto, rete, tempo, accesso). */
 export type CertificateErrorKind = 'rejected' | 'unreachable' | 'timeout' | 'auth';
@@ -219,6 +232,11 @@ export function certificateTransition(
       return no('Già annullato o rettificato');
     case 'rectify':
       return from === 'sent' ? ok('rectified') : no('Si rettifica solo un certificato inviato');
+    case 'settle_arrived':
+      return from === 'sending' ? ok('sent') : no('Nessun invio senza risposta da chiudere');
+    case 'settle_not_arrived':
+      // L'INPS ha detto che non è arrivato: come quando non risponde, si rimanda.
+      return from === 'sending' ? ok('error') : no('Nessun invio senza risposta da chiudere');
   }
 }
 

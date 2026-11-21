@@ -18,6 +18,8 @@ const EVENTS: PrescriptionEvent[] = [
   'send_failed',
   'cancel',
   'print_paper',
+  'settle_arrived',
+  'settle_not_arrived',
 ];
 
 /**
@@ -47,6 +49,9 @@ const ALLOWED: Record<string, PrescriptionStatus> = {
   'error|edit|auth': 'draft',
   'error|start_sending|auth': 'sending',
   'error|cancel|auth': 'cancelled',
+  // Invio rimasto senza risposta, esito chiesto all'ente (D233).
+  'sending|settle_arrived|': 'sent',
+  'sending|settle_not_arrived|': 'error',
 };
 
 describe('ciclo della ricetta', () => {
@@ -87,6 +92,12 @@ describe('ciclo della ricetta', () => {
   it('un invio in corso non si ripete né si annulla', () => {
     expect(transition('sending', 'start_sending').ok).toBe(false);
     expect(transition('sending', 'cancel').ok).toBe(false);
+  });
+
+  it('l’esito di un invio senza risposta si segna solo per una ricetta «in invio» (D233)', () => {
+    for (const s of PRESCRIPTION_STATUSES.filter((x) => x !== 'sending'))
+      for (const e of ['settle_arrived', 'settle_not_arrived'] as const)
+        expect(transition(s, e).ok, `${s} + ${e}`).toBe(false);
   });
 });
 

@@ -128,6 +128,19 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           dell’accesso.
         </p>
       </section>
+      <section aria-labelledby="dimo-invii">
+        <h3 id="dimo-invii">Invii senza risposta</h3>
+        <p>
+          Una ricetta e un certificato di malattia di {ready.interrupted.patient}, firmati da{' '}
+          {ready.interrupted.doctor}, sono rimasti «in invio»: come se il servizio si fosse fermato
+          mentre aspettava il SAR e l’INPS.
+        </p>
+        <p>
+          Il medico segna l’esito chiesto all’ente: la ricetta in{' '}
+          <strong>Ricette › Invii senza risposta</strong>, il certificato nella cartella del
+          paziente, in <strong>Certificati</strong>.
+        </p>
+      </section>
       <section aria-labelledby="dimo-codice">
         <h3 id="dimo-codice">Secondo fattore</h3>
         {/* Si annuncia il codice quando cambia, non il conto alla rovescia di ogni secondo (D232). */}

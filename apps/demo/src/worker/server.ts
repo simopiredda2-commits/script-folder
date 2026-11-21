@@ -16,8 +16,16 @@ import { totp, TOTP_STEP_SECONDS } from '../../../api/src/security/totp';
 import { createAuraDemo } from './aura';
 import { COLLEAGUE_USERS, prepareColleagues } from './colleghi';
 import { singleSession, type SingleSession } from './database';
+import { prepareInterruptedSends } from './invii';
 import { getRequestHandler, IncomingMessage, ServerResponse } from './shims/http';
-import type { AftHints, AuraHints, DemoUser, WireRequest, WireResponse } from '../protocol';
+import type {
+  AftHints,
+  AuraHints,
+  DemoUser,
+  InterruptedHints,
+  WireRequest,
+  WireResponse,
+} from '../protocol';
 
 /** Password di tutti gli utenti dimostrativi: la mostra la pagina, non è un segreto. */
 export const DEMO_PASSWORD = 'dimostrazione';
@@ -53,7 +61,12 @@ async function fetchBase64(base: string, name: string, gunzip: boolean): Promise
 export async function start(
   base: string,
   progress: (message: string) => void,
-): Promise<{ users: DemoUser[]; aura: AuraHints; aft: AftHints }> {
+): Promise<{
+  users: DemoUser[];
+  aura: AuraHints;
+  aft: AftHints;
+  interrupted: InterruptedHints;
+}> {
   progress(
     'Scarico il database e il programma (circa 20 MB, solo la prima volta che il browser li vede)…',
   );
@@ -86,6 +99,10 @@ export async function start(
   // al cambio di medico che AURA manda.
   progress('Preparo la collega dello studio e l’AFT…');
   const colleagues = await prepareColleagues(db, DEMO_PASSWORD);
+  // Una ricetta e un certificato rimasti «in invio» (D233), prima di AURA: il loro paziente non
+  // riceve il cambio di medico.
+  progress('Preparo gli invii rimasti senza risposta…');
+  const interrupted = await prepareInterruptedSends(db);
 
   // AURA simulata con i pazienti dimostrativi (D223): collegati e con le loro variazioni prima che
   // il servizio la ascolti; il nuovo assistito arriva dopo, come una notifica.
@@ -114,7 +131,7 @@ export async function start(
       note: u.note,
     })),
   ];
-  return { users, aura, aft: colleagues.aft };
+  return { users, aura, aft: colleagues.aft, interrupted };
 }
 
 function remember(setCookie: string) {

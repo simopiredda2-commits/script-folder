@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { DiagnosisCodeInfo, DiagnosisSearch } from '../components/DiagnosisSearch';
 import { Icon } from '../components/Icon';
+import { InterruptedCertificatePanel } from '../components/InterruptedCertificatePanel';
 import { PrintHint } from '../components/PrintHint';
 import { api, ApiError } from '../lib/api';
 import {
@@ -603,6 +604,16 @@ function CertificateCard({
         </p>
       )}
       {c.errore?.messaggio && <Notice kind="errore">{c.errore.messaggio}</Notice>}
+      {c.stato === 'sending' &&
+        (c.invioInterrotto ? (
+          <InterruptedCertificatePanel
+            certificateId={c.id}
+            signedAt={c.inviatoIl}
+            onChange={onChange}
+          />
+        ) : (
+          <p className="tenue">Invio all’INPS in corso: aspetta la risposta.</p>
+        ))}
 
       <div className="azioni">
         {editable && (

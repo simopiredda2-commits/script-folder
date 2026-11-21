@@ -1568,3 +1568,42 @@ Come si fa:
 - **La lettura dei tipi**: ora i passi già visti si contano per profondità, e questa parte non ha una prova sua.
 
 Prove: 34 nuove e una cambiata. In tutto 54 sabotaggi, ognuno rosso con il guasto e verde dopo il ripristino.
+
+**D233 · Risposte della fermata dopo l'unione della #25: ricetta e certificato fermi «in invio».** Via alla #26, unita con le verifiche su GitHub verdi. Per la ricetta che resta «in invio» se il servizio si ferma mentre aspetta il SAR, Simone ha scelto «Come le PPIP, ora»; per il dopo, «Ricetta, poi pausa».
+
+Scelte prese qui, con il motivo:
+
+- **Anche il certificato di malattia.** Ha lo stesso ciclo: passa «in invio» prima della chiamata all'INPS, e se il servizio si ferma in quel momento ci resta. È lo stesso difetto, e una pratica ferma «in invio» impedisce anche «Sposta» (D200). Si chiude allo stesso modo, con il protocollo dell'INPS al posto dell'NRE.
+- **Dopo 15 minuti**, come la distinta delle PPIP (D232). Un invio aspetta la risposta al più per il tempo dello studio (8 secondi per difetto, D94): dopo 15 minuti non è più in corso.
+- **Chi segna l'esito**: chi può firmare e inviare per quel paziente, come per l'invio; non la segreteria.
+- **«Non è arrivata»**: il medico l'ha chiesto all'ente, quindi l'esito è certo. La ricetta torna in errore come quando il SAR non risponde: si rimanda, o si stampa la ricetta rossa. Il certificato torna da inviare.
+- **«È arrivata»**: il medico scrive il numero che l'ente gli ha dato, l'NRE della ricetta o il protocollo del certificato. Il formato dell'NRE non è ancora nelle specifiche che abbiamo (A1): si accettano lettere e cifre. Il codice di autenticazione è facoltativo: con il codice il promemoria si stampa come sempre; senza, il promemoria non si stampa e lo si dice, e al paziente bastano il numero di ricetta e il codice fiscale.
+- **Un esito tardivo dell'invio di prima** non cambia più la pratica. Succede se il servizio, rimasto fermo più di 15 minuti, poi risponde. La risposta resta nel registro degli invii e chi aspettava riceve «l'esito è stato segnato nel frattempo».
+- **Tracce**: l'esito segnato a mano entra nel registro degli invii con l'ambiente «manuale», insieme al cambio di stato; il registro degli accessi ha la richiesta, come per l'invio.
+- **Anche nella dimostrazione**, perché lì si prova tutto il programma (D224). Il servizio della dimostrazione non si ferma: all'avvio una ricetta e un certificato di malattia di un paziente inventato sono già «in invio» da 20 minuti, firmati dalla Dott.ssa Marchi. Il riquadro della dimostrazione dice di chi sono e dove si chiudono. Il paziente è il più giovane senza pratiche aperte, senza diabete e con una terapia cronica; si sceglie prima di AURA simulata, così non è uno dei pazienti che AURA cambia (esenzione, decesso, revoca, anagrafica, cambio di medico).
+
+Come si è fatto:
+
+- **Ricetta**: la coda «Invii senza risposta» nella pagina Ricette, con il conto in Oggi. Per ogni ricetta: quando era partito l'invio e chi l'aveva firmato, «Non è arrivata: torna da inviare» e il modulo «È arrivata», con l'NRE e il codice di autenticazione facoltativo.
+- **Certificato**: nella sua scheda, dopo 15 minuti, gli stessi due esiti, con il protocollo. Prima dei 15 minuti la scheda dice «Invio all'INPS in corso: aspetta la risposta».
+- **Tutti e due**: l'esito si scrive con la pratica bloccata e riletta, quindi due esiti insieme non passano tutti e due. L'invio scrive la sua risposta solo se la pratica è ancora «in invio» da quella firma.
+- **Una soglia sola**: i 15 minuti stanno nel dominio e valgono anche per le PPIP (D232).
+- **Dimostrazione**: `apps/demo/src/worker/invii.ts` scrive le due pratiche nel database prima dell'avvio, come fanno le prove del servizio. Una prova della dimostrazione segna «È arrivata» con l'NRE e il codice, apre il promemoria nel visore, poi segna il certificato «Non è arrivato» e lo rimanda all'INPS.
+
+Prove: 13 del servizio, 7 dell'interfaccia, 2 del dominio, 1 della dimostrazione; 31 sabotaggi. Al primo giro un sabotaggio del permesso non è stato rilevato: il permesso messo al posto giusto era uno che la segreteria non ha senza le terapie croniche, quindi la segreteria riceveva il rifiuto lo stesso. Rifatto con un permesso che la segreteria ha davvero, è diventato rosso. Non provati: un arresto vero del servizio, il SAR e l'INPS veri. Nella dimostrazione le due pratiche sono scritte «in invio» all'avvio: il servizio non si ferma davvero. La prova nuova della dimostrazione gira qui con Chromium; con WebKit e Firefox solo nella CI.
+
+**D234 · Prove instabili con WebKit: le venti cartelle aperte e «Ricomincia da capo».** Sulla pull request #27 la prova dell'interfaccia con WebKit è caduta una volta (giro 363). Lo stesso commit era verde nell'altro giro (362), e la prova caduta non tocca il codice della #27.
+
+Che cosa è successo:
+
+- Nella prova delle venti cartelle aperte (D68), uno dei venti caricamenti di pagina di fila si è fermato con «WebKit encountered an internal error». WebKit dà questo errore ai caricamenti in corso quando si ferma il suo processo di rete.
+- Con quel processo il browser della prova ha perso i cookie e la memoria della scheda: la sessione e le cartelle aperte. Le dieci prove dopo sono cadute per questo. È passata solo quella che parte senza sessione (ripristino con SPID o CIE), e «dopo l'inattività» ha trovato zero cartelle aperte.
+- Perché il processo di rete di WebKit si sia fermato non si sa: è un difetto del browser, e qui WebKit non c'è. Il programma non ricarica la pagina per aprire una cartella: lo fa solo la prova.
+
+Che cosa si è cambiato:
+
+- **Le venti cartelle si aprono dentro l'interfaccia**, come con un collegamento e senza ricaricare la pagina, cioè come nell'uso vero. Che le cartelle aperte restino dopo un ricaricamento lo prova ancora «dopo l'inattività». La prova aspetta che ogni cartella sia la scheda attiva prima di aprire la successiva.
+- **La prova nuova vede di più.** Con la cartella registrata solo alla prima apertura della pagina, la prova di prima restava verde; quella nuova diventa rossa. Due sabotaggi.
+- **«Ricomincia da capo» con WebKit** è caduto una volta su main dopo l'unione della #26 (giro 353). In 90 secondi il modulo d'accesso non è comparso, e la prova non diceva che cosa mostrava la pagina. Ora, se non riparte, l'errore riporta il testo della pagina, i problemi raccolti e, per confronto, il tempo del primo avvio. Provato con un guasto (la ripartenza dalla pagina interna, il difetto di D232): l'errore riporta «La dimostrazione non è partita in questo browser» con il motivo.
+
+Non provati: WebKit, che qui non c'è; la causa della ripartenza mancata su main, che si vedrà dal testo della pagina se succede di nuovo. Le prove dell'interfaccia usano una sola sessione del browser: se WebKit perde di nuovo il processo di rete in un'altra prova, quelle dopo cadono ancora a catena.

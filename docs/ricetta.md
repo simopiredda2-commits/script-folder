@@ -12,7 +12,8 @@ Da verificare con la Dr.ssa Rocca alla seconda fermata. Fonte: «Prescrizioni e 
    ▲  ▲            │   medico firma     │
    │  └────────────┘                    ├──► Errore: rifiutata ── correggi ──► Bozza
    │                                    ├──► Errore: SAR non raggiungibile ──► Ricetta rossa
-   │                                    └──► Errore: esito incerto ── riprova l'invio
+   │                                    ├──► Errore: esito incerto ── riprova l'invio
+   │                                    └──► (servizio fermo) esito segnato dal medico dopo 15 minuti
    │
  Annullata ◄── da Bozza, Da firmare, Errore (solo locale) o Inviata (tramite SAR)
 ```
@@ -20,6 +21,12 @@ Da verificare con la Dr.ssa Rocca alla seconda fermata. Fonte: «Prescrizioni e 
 - **Bozza**: la prepara il medico, oppure la segreteria per le terapie croniche richieste dal paziente.
 - **Da firmare**: la coda del medico, raggruppata per paziente (`GET /api/ricette/da-firmare`). Le ripetizioni preparate dalla segreteria arrivano qui direttamente.
 - **In invio**: stato tecnico di pochi istanti. Il passaggio è atomico, così la stessa ricetta non parte due volte anche con due clic contemporanei.
+- **Invio rimasto senza risposta** (D233): se il servizio si ferma proprio mentre aspetta il SAR, la ricetta resta «in invio». Dopo 15 minuti è nella coda «Invii senza risposta» della pagina Ricette (`GET /api/ricette/senza-risposta`), e Oggi ne dà il conto. Il medico chiede all'ente se la ricetta è arrivata e segna la risposta (`POST /api/ricette/:id/esito-invio`):
+  - «Non è arrivata»: la ricetta torna in errore come quando il SAR non risponde; si rimanda o si stampa la ricetta rossa;
+  - «È arrivata»: con l'NRE dato dall'ente (lettere e cifre) e, se l'ente lo dà, il codice di autenticazione. Con il codice il promemoria si stampa come sempre; senza, non si stampa e il pannello lo dice. Per i riepiloghi la ricetta è inviata il giorno in cui era partita.
+
+  L'esito resta in `external_submission` con l'ambiente «manuale». Se il servizio di prima, rimasto fermo, poi risponde, la sua risposta resta in `external_submission` e non cambia più la ricetta. Lo segnano solo i medici che possono firmare, non la segreteria.
+
 - **Controlli prima dell'invio**: partono da sé quando la ricetta è pronta. «Firma e invia», e per la segreteria «Manda alla firma del medico», si accendono a controllo finito: chi firma vede sempre i controlli prima (D230). Se il controllo non riesce si può andare avanti, perché il servizio controlla di nuovo all'invio.
 - **Inviata**: il SAR (o il Sistema TS per la ricetta bianca) ha accettato e ha dato l'NRE (l'NRBE per la bianca).
 - **Errore**, con il motivo in chiaro e la coda «Invii non riusciti» (`GET /api/ricette/non-inviate`). Tre casi:
@@ -51,7 +58,7 @@ Una ricetta inviata si annulla solo se l'ente non l'ha ancora lavorata. Prima di
 
 - La segreteria prepara le ripetizioni di terapie croniche non riservate, nella coda «da firmare». Le ripetizioni sono **raggruppate** (scelta della seconda fermata): più terapie nella stessa ricetta se hanno lo stesso tipo di ricetta e la stessa esenzione, senza superare il limite di confezioni di R2 in vigore. Non firma, non invia, non prepara ricette nuove.
 - Il medico prepara, firma e invia. Il sostituto e il collega autorizzato firmano **a nome loro**.
-- Ogni operazione passa dalla guardia sui dati del paziente e finisce nel registro degli accessi (`ricetta_bozza`, `ricetta_ripetizione`, `ricetta_da_firmare`, `ricetta_firma_invio`, `ricetta_annullamento`, `ricetta_cartacea`).
+- Ogni operazione passa dalla guardia sui dati del paziente e finisce nel registro degli accessi (`ricetta_bozza`, `ricetta_ripetizione`, `ricetta_da_firmare`, `ricetta_firma_invio`, `ricetta_esito_invio`, `ricetta_annullamento`, `ricetta_cartacea`).
 
 ## Integrazioni
 

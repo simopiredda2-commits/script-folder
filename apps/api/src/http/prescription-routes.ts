@@ -76,6 +76,11 @@ export function registerPrescriptionRoutes(
     return { esito: r.outcome, nre: r.nre, messaggio: r.messaggio };
   });
 
+  // Esito di un invio rimasto senza risposta, chiesto all'ente dal medico (D233).
+  app.post('/api/ricette/:id/esito-invio', scoped, async (req) => {
+    return service.settleInterrupted(req.actor!, idParams.parse(req.params).id, req.body);
+  });
+
   // Stato di erogazione presso l'ente e possibilità di annullare (D70).
   app.get('/api/ricette/:id/stato-erogazione', scoped, async (req) => {
     return service.dispensingStatus(req.actor!, idParams.parse(req.params).id);
@@ -96,5 +101,10 @@ export function registerPrescriptionRoutes(
 
   app.get('/api/ricette/non-inviate', async (req) => ({
     pazienti: await service.failedQueue(req.actor!),
+  }));
+
+  // Invii rimasti senza risposta: l'esito lo segna il medico (D233).
+  app.get('/api/ricette/senza-risposta', async (req) => ({
+    pazienti: await service.interruptedQueue(req.actor!),
   }));
 }

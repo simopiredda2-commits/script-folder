@@ -4,6 +4,7 @@ import type {
   AdditionalServicesReport,
   AdditionalServicesResult,
 } from '@mmg/integrations';
+import { INTERRUPTED_SEND_AFTER_MINUTES } from '@mmg/domain';
 import { and, asc, desc, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccessForPatients } from '../audit/access-log';
@@ -398,7 +399,7 @@ export async function reportsOf(db: Database, archiveId: string, month: string) 
  * Dopo quanto un invio senza risposta si considera interrotto: il servizio si è fermato a metà, o
  * il portale non ha risposto in modo chiaro. Prima, l'invio potrebbe essere ancora in corso.
  */
-export const INTERRUPTED_AFTER_MINUTES = 15;
+export const INTERRUPTED_AFTER_MINUTES = INTERRUPTED_SEND_AFTER_MINUTES;
 
 /** Ambiente degli esiti segnati dal titolare: consegna fuori dal programma o esito chiesto all'ASL. */
 export const MANUAL_ENVIRONMENT = 'manuale';

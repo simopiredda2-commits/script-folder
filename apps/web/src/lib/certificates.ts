@@ -35,6 +35,10 @@ export interface Certificate {
   annullabile: boolean;
   rettificabile: boolean;
   continuabile: boolean;
+  /** «In invio» da più di 15 minuti: l'esito lo segna il medico (D233). */
+  invioInterrotto: boolean;
+  /** Quando era partito l'ultimo invio. */
+  inviatoIl: string | null;
 }
 
 export interface CertificateList {

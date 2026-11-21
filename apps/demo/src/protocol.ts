@@ -44,6 +44,15 @@ export interface AftHints {
   fiscalCode: string;
 }
 
+/**
+ * Gli invii rimasti senza risposta (D233): il paziente della ricetta e del certificato «in invio»,
+ * e il medico che li aveva firmati.
+ */
+export interface InterruptedHints {
+  patient: string;
+  doctor: string;
+}
+
 export type ToWorker =
   | { type: 'start'; base: string }
   | { type: 'request'; id: number; request: WireRequest }
@@ -56,6 +65,7 @@ export type FromWorker =
       users: DemoUser[];
       aura: AuraHints;
       aft: AftHints;
+      interrupted: InterruptedHints;
       password: string;
       ms: number;
     }
