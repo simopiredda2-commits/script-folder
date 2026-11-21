@@ -239,6 +239,145 @@ describe('allegato 3 del DPCM LEA: presidi per diabete e malattie rare (D218)', 
   });
 });
 
+/**
+ * Allegato 2 del DPCM LEA (D236): gli ausili monouso, dal PDF della pagina del Ministero
+ * (29/9/2026), con le modifiche dell'allegato M del DM 3/8/2026. Da controllare prima dell'uso (A8).
+ */
+describe('allegato 2 del DPCM LEA: ausili monouso (D236)', () => {
+  const sheet2 = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+    (f) => f.path === 'lea/allegato-2-ausili-monouso.json',
+  )!;
+  const table2 = readTable(readFileSync(sheet2.csvPath), 'allegato-2-ausili-monouso.csv');
+  const read2 = extractRecords(mappingForTranscription(loadMappings(), 'presidi')!, table2);
+  const item = (code: string) => read2.records.find((r) => r.code === code)!;
+  const cell = (code: string, name: string) =>
+    table2.find((r) => r[1] === code)![table2[0]!.indexOf(name)];
+
+  it('una scheda intera, da controllare, in vigore dal 30/10/2026 come il DM 3/8/2026', () => {
+    expect(sheet2.sheet).toMatchObject({
+      tipo: 'presidi',
+      serie: 'lea-presidi-ausili-monouso',
+      in_vigore_dal: '2026-10-30',
+      controllato_da: null,
+    });
+    expect(sheet2.sheet.solo_modifiche ?? false).toBe(false);
+    expect(sheet2.sheet.atto).toMatch(
+      /allegato 2: ausili monouso, aggiornato dal DM 3 agosto 2026/,
+    );
+  });
+
+  it('87 presidi dell’allegato 2 in 21 gruppi, nell’ordine dell’allegato, ogni codice una volta', () => {
+    expect(read2.missingColumns).toEqual([]);
+    expect(read2.problems).toEqual([]);
+    expect(read2.records).toHaveLength(87);
+    expect(new Set(read2.records.map((r) => r.entryType))).toEqual(new Set(['presidio']));
+    expect(new Set(read2.records.map((r) => r.annex))).toEqual(new Set(['2']));
+    const codes = read2.records.map((r) => String(r.code));
+    expect(new Set(codes).size).toBe(87);
+    for (const c of codes) expect(c).toMatch(/^(?:04|09)\.\d{2}\.\d{2}\.\d{3}$/);
+    expect([...new Set(read2.records.map((r) => r.group))]).toEqual([
+      '09.15 ausili per tracheostomia/laringectomia',
+      '09.18.04 sacche per stomia, a un pezzo, a fondo chiuso',
+      '09.18.05 sacche per stomia, a più pezzi, a fondo chiuso',
+      '09.18.07 sacche per stomia, a un pezzo, a fondo aperto con valvola anti-reflusso',
+      '09.18.08 sacche per stomia, a più pezzi, a fondo aperto con valvola anti-reflusso',
+      "09.18.24 ausili per l'irrigazione dell'intestino",
+      '09.18.30 protettori dello stoma e cute peristomale',
+      '04.49 prodotti per il trattamento delle lesioni cutanee',
+      'lubrificante per cateterismo',
+      '09.24.03 cateteri vescicali a permanenza (o autostatici)',
+      '09.24.06 cateteri vescicali a intermittenza',
+      '09.24.21 catetere maschile esterno per urina',
+      '09.27 raccoglitori di urina',
+      "09.30 ausili assorbenti l'urina (ed altre deiezioni)",
+      '09.30.12 ausili assorbenti per bambini',
+      '09.30.18 ausili assorbenti per adulti',
+      '09.30.21 ausili assorbenti da indossare',
+      '09.30.24 biancheria monouso protettiva per adulti',
+      '09.30.39 sistema di fissaggio per pannolini ed assorbenti',
+      '09.30.42 ausili assorbenti monuso non indossabili',
+      '09.31.06 ausili per incontinenza fecale',
+    ]);
+    const count = (group: string) => read2.records.filter((r) => r.group === group).length;
+    expect(count('04.49 prodotti per il trattamento delle lesioni cutanee')).toBe(19);
+    expect(count('09.24.06 cateteri vescicali a intermittenza')).toBe(8);
+  });
+
+  it('le modifiche dell’allegato M del DM 3/8/2026: refusi (M1) e denominazioni (M2)', () => {
+    expect(item('09.15.03.021').description).toBe('adesivi stomali per laringectomizzati');
+    expect(item('09.15.03.024').description).toBe('filtri umidificatori per laringectomizzati');
+    expect(item('09.15.03.003').group).toBe('09.15 ausili per tracheostomia/laringectomia');
+    expect(item('09.24.21.003')).toMatchObject({
+      description: 'guaina (catetere maschile esterno)',
+      group: '09.24.21 catetere maschile esterno per urina',
+    });
+    const text = read2.records.map((r) => `${r.description} ${r.group}`).join('\n');
+    expect(text).not.toMatch(/condom|guaina in materiale ipoallergenico|tracheostomia$/m);
+  });
+
+  it('le voci che dicono solo una misura hanno davanti la loro etichetta, senza note', () => {
+    expect(item('04.49.03.103').description).toBe(
+      'medicazioni in alginato (classe M040402 - Cnd): cm 15 x 15 (corrispondente ad una superficie attiva di 225 cm² +/- 10%)',
+    );
+    expect(item('09.27.04.003').description).toBe(
+      "sacca di raccolta dell'urina, da gamba: monouso",
+    );
+    expect(item('09.30.39.003').description).toBe(
+      'mutanda di fissaggio, elasticizzata, riutilizzabile, priva di lattice: extra-grande',
+    );
+    expect(item('09.30.18.048').description).toMatch(
+      /^assorbente .*\(sagomato, .*\): misura grande$/,
+    );
+    // Le due serie dei 09.30.21 si distinguono anche nel nome, non solo nel codice.
+    for (const c of ['003', '006', '009'])
+      expect(item(`09.30.21.${c}`).description).not.toMatch(/più elevata capacità/);
+    for (const c of ['012', '015', '018'])
+      expect(item(`09.30.21.${c}`).description).toMatch(
+        /\) \[…\] allo scopo di realizzare una più elevata capacità di assorbimento: taglia /,
+      );
+    const descriptions = read2.records.map((r) => String(r.description));
+    expect(new Set(descriptions).size).toBe(87);
+    // Niente note, righe o spazi doppi; l'esponente è «cm²», non «cm2» o «cm 2».
+    for (const d of descriptions) expect(d).not.toMatch(/\bNOTA\b|\n|\s{2}|cm ?2 \+\/-/);
+    expect(descriptions.filter((d) => d.includes('cm² +/- 10%'))).toHaveLength(14);
+    // Il campo «Prodotto» della prescrizione ne tiene 500: la voce più lunga ne ha 401.
+    expect(Math.max(...descriptions.map((d) => d.length))).toBe(401);
+    expect(item('09.30.24.063').description).toMatch(/al momento del cambio\.$/);
+  });
+
+  it('il testo come stampato, compresi i refusi dell’allegato', () => {
+    expect(item('09.30.42.003').group).toMatch(/monuso non indossabili$/);
+    expect(item('09.30.24.063').description).toMatch(/morbido e ipoallegenico/);
+    expect(item('09.30.04.060').description).toMatch(/con moderate perdita di urina\.$/);
+    expect(item('09.18.05.006').description).toMatch(/in una cicatrice \+ sacca a fondo chiuso\)$/);
+    expect(item('09.21.18.003')).toMatchObject({
+      description: 'lubrificante per cateterismo',
+      group: 'lubrificante per cateterismo',
+    });
+  });
+
+  it('quantità e pagina restano nel CSV come stampate, ma non si importano', () => {
+    expect(table2[0]).toEqual([
+      'tipo',
+      'codice',
+      'descrizione',
+      'gruppo',
+      'allegato',
+      'quantita',
+      'pagina_pdf',
+    ]);
+    expect(cell('09.15.03.003', 'quantita')).toBe('4');
+    expect(cell('09.15.03.021', 'quantita')).toBe('');
+    expect(cell('09.18.05.003', 'quantita')).toBe('20 + 60');
+    expect(cell('09.31.06.006', 'quantita')).toBe('2/anno');
+    expect(cell('09.30.12.045', 'quantita')).toBe('120');
+    expect(cell('09.31.06.009', 'pagina_pdf')).toBe('10');
+    expect(Object.keys(item('09.15.03.003')).sort()).toEqual(
+      ['annex', 'code', 'description', 'entryType', 'group'].sort(),
+    );
+  });
+});
+
 describe('famiglie dei codici di esenzione (D190)', () => {
   it('cronici con le cifre, rari con R e una lettera, gli altri per le lettere iniziali', () => {
     expect(

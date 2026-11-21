@@ -1,0 +1,88 @@
+tipo;codice;descrizione;gruppo;allegato;quantita;pagina_pdf
+presidio;09.15.03.003;cannula tracheale in plastica morbida con mandrino, non fenestrata;09.15 ausili per tracheostomia/laringectomia;2;4;1
+presidio;09.15.03.006;cannula tracheale in plastica morbida con mandrino, fenestrata;09.15 ausili per tracheostomia/laringectomia;2;4;1
+presidio;09.15.03.009;cannula tracheale in plastica rigida con mandrino, non fenestrata;09.15 ausili per tracheostomia/laringectomia;2;4;1
+presidio;09.15.03.012;cannula tracheale in plastica rigida con mandrino, fenestrata;09.15 ausili per tracheostomia/laringectomia;2;4;1
+presidio;09.15.03.015;cannula tracheale in metallo cromato o argentato in due o tre pezzi;09.15 ausili per tracheostomia/laringectomia;2;2;1
+presidio;09.15.03.018;cannula tracheale in argento 900/1000 in tre pezzi;09.15 ausili per tracheostomia/laringectomia;2;2;1
+presidio;09.15.03.021;adesivi stomali per laringectomizzati;09.15 ausili per tracheostomia/laringectomia;2;;1
+presidio;09.15.03.024;filtri umidificatori per laringectomizzati;09.15 ausili per tracheostomia/laringectomia;2;;1
+presidio;09.18.04.003;sacca per colostomia a fondo chiuso;09.18.04 sacche per stomia, a un pezzo, a fondo chiuso;2;60;1
+presidio;09.18.04.006;sacca per colostomia a fondo chiuso per stomi introflessi (stoma a filo, retratto, situato in una piega cutanea o in una cicatrice);09.18.04 sacche per stomia, a un pezzo, a fondo chiuso;2;60;1
+presidio;09.18.05.003;sistema per colostomia (placca adesiva con flangia + sacche a fondo chiuso);09.18.05 sacche per stomia, a più pezzi, a fondo chiuso;2;20 + 60;2
+presidio;09.18.05.006;sistema per colostomia (placca adesiva con flangia a convessità integrale per stomi introflessi (stoma a filo, retratto o situato in una piega cutanea e/o in una cicatrice + sacca a fondo chiuso);09.18.05 sacche per stomia, a più pezzi, a fondo chiuso;2;20 + 60;2
+presidio;09.18.07.003;sacca per ileostomia a fondo aperto;09.18.07 sacche per stomia, a un pezzo, a fondo aperto con valvola anti-reflusso;2;90;2
+presidio;09.18.07.006;sacca per urostomia a fondo aperto;09.18.07 sacche per stomia, a un pezzo, a fondo aperto con valvola anti-reflusso;2;30;2
+presidio;09.18.07.009;sacca per ileostomie introflesse (stoma a filo, retratto o situato in una piega cutanea e/o in una cicatrice) a fondo aperto;09.18.07 sacche per stomia, a un pezzo, a fondo aperto con valvola anti-reflusso;2;90;2
+presidio;09.18.07.012;sacca per urostomie introflesse (stoma a filo, retratto o situato in una piega cutanea e/o in una cicatrice) a fondo aperto;09.18.07 sacche per stomia, a un pezzo, a fondo aperto con valvola anti-reflusso;2;30;2
+presidio;09.18.08.003;sistema per ileostomia (placca adesiva con flangia + sacche a fondo aperto);09.18.08 sacche per stomia, a più pezzi, a fondo aperto con valvola anti-reflusso;2;20 + 90;2
+presidio;09.18.08.006;sistema per urostomia (placca adesiva con flangia + sacche a fondo aperto);09.18.08 sacche per stomia, a più pezzi, a fondo aperto con valvola anti-reflusso;2;20 + 30;2
+presidio;09.18.08.009;sistema per ileostomia (placca adesiva con flangia a convessità integrale per ileostomie introflesse (stoma a filo, retratto o situato in una piega cutanea e/o in una cicatrice) + sacche a fondo aperto);09.18.08 sacche per stomia, a più pezzi, a fondo aperto con valvola anti-reflusso;2;20 + 90;2
+presidio;09.18.08.012;sistema per urostomia (placca adesiva con flangia a convessità integrale per urostomie introflesse (stoma a filo, retratto o situato in una piega cutanea e/o in una cicatrice) + sacche a fondo aperto);09.18.08 sacche per stomia, a più pezzi, a fondo aperto con valvola anti-reflusso;2;20 + 30;3
+presidio;09.18.24.003;sistema di irrigazione completo;09.18.24 ausili per l'irrigazione dell'intestino;2;;3
+presidio;09.18.24.006;irrigatore semplice;09.18.24 ausili per l'irrigazione dell'intestino;2;;3
+presidio;09.18.24.009;sacche di scarico trasparenti a fondo aperto per irrigazione, con barriera autoportante o adesivo o flangia;09.18.24 ausili per l'irrigazione dell'intestino;2;;3
+presidio;09.18.24.012;tappo ad espansione o post irrigazione non ad espansione, con filtro incorporato;09.18.24 ausili per l'irrigazione dell'intestino;2;;3
+presidio;09.18.24.015;mini sacca post-irrigazione con barriera autoportante, filtro incorporato e lato interno in TNT assorbente;09.18.24 ausili per l'irrigazione dell'intestino;2;;3
+presidio;09.18.30.003;pasta o pomata protettiva, ad azione emolliente e/o eudermica;09.18.30 protettori dello stoma e cute peristomale;2;;3
+presidio;09.18.30.006;polvere protettiva per zone peristomali;09.18.30 protettori dello stoma e cute peristomale;2;;3
+presidio;09.18.30.009;salviettine per detersione;09.18.30 protettori dello stoma e cute peristomale;2;;3
+presidio;09.18.30.012;pasta solidificata;09.18.30 protettori dello stoma e cute peristomale;2;;3
+presidio;04.49.03.103;medicazioni in alginato (classe M040402 - Cnd): cm 15 x 15 (corrispondente ad una superficie attiva di 225 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;4
+presidio;04.49.03.106;medicazioni in alginato (classe M040402 - Cnd): a nastro (espressa in superficie attiva);04.49 prodotti per il trattamento delle lesioni cutanee;2;;4
+presidio;04.49.03.109;medicazioni in alginato (classe M040402 - Cnd): cm 10 x 20 (corrispondente ad una superficie attiva di 200 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;4
+presidio;04.49.06.203;medicazioni in idrocolloidi (classi M040403 - Cnd): cm 10 x 10 (corrispondente ad una superficie attiva di 100 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;4
+presidio;04.49.06.206;medicazioni in idrocolloidi (classi M040403 - Cnd): cm 15 x 15 (corrispondente ad una superficie attiva di 225 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;4
+presidio;04.49.06.209;medicazioni in idrocolloidi (classi M040403 - Cnd): cm 20 x 20 (corrispondente ad una superficie attiva di 400 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;4
+presidio;04.49.09.303;medicazioni in idrofibra (classe M040404 - Cnd): cm 5 x 5 (corrispondente ad una superficie attiva di 25 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.09.306;medicazioni in idrofibra (classe M040404 - Cnd): cm 10 x 10 (corrispondente ad una superficie attiva di 100 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.09.309;medicazioni in idrofibra (classe M040404 - Cnd): cm 15 x 15 (corrispondente ad una superficie attiva di 225 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.12.403;medicazioni in gel idrofilo (classe M040405 - Cnd);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.15.503;medicazioni in argento (classe M04040801/02- Cnd): cm 15 x 15 (corrispondente ad una superficie attiva di 225 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.15.506;medicazioni in argento (classe M04040801/02- Cnd): cm 10 x 10 (corrispondente ad una superficie attiva di 100 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.15.509;medicazioni in argento (classe M04040801/02- Cnd): cm 10 x 20 (corrispondente ad una superficie attiva di 200 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.18.603;medicazioni in poliuretano (classe M040406 - Cnd): cm 10 x 10 (corrispondente ad una superficie attiva di 100 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.18.606;medicazioni in poliuretano (classe M040406 - Cnd): cm 10 x 20 (corrispondente ad una superficie attiva di 200 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.18.609;medicazioni in poliuretano (classe M040406 - Cnd): cm 15 x 20 (corrispondente ad una superficie attiva di 300 cm² +/- 10%);04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.21.633;medicazione cavitaria;04.49 prodotti per il trattamento delle lesioni cutanee;2;;5
+presidio;04.49.24.703;medicazioni costituite da garze e sostanze ad azione emolliente (classi M02030201 e M02030299 - Cnd);04.49 prodotti per il trattamento delle lesioni cutanee;2;;6
+presidio;04.49.27.903;rete elastica tubolare;04.49 prodotti per il trattamento delle lesioni cutanee;2;;6
+presidio;09.21.18.003;lubrificante per cateterismo;lubrificante per cateterismo;2;;6
+presidio;09.24.03.003;catetere a permanenza tipo Foley a due vie con scanalature;09.24.03 cateteri vescicali a permanenza (o autostatici);2;2;6
+presidio;09.24.03.006;catetere a permanenza tipo Foley a due vie senza scanalature;09.24.03 cateteri vescicali a permanenza (o autostatici);2;2;6
+presidio;09.24.06.006;catetere in PVC in confezione singola sterile con punta Nelaton (dritta e di forma conica);09.24.06 cateteri vescicali a intermittenza;2;120;6
+presidio;09.24.06.009;catetere in PVC in confezione singola sterile con punta Tieman (leggermente ricurva);09.24.06 cateteri vescicali a intermittenza;2;120;7
+presidio;09.24.06.103;catetere autolubrificante a base di gel;09.24.06 cateteri vescicali a intermittenza;2;120;7
+presidio;09.24.06.203;catetere autolubrificante idrofilo in PVP o analogo materiale (NON PRONTO ALL'USO);09.24.06 cateteri vescicali a intermittenza;2;120;7
+presidio;09.24.06.303;catetere autolubrificante idrofilo in PVP o analogo materiale (PRONTO ALL'USO);09.24.06 cateteri vescicali a intermittenza;2;120;7
+presidio;09.24.06.403;catetere autolubrificante a base di gel CON SACCA GRADUATA DI RACCOLTA;09.24.06 cateteri vescicali a intermittenza;2;120;7
+presidio;09.24.06.503;catetere autolubrificante idrofilo CON SACCA GRADUATA DI RACCOLTA;09.24.06 cateteri vescicali a intermittenza;2;120;7
+presidio;09.24.06.603;catetere/tutore per ureterocutaneostomia;09.24.06 cateteri vescicali a intermittenza;2;2;7
+presidio;09.24.21.003;guaina (catetere maschile esterno);09.24.21 catetere maschile esterno per urina;2;60;7
+presidio;09.27.04.006;sacca di raccolta dell'urina, da letto: monouso a fondo chiuso;09.27 raccoglitori di urina;2;30;8
+presidio;09.27.05.003;sacca di raccolta dell'urina, da letto: riutilizzabile con rubinetto di scarico;09.27 raccoglitori di urina;2;20;8
+presidio;09.27.04.003;sacca di raccolta dell'urina, da gamba: monouso;09.27 raccoglitori di urina;2;30;8
+presidio;09.27.05.006;sacca di raccolta dell'urina, da gamba: riutilizzabile;09.27 raccoglitori di urina;2;20;8
+presidio;09.30.04.060;"pannolone rettangolare per adulti, senza sistema integrato di fissaggio, ad elevata flessibilità, con rivestimento esterno impermeabile, con rivestimento interno morbido ed ipoallergenico, con materiale assorbente costituito da polimeri o fibre superassorbenti; in genere, indicato per assistiti con moderate perdita di urina.";09.30 ausili assorbenti l'urina (ed altre deiezioni);2;150;8
+presidio;09.30.12.042;pannolone a mutandina per bambini con sistema integrato di fissaggio (ad adesivi riposizionabili, ad etichette meccaniche, a pannelli elastici): formato per assistiti di peso da 7 a 14 Kg circa;09.30.12 ausili assorbenti per bambini;2;120;8
+presidio;09.30.12.045;pannolone a mutandina per bambini con sistema integrato di fissaggio (ad adesivi riposizionabili, ad etichette meccaniche, a pannelli elastici): formato per assistiti di peso da 15 a 22 Kg circa;09.30.12 ausili assorbenti per bambini;2;120;8
+presidio;09.30.18.048;assorbente senza sistema integrato di fissaggio (sagomato, aderente e di facile vestibilità): misura grande;09.30.18 ausili assorbenti per adulti;2;120;9
+presidio;09.30.18.051;assorbente senza sistema integrato di fissaggio (sagomato, aderente e di facile vestibilità): misura media;09.30.18 ausili assorbenti per adulti;2;120;9
+presidio;09.30.18.054;assorbente senza sistema integrato di fissaggio (sagomato, aderente e di facile vestibilità): misura piccola;09.30.18 ausili assorbenti per adulti;2;120;9
+presidio;09.30.18.057;pannolino per uomo a conformazione fisioanatomica con adesivo o altri sistemi di fissaggio;09.30.18 ausili assorbenti per adulti;2;120;9
+presidio;09.30.21.003;pannolone a mutandina con sistema integrato di fissaggio (ad adesivi riposizionabili, ad etichette meccaniche, a pannelli elastici o a cintura): taglia grande (per assistiti con circonferenza di vita orientativamente superiore a 110 cm);09.30.21 ausili assorbenti da indossare;2;120;9
+presidio;09.30.21.006;pannolone a mutandina con sistema integrato di fissaggio (ad adesivi riposizionabili, ad etichette meccaniche, a pannelli elastici o a cintura): taglia media (per assistiti con circonferenza di vita orientativamente da 70 a 110 cm);09.30.21 ausili assorbenti da indossare;2;120;9
+presidio;09.30.21.009;pannolone a mutandina con sistema integrato di fissaggio (ad adesivi riposizionabili, ad etichette meccaniche, a pannelli elastici o a cintura): taglia piccola (per assistiti con circonferenza di vita orientativamente da 50 a 80 cm);09.30.21 ausili assorbenti da indossare;2;120;9
+presidio;09.30.21.012;pannolone a mutandina con sistema integrato di fissaggio (ad adesivi riposizionabili, ad etichette meccaniche, a pannelli elastici o a cintura) […] allo scopo di realizzare una più elevata capacità di assorbimento: taglia grande (per assistiti con circonferenza di vita superiore a 110 cm);09.30.21 ausili assorbenti da indossare;2;120;9
+presidio;09.30.21.015;pannolone a mutandina con sistema integrato di fissaggio (ad adesivi riposizionabili, ad etichette meccaniche, a pannelli elastici o a cintura) […] allo scopo di realizzare una più elevata capacità di assorbimento: taglia media (per assistiti con circonferenza di vita da 70 a 110 cm circa);09.30.21 ausili assorbenti da indossare;2;120;9
+presidio;09.30.21.018;pannolone a mutandina con sistema integrato di fissaggio (ad adesivi riposizionabili, ad etichette meccaniche, a pannelli elastici o a cintura) […] allo scopo di realizzare una più elevata capacità di assorbimento: taglia piccola (per assistiti con circonferenza di vita da 50 a 80 cm circa);09.30.21 ausili assorbenti da indossare;2;120;9
+presidio;09.30.24.063;"mutanda pannolone (tipo pull-on ), completamente indossabile, avvolgente l'addome, rivestimento esterno impermeabile, rivestimento interno morbido e ipoallegenico, presenza di barriere antifuoriuscita a varia conformazione; il materiale assorbente è costituito da polimeri e fibre superassorbenti ad elevata capacità di tenuta ai liquidi, con saldature laterali facili da aprire al momento del cambio.";09.30.24 biancheria monouso protettiva per adulti;2;120;9
+presidio;09.30.39.003;mutanda di fissaggio, elasticizzata, riutilizzabile, priva di lattice: extra-grande;09.30.39 sistema di fissaggio per pannolini ed assorbenti;2;3;10
+presidio;09.30.39.006;mutanda di fissaggio, elasticizzata, riutilizzabile, priva di lattice: grande;09.30.39 sistema di fissaggio per pannolini ed assorbenti;2;3;10
+presidio;09.30.39.009;mutanda di fissaggio, elasticizzata, riutilizzabile, priva di lattice: media;09.30.39 sistema di fissaggio per pannolini ed assorbenti;2;3;10
+presidio;09.30.39.012;mutanda di fissaggio, elasticizzata, riutilizzabile, priva di lattice: piccola;09.30.39 sistema di fissaggio per pannolini ed assorbenti;2;3;10
+presidio;09.30.42.003;traversa salvamaterasso rimboccabile, formato cm 80 x 180, con superficie del tampone assorbente non inferiore al 25% della superficie totale;09.30.42 ausili assorbenti monuso non indossabili;2;120;10
+presidio;09.30.42.006;traversa salvamaterasso non rimboccabile, formato cm 60 x 90, con superficie del tampone assorbente non inferiore al 75% della superficie totale;09.30.42 ausili assorbenti monuso non indossabili;2;120;10
+presidio;09.31.06.003;tampone anale ad espansione;09.31.06 ausili per incontinenza fecale;2;30/mese;10
+presidio;09.31.06.006;irrigatore anale: set completo;09.31.06 ausili per incontinenza fecale;2;2/anno;10
+presidio;09.31.06.009;irrigatore anale: cateteri monouso;09.31.06 ausili per incontinenza fecale;2;15/mese;10

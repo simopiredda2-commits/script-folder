@@ -111,20 +111,24 @@ Letti, non trascritti: l'elenco è precedente al nuovo nomenclatore (`docs/banch
 
 ### Modifiche del 2026 ai LEA (D216)
 
-Letta il 20/11/2026 per sapere che cosa cambiano il DPCM 7 agosto 2026 e il DM 3 agosto 2026; nel repository non entra niente. Il DPCM con i suoi allegati, mandato da Simone il 21/11/2026, è servito a controllare la trascrizione dell'allegato 8. Testo di atti ufficiali (art. 5 della legge 633/1941); il PDF resta fuori dal repository.
+Letta il 20/11/2026 per sapere che cosa cambiano il DPCM 7 agosto 2026 e il DM 3 agosto 2026; nel repository non entra niente. Il DPCM con i suoi allegati e il DM in tre parti, mandati da Simone il 21/11/2026, sono serviti a controllare le trascrizioni degli allegati 2, 7 e 8 (D236). Testo di atti ufficiali (art. 5 della legge 633/1941); i PDF restano fuori dal repository.
 
 | Documento                                                                                    | Indirizzo                                                                                      | Byte      | SHA-256                                                            |
 | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
 | GU n. 227 del 30/9/2026, serie generale: DPCM 7/8/2026 (pp. 20–22) e DM 3/8/2026 (pp. 43–47) | `https://www.gazzettaufficiale.it/eli/gu/2026/09/30/227/sg/pdf`                                | 3.379.374 | `5b57a2f001b3d2bc2687f62b9ed46eb610d4760ce32b727ebad4b3a17d6a6974` |
 | DPCM 7/8/2026 con gli allegati A–E (testo integrale firmato, 37 pagine)                      | Mandato da Simone il 21/11/2026 (file `DPCM_modifica_LEA.pdf`, dalla pagina LEA del Ministero) | 1.762.275 | `2ab2314b1f3a2fdb8c3357b30aa51f02728c90dc181bd145285de1a0af9337e7` |
+| DM 3/8/2026, parte 1 di 3: decreto, allegato 1 (articoli), allegati A e M (26 pagine)        | Mandato da Simone il 21/11/2026 (file `DM-LEA-2026_parte1di3_decreto_AllA_AllM.pdf`)           | 1.242.761 | `37dd601106f88a3bc35dfcf5433c23a7420c1c14e5dd11367df24bbce4a567fd` |
+| DM 3/8/2026, parte 2 di 3: allegato B, specialistica (33 pagine)                             | Mandato da Simone il 21/11/2026 (file `DM-LEA-2026_parte2di3_AllB_specialistica.pdf`)          | 683.328   | `cb0d650aa21c22e037a3f56c9e67de52c2ab58977265db9c6e0683c854aa9454` |
+| DM 3/8/2026, parte 3 di 3: allegati C, N, R, D, F, T e V (73 pagine)                         | Mandato da Simone il 21/11/2026 (file `DM-LEA-2026_parte3di3_AllC_D_F_T.pdf`)                  | 1.770.558 | `cf7286f73af4df3079c76a6575b1e3c47fd2f0a24832b802fe5b2708cef427a5` |
 
-### Presidi del DPCM LEA (D218)
+### Presidi del DPCM LEA (D218, D236)
 
-La trascrizione in `packages/reference/data/trascrizioni/lea/allegato-3-presidi.csv` viene dalle pagine 52 e 53 del supplemento qui sotto, scaricato il 20/11/2026. È testo di un atto ufficiale (art. 5 della legge 633/1941); il PDF resta fuori dal repository. Che cosa è diverso dal PDF: `docs/banche-dati.md`, «Presidi del DPCM LEA».
+La trascrizione in `packages/reference/data/trascrizioni/lea/allegato-3-presidi.csv` viene dalle pagine 52 e 53 del supplemento qui sotto, scaricato il 20/11/2026. Quella in `allegato-2-ausili-monouso.csv` viene dal PDF dell'allegato 2 della pagina LEA del Ministero (versione del 29/9/2026), mandato da Simone il 18/11/2026, confrontato con l'allegato M del DM 3/8/2026 (sezione qui sopra). Sono testo di atti ufficiali (art. 5 della legge 633/1941); i PDF restano fuori dal repository. Che cosa è diverso dal PDF: `docs/banche-dati.md`, «Presidi del DPCM LEA».
 
-| Documento                                                                                     | Indirizzo                                                            | Byte      | SHA-256                                                            |
-| --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
-| DPCM 12/1/2017 (LEA), S.O. n. 15 alla GU n. 65 del 18/3/2017 (allegato 3 alle pagine 52 e 53) | `https://www.gazzettaufficiale.it/eli/gu/2017/03/18/65/so/15/sg/pdf` | 8.414.349 | `a489b86ee9a222af1cea2be946515a34feb3149120d69fa1cbbf7a3899ebaab9` |
+| Documento                                                                                     | Indirizzo                                                              | Byte      | SHA-256                                                            |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
+| DPCM 12/1/2017 (LEA), S.O. n. 15 alla GU n. 65 del 18/3/2017 (allegato 3 alle pagine 52 e 53) | `https://www.gazzettaufficiale.it/eli/gu/2017/03/18/65/so/15/sg/pdf`   | 8.414.349 | `a489b86ee9a222af1cea2be946515a34feb3149120d69fa1cbbf7a3899ebaab9` |
+| DPCM 12/1/2017, allegato 2: ausili monouso (10 pagine, creato il 29/9/2026)                   | Mandato da Simone il 18/11/2026 (file `Allegato_2_Ausili_monouso.pdf`) | 386.408   | `2296b327d020f50cba641df3d11779649359b05d6eb7c27240ca64092438e67d` |
 
 ### Promemoria della ricetta (D217)
 

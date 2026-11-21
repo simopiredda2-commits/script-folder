@@ -22,8 +22,9 @@ const optionalText = (max: number) => z.string().trim().max(max).optional();
 export const supplyBody = z
   .object({
     categoria: z.enum(SUPPLY_CATEGORY_KEYS),
-    prodotto: z.string().trim().min(1).max(300),
-    /** Codice del nomenclatore, se noto (allegati 2 e 3 del DPCM): da completare nel programma. */
+    // 500: la voce più lunga dell'allegato 2 del DPCM LEA ha 401 caratteri (D236).
+    prodotto: z.string().trim().min(1).max(500),
+    /** Codice del nomenclatore, se noto: scelto dagli allegati 2 e 3 del DPCM (D218, D236) o scritto. */
     codice: optionalText(30),
     quantitaMensile: z.number().int().min(1).max(9999),
     unita: z.string().trim().min(1).max(50),

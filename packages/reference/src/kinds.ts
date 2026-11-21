@@ -230,9 +230,9 @@ export const KINDS = {
   },
   /**
    * Nomenclatore dei presidi dell'assistenza integrativa, dagli allegati del DPCM LEA: l'allegato 3
-   * (presidi per persone affette da patologia diabetica e da malattie rare, art. 13) e, quando
-   * arriva, l'allegato 2 (ausili monouso, art. 11). Ogni voce è un presidio con il suo codice,
-   * oppure una delle malattie rare che danno diritto ai presidi dell'allegato 3 (D218).
+   * (presidi per persone affette da patologia diabetica e da malattie rare, art. 13, D218) e
+   * l'allegato 2 (ausili monouso, art. 11, D236). Ogni voce è un presidio con il suo codice,
+   * oppure una delle malattie rare che danno diritto ai presidi dell'allegato 3.
    */
   presidi: {
     label: 'Presidi dell’assistenza integrativa (DPCM LEA)',
@@ -254,7 +254,7 @@ export const KINDS = {
       description: { type: 'text', required: true },
       /** Il titolo del gruppo nell'allegato («Lancette pungidito»), o «Malattie rare». */
       group: { type: 'text', required: true },
-      /** Numero dell'allegato del DPCM: «3» (poi «2»). */
+      /** Numero dell'allegato del DPCM: «2» o «3». */
       annex: { type: 'text', required: true },
     },
   },

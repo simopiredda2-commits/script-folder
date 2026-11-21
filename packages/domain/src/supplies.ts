@@ -9,8 +9,8 @@
  *   avanzate e bendaggio specialistico: la prima volta lo specialista, poi il medico di famiglia
  *   per al massimo 6 mesi; per i diabetici il piano di automonitoraggio glicemico (PAG).
  *
- * Solo controlli formali. Il nomenclatore dell'allegato 3 è una banca dati trascritta (D218), in uso
- * dopo il controllo; quello dell'allegato 2 arriva con i file di Simone.
+ * Solo controlli formali. I nomenclatori degli allegati 3 (D218) e 2 (D236) sono banche dati
+ * trascritte, in uso dopo il controllo.
  */
 
 export interface SupplyCategoryInfo {
