@@ -1568,3 +1568,16 @@ Come si fa:
 - **La lettura dei tipi**: ora i passi già visti si contano per profondità, e questa parte non ha una prova sua.
 
 Prove: 34 nuove e una cambiata. In tutto 54 sabotaggi, ognuno rosso con il guasto e verde dopo il ripristino.
+
+**D233 · Risposte della fermata dopo l'unione della #25: ricetta e certificato fermi «in invio».** Via alla #26, unita con le verifiche su GitHub verdi. Per la ricetta che resta «in invio» se il servizio si ferma mentre aspetta il SAR, Simone ha scelto «Come le PPIP, ora»; per il dopo, «Ricetta, poi pausa».
+
+Scelte prese qui, con il motivo:
+
+- **Anche il certificato di malattia.** Ha lo stesso ciclo: passa «in invio» prima della chiamata all'INPS, e se il servizio si ferma in quel momento ci resta. È lo stesso difetto, e una pratica ferma «in invio» impedisce anche «Sposta» (D200). Si chiude allo stesso modo, con il protocollo dell'INPS al posto dell'NRE.
+- **Dopo 15 minuti**, come la distinta delle PPIP (D232). Un invio aspetta la risposta al più per il tempo dello studio (8 secondi per difetto, D94): dopo 15 minuti non è più in corso.
+- **Chi segna l'esito**: chi può firmare e inviare per quel paziente, come per l'invio; non la segreteria.
+- **«Non è arrivata»**: il medico l'ha chiesto all'ente, quindi l'esito è certo. La ricetta torna in errore come quando il SAR non risponde: si rimanda, o si stampa la ricetta rossa. Il certificato torna da inviare.
+- **«È arrivata»**: il medico scrive il numero che l'ente gli ha dato, l'NRE della ricetta o il protocollo del certificato. Il formato dell'NRE non è ancora nelle specifiche che abbiamo (A1): si accettano lettere e cifre. Il codice di autenticazione è facoltativo: con il codice il promemoria si stampa come sempre; senza, il promemoria non si stampa e lo si dice, e al paziente bastano il numero di ricetta e il codice fiscale.
+- **Un esito tardivo dell'invio di prima** non cambia più la pratica. Succede se il servizio, rimasto fermo più di 15 minuti, poi risponde. La risposta resta nel registro degli invii e chi aspettava riceve «l'esito è stato segnato nel frattempo».
+- **Tracce**: l'esito segnato a mano entra nel registro degli invii con l'ambiente «manuale», insieme al cambio di stato; il registro degli accessi ha la richiesta, come per l'invio.
+
