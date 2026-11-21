@@ -42,12 +42,19 @@ async function go(start: URL) {
     }
     const type = res.headers.get('content-type') ?? '';
     if (type.startsWith('text/html')) {
-      showPage(await res.text(), url, (next) => void go(next));
+      showPage(await res.text(), url, follow);
       return;
     }
     console.warn(`[dimostrazione] risposta inattesa ${res.status} da ${url.pathname}`);
     return;
   }
+}
+
+/** Un cambio di pagina che non riesce si dice nella console, senza un errore non gestito (D232). */
+function follow(url: URL) {
+  go(url).catch((err: unknown) => {
+    console.warn(`[dimostrazione] cambio di pagina non riuscito: ${String(err)}`);
+  });
 }
 
 declare global {
@@ -57,7 +64,5 @@ declare global {
 /** vite.config.ts sostituisce window.location.assign(…) dell'interfaccia con questa funzione. */
 export function installNavigation(reload: () => void) {
   reloadApp = reload;
-  globalThis.__dimostrazioneVai = (target: string) => {
-    void go(new URL(target, location.href));
-  };
+  globalThis.__dimostrazioneVai = (target: string) => follow(new URL(target, location.href));
 }

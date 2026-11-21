@@ -25,7 +25,7 @@ import {
   type Locator,
   type Page,
 } from 'playwright';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 const ROOT = resolve(import.meta.dirname, '..', 'dist', 'artifact');
 const ENGINES = { chromium, firefox, webkit };
@@ -51,6 +51,41 @@ const FRAME_PAGE =
   '<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Cornice di prova</title></head>' +
   '<body style="margin:0"><iframe title="Dimostrazione" sandbox="allow-scripts allow-same-origin allow-forms" ' +
   'src="/index.html" style="border:0;display:block;width:100vw;height:100vh"></iframe></body></html>';
+
+/**
+ * Un PDF piccolo e valido, con una pagina e un tratto: il visore lo deve disegnare davvero. Un
+ * file che comincia con «%PDF» e basta il visore non lo apre (D232).
+ */
+function tinyPdf(): Buffer {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 120] /Contents 4 0 R >>',
+  ];
+  const content = '2 w 20 20 m 180 100 l S';
+  let pdf = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((o, i) => {
+    offsets.push(pdf.length);
+    pdf += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  offsets.push(pdf.length);
+  pdf += `4 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`;
+  const xref = pdf.length;
+  pdf += `xref\n0 5\n0000000000 65535 f \n`;
+  pdf += offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('');
+  pdf += `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf, 'latin1');
+}
+
+/** Dopo `presses` volte Tab il fuoco è ancora dentro il riquadro modale (WCAG 2.4.3, D232). */
+async function focusStaysIn(frame: Frame, selector: string, presses = 6) {
+  for (let i = 0; i < presses; i++) {
+    await frame.page().keyboard.press('Tab');
+    const inside = await frame.evaluate((sel) => !!document.activeElement?.closest(sel), selector);
+    expect(inside, `Tab ${i + 1}: il fuoco è uscito da ${selector}`).toBe(true);
+  }
+}
 
 function serve(): Promise<Server> {
   const server = createServer((req, res) => {
@@ -107,7 +142,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     const t0 = Date.now();
     await page.goto(`http://127.0.0.1:${port}/cornice.html`);
     f = page.frames().find((x) => x.parentFrame() === page.mainFrame())!;
-    await f.getByLabel('Nome utente').waitFor({ timeout: 90_000 });
+    await f.getByLabel('Nome utente', { exact: true }).waitFor({ timeout: 90_000 });
     startMs = Date.now() - t0;
     // Le chiamate al servizio che finiscono con un errore del servizio (5xx) sono un problema.
     await f.evaluate(() => {
@@ -124,6 +159,17 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       };
     });
   }, 180_000);
+
+  // Una prova caduta a metà può lasciare aperti il visore o una conferma: coprirebbero le prove
+  // seguenti, che cadrebbero tutte per lei. Si chiudono, senza nascondere la prima caduta.
+  afterEach(async () => {
+    if (!f) return;
+    for (const close of [
+      f.locator('#dimo-visore').getByRole('button', { name: 'Chiudi' }),
+      f.locator('#dimo-conferma').getByRole('button', { name: 'Annulla' }),
+    ])
+      if (await close.count()) await close.click();
+  });
 
   afterAll(async () => {
     await browser?.close();
@@ -173,15 +219,16 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     return value;
   }
 
-  async function login(username: string) {
+  /** L'accesso; `typed` è il nome utente come lo scrive chi prova, anche con le maiuscole. */
+  async function login(username: string, typed = username) {
     const exit = f.getByRole('button', { name: 'Esci', exact: true });
     if (await exit.count()) {
       await exit.click();
-      await f.getByLabel('Nome utente').waitFor();
+      await f.getByLabel('Nome utente', { exact: true }).waitFor();
     }
     // Dopo l'accesso il programma torna alla pagina di prima: si riparte da «Oggi».
     await go('/');
-    await f.getByLabel('Nome utente').fill(username);
+    await f.getByLabel('Nome utente', { exact: true }).fill(typed);
     await f.getByLabel('Password').fill(PASSWORD);
     await f.getByLabel('Postazione').fill('Ambulatorio');
     await f.getByRole('button', { name: 'Continua' }).click();
@@ -498,7 +545,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await f.getByLabel(/Referto \(PDF o immagine/).setInputFiles({
       name: 'referto-dimostrativo.pdf',
       mimeType: 'application/pdf',
-      buffer: Buffer.from('%PDF-1.4\n% referto dimostrativo\n%%EOF\n', 'latin1'),
+      buffer: tinyPdf(),
     });
     await f.getByRole('button', { name: 'Registra', exact: true }).click();
     await f.getByText('Esecuzione registrata.').waitFor();
@@ -506,7 +553,15 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .getByRole('link', { name: /Referto/ })
       .first()
       .click();
-    await viewer().waitFor();
+    // Il referto si vede davvero: una pagina disegnata, nessun errore del visore (D232).
+    await viewer().locator('canvas').first().waitFor({ timeout: 30_000 });
+    expect(
+      await viewer()
+        .getByText(/non si è aperto/)
+        .count(),
+    ).toBe(0);
+    // Il fuoco resta nel visore: il resto della pagina non si raggiunge con Tab.
+    await focusStaysIn(f, '#dimo-visore');
     await closeViewer();
   });
 
@@ -516,12 +571,22 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await f.getByRole('heading', { level: 1, name: 'Prestazioni aggiuntive' }).waitFor();
     const today = new Date().toISOString().slice(0, 10);
     await f.getByLabel('Data dell’esecuzione').fill(today);
-    await f.getByLabel('Prestazione', { exact: true }).selectOption({ index: 1 });
+    const select = f.getByLabel('Prestazione', { exact: true });
+    await select.selectOption({ index: 1 });
+    // Il compenso della voce scelta, come lo dice il catalogo (D232).
+    const option = await select.locator('option:checked').innerText();
+    const [, compenso] = /(\d+,\d{2})\s*€/.exec(option) ?? [];
+    expect(compenso, option).toBeTruthy();
     const auth = f.getByLabel(/^Estremi dell’autorizzazione/);
     if (await auth.evaluate((el) => (el as HTMLInputElement).required))
       await auth.fill('Autorizzazione dimostrativa n. 1');
     await f.getByRole('button', { name: 'Registra la prestazione' }).click();
     await f.getByText('Prestazione registrata.').waitFor();
+    const registered = f.getByRole('heading', { name: 'Prestazioni registrate' }).locator('..');
+    await registered
+      .getByText(new RegExp(`^${compenso}\\s*€$`))
+      .first()
+      .waitFor();
   });
 
   it('la segreteria prepara la ripetizione; il medico la trova da firmare e la manda', async () => {
@@ -538,11 +603,23 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await pick.check();
     await f.getByRole('button', { name: /Ripeti 1 terapia/ }).click();
     await f.getByText(/coda «da firmare» del medico/).waitFor();
+    // Chi ha preparato e per chi: il medico firma proprio questa ricetta, non la prima della coda.
+    const { secretary, name } = await f.evaluate(async (pid) => {
+      const me = (await (await fetch('/api/io')).json()) as { nome: string };
+      const p = (await (await fetch(`/api/pazienti/${pid}`)).json()) as {
+        paziente: { firstName: string; lastName: string };
+      };
+      return { secretary: me.nome, name: `${p.paziente.firstName} ${p.paziente.lastName}` };
+    }, id);
     await login('medico');
     await go('/ricette');
-    await f.getByRole('button', { name: 'Firma e invia' }).first().click();
+    const group = f.locator('li.riquadro', { has: f.getByRole('link', { name, exact: true }) });
+    await group
+      .locator('li.ricetta-in-coda', { hasText: `preparata da ${secretary}` })
+      .getByRole('button', { name: 'Firma e invia' })
+      .click();
     await f
-      .getByText(/Ricetta inviata per/)
+      .getByText(new RegExp(`^Ricetta inviata per ${name}\\.`))
       .first()
       .waitFor({ timeout: 30_000 });
   });
@@ -785,7 +862,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
 
     await go('/strumenti?sezione=utenti');
     const form = f.getByRole('form', { name: 'Nuovo utente' });
-    await form.getByLabel('Nome utente').fill('segreteria.prova');
+    await form.getByLabel('Nome utente', { exact: true }).fill('segreteria.prova');
     await form.getByLabel('Nome mostrato').fill('Segreteria di prova');
     await form.getByLabel('Segreteria', { exact: true }).check();
     await form.getByRole('button', { name: 'Crea l’utente' }).click();
@@ -804,10 +881,51 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await row.getByRole('button', { name: 'Conferma Segreteria di prova' }).click();
     const dialog = f.getByRole('alertdialog', { name: 'Conferma' });
     await dialog.waitFor();
+    await focusStaysIn(f, '#dimo-conferma');
     await expectAccessible('conferma nella pagina');
     await expectDemoTargets('#dimo-conferma', 'conferma nella pagina');
     await dialog.getByRole('button', { name: 'Conferma' }).click();
     await f.getByText('Password temporanea di Segreteria di prova').waitFor();
+  });
+
+  it('il nome utente scritto con le maiuscole: il riquadro dà il codice di quell’utente (D232)', async () => {
+    await login('medico', 'Medico');
+    // Il codice si annuncia quando cambia; il conto alla rovescia di ogni secondo no.
+    const live = await f.locator('#dimostrazione [aria-live]').allInnerTexts();
+    expect(live.join(' ')).not.toMatch(/Cambia fra/);
+  });
+
+  it('un documento del servizio che non arriva: il visore lo dice, senza errori non gestiti (D232)', async () => {
+    const before = problems.length;
+    // Il servizio nel browser che non risponde, solo per questo indirizzo; poi si rimette com'era.
+    await f.evaluate(() => {
+      const w = window as Window & { __fetchDiPrima?: typeof fetch };
+      const original = window.fetch.bind(window);
+      w.__fetchDiPrima = original;
+      window.fetch = (input, init) =>
+        (input instanceof Request ? input.url : String(input)).includes('/api/documento-assente')
+          ? Promise.reject(new TypeError('il servizio non risponde'))
+          : original(input, init);
+      const a = document.createElement('a');
+      a.id = 'dimo-prova-documento';
+      a.href = '/api/documento-assente';
+      a.textContent = 'Documento di prova';
+      document.body.append(a);
+    });
+    try {
+      await f.locator('#dimo-prova-documento').click();
+      await viewer()
+        .getByText('Il documento non si è aperto: il servizio non risponde')
+        .waitFor({ timeout: 10_000 });
+      await closeViewer();
+    } finally {
+      await f.evaluate(() => {
+        const w = window as Window & { __fetchDiPrima?: typeof fetch };
+        if (w.__fetchDiPrima) window.fetch = w.__fetchDiPrima;
+        document.getElementById('dimo-prova-documento')?.remove();
+      });
+    }
+    expect(problems.slice(before)).toEqual([]);
   });
 
   it('in tutto il giro nessun errore della pagina e del servizio', async () => {
@@ -815,5 +933,16 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       () => (window as Window & { __errori?: string[] }).__errori ?? [],
     );
     expect([...problems, ...serviceErrors]).toEqual([]);
+  });
+
+  it('«Ricomincia da capo» da una pagina interna: la dimostrazione riparte (D232)', async () => {
+    const before = problems.length;
+    await go('/archivio/riepiloghi');
+    const opener = f.locator('button.dimo-apri');
+    if (await opener.count()) await opener.click();
+    await f.getByRole('button', { name: 'Ricomincia da capo' }).click();
+    await f.getByLabel('Nome utente', { exact: true }).waitFor({ timeout: 90_000 });
+    expect(await f.getByText('La dimostrazione non è partita in questo browser.').count()).toBe(0);
+    expect(problems.slice(before)).toEqual([]);
   });
 });

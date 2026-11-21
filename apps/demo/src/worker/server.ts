@@ -186,7 +186,9 @@ function safeJson(bytes: Uint8Array): Record<string, unknown> | null {
 
 /** Dopo la password: chi sta entrando e, se attiva il secondo fattore ora, il suo segreto. */
 function watchLogin(body: Record<string, unknown>, response: Uint8Array) {
-  const username = typeof body.username === 'string' ? body.username.trim() : null;
+  // Come lo legge il servizio (auth/service.ts): senza spazi e in minuscolo, così «Medico» e
+  // «medico» sono lo stesso utente anche qui (D232).
+  const username = typeof body.username === 'string' ? body.username.trim().toLowerCase() : null;
   const r = safeJson(response);
   if (!username || !r) return;
   pendingUser = username;

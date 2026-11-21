@@ -29,6 +29,7 @@ import {
   sameRegistry,
   type RegistryDifference,
 } from './registry';
+import { unrefTimer } from '../timers';
 
 /**
  * Esenzioni e scelte del medico dall'anagrafe regionale AURA (D197). AURA è la fonte: le righe che
@@ -640,8 +641,7 @@ export function createAuraService(deps: AuraDeps) {
     await Promise.race([
       syncPatient(patientId, 'ricetta', userId),
       new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, timeoutMs);
-        timer.unref();
+        timer = unrefTimer(setTimeout(resolve, timeoutMs));
       }),
     ]).finally(() => clearTimeout(timer));
   }

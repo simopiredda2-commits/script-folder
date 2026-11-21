@@ -1,3 +1,5 @@
+import { holdFocusIn } from './modal';
+
 /**
  * Conferme e stampa nella cornice dell'artifact (D223, D224). Dentro un artifact il browser non apre
  * le sue finestre: `window.confirm` risponde subito «no» e `window.print` non fa nulla. Il programma
@@ -21,6 +23,8 @@ const APPROVAL_MS = 15_000;
 
 let lastClicked: HTMLElement | null = null;
 const approved = new Map<string, number>();
+/** Chiude la conferma aperta, se c'è, e rimette raggiungibile la pagina dietro. */
+let closeOpenConfirm: () => void = () => undefined;
 
 function notice(text: string) {
   document.getElementById('dimo-avviso')?.remove();
@@ -40,7 +44,9 @@ function notice(text: string) {
 }
 
 function askInPage(message: string, origin: HTMLElement | null) {
-  document.getElementById('dimo-conferma')?.remove();
+  // Una conferma di prima ancora aperta si chiude con la sua pagina: toglierla e basta lascerebbe
+  // la pagina dietro irraggiungibile (D232).
+  closeOpenConfirm();
   const overlay = document.createElement('div');
   overlay.id = 'dimo-conferma';
   overlay.className = 'dimo-conferma';
@@ -69,8 +75,17 @@ function askInPage(message: string, origin: HTMLElement | null) {
   const no = document.createElement('button');
   no.type = 'button';
   no.textContent = 'Annulla';
-  const done = () => {
+  let release: () => void = () => undefined;
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
     overlay.remove();
+    release();
+    closeOpenConfirm = () => undefined;
+  };
+  const done = () => {
+    close();
     if (origin?.isConnected) origin.focus();
   };
   no.addEventListener('click', done);
@@ -88,6 +103,8 @@ function askInPage(message: string, origin: HTMLElement | null) {
   box.append(title, text, note, actions);
   overlay.append(box);
   document.body.append(overlay);
+  release = holdFocusIn(overlay);
+  closeOpenConfirm = close;
   yes.focus();
 }
 

@@ -5,16 +5,23 @@
  */
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { holdFocusIn } from './modal';
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 let lastFocus: Element | null = null;
+/** Rimette raggiungibile la pagina dietro il visore. */
+let release: () => void = () => undefined;
 
 const NOTE =
   'Nella dimostrazione il documento si apre qui: nel programma vero si apre in una scheda nuova, da stampare o salvare.';
 
 export function closeViewer() {
-  document.getElementById('dimo-visore')?.remove();
+  const open = document.getElementById('dimo-visore');
+  if (!open) return;
+  open.remove();
+  release();
+  release = () => undefined;
   if (lastFocus instanceof HTMLElement) lastFocus.focus();
 }
 
@@ -46,6 +53,7 @@ function frame(title: string, note = NOTE): HTMLElement {
     if (e.target === overlay) closeViewer();
   });
   document.body.append(overlay);
+  release = holdFocusIn(overlay);
   overlay.querySelector<HTMLButtonElement>('.dimo-visore-chiudi')!.focus();
   return overlay.querySelector<HTMLElement>('.dimo-visore-corpo')!;
 }
@@ -140,6 +148,20 @@ async function openFromService(path: string, title: string) {
   await show(await res.blob(), title);
 }
 
+/**
+ * Un documento del servizio nel visore. Se non arriva (il servizio nel browser non risponde), il
+ * visore lo dice, invece di lasciare un errore non gestito e nessun riquadro (D232).
+ */
+function openDocument(load: () => Promise<void>, title: string) {
+  load().catch((err: unknown) => {
+    const body = frame(title);
+    const p = document.createElement('p');
+    p.className = 'dimo-visore-errore';
+    p.textContent = `Il documento non si è aperto: ${err instanceof Error ? err.message : String(err)}`;
+    body.append(p);
+  });
+}
+
 const serviceUrl = (href: string) => {
   const url = new URL(href, document.baseURI);
   return url.origin === location.origin && url.pathname.startsWith('/api/') ? url : null;
@@ -154,7 +176,8 @@ export function installDocumentViewer() {
       const url = serviceUrl(a.getAttribute('href') ?? '');
       if (!url) return;
       e.preventDefault();
-      void openFromService(`${url.pathname}${url.search}`, a.textContent?.trim() || 'Documento');
+      const title = a.textContent?.trim() || 'Documento';
+      openDocument(() => openFromService(`${url.pathname}${url.search}`, title), title);
     },
     true,
   );
@@ -165,14 +188,12 @@ export function installDocumentViewer() {
     if (!url) return null;
     const href = String(url);
     if (href.startsWith('blob:')) {
-      void fetch(href)
-        .then((r) => r.blob())
-        .then((b) => show(b, 'Documento'));
+      openDocument(async () => show(await (await fetch(href)).blob(), 'Documento'), 'Documento');
       return null;
     }
     const api = serviceUrl(href);
     if (api) {
-      void openFromService(`${api.pathname}${api.search}`, 'Documento');
+      openDocument(() => openFromService(`${api.pathname}${api.search}`, 'Documento'), 'Documento');
       return null;
     }
     return original(url, target, features);

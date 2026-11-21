@@ -3,6 +3,8 @@
  * in un Web Worker, con PGlite al posto di Postgres. Dati inventati, solo simulatori; niente esce
  * dal browser. Prima si avvia il servizio, poi l'interfaccia.
  */
+// Per primo: l'indirizzo d'avvio, prima di qualunque cambio di pagina (D232).
+import './start';
 import { StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { App } from '../../web/src/App';

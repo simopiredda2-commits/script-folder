@@ -5,6 +5,8 @@
  * in corso e salta.
  */
 
+import { unrefTimer } from '../timers';
+
 export const STUDIO_TIME_ZONE = 'Europe/Rome';
 
 /** «HH:MM» → ore e minuti; errore se non è un'ora valida. */
@@ -139,13 +141,7 @@ export class ReferenceUpdateScheduler {
 
   constructor(private readonly deps: SchedulerDeps) {
     parseTime(deps.time);
-    this.setTimer =
-      deps.setTimer ??
-      ((fn, ms) => {
-        const t = setTimeout(fn, ms);
-        t.unref();
-        return t;
-      });
+    this.setTimer = deps.setTimer ?? ((fn, ms) => unrefTimer(setTimeout(fn, ms)));
     this.clearTimer = deps.clearTimer ?? ((h) => clearTimeout(h as NodeJS.Timeout));
   }
 
