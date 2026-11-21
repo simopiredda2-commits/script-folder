@@ -236,7 +236,11 @@ describe('preferenze di stampa (tappa 14)', () => {
       }),
       '/api/ricette/r1/promemoria/consegne': () => ({
         status: 200,
-        body: { consegne: [], carta: 'A4' },
+        body: {
+          consegne: [],
+          carta: 'A4',
+          disponibile: { promemoria: true, soloNre: true, email: true, sms: true, motivo: null },
+        },
       }),
       '/api/stampa/preferenze': () => ({
         status: 200,
@@ -287,7 +291,11 @@ describe('preferenze di stampa (tappa 14)', () => {
       }),
       '/api/ricette/r1/promemoria/consegne': () => ({
         status: 200,
-        body: { consegne: [], carta: 'A5' },
+        body: {
+          consegne: [],
+          carta: 'A5',
+          disponibile: { promemoria: true, soloNre: true, email: true, sms: true, motivo: null },
+        },
       }),
       '/api/stampa/preferenze': () => ({ status: 200, body: effective() }),
     });
@@ -316,7 +324,11 @@ describe('preferenze di stampa (tappa 14)', () => {
       }),
       '/api/ricette/r1/promemoria/consegne': () => ({
         status: 200,
-        body: { consegne: [], carta: 'A4' },
+        body: {
+          consegne: [],
+          carta: 'A4',
+          disponibile: { promemoria: true, soloNre: true, email: true, sms: true, motivo: null },
+        },
       }),
       '/api/stampa/preferenze': () => ({ status: 200, body: effective() }),
     });

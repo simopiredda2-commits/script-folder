@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { DiagnosisCodeInfo, DiagnosisSearch } from '../components/DiagnosisSearch';
@@ -516,6 +516,10 @@ function CertificateCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const doneRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (done) doneRef.current?.focus();
+  }, [done]);
   const [newEnd, setNewEnd] = useState('');
   const [reason, setReason] = useState('');
   const [askedByWorker, setAskedByWorker] = useState(false);
@@ -609,7 +613,10 @@ function CertificateCard({
           <InterruptedCertificatePanel
             certificateId={c.id}
             signedAt={c.inviatoIl}
-            onChange={onChange}
+            onChange={(message) => {
+              setDone(message);
+              onChange();
+            }}
           />
         ) : (
           <p className="tenue">Invio all’INPS in corso: aspetta la risposta.</p>
@@ -754,7 +761,12 @@ function CertificateCard({
         </fieldset>
       )}
       <ErrorMessage error={error} />
-      {done && <Notice kind="fatto">{done}</Notice>}
+      {done && (
+        // Il fuoco va al risultato: il pulsante premuto può non esserci più (WCAG 2.4.3, D239).
+        <div ref={doneRef} tabIndex={-1}>
+          <Notice kind="fatto">{done}</Notice>
+        </div>
+      )}
     </li>
   );
 }

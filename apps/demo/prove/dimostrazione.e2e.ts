@@ -469,6 +469,11 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await form.getByLabel(/Numero di ricetta/).fill('DIMO00000000001');
     await form.getByLabel(/Codice di autenticazione/).fill('DIMOAUT01');
     await form.getByRole('button', { name: /È arrivata/ }).click();
+    // L'esito non si cambia dopo: si conferma prima di segnarlo (D239).
+    await group
+      .getByRole('group', { name: 'Conferma dell’esito' })
+      .getByRole('button', { name: 'Sì, confermo' })
+      .click();
     await section.getByText('Ricetta segnata come arrivata. NRE DIMO00000000001').waitFor();
     await section.getByRole('link', { name: 'Promemoria (PDF)' }).click();
     await viewer().locator('canvas').first().waitFor({ timeout: 30_000 });
@@ -477,6 +482,11 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await go(`/pazienti/${await patientId(name)}/certificati`);
     await f.getByRole('heading', { level: 1, name: 'Certificati di malattia' }).waitFor();
     await f.getByRole('button', { name: 'Non è arrivato: torna da inviare' }).click();
+    await f
+      .getByRole('group', { name: 'Conferma dell’esito' })
+      .getByRole('button', { name: 'Sì, confermo' })
+      .click();
+    await f.getByText('Certificato di nuovo da inviare: si può rimandare all’INPS.').waitFor();
     const failed = f.locator('.scheda-certificato').filter({ hasText: /Non arrivato all’INPS/ });
     await failed.getByRole('button', { name: 'Riprova l’invio' }).click();
     const sent = f.locator('.scheda-certificato').filter({ hasText: 'Inviato' }).first();

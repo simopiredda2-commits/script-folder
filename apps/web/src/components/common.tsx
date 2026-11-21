@@ -14,13 +14,27 @@ export function Loading({ what = 'dati' }: { what?: string }) {
   );
 }
 
+/**
+ * I motivi di un rifiuto dei dati (400): i messaggi dei campi che il servizio non ha accettato, per
+ * esempio il formato di un NRE, senza doppioni (D239).
+ */
+function fieldMessages(error: ApiError): string[] {
+  if (error.status !== 400 || !Array.isArray(error.details)) return [];
+  const messages = (error.details as { message?: unknown }[])
+    .map((d) => d?.message)
+    .filter((m): m is string => typeof m === 'string' && m.length > 0);
+  return [...new Set(messages)].slice(0, 5);
+}
+
 export function ErrorMessage({ error }: { error: ApiError | null }) {
   if (!error) return null;
+  const fields = fieldMessages(error);
   return (
     <div className="messaggio messaggio-errore" role="alert">
       <Icon name="avviso" />
       <span>
         {error.message}
+        {fields.length > 0 && `: ${fields.join('; ')}`}
         {isCredentialError(error.details) && (
           <>
             {' '}

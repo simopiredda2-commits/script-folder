@@ -17,6 +17,14 @@ interface Contacts {
   }[];
 }
 
+interface Available {
+  promemoria: boolean;
+  soloNre: boolean;
+  email: boolean;
+  sms: boolean;
+  motivo: string | null;
+}
+
 interface Delivery {
   il: string;
   canale: string;
@@ -52,16 +60,25 @@ export function ReminderPanel({
   prescriptionId,
   patientId,
   kind,
+  title,
 }: {
   prescriptionId: string;
   patientId: string;
   kind: string;
+  /** Il titolo del riquadro: in un elenco di ricette, con il paziente (D239). */
+  title?: string;
 }) {
   const contacts = useApi<Contacts>(`/api/pazienti/${patientId}/recapiti-promemoria`);
-  const deliveries = useApi<{ consegne: Delivery[]; carta: 'A4' | 'A5' | null }>(
-    `/api/ricette/${prescriptionId}/promemoria/consegne`,
-  );
-  const [channel, setChannel] = useState<'email' | 'sms'>('email');
+  const deliveries = useApi<{
+    consegne: Delivery[];
+    carta: 'A4' | 'A5' | null;
+    /** Che cosa si può consegnare, con il motivo se manca qualcosa (D239). */
+    disponibile?: Available;
+  }>(`/api/ricette/${prescriptionId}/promemoria/consegne`);
+  const [picked, setChannel] = useState<'email' | 'sms'>('email');
+  // Finché il servizio non ha detto che cosa si può consegnare, niente pulsanti che falliscono.
+  const can = deliveries.data?.disponibile ?? null;
+  const channel: 'email' | 'sms' = can && !can.email ? 'sms' : picked;
   const [target, setTarget] = useState('paziente');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
@@ -118,10 +135,11 @@ export function ReminderPanel({
   }
 
   return (
-    <section className="pannello-promemoria" aria-label="Promemoria della ricetta">
-      <h4>Promemoria</h4>
+    <section className="pannello-promemoria" aria-label={title ?? 'Promemoria della ricetta'}>
+      <h4>{title ?? 'Promemoria'}</h4>
+      {can?.motivo && <Notice kind="avviso">{can.motivo}</Notice>}
       <div className="azioni">
-        {nreFirst && (
+        {can?.soloNre && nreFirst && (
           <a
             className={`pulsante${chosenVariant ? ' pulsante-primario' : ''}`}
             href={`${base}?formato=nre`}
@@ -133,18 +151,20 @@ export function ReminderPanel({
             <Icon name="stampa" /> <span>Solo NRE (PDF)</span>
           </a>
         )}
-        <a
-          className={`pulsante${chosenVariant && !nreFirst ? ' pulsante-primario' : ''}`}
-          href={base}
-          target="_blank"
-          rel="noopener"
-          aria-describedby={describedBy}
-          onClick={() => setTimeout(deliveries.reload, 800)}
-        >
-          <Icon name="stampa" />{' '}
-          <span>{white ? 'Promemoria del SAC (PDF)' : 'Promemoria (PDF)'}</span>
-        </a>
-        {!white && !nreFirst && (
+        {can?.promemoria && (
+          <a
+            className={`pulsante${chosenVariant && !nreFirst ? ' pulsante-primario' : ''}`}
+            href={base}
+            target="_blank"
+            rel="noopener"
+            aria-describedby={describedBy}
+            onClick={() => setTimeout(deliveries.reload, 800)}
+          >
+            <Icon name="stampa" />{' '}
+            <span>{white ? 'Promemoria del SAC (PDF)' : 'Promemoria (PDF)'}</span>
+          </a>
+        )}
+        {can?.soloNre && !white && !nreFirst && (
           <a
             className="pulsante"
             href={`${base}?formato=nre`}
@@ -178,57 +198,61 @@ export function ReminderPanel({
         </p>
       )}
 
-      <fieldset className="invio-promemoria" disabled={busy}>
-        <legend>Invia al paziente o a un delegato</legend>
-        <div className="scelta-in-riga">
-          {(
-            [
-              ['email', 'Email con il promemoria'],
-              ['sms', 'SMS con il numero'],
-            ] as const
-          ).map(([v, label]) => (
-            <div key={v} className="casella">
-              <input
-                type="radio"
-                id={`canale-${prescriptionId}-${v}`}
-                name={`canale-${prescriptionId}`}
-                checked={channel === v}
-                onChange={() => setChannel(v)}
-              />
-              <label htmlFor={`canale-${prescriptionId}-${v}`}>{label}</label>
-            </div>
-          ))}
-        </div>
-        {contacts.data && options.length === 0 ? (
-          <p className="tenue">
-            Nessun recapito {channel === 'email' ? 'email' : 'telefonico'} del paziente o di un
-            delegato con delega valida.
-          </p>
-        ) : (
-          <div className="campo">
-            <label htmlFor={`destinatario-${prescriptionId}`}>Destinatario</label>
-            <select
-              id={`destinatario-${prescriptionId}`}
-              value={chosen}
-              onChange={(e) => setTarget(e.target.value)}
-            >
-              {options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
+      {(can?.email || can?.sms) && (
+        <fieldset className="invio-promemoria" disabled={busy}>
+          <legend>Invia al paziente o a un delegato</legend>
+          <div className="scelta-in-riga">
+            {(
+              [
+                ['email', 'Email con il promemoria'],
+                ['sms', 'SMS con il numero'],
+              ] as const
+            )
+              .filter(([v]) => can[v])
+              .map(([v, label]) => (
+                <div key={v} className="casella">
+                  <input
+                    type="radio"
+                    id={`canale-${prescriptionId}-${v}`}
+                    name={`canale-${prescriptionId}`}
+                    checked={channel === v}
+                    onChange={() => setChannel(v)}
+                  />
+                  <label htmlFor={`canale-${prescriptionId}-${v}`}>{label}</label>
+                </div>
               ))}
-            </select>
           </div>
-        )}
-        <button
-          type="button"
-          className="pulsante pulsante-primario"
-          disabled={!chosen}
-          onClick={() => void send()}
-        >
-          <Icon name="apri" /> <span>Invia</span>
-        </button>
-      </fieldset>
+          {contacts.data && options.length === 0 ? (
+            <p className="tenue">
+              Nessun recapito {channel === 'email' ? 'email' : 'telefonico'} del paziente o di un
+              delegato con delega valida.
+            </p>
+          ) : (
+            <div className="campo">
+              <label htmlFor={`destinatario-${prescriptionId}`}>Destinatario</label>
+              <select
+                id={`destinatario-${prescriptionId}`}
+                value={chosen}
+                onChange={(e) => setTarget(e.target.value)}
+              >
+                {options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          <button
+            type="button"
+            className="pulsante pulsante-primario"
+            disabled={!chosen}
+            onClick={() => void send()}
+          >
+            <Icon name="apri" /> <span>Invia</span>
+          </button>
+        </fieldset>
+      )}
       <ErrorMessage error={error ?? contacts.error} />
       {done && <Notice kind="fatto">{done}</Notice>}
 

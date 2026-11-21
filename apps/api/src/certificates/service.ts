@@ -597,19 +597,27 @@ export function createCertificateService(deps: CertificateDeps) {
       });
     check(c, 'start_sending');
     const auth = await deps.credentials.authFor(actor.userId, 'certificato_inps');
+    // I dati di copia e attestato come partono: restano con il certificato dalla firma, per l'esito
+    // segnato a mano se il servizio si ferma prima della risposta (D239).
+    const snapshot = await snapshotOf(c, p, actor.studioId, actor);
     // L'ora della firma segna questo invio: l'esito si scrive solo se è ancora lui (D233).
     const claimedAt = now();
     const claimed = await withActor(db, actor.userId, (tx) =>
       tx
         .update(sickLeaveCertificate)
-        .set({ status: 'sending', signedBy: actor.userId, signedAt: claimedAt, updatedAt: now() })
+        .set({
+          status: 'sending',
+          signedBy: actor.userId,
+          signedAt: claimedAt,
+          snapshot,
+          updatedAt: now(),
+        })
         .where(and(eq(sickLeaveCertificate.id, c.id), eq(sickLeaveCertificate.status, c.status)))
         .returning({ id: sickLeaveCertificate.id }),
     );
     if (!claimed.length)
       throw new HttpError(409, 'Il certificato è cambiato nel frattempo: ricarica');
 
-    const snapshot = await snapshotOf(c, p, actor.studioId, actor);
     const availability = c.availability as Availability | null;
     const message: SickLeaveMessage = {
       localId: c.id,
@@ -683,6 +691,7 @@ export function createCertificateService(deps: CertificateDeps) {
                 lastErrorKind: kind,
                 lastErrorCode: result.outcome === 'rejected' ? result.code : null,
                 lastErrorMessage: result.message,
+                snapshot: null,
                 updatedAt: now(),
               },
         )
@@ -729,17 +738,21 @@ export function createCertificateService(deps: CertificateDeps) {
       );
     const signedAt = c.signedAt!;
     const arrived = input.esito === 'arrivato' ? input : null;
-    // Copia e attestato con i dati di chi aveva firmato quell'invio.
+    // Copia e attestato con i dati partiti con quell'invio, fotografati alla firma (D239); per un
+    // certificato firmato prima della fotografia, con i dati di chi l'aveva firmato.
     let snapshot: Snapshot | null = null;
     if (arrived) {
-      const [signer] = await db
-        .select({ displayName: appUser.displayName })
-        .from(appUser)
-        .where(eq(appUser.id, c.signedBy!));
-      snapshot = await snapshotOf(c, await patientRow(c.patientId), actor.studioId, {
-        userId: c.signedBy!,
-        displayName: signer?.displayName ?? '',
-      });
+      snapshot = c.snapshot as Snapshot | null;
+      if (!snapshot) {
+        const [signer] = await db
+          .select({ displayName: appUser.displayName })
+          .from(appUser)
+          .where(eq(appUser.id, c.signedBy!));
+        snapshot = await snapshotOf(c, await patientRow(c.patientId), actor.studioId, {
+          userId: c.signedBy!,
+          displayName: signer?.displayName ?? '',
+        });
+      }
     }
     const notArrived = 'Non arrivato all’INPS, secondo l’INPS: si può rimandare';
     await withActor(db, actor.userId, async (tx) => {
@@ -783,6 +796,7 @@ export function createCertificateService(deps: CertificateDeps) {
                 lastErrorKind: 'unreachable',
                 lastErrorCode: null,
                 lastErrorMessage: notArrived,
+                snapshot: null,
                 updatedAt: now(),
               },
         )

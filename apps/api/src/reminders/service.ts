@@ -203,6 +203,9 @@ export function createReminderService(deps: ReminderDeps) {
           409,
           'Manca il codice di autenticazione del SAC: la ricetta non è valida',
         );
+      // Un SMS con «PIN -» non serve al paziente (D239).
+      if (p.kind === 'white' && !p.pinNrbe)
+        throw new HttpError(409, 'Manca il PIN della ricetta bianca: chiedilo al Sistema TS');
       result = await sender.sendSms({
         to: to.to,
         text:
@@ -251,7 +254,53 @@ export function createReminderService(deps: ReminderDeps) {
     return data.versione === 1 ? 'A4' : await chosenPaper(actor);
   }
 
-  /** Le consegne di una ricetta, dalla più recente, e la carta del suo promemoria. */
+  /**
+   * Che cosa si può consegnare di questa ricetta, con il motivo se qualcosa manca (D239): la pagina
+   * offre solo ciò che il servizio accetta, invece di pulsanti che finiscono in un errore. Le stesse
+   * condizioni della stampa e dell'invio qui sopra.
+   */
+  async function availableFor(p: typeof prescription.$inferSelect) {
+    const none = (motivo: string) => ({
+      promemoria: false,
+      soloNre: false,
+      email: false,
+      sms: false,
+      motivo,
+    });
+    if (p.status !== 'sent' || !p.nre)
+      return none('Il promemoria si consegna solo per una ricetta inviata e accettata');
+    if (p.kind === 'white') {
+      const sac = await document(p.id, 'promemoria_sac');
+      const sms = !!p.pinNrbe;
+      return {
+        promemoria: !!sac,
+        soloNre: false,
+        email: !!sac,
+        sms,
+        motivo: sac
+          ? null
+          : sms
+            ? 'Il promemoria del Sistema TS non c’è: NRBE e PIN si dettano al paziente o gli si mandano per SMS'
+            : 'Il promemoria del Sistema TS e il PIN non ci sono: chiedi NRBE e PIN al Sistema TS',
+      };
+    }
+    if (!p.authCode)
+      return none(
+        'Manca il codice di autenticazione del SAC: la ricetta non è valida e il promemoria non si dà',
+      );
+    if (!(await document(p.id, 'promemoria_dati')))
+      return {
+        promemoria: false,
+        soloNre: false,
+        email: false,
+        sms: true,
+        motivo:
+          'I dati del promemoria non si sono potuti fissare all’invio: il promemoria non si stampa e non si manda per email. Il numero di ricetta si detta al paziente o gli si manda per SMS',
+      };
+    return { promemoria: true, soloNre: true, email: true, sms: true, motivo: null };
+  }
+
+  /** Le consegne di una ricetta, dalla più recente, la carta del suo promemoria e che cosa si dà. */
   async function deliveries(actor: Actor, id: string) {
     const { p } = await guarded(actor, id, 'lettura_consegne_promemoria');
     const rows = await db
@@ -268,7 +317,7 @@ export function createReminderService(deps: ReminderDeps) {
       .innerJoin(appUser, eq(appUser.id, reminderDelivery.userId))
       .where(eq(reminderDelivery.prescriptionId, p.id))
       .orderBy(desc(reminderDelivery.id));
-    return { consegne: rows, carta: await paperOf(actor, p) };
+    return { consegne: rows, carta: await paperOf(actor, p), disponibile: await availableFor(p) };
   }
 
   /** Recapiti per il promemoria: quelli del paziente e le deleghe, con la validità di oggi (R16). */

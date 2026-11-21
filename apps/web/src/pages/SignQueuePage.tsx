@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { InterruptedSendPanel } from '../components/InterruptedSendPanel';
 import { ReminderPanel } from '../components/ReminderPanel';
@@ -21,6 +21,8 @@ interface QueueGroup {
     /** Solo negli invii senza risposta: quando era partito l'invio e chi l'aveva firmato. */
     firmataIl?: string;
     firmataDa?: string | null;
+    /** Da quando l'esito si può segnare (D239). */
+    esitoDal?: string | null;
   }[];
 }
 
@@ -36,6 +38,24 @@ interface PatientPrescriptions {
   }[];
 }
 
+/** Le righe di una ricetta, lette dalla cartella del paziente (accesso registrato). */
+function useLines(patientId: string, prescriptionId: string) {
+  const list = useApi<PatientPrescriptions>(`/api/pazienti/${patientId}/ricette`);
+  return { list, lines: list.data?.ricette.find((r) => r.id === prescriptionId)?.righe ?? [] };
+}
+
+function Lines({ lines }: { lines: PatientPrescriptions['ricette'][number]['righe'] }) {
+  return (
+    <ul className="elenco-semplice">
+      {lines.map((l) => (
+        <li key={l.id}>
+          {l.drugName ?? l.serviceDescription} × {l.quantity}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Le righe di una ricetta in coda, lette dalla cartella del paziente (accesso registrato). */
 function QueueItem({
   patientId,
@@ -48,8 +68,7 @@ function QueueItem({
   status: 'to_sign' | 'error';
   onChange: (status: string, nre?: string) => void;
 }) {
-  const list = useApi<PatientPrescriptions>(`/api/pazienti/${patientId}/ricette`);
-  const lines = list.data?.ricette.find((r) => r.id === prescription.id)?.righe ?? [];
+  const { list, lines } = useLines(patientId, prescription.id);
   return (
     <li className="ricetta-in-coda">
       <p>
@@ -59,13 +78,7 @@ function QueueItem({
           · preparata da {prescription.preparataDa}, {dateTime(prescription.preparataIl)}
         </span>
       </p>
-      <ul className="elenco-semplice">
-        {lines.map((l) => (
-          <li key={l.id}>
-            {l.drugName ?? l.serviceDescription} × {l.quantity}
-          </li>
-        ))}
-      </ul>
+      <Lines lines={lines} />
       {prescription.errore && (
         <Notice kind="avviso">Ultimo invio non riuscito: {prescription.errore}</Notice>
       )}
@@ -73,6 +86,7 @@ function QueueItem({
         <SendPanel
           prescriptionId={prescription.id}
           status={status}
+          lastErrorKind={prescription.tipoErrore}
           lineNames={Object.fromEntries(
             lines.map((l) => [l.id, l.drugName ?? l.serviceDescription ?? '']),
           )}
@@ -87,12 +101,21 @@ function Queue({
   path,
   status,
   empty,
+  reloadKey,
+  onChanged,
 }: {
   path: string;
   status: 'to_sign' | 'error';
   empty: string;
+  /** Cambia quando un'altra coda della pagina ha spostato una ricetta: si ricarica (D239). */
+  reloadKey?: number;
+  onChanged?: () => void;
 }) {
   const queue = useApi<{ pazienti: QueueGroup[] }>(path);
+  const { reload } = queue;
+  useEffect(() => {
+    if (reloadKey) reload();
+  }, [reloadKey, reload]);
   // Le ricette inviate escono dalla coda: la conferma con l'NRE resta qui sopra.
   const [sent, setSent] = useState<
     { who: string; nre: string; id: string; patientId: string; kind: string }[]
@@ -107,7 +130,12 @@ function Queue({
           <Notice kind="fatto">
             Ricetta inviata per {x.who}. NRE <span className="codice">{x.nre}</span>
           </Notice>
-          <ReminderPanel prescriptionId={x.id} patientId={x.patientId} kind={x.kind} />
+          <ReminderPanel
+            prescriptionId={x.id}
+            patientId={x.patientId}
+            kind={x.kind}
+            title={`Promemoria della ricetta di ${x.who}`}
+          />
         </li>
       ))}
     </ul>
@@ -151,6 +179,7 @@ function Queue({
                       ]);
                     }
                     queue.reload();
+                    onChanged?.();
                   }}
                 />
               ))}
@@ -163,17 +192,64 @@ function Queue({
 }
 
 /**
- * Invii rimasti senza risposta da più di 15 minuti (D233): il servizio si è fermato mentre
- * aspettava il SAR. Il medico ne segna l'esito chiesto all'ente.
+ * Una ricetta rimasta «in invio»: le sue righe, così il numero dato dall'ente si mette sulla
+ * ricetta giusta; dopo «È arrivata» il promemoria resta qui, con il paziente (D239).
  */
-function InterruptedQueue() {
+function InterruptedItem({
+  patient,
+  prescription: r,
+  onChanged,
+}: {
+  patient: QueueGroup['paziente'];
+  prescription: QueueGroup['ricette'][number];
+  onChanged: () => void;
+}) {
+  const { lines } = useLines(patient.id, r.id);
+  const [arrived, setArrived] = useState(false);
+  return (
+    <li className="ricetta-in-coda">
+      <p>
+        <strong>{PRESCRIPTION_KIND[r.tipo] ?? r.tipo}</strong>
+        <span className="tenue">
+          {' '}
+          · preparata da {r.preparataDa}, {dateTime(r.preparataIl)}
+        </span>
+      </p>
+      <Lines lines={lines} />
+      <InterruptedSendPanel
+        prescriptionId={r.id}
+        kind={r.tipo}
+        signedAt={r.firmataIl ?? r.preparataIl}
+        signedBy={r.firmataDa ?? null}
+        settleFrom={r.esitoDal ?? null}
+        onChange={(status) => {
+          if (status === 'sent') setArrived(true);
+          // «Non è arrivata»: la ricetta passa fra gli invii non riusciti, che si ricaricano.
+          else onChanged();
+        }}
+      />
+      {arrived && (
+        <ReminderPanel
+          prescriptionId={r.id}
+          patientId={patient.id}
+          kind={r.tipo}
+          title={`Promemoria della ricetta di ${patient.nome} ${patient.cognome}`}
+        />
+      )}
+    </li>
+  );
+}
+
+/**
+ * Invii rimasti senza risposta (D233): il servizio si è fermato mentre aspettava l'ente. Il medico
+ * ne segna l'esito chiesto all'ente dopo 15 minuti; prima la ricetta si vede, con l'ora (D239).
+ */
+function InterruptedQueue({ onChanged }: { onChanged: () => void }) {
   const queue = useApi<{ pazienti: QueueGroup[] }>('/api/ricette/senza-risposta');
-  const [settled, setSettled] = useState<{ id: string; patientId: string; kind: string }[]>([]);
   if (queue.loading && !queue.data) return <Loading what="ricette" />;
   if (!queue.data) return <ErrorMessage error={queue.error} />;
   const groups = queue.data.pazienti;
-  if (groups.length === 0 && settled.length === 0)
-    return <p className="tenue">Nessun invio rimasto senza risposta.</p>;
+  if (groups.length === 0) return <p className="tenue">Nessun invio rimasto senza risposta.</p>;
   return (
     <ul className="coda-ricette">
       {groups.map((g) => (
@@ -185,34 +261,14 @@ function InterruptedQueue() {
           </h3>
           <ul>
             {g.ricette.map((r) => (
-              <li key={r.id} className="ricetta-in-coda">
-                <p>
-                  <strong>{PRESCRIPTION_KIND[r.tipo] ?? r.tipo}</strong>
-                  <span className="tenue">
-                    {' '}
-                    · preparata da {r.preparataDa}, {dateTime(r.preparataIl)}
-                  </span>
-                </p>
-                <InterruptedSendPanel
-                  prescriptionId={r.id}
-                  signedAt={r.firmataIl ?? r.preparataIl}
-                  signedBy={r.firmataDa ?? null}
-                  onChange={(status) => {
-                    if (status === 'sent')
-                      setSettled((xs) => [
-                        ...xs,
-                        { id: r.id, patientId: g.paziente.id, kind: r.tipo },
-                      ]);
-                  }}
-                />
-              </li>
+              <InterruptedItem
+                key={r.id}
+                patient={g.paziente}
+                prescription={r}
+                onChanged={onChanged}
+              />
             ))}
           </ul>
-        </li>
-      ))}
-      {settled.map((x) => (
-        <li key={x.id} className="riquadro">
-          <ReminderPanel prescriptionId={x.id} patientId={x.patientId} kind={x.kind} />
         </li>
       ))}
     </ul>
@@ -222,6 +278,18 @@ function InterruptedQueue() {
 /** Coda «da firmare» del medico e invii non riusciti. */
 export function SignQueuePage() {
   const { isDoctor } = useSession();
+  // Una ricetta che passa da una coda all'altra: gli invii non riusciti si ricaricano (D239).
+  const [changes, setChanges] = useState(0);
+  const changed = () => setChanges((n) => n + 1);
+  // I collegamenti di Oggi portano alla loro sezione (#non-inviate, #senza-risposta), con il fuoco
+  // sul titolo (D239): React Router non segue l'ancora da solo.
+  const { hash } = useLocation();
+  useEffect(() => {
+    const target = hash ? document.getElementById(hash.slice(1)) : null;
+    if (!target) return;
+    target.scrollIntoView?.({ block: 'start' });
+    target.focus({ preventScroll: true });
+  }, [hash]);
   return (
     <>
       <PageHeader title="Ricette" />
@@ -241,28 +309,38 @@ export function SignQueuePage() {
             path="/api/ricette/da-firmare"
             status="to_sign"
             empty="Nessuna ricetta da firmare."
+            onChanged={changed}
           />
         ) : (
           <p className="tenue">La coda è visibile al medico.</p>
         )}
       </section>
       <section aria-labelledby="non-inviate">
-        <h2 id="non-inviate">Invii non riusciti</h2>
+        <h2 id="non-inviate" tabIndex={-1}>
+          Invii non riusciti
+        </h2>
         {isDoctor ? (
-          <Queue path="/api/ricette/non-inviate" status="error" empty="Nessun invio in sospeso." />
+          <Queue
+            path="/api/ricette/non-inviate"
+            status="error"
+            empty="Nessun invio in sospeso."
+            reloadKey={changes}
+          />
         ) : (
           <p className="tenue">La coda è visibile al medico.</p>
         )}
       </section>
       <section aria-labelledby="senza-risposta">
-        <h2 id="senza-risposta">Invii senza risposta</h2>
+        <h2 id="senza-risposta" tabIndex={-1}>
+          Invii senza risposta
+        </h2>
         {isDoctor ? (
           <>
             <p className="tenue">
-              Ricette rimaste «in invio» da più di 15 minuti: il servizio si è fermato mentre
-              aspettava il SAR. Si chiede all’ente se sono arrivate.
+              Ricette rimaste «in invio». Se la risposta non arriva entro 15 minuti, il servizio si
+              è fermato mentre aspettava l’ente: si chiede all’ente se sono arrivate.
             </p>
-            <InterruptedQueue />
+            <InterruptedQueue onChanged={changed} />
           </>
         ) : (
           <p className="tenue">La coda è visibile al medico.</p>

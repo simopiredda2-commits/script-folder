@@ -10,6 +10,7 @@ import {
   accessLog,
   appUser,
   externalSubmission,
+  patient,
   prescription,
   prescriptionDocument,
 } from '../src/db/schema';
@@ -54,7 +55,7 @@ class GatedGateway implements PrescriptionGateway {
 
 interface QueueGroup {
   paziente: { id: string };
-  ricette: { id: string; firmataIl: string; firmataDa: string }[];
+  ricette: { id: string; firmataIl: string; firmataDa: string; esitoDal: string | null }[];
 }
 
 /**
@@ -99,17 +100,17 @@ describe('ricetta rimasta «in invio» (D233)', () => {
     });
   const row = async (id: string) =>
     (await t.db.select().from(prescription).where(eq(prescription.id, id)))[0]!;
-  const draft = async () => {
+  const draft = async (kind: 'pharma_ssn' | 'white' = 'pharma_ssn') => {
     const res = await req('titolare', 'POST', `/api/pazienti/${s.richPatient}/ricette`, {
-      kind: 'pharma_ssn',
+      kind,
       lines: [{ drugName: 'Farmaco di prova 5 mg', quantity: 1 }],
     });
     expect(res.statusCode, res.body).toBe(201);
     return res.json<{ id: string }>().id;
   };
   /** Come dopo un arresto del servizio: firmata, «in invio», e nessun esito scritto. */
-  const stuck = async () => {
-    const id = await draft();
+  const stuck = async (kind: 'pharma_ssn' | 'white' = 'pharma_ssn') => {
+    const id = await draft(kind);
     await t.db
       .update(prescription)
       .set({ status: 'sending', signedBy: s.users.titolare.id, signedAt: s.clock.now() })
@@ -127,6 +128,10 @@ describe('ricetta rimasta «in invio» (D233)', () => {
   const today = async () =>
     (await req('titolare', 'GET', '/api/oggi')).json<{ code: { senzaRisposta: number | null } }>()
       .code.senzaRisposta;
+  const available = async (id: string) =>
+    (await req('titolare', 'GET', `/api/ricette/${id}/promemoria/consegne`)).json<{
+      disponibile: unknown;
+    }>().disponibile;
   const manualRows = (id: string) =>
     t.db
       .select()
@@ -141,7 +146,12 @@ describe('ricetta rimasta «in invio» (D233)', () => {
     const res = await settle('titolare', id, { esito: 'non_arrivata' });
     expect(res.statusCode).toBe(409);
     expect(res.json().errore).toMatch(/meno di 15 minuti: potrebbe essere ancora in corso/);
-    expect(await inQueue(id)).toBeUndefined();
+    // Già nella coda, con l'ora da cui l'esito si segna: chi ricarica la pagina la trova (D239).
+    // Oggi la conta solo quando c'è da chiuderla.
+    const signedAt = (await row(id)).signedAt!;
+    expect((await inQueue(id))?.esitoDal).toBe(
+      new Date(signedAt.getTime() + 15 * 60_000).toISOString(),
+    );
     expect(await today()).toBe(0);
     expect((await row(id)).status).toBe('sending');
     s.clock.advance(2 * 60_000);
@@ -237,6 +247,14 @@ describe('ricetta rimasta «in invio» (D233)', () => {
     expect((await req('titolare', 'GET', `/api/ricette/${id}/promemoria`)).statusCode).not.toBe(
       200,
     );
+    // La pagina sa che non c'è niente da consegnare, e perché (D239).
+    expect(await available(id)).toEqual({
+      promemoria: false,
+      soloNre: false,
+      email: false,
+      sms: false,
+      motivo: expect.stringMatching(/Manca il codice di autenticazione del SAC/),
+    });
   });
 
   it('un NRE con spazi o segni non entra; una ricetta non «in invio» non ha esito da segnare', async () => {
@@ -263,6 +281,160 @@ describe('ricetta rimasta «in invio» (D233)', () => {
     const r = await row(id);
     // Vale l'esito che è passato: arrivata, inviata; non arrivata, di nuovo da inviare.
     expect(r.status).toBe(a.statusCode === 200 ? 'sent' : 'error');
+  });
+
+  it('«è arrivata» con l’NRE scritto in minuscolo: si registra in maiuscolo e il promemoria si stampa (D239)', async () => {
+    const id = await stuck();
+    s.clock.advance(16 * 60_000);
+    const res = await settle('titolare', id, {
+      esito: 'arrivata',
+      nre: ' man00000000000a ',
+      codiceAutenticazione: 'MANAUT0002',
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().nre).toBe('MAN00000000000A');
+    expect((await row(id)).nre).toBe('MAN00000000000A');
+    for (const url of [
+      `/api/ricette/${id}/promemoria`,
+      `/api/ricette/${id}/promemoria?formato=nre`,
+    ])
+      expect((await req('titolare', 'GET', url)).statusCode, url).toBe(200);
+    expect(await available(id)).toEqual({
+      promemoria: true,
+      soloNre: true,
+      email: true,
+      sms: true,
+      motivo: null,
+    });
+  });
+
+  it('l’esito a mano registra la richiesta partita e il promemoria con il paziente di allora (D239)', async () => {
+    const id = await draft();
+    sar.hold();
+    const before = sar.calls;
+    const sending = req('titolare', 'POST', `/api/ricette/${id}/firma-e-invia`, {});
+    for (let i = 0; sar.calls === before; i++) {
+      if (i > 500) throw new Error('Il SAR non è stato chiamato');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    // L'invio è fotografato alla firma: messaggio e paziente come partono.
+    const atClaim = (await row(id)).sendingSnapshot as {
+      message: { patientFiscalCode: string };
+      paziente: { lastName: string; fiscalCode: string };
+    };
+    const [pt] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    expect(atClaim.message.patientFiscalCode).toBe(pt!.fiscalCode);
+    expect(atClaim.paziente).toMatchObject({ lastName: pt!.lastName, fiscalCode: pt!.fiscalCode });
+    // Intanto cognome e codice fiscale cambiano (un errore corretto, inventato come il primo: la X
+    // del luogo di nascita resta); poi il servizio resta fermo e il medico segna l'esito.
+    await t.db
+      .update(patient)
+      .set({ lastName: 'Cognomecambiato', fiscalCode: `CGN${pt!.fiscalCode.slice(3)}` })
+      .where(eq(patient.id, s.richPatient));
+    s.clock.advance(16 * 60_000);
+    const res = await settle('titolare', id, {
+      esito: 'arrivata',
+      nre: 'MAN000000000009',
+      codiceAutenticazione: 'MANAUT0009',
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    const [manual] = await manualRows(id);
+    expect((manual!.request as { ricetta: unknown }).ricetta).toEqual(atClaim.message);
+    const [doc] = await t.db
+      .select()
+      .from(prescriptionDocument)
+      .where(eq(prescriptionDocument.prescriptionId, id));
+    const data = JSON.parse(doc!.content) as {
+      assistito: { cognomeNome: string | null; codiceFiscale: string };
+    };
+    expect(data.assistito).toMatchObject({
+      cognomeNome: `${pt!.lastName} ${pt!.firstName}`,
+      codiceFiscale: pt!.fiscalCode,
+    });
+    expect((await row(id)).sendingSnapshot).toBeNull();
+    await t.db
+      .update(patient)
+      .set({ lastName: pt!.lastName, fiscalCode: pt!.fiscalCode })
+      .where(eq(patient.id, s.richPatient));
+    sar.release();
+    expect((await sending).statusCode).toBe(409);
+  });
+
+  it('ricetta bianca: «è arrivata» con NRBE e PIN, senza il promemoria del Sistema TS (D239)', async () => {
+    const id = await stuck('white');
+    s.clock.advance(16 * 60_000);
+    const missing = await settle('titolare', id, { esito: 'arrivata', nre: 'NRBE00000001' });
+    expect(missing.statusCode).toBe(400);
+    expect(missing.json().errore).toMatch(/servono il numero \(NRBE\) e il PIN/);
+    const res = await settle('titolare', id, {
+      esito: 'arrivata',
+      nre: 'NRBE00000001',
+      pin: '1234',
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json().messaggio).toMatch(
+      /NRBE e PIN si dettano al paziente o gli si mandano per SMS/,
+    );
+    expect(await row(id)).toMatchObject({ status: 'sent', pinNrbe: '1234', authCode: null });
+    expect((await manualRows(id))[0]!.request).toMatchObject({ esito: 'arrivata', pin: '1234' });
+    // Il promemoria del Sistema TS non c'è: solo l'SMS con NRBE e PIN.
+    expect(await available(id)).toEqual({
+      promemoria: false,
+      soloNre: false,
+      email: false,
+      sms: true,
+      motivo: expect.stringMatching(/NRBE e PIN si dettano al paziente o gli si mandano per SMS/),
+    });
+  });
+
+  it('ricetta accettata senza i dati del promemoria: niente PDF né email, l’SMS con il numero sì (D239)', async () => {
+    // Come una ricetta accettata dal SAR di cui i dati del promemoria non si sono fissati (D232).
+    const id = await stuck();
+    await t.db
+      .update(prescription)
+      .set({
+        status: 'sent',
+        nre: 'MAN000000000010',
+        authCode: 'MANAUT0010',
+        sentAt: s.clock.now(),
+      })
+      .where(eq(prescription.id, id));
+    expect(await available(id)).toEqual({
+      promemoria: false,
+      soloNre: false,
+      email: false,
+      sms: true,
+      motivo: expect.stringMatching(/I dati del promemoria non si sono potuti fissare/),
+    });
+    expect((await req('titolare', 'GET', `/api/ricette/${id}/promemoria`)).statusCode).not.toBe(
+      200,
+    );
+    const sms = await req('titolare', 'POST', `/api/ricette/${id}/promemoria/invio`, {
+      canale: 'sms',
+      destinatario: 'paziente',
+    });
+    expect(sms.statusCode, sms.body).toBe(200);
+  });
+
+  it('ricetta bianca senza il PIN: l’SMS non parte, e la pagina lo sa prima (D239)', async () => {
+    const id = await stuck('white');
+    await t.db
+      .update(prescription)
+      .set({ status: 'sent', nre: 'NRBE00000010', pinNrbe: null, sentAt: s.clock.now() })
+      .where(eq(prescription.id, id));
+    expect(await available(id)).toEqual({
+      promemoria: false,
+      soloNre: false,
+      email: false,
+      sms: false,
+      motivo: expect.stringMatching(/chiedi NRBE e PIN al Sistema TS/),
+    });
+    const sms = await req('titolare', 'POST', `/api/ricette/${id}/promemoria/invio`, {
+      canale: 'sms',
+      destinatario: 'paziente',
+    });
+    expect(sms.statusCode).toBe(409);
+    expect(sms.json().errore).toMatch(/Manca il PIN della ricetta bianca/);
   });
 
   it('la risposta tardiva dell’invio di prima non cambia la ricetta segnata a mano', async () => {

@@ -22,7 +22,7 @@ import type {
 import { systemFor } from '@mmg/integrations';
 import { basePackLimit } from '@mmg/rules';
 import { createHash } from 'node:crypto';
-import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { secondsText, studioSendTimeoutMs } from '../admin/studio-service';
 import type { AccessAction } from '../audit/access-log';
@@ -43,7 +43,11 @@ import {
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
-import { buildPromemoriaData } from '../reminders/promemoria';
+import {
+  buildPromemoriaData,
+  promemoriaPatientOf,
+  type PromemoriaPatient,
+} from '../reminders/promemoria';
 import type { createCredentialService } from '../credentials/service';
 import { studioDate } from './rules-check';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
@@ -113,8 +117,9 @@ const signSchema = z
 
 /**
  * Esito di un invio rimasto senza risposta (D233), come lo dice l'ente al medico. Il formato
- * dell'NRE non è nelle specifiche che abbiamo (A1): lettere e cifre. Il codice di autenticazione
- * è facoltativo: senza, il promemoria non si stampa.
+ * dell'NRE non è nelle specifiche che abbiamo (A1): lettere e cifre, in maiuscolo come le vuole il
+ * codice a barre del promemoria (D239). Il codice di autenticazione è facoltativo: senza, il
+ * promemoria non si stampa. Per la ricetta bianca il Sistema TS dà NRBE e PIN (D239).
  */
 const settleSchema = z.discriminatedUnion('esito', [
   z.object({ esito: z.literal('non_arrivata') }).strict(),
@@ -124,7 +129,8 @@ const settleSchema = z.discriminatedUnion('esito', [
       nre: z
         .string()
         .trim()
-        .regex(/^[A-Za-z0-9]{1,30}$/, 'Il numero di ricetta ha solo lettere e cifre, al più 30'),
+        .toUpperCase()
+        .regex(/^[A-Z0-9]{1,30}$/, 'Il numero di ricetta ha solo lettere e cifre, al più 30'),
       codiceAutenticazione: z
         .string()
         .trim()
@@ -133,9 +139,20 @@ const settleSchema = z.discriminatedUnion('esito', [
           'Il codice di autenticazione ha solo lettere e cifre, al più 64',
         )
         .nullish(),
+      pin: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9]{1,20}$/, 'Il PIN ha solo lettere e cifre, al più 20')
+        .nullish(),
     })
     .strict(),
 ]);
+
+/** L'invio fotografato alla firma (D239): messaggio mandato e paziente per il promemoria. */
+interface SendingSnapshot {
+  message: PrescriptionMessage;
+  paziente: PromemoriaPatient;
+}
 
 /** Ambiente degli esiti segnati a mano dal medico, nel registro degli invii (D233). */
 export const MANUAL_ENVIRONMENT = 'manuale';
@@ -261,6 +278,18 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const catalog =
       input.kind === 'specialist_ssn' ? await deps.serviceCatalog?.(studioDate(now())) : undefined;
     return withActor(db, actor.userId, async (tx) => {
+      // Il paziente resta fermo fino alla fine (D239): «Sposta» insieme a una ricetta nuova aspetta
+      // e la trova aperta; oppure la ricetta trova lo spostamento già fatto e si ferma.
+      const [locked] = await tx
+        .select({ archiveId: patient.archiveId })
+        .from(patient)
+        .where(eq(patient.id, patientId))
+        .for('share');
+      if (locked?.archiveId !== archiveId)
+        throw new HttpError(
+          409,
+          'Il paziente è passato a un altro archivio nel frattempo: ricarica la pagina',
+        );
       const [p] = await tx
         .insert(prescription)
         .values({
@@ -567,20 +596,30 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const use = useFor(p.kind);
     const auth = await deps.credentials.authFor(actor.userId, use);
 
+    // Il messaggio e il paziente come partono: restano con la ricetta finché l'invio è in corso,
+    // per l'esito segnato a mano se il servizio si ferma (D239).
+    const message = await buildMessage(p, actor.userId);
+    const [sendingPatient] = await db.select().from(patient).where(eq(patient.id, p.patientId));
+    const snapshot: SendingSnapshot = { message, paziente: promemoriaPatientOf(sendingPatient!) };
     // Passaggio atomico a «in invio»: se due richieste arrivano insieme, ne passa una sola. L'ora
     // della firma segna questo invio: l'esito si scrive solo se è ancora lui (D233).
     const claimedAt = now();
     const claimed = await withActor(db, actor.userId, (tx) =>
       tx
         .update(prescription)
-        .set({ status: 'sending', signedBy: actor.userId, signedAt: claimedAt, updatedAt: now() })
+        .set({
+          status: 'sending',
+          signedBy: actor.userId,
+          signedAt: claimedAt,
+          sendingSnapshot: snapshot,
+          updatedAt: now(),
+        })
         .where(and(eq(prescription.id, p.id), eq(prescription.status, p.status)))
         .returning({ id: prescription.id }),
     );
     if (claimed.length === 0)
       throw new HttpError(409, 'La ricetta è cambiata nel frattempo: ricarica');
 
-    const message = await buildMessage(p, actor.userId);
     const system = systemFor(p.kind);
     const gateway = deps.gateways[system];
     // Il tempo di attesa dello studio, com'è adesso: l'amministratore può averlo appena cambiato.
@@ -695,6 +734,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
                 lastErrorCode: null,
                 lastErrorMessage: null,
                 rulesVersion,
+                sendingSnapshot: null,
                 updatedAt: now(),
               }
             : {
@@ -702,6 +742,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
                 lastErrorKind: errorKind,
                 lastErrorCode: result.outcome === 'rejected' ? result.code : null,
                 lastErrorMessage: result.message,
+                sendingSnapshot: null,
                 updatedAt: now(),
               },
         )
@@ -782,13 +823,23 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       );
     const signedAt = p.signedAt!;
     const arrived = input.esito === 'arrivata' ? input : null;
-    const authCode = arrived?.codiceAutenticazione ?? null;
+    const white = p.kind === 'white';
+    if (arrived && white && !arrived.pin)
+      throw new HttpError(
+        400,
+        'Per la ricetta bianca servono il numero (NRBE) e il PIN dati dal Sistema TS',
+      );
+    const authCode = white ? null : (arrived?.codiceAutenticazione ?? null);
     const ssn = p.kind === 'pharma_ssn' || p.kind === 'specialist_ssn';
-    // Il messaggio come l'aveva firmato chi ha mandato la ricetta, con la data di quell'invio: è la
-    // richiesta che resta nel registro degli invii, e le sue righe vanno sul promemoria.
-    const message = await buildMessage(p, p.signedBy!, studioDate(signedAt));
+    // Il messaggio partito con quell'invio, fotografato alla firma (D239): è la richiesta che resta
+    // nel registro degli invii, e le sue righe e il paziente di allora vanno sul promemoria. Per
+    // una ricetta firmata prima della fotografia, come l'aveva firmato chi l'ha mandata.
+    const snapshot = p.sendingSnapshot as SendingSnapshot | null;
+    const message = snapshot?.message ?? (await buildMessage(p, p.signedBy!, studioDate(signedAt)));
     let promemoria: Awaited<ReturnType<typeof buildPromemoriaData>> | null = null;
-    let promemoriaMissing = arrived !== null && ssn && !authCode;
+    // Perché il promemoria non c'è: manca il codice, oppure i dati non si sono potuti fissare.
+    const noCode = arrived !== null && ssn && !authCode;
+    let notFixed = false;
     if (arrived && ssn && authCode) {
       try {
         promemoria = await (deps.buildPromemoria ?? buildPromemoriaData)(
@@ -802,9 +853,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
             messages: null,
           },
           message.lines,
+          snapshot?.paziente ?? null,
         );
       } catch {
-        promemoriaMissing = true;
+        notFixed = true;
       }
     }
     // La versione delle regole dell'ultimo controllo prima di quell'invio.
@@ -836,6 +888,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
               esito: 'arrivata',
               nre: arrived.nre,
               codiceAutenticazione: authCode,
+              ...(white ? { pin: arrived.pin } : {}),
               ricetta: message,
             }
           : { esito: 'non_arrivata', ricetta: message },
@@ -854,7 +907,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
                 nre: arrived.nre,
                 authCode,
                 sacDoctorName: null,
-                pinNrbe: null,
+                pinNrbe: white ? (arrived.pin ?? null) : null,
+                sendingSnapshot: null,
                 // È arrivata con quell'invio: per i riepiloghi conta il suo giorno (D201).
                 sentAt: signedAt,
                 lastErrorKind: null,
@@ -868,6 +922,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
                 lastErrorKind: 'unreachable',
                 lastErrorCode: null,
                 lastErrorMessage: notArrived,
+                sendingSnapshot: null,
                 updatedAt: now(),
               },
         )
@@ -887,9 +942,13 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       stato: arrived ? ('sent' as const) : ('error' as const),
       nre: arrived?.nre ?? null,
       messaggio: arrived
-        ? promemoriaMissing
-          ? `Ricetta segnata come arrivata, NRE ${arrived.nre}: senza il codice di autenticazione il promemoria non si stampa. Al paziente bastano il numero di ricetta e il codice fiscale.`
-          : null
+        ? white
+          ? `Ricetta bianca segnata come arrivata, NRBE ${arrived.nre}: il promemoria del Sistema TS non c’è, perché la risposta dell’invio non è arrivata. NRBE e PIN si dettano al paziente o gli si mandano per SMS.`
+          : noCode
+            ? `Ricetta segnata come arrivata, NRE ${arrived.nre}: senza il codice di autenticazione il promemoria non si stampa. Al paziente bastano il numero di ricetta e il codice fiscale.`
+            : notFixed
+              ? `Ricetta segnata come arrivata, NRE ${arrived.nre}: i dati del promemoria non si sono potuti fissare, quindi il promemoria non si stampa. Al paziente bastano il numero di ricetta e il codice fiscale.`
+              : null
         : notArrived,
     };
   }
@@ -1136,18 +1195,16 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
   }
 
   /**
-   * «Invii senza risposta»: ricette «in invio» da più di INTERRUPTED_SEND_AFTER_MINUTES, di cui il
-   * medico segna l'esito chiesto all'ente (D233).
+   * «Invii senza risposta»: ricette «in invio», di cui il medico segna l'esito chiesto all'ente
+   * dopo INTERRUPTED_SEND_AFTER_MINUTES (D233). Anche quelle più recenti, con l'ora da cui l'esito
+   * si segna: chi ricarica la pagina mentre l'invio è in corso vede dov'è la ricetta, e non la rifà
+   * (D239). Il conto di Oggi resta per quelle da chiudere.
    */
   async function interruptedQueue(actor: Actor) {
-    return queue(
-      actor,
-      'sending',
-      new Date(now().getTime() - INTERRUPTED_SEND_AFTER_MINUTES * 60_000),
-    );
+    return queue(actor, 'sending', { signer: true });
   }
 
-  async function queue(actor: Actor, status: PrescriptionStatus, signedBefore?: Date) {
+  async function queue(actor: Actor, status: PrescriptionStatus, opts: { signer?: boolean } = {}) {
     const archives = await visibleArchives(db, actor, 'prescription.sign_send');
     if (archives.length === 0) return [];
     const rows = await db
@@ -1171,13 +1228,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       .from(prescription)
       .innerJoin(patient, eq(patient.id, prescription.patientId))
       .innerJoin(appUser, eq(appUser.id, prescription.preparedBy))
-      .where(
-        and(
-          inArray(prescription.archiveId, archives),
-          eq(prescription.status, status),
-          signedBefore ? lt(prescription.signedAt, signedBefore) : undefined,
-        ),
-      )
+      .where(and(inArray(prescription.archiveId, archives), eq(prescription.status, status)))
       .orderBy(patient.lastName, patient.firstName, prescription.preparedAt);
     const groups = new Map<
       string,
@@ -1204,7 +1255,17 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         righe: r.righe,
         errore: r.errore,
         tipoErrore: r.tipoErrore,
-        ...(signedBefore ? { firmataIl: r.firmataIl, firmataDa: r.firmataDa } : {}),
+        ...(opts.signer
+          ? {
+              firmataIl: r.firmataIl,
+              firmataDa: r.firmataDa,
+              esitoDal: r.firmataIl
+                ? new Date(
+                    r.firmataIl.getTime() + INTERRUPTED_SEND_AFTER_MINUTES * 60_000,
+                  ).toISOString()
+                : null,
+            }
+          : {}),
       });
       groups.set(r.patientId, g);
     }
