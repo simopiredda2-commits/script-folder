@@ -111,11 +111,12 @@ Letti, non trascritti: l'elenco è precedente al nuovo nomenclatore (`docs/banch
 
 ### Modifiche del 2026 ai LEA (D216)
 
-Letta il 20/11/2026 per sapere che cosa cambiano il DPCM 7 agosto 2026 e il DM 3 agosto 2026; nel repository non entra niente. Testo di atti ufficiali (art. 5 della legge 633/1941); il PDF resta fuori dal repository.
+Letta il 20/11/2026 per sapere che cosa cambiano il DPCM 7 agosto 2026 e il DM 3 agosto 2026; nel repository non entra niente. Il DPCM con i suoi allegati, mandato da Simone il 21/11/2026, è servito a controllare la trascrizione dell'allegato 8. Testo di atti ufficiali (art. 5 della legge 633/1941); il PDF resta fuori dal repository.
 
-| Documento                                                                                    | Indirizzo                                                       | Byte      | SHA-256                                                            |
-| -------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
-| GU n. 227 del 30/9/2026, serie generale: DPCM 7/8/2026 (pp. 20–22) e DM 3/8/2026 (pp. 43–47) | `https://www.gazzettaufficiale.it/eli/gu/2026/09/30/227/sg/pdf` | 3.379.374 | `5b57a2f001b3d2bc2687f62b9ed46eb610d4760ce32b727ebad4b3a17d6a6974` |
+| Documento                                                                                    | Indirizzo                                                                                      | Byte      | SHA-256                                                            |
+| -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
+| GU n. 227 del 30/9/2026, serie generale: DPCM 7/8/2026 (pp. 20–22) e DM 3/8/2026 (pp. 43–47) | `https://www.gazzettaufficiale.it/eli/gu/2026/09/30/227/sg/pdf`                                | 3.379.374 | `5b57a2f001b3d2bc2687f62b9ed46eb610d4760ce32b727ebad4b3a17d6a6974` |
+| DPCM 7/8/2026 con gli allegati A–E (testo integrale firmato, 37 pagine)                      | Mandato da Simone il 21/11/2026 (file `DPCM_modifica_LEA.pdf`, dalla pagina LEA del Ministero) | 1.762.275 | `2ab2314b1f3a2fdb8c3357b30aa51f02728c90dc181bd145285de1a0af9337e7` |
 
 ### Presidi del DPCM LEA (D218)
 

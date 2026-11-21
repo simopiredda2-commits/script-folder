@@ -62,7 +62,9 @@ _C. Decisioni o materiali di Simone_
    - l'allegato 2 «Ausili monouso» aggiornato, o l'allegato M del DM 3/8/2026;
    - l'allegato 11 aggiornato, o l'allegato V del DM;
    - l'allegato 1 del DM, che cambia gli articoli 11 e 14 (e 17, 18, 27, 33, 35, 38);
-   - per controllare gli allegati 7 e 8 già trascritti: gli allegati R e D del DM e l'allegato D del DPCM 7/8/2026.
+   - per controllare gli allegati 7 e 8 già trascritti: gli allegati R e D del DM.
+
+   Il DPCM 7/8/2026 con gli allegati A–E è arrivato da Simone il 21/11/2026: le tre condizioni nuove del suo allegato D (068 sindrome fibromialgica nelle forme molto severe, 069 idrosadenite suppurativa allo stadio III, 070 malattia polmonare da micobatteri non tubercolari) e la loro corrispondenza ICD-9-CM sono già nella trascrizione dell'allegato 8. Le prestazioni esenti dei fogli D2–D4 non si trascrivono (D190). Manca il DM 3/8/2026 con i suoi allegati, sulla stessa pagina del Ministero.
 
    L'allegato 3 non serve: i decreti del 2026 non lo toccano. È trascritto dalla Gazzetta del 2017 (D218) e resta da controllare (B2).
 
