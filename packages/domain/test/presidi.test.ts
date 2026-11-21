@@ -82,6 +82,17 @@ describe('presidi e assistenza integrativa', () => {
       [],
     );
     expect(advancedDressingIssues({ category: 'monouso', code: null }, chosen)).toEqual([]);
+    // Lo stesso codice in un'altra forma: con uno spazio a larghezza zero copiato da un PDF, con
+    // un punto in più o senza punti. Il messaggio dice la voce scelta (D239).
+    for (const code of ['04.49.03.103\u200b', '04.49.03.103.', '044903103', '04 49 03 103'])
+      expect(advancedDressingIssues({ category: 'monouso', code }, chosen), code).toEqual([
+        'La voce 04.49.03.103 è fra le medicazioni avanzate scelte dal titolare dell’archivio: si prescrive nella categoria «Medicazioni avanzate»',
+      ]);
+    // Un codice diverso resta diverso.
+    expect(advancedDressingIssues({ category: 'monouso', code: '04.49.03.1030' }, chosen)).toEqual(
+      [],
+    );
+    expect(advancedDressingIssues({ category: 'monouso', code: '04.49.03' }, chosen)).toEqual([]);
     expect(advancedDressingIssues({ category: 'monouso', code: '04.49.03.103' }, [])).toEqual([]);
     // Le voci fra cui si sceglie: il gruppo 04.49, con il codice intero.
     expect(['04.49.03.103', '04.49.27.903'].every((c) => ADVANCED_DRESSING_CODE.test(c))).toBe(

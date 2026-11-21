@@ -1,4 +1,6 @@
 import {
+  ADVANCED_DRESSING_MAX_MONTHS,
+  chosenAdvancedDressing,
   SUPPLY_CATEGORY_KEYS,
   supplyCategory,
   supplyEndOn,
@@ -45,6 +47,17 @@ export const renewBody = z
     /** Dal giorno dopo la fine della precedente, se non si dice altro. */
     dal: isoDate.optional(),
     mesi: z.number().int().min(1).max(99).optional(),
+    /**
+     * Il rinnovo di una voce che il titolare ha poi scelto come medicazione avanzata passa in quella
+     * categoria (D239): è l'unico cambio di categoria ammesso.
+     */
+    categoria: z.literal('medicazione_avanzata').optional(),
+    /**
+     * La prima prescrizione dello specialista, quando la prescrizione di prima non la dice: per
+     * esempio una trascrizione dello specialista, o una voce passata alle medicazioni avanzate.
+     */
+    primoSpecialista: optionalText(200),
+    primoSpecialistaIl: isoDate.optional(),
   })
   .strict();
 
@@ -138,8 +151,13 @@ export function renewalOf(s: typeof supplyPrescription.$inferSelect, r: z.infer<
     mesi: r.mesi ?? s.months,
     dal: r.dal ?? next,
     prescrittore: 'mmg',
-    ...(s.firstSpecialist ? { primoSpecialista: s.firstSpecialist } : {}),
-    ...(s.firstSpecialistOn ? { primoSpecialistaIl: s.firstSpecialistOn } : {}),
+    ...(r.categoria ? { categoria: r.categoria } : {}),
+    ...((r.primoSpecialista ?? s.firstSpecialist)
+      ? { primoSpecialista: r.primoSpecialista ?? s.firstSpecialist }
+      : {}),
+    ...((r.primoSpecialistaIl ?? s.firstSpecialistOn)
+      ? { primoSpecialistaIl: r.primoSpecialistaIl ?? s.firstSpecialistOn }
+      : {}),
     ...(s.indicationEntryId ? { indicazione: s.indicationEntryId } : {}),
     ...(s.notes ? { note: s.notes } : {}),
     riservato: s.reserved,
@@ -176,11 +194,34 @@ export async function annulSupply(
     .where(eq(supplyPrescription.id, s.id));
 }
 
+/**
+ * Che cosa chiede il rinnovo di una prescrizione (D239): se la voce è ora fra le medicazioni
+ * avanzate del titolare passa in quella categoria; fra le medicazioni avanzate il medico di
+ * famiglia rinnova con la prima prescrizione dello specialista e per al massimo 6 mesi.
+ */
+export function renewalNeeds(
+  s: Pick<
+    typeof supplyPrescription.$inferSelect,
+    'category' | 'code' | 'months' | 'firstSpecialist' | 'firstSpecialistOn'
+  >,
+  advancedCodes: readonly string[],
+) {
+  const move =
+    s.category !== 'medicazione_avanzata' && chosenAdvancedDressing(s.code, advancedCodes) !== null;
+  const advanced = move || s.category === 'medicazione_avanzata';
+  return {
+    categoria: move ? ('medicazione_avanzata' as const) : null,
+    chiedeSpecialista: advanced && !(s.firstSpecialist && s.firstSpecialistOn),
+    mesiMassimi: advanced ? ADVANCED_DRESSING_MAX_MONTHS : null,
+  };
+}
+
 export async function listSupplies(
   db: Database,
   patientId: string,
   reservedAllowed: boolean,
   today: string,
+  advancedCodes: readonly string[] = [],
 ) {
   const rows = await db
     .select({ s: supplyPrescription, by: appUser.displayName })
@@ -215,5 +256,6 @@ export async function listSupplies(
     stato: supplyState(s, today),
     motivoAnnullamento: s.annulReason,
     registrataDa: by,
+    rinnovo: renewalNeeds(s, advancedCodes),
   }));
 }

@@ -20,7 +20,7 @@ import {
   therapeuticPlan,
   therapy,
 } from '../db/schema';
-import { withActor } from '../db/tx';
+import { withActor, type Tx } from '../db/tx';
 import { advancedCodesOf } from '../clinical/supplies';
 import { buildCsvZip } from '../export/csv';
 import { buildExport } from '../export/export';
@@ -338,9 +338,28 @@ export function registerPatientRoutes(
     .strict();
 
   /**
-   * Che cosa vede la segreteria di questo archivio: lo decide il titolare (D30). Nel registro la
-   * consultazione e la modifica restano distinte, la modifica con i nomi dei campi (mai i valori).
+   * Che cosa vede la segreteria di questo archivio (D30) e quali voci sono medicazioni avanzate
+   * (D238): lo decide il titolare. Nel registro la consultazione e la modifica restano distinte, la
+   * modifica con i nomi dei campi (mai i valori) e con l'esito vero: «fallito» se la richiesta non
+   * va bene, «consentito» scritto insieme alla modifica (D239).
    */
+  const logArchiveSettings = (
+    on: Database | Tx,
+    actor: Actor,
+    archiveId: string,
+    fase: 'lettura' | 'modifica',
+    outcome: 'consentito' | 'negato' | 'fallito',
+    motivo: string,
+    campi: string[] = [],
+  ) =>
+    logAccess(on, {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      action: 'impostazioni_archivio',
+      outcome,
+      workstation: actor.workstation,
+      details: { archivio: archiveId, fase, ...(campi.length ? { campi } : {}), motivo },
+    });
   const guardArchiveSettings = async (
     actor: Actor,
     archiveId: string,
@@ -349,26 +368,24 @@ export function registerPatientRoutes(
   ) => {
     const ctx = await loadArchiveContext(db, archiveId);
     const decision = can(actor, 'archive.settings', { ...ctx, now: new Date() });
-    await logAccess(db, {
-      studioId: actor.studioId,
-      userId: actor.userId,
-      action: 'impostazioni_archivio',
-      outcome: decision.allowed ? 'consentito' : 'negato',
-      workstation: actor.workstation,
-      details: {
-        archivio: archiveId,
+    // La modifica consentita si registra dopo, con il suo esito.
+    if (!decision.allowed || fase === 'lettura')
+      await logArchiveSettings(
+        db,
+        actor,
+        archiveId,
         fase,
-        ...(campi.length ? { campi } : {}),
-        motivo: decision.reason,
-      },
-    });
+        decision.allowed ? 'consentito' : 'negato',
+        decision.reason,
+        campi,
+      );
     if (!decision.allowed) throw new HttpError(403, decision.reason);
-    return ctx;
+    return { ctx, reason: decision.reason };
   };
 
   app.get('/api/archivi/:id/impostazioni', async (req) => {
     const { id } = archiveParams.parse(req.params);
-    const ctx = await guardArchiveSettings(req.actor!, id, 'lettura');
+    const { ctx } = await guardArchiveSettings(req.actor!, id, 'lettura');
     return {
       segreteriaLeggeDiario: ctx.settings.secretaryCanReadDiary,
       segreteriaLeggeRiepilogo: ctx.settings.secretaryCanReadSummary,
@@ -377,32 +394,45 @@ export function registerPatientRoutes(
   });
 
   app.patch('/api/archivi/:id/impostazioni', async (req) => {
+    const actor = req.actor!;
     const { id } = archiveParams.parse(req.params);
     const parsed = settingsBody.safeParse(req.body);
-    await guardArchiveSettings(
-      req.actor!,
-      id,
-      'modifica',
-      parsed.success ? Object.keys(parsed.data) : [],
-    );
-    const body = settingsBody.parse(req.body);
-    // Solo voci del nomenclatore in uso: una voce che non c'è non si potrebbe scegliere (D237).
-    const advanced = body.medicazioniAvanzate && [...new Set(body.medicazioniAvanzate)].sort();
-    if (advanced?.length) {
-      const known = new Set(
-        (await new ReferenceData(db).supplyCatalog(studioDate(now())))
-          .filter((i) => i.entryType === 'presidio' && i.annex === '2')
-          .map((i) => i.code),
+    const campi = parsed.success ? Object.keys(parsed.data) : [];
+    const { reason } = await guardArchiveSettings(actor, id, 'modifica', campi);
+    // Una richiesta che non va bene non cambia niente, e il registro lo dice (D239).
+    const refuse = async (motivo: string, error: Error): Promise<never> => {
+      await logArchiveSettings(db, actor, id, 'modifica', 'fallito', motivo, campi);
+      throw error;
+    };
+    if (!parsed.success) return refuse('Richiesta non valida', parsed.error);
+    const body = parsed.data;
+    if (campi.length === 0)
+      return refuse(
+        'Nessuna impostazione da cambiare',
+        new HttpError(400, 'Nessuna impostazione da cambiare'),
       );
-      const unknown = advanced.filter((c) => !known.has(c));
-      if (unknown.length)
-        throw new HttpError(
-          400,
-          `Non sono voci del nomenclatore dell’allegato 2 in uso: ${unknown.join(', ')}`,
-        );
-    }
-    const [row] = await withActor(db, req.actor!.userId, (tx) =>
-      tx
+    const advanced = body.medicazioniAvanzate && [...new Set(body.medicazioniAvanzate)].sort();
+    // Le voci che si possono aggiungere sono quelle del nomenclatore in uso (D237).
+    const known = advanced?.length
+      ? new Set(
+          (await new ReferenceData(db).supplyCatalog(studioDate(now())))
+            .filter((i) => i.entryType === 'presidio' && i.annex === '2')
+            .map((i) => i.code),
+        )
+      : new Set<string>();
+    const outcome = await withActor(db, actor.userId, async (tx) => {
+      const [locked] = await tx
+        .select({ codes: archive.advancedDressingCodes })
+        .from(archive)
+        .where(eq(archive.id, id))
+        .for('update');
+      // Solo le voci aggiunte: una voce già scelta che una versione nuova del nomenclatore non ha
+      // più resta nell'elenco, e il titolare la può togliere (D239).
+      const unknown = (advanced ?? []).filter(
+        (c) => !(locked?.codes ?? []).includes(c) && !known.has(c),
+      );
+      if (unknown.length) return { ok: false as const, unknown };
+      const [row] = await tx
         .update(archive)
         .set({
           ...(body.segreteriaLeggeDiario !== undefined
@@ -414,12 +444,22 @@ export function registerPatientRoutes(
           ...(advanced !== undefined ? { advancedDressingCodes: advanced } : {}),
         })
         .where(eq(archive.id, id))
-        .returning(),
-    );
+        .returning();
+      await logArchiveSettings(tx, actor, id, 'modifica', 'consentito', reason, campi);
+      return { ok: true as const, row: row! };
+    });
+    if (!outcome.ok)
+      return refuse(
+        'Voci che il nomenclatore in uso non ha',
+        new HttpError(
+          400,
+          `Non sono voci del nomenclatore dell’allegato 2 in uso: ${outcome.unknown.join(', ')}`,
+        ),
+      );
     return {
-      segreteriaLeggeDiario: row!.secretaryCanReadDiary,
-      segreteriaLeggeRiepilogo: row!.secretaryCanReadSummary,
-      medicazioniAvanzate: row!.advancedDressingCodes,
+      segreteriaLeggeDiario: outcome.row.secretaryCanReadDiary,
+      segreteriaLeggeRiepilogo: outcome.row.secretaryCanReadSummary,
+      medicazioniAvanzate: outcome.row.advancedDressingCodes,
     };
   });
 

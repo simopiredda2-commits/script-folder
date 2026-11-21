@@ -99,7 +99,7 @@ const CATALOG = {
   malattieRare: [],
 };
 
-function supplyRoutes(advanced: string[]) {
+function supplyRoutes(advanced: string[], presidi: unknown[] = []) {
   return stubFetch({
     '/api/io': ok(ME),
     '/api/oggi': ok({ data: '2026-11-21', appuntamenti: [], code: { daFirmare: 0 } }),
@@ -110,12 +110,38 @@ function supplyRoutes(advanced: string[]) {
         ? { status: 201, body: { id: 's9' } }
         : {
             status: 200,
-            body: { presidi: [], puoScrivere: true, medicazioniAvanzate: advanced },
+            body: { presidi, puoScrivere: true, medicazioniAvanzate: advanced },
           },
+    '/api/pazienti/p1/presidi/s1/rinnova': () => ({ status: 201, body: { id: 's2' } }),
     '/api/presidi/categorie': ok(CATEGORIES),
     '/api/presidi/nomenclatore': ok(CATALOG),
   });
 }
+
+/** Una prescrizione di presidi già registrata, nella forma del servizio. */
+const supply = (extra: object = {}) => ({
+  id: 's1',
+  categoria: 'monouso',
+  nomeCategoria: 'Dispositivi medici monouso',
+  fonte: null,
+  prodotto: 'medicazione di prova in alginato',
+  codice: '04.49.03.103',
+  quantitaMensile: 10,
+  unita: 'pezzi',
+  mesi: 12,
+  dal: '2025-10-01',
+  al: '2026-09-30',
+  prescrittore: 'mmg',
+  primoSpecialista: null,
+  primoSpecialistaIl: null,
+  note: null,
+  riservato: false,
+  stato: 'scaduta',
+  motivoAnnullamento: null,
+  registrataDa: 'Dott.ssa Titolare Inventata',
+  rinnovo: { categoria: null, chiedeSpecialista: false, mesiMassimi: null },
+  ...extra,
+});
 
 const options = (select: HTMLElement) =>
   within(select)
@@ -201,6 +227,78 @@ describe('presidi: quantità del nomenclatore e medicazioni avanzate (D237)', ()
     );
   });
 
+  it('cambiando categoria la voce scelta dal nomenclatore si toglie (D239)', async () => {
+    supplyRoutes([]);
+    window.history.pushState({}, '', '/pazienti/p1/presidi');
+    render(<App />);
+    const select = await screen.findByLabelText<HTMLSelectElement>('Dal nomenclatore (allegato 2)');
+    fireEvent.change(select, {
+      target: {
+        value: within(select)
+          .getByRole('option', { name: 'medicazione di prova in alginato · 04.49.03.103' })
+          .getAttribute('value'),
+      },
+    });
+    const product = screen.getByLabelText<HTMLInputElement>('Prodotto');
+    const code = screen.getByLabelText<HTMLInputElement>('Codice del nomenclatore');
+    expect([product.value, code.value]).toEqual([
+      'medicazione di prova in alginato',
+      '04.49.03.103',
+    ]);
+    fireEvent.change(screen.getByLabelText('Categoria'), {
+      target: { value: 'medicazione_avanzata' },
+    });
+    expect([product.value, code.value]).toEqual(['', '']);
+    // Un prodotto scritto a mano resta.
+    fireEvent.change(product, { target: { value: 'garza scritta a mano' } });
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'monouso' } });
+    expect(product.value).toBe('garza scritta a mano');
+  });
+
+  it('il rinnovo che passa fra le medicazioni avanzate chiede specialista e mesi (D239)', async () => {
+    const calls = supplyRoutes(
+      ['04.49.03.103'],
+      [
+        supply({
+          rinnovo: { categoria: 'medicazione_avanzata', chiedeSpecialista: true, mesiMassimi: 6 },
+        }),
+      ],
+    );
+    window.history.pushState({}, '', '/pazienti/p1/presidi');
+    render(<App />);
+    const renew = await screen.findByRole('button', { name: /^Rinnova/ });
+    expect(renew.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(renew);
+    expect(renew.getAttribute('aria-expanded')).toBe('true');
+    screen.getByText(/il rinnovo passa nella categoria «Medicazioni avanzate»/);
+    expect(screen.getByLabelText<HTMLInputElement>('Rinnovo: mesi').value).toBe('6');
+    fireEvent.change(screen.getByLabelText('Rinnovo: specialista della prima prescrizione'), {
+      target: { value: 'Dr. Vulnologo di prova' },
+    });
+    fireEvent.change(screen.getByLabelText('Rinnovo: data della prima prescrizione'), {
+      target: { value: '2026-01-10' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Conferma il rinnovo' }));
+    await screen.findByText('Rinnovata fra le medicazioni avanzate.');
+    expect(calls.find((c) => c.path.endsWith('/rinnova'))?.body).toEqual({
+      categoria: 'medicazione_avanzata',
+      primoSpecialista: 'Dr. Vulnologo di prova',
+      primoSpecialistaIl: '2026-01-10',
+      mesi: 6,
+    });
+  });
+
+  it('il rinnovo che non chiede niente resta un clic', async () => {
+    const calls = supplyRoutes([], [supply({ mesi: 3 })]);
+    window.history.pushState({}, '', '/pazienti/p1/presidi');
+    render(<App />);
+    const renew = await screen.findByRole('button', { name: /^Rinnova/ });
+    expect(renew.getAttribute('aria-expanded')).toBeNull();
+    fireEvent.click(renew);
+    await screen.findByText('Rinnovata.');
+    expect(calls.find((c) => c.path.endsWith('/rinnova'))?.body).toEqual({});
+  });
+
   it('senza scelte del titolare le medicazioni avanzate non hanno un nomenclatore', async () => {
     supplyRoutes([]);
     window.history.pushState({}, '', '/pazienti/p1/presidi');
@@ -223,8 +321,8 @@ describe('archivio: le medicazioni avanzate le sceglie il titolare (D237)', () =
     window.history.pushState({}, '', '/');
   });
 
-  const archiveRoutes = (catalog: unknown, reloadFails = false) => {
-    let saved = ['04.49.06.203'];
+  const archiveRoutes = (catalog: unknown, reloadFails = false, initial = ['04.49.06.203']) => {
+    let saved = initial;
     let patched = false;
     const calls = stubFetch({
       '/api/io': ok(ME),
@@ -293,7 +391,7 @@ describe('archivio: le medicazioni avanzate le sceglie il titolare (D237)', () =
   });
 
   it('con il nomenclatore non ancora in uso la pagina lo dice, senza caselle', async () => {
-    archiveRoutes({ presidi: [], malattieRare: [] });
+    archiveRoutes({ presidi: [], malattieRare: [] }, false, []);
     window.history.pushState({}, '', '/archivio');
     render(<App />);
     const section = (await screen.findByRole('heading', { name: 'Medicazioni avanzate' })).closest(
@@ -301,5 +399,46 @@ describe('archivio: le medicazioni avanzate le sceglie il titolare (D237)', () =
     )!;
     await within(section).findByText(/non è ancora in uso/);
     expect(within(section).queryAllByRole('checkbox')).toEqual([]);
+  });
+
+  it('una voce scelta che il nomenclatore in uso non ha più si vede e si toglie (D239)', async () => {
+    const calls = archiveRoutes(CATALOG, false, ['04.49.06.203', '04.49.99.999']);
+    window.history.pushState({}, '', '/archivio');
+    render(<App />);
+    const section = (await screen.findByRole('heading', { name: 'Medicazioni avanzate' })).closest(
+      'section',
+    )!;
+    const boxes = await within(section).findAllByRole('checkbox');
+    expect(boxes.map((b) => [b.id, (b as HTMLInputElement).checked])).toEqual([
+      ['avanzata-04.49.03.103', false],
+      ['avanzata-04.49.06.203', true],
+      ['avanzata-04.49.99.999', true],
+    ]);
+    expect(within(section).getByLabelText(/04\.49\.99\.999.*non è più nel nomenclatore/)).toBe(
+      boxes[2],
+    );
+    fireEvent.click(boxes[2]!);
+    fireEvent.click(within(section).getByRole('button', { name: 'Salva le medicazioni avanzate' }));
+    await within(section).findByText('Medicazioni avanzate salvate: 1.');
+    expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({
+      medicazioniAvanzate: ['04.49.06.203'],
+    });
+    // Tolta e salvata, non si vede più.
+    await waitFor(() => expect(within(section).queryByLabelText(/04\.49\.99\.999/)).toBeNull());
+  });
+
+  it('anche con il nomenclatore non in uso le voci già scelte si vedono, per toglierle', async () => {
+    archiveRoutes({ presidi: [], malattieRare: [] }, false, ['04.49.06.203']);
+    window.history.pushState({}, '', '/archivio');
+    render(<App />);
+    const section = (await screen.findByRole('heading', { name: 'Medicazioni avanzate' })).closest(
+      'section',
+    )!;
+    await within(section).findByText(/non è ancora in uso/);
+    expect(
+      within(section)
+        .getAllByRole('checkbox')
+        .map((b) => b.id),
+    ).toEqual(['avanzata-04.49.06.203']);
   });
 });

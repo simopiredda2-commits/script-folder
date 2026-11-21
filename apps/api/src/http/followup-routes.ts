@@ -148,16 +148,18 @@ export function registerFollowUpRoutes(app: FastifyInstance, db: Database, now: 
       'lettura_presidi',
     );
     const at = { ...context, now: now() };
+    // Le voci che il titolare considera medicazioni avanzate (D237).
+    const advanced = await advancedCodesOf(db, p.archiveId);
     return {
       presidi: await listSupplies(
         db,
         id,
         can(actor, 'reserved.read', at).allowed,
         studioDate(now()),
+        advanced,
       ),
       puoScrivere: can(actor, 'therapy.write', at).allowed,
-      // Le voci che il titolare considera medicazioni avanzate (D237).
-      medicazioniAvanzate: await advancedCodesOf(db, p.archiveId),
+      medicazioniAvanzate: advanced,
     };
   });
 

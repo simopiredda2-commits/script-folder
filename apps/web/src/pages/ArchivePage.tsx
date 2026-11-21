@@ -665,6 +665,12 @@ function AdvancedDressings({
   const items = (catalog.data?.presidi ?? []).filter(
     (i) => i.allegato === '2' && i.codice.startsWith('04.49.'),
   );
+  // Le voci scelte che il nomenclatore in uso non ha più (una versione nuova le ha tolte o
+  // corrette): restano finché il titolare non le toglie, e qui si vedono per poterlo fare (D239).
+  const known = new Set(items.map((i) => i.codice));
+  const stale = catalog.data
+    ? [...new Set([...codes, ...current])].filter((c) => !known.has(c)).sort()
+    : [];
 
   const toggle = (code: string, on: boolean) => {
     const next = new Set(current);
@@ -719,7 +725,7 @@ function AdvancedDressings({
           controllo.
         </p>
       )}
-      {items.length > 0 && (
+      {(items.length > 0 || stale.length > 0) && (
         <form onSubmit={(e) => void save(e)}>
           <fieldset className="scelta" disabled={busy}>
             <legend className="visivamente-nascosto">Medicazioni avanzate del nomenclatore</legend>
@@ -733,6 +739,23 @@ function AdvancedDressings({
                 />
                 <label htmlFor={`avanzata-${i.codice}`}>
                   {i.descrizione} <span className="codice">{i.codice}</span>
+                </label>
+              </div>
+            ))}
+            {stale.map((code) => (
+              <div key={code} className="casella">
+                <input
+                  type="checkbox"
+                  id={`avanzata-${code}`}
+                  checked={current.has(code)}
+                  onChange={(e) => toggle(code, e.target.checked)}
+                />
+                <label htmlFor={`avanzata-${code}`}>
+                  <span className="codice">{code}</span>{' '}
+                  <span className="tenue">
+                    non è più nel nomenclatore in uso: resta fra le medicazioni avanzate finché non
+                    la togli
+                  </span>
                 </label>
               </div>
             ))}
