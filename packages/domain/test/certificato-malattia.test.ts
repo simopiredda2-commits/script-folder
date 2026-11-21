@@ -101,6 +101,8 @@ describe('ciclo del certificato', () => {
     'send_failed',
     'cancel',
     'rectify',
+    'settle_arrived',
+    'settle_not_arrived',
   ] as const;
   // Le sole transizioni ammesse: tutte le altre sono rifiutate con un motivo.
   const ALLOWED: Record<string, string> = {
@@ -121,6 +123,9 @@ describe('ciclo del certificato', () => {
     'error|cancel|unreachable': 'cancelled',
     'error|cancel|timeout': 'cancelled',
     'error|cancel|auth': 'cancelled',
+    // Invio rimasto senza risposta, esito chiesto all'INPS (D233).
+    'sending|settle_arrived|': 'sent',
+    'sending|settle_not_arrived|': 'error',
   };
   const cases = CERTIFICATE_STATUSES.flatMap((s) =>
     events.flatMap((e) => kinds.map((k) => [s, e, k] as const)),

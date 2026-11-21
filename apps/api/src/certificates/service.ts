@@ -8,6 +8,7 @@ import {
   checkSickLeave,
   checkSickLeaveAddress,
   DOCTOR_ROLES,
+  INTERRUPTED_SEND_AFTER_MINUTES,
   NO_HOUSE_NUMBER,
   nextDay,
   prognosisDays,
@@ -128,6 +129,21 @@ const createBody = z.object({ ...fields, continuaDa: z.uuid().optional() }).stri
 const updateBody = z.object(fields).strict();
 const rectifyBody = z.object({ dataFine: z.iso.date() }).strict();
 const cancelBody = z.object({ motivo: z.string().trim().min(3).max(500) }).strict();
+/** Esito di un invio rimasto senza risposta, come lo dice l'INPS al medico (D233). */
+const settleBody = z.discriminatedUnion('esito', [
+  z.object({ esito: z.literal('non_arrivato') }).strict(),
+  z
+    .object({
+      esito: z.literal('arrivato'),
+      protocollo: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9]{1,40}$/, 'Il protocollo ha solo lettere e cifre, al più 40'),
+    })
+    .strict(),
+]);
+/** Ambiente degli esiti segnati a mano dal medico, fra gli invii all'INPS (D233). */
+const MANUAL_ENVIRONMENT = 'manuale';
 const deliverBody = z
   .object({
     canale: z.enum(['email', 'sms', 'email_datore']),
@@ -162,6 +178,12 @@ export function createCertificateService(deps: CertificateDeps) {
   const { db } = deps;
   const now = deps.now ?? (() => new Date());
   const today = () => studioDate(now());
+
+  /** Un certificato «in invio» da più di INTERRUPTED_SEND_AFTER_MINUTES: l'invio si è interrotto. */
+  const interrupted = (c: { status: string; signedAt: Date | null }) =>
+    c.status === 'sending' &&
+    c.signedAt !== null &&
+    now().getTime() - c.signedAt.getTime() >= INTERRUPTED_SEND_AFTER_MINUTES * 60_000;
 
   async function load(id: string, studioId: string): Promise<Row> {
     const [row] = await db
@@ -255,6 +277,9 @@ export function createCertificateService(deps: CertificateDeps) {
         c.status === 'sent' ? canCancelSickLeave({ releaseDate: c.releaseDate }, t).ok : cancel.ok,
       rettificabile: c.status === 'sent' && t <= c.endDate,
       continuabile: c.status === 'sent',
+      /** «In invio» da più di INTERRUPTED_SEND_AFTER_MINUTES: l'esito lo segna il medico (D233). */
+      invioInterrotto: interrupted(c),
+      inviatoIl: c.signedAt,
     };
   }
 
@@ -423,8 +448,17 @@ export function createCertificateService(deps: CertificateDeps) {
     return { problemi: issues };
   }
 
-  async function snapshotOf(c: Row, p: PatientRow, actor: Actor): Promise<Snapshot> {
-    const profile = await profileOf(actor.userId);
+  /**
+   * I dati che vanno sulla copia e sull'attestato, fissati all'invio: il lavoratore e il medico
+   * che firma (chi invia ora, oppure chi aveva firmato l'invio rimasto senza risposta, D233).
+   */
+  async function snapshotOf(
+    c: Row,
+    p: PatientRow,
+    studioId: string,
+    doctor: { userId: string; displayName: string },
+  ): Promise<Snapshot> {
+    const profile = await profileOf(doctor.userId);
     let birthProvince: string | null = null;
     if (p.birthPlaceCode && deps.reference) {
       try {
@@ -442,7 +476,7 @@ export function createCertificateService(deps: CertificateDeps) {
         province: studio.province,
       })
       .from(studio)
-      .where(eq(studio.id, actor.studioId));
+      .where(eq(studio.id, studioId));
     const availability = c.availability as Availability | null;
     // Luogo del fac-simile: l'indirizzo completo dello studio per la visita ambulatoriale (via e
     // civico, CAP, comune, provincia), il comune della casa per la domiciliare (D106).
@@ -464,7 +498,7 @@ export function createCertificateService(deps: CertificateDeps) {
         birthProvince,
       },
       doctor: {
-        name: actor.displayName,
+        name: doctor.displayName,
         regionalCode: profile?.regionalCode ?? null,
         asl: profile?.asl ?? null,
       },
@@ -563,17 +597,19 @@ export function createCertificateService(deps: CertificateDeps) {
       });
     check(c, 'start_sending');
     const auth = await deps.credentials.authFor(actor.userId, 'certificato_inps');
+    // L'ora della firma segna questo invio: l'esito si scrive solo se è ancora lui (D233).
+    const claimedAt = now();
     const claimed = await withActor(db, actor.userId, (tx) =>
       tx
         .update(sickLeaveCertificate)
-        .set({ status: 'sending', signedBy: actor.userId, signedAt: now(), updatedAt: now() })
+        .set({ status: 'sending', signedBy: actor.userId, signedAt: claimedAt, updatedAt: now() })
         .where(and(eq(sickLeaveCertificate.id, c.id), eq(sickLeaveCertificate.status, c.status)))
         .returning({ id: sickLeaveCertificate.id }),
     );
     if (!claimed.length)
       throw new HttpError(409, 'Il certificato è cambiato nel frattempo: ricarica');
 
-    const snapshot = await snapshotOf(c, p, actor);
+    const snapshot = await snapshotOf(c, p, actor.studioId, actor);
     const availability = c.availability as Availability | null;
     const message: SickLeaveMessage = {
       localId: c.id,
@@ -624,7 +660,10 @@ export function createCertificateService(deps: CertificateDeps) {
           : result.outcome === 'rejected'
             ? 'rejected'
             : result.outcome;
-    await withActor(db, actor.userId, (tx) =>
+    // Se intanto il medico ha segnato a mano l'esito di questo invio, rimasto senza risposta per
+    // più di INTERRUPTED_SEND_AFTER_MINUTES, la risposta arrivata ora resta fra gli invii
+    // all'INPS e non cambia più il certificato (D233).
+    const applied = await withActor(db, actor.userId, (tx) =>
       tx
         .update(sickLeaveCertificate)
         .set(
@@ -647,13 +686,112 @@ export function createCertificateService(deps: CertificateDeps) {
                 updatedAt: now(),
               },
         )
-        .where(eq(sickLeaveCertificate.id, c.id)),
+        .where(
+          and(
+            eq(sickLeaveCertificate.id, c.id),
+            eq(sickLeaveCertificate.status, 'sending'),
+            eq(sickLeaveCertificate.signedBy, actor.userId),
+            eq(sickLeaveCertificate.signedAt, claimedAt),
+          ),
+        )
+        .returning({ id: sickLeaveCertificate.id }),
     );
+    if (!applied.length)
+      throw new HttpError(
+        409,
+        'Nel frattempo l’esito di questo invio è stato segnato a mano: la risposta arrivata ora resta fra gli invii all’INPS. Ricarica la pagina per vedere il certificato',
+      );
     return {
       esito: kind ?? 'accepted',
       protocollo: result.outcome === 'accepted' ? result.protocol : null,
       ricevutoIl: result.outcome === 'accepted' ? result.receivedAt : null,
       messaggio: result.outcome === 'accepted' ? null : result.message,
+    };
+  }
+
+  /**
+   * Esito di un invio rimasto senza risposta (D233): il servizio si è fermato mentre aspettava
+   * l'INPS. Il medico gli ha chiesto se il certificato è arrivato e segna la risposta: non
+   * arrivato, e torna da inviare come quando l'INPS non risponde; arrivato, con il protocollo.
+   * Come data di ricezione vale l'ora in cui era partito l'invio. Il certificato resta bloccato
+   * finché l'esito non è scritto: due esiti insieme non passano tutti e due, e l'invio di prima, se
+   * poi risponde, non scrive sopra.
+   */
+  async function settleInterrupted(actor: Actor, id: string, body: unknown) {
+    const c = await load(id, actor.studioId);
+    await guard(actor, c.patientId, 'certificato_esito_invio');
+    const input = settleBody.parse(body ?? {});
+    check(c, input.esito === 'arrivato' ? 'settle_arrived' : 'settle_not_arrived');
+    if (!interrupted(c))
+      throw new HttpError(
+        409,
+        `L’invio è cominciato da meno di ${INTERRUPTED_SEND_AFTER_MINUTES} minuti: potrebbe essere ancora in corso. Aspetta, poi segna l’esito`,
+      );
+    const signedAt = c.signedAt!;
+    const arrived = input.esito === 'arrivato' ? input : null;
+    // Copia e attestato con i dati di chi aveva firmato quell'invio.
+    let snapshot: Snapshot | null = null;
+    if (arrived) {
+      const [signer] = await db
+        .select({ displayName: appUser.displayName })
+        .from(appUser)
+        .where(eq(appUser.id, c.signedBy!));
+      snapshot = await snapshotOf(c, await patientRow(c.patientId), actor.studioId, {
+        userId: c.signedBy!,
+        displayName: signer?.displayName ?? '',
+      });
+    }
+    const notArrived = 'Non arrivato all’INPS, secondo l’INPS: si può rimandare';
+    await withActor(db, actor.userId, async (tx) => {
+      const [row] = await tx
+        .select({ status: sickLeaveCertificate.status, signedAt: sickLeaveCertificate.signedAt })
+        .from(sickLeaveCertificate)
+        .where(eq(sickLeaveCertificate.id, c.id))
+        .for('update', { of: sickLeaveCertificate });
+      if (row?.status !== 'sending' || row.signedAt?.getTime() !== signedAt.getTime())
+        throw new HttpError(409, 'Il certificato è cambiato nel frattempo: ricarica la pagina');
+      await tx.insert(certificateSubmission).values({
+        certificateId: c.id,
+        operation: 'esito',
+        environment: MANUAL_ENVIRONMENT,
+        userId: actor.userId,
+        request: arrived
+          ? { esito: 'arrivato', protocollo: arrived.protocollo }
+          : { esito: 'non_arrivato' },
+        response: null,
+        outcome: arrived ? 'accepted' : 'unreachable',
+        errorCode: null,
+        errorMessage: arrived ? null : notArrived,
+        durationMs: null,
+      });
+      await tx
+        .update(sickLeaveCertificate)
+        .set(
+          arrived
+            ? {
+                status: 'sent',
+                protocol: arrived.protocollo,
+                receivedAt: signedAt,
+                snapshot,
+                lastErrorKind: null,
+                lastErrorCode: null,
+                lastErrorMessage: null,
+                updatedAt: now(),
+              }
+            : {
+                status: 'error',
+                lastErrorKind: 'unreachable',
+                lastErrorCode: null,
+                lastErrorMessage: notArrived,
+                updatedAt: now(),
+              },
+        )
+        .where(eq(sickLeaveCertificate.id, c.id));
+    });
+    return {
+      stato: arrived ? ('sent' as const) : ('error' as const),
+      protocollo: arrived?.protocollo ?? null,
+      messaggio: arrived ? null : notArrived,
     };
   }
 
@@ -943,6 +1081,7 @@ export function createCertificateService(deps: CertificateDeps) {
     send,
     rectify,
     cancel,
+    settleInterrupted,
     pdf,
     deliver,
     deliveries,

@@ -28,6 +28,10 @@ export function registerCertificateRoutes(
   app.post('/api/certificati/:id/invia', scoped, async (req) =>
     service.send(req.actor!, id(req.params)),
   );
+  // Esito di un invio rimasto senza risposta, chiesto all'INPS dal medico (D233).
+  app.post('/api/certificati/:id/esito-invio', scoped, async (req) =>
+    service.settleInterrupted(req.actor!, id(req.params), req.body),
+  );
   app.post('/api/certificati/:id/rettifica', scoped, async (req) =>
     service.rectify(req.actor!, id(req.params), req.body),
   );

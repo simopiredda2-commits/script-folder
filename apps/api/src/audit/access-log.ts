@@ -49,6 +49,8 @@ export type AccessAction =
   | 'certificato_modifica'
   | 'certificato_controllo'
   | 'certificato_invio'
+  /** Esito di un invio all'INPS rimasto senza risposta, segnato a mano (D233). */
+  | 'certificato_esito_invio'
   | 'certificato_rettifica'
   | 'certificato_annullamento'
   | 'stampa_certificato'
