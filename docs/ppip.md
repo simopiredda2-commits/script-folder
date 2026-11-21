@@ -35,6 +35,8 @@ I tre PDF sono stati scaricati il 20/11/2026 e non sono nel repository: impronte
   - `piemonte-prestazioni-aggiuntive`: AIR 2024, art. 35, comma 4, una voce.
 - **Campi**: codice, sezione, descrizione, se serve l'autorizzazione, compenso in euro, note.
 - **Quale catalogo vale**: quello in vigore il giorno dell'esecuzione, con tutte le serie insieme. Se lo stesso codice è in due serie, vale quella con la data di efficacia più recente.
+- **Dove vale una serie** (D232): la trascrizione può dire il suo `ambito`, cioè la regione, l'ASL o tutte e due. Un accordo aziendale vale solo per gli archivi della sua ASL (quella scritta nel profilo del medico titolare), uno regionale solo per gli studi della sua regione; una serie senza ambito vale in tutta Italia. I nomi si confrontano senza maiuscole, accenti e segni («ASL TO3» e «Asl To 3» sono la stessa). Con la stessa data di efficacia vale l'atto più vicino: ASL, poi regione, poi Italia; a parità anche di questo, l'importazione più recente. L'AIR del Piemonte ha l'ambito `{"regione": "Piemonte"}`.
+- **Il catalogo di un paziente** è quello del suo archivio: la regione dello studio e l'ASL del titolare. Senza archivio (per esempio la pagina aperta dall'amministratore) vale la regione dello studio.
 - **Le trascrizioni vere hanno `controllato_da` vuoto**: non si usano finché una persona non le confronta con gli atti (A8, D159). Fino ad allora il modulo dice «Nessun catalogo delle prestazioni aggiuntive in vigore». Le trascrizioni d'esempio (`fixtures/banche-dati/trascrizioni/ppip/`) hanno le stesse righe e risultano controllate: servono alle prove e alla dimostrazione.
 
 ### In cartella
@@ -48,15 +50,18 @@ Pagina «Prestazioni aggiuntive» della cartella, `/pazienti/:id/prestazioni-agg
 - estremi dell'autorizzazione: obbligatori per la sezione B (comma 5);
 - note, se servono.
 
-Il servizio rifiuta una voce che non è nel catalogo di quel giorno. Le prestazioni non si cancellano: si annullano con un motivo, finché non sono partite con la distinta. Dopo l'invio la correzione si chiede all'ASL.
+Il servizio rifiuta una voce che non è nel catalogo di quel giorno. Le prestazioni non si cancellano: si annullano con un motivo, finché non sono partite con la distinta. Dopo l'invio la correzione si chiede all'ASL. Mentre la distinta sta partendo («in invio») una prestazione non si annulla: si annulla solo se l'invio non va a buon fine.
+
+**Una prestazione è dell'archivio in cui è registrata** (D232), come le ricette e i certificati (D200). Se il paziente passa a un altro medico dello studio con «Sposta», le sue prestazioni restano nella distinta di chi le ha registrate. Nella cartella il nuovo medico le vede con il nome dell'archivio dove sono nate e senza «Annulla»: si annullano da quella distinta.
 
 Chi può fare che cosa:
 
 - il titolare dell'archivio e i medici con accesso all'archivio (sostituto, medicina di gruppo) registrano e annullano;
 - la segreteria confermata per l'archivio (D185) prepara: registra e annulla;
+- la distinta e il suo CSV li vedono il titolare e la segreteria (permesso `ppip.report`, D232), come i riepiloghi (D201, D204): non il sostituto né il collega di gruppo, perché la distinta riguarda i compensi del titolare;
 - la distinta la manda solo il titolare (permesso `ppip.send`), come la firma.
 
-Ogni lettura, registrazione e annullamento resta nel registro degli accessi del paziente.
+Ogni lettura, registrazione e annullamento resta nel registro degli accessi del paziente, nella stessa transazione della scrittura.
 
 ### Distinta del mese
 
@@ -66,16 +71,29 @@ Pagina «Prestazioni aggiuntive» dell'archivio, `/archivio/prestazioni-aggiunti
 - **i totali per voce** e la scadenza del 15 del mese dopo;
 - **il CSV della distinta**, nei formati di `apps/api/distinte/ppip-formati.json`. Oggi ce n'è uno solo, `acn-allegato-6`, con i campi del comma 4 più codice, prestazione, quantità, luogo, autorizzazione e compenso. Il CSV usa punto e virgola, UTF-8 con BOM, date gg/mm/aaaa e decimali con la virgola.
 
-Il titolare la manda dopo aver spuntato «Ho controllato la distinta». La distinta si può mandare solo dal primo giorno del mese dopo, e partono solo le prestazioni non ancora inviate. L'esito dipende dalla risposta:
+Il titolare la manda dopo aver spuntato «Ho controllato la distinta». La distinta si può mandare solo dal primo giorno del mese dopo, e partono solo le prestazioni non ancora inviate. **Partono proprio quelle che il titolare ha visto** (D232): la pagina manda al servizio l'elenco delle prestazioni controllate e, se nel frattempo se n'è aggiunta o annullata una, il servizio risponde «La distinta è cambiata dopo il controllo: ricontrollala prima di mandarla».
+
+L'invio va in tre passi (D232):
+
+1. le prestazioni passano «in invio», tutte insieme: nessun altro invio le manda e nessuno le annulla;
+2. il programma manda la distinta al portale, fuori da ogni transazione;
+3. alla risposta, l'esito, il segno sulle prestazioni e il registro degli accessi si scrivono insieme.
+
+L'esito dipende dalla risposta:
 
 - accolta: le prestazioni sono «Inviata all'ASL» con il protocollo;
-- non accolta, o ASL non raggiungibile: restano da inviare.
+- non accolta, o ASL non raggiungibile: tornano da inviare;
+- **nessuna risposta chiara** (il collegamento si interrompe, il servizio si ferma a metà): le prestazioni restano «in invio», perché la distinta potrebbe essere arrivata e rimandarla la farebbe arrivare due volte. Dopo 15 minuti la distinta lo dice e il titolare, dopo averlo chiesto all'ASL, segna l'esito: «È arrivata all'ASL», con il riferimento se l'ASL lo dà, e le prestazioni risultano partite; oppure «Non è arrivata: torna da inviare».
 
-Ogni invio resta nella tabella `ppip_report`, con il contenuto mandato, e non si modifica.
+**Consegnata all'ASL fuori dal programma** (D232): se la distinta arriva all'ASL in un altro modo, per esempio con il CSV sul portale regionale, il titolare spunta la conferma, scrive il riferimento della consegna se c'è e segna come partite le prestazioni controllate. Da lì non si annullano più, come quelle mandate dal programma.
 
-**In produzione con il simulatore l'invio è spento**: resta il CSV, che il medico carica dove l'ASL dice.
+Dalla distinta si annulla anche una prestazione da inviare, con il motivo, senza aprire la cartella. Un assistito passato nel frattempo a un altro medico resta nella distinta, senza il collegamento alla cartella e con «(ora assistito di un altro medico)». La distinta avvisa se manca l'indirizzo di residenza di qualche assistito, che il comma 4 chiede.
 
-Il totale non c'è se una voce non ha il compenso nel catalogo.
+Ogni invio, consegna o esito segnato resta nella tabella `ppip_report`, con il contenuto mandato, e non si modifica. Gli esiti segnati dal titolare hanno l'ambiente «manuale».
+
+**In produzione con il simulatore l'invio dal programma è spento** e la pagina lo dice: resta il CSV, che il medico carica dove l'ASL dice, e poi la consegna fuori dal programma.
+
+Il totale non c'è se una voce non ha il compenso nel catalogo. Il mese si sceglie con il campo del mese; dove il browser non ha il selettore e mostra un campo di testo, si scrive AAAA-MM o MM/AAAA, e un mese scritto male si dice.
 
 ## Modello dei dati
 
@@ -83,12 +101,13 @@ Il totale non c'è se una voce non ha il compenso nel catalogo.
 - **`ppip_record`**: le prestazioni registrate. Ogni riga porta:
   - la voce com'era nel catalogo quel giorno: codice, sezione, descrizione, autorizzazione, compenso, versione della banca dati;
   - quantità, luogo, estremi dell'autorizzazione e note;
-  - lo stato (registrata o annullata) e l'invio con cui è partita.
+  - l'archivio in cui è registrata (`archive_id`, D232), che non cambia quando il paziente cambia medico;
+  - lo stato (registrata o annullata), l'invio con cui è partita e, durante un invio, da quando e di chi (`sending_since`, `sending_by`).
 
-  Lo storico delle modifiche è automatico. Le righe non si cancellano: si annullano con un motivo.
+  Lo storico delle modifiche è automatico. Le righe non si cancellano: si annullano con un motivo. Il database stesso tiene fermi i dati (migrazione 0042, D232): una prestazione registrata non cambia voce, data, quantità o luogo; una annullata o partita non cambia più; una «in invio» ha sempre chi la manda e non è partita né annullata.
 
 - **`ppip_report`**: gli invii della distinta, con esito, protocollo, messaggio, ambiente (simulatore o servizio vero), numero di righe, totale e contenuto mandato. Non si modifica e non si cancella.
-- **Esportazione completa** (`docs/esportazione.md`): `ppip_record` tra le tabelle dei pazienti, `ppip_report` tra quelle dell'archivio.
+- **Esportazione completa** (`docs/esportazione.md`): `ppip_record` tra le tabelle dei pazienti, `ppip_report` tra quelle dell'archivio. Come per le ricette (D200), l'esportazione segue il paziente: le sue prestazioni vanno con l'archivio dove sta adesso, ognuna con l'archivio in cui è nata.
 
 ## Che cosa è diverso dagli atti
 
@@ -124,12 +143,19 @@ Senza il controllo il catalogo non si usa.
 ## Come provarlo
 
 - Servizio: `apps/api/test/ppip.test.ts`, 13 prove. Coprono:
-  - catalogo per data, con un accordo aziendale inventato che cambia un compenso da una data;
+  - catalogo per data, con un accordo aziendale inventato che cambia un compenso da una data e vale solo nella sua ASL; a parità di data vince l'atto più vicino, anche se una serie nazionale si importa dopo;
   - controlli della registrazione e ruoli;
   - distinta, totale e CSV;
   - invio accolto e rifiutato, annullamento, produzione con il simulatore;
   - esportazione, trigger e formati.
-- Interfaccia: `apps/web/test/ppip.test.tsx`, 4 prove.
+- Servizio, invio senza gare: `apps/api/test/ppip-invio.test.ts`, 12 prove (D232). Fermano il portale a metà o tengono bloccate le righe da una seconda connessione, così le gare si ripetono uguali:
+  - due invii insieme: la distinta parte una volta;
+  - annullamento durante l'invio, due annullamenti insieme, annullamento a metà di un invio;
+  - una prestazione arrivata dopo il controllo fa ricontrollare la distinta;
+  - invio senza risposta, poi «arrivata» o «non arrivata»; consegna fuori dal programma;
+  - paziente spostato a un altro medico: la prestazione resta nella distinta di prima;
+  - i dati fermi nel database; chi legge distinta e CSV; produzione con il simulatore.
+- Interfaccia: `apps/web/test/ppip.test.tsx`, 9 prove.
 - Browser: `apps/api/test/e2e/interfaccia.test.ts`, «prestazioni aggiuntive (D212)». La prova registra dalla cartella una B2 con l'autorizzazione, apre la distinta dall'Archivio, scarica il CSV e manda la distinta al simulatore; poi controlla in cartella lo stato «Inviata all'ASL». Controlla anche accessibilità, bersagli e tablet.
 - Schermate: 72 (cartella) e 73 (distinta), in `docs/interfaccia.md`.
 
@@ -141,3 +167,7 @@ Senza il controllo il catalogo non si usa.
 - **Le condizioni di una voce** (paziente in ADI, studio con il frigorifero o con gli impianti fissi, autorizzazione complessiva delle vaccinazioni): il programma non le controlla. Le note della voce le ricordano a chi registra.
 - **Le vaccinazioni (B4) e la voce «vaccinazione» della cartella**: non sono collegate. Chi registra la prestazione scrive a parte la vaccinazione nella cartella.
 - **Il pagamento dei compensi**: lo fa l'ASL, entro il secondo mese dopo l'invio (comma 7), e il programma non lo segue.
+- **Due prestazioni uguali lo stesso giorno** per lo stesso paziente: il programma non avvisa, perché la stessa voce può servire più volte nello stesso giorno (per questo c'è la quantità). Chi controlla la distinta le vede una accanto all'altra (D232).
+- **Il CSV è la distinta intera del mese**, anche con le prestazioni già partite, ognuna con il suo stato: si sceglie che cosa caricare quando l'ASL dirà come vuole il file.
+- **I numeri del simulatore** ripartono da capo a ogni avvio del servizio: valgono solo nelle prove.
+- **Il campo del mese come testo**: la prova dell'interfaccia controlla la lettura di AAAA-MM e MM/AAAA, non il campo in un browser senza il selettore del mese.

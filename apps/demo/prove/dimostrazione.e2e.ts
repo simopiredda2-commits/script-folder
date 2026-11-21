@@ -889,6 +889,9 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   });
 
   it('il nome utente scritto con le maiuscole: il riquadro dà il codice di quell’utente (D232)', async () => {
+    // Prima l'accesso con il nome com'è, quando il riquadro impara il segreto dell'app; poi con le
+    // maiuscole, e il codice c'è ancora. Così la prova non dipende da quelle di prima.
+    await login('medico');
     await login('medico', 'Medico');
     // Il codice si annuncia quando cambia; il conto alla rovescia di ogni secondo no.
     const live = await f.locator('#dimostrazione [aria-live]').allInnerTexts();
