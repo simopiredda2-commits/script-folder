@@ -110,12 +110,14 @@ Sono estratte in automatico dai PDF e restano **da controllare**. Che cosa è di
 
 Estratte dal manuale da Simone, con un controllo esterno e le correzioni della simulazione del controllo; restano **da controllare** (le controlla la Dr.ssa Rocca). Che cosa è diverso dal PDF e che cosa controllare: `docs/icd9cm.md`.
 
-| File (in `lea/`)               | Atto                                                             | In vigore dal | Voci in vigore |
-| ------------------------------ | ---------------------------------------------------------------- | ------------- | -------------- |
-| `allegato-8-malattie-croniche` | DPCM LEA, allegato 8: codici delle malattie croniche (D190)      | 30/10/2026    | 247            |
-| `allegato-3-presidi`           | DPCM LEA, allegato 3: presidi per diabete e malattie rare (D218) | 19/03/2017    | 30             |
+| File (in `lea/`)               | Atto                                                                          | In vigore dal | Voci in vigore |
+| ------------------------------ | ----------------------------------------------------------------------------- | ------------- | -------------- |
+| `allegato-8-malattie-croniche` | DPCM LEA, allegato 8: codici delle malattie croniche (D190)                   | 30/10/2026    | 247            |
+| `allegato-7-malattie-rare`     | DPCM LEA, allegato 7: codici delle malattie rare (D195)                       | 30/10/2026    | 370            |
+| `allegato-3-presidi`           | DPCM LEA, allegato 3: presidi per diabete e malattie rare (D218)              | 19/03/2017    | 30             |
+| `allegato-2-ausili-monouso`    | DPCM LEA, allegato 2: ausili monouso, con l'allegato M del DM 3/8/2026 (D236) | 30/10/2026    | 87             |
 
-Estratta in automatico dal PDF della pagina del Ministero (versione del 29/9/2026) e **da controllare** (sotto, «Esenzioni del DPCM LEA»).
+Gli allegati 7 e 8 sono estratti in automatico dai PDF della pagina del Ministero (versione del 29/9/2026), l'allegato 2 dalle celle del PDF del Ministero, l'allegato 3 dalla Gazzetta del 2017. Tutti **da controllare** (sotto, «Esenzioni del DPCM LEA» e «Presidi del DPCM LEA»).
 
 | File (in `ppip/`)          | Atto                                                                | In vigore dal | Voci |
 | -------------------------- | ------------------------------------------------------------------- | ------------- | ---- |
@@ -145,9 +147,16 @@ Che cosa resta fuori, e perché:
 
 **Allegato 7, malattie rare (D195).** Trascritto anche questo, da controllare: 370 codici (116 gruppi e 254 malattie) nella serie `lea-esenzioni-malattie-rare`, dal 30/10/2026. Il PDF si legge cella per cella: nome della malattia o del gruppo, esempi di malattie afferenti, sinonimi, malattie del gruppo con un codice proprio («… (codice RN1200)»), sezione e sottosezione. Dal testo impaginato, invece, nomi ed esempi si mescolavano (98 nomi su 370 erano sbagliati nella prima prova). Con i due allegati il catalogo copre le famiglie delle croniche e delle rare. Che cosa controllare: un campione di codici e nomi contro il PDF, i gruppi con molte righe (per esempio RCG071, RCG078, RNG262) e la riga di RNG262, dove le lettere spaziate «D I S G E N E S I A …» sono ricomposte.
 
+**Confronto con i decreti del 2026 (D236).** I PDF del Ministero (29/9/2026) dovevano avere già le modifiche dei due decreti di agosto; si è controllato con gli allegati dei decreti mandati da Simone il 21/11/2026 (`docs/provenienze.md`). Allegato 7: le modifiche dei fogli R1–R6 del DM 3/8/2026 (malattie e gruppi nuovi, denominazioni, esempi, spostamenti, sinonimi, esempi tolti) ci sono tutte. Allegato 8: le condizioni nuove dell'allegato D del DPCM 7/8/2026 e il foglio D1 del DM (denominazioni) ci sono. Due differenze di scrittura fra PDF e decreto, con lo stesso senso: la trascrizione segue il PDF, e sono fra le cose da controllare:
+
+- condizione 051: il PDF scrive «… DEFICIT FISICI, SENSORIALI E NEUROPSICHICI E DEL NEUROSVILUPPO», il foglio D1 «… DEFICIT FISICI, SENSORIALI, NEUROPSICHICI E DEL NEUROSVILUPPO»;
+- gruppo RFG102: il PDF scrive l'esempio «Sindrome di Allan-Herndon-Dudley», il foglio R3 «ALLAN-HERNDON-DURDLEY, SINDROME DI».
+
+I fogli D2–D4 (prestazioni delle esenzioni) riguardano la parte che non si trascrive (sopra). Le prove fissano alcune modifiche dei fogli R e D1 (`packages/reference/test/lea.test.ts`).
+
 **Elenco esenzioni–prestazioni per R17 (D196).** Il SAR blocca le prestazioni non associate all'esenzione dal 28/06/2022 (D.D. 1167/2022). Il suo elenco è stato sostituito dall'allegato C della D.D. 1452/2023, in vigore dal 20/07/2023: 9871 righe, 48 esenzioni. È però precedente al nuovo nomenclatore, in vigore dal 30/12/2024: dei 1170 codici di prestazione distinti, solo 437 (37%) esistono nel catalogo regionale 2026, pari al 78% delle righe. Gli atti successivi letti (D.D. 868/2024, 990/2024, 444/2025, 590/2026, 710/2026) aggiornano il catalogo, non l'elenco. Per questo non si importa: usato per bloccare, fermerebbe ricette giuste. R17 resta «non verificabile» finché la Regione o il CSI Piemonte non danno l'elenco in uso nel SAR.
 
-### Presidi del DPCM LEA (D218)
+### Presidi del DPCM LEA (D218, D236)
 
 L'allegato 3 del DPCM 12/1/2017 è il nomenclatore dei presidi per persone affette da patologia diabetica e da malattie rare (art. 13). I decreti del 2026 non lo toccano (D216), quindi si trascrive dal supplemento ordinario n. 15 alla GU n. 65 del 18/3/2017, pagine 52 e 53. Il DPCM vale dal giorno dopo la pubblicazione, 19/3/2017.
 
@@ -160,7 +169,31 @@ Che cosa c'è nella trascrizione (`lea/allegato-3-presidi`), 30 righe:
 
 Come si è controllata la trascrizione: ogni cella si ritrova nel testo del PDF e ogni codice sta sulla riga della sua descrizione nel testo impaginato; le due pagine sono state guardate anche come immagine. Che cosa controllare: un confronto a vista delle 30 righe con le pagine 52 e 53, che sono poche.
 
-Nel programma, quando la trascrizione è controllata e importata (A8): nella prescrizione dei presidi per diabetici si sceglie la voce dal nomenclatore, e prodotto e codice si riempiono da soli; sotto, l'elenco delle malattie rare dell'art. 13. Si può sempre scrivere a mano. L'allegato 2 (ausili monouso, con le modifiche del DM 3/8/2026) si aggiunge come serie dello stesso tipo quando arriva il file di Simone.
+Nel programma, quando la trascrizione è controllata e importata (A8): nella prescrizione dei presidi per diabetici si sceglie la voce dal nomenclatore, e prodotto e codice si riempiono da soli; sotto, l'elenco delle malattie rare dell'art. 13. Si può sempre scrivere a mano.
+
+**Allegato 2, ausili monouso (D236).** È il nomenclatore dell'art. 11 (dispositivi medici monouso), che il DM 3/8/2026 aggiorna con l'allegato M (fogli M1–M4). Si trascrive dal PDF dell'allegato 2 della pagina del Ministero (versione del 29/9/2026, mandato da Simone il 18/11/2026), che ha già tutte le modifiche dell'allegato M; il foglio M è servito da controllo. In vigore dal 30/10/2026, come il DM. Serie `lea-presidi-ausili-monouso`, dello stesso tipo dell'allegato 3: la scheda dei presidi la offre per la categoria «Dispositivi medici monouso».
+
+Che cosa c'è nella trascrizione (`lea/allegato-2-ausili-monouso`), 87 voci in 21 gruppi, nell'ordine dell'allegato:
+
+- **gruppo**: il titolo stampato più vicino, con il suo codice («09.18.04 sacche per stomia, a un pezzo, a fondo chiuso»). Il lubrificante per cateterismo (09.21.18.003) nell'allegato non ha un titolo, né nel PDF del Ministero né nella Gazzetta del 2017: il gruppo è il suo nome;
+- **descrizione**: il testo della voce come stampato, con le righe unite, senza le note («NOTA…») e senza le spiegazioni in corsivo sotto la voce. Le voci che da sole dicono solo una misura, un formato o una taglia hanno davanti l'etichetta stampata sopra di loro e «: », perché la descrizione diventa il prodotto della prescrizione: «medicazioni in alginato (classe M040402 - Cnd): cm 15 x 15 (…)», «sacca di raccolta dell'urina, da gamba: monouso», «mutanda di fissaggio, elasticizzata, riutilizzabile, priva di lattice: extra-grande». Dei paragrafi che fanno da etichetta (09.30.12, 09.30.18, 09.30.21) si prende il nome del dispositivo fino alla prima parentesi chiusa. Le due serie dei 09.30.21 hanno lo stesso paragrafo all'inizio: la seconda ha anche le parole, in grassetto nel PDF, che la distinguono, dopo «[…]» («… allo scopo di realizzare una più elevata capacità di assorbimento»). Così tutte le 87 descrizioni sono diverse;
+- il testo come stampato, compresi «monuso» (09.30.42), «ipoallegenico» (09.30.24.063), «moderate perdita» (09.30.04.060) e la parentesi non chiusa di 09.18.05.006; cm² con l'esponente, come nel PDF;
+- due colonne in più, che non si importano: `quantita`, come stampata (per i 09.15 all'anno, «quantità/anno»; per gli altri la colonna dice «quantità erogabile» o «quantità massima erogabile», mensili secondo l'art. 1 dell'allegato 11; i 09.31.06 scrivono l'unità, per esempio «2/anno»), e `pagina_pdf`.
+
+Confronto con l'allegato M del DM 3/8/2026: refusi (M1: 09.15.03.021 e 09.15.03.024, «laringectomizzati», voci che nella Gazzetta del 2017 non ci sono), denominazioni (M2: 09.15 «ausili per tracheostomia/laringectomia», 09.24.21 «catetere maschile esterno per urina», 09.24.21.003 «guaina (catetere maschile esterno)»), descrizioni e note dei gruppi (M3, M4: 09.15, 09.18, 09.18.07, 09.18.24). Tutto è già nel PDF del Ministero. Le descrizioni dei gruppi e le note non sono nella trascrizione: restano nel PDF. Le prove fissano M1 e M2.
+
+Come si è controllata la trascrizione: il testo di ogni voce viene dalle celle delle tabelle del PDF e coincide con la sua riga nel testo impaginato; ogni etichetta e ogni titolo si ritrovano nel PDF; i codici del testo impaginato sono 87, ognuno una volta, e tutti nella trascrizione; le 10 pagine sono state guardate anche come immagine, riga per riga. Due celle del codice (09.30.12.045 e 09.30.18.057) l'estrazione le perde: sono ricostruite dalla riga con lo stesso testo e controllate sull'immagine.
+
+Che cosa controllare: le 87 righe con le 10 pagine del PDF, in particolare le descrizioni composte con l'etichetta (04.49, 09.27, 09.30.12, 09.30.18, 09.30.21, 09.30.39) e il gruppo del lubrificante. Da sapere:
+
+- la NOTA 2 dei 04.49 cita la rete elastica con il codice 04.49.27.003, ma la voce è 04.49.27.903 (così anche nella Gazzetta del 2017);
+- le medicazioni del gruppo 04.49 compaiono nella categoria «Dispositivi medici monouso». La regola delle medicazioni avanzate (prima lo specialista, poi il medico per al massimo 6 mesi, D123) vale nella categoria «Medicazioni avanzate», che oggi non ha un nomenclatore: domanda per la fermata;
+- le quantità massime non si usano: un controllo del fabbisogno al mese contro il nomenclatore è da decidere (domanda per la fermata). L'allegato 11 dice che la prescrizione riporta i dispositivi «e i relativi codici identificativi», «ferme restando le quantità massime mensili indicate dal nomenclatore»; secondo le note dell'allegato 2, per le stomie valgono per ogni stomia e per alcune voci si possono superare fino al 50% nei primi mesi;
+- l'allegato 11 (modalità di erogazione) e l'allegato 1 del DM (modifiche degli articoli 11, 14, 17, 18, 27, 33, 35 e 38) sono testo, non elenchi: non si trascrivono. Il PDF dell'allegato 11 del Ministero ha già la modifica dell'allegato V del DM (art. 1, comma 4: tolto «inclusi nel repertorio»). All'art. 11 il DM aggiunge i laringectomizzati e gli assistiti affetti da malattie rare; le categorie dei presidi citano articoli e allegati, non il loro testo, e non cambiano.
+
+Il prodotto della prescrizione di presidi arriva a 500 caratteri, nel servizio e nell'interfaccia: la voce più lunga dell'allegato 2 (09.30.24.063) ne ha 401.
+
+Nella dimostrazione nel browser i due nomenclatori si vedono prima del controllo, perché Simone e la Dr.ssa Rocca possano guardarli dove servono (D236): la copia della dimostrazione dice, al posto di chi li ha controllati, che nessuno l'ha fatto, e il riquadro lo scrive.
 
 ### Atti che modificano una tabella (D157)
 

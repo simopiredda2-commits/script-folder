@@ -180,11 +180,62 @@ describe('presidi: scelta dal nomenclatore del DPCM LEA (D218)', () => {
     window.history.pushState({}, '', '/pazienti/p1/presidi');
     render(<App />);
     await screen.findByLabelText('Dal nomenclatore (allegato 3)');
-    // Monouso: l'allegato 2 non è ancora trascritto. Dietetici: nessun allegato.
+    // Monouso: nel catalogo di questa prova nessuna voce dell'allegato 2. Dietetici: nessun allegato.
     for (const value of ['monouso', 'dietetici']) {
       fireEvent.change(screen.getByLabelText('Categoria'), { target: { value } });
       expect(screen.queryByLabelText(/Dal nomenclatore/)).toBeNull();
     }
+  });
+
+  it('monouso: le voci dell’allegato 2; la più lunga riempie tutto il prodotto (D236)', async () => {
+    // Come la voce più lunga dell'allegato 2 (09.30.24.063): 401 caratteri, oltre i 300 di prima.
+    const long = `mutanda di prova ${'con rivestimento inventato, '.repeat(14)}fine`.slice(0, 401);
+    expect(long).toHaveLength(401);
+    const annex2 = (codice: string, descrizione: string, gruppo: string) => ({
+      codice,
+      descrizione,
+      gruppo,
+      allegato: '2',
+      atto: 'DPCM di prova, allegato 2',
+    });
+    const calls = routes({
+      presidi: [
+        ...CATALOG.presidi,
+        annex2('09.99.01.003', 'sacca di prova', '09.99.01 sacche di prova'),
+        annex2('09.99.02.063', long, '09.99.02 biancheria di prova'),
+      ],
+      malattieRare: [],
+    });
+    window.history.pushState({}, '', '/pazienti/p1/presidi');
+    render(<App />);
+    await screen.findByLabelText('Dal nomenclatore (allegato 3)');
+    fireEvent.change(screen.getByLabelText('Categoria'), { target: { value: 'monouso' } });
+    const select = await screen.findByLabelText<HTMLSelectElement>('Dal nomenclatore (allegato 2)');
+    // Solo i gruppi dell'allegato della categoria.
+    expect([...select.querySelectorAll('optgroup')].map((g) => g.getAttribute('label'))).toEqual([
+      '09.99.01 sacche di prova',
+      '09.99.02 biancheria di prova',
+    ]);
+    fireEvent.change(select, {
+      target: {
+        value: within(select)
+          .getByRole('option', { name: `${long} · 09.99.02.063` })
+          .getAttribute('value'),
+      },
+    });
+    const product = screen.getByLabelText<HTMLInputElement>('Prodotto');
+    expect(product.value).toBe(long);
+    expect(product.maxLength).toBe(500);
+    fireEvent.change(screen.getByLabelText('Fabbisogno al mese'), { target: { value: '120' } });
+    fireEvent.change(screen.getByLabelText('Unità'), { target: { value: 'pezzi' } });
+    fireEvent.click(screen.getByRole('button', { name: /Registra la prescrizione/ }));
+    await waitFor(() =>
+      expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({
+        categoria: 'monouso',
+        prodotto: long,
+        codice: '09.99.02.063',
+      }),
+    );
   });
 
   it('senza banca dati controllata il modulo resta quello di sempre', async () => {

@@ -422,7 +422,7 @@ function SupplyForm({
           </div>
         )}
         <div className="campi-in-riga">
-          {field('prodotto', 'Prodotto', { required: true, maxLength: 300 })}
+          {field('prodotto', 'Prodotto', { required: true, maxLength: 500 })}
           {field('codice', 'Codice del nomenclatore', { className: 'codice', maxLength: 30 }, true)}
         </div>
         <div className="campi-in-riga">

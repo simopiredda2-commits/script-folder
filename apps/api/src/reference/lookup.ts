@@ -353,7 +353,7 @@ export interface SupplyCatalogItem {
   code: string;
   description: string;
   group: string;
-  /** Allegato del DPCM: «3», poi «2». */
+  /** Allegato del DPCM: «2» o «3». */
   annex: string;
   series: string;
   act: string | null;

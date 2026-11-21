@@ -141,6 +141,14 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           paziente, in <strong>Certificati</strong>.
         </p>
       </section>
+      <section aria-labelledby="dimo-presidi">
+        <h3 id="dimo-presidi">Presidi</h3>
+        <p>
+          Nella cartella, in <strong>Presidi</strong>, si sceglie dal nomenclatore del DPCM LEA:
+          allegato 2 (ausili monouso) e allegato 3 (diabete e malattie rare). Qui si vede prima che
+          una persona abbia controllato la trascrizione; nel programma entra dopo il controllo.
+        </p>
+      </section>
       <section aria-labelledby="dimo-codice">
         <h3 id="dimo-codice">Secondo fattore</h3>
         {/* Si annuncia il codice quando cambia, non il conto alla rovescia di ogni secondo (D232). */}

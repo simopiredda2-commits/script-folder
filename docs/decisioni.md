@@ -1607,3 +1607,24 @@ Che cosa si è cambiato:
 - **«Ricomincia da capo» con WebKit** è caduto una volta su main dopo l'unione della #26 (giro 353). In 90 secondi il modulo d'accesso non è comparso, e la prova non diceva che cosa mostrava la pagina. Ora, se non riparte, l'errore riporta il testo della pagina, i problemi raccolti e, per confronto, il tempo del primo avvio. Provato con un guasto (la ripartenza dalla pagina interna, il difetto di D232): l'errore riporta «La dimostrazione non è partita in questo browser» con il motivo.
 
 Non provati: WebKit, che qui non c'è; la causa della ripartenza mancata su main, che si vedrà dal testo della pagina se succede di nuovo. Le prove dell'interfaccia usano una sola sessione del browser: se WebKit perde di nuovo il processo di rete in un'altra prova, quelle dopo cadono ancora a catena.
+
+**D235 · Risposte della fermata dopo l'unione della #26.** Via alla #27, unita con le verifiche su GitHub verdi: la ricetta e il certificato di malattia fermi «in invio» (D233), anche nella dimostrazione, e le due prove instabili con WebKit (D234). Dopo l'unione la pausa che Simone aveva già scelto («Ricetta, poi pausa»): si aspettano i file dei LEA (C2) e le risposte di Regione, ASL e CSI (A). Le verifiche di Simone e della Dr.ssa Rocca si fanno alla fine (B).
+
+**D236 · I file dei LEA del 2026: allegato 2 trascritto, allegati 7 e 8 confrontati con i decreti.** Il 21/11/2026 Simone ha mandato il DPCM 7/8/2026 con gli allegati e il DM 3/8/2026 in tre parti (`docs/provenienze.md`). Con questi file, come diceva C2:
+
+- **Allegati 7 e 8**: confrontati con i fogli R1–R6 e D1 del DM e con l'allegato D del DPCM. I PDF del Ministero del 29/9/2026, da cui vengono le trascrizioni, hanno già tutte le modifiche. Due differenze di scrittura con lo stesso senso (condizione 051, esempio di RFG102): si tiene il PDF, e sono fra le cose da controllare (`docs/banche-dati.md`). Le prove fissano alcune modifiche dei fogli.
+- **Allegato 2, ausili monouso**: trascritto dal PDF del Ministero mandato il 18/11/2026, che ha già le modifiche dell'allegato M del DM; il foglio M è servito da controllo. 87 voci in 21 gruppi, in vigore dal 30/10/2026, **da controllare** (A8). Ogni riga è stata guardata sulle 10 pagine come immagine.
+- **Allegato 11 e allegato 1 del DM**: testo (modalità di erogazione; modifiche degli articoli 11, 14, 17, 18, 27, 33, 35 e 38), non elenchi: non si trascrivono. Il PDF dell'allegato 11 del Ministero ha già la modifica dell'allegato V.
+
+Scelte prese da me:
+
+1. **Descrizione delle voci che dicono solo una misura**: davanti l'etichetta stampata sopra di loro, con «: » («medicazioni in alginato (classe M040402 - Cnd): cm 15 x 15 …»). Motivo: la descrizione diventa il prodotto della prescrizione, e «cm 15 x 15» da solo non dice che cosa si prescrive. Dei paragrafi che fanno da etichetta si prende il nome del dispositivo fino alla prima parentesi chiusa; per la seconda serie dei 09.30.21 anche le parole in grassetto che la distinguono, dopo «[…]». Sono tutte parole del PDF.
+2. **Gruppo del lubrificante per cateterismo**: il suo nome, perché l'allegato non gli dà un titolo (né nel 2017 né nel 2026). Un titolo ricostruito a memoria dal codice no.
+3. **Quantità**: nel CSV, come stampate, ma non importate. Il tipo di banca dati non le ha, e un controllo del fabbisogno contro le quantità massime è una scelta per la fermata.
+4. **Il prodotto della prescrizione di presidi arriva a 500 caratteri** (prima 300): la voce più lunga dell'allegato 2 ne ha 401. La colonna del database è già un testo senza limite.
+5. **Le medicazioni del gruppo 04.49** restano nella categoria «Dispositivi medici monouso», che ha l'allegato 2. Se debbano stare anche in «Medicazioni avanzate», con la regola dello specialista (D123), è una domanda per la fermata.
+6. **Dimostrazione** (D224): i nomenclatori degli allegati 2 e 3 si vedono prima del controllo. Così Simone e la Dr.ssa Rocca li guardano dove servono, nella scheda Presidi. La copia della dimostrazione scrive, al posto di chi li ha controllati, «nessuno: copia della dimostrazione, ancora da controllare (A8)», e il riquadro lo dice. Nel programma vero restano fuori fino al controllo.
+
+Prove: trascrizione (`packages/reference/test/lea.test.ts`), importazione nel database con il servizio e la registrazione della voce più lunga (`apps/api/test/nomenclatore-presidi.test.ts`), scheda dei presidi (`apps/web/test/presidi.test.tsx`), dimostrazione nel browser. 14 sabotaggi, nel registro di `docs/avanzamento.md`.
+
+Non provato: il controllo di una persona sulle 87 righe e sul confronto con i decreti; le quantità massime nella prescrizione; WebKit e Firefox solo nella CI.
