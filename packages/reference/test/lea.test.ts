@@ -81,6 +81,16 @@ describe('allegato 8 del DPCM LEA: codici di esenzione delle malattie croniche (
     expect(['068', '069', '070'].map((c) => byCode.has(c))).toEqual([true, true, true]);
   });
 
+  it('le denominazioni del foglio D1 del DM 3/8/2026 sono già quelle nuove (D236)', () => {
+    expect(byCode.get('039')).toBe('DEFICIT DI ORMONE DELLA CRESCITA [GH]');
+    expect(byCode.get('039.253.3')).toBe('DEFICIT DI ORMONE DELLA CRESCITA [GH]');
+    // Il PDF del Ministero scrive «SENSORIALI E NEUROPSICHICI», il foglio D1 «SENSORIALI,
+    // NEUROPSICHICI»: si tiene il PDF, da controllare (docs/banche-dati.md).
+    expect(byCode.get('051')).toBe(
+      'SOGGETTI NATI CON CONDIZIONI DI GRAVI DEFICIT FISICI, SENSORIALI E NEUROPSICHICI E DEL NEUROSVILUPPO',
+    );
+  });
+
   it('HIV-2 non è un codice a parte: 020.042 con il codice aggiuntivo 079.53', () => {
     expect([...byCode.keys()].filter((c) => c.startsWith('020'))).toEqual([
       '020',
@@ -140,6 +150,25 @@ describe('allegato 7 del DPCM LEA: codici di esenzione delle malattie rare (D195
       'DIFETTI CONGENITI DEL METABOLISMO E DEL TRASPORTO DEGLI AMINOACIDI',
     );
     expect(row('RA0020')[col('sinonimi')]).toBe('LIPODISTROFIA INTESTINALE');
+  });
+
+  it('le modifiche dei fogli R1–R6 del DM 3/8/2026 sono già nella trascrizione (D236)', () => {
+    const name = (code: string) => row(code)[col('descrizione')];
+    // R1: malattie e gruppi nuovi.
+    for (const c of ['RFG102', 'RG0041', 'RG0130', 'RI0090', 'RIG030', 'RN0071', 'RNG140'])
+      expect(row(c), c).toBeTruthy();
+    // R2: denominazioni nuove.
+    expect(name('RC0040')).toBe(
+      "PUBERTA' PRECOCE IDIOPATICA (Fino ai 14 anni compiuti per le femmine e a 15 anni compiuti per i maschi)",
+    );
+    expect(name('RC0080')).toMatch(/^SINDROMI LIPODISTROFICHE \(ESCLUSO: FORME SECONDARIE/);
+    // R3: esempi nuovi; il foglio scrive «ALLAN-HERNDON-DURDLEY», il PDF del Ministero «Dudley».
+    expect(row('RBG010')[col('esempi')]).toMatch(/NEUROFIBROMATOSI TIPO 3/i);
+    expect(row('RFG102')[col('esempi')]).toMatch(/Allan-Herndon-Dudley/);
+    // R4: malattie spostate nel gruppo nuovo, con il loro codice.
+    expect(row('RFG102')[col('comprende_con_codice_proprio')]).toContain(
+      'DRAVET, SINDROME DI (RF0061)',
+    );
   });
 
   it('le malattie del gruppo con un codice proprio, e le lettere spaziate ricomposte', () => {

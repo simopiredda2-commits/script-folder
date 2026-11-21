@@ -621,6 +621,34 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .waitFor();
   });
 
+  it('presidi: la voce più lunga dell’allegato 2 si sceglie dal nomenclatore e si registra intera (D236)', async () => {
+    const hint = await fromPanel((panel) =>
+      panel.getByRole('region', { name: 'Presidi' }).innerText(),
+    );
+    expect(hint).toMatch(/prima che una persona abbia controllato la trascrizione/);
+    const id = (await patients())[0]!.id;
+    await go(`/pazienti/${id}/presidi`);
+    await f.getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' }).waitFor();
+    await f.getByLabel('Categoria').selectOption('monouso');
+    const select = f.getByLabel('Dal nomenclatore (allegato 2)');
+    // 87 voci in 21 gruppi, più la voce «scrivi a mano».
+    expect(await select.locator('optgroup').count()).toBe(21);
+    expect(await select.locator('option').count()).toBe(88);
+    const option = select.locator('option', { hasText: '· 09.30.24.063' });
+    await select.selectOption(await option.getAttribute('value'));
+    const product = f.getByLabel('Prodotto', { exact: true });
+    const chosen = await product.inputValue();
+    expect(chosen).toMatch(/^mutanda pannolone \(tipo pull-on \)/);
+    expect(chosen).toHaveLength(401);
+    expect(await f.getByLabel('Codice del nomenclatore').inputValue()).toBe('09.30.24.063');
+    await f.getByLabel('Fabbisogno al mese').fill('120');
+    await f.getByLabel('Unità').fill('pezzi');
+    await f.getByRole('button', { name: /Registra la prescrizione/ }).click();
+    await f.getByText('Prescrizione registrata.').waitFor();
+    // Nell'elenco il prodotto intero, con il codice.
+    await f.getByRole('region', { name: 'Prescrizioni' }).getByText(chosen).first().waitFor();
+  });
+
   it('la segreteria prepara la ripetizione; il medico la trova da firmare e la manda', async () => {
     await login('segreteria');
     const id = await firstPatient(

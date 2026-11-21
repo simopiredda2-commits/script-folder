@@ -1,16 +1,18 @@
 /**
  * Database di partenza della dimostrazione (D221), preparato in Node una volta per costruzione:
  * tutte le migrazioni e le banche dati d'esempio, cioè `sync/` lanciato sul sito d'esempio
- * (fixtures/banche-dati) e importato come fa `pnpm banche-dati:importa -- --esempio`. Nessun
+ * (fixtures/banche-dati) e importato come fa `pnpm banche-dati:importa -- --esempio`. In più il
+ * nomenclatore dei presidi degli allegati 2 e 3 del DPCM LEA (D218, D236), che nel programma entra
+ * solo dopo il controllo di una persona (A8): qui si vede prima, e il riquadro lo dice. Nessun
  * paziente: i dati dimostrativi si creano nel browser all'avvio, con le date di quel giorno.
  *
  *   tsx apps/demo/scripts/prepara-database.ts DESTINAZIONE.tar.gz
  */
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
-import { loadMappings } from '@mmg/reference';
+import { loadMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
 import { drizzle } from 'drizzle-orm/pglite';
 import type { Database } from '../../api/src/db/client';
 import { readMigrations } from '../../api/src/db/migrate';
@@ -24,6 +26,11 @@ import { importReferenceData } from '../../api/src/reference/importer';
 
 const dest = process.argv[2];
 if (!dest) throw new Error('Indica il file da scrivere (.tar.gz)');
+
+/** Le trascrizioni dei presidi del DPCM LEA che la dimostrazione mostra prima del controllo. */
+const SUPPLY_TRANSCRIPTIONS = ['allegato-2-ausili-monouso', 'allegato-3-presidi'];
+/** «Controllato da» nella copia della dimostrazione: dice che nessuno l'ha controllata. */
+const DEMO_UNCHECKED = 'nessuno: copia della dimostrazione, ancora da controllare (A8)';
 
 const work = mkdtempSync(join(tmpdir(), 'mmg-dimostrazione-'));
 try {
@@ -62,6 +69,32 @@ try {
     mappings: loadMappings(),
     importedBy: 'dimostrazione nel browser (banche dati d’esempio)',
   });
+  // Il nomenclatore dei presidi: le trascrizioni del programma, copiate con chi le ha controllate.
+  // Non vengono da sync (atti non scaricati): una cartella di sync vuota, perché i file d'esempio
+  // sono già entrati sopra.
+  const supplies = join(work, 'trascrizioni-presidi');
+  const noSync = join(work, 'senza-sync');
+  mkdirSync(join(supplies, 'lea'), { recursive: true });
+  mkdirSync(noSync);
+  writeFileSync(join(noSync, 'stato.json'), JSON.stringify({ versione: 1, file: {} }));
+  for (const base of SUPPLY_TRANSCRIPTIONS) {
+    const from = (ext: string) => join(REGIONAL_TRANSCRIPTIONS, 'lea', `${base}.${ext}`);
+    cpSync(from('csv'), join(supplies, 'lea', `${base}.csv`));
+    const sheet = JSON.parse(readFileSync(from('json'), 'utf-8')) as Record<string, unknown>;
+    writeFileSync(
+      join(supplies, 'lea', `${base}.json`),
+      JSON.stringify({ ...sheet, controllato_da: DEMO_UNCHECKED }),
+    );
+  }
+  report.push(
+    ...(await importReferenceData({
+      db,
+      syncDir: noSync,
+      transcriptionsDir: supplies,
+      mappings: loadMappings(),
+      importedBy: 'dimostrazione nel browser (presidi del DPCM LEA, da controllare)',
+    })),
+  );
   const refused = report.filter((r) => r.outcome !== 'importato' && r.outcome !== 'gia_importato');
   for (const r of report)
     console.log(`${r.file}: ${r.outcome}${r.rows ? `, ${r.rows} righe` : ''}`);
