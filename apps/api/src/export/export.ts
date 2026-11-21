@@ -78,10 +78,11 @@ export const HANDLED_SEPARATELY: Record<string, string> = {
     'i PDF del Profilo Sanitario Sintetico: sezione documenti_profilo del JSON, cartella profilo-sanitario/ nello ZIP',
   aura_new_patient:
     'esportata per archivio: i nuovi assistiti segnalati da AURA, anche quelli non registrati',
+  // Per paziente e per archivio (D240).
   ppip_record:
-    'le prestazioni aggiuntive dei pazienti dell’archivio e quelle nella sua distinta di pazienti passati poi a un altro archivio (D240)',
+    'le prestazioni aggiuntive dei pazienti dell’archivio e quelle nella sua distinta di pazienti passati poi a un altro archivio',
   patient_archive_move:
-    'gli spostamenti dei pazienti dell’archivio e quelli dall’archivio o verso l’archivio (D240)',
+    'gli spostamenti dei pazienti dell’archivio e quelli dall’archivio o verso l’archivio',
 };
 
 type Row = Record<string, unknown>;
