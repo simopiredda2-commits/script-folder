@@ -1209,7 +1209,7 @@ Nello stesso branch, ripartito da `main`, le risposte della fermata dopo l'union
 - come l'ASL tratta una prestazione eseguita dal medico di prima dopo la nuova scelta del paziente in AURA e prima di «Sposta» (A6 di «Che cosa resta aperto»);
 - il catalogo dell'archivio della distinta quando i due archivi hanno ASL diverse;
 - il SAR vero e il Sistema TS veri;
-- Firefox solo nella CI; WebKit anche in locale (D241).
+- WebKit e Firefox anche in locale, oltre che nella CI (D241).
 
 **Domande per la fermata**: via alla #30.
 
@@ -1221,10 +1221,11 @@ Domanda di Simone del 21/11/2026, durante il blocco: «Non puoi installarlo? Web
 
 1. **WebKit in locale** (fatto): `scripts/browser-locali.sh` scarica WebKit, e se serve Firefox, in una cartella a parte, con le librerie di sistema; il Chromium già installato non cambia. La rete dell'ambiente ora permette `playwright.download.prss.microsoft.com`, con l'approvazione di Simone. In ogni sessione nuova lo script va rilanciato.
 2. **Guasto della dimostrazione** (corretto): con WebKit in locale si è riprodotto quello visto su GitHub nella #30, «Ricomincia da capo» che non si cliccava. Dopo un accesso il riquadro si riduceva da sé fino a un secondo dopo, anche se lo si era appena aperto. Ora si riduce una volta per sessione, e non se lo si è aperto a mano dopo l'accesso; le prove lo aprono in uno stato noto.
+3. **Esito** (fatto): dopo la correzione la dimostrazione è verde in locale con WebKit, Chromium e Firefox, 31 prove ciascuno (5 sulla decisione del riquadro, 26 nel browser). Alla domanda di Simone «firefox è necessario? se comporta troppo lavoro lasciamo perdere»: resta, perché non chiede lavoro (si scarica in un minuto e la prova parte da sola) e su GitHub la dimostrazione era caduta anche con Firefox. Dimostrazione ripubblicata nello stesso artifact (versione 14).
 
 **Come provarlo**: `scripts/browser-locali.sh`, poi `eval "$(scripts/browser-locali.sh --env)"` e `E2E_BROWSER=webkit pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts`, o `pnpm --filter @mmg/demo build` e `DEMO_BROWSER=webkit pnpm --filter @mmg/demo test:browser`. La decisione del riquadro: `apps/demo/prove/riquadro.unit.ts`. 4 sabotaggi, nel registro in fondo.
 
-**Non provato**: Firefox in locale (lo script lo scarica; qui è rimasto alla CI); il collegamento del pulsante del riquadro con la decisione, che si prova solo nella dimostrazione, dove il guasto dipende dai tempi; Safari e Firefox veri.
+**Non provato**: la prova dell'interfaccia con Firefox in locale (con WebKit sì, 55 su 55; Firefox nella CI); il collegamento del pulsante del riquadro con la decisione, che si prova solo nella dimostrazione, dove il guasto dipende dai tempi; Safari e Firefox veri.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 

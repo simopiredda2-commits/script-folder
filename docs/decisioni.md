@@ -1763,7 +1763,7 @@ Non provato:
 - come l'ASL tratta una prestazione eseguita dal medico di prima dopo la nuova scelta del paziente in AURA, che vale subito (art. 40), e prima di «Sposta». Nel programma va nella distinta del medico che l'ha eseguita; le fonti non dicono come l'ASL la controlla;
 - il catalogo dell'archivio della distinta quando i due archivi hanno ASL diverse: nella prova i due archivi hanno lo stesso catalogo;
 - il SAR vero e il Sistema TS veri;
-- Firefox solo nella CI; WebKit anche in locale (D241).
+- WebKit e Firefox anche in locale, oltre che nella CI (D241).
 
 **D241 · WebKit in locale e riquadro della dimostrazione.** Simone ha chiesto il 21/11/2026: «Non puoi installarlo? Webkit intendo».
 
@@ -1771,5 +1771,6 @@ Non provato:
 - **Rete.** Il download era bloccato dalla rete dell'ambiente: Simone ha approvato l'aggiunta di `playwright.download.prss.microsoft.com`, che vale anche per le sessioni future. Il contenitore si ricrea da zero, quindi WebKit si riscarica a ogni sessione nuova, circa 300 MB, con lo script e solo quando serve. Non l'ho messo nell'avvio della sessione: lo renderebbe lento per tutte.
 - **Che cosa ha trovato.** Con WebKit in locale la prova dell'interfaccia è verde, 55 prove su 55. La dimostrazione ha riprodotto il guasto visto su GitHub nella #30: «Ricomincia da capo» non si cliccava, perché il pulsante spariva. Causa: dopo ogni accesso il riquadro della dimostrazione si riduce da sé, e lo fa fino a un secondo dopo, quando rilegge lo stato del servizio. Chi lo apriva in quel secondo, anche a mano, lo vedeva richiudersi. Le prove lo aprivano proprio lì.
 - **Correzione.** Il servizio della dimostrazione dice da quando c'è la sessione. Il riquadro si riduce da sé una volta per sessione, ma non se lo si è aperto a mano dopo l'inizio della sessione. Aperto durante l'accesso, prima della sessione, si riduce come prima. La decisione è una funzione pura, provata senza browser (`apps/demo/prove/riquadro.unit.ts`, con le prove della dimostrazione). Le prove della dimostrazione aprono il riquadro in uno stato noto: se è aperto lo riducono, poi lo riaprono a mano.
+- **Esito.** Dopo la correzione la dimostrazione è verde in locale con i tre motori, WebKit, Chromium e Firefox: 31 prove ciascuno, 5 sulla decisione del riquadro e 26 nel browser. Firefox si è scaricato con lo stesso script, in un minuto. Simone ha chiesto: «firefox è necessario? se comporta troppo lavoro lasciamo perdere». Resta: non chiede lavoro, perché la prova parte da sola, e su GitHub la dimostrazione era caduta anche con Firefox.
 
 Non provato: il collegamento del pulsante con la decisione si prova solo nella dimostrazione, dove il guasto dipende dai tempi; Safari e Firefox veri, su computer e tablet.
