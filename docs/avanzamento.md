@@ -50,9 +50,9 @@ Contatto per le applicazioni sanitarie della Regione gestite dal CSI (AURA, SAR,
 _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 
 1. Validazione clinica di tutte le regole (R1–R22) e verifica dei riferimenti normativi con un consulente: oggi «Validata: no».
-2. Le verifiche già annotate: ICD-9-CM, catalogo regionale con l'ASL, allegati 8, 7 e 3 (le 30 righe dei presidi, D218), modello della patente, R19–R22, testi delle variazioni e dei registri AIFA, le 17 voci delle PPIP (D213), e come la Dr.ssa Rocca manda oggi la distinta.
+2. Le verifiche già annotate: ICD-9-CM, catalogo regionale con l'ASL, allegati 8, 7 e 3 (le 30 righe dei presidi, D218), modello della patente, R19–R22, testi delle variazioni e dei registri AIFA, le 17 voci delle PPIP (D213), e come la Dr.ssa Rocca manda oggi la distinta: con il CSV e poi «Consegnata all'ASL fuori dal programma», o in un altro modo (D232).
 3. Primo giro di `sync/` dal computer dello studio, con le intestazioni ISTAT (D55, D56); due versioni vere dell'anagrafica AIFA una dopo l'altra.
-4. Stampa vera: promemoria del modello del 2024 con l'OCR-A, su A5 e su A4 (D222), codici a barre letti in farmacia (D211, D217); ricetta rossa sui moduli veri.
+4. Stampa vera: promemoria del modello del 2024 con l'OCR-A, su A5 e su A4 (D222), anche con una ricetta lunga che riempie l'area delle prescrizioni (D232); codici a barre letti in farmacia (D211, D217); ricetta rossa sui moduli veri.
 5. Lettori di schermo e tablet veri; WebKit e Firefox anche fuori dalla CI; un riavvio vero di Postgres con il servizio acceso (D207); una giornata di lavoro con la Dr.ssa Rocca.
 
 _C. Decisioni o materiali di Simone_
