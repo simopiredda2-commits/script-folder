@@ -180,6 +180,85 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect(small, where).toEqual([]);
   }
 
+  /**
+   * Nessun pulsante è più stretto del suo contenuto (D242). Accanto a un testo lungo, «Aggiungi» si
+   * stringeva sotto la sua misura e il «+» usciva dal bordo: il bersaglio restava di 44 px, quindi la
+   * prova dei bersagli non lo vedeva.
+   */
+  async function expectNoClippedButtons(p: Page, where: string) {
+    const clipped = await p.evaluate(() =>
+      [...document.querySelectorAll('button, a.pulsante, summary')]
+        .filter((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          if (getComputedStyle(el).display === 'inline') return false;
+          return el.scrollWidth > el.clientWidth + 1;
+        })
+        .slice(0, 5)
+        .map(
+          (el) =>
+            `${el.tagName.toLowerCase()} «${(el.textContent ?? '').trim().slice(0, 40)}»: contenuto di ${el.scrollWidth} px in ${el.clientWidth} px`,
+        ),
+    );
+    expect(clipped, where).toEqual([]);
+  }
+
+  /**
+   * Il segno del prodotto poggia sulla base del nome (D242): il bordo in basso del tratto sta sulla
+   * base delle lettere. Centrato come riquadro, il corpo della cartella scendeva 3-4 px sotto.
+   */
+  async function expectLogoOnBase(p: Page, where: string) {
+    const gap = await p.evaluate(() => {
+      const logo = document.querySelector('.brand-logo')!;
+      const path = logo.querySelector('svg path') as SVGPathElement;
+      const ctm = path.getScreenCTM()!;
+      const box = path.getBBox();
+      const half = Number(path.getAttribute('stroke-width')) / 2;
+      const inkBottom = ctm.f + ctm.d * (box.y + box.height + half);
+      // La base delle lettere: un elemento vuoto in riga con il nome ci poggia sopra.
+      const probe = document.createElement('span');
+      probe.style.cssText = 'display:inline-block;width:0;height:0';
+      logo.querySelector('span')!.appendChild(probe);
+      const baseline = probe.getBoundingClientRect().bottom;
+      probe.remove();
+      return inkBottom - baseline;
+    });
+    expect(
+      Math.abs(gap),
+      `${where}: il segno sta ${gap.toFixed(2)} px sotto la base del nome`,
+    ).toBeLessThanOrEqual(0.5);
+  }
+
+  /**
+   * La ricetta in una schermata (D242): sul computer e sul tablet in orizzontale la pagina non
+   * scorre e «Prepara la ricetta» è in vista; scorrono, se serve, la ricerca e la ricetta.
+   */
+  async function expectOneScreen(p: Page, where: string) {
+    for (const v of [
+      { width: 1280, height: 800 },
+      { width: 1024, height: 768 },
+    ]) {
+      await p.setViewportSize(v);
+      const m = await p.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find((x) => x.textContent?.includes('Prepara la ricetta'))
+          ?.getBoundingClientRect();
+        return {
+          height: document.scrollingElement!.scrollHeight,
+          view: innerHeight,
+          button: b ? b.top >= 0 && b.bottom <= innerHeight : false,
+        };
+      });
+      expect(m.height, `${where} a ${v.width}×${v.height}: la pagina scorre`).toBeLessThanOrEqual(
+        m.view,
+      );
+      expect(m.button, `${where} a ${v.width}×${v.height}: «Prepara la ricetta» fuori vista`).toBe(
+        true,
+      );
+    }
+    await p.setViewportSize({ width: 1280, height: 900 });
+  }
+
   /** Su tablet, in verticale e in orizzontale, la pagina non scorre di lato. */
   async function expectTabletLayout(p: Page, where: string) {
     for (const v of TABLETS) {
@@ -197,6 +276,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       );
       expect(wide, `${where} a ${v.width}×${v.height}: elementi oltre il bordo`).toEqual([]);
       await expectTargets(p, `${where} a ${v.width}×${v.height}`);
+      await expectNoClippedButtons(p, `${where} a ${v.width}×${v.height}`);
     }
     await p.setViewportSize({ width: 1280, height: 900 });
   }
@@ -204,17 +284,49 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   const check = async (p: Page, where: string, tablet = false) => {
     await expectAccessible(p, where);
     await expectTargets(p, where);
+    await expectNoClippedButtons(p, where);
     if (tablet) await expectTabletLayout(p, where);
   };
 
   /**
-   * page.goto che aspetta la pagina nuova. Con WebKit, tornando all'indirizzo dove la prova
-   * precedente era finita, «la stessa prestazione già prescritta» è caduta una volta (CI su main,
-   * giro 170): il campo di ricerca restava bloccato dalla ricetta ricordata, come se «Nuova ricetta
-   * da capo» fosse stato cercato nella pagina di prima o in quella nuova ancora vuota. Causa
-   * probabile, non provata (qui WebKit non c'è): page.goto che risponde prima che la pagina nuova
-   * prenda il posto di quella di prima, come in un difetto segnalato a Playwright per WebKit. La
-   * pagina di prima porta un segno; si va avanti quando il segno non c'è più.
+   * La pagina ferma dopo un caricamento: nessuna richiesta da mezzo secondo, i caratteri pronti,
+   * due fotogrammi. Le parti che arrivano dopo spostano la pagina: le impostazioni e le medicazioni
+   * avanzate sopra «Apri i riepiloghi» e «Apri la distinta» nell'Archivio, il promemoria e i «già
+   * prescritti» sopra «Nuova ricetta da capo». Un clic in quel momento preme su un elemento e
+   * rilascia su un altro: Playwright controlla il bersaglio solo alla pressione, e il clic va perso
+   * senza errore. È la causa delle tre prove cadute con WebKit sulle prove su GitHub del 21/11/2026
+   * (giri 405, 408 e 411); il meccanismo è riprodotto in Chromium, WebKit e Firefox (D242).
+   */
+  async function settle(p: Page) {
+    await p.waitForLoadState('networkidle');
+    await p.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    });
+  }
+
+  /** Ogni pagina della prova aspetta la pagina ferma dopo goto e reload (vedi settle). */
+  function settling(p: Page): Page {
+    const goto = p.goto.bind(p);
+    const reload = p.reload.bind(p);
+    p.goto = async (url, options) => {
+      const response = await goto(url, options);
+      await settle(p);
+      return response;
+    };
+    p.reload = async (options) => {
+      const response = await reload(options);
+      await settle(p);
+      return response;
+    };
+    return p;
+  }
+
+  /**
+   * page.goto che aspetta la pagina nuova al suo posto: la pagina di prima porta un segno, e si va
+   * avanti quando il segno non c'è più (con WebKit, tornando all'indirizzo dove la prova precedente
+   * era finita, «la stessa prestazione già prescritta» era caduta una volta: CI su main, giro 170).
+   * Poi la pagina ferma, come dopo ogni caricamento.
    */
   async function gotoNewPage(p: Page, url: string) {
     await p.evaluate(() => {
@@ -222,6 +334,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
     await p.goto(url);
     await p.waitForFunction(() => !(window as Window & { paginaDiPrima?: boolean }).paginaDiPrima);
+    await settle(p);
   }
 
   /**
@@ -405,7 +518,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect(browser.browserType().name()).toBe(ENGINE);
     doctor = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'it-IT' });
     await doctor.clock.setFixedTime(s.clock.now());
-    page = await doctor.newPage();
+    page = settling(await doctor.newPage());
   }, 120_000);
 
   afterAll(async () => {
@@ -419,9 +532,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   it('accesso: password, attivazione del secondo fattore, poi «Oggi»', async () => {
     await page.goto(base);
     await check(page, 'pagina di accesso');
+    await expectLogoOnBase(page, 'pagina di accesso');
     await loginInBrowser(page, 'titolare');
     await page.getByText('Controllo di prova').waitFor();
     await check(page, 'Oggi', true);
+    await expectLogoOnBase(page, 'testata');
   });
 
   it('il menu ha simbolo e nome insieme (D67)', async () => {
@@ -462,11 +577,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .filter({ hasText: 'TEVA ITALIA' })
       .getByRole('button', { name: 'Aggiungi' })
       .click();
-    await page
-      .locator('.riga-ricetta')
-      .filter({ hasText: 'TEVA ITALIA' })
-      .getByLabel('Confezioni')
-      .fill('1');
+    // La riga aggiunta è chiusa: nome e sintesi; i campi si aprono solo col clic (D242).
+    const line = page.locator('.riga-ricetta').filter({ hasText: 'TEVA ITALIA' });
+    const opener = line.getByRole('button', { name: /TEVA ITALIA/ });
+    await line.getByText('1 confezione · posologia non indicata').waitFor();
+    await expect(opener.getAttribute('aria-expanded')).resolves.toBe('false');
+    await expect(line.getByLabel('Confezioni').isVisible()).resolves.toBe(false);
+    await opener.click();
+    await expect(opener.getAttribute('aria-expanded')).resolves.toBe('true');
+    await line.getByLabel('Confezioni').fill('1');
+    await line.getByLabel('Posologia').fill('1 compressa al giorno');
+    await line.getByText('1 confezione · 1 compressa al giorno').waitFor();
+    await opener.click();
+    await expect(line.getByLabel('Confezioni').isVisible()).resolves.toBe(false);
     // Anche la terapia in corso: la ricetta inviata finisce nel suo storico (D65).
     await page
       .locator('.risultato')
@@ -474,6 +597,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByRole('button', { name: 'Aggiungi' })
       .click();
     await page.locator('.riga-ricetta').filter({ hasText: 'Farmaco di prova 5 mg' }).waitFor();
+    // Con due farmaci la pagina sta in una schermata: non scorre, e i pulsanti sono in vista.
+    await expectOneScreen(page, 'nuova ricetta con due farmaci');
     await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
     await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await page.getByText(/Regole di prescrizione, versione/).waitFor();
@@ -500,19 +625,33 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('nell’editor: oscuramento per le SSN, ripetibilità per la ricetta bianca (tappa 7)', async () => {
-    // Di nuovo lo stesso indirizzo: la ricetta inviata è ancora ricordata.
-    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}/ricetta`);
-    await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
-    await page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ }).click();
-    await page.getByLabel(/Oscura nome e indirizzo/).waitFor();
+    // Di nuovo lo stesso indirizzo: la ricetta inviata è ancora ricordata, e si ricomincia.
+    await freshPrescription(
+      page,
+      `${base}/pazienti/${s.richPatient}/ricetta`,
+      'Nuova ricetta',
+      'Farmaco, principio attivo, codice AIC o ATC',
+    );
+    // Promemoria e oscuramento sono chiusi in «Altre opzioni», che dice la scelta in corso (D242).
+    const options = page.locator('details.altre-opzioni');
+    await options.getByText('nome e indirizzo in chiaro').waitFor();
+    await options.locator('summary').click();
+    await page.getByLabel(/Oscura nome e indirizzo/).check();
+    await options.getByText('nome e indirizzo oscurati').waitFor();
+    await page.getByLabel(/Oscura nome e indirizzo/).uncheck();
     await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
     const item = page.locator('.risultato').filter({ hasText: 'TEVA ITALIA' });
     await item.waitFor();
     await item.getByRole('button', { name: 'Aggiungi' }).click();
     await page.getByLabel('Bianca (a carico del paziente)').check();
     await expect(page.getByLabel(/Oscura nome e indirizzo/).count()).resolves.toBe(0);
+    await page
+      .locator('.riga-ricetta')
+      .getByRole('button', { name: /TEVA ITALIA/ })
+      .click();
     await page.getByLabel('Ripetibile (volte)').fill('2');
     await page.getByLabel('Validità (mesi)').fill('6');
+    await page.getByText(/ripetibile 2 volte · validità 6 mesi/).waitFor();
     await check(page, 'ricetta bianca ripetibile', true);
     await page.getByRole('button', { name: 'Ricomincia' }).click();
   });
@@ -636,10 +775,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .fill('PRESTAZIONE NUOVA DI PROVA');
     await check(page, 'prestazione scritta a mano');
     await page.getByRole('button', { name: 'Aggiungi in ricetta' }).click();
+    // I due codici si leggono già nella riga chiusa (D242).
     await page
       .locator('.riga-ricetta')
       .filter({ hasText: 'PRESTAZIONE NUOVA DI PROVA' })
-      .getByText('Catalogo NUOVO.1 · nomenclatore (DM) 99.99.1')
+      .getByText('quantità 1 · catalogo NUOVO.1 · nomenclatore (DM) 99.99.1')
       .waitFor();
     await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
     await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
@@ -701,7 +841,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       locale: 'it-IT',
     });
     await ctx.clock.setFixedTime(s.clock.now());
-    const sec = await ctx.newPage();
+    const sec = settling(await ctx.newPage());
     try {
       await loginInBrowser(sec, 'segreteria');
       await sec.goto(`${base}/pazienti/${s.richPatient}`);
@@ -1275,7 +1415,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
 
     await ctx.clock.setFixedTime(s.clock.now());
-    const admin = await ctx.newPage();
+    const admin = settling(await ctx.newPage());
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin
@@ -1326,7 +1466,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
 
     await ctx.clock.setFixedTime(s.clock.now());
-    const admin = await ctx.newPage();
+    const admin = settling(await ctx.newPage());
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin.goto(`${base}/strumenti?sezione=banche-dati`);
@@ -1479,7 +1619,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
 
     await ctx.clock.setFixedTime(s.clock.now());
-    const colleague = await ctx.newPage();
+    const colleague = settling(await ctx.newPage());
     try {
       await loginInBrowser(colleague, 'collega');
       await colleague.goto(`${base}/strumenti?sezione=aft`);
@@ -1536,7 +1676,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       locale: 'it-IT',
     });
     await ctx.clock.setFixedTime(s.clock.now());
-    const admin = await ctx.newPage();
+    const admin = settling(await ctx.newPage());
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin.goto(`${base}/strumenti?sezione=studio`);
@@ -1612,7 +1752,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       locale: 'it-IT',
     });
     await ctx.clock.setFixedTime(s.clock.now());
-    const admin = await ctx.newPage();
+    const admin = settling(await ctx.newPage());
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin.goto(`${base}/strumenti?sezione=utenti`);
@@ -2310,7 +2450,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
     await anonymous.clock.setFixedTime(s.clock.now());
     try {
-      const p = await anonymous.newPage();
+      const p = settling(await anonymous.newPage());
       await p.goto(base);
       await p.getByRole('link', { name: /Ripristina con SPID o CIE/ }).click();
       await p.getByRole('heading', { level: 1, name: 'Ripristino con SPID o CIE' }).waitFor();

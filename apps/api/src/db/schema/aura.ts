@@ -192,3 +192,35 @@ export const auraDoctorChange = pgTable(
   },
   (t) => [index().on(t.fromArchiveId, t.status), index().on(t.toDoctorUserId, t.status)],
 );
+
+/**
+ * Spostamenti di un paziente fra gli archivi dello studio (D240): uno per ogni «Sposta» (D200),
+ * con il giorno e chi l'ha fatto. Dicono in quale archivio stava il paziente in un giorno: una
+ * prestazione aggiuntiva va nella distinta del medico che l'aveva quel giorno (ACN, allegato 6,
+ * commi 4 e 6). Di sola aggiunta: non si modificano e non si cancellano (trigger nella migrazione).
+ */
+export const patientArchiveMove = pgTable(
+  'patient_archive_move',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    studioId: uuid()
+      .notNull()
+      .references(() => studio.id),
+    patientId: uuid()
+      .notNull()
+      .references(() => patient.id),
+    fromArchiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
+    toArchiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
+    movedAt: timestamp({ withTimezone: true }).notNull(),
+    movedBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    /** Il cambio di medico di AURA che ha portato allo spostamento. */
+    doctorChangeId: uuid().references(() => auraDoctorChange.id),
+  },
+  (t) => [index().on(t.patientId, t.movedAt)],
+);

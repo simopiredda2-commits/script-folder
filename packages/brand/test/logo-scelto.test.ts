@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PRODUCT_NAME } from '../brand';
 import { CHOSEN_PROPOSAL_ID, proposals } from '../logo-proposals';
-import { productMark } from '../mark';
+import { markInk, productMark } from '../mark';
 import { contrastRatio, scriptColors, uiColors } from '../tokens';
 
 const logoDir = join(import.meta.dirname, '..', 'assets', 'logo');
@@ -31,6 +31,32 @@ describe('logo scelto alla prima fermata', () => {
       expect(svg, f).toContain(`stroke="${productMark.onDark.color}"`);
       expect(svg, f).not.toContain(`stroke="${scriptColors.dark.luce}"`);
     }
+  });
+
+  it('il segno poggia sul bordo in basso del suo tratto (D242)', () => {
+    // I vertici più bassi sono a 27, il tratto è spesso 3: il bordo è a 28,5 su 32.
+    expect(markInk(productMark.paths, productMark.strokeWidth)).toEqual({
+      left: 3.5,
+      right: 28.5,
+      top: 3.5,
+      bottom: 28.5,
+    });
+    expect(productMark.base).toBe(28.5);
+    expect(productMark.size).toBe(32);
+  });
+
+  it('nel logo con il nome il segno poggia sulla base del nome, come nell’interfaccia (D242)', () => {
+    const svg = read('con-nome.svg');
+    const [ty, s] = /<g transform="translate\([-\d.]+ ([-\d.]+)\) scale\(([\d.]+)\)">/
+      .exec(svg)!
+      .slice(1)
+      .map(Number) as [number, number];
+    // Il nome comincia con la «F»: il suo primo punto è in basso a sinistra, sulla base.
+    const baseline = Number(/<\/g><path d="M[\d.]+ ([\d.]+)/.exec(svg)![1]);
+    expect(ty + productMark.base * s).toBeCloseTo(baseline, 2);
+    // Il nome resta dentro il riquadro: gli occhielli scendono appena sotto la base.
+    const height = Number(/viewBox="0 0 [\d.]+ ([\d.]+)"/.exec(svg)![1]);
+    expect(baseline).toBeLessThan(height - 2);
   });
 
   it('su fondo scuro l’icona gialla con il segno blu scuro si legge (D214)', () => {

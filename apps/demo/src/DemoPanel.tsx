@@ -1,6 +1,7 @@
 import { START_URL } from './start';
 import { useEffect, useRef, useState } from 'react';
 import { secondFactorCode, type Ready } from './bridge';
+import { autoReduce } from './panel-state';
 
 type Code = Awaited<ReturnType<typeof secondFactorCode>>['code'];
 
@@ -13,7 +14,10 @@ const group = (code: string) => `${code.slice(0, 3)} ${code.slice(3)}`;
 export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number }) {
   const [open, setOpen] = useState(true);
   const [code, setCode] = useState<Code>(null);
-  const wasLoggedIn = useRef(false);
+  /** La sessione per cui il riquadro ha già deciso se ridursi. */
+  const decidedFor = useRef<number | null>(null);
+  /** Quando lo si è aperto a mano l'ultima volta. */
+  const openedByHand = useRef(0);
 
   useEffect(() => {
     let alive = true;
@@ -21,9 +25,12 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
       void secondFactorCode().then((state) => {
         if (!alive) return;
         setCode(state.code);
-        // Dopo l'accesso il riquadro si riduce da sé: resta il pulsante con il codice.
-        if (state.loggedIn && !wasLoggedIn.current) setOpen(false);
-        wasLoggedIn.current = state.loggedIn;
+        // Dopo l'accesso il riquadro si riduce da sé, una volta per sessione: resta il pulsante con
+        // il codice. Se lo si è aperto a mano dopo l'accesso resta aperto: non si chiude mentre lo
+        // si legge (D241).
+        const next = autoReduce(state, decidedFor.current, openedByHand.current);
+        decidedFor.current = next.decidedFor;
+        if (next.reduce) setOpen(false);
       });
     tick();
     const timer = window.setInterval(tick, 1000);
@@ -38,7 +45,10 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
       <button
         type="button"
         className="dimo-apri"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          openedByHand.current = Date.now();
+          setOpen(true);
+        }}
         aria-expanded="false"
       >
         Dimostrazione

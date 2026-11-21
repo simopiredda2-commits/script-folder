@@ -155,7 +155,8 @@ legend {
 
 .brand-logo {
   display: inline-flex;
-  align-items: center;
+  /* Il segno poggia sulla base del nome (D242): centrati come riquadri, la cartella scendeva sotto. */
+  align-items: baseline;
   gap: 0.5rem;
   font-family: var(--font-display);
   font-size: 1.5rem;
@@ -375,6 +376,12 @@ legend {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
+  /*
+   * Mai più stretto del suo contenuto (D242). La larghezza minima di 44 px toglie il minimo
+   * automatico degli elementi flessibili: accanto a un testo lungo il pulsante si stringeva e il
+   * «+» di «Aggiungi» usciva dal bordo. Si stringe il testo vicino, che va a capo.
+   */
+  flex-shrink: 0;
   min-height: var(--size-min-target);
   min-width: var(--size-min-target);
   padding: 0 1rem;
@@ -718,6 +725,13 @@ legend {
   gap: 1rem;
   padding: 0.625rem 0;
   border-bottom: 1px solid var(--color-divider);
+}
+
+/* Il testo del risultato si stringe e va a capo, anche nei codici lunghi; il pulsante no (D242). */
+.risultato > div:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .risultato-colonna {
@@ -1337,10 +1351,217 @@ a.coda:hover {
 }
 
 .riga-ricetta {
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  margin-bottom: 0.5rem;
   border: 1px solid var(--color-divider);
   border-radius: var(--radius);
+}
+
+/*
+ * La riga chiusa (D242): nome e sintesi in un pulsante che apre i dettagli. Si apre solo col clic,
+ * così la ricetta con più farmaci sta in una schermata.
+ */
+.riga-ricetta-testa {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.riga-ricetta-apri {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--size-min-target);
+  padding: 0.25rem 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.riga-ricetta-apri svg {
+  flex: none;
+  color: var(--color-primary);
+  transition: transform 0.15s;
+}
+
+.riga-ricetta.aperta .riga-ricetta-apri svg {
+  transform: rotate(90deg);
+}
+
+.riga-ricetta-testo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Chiusa, il nome sta su due righe al più; aperta, si legge intero. */
+.riga-ricetta-nome {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.riga-ricetta.aperta .riga-ricetta-nome {
+  display: block;
+  overflow: visible;
+}
+
+.riga-ricetta-dettagli {
+  margin: 0;
+  padding: 0.25rem 0 0.5rem;
+}
+
+/* Le altre opzioni della ricetta e le banche dati in uso, chiuse in una riga (D242). */
+.altre-opzioni summary,
+.versioni-chiuse summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.25rem;
+  min-height: var(--size-min-target);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.altre-opzioni summary {
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  font-weight: 400;
+  margin-bottom: 0.25rem;
+}
+
+.altre-opzioni summary > span {
+  min-width: 0;
+}
+
+.altre-opzioni summary svg,
+.versioni-chiuse summary svg {
+  flex: none;
+  color: var(--color-primary);
+  transition: transform 0.15s;
+}
+
+.altre-opzioni[open] summary svg,
+.versioni-chiuse[open] summary svg {
+  transform: rotate(90deg);
+}
+
+/*
+ * La ricetta in una schermata (D242), sul computer e sul tablet in orizzontale: la cornice è alta
+ * quanto lo schermo, il piede resta in fondo, e scorrono la ricerca e la ricetta, ciascuna nel suo
+ * riquadro. I pulsanti della ricetta restano in vista. Su schermi stretti o bassi la pagina scorre
+ * come le altre.
+ */
+@media (min-width: 901px) and (min-height: 600px) {
+  html.schermo-unico .app-shell {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  html.schermo-unico .app-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  html.schermo-unico .testata-ricetta,
+  html.schermo-unico .intestazione-pagina,
+  html.schermo-unico .testata-paziente {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 1.5rem;
+    margin-bottom: 0;
+  }
+
+  html.schermo-unico .testata-ricetta {
+    margin-bottom: 0.5rem;
+  }
+
+  html.schermo-unico .testata-ricetta h1 {
+    font-size: 1.5rem;
+  }
+
+  html.schermo-unico .testata-dati,
+  html.schermo-unico .testata-avvisi {
+    margin: 0;
+  }
+
+  html.schermo-unico .griglia-ricetta {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  html.schermo-unico .griglia-ricetta > .riquadro {
+    min-height: 0;
+    overflow-y: auto;
+    padding-top: 0.75rem;
+    padding-bottom: 0;
+  }
+
+  html.schermo-unico .griglia-ricetta h2 {
+    margin-top: 0;
+    margin-bottom: 0.25rem;
+  }
+
+  /* Il tipo di ricetta in una riga, con il suo nome accanto. */
+  html.schermo-unico .griglia-ricetta .scelta-in-riga {
+    align-items: center;
+    margin-bottom: 0.25rem;
+  }
+
+  html.schermo-unico .griglia-ricetta .scelta-in-riga legend {
+    float: left;
+    width: auto;
+    margin: 0;
+  }
+
+  /* Il campo di ricerca resta in vista mentre scorrono i risultati. */
+  html.schermo-unico .griglia-ricetta .ricerca {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin-bottom: 0;
+    padding-bottom: 0.25rem;
+    background: inherit;
+  }
+
+  /* «Dati della ricetta» resta per i lettori di schermo; a vista bastano le etichette dei campi. */
+  html.schermo-unico .dati-ricetta > legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  html.schermo-unico .dati-ricetta .campo {
+    margin-bottom: 0.25rem;
+  }
+
+  html.schermo-unico .azioni-ricetta {
+    position: sticky;
+    bottom: 0;
+    margin: 0;
+    padding: 0.75rem 0;
+    background: inherit;
+    border-top: 1px solid var(--color-divider);
+  }
 }
 
 .campi-riga {

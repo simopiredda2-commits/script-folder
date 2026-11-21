@@ -219,12 +219,84 @@ describe('prestazioni aggiuntive in cartella (D212)', () => {
     render(<App />);
     const list = (await screen.findByRole('heading', { name: 'Prestazioni registrate' }))
       .parentElement!;
-    await within(list).findByText(/Registrata nell’archivio «Archivio della dottoressa di prima»/);
+    await within(list).findByText(
+      /Nella distinta dell’archivio «Archivio della dottoressa di prima», che aveva il paziente il giorno dell’esecuzione: lì si annulla/,
+    );
     expect(within(list).getByText('In invio con la distinta')).toBeTruthy();
     // Si annulla solo la terza: le altre sono nella distinta di un altro archivio o partono.
     const buttons = within(list).getAllByRole('button', { name: /^Annulla/ });
     expect(buttons).toHaveLength(1);
     expect(buttons[0]!.textContent).toMatch(/A4/);
+  });
+
+  it('dopo «Sposta»: la distinta di chi aveva il paziente quel giorno; il giorno dello spostamento si sceglie (D240)', async () => {
+    const calls = stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/oggi': ok({ data: '2026-11-20', appuntamenti: [], code: { daFirmare: 0 } }),
+      '/api/pazienti/p1': ok(PATIENT),
+      '/api/pazienti/p1/ppip': (method) =>
+        method === 'POST'
+          ? { status: 201, body: { id: 'r9' } }
+          : {
+              status: 200,
+              body: {
+                puoScrivere: true,
+                archivio: 'a1',
+                prestazioni: [],
+                spostamenti: [
+                  {
+                    giorno: '2026-11-18',
+                    da: 'a0',
+                    daNome: 'Archivio della dottoressa di prima',
+                    a: 'a1',
+                    aNome: 'Archivio di prova',
+                  },
+                ],
+              },
+            },
+      '/api/prestazioni-aggiuntive/catalogo': ok(CATALOG),
+    });
+    window.history.pushState({}, '', '/pazienti/p1/prestazioni-aggiuntive');
+    render(<App />);
+    const select = await screen.findByLabelText('Prestazione');
+    await within(select).findByRole('option', { name: /A1 · Prima medicazione/ });
+    const day = screen.getByLabelText('Data dell’esecuzione');
+    // Prima dello spostamento: la distinta della dottoressa di prima, con il suo catalogo.
+    fireEvent.change(day, { target: { value: '2026-11-17' } });
+    await screen.findByText(
+      /Va nella distinta dell’archivio «Archivio della dottoressa di prima»: il 17\/11\/2026 il paziente era nel suo archivio/,
+    );
+    await waitFor(() =>
+      expect(
+        calls.filter((c) => c.path === '/api/prestazioni-aggiuntive/catalogo').at(-1)?.search,
+      ).toMatch(/(^|&)archivio=a0(&|$)/),
+    );
+    // Dopo: la propria, senza avvisi.
+    fireEvent.change(day, { target: { value: '2026-11-19' } });
+    expect(screen.queryByText(/Va nella distinta dell’archivio/)).toBeNull();
+    expect(screen.queryByRole('group', { name: /In quale distinta va/ })).toBeNull();
+    // Il giorno dello spostamento: si sceglie, e senza scelta non parte niente.
+    fireEvent.change(day, { target: { value: '2026-11-18' } });
+    const group = screen.getByRole('group', { name: /In quale distinta va\? Il 18\/11\/2026/ });
+    const radios = within(group).getAllByRole<HTMLInputElement>('radio');
+    expect(radios.map((r) => r.required)).toEqual([true, true]);
+    expect(within(group).getByLabelText(/Archivio di prova \(dopo lo spostamento\)/)).toBeTruthy();
+    fireEvent.change(select, { target: { value: 'A1' } });
+    // Il browser ferma il modulo con il gruppo obbligatorio vuoto; se lo manda lo stesso, lo ferma
+    // la pagina.
+    expect(radios[0]!.validity.valueMissing).toBe(true);
+    fireEvent.submit(select.closest('form')!);
+    await screen.findByText(/scegli in quale distinta va la prestazione/);
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+    fireEvent.click(
+      within(group).getByLabelText(
+        /Archivio della dottoressa di prima \(prima dello spostamento\)/,
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Registra la prestazione' }));
+    await screen.findByText('Prestazione registrata.');
+    const post = calls.find((c) => c.method === 'POST' && c.path === '/api/pazienti/p1/ppip');
+    expect(post?.body).toMatchObject({ data: '2026-11-18', codice: 'A1', archivio: 'a0' });
   });
 
   it('senza catalogo in vigore lo dice, con simbolo e parola', async () => {

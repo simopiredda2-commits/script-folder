@@ -41,6 +41,8 @@ interface Session {
   isDoctor: boolean;
   /** Vero se l'utente è amministratore dello studio (tappa 14). */
   isAdmin: boolean;
+  /** Vero se l'utente è della segreteria: prepara, e vede le ricette in attesa (D242). */
+  isSecretary: boolean;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -80,6 +82,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       logout,
       isDoctor: roles.includes('owner_doctor') || roles.includes('substitute_doctor'),
       isAdmin: roles.includes('administrator'),
+      isSecretary: roles.includes('secretary'),
     };
   }, [state, refresh, logout]);
 

@@ -89,3 +89,4 @@ La favicon segue il tema del browser: segno blu nel tema chiaro, icona gialla ne
 1. Fatto: `packages/brand/mark.ts` usa la geometria della B (da `logo-proposals.ts`) e il componente `Logo` dell'interfaccia la disegna, con il nome da `PRODUCT_NAME`.
 2. Fatto: favicon dell'interfaccia (`apps/web/public/favicon.svg`) generata dal segno. L'icona dell'app per tablet arriva con l'interfaccia (tappa 6).
 3. Le proposte scartate e il segno di oggi restano qui come traccia.
+4. Fatto (D242): accanto al nome il segno poggia sulla base delle lettere, nell'interfaccia e in `con-nome.svg`. Centrato come riquadro, il corpo della cartella scendeva sotto il nome.

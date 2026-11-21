@@ -70,7 +70,7 @@ export function startService(
         pending.get(m.id)?.reject(new Error(m.message));
         pending.delete(m.id);
       } else if (m.type === 'code') {
-        codeWaiter?.({ code: m.code, loggedIn: m.loggedIn });
+        codeWaiter?.({ code: m.code, loggedIn: m.loggedIn, sessionSince: m.sessionSince });
         codeWaiter = null;
       }
     };

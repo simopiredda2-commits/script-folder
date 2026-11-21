@@ -76,4 +76,6 @@ export type FromWorker =
       type: 'code';
       code: { username: string; code: string; secondsLeft: number } | null;
       loggedIn: boolean;
+      /** Da quando c'è la sessione aperta, in millisecondi; nessuna sessione, null (D241). */
+      sessionSince: number | null;
     };
