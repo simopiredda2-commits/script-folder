@@ -1580,4 +1580,3 @@ Scelte prese qui, con il motivo:
 - **«È arrivata»**: il medico scrive il numero che l'ente gli ha dato, l'NRE della ricetta o il protocollo del certificato. Il formato dell'NRE non è ancora nelle specifiche che abbiamo (A1): si accettano lettere e cifre. Il codice di autenticazione è facoltativo: con il codice il promemoria si stampa come sempre; senza, il promemoria non si stampa e lo si dice, e al paziente bastano il numero di ricetta e il codice fiscale.
 - **Un esito tardivo dell'invio di prima** non cambia più la pratica. Succede se il servizio, rimasto fermo più di 15 minuti, poi risponde. La risposta resta nel registro degli invii e chi aspettava riceve «l'esito è stato segnato nel frattempo».
 - **Tracce**: l'esito segnato a mano entra nel registro degli invii con l'ambiente «manuale», insieme al cambio di stato; il registro degli accessi ha la richiesta, come per l'invio.
-
