@@ -147,6 +147,9 @@ describe('esportazione completa dei dati del medico', () => {
       'family',
       // Esportata per archivio, non per paziente (D199).
       'aura_new_patient',
+      // Per paziente e per archivio (D240).
+      'ppip_record',
+      'patient_archive_move',
     ]) {
       expect(doc.tabelle, tname).toHaveProperty(tname);
     }

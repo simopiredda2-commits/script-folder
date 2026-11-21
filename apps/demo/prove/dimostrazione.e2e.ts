@@ -828,7 +828,23 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     expect(await patientId(moving)).toBeNull();
     // La collega lo trova nel suo archivio.
     await login('collega');
-    expect(await patientId(moving)).not.toBeNull();
+    const id = await patientId(moving);
+    expect(id).not.toBeNull();
+    // Una prestazione aggiuntiva di ieri è del medico di prima: va nella sua distinta. Oggi, il
+    // giorno dello spostamento, si sceglie (D240).
+    await go(`/pazienti/${id!}/prestazioni-aggiuntive`);
+    const day = f.getByLabel('Data dell’esecuzione');
+    await day.waitFor();
+    const today = await day.inputValue();
+    const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    await day.fill(yesterday);
+    await f
+      .getByText(/Va nella distinta dell’archivio «.+»: il .+ il paziente era nel suo archivio/)
+      .waitFor();
+    await day.fill(today);
+    await f.getByRole('group', { name: /In quale distinta va\?/ }).waitFor();
   });
 
   it('cambio di medico: «Non spostare», e il paziente resta nell’archivio senza riproporsi', async () => {

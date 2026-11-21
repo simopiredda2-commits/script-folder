@@ -26,7 +26,6 @@ export const PATIENT_TABLES = [
   'sick_leave_certificate',
   'service_execution',
   'supply_prescription',
-  'ppip_record',
   'pss_document',
   'template_certificate',
   'aft_activity',
@@ -79,6 +78,10 @@ export const HANDLED_SEPARATELY: Record<string, string> = {
     'i PDF del Profilo Sanitario Sintetico: sezione documenti_profilo del JSON, cartella profilo-sanitario/ nello ZIP',
   aura_new_patient:
     'esportata per archivio: i nuovi assistiti segnalati da AURA, anche quelli non registrati',
+  ppip_record:
+    'le prestazioni aggiuntive dei pazienti dell’archivio e quelle nella sua distinta di pazienti passati poi a un altro archivio (D240)',
+  patient_archive_move:
+    'gli spostamenti dei pazienti dell’archivio e quelli dall’archivio o verso l’archivio (D240)',
 };
 
 type Row = Record<string, unknown>;
@@ -170,6 +173,22 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
   tables.aura_new_patient = await rows(
     db,
     sql`select * from aura_new_patient where archive_id = ${archiveId} order by id`,
+  );
+  // Prestazioni aggiuntive dei pazienti dell'archivio e quelle nella sua distinta, anche di pazienti
+  // passati poi a un altro medico (D240): il compenso è del medico che le ha eseguite (regola 4).
+  tables.ppip_record = await rows(
+    db,
+    sql`select * from ppip_record
+        where patient_id = any(${pgArray(patientIds)}::uuid[]) or archive_id = ${archiveId}
+        order by id`,
+  );
+  // Spostamenti fra gli archivi: dei pazienti dell'archivio, e quelli dall'archivio o verso (D240).
+  tables.patient_archive_move = await rows(
+    db,
+    sql`select * from patient_archive_move
+        where patient_id = any(${pgArray(patientIds)}::uuid[])
+           or from_archive_id = ${archiveId} or to_archive_id = ${archiveId}
+        order by moved_at, id`,
   );
   // Invii della distinta delle prestazioni aggiuntive (D212), con la distinta come è partita.
   tables.ppip_report = await rows(

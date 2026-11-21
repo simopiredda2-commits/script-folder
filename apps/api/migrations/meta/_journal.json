@@ -330,6 +330,13 @@
       "when": 1795262256594,
       "tag": "0046_versioni_per_ambito",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1795267589994,
+      "tag": "0047_spostamenti_fra_archivi",
+      "breakpoints": true
     }
   ]
 }

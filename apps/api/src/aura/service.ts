@@ -16,6 +16,7 @@ import {
   doctorProfile,
   exemption,
   patient,
+  patientArchiveMove,
   patientChoice,
   prescription,
   sickLeaveCertificate,
@@ -880,6 +881,16 @@ export function createAuraService(deps: AuraDeps) {
           .update(patient)
           .set({ archiveId: c!.toArchiveId, updatedAt: at })
           .where(eq(patient.id, p!.id));
+        // Lo spostamento resta nello storico: dice chi aveva il paziente in un giorno (D240).
+        await tx.insert(patientArchiveMove).values({
+          studioId: p!.studioId,
+          patientId: p!.id,
+          fromArchiveId: c!.fromArchiveId,
+          toArchiveId: c!.toArchiveId,
+          movedAt: at,
+          movedBy: actor.userId,
+          doctorChangeId: c!.id,
+        });
         await tx
           .update(auraDoctorChange)
           .set({ status: 'spostato', decidedBy: actor.userId, decidedAt: at })

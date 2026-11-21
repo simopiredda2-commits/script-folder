@@ -4,8 +4,9 @@ import type {
   AdditionalServicesReport,
   AdditionalServicesResult,
 } from '@mmg/integrations';
-import { INTERRUPTED_SEND_AFTER_MINUTES } from '@mmg/domain';
+import { archivesOnDay, INTERRUPTED_SEND_AFTER_MINUTES, type ArchiveMove } from '@mmg/domain';
 import { and, asc, desc, eq, gte, inArray, isNotNull, lte } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { z } from 'zod';
 import { logAccessForPatients } from '../audit/access-log';
 import type { Actor } from '../auth/service';
@@ -15,6 +16,7 @@ import {
   archive,
   doctorProfile,
   patient,
+  patientArchiveMove,
   ppipRecord,
   ppipReport,
   ppipSending,
@@ -23,6 +25,7 @@ import {
 import { secondsText } from '../admin/studio-service';
 import { withActor, type Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
+import { studioDate } from '../prescriptions/rules-check';
 import type { AdditionalServiceItem, ReferenceData, ReferenceScope } from '../reference/lookup';
 
 /**
@@ -50,6 +53,11 @@ export const ppipBody = z
     luogo: z.enum(['studio', 'domicilio']),
     autorizzazione: optionalText(200),
     note: optionalText(500),
+    /**
+     * In quale distinta, solo il giorno di uno spostamento del paziente: quella dell'archivio di
+     * prima o di dopo, secondo chi l'aveva quando la prestazione è stata eseguita (D240).
+     */
+    archivio: z.uuid().optional(),
   })
   .strict();
 export type PpipBody = z.infer<typeof ppipBody>;
@@ -122,9 +130,78 @@ export async function catalogItem(
   return item;
 }
 
+/** Uno spostamento del paziente, con i nomi dei due archivi per i messaggi e la pagina. */
+export interface NamedArchiveMove extends ArchiveMove {
+  fromName: string;
+  toName: string;
+}
+
+/** Gli spostamenti del paziente fra gli archivi dello studio, in ordine di tempo (D240). */
+export async function archiveMovesOf(
+  db: Database | Tx,
+  patientId: string,
+): Promise<NamedArchiveMove[]> {
+  const from = alias(archive, 'archivio_di_prima');
+  const to = alias(archive, 'archivio_di_dopo');
+  const rows = await db
+    .select({
+      at: patientArchiveMove.movedAt,
+      from: patientArchiveMove.fromArchiveId,
+      to: patientArchiveMove.toArchiveId,
+      fromName: from.name,
+      toName: to.name,
+    })
+    .from(patientArchiveMove)
+    .innerJoin(from, eq(from.id, patientArchiveMove.fromArchiveId))
+    .innerJoin(to, eq(to.id, patientArchiveMove.toArchiveId))
+    .where(eq(patientArchiveMove.patientId, patientId))
+    .orderBy(asc(patientArchiveMove.movedAt), asc(patientArchiveMove.id));
+  return rows.map((r) => ({
+    day: studioDate(r.at),
+    from: r.from,
+    to: r.to,
+    fromName: r.fromName,
+    toName: r.toName,
+  }));
+}
+
 /**
- * La prestazione nasce nell'archivio dove il paziente sta quando la si registra, e lì resta: la
- * distinta è del titolare di quell'archivio anche se poi il paziente cambia medico (D232).
+ * In quale distinta va una prestazione (D240): quella dell'archivio in cui il paziente stava il
+ * giorno dell'esecuzione, anche se lo si è spostato dopo. Il compenso è del medico che l'ha
+ * eseguita (ACN, allegato 6: comma 4, riepilogo delle prestazioni eseguite; comma 6, per le
+ * prestazioni rese al medico spettano i compensi). Il giorno di uno spostamento gli archivi sono
+ * due, e sceglie chi registra; gli altri giorni la scelta, se c'è, deve essere quella giusta.
+ */
+export function ppipArchiveFor(
+  moves: readonly NamedArchiveMove[],
+  current: string,
+  day: string,
+  chosen: string | undefined,
+): string {
+  const options = archivesOnDay(moves, current, day);
+  const names = new Map<string, string>();
+  for (const m of moves) names.set(m.from, m.fromName).set(m.to, m.toName);
+  const nameOf = (id: string) => `«${names.get(id) ?? 'archivio di adesso'}»`;
+  if (options.length === 1) {
+    const only = options[0]!;
+    if (chosen !== undefined && chosen !== only)
+      throw new HttpError(
+        400,
+        `Il ${dayIt(day)} il paziente era nell’archivio ${nameOf(only)}: la prestazione va nella sua distinta`,
+      );
+    return only;
+  }
+  if (chosen === undefined || !options.includes(chosen))
+    throw new HttpError(
+      400,
+      `Il ${dayIt(day)} il paziente è passato dall’archivio ${nameOf(options[0]!)} a ${nameOf(options.at(-1)!)}: scegli in quale distinta va la prestazione, secondo chi aveva il paziente quando è stata eseguita`,
+    );
+  return chosen;
+}
+
+/**
+ * La prestazione va nella distinta dell'archivio scelto con ppipArchiveFor, e lì resta, anche se
+ * poi il paziente cambia di nuovo medico (D232, D240).
  */
 export async function insertPpip(
   tx: Tx,
