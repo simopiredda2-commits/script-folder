@@ -1591,3 +1591,19 @@ Come si è fatto:
 - **Dimostrazione**: `apps/demo/src/worker/invii.ts` scrive le due pratiche nel database prima dell'avvio, come fanno le prove del servizio. Una prova della dimostrazione segna «È arrivata» con l'NRE e il codice, apre il promemoria nel visore, poi segna il certificato «Non è arrivato» e lo rimanda all'INPS.
 
 Prove: 13 del servizio, 7 dell'interfaccia, 2 del dominio, 1 della dimostrazione; 31 sabotaggi. Al primo giro un sabotaggio del permesso non è stato rilevato: il permesso messo al posto giusto era uno che la segreteria non ha senza le terapie croniche, quindi la segreteria riceveva il rifiuto lo stesso. Rifatto con un permesso che la segreteria ha davvero, è diventato rosso. Non provati: un arresto vero del servizio, il SAR e l'INPS veri. Nella dimostrazione le due pratiche sono scritte «in invio» all'avvio: il servizio non si ferma davvero. La prova nuova della dimostrazione gira qui con Chromium; con WebKit e Firefox solo nella CI.
+
+**D234 · Prove instabili con WebKit: le venti cartelle aperte e «Ricomincia da capo».** Sulla pull request #27 la prova dell'interfaccia con WebKit è caduta una volta (giro 363). Lo stesso commit era verde nell'altro giro (362), e la prova caduta non tocca il codice della #27.
+
+Che cosa è successo:
+
+- Nella prova delle venti cartelle aperte (D68), uno dei venti caricamenti di pagina di fila si è fermato con «WebKit encountered an internal error». WebKit dà questo errore ai caricamenti in corso quando si ferma il suo processo di rete.
+- Con quel processo il browser della prova ha perso i cookie e la memoria della scheda: la sessione e le cartelle aperte. Le dieci prove dopo sono cadute per questo. È passata solo quella che parte senza sessione (ripristino con SPID o CIE), e «dopo l'inattività» ha trovato zero cartelle aperte.
+- Perché il processo di rete di WebKit si sia fermato non si sa: è un difetto del browser, e qui WebKit non c'è. Il programma non ricarica la pagina per aprire una cartella: lo fa solo la prova.
+
+Che cosa si è cambiato:
+
+- **Le venti cartelle si aprono dentro l'interfaccia**, come con un collegamento e senza ricaricare la pagina, cioè come nell'uso vero. Che le cartelle aperte restino dopo un ricaricamento lo prova ancora «dopo l'inattività». La prova aspetta che ogni cartella sia la scheda attiva prima di aprire la successiva.
+- **La prova nuova vede di più.** Con la cartella registrata solo alla prima apertura della pagina, la prova di prima restava verde; quella nuova diventa rossa. Due sabotaggi.
+- **«Ricomincia da capo» con WebKit** è caduto una volta su main dopo l'unione della #26 (giro 353). In 90 secondi il modulo d'accesso non è comparso, e la prova non diceva che cosa mostrava la pagina. Ora, se non riparte, l'errore riporta il testo della pagina, i problemi raccolti e, per confronto, il tempo del primo avvio. Provato con un guasto (la ripartenza dalla pagina interna, il difetto di D232): l'errore riporta «La dimostrazione non è partita in questo browser» con il motivo.
+
+Non provati: WebKit, che qui non c'è; la causa della ripartenza mancata su main, che si vedrà dal testo della pagina se succede di nuovo. Le prove dell'interfaccia usano una sola sessione del browser: se WebKit perde di nuovo il processo di rete in un'altra prova, quelle dopo cadono ancora a catena.

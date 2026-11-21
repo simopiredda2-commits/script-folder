@@ -976,7 +976,22 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     const opener = f.locator('button.dimo-apri');
     if (await opener.count()) await opener.click();
     await f.getByRole('button', { name: 'Ricomincia da capo' }).click();
-    await f.getByLabel('Nome utente', { exact: true }).waitFor({ timeout: 90_000 });
+    // Se non riparte, la prova dice che cosa mostra la pagina, con il tempo del primo avvio per
+    // confronto: con WebKit è caduta una volta su main dicendo solo che l'attesa era scaduta (prove
+    // su GitHub del 21/11/2026, giro 353; D234).
+    await f
+      .getByLabel('Nome utente', { exact: true })
+      .waitFor({ timeout: 90_000 })
+      .catch(async (err: unknown) => {
+        const shown = await f
+          .locator('body')
+          .innerText()
+          .catch(() => '(pagina non leggibile)');
+        throw new Error(
+          `La dimostrazione non è ripartita in 90 s (il primo avvio: ${startMs} ms). La pagina mostra: «${shown.replace(/\s+/g, ' ').slice(0, 400)}». Problemi: ${problems.slice(before).join(' | ') || 'nessuno'}`,
+          { cause: err },
+        );
+      });
     expect(await f.getByText('La dimostrazione non è partita in questo browser.').count()).toBe(0);
     expect(problems.slice(before)).toEqual([]);
   });

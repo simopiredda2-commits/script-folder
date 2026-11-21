@@ -225,6 +225,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   }
 
   /**
+   * Un cambio di pagina dentro l'interfaccia, come con un collegamento: la pagina non si
+   * ricarica. Con WebKit, venti caricamenti di pagina di fila (le venti cartelle, D68) sono stati
+   * il momento in cui il browser ha perso il suo processo di rete: con lui la sessione e le
+   * cartelle aperte, e le prove dopo sono cadute tutte (prove su GitHub del 21/11/2026, giro 363;
+   * D234).
+   */
+  const openInApp = (p: Page, path: string) =>
+    p.evaluate((to) => {
+      history.pushState({}, '', to);
+      dispatchEvent(new PopStateEvent('popstate'));
+    }, path);
+
+  /**
    * «Firma e invia», poi «Ricetta inviata». Se la ricetta non parte, l'errore dice le risposte
    * d'errore del servizio e che cosa mostra la pagina: con WebKit la ricetta specialistica non è
    * partita una volta, e la prova diceva solo che l'attesa era scaduta (prove su GitHub del
@@ -2001,13 +2014,15 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     const closeOne = bar.getByRole('button', { name: /^Chiudi la cartella di / });
     if (await closeOne.count()) await closeOne.click();
     await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(0);
+    // Le cartelle si aprono una dopo l'altra dentro l'interfaccia, come nell'uso vero: la pagina
+    // non si ricarica (D234). Ricaricare la pagina con le cartelle aperte lo prova «dopo
+    // l'inattività», più avanti.
     for (const id of ids.slice(0, 20)) {
-      await page.goto(`${base}/pazienti/${id}`);
+      await openInApp(page, `/pazienti/${id}`);
+      // La cartella entra nella barra con un effetto di React, dopo la pagina: si aspetta che la
+      // barra la mostri, come scheda attiva, prima di aprire la successiva.
+      await tab(id).and(bar.locator('a[aria-current="page"]')).waitFor();
       await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
-      // La cartella entra nella barra con un effetto di React, subito dopo la pagina: ricaricando
-      // la pagina successiva troppo presto (WebKit) la registrazione andava persa. Nell'uso vero
-      // non si ricarica: la barra resta in memoria. Si aspetta che la barra la mostri.
-      await tab(id).waitFor();
     }
     // La barra si aggiorna dopo la pagina: con i motori più lenti (WebKit) si aspetta un attimo.
     await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
@@ -2020,7 +2035,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'venti cartelle aperte', true);
 
     // La ventunesima: si chiude quella usata meno di recente, con l'avviso.
-    await page.goto(`${base}/pazienti/${ids[20]}`);
+    await openInApp(page, `/pazienti/${ids[20]}`);
+    await tab(ids[20]!).and(bar.locator('a[aria-current="page"]')).waitFor();
     await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
     await page.getByText(`chiusa quella di ${names.get(ids[0]!)}, usata meno di recente`).waitFor();
     await expect.poll(() => bar.getByRole('link').count(), { timeout: 5000 }).toBe(20);
