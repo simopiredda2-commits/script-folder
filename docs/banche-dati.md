@@ -88,6 +88,7 @@ I PDF non si estraggono da soli. Una persona copia i dati in un CSV (UTF-8, sepa
 - `fonte`, `chiave` e `sha256_origine` vanno indicati tutti e tre, oppure nessuno (atto che `sync/` non scarica: si importa con la nota «origine non verificabile»).
 - Se il PDF in uso in `sync/` ha un'impronta diversa, la trascrizione è **superata** e non entra: va trascritta la versione nuova.
 - `serie` (facoltativa) lega le versioni successive della stessa tabella, per esempio due determine sul catalogo.
+- `ambito` (facoltativo, D232) dice dove vale l'atto: `{"regione": "Piemonte"}`, `{"asl": "ASL TO3"}` o tutti e due. Senza, l'atto vale in tutta Italia. Oggi lo legge il catalogo delle prestazioni aggiuntive: un accordo aziendale vale solo per gli archivi della sua ASL, uno regionale solo per gli studi della sua regione. I nomi si confrontano senza maiuscole, accenti e segni.
 - **Da controllare (D159).** Finché nessuno l'ha controllata, `controllato_da` è `null`: la trascrizione non entra in uso e ogni importazione la segnala come «trascrizione da controllare», tra le cose da guardare a mano. Chi la controlla scrive nome e cognome; dal giro successivo entra, con il suo nome nella versione.
 
 ### Trascrizioni che il programma porta con sé (D159)
@@ -121,7 +122,7 @@ Estratta in automatico dal PDF della pagina del Ministero (versione del 29/9/202
 | `acn-2022-2024-allegato-6` | ACN della medicina generale 2022-2024, allegato 6 (serie nazionale) | 15/01/2026    | 16   |
 | `air-piemonte-2024`        | AIR del Piemonte 2024, art. 35, comma 4 (serie regionale)           | 01/01/2025    | 1    |
 
-Trascritte qui dalle pagine 146 e 147 del supplemento della Gazzetta (lettura ottica, controllata a vista voce per voce) e dal PDF della delibera; restano **da controllare**. Il catalogo di un giorno unisce le serie in vigore; a parità di codice vale la serie più recente, così un accordo aziendale si aggiunge come serie nuova (D213). Colonne: `codice`, `sezione`, `descrizione`, `autorizzazione` (sì/no), `compenso` (euro, con la virgola), `note`. Che cosa è diverso dagli atti e che cosa controllare: `docs/ppip.md`.
+Trascritte qui dalle pagine 146 e 147 del supplemento della Gazzetta (lettura ottica, controllata a vista voce per voce) e dal PDF della delibera; restano **da controllare**. Il catalogo di un giorno unisce le serie in vigore nella regione e nell'ASL dell'archivio (`ambito`); a parità di codice vale la serie più recente, e a parità di data l'atto più vicino: ASL, poi regione, poi Italia (D213, D232). Così un accordo aziendale si aggiunge come serie nuova, con il suo ambito. Colonne: `codice`, `sezione`, `descrizione`, `autorizzazione` (sì/no), `compenso` (euro, con la virgola), `note`. Che cosa è diverso dagli atti e che cosa controllare: `docs/ppip.md`.
 
 ### Esenzioni del DPCM LEA (D190)
 

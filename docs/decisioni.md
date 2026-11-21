@@ -1485,3 +1485,86 @@ Come si è fatto il punto 2:
 - nella dimostrazione, la consultazione al contrario nell'AFT, tutta dall'interfaccia: la Dott.ssa Marchi accende la condivisione e registra il consenso di una sua paziente in «Privacy»; il Dott. Rinaldi consulta la scheda con il codice fiscale e il motivo; lei vede la consultazione nel suo registro.
 
 Sabotaggi: quattro per la firma a controllo finito, due per le gare, due per la dimostrazione.
+
+**D231 · Risposte della fermata dopo l'unione della #24: revisione indipendente dalla #18 alla #25.** Via alla #25, unita con le verifiche su GitHub verdi. Per il dopo Simone ha chiesto se c'erano state altre revisioni. Sì, prima di questo giro: quella della #17 (D209), le tre dei poteri dell'amministratore nella tappa 14, quella del piano delle tappe 14 e 15 e il controllo esterno del catalogo ICD-9-CM (D186). Il codice unito dopo la #17, dalla #18 alla #25 (D210–D230), non ne aveva avute. Scelta di Simone: la revisione di tutto quel codice, come per la #17.
+
+Come si fa:
+
+- quattro revisori separati, uno per area: pazienti, registro degli accessi, transazioni e firma; prestazioni aggiuntive; promemoria, R22, presidi, Fascicolo regionale e logo; dimostrazione nel browser;
+- ognuno riceve il codice, le decisioni che dicono il comportamento voluto e che cosa cercare (correttezza, permessi e riservatezza, integrità e gare, tempi che crescono, robustezza, regole di CLAUDE.md), non le conclusioni di chi l'ha scritto. Le prove contano come codice: una prova che resterebbe verde con il difetto è un difetto;
+- ogni difetto segnalato si verifica sul codice prima di correggerlo. Quelli veri si correggono con prove e sabotaggi; gli altri si annotano con il motivo. Gli esiti sono nella decisione che segue.
+
+**D232 · Esiti della revisione indipendente dalla #18 alla #25 (D231).** Quattro revisori separati, uno per area, hanno segnalato difetti e sospetti. Ognuno si è verificato sul codice prima di toccarlo. I difetti veri sono corretti, ciascuno con prove e sabotaggi; gli altri sono qui sotto con il motivo.
+
+1. **Prestazioni aggiuntive (D212, D213).** L'area con più difetti; il primo l'hanno trovato due revisori, ognuno per conto suo.
+   - **La distinta seguiva l'archivio di oggi del paziente.** Dopo «Sposta» (D200) le prestazioni passavano nella distinta del nuovo medico, anche quelle eseguite dal medico di prima. Ora ogni prestazione porta l'archivio in cui è registrata (migrazione 0042; per le righe già scritte, l'archivio del paziente) e la distinta è di quell'archivio, come le ricette e i certificati. Nella cartella il nuovo medico vede la prestazione con il nome dell'archivio di prima e senza «Annulla»; nella distinta di prima l'assistito resta, senza il collegamento alla cartella e con «(ora assistito di un altro medico)», e da lì si annulla.
+   - **Due invii insieme della stessa distinta partivano tutti e due**, e un annullamento poteva cadere a metà di un invio. Ora le prestazioni passano «in invio», bloccate, prima della chiamata al portale. Con un invio in corso non ne parte un altro e non si annullano. Esito, segno sulle prestazioni e registro degli accessi si scrivono insieme; prima il registro dell'invio si scriveva dopo, fuori dalla transazione. Due annullamenti insieme: il secondo aspetta il primo e trova la prestazione già annullata.
+   - **«Ho controllato la distinta» non era legato a ciò che si era visto**: una prestazione registrata dopo il controllo partiva senza che il titolare l'avesse vista. Ora la pagina manda le prestazioni controllate e, se la distinta è cambiata, va ricontrollata.
+   - **Un catalogo solo per tutto il servizio**: un accordo aziendale sarebbe valso per tutte le ASL d'Italia. Ora una trascrizione può dire il suo ambito, regione o ASL (migrazione 0043), e il catalogo di un paziente è quello del suo archivio: la regione dello studio e l'ASL del titolare. L'AIR del Piemonte ha l'ambito Piemonte.
+   - **Con la stessa data di efficacia vinceva la prima riga letta**, in un ordine che il database non garantisce. Ora vince l'atto più vicino (ASL, poi regione, poi Italia), poi l'importazione più recente.
+   - **In produzione con il simulatore** la pagina diceva «Invio simulato» e offriva un pulsante che falliva. Ora lo dice e il pulsante non c'è.
+   - **Una prova dipendeva dal giorno**: l'autorizzazione del sostituto era valida solo con uno dei due orologi delle prove. Ora vale con tutti e due.
+   - **I riepiloghi dicevano ancora che le PPIP mancavano**; il mese scritto a mano, dove il browser non ha il selettore del mese, non si controllava.
+   - Tre segnalazioni minori, vere anche loro:
+     - il sostituto e il collega di gruppo leggevano distinta e CSV, cioè i compensi del titolare. Ora il permesso nuovo `ppip.report` è solo del titolare e della segreteria, come i riepiloghi (D201, D204);
+     - con il solo CSV, che in produzione è l'unica strada, le prestazioni non risultavano mai partite e restavano annullabili. Ora c'è «Consegnata all'ASL fuori dal programma». Un invio rimasto senza risposta si chiude dopo 15 minuti, con l'esito chiesto all'ASL: rimandare da sole quelle prestazioni potrebbe farle arrivare due volte;
+     - la distinta non diceva quando mancava l'indirizzo dell'assistito, che il comma 4 chiede. Ora lo dice.
+   - Il database stesso tiene fermi i dati di una prestazione registrata, annullata, partita o in invio (vincoli e un trigger, migrazione 0042).
+   - Prove: 12 nuove nel servizio (`ppip-invio.test.ts`). Fermano il portale a metà o tengono le righe bloccate da una seconda connessione, così ogni gara si ripete uguale. Una cambiata in `ppip.test.ts`, 5 nuove nell'interfaccia. 28 sabotaggi.
+
+2. **Promemoria, presidi e Fascicolo regionale (D217, D218, D220, D222).**
+   - **Campo 22 del promemoria** (numero di confezioni o prestazioni): nello spazio dato, un numero da 10 in su diventava «…». Ora il campo arriva a 50 mm e il tipo di ricetta comincia a 51, come nel facsimile; fino a tre cifre il numero sta intero a 8 punti.
+   - **Area delle prescrizioni piena**: le righe in più sparivano senza avviso, e quantità e nota finivano sotto il bordo. Ora il carattere scende fino a 6 punti e, se non basta, si accorciano i testi più lunghi con «…»: ogni prescrizione resta, con il codice, la quantità e la nota.
+   - **Farmaco con l'AIC e senza il nome**: la riga usciva vuota. Ora c'è l'AIC.
+   - **La carta annunciata**: il pannello diceva A5 anche per un promemoria della versione 1, che esce su A4. Ora la carta la dice il servizio.
+   - **Presidi**: tornare a «scrivi a mano» sceglieva il primo presidio dell'elenco. Ora svuota prodotto e codice.
+   - **Fascicolo regionale**: il tipo di documento si controllava anche sui nomi che ogni oggetto ha di suo («constructor», «toString»…). Ora valgono solo i tipi delle specifiche, nel servizio e nel simulatore.
+   - Due sospetti veri:
+     - il tipo delle voci dei presidi non si controllava all'importazione. Ora sì;
+     - il simulatore del Fascicolo teneva i token senza limite. Ora ne tiene al più 1000, e il token usato si cancella.
+   - Le ristampe della versione 1 «diverse da prima della #18»: vero solo in parte, perché prima non c'erano promemoria veri. Il testo di `docs/ricetta.md` ora lo dice.
+   - 10 sabotaggi.
+
+3. **Pazienti, registro degli accessi, transazioni e firma (D226–D230).**
+   - **«Registra» e «Non registrare» insieme, per lo stesso nuovo assistito da AURA, riuscivano tutti e due.** Ora «Registra» blocca la riga e la cambia solo se è ancora da decidere; «Non registrare» aspetta e riceve un rifiuto. «Non registrare» scrive il registro nella stessa transazione. La prova ferma «Registra» a metà con un cancello nel database.
+   - **Il pannello dell'invio taceva quando il servizio non rispondeva** (rete, pagina d'errore del proxy). Ora lo dice, nel controllo («Controlla di nuovo») e nella firma («non si sa se la ricetta è partita: ricarica la pagina»).
+   - **La lettura dei tipi (D228)** non seguiva le funzioni passate come argomento, per esempio a `onUserRow`. Ora le segue, e un guasto messo apposta lo prova.
+   - **Una ricetta accettata dal SAR restava «in invio»** se poi i dati del promemoria non si potevano fissare: l'NRE non si scriveva. Lo hanno sospettato due revisori. Ora l'NRE si scrive lo stesso, il promemoria non si stampa e il pannello lo dice. Al paziente bastano il numero di ricetta e il codice fiscale.
+   - 6 sabotaggi.
+
+4. **Dimostrazione nel browser (D221, D223–D225).**
+   - **«Ricomincia da capo» da una pagina interna** ricaricava quella pagina, dove la dimostrazione non trova il suo servizio, e non ripartiva. Ora torna all'indirizzo d'avvio.
+   - **Il codice del secondo fattore spariva** se il nome utente si scriveva con le maiuscole («Medico»). Il servizio lo legge in minuscolo; la dimostrazione ora fa lo stesso.
+   - **I tempi d'attesa nel browser**: il servizio staccava i suoi timer con `unref()`, che nel browser non c'è. Il controllo su AURA prima della ricetta, per esempio, non aspettava AURA, e la lettura di AURA andava avanti insieme ai controlli, nella sessione unica del database della dimostrazione. Ora c'è una funzione sola per i timer, che nel browser non fa nulla, e una prova controlla che il servizio non chiami `unref()` altrove.
+   - **Tre prove sarebbero rimaste verdi con il difetto**:
+     - il referto nel visore non era un PDF vero;
+     - la segreteria firmava la prima ricetta della coda, non quella preparata;
+     - il compenso della prestazione aggiuntiva non si controllava.
+       Ora il referto è un PDF disegnato davvero, la ricetta è quella del paziente, con chi l'ha preparata, e il compenso è quello del catalogo.
+   - **Accessibilità**: con Tab il fuoco usciva dal visore e dalla conferma, sui campi nascosti dietro. Ora la pagina dietro non si raggiunge (`inert`) e il fuoco gira dentro il riquadro, come nello schema dei dialoghi modali di WAI-ARIA. Il riquadro del secondo fattore annunciava a ogni secondo il conto alla rovescia: ora annuncia solo il codice.
+   - **Un cambio di pagina che non riesce** lasciava un errore non gestito (sospetto vero). Ora lo dice nella console.
+   - Trovati durante le correzioni, dello stesso genere:
+     - un documento che non arriva lasciava un errore non gestito e nessun riquadro. Ora lo dice il visore;
+     - una conferma aperta sopra un'altra lasciava la pagina dietro irraggiungibile. Ora la prima si chiude bene;
+     - una prova caduta a metà lasciava aperti visore o conferma, e le prove dopo cadevano tutte per lei. Ora i riquadri rimasti aperti si chiudono dopo ogni prova.
+   - 10 sabotaggi. Uno, al primo giro, non è stato rilevato: lanciata da sola, la prova del nome utente con le maiuscole entrava subito come «Medico», e il difetto non si vedeva. Ora entra prima come «medico» e poi come «Medico», e non dipende più dalle prove di prima. Due sabotaggi erano rossi per il motivo sbagliato: lanciate da sole, le prove non avevano l'accesso regionale con SPID e la ricetta non partiva comunque. Si sono ripetuti insieme alle prove che servono.
+
+**Non corretti, con il motivo:**
+
+- **Una ricetta ferma «in invio» dopo un arresto del servizio** fra la chiamata al SAR e la risposta. C'è dalla tappa 3: la ricetta resta «in invio» e dal programma non si chiude. Si potrebbe chiudere come la distinta delle PPIP, con l'esito chiesto al SAR, oppure con un controllo automatico verso il SAR quando l'adattatore vero ci sarà. È una domanda per la fermata.
+- **Quesito diagnostico oltre due righe** sul promemoria: si taglia con «…». Le specifiche di stampa danno al campo 21 lo spazio di due righe e non dicono che cosa fare di un testo più lungo. Il limite del SAR, secondo il revisore 1000 caratteri, non è verificato.
+- **Codice di autenticazione lungo** (campo 26): si rimpicciolisce fino a 6 punti e poi si taglia. Le specifiche non dicono quanto è lungo il codice del SAC; si vedrà con il primo codice vero.
+- **Caratteri fuori dall'alfabeto del carattere del PDF** (per esempio lettere greche) stampati come «?»: c'è da prima di questa revisione, e serve un carattere incorporato con più lettere.
+- **Prestazioni aggiuntive**:
+  - due prestazioni uguali lo stesso giorno non danno un avviso: la stessa voce può servire più volte;
+  - il CSV è la distinta intera del mese, anche con le righe già partite, ognuna con il suo stato;
+  - i numeri del simulatore ripartono a ogni avvio, ma valgono solo nelle prove;
+  - il revisore non ha riverificato la trascrizione dell'AIR sull'atto: resta da controllare da una seconda persona, come scritto in `docs/ppip.md`.
+- **Dimostrazione**:
+  - gli errori del servizio nel browser arrivati dopo l'avvio si ignorano. Non c'è un caso concreto, e fermare tutto a ogni errore farebbe fallire anche le richieste buone;
+  - un doppio clic su un documento lo apre due volte, come nel programma vero, che apre due schede;
+  - se la lettura di AURA prima della ricetta supera i 3 secondi di attesa, nella sessione unica della dimostrazione andrebbe ancora avanti insieme ai controlli. AURA simulata risponde da dentro la pagina; quanto ci mette non si è misurato.
+- **Il collega di gruppo che apre il Fascicolo regionale** del paziente: è giusto. D220 lo dà al medico sugli archivi dove ha un'autorizzazione, come al sostituto, ognuno con le sue credenziali RUPAR.
+- **La lettura dei tipi**: ora i passi già visti si contano per profondità, e questa parte non ha una prova sua.
+
+Prove: 34 nuove e una cambiata. In tutto 54 sabotaggi, ognuno rosso con il guasto e verde dopo il ripristino.

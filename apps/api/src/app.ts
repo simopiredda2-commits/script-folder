@@ -135,6 +135,8 @@ export interface AppDeps {
   reminderSender?: ReminderSender;
   /** Tempo massimo di attesa dell'invio delle ricette, in millisecondi (D94). */
   sendTimeoutMs?: number;
+  /** Solo per le prove: come si fissano i dati del promemoria all'invio (D232). */
+  buildPromemoria?: PrescriptionDeps['buildPromemoria'];
   /**
    * Gateway del Fascicolo e firma PAdES del medico (tappa 11). Per difetto i simulatori: il
    * simulatore rilascia i certificati del programma all'avvio, solo in memoria (regola 7).
@@ -196,6 +198,7 @@ export function buildApp({
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
   sendTimeoutMs,
+  buildPromemoria,
   fse = defaultFse(now),
   referenceUpdates = new ReferenceUpdates(db, null, now ? { now } : {}),
   loginSources,
@@ -423,6 +426,7 @@ export function buildApp({
       // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
       preSendChecks: withAuraRefresh(preSendChecks ?? createRulesCheck({ db, now, reference })),
       sendTimeoutMs,
+      ...(buildPromemoria ? { buildPromemoria } : {}),
       serviceCatalog: (date) => reference.serviceLookup(date),
     }),
     db,

@@ -136,6 +136,18 @@ const transcriptionSchema = z
      * versione intera si ricostruisce dalla versione della serie in vigore il giorno prima (D157).
      */
     solo_modifiche: z.boolean().default(false),
+    /**
+     * Dove vale l'atto, se non in tutta Italia: la regione dello studio, l'ASL del medico titolare
+     * dell'archivio (per esempio un accordo integrativo regionale o un accordo aziendale, D232).
+     * Si confrontano senza maiuscole, spazi e segni.
+     */
+    ambito: z
+      .object({ regione: z.string().min(1).optional(), asl: z.string().min(1).optional() })
+      .strict()
+      .refine((a) => a.regione !== undefined || a.asl !== undefined, {
+        message: 'un ambito dice la regione, l’ASL o tutte e due',
+      })
+      .optional(),
     nota: z.string().optional(),
   })
   .refine((t) => !t.solo_modifiche || t.serie !== undefined, {

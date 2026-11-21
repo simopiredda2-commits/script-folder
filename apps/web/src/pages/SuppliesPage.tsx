@@ -298,9 +298,17 @@ function SupplyForm({
   const groups = [...new Set(items.map((i) => i.gruppo))];
   const rare = annex ? catalog.malattieRare.filter((i) => i.allegato === annex) : [];
   const chosen = items.findIndex((i) => i.descrizione === f.prodotto && i.codice === f.codice);
+  // La voce vuota è «scrivi a mano»: prodotto e codice si svuotano, e non diventano quelli della
+  // prima voce (Number('') è 0). Un codice rimasto da un'altra voce sarebbe sbagliato (D232).
   const pick = (index: string) => {
-    const item = items[Number(index)];
-    if (item) setF((x) => ({ ...x, prodotto: item.descrizione, codice: item.codice }));
+    const item = index === '' ? undefined : items[Number(index)];
+    setF((x) =>
+      item
+        ? { ...x, prodotto: item.descrizione, codice: item.codice }
+        : chosen >= 0
+          ? { ...x, prodotto: '', codice: '' }
+          : x,
+    );
   };
 
   async function submit(e: FormEvent) {

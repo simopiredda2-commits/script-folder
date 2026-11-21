@@ -36,8 +36,12 @@ interface PpipRecord {
   stato: 'registrata' | 'annullata';
   motivoAnnullamento: string | null;
   inviata: boolean;
+  /** Sta partendo con la distinta del mese (D232). */
+  inInvio: boolean;
   protocolloInvio: string | null;
   registrataDa: string;
+  /** Registrata in un altro archivio, prima che il paziente cambiasse medico: è nella sua distinta. */
+  altroArchivio: string | null;
 }
 
 const failure = (e: unknown) =>
@@ -60,7 +64,7 @@ export const SECTION_LABEL = (sezione: string) =>
 export function PpipPage() {
   const { id } = useParams<{ id: string }>();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
-  const list = useApi<{ prestazioni: PpipRecord[]; puoScrivere: boolean }>(
+  const list = useApi<{ prestazioni: PpipRecord[]; puoScrivere: boolean; archivio: string }>(
     `/api/pazienti/${id}/ppip`,
   );
   const [saved, setSaved] = useState<string | null>(null);
@@ -87,7 +91,13 @@ export function PpipPage() {
         }
       />
       <PatientBanner patient={p} summary={record.data.riepilogo} />
-      {canWrite && <PpipForm patientId={id!} onSaved={() => refresh('Prestazione registrata.')} />}
+      {canWrite && list.data && (
+        <PpipForm
+          patientId={id!}
+          archiveId={list.data.archivio}
+          onSaved={() => refresh('Prestazione registrata.')}
+        />
+      )}
       {saved && <Notice kind="fatto">{saved}</Notice>}
       <section className="riquadro" aria-labelledby="titolo-ppip">
         <h2 id="titolo-ppip">Prestazioni registrate</h2>
@@ -161,15 +171,23 @@ function PpipItem({
             ? 'Annullata'
             : r.inviata
               ? `Inviata all’ASL${r.protocolloInvio ? ` (${r.protocolloInvio})` : ''}`
-              : 'Da inviare'}
+              : r.inInvio
+                ? 'In invio con la distinta'
+                : 'Da inviare'}
         </span>
         <span className="tenue">registrata da {r.registrataDa}</span>
       </p>
+      {r.altroArchivio && (
+        <p className="tenue">
+          Registrata nell’archivio «{r.altroArchivio}», prima che il paziente cambiasse medico: è
+          nella distinta di quell’archivio, e lì si annulla.
+        </p>
+      )}
       {r.note && <p className="tenue">Note: {r.note}</p>}
       {annulled && r.motivoAnnullamento && (
         <p className="tenue">Motivo dell’annullamento: {r.motivoAnnullamento}</p>
       )}
-      {canWrite && !annulled && !r.inviata && (
+      {canWrite && !annulled && !r.inviata && !r.inInvio && !r.altroArchivio && (
         <div className="azioni">
           <button
             type="button"
@@ -207,7 +225,15 @@ function PpipItem({
   );
 }
 
-function PpipForm({ patientId, onSaved }: { patientId: string; onSaved: () => void }) {
+function PpipForm({
+  patientId,
+  archiveId,
+  onSaved,
+}: {
+  patientId: string;
+  archiveId: string;
+  onSaved: () => void;
+}) {
   const today = studioToday();
   const empty = {
     data: today,
@@ -221,7 +247,8 @@ function PpipForm({ patientId, onSaved }: { patientId: string; onSaved: () => vo
   const [f, setF, resetF] = usePersistentState(`bozza-ppip-${patientId}`, empty);
   const catalog = useApi<{ data: string; voci: CatalogItem[] }>(
     /^\d{4}-\d{2}-\d{2}$/.test(f.data)
-      ? `/api/prestazioni-aggiuntive/catalogo?data=${f.data}`
+      ? // Con gli accordi della regione e dell'ASL dell'archivio (D232).
+        `/api/prestazioni-aggiuntive/catalogo?data=${f.data}&archivio=${archiveId}`
       : null,
   );
   const [busy, setBusy] = useState(false);

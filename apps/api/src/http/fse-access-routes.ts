@@ -1,5 +1,6 @@
 import {
   FSE_DOCUMENT_TYPES,
+  isFseDocumentType,
   SimulatedRegionalFseAccess,
   type RegionalFseAccess,
 } from '@mmg/integrations';
@@ -55,7 +56,7 @@ export function registerFseAccessRoutes(app: FastifyInstance, deps: FseAccessDep
     );
     const { tipoDocumento } = body.parse(req.body ?? {});
     const documentType = tipoDocumento || null;
-    if (documentType !== null && !(documentType in FSE_DOCUMENT_TYPES))
+    if (documentType !== null && !isFseDocumentType(documentType))
       throw new HttpError(400, 'Tipo di documento non previsto dalle specifiche del Fascicolo');
     if (!active)
       throw new HttpError(

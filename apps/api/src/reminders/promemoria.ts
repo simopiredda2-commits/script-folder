@@ -338,10 +338,11 @@ export async function buildPromemoriaData(
       };
     }
     const group = l.drugAic ? (groups.get(l.drugAic) ?? null) : null;
-    const product = l.drugAic && l.drugName ? `${l.drugAic} - ${l.drugName}` : l.drugName;
+    // AIC e nome; senza il nome, almeno l'AIC che è partito al SAR: mai una riga vuota (D232).
+    const product = [l.drugAic, l.drugName].filter(Boolean).join(' - ') || null;
     // 17: gruppo di equivalenza e nome commerciale; per principio attivo solo il gruppo.
     const prescrizione = l.byActiveIngredient
-      ? [group ?? l.activeIngredient ?? l.drugName ?? '']
+      ? [group ?? l.activeIngredient ?? l.drugName ?? l.drugAic ?? '']
       : [group, product ?? ''].filter((x): x is string => x !== null);
     return {
       prescrizione,

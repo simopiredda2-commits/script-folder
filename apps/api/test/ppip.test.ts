@@ -1,27 +1,20 @@
-import {
-  cpSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   SimulatedAdditionalServicesPortal,
   type AdditionalServicesResult,
 } from '@mmg/integrations';
-import { loadMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
+import { loadMappings } from '@mmg/reference';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Actor } from '../src/auth/service';
 import { accessLog, patient, ppipRecord } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
 import { buildExport } from '../src/export/export';
 import { DISTINTA_FIELDS, formatById, loadFormats } from '../src/ppip/formats';
 import { reportDeadline, sendMonth, totalOf } from '../src/ppip/service';
 import { importReferenceData } from '../src/reference/importer';
+import { importPpipCatalog } from './helpers/ppip';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -43,6 +36,7 @@ interface Riga {
   quantita: number;
   importo: number | null;
   inviata: boolean;
+  inInvioDal: string | null;
   protocolloInvio: string | null;
 }
 
@@ -92,25 +86,9 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
       { clockAt: new Date('2026-11-20T11:00:00Z'), ppipPortal: portal },
     );
     for (const who of Object.keys(cookies) as Who[]) cookies[who] = await login(s, who);
-    // Le trascrizioni del repository, con chi le ha controllate: senza, non entrano in uso (A8).
-    work = mkdtempSync(join(tmpdir(), 'mmg-ppip-'));
-    const syncDir = join(work, 'dati-pubblici');
-    mkdirSync(syncDir);
-    writeFileSync(join(syncDir, 'stato.json'), JSON.stringify({ versione: 1, file: {} }));
-    const dir = join(work, 'trascrizioni', 'ppip');
-    cpSync(join(REGIONAL_TRANSCRIPTIONS, 'ppip'), dir, { recursive: true });
-    for (const f of readdirSync(dir).filter((n) => n.endsWith('.json'))) {
-      const sheet = JSON.parse(readFileSync(join(dir, f), 'utf-8')) as Record<string, unknown>;
-      writeFileSync(join(dir, f), JSON.stringify({ ...sheet, controllato_da: 'Persona di prova' }));
-    }
-    const report = await importReferenceData({
-      db: t.db,
-      syncDir,
-      transcriptionsDir: join(work, 'trascrizioni'),
-      mappings: loadMappings(),
-      importedBy: 'prova',
-    });
-    expect(report.map((r) => r.outcome)).toEqual(['importato', 'importato']);
+    const imported = await importPpipCatalog(t.db);
+    work = imported.work;
+    expect(imported.outcomes).toEqual(['importato', 'importato']);
     const mine = await t.db
       .select()
       .from(patient)
@@ -263,9 +241,15 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
     ]);
     expect(d.daInviare).toBe(5);
     expect(d.puoInviare).toBe(true);
+    expect(d.invioAttivo).toBe(true);
     expect(d.invioSimulato).toBe(true);
+    expect(d.inInvio).toBeNull();
     // La segreteria la prepara e la legge; non la manda.
     expect((await distinta('segreteria')).json().puoInviare).toBe(false);
+    // Il sostituto registra le prestazioni ma non legge la distinta, come i riepiloghi (D232).
+    const substitute = await distinta('sostituto');
+    expect(substitute.statusCode).toBe(403);
+    expect(substitute.json().errore).toBe('Sostituzione: azione riservata al titolare');
     // Una riga del registro per paziente: la distinta ha i nomi.
     const logged = await t.db
       .select({ p: accessLog.patientId })
@@ -308,10 +292,21 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
   });
 
   it('invio: solo il titolare, solo un mese finito; poi le prestazioni non si annullano più qui', async () => {
-    const send = (who: Who, mese: string) =>
-      req(who, 'POST', `/api/archivi/${s.archives.titolare}/ppip/invio`, { mese });
+    // Le prestazioni da inviare che il titolare ha visto nella distinta (D232).
+    const seen = async (mese: string) =>
+      ((await distinta('titolare', mese)).json().righe as Riga[])
+        .filter((r) => !r.inviata && !r.inInvioDal)
+        .map((r) => r.id);
+    const send = async (who: Who, mese: string) =>
+      req(who, 'POST', `/api/archivi/${s.archives.titolare}/ppip/invio`, {
+        mese,
+        righe: await seen(mese),
+      });
     expect((await send('segreteria', '2026-10')).statusCode).toBe(403);
-    expect((await send('sostituto', '2026-10')).statusCode).toBe(403);
+    // Il no è per il ruolo, non per un'autorizzazione scaduta (D232).
+    const substitute = await send('sostituto', '2026-10');
+    expect(substitute.statusCode).toBe(403);
+    expect(substitute.json().errore).toBe('Sostituzione: azione riservata al titolare');
     expect((await send('titolare', '2026-11')).json().errore).toBe(
       'Il mese non è finito: la distinta si manda dal primo giorno del mese dopo',
     );
@@ -369,15 +364,22 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
   });
 
   it('con il simulatore, in produzione, la distinta non parte', async () => {
+    const actor = {
+      userId: s.users.titolare.id,
+      studioId: s.studioId,
+      roles: s.users.titolare.roles,
+      workstation: null,
+    } as unknown as Actor;
     await expect(
       sendMonth({
         db: t.db,
         portal,
         environment: 'produzione',
+        actor,
         archiveId: s.archives.titolare,
         month: '2026-09',
+        seen: [],
         today: '2026-11-20',
-        userId: s.users.titolare.id,
         at: new Date('2026-11-20T11:00:00Z'),
       }),
     ).rejects.toThrow(/non è ancora collegato/);
@@ -404,31 +406,71 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
     expect(counted.length).toBeGreaterThanOrEqual(8);
   });
 
-  it('un accordo aziendale nuovo è un file da importare: vale dalla sua data, il passato resta', async () => {
-    // Accordo dell'ASL inventato, in vigore dal 1/11/2026: A1 pagata di più e una voce sua.
+  it('un accordo aziendale nuovo è un file da importare: vale dalla sua data e solo nella sua ASL', async () => {
+    // Accordi inventati. Quello dell'ASL del titolare vale dal 1/11/2026: A1 pagata di più e una
+    // voce sua. Quello di un'altra ASL vale per i suoi medici e basta (D232). Un terzo, della
+    // stessa ASL e con la data dell'ACN, vince sull'ACN perché è più vicino.
     const dir = join(work, 'trascrizioni-asl', 'ppip');
     mkdirSync(dir, { recursive: true });
+    const sheet = (serie: string, atto: string, from: string, asl: string) => ({
+      tipo: 'prestazioni_aggiuntive',
+      serie,
+      fonte: null,
+      chiave: null,
+      sha256_origine: null,
+      atto,
+      in_vigore_dal: from,
+      ambito: { regione: 'Piemonte', asl },
+      trascritto_da: 'Persona di prova',
+      trascritto_il: '2026-11-20',
+      controllato_da: 'Seconda persona di prova',
+    });
+    const header = 'codice;sezione;descrizione;autorizzazione;compenso;note\n';
     writeFileSync(
       join(dir, 'asl-di-prova-2026.json'),
-      JSON.stringify({
-        tipo: 'prestazioni_aggiuntive',
-        serie: 'asl-di-prova-prestazioni-aggiuntive',
-        fonte: null,
-        chiave: null,
-        sha256_origine: null,
-        atto: 'Accordo aziendale di prova',
-        in_vigore_dal: '2026-11-01',
-        trascritto_da: 'Persona di prova',
-        trascritto_il: '2026-11-20',
-        controllato_da: 'Seconda persona di prova',
-      }),
+      // Come nel profilo dei medici dello scenario, scritto in un altro modo.
+      JSON.stringify(
+        sheet(
+          'asl-di-prova-prestazioni-aggiuntive',
+          'Accordo aziendale di prova',
+          '2026-11-01',
+          'asl DI-prova',
+        ),
+      ),
     );
     writeFileSync(
       join(dir, 'asl-di-prova-2026.csv'),
-      'codice;sezione;descrizione;autorizzazione;compenso;note\n' +
+      header +
         'A1;A;Prima medicazione;no;15,00;\n' +
         'ASL1;C;Prestazione di prova dell’accordo aziendale;no;10,00;\n',
     );
+    writeFileSync(
+      join(dir, 'asl-altra-2026.json'),
+      JSON.stringify(
+        sheet(
+          'asl-altra-prestazioni-aggiuntive',
+          'Accordo di un’altra ASL',
+          '2026-11-01',
+          'ASL di un’altra zona',
+        ),
+      ),
+    );
+    writeFileSync(
+      join(dir, 'asl-altra-2026.csv'),
+      header + 'A1;A;Prima medicazione;no;20,00;\n' + 'ALT1;C;Voce di un’altra ASL;no;8,00;\n',
+    );
+    writeFileSync(
+      join(dir, 'asl-di-prova-gennaio.json'),
+      JSON.stringify(
+        sheet(
+          'asl-di-prova-gennaio',
+          'Accordo aziendale di prova di gennaio',
+          '2026-01-15',
+          'ASL di prova',
+        ),
+      ),
+    );
+    writeFileSync(join(dir, 'asl-di-prova-gennaio.csv'), header + 'A2;A;Seconda voce;no;9,99;\n');
     const report = await importReferenceData({
       db: t.db,
       syncDir: join(work, 'dati-pubblici'),
@@ -436,21 +478,63 @@ describe('prestazioni aggiuntive (PPIP, D212)', () => {
       mappings: loadMappings(),
       importedBy: 'prova',
     });
-    expect(report.map((r) => r.outcome)).toEqual(['importato']);
+    expect(report.map((r) => r.outcome)).toEqual(['importato', 'importato', 'importato']);
     const at = async (data: string) =>
-      (await req('titolare', 'GET', `/api/prestazioni-aggiuntive/catalogo?data=${data}`)).json()
-        .voci as Voce[];
+      (
+        await req(
+          'titolare',
+          'GET',
+          `/api/prestazioni-aggiuntive/catalogo?data=${data}&archivio=${s.archives.titolare}`,
+        )
+      ).json().voci as Voce[];
     const before = await at('2026-10-31');
     expect(before.find((v) => v.codice === 'A1')?.compenso).toBe(12.32);
     expect(before.some((v) => v.codice === 'ASL1')).toBe(false);
+    // Stessa data dell'ACN: vale l'accordo dell'ASL, non l'ordine delle righe.
+    expect(before.find((v) => v.codice === 'A2')?.compenso).toBe(9.99);
+    // Nemmeno un atto di tutta Italia con la stessa data, importato dopo, lo cambia: vale il più
+    // vicino, poi l'ultimo importato.
+    const later = join(work, 'trascrizioni-nazionali', 'ppip');
+    mkdirSync(later, { recursive: true });
+    writeFileSync(
+      join(later, 'nazionale-di-prova.json'),
+      JSON.stringify({
+        ...sheet('nazionale-di-prova', 'Atto nazionale di prova', '2026-01-15', 'x'),
+        ambito: undefined,
+      }),
+    );
+    writeFileSync(join(later, 'nazionale-di-prova.csv'), header + 'A2;A;Seconda voce;no;1,00;\n');
+    expect(
+      (
+        await importReferenceData({
+          db: t.db,
+          syncDir: join(work, 'dati-pubblici'),
+          transcriptionsDir: join(work, 'trascrizioni-nazionali'),
+          mappings: loadMappings(),
+          importedBy: 'prova',
+        })
+      ).map((r) => r.outcome),
+    ).toEqual(['importato']);
+    expect((await at('2026-10-31')).find((v) => v.codice === 'A2')?.compenso).toBe(9.99);
     const after = await at('2026-11-10');
     expect(after.find((v) => v.codice === 'A1')?.compenso).toBe(15);
     expect(after.filter((v) => v.codice === 'A1')).toHaveLength(1);
     expect(after.map((v) => v.codice).slice(-2)).toEqual(['AIR35.4', 'ASL1']);
+    expect(after.some((v) => v.codice === 'ALT1')).toBe(false);
+    // Senza l'archivio, gli accordi delle ASL non valgono: solo l'Italia e la regione dello studio.
+    const studioOnly = (
+      await req('segreteria', 'GET', '/api/prestazioni-aggiuntive/catalogo?data=2026-11-10')
+    ).json().voci as Voce[];
+    expect(studioOnly.find((v) => v.codice === 'A1')?.compenso).toBe(12.32);
+    expect(studioOnly.map((v) => v.codice)).toContain('AIR35.4');
     // Registrata dopo, la prima medicazione ha il compenso nuovo; quella di ottobre resta com'era.
     expect(
       (await register('titolare', pt.id, { codice: 'A1', data: '2026-11-10' })).statusCode,
     ).toBe(201);
+    // La voce dell'altra ASL non c'è per questo archivio.
+    expect(
+      (await register('titolare', pt.id, { codice: 'ALT1', data: '2026-11-10' })).statusCode,
+    ).toBe(400);
     const list = (await req('titolare', 'GET', `/api/pazienti/${pt.id}/ppip`)).json()
       .prestazioni as { codice: string; data: string; compensoUnitario: number }[];
     expect(list.filter((p) => p.codice === 'A1').map((p) => [p.data, p.compensoUnitario])).toEqual([

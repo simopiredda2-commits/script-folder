@@ -134,6 +134,30 @@ async function placed(bytes: Uint8Array) {
   return items;
 }
 
+/** Le scritte con la posizione in millimetri (sinistra, destra, dall'alto) e la misura in punti. */
+async function measured(bytes: Uint8Array) {
+  const task = getDocument({ data: new Uint8Array(bytes), useSystemFonts: false });
+  const doc = await task.promise;
+  const page = await doc.getPage(1);
+  const height = page.view[3]!;
+  const mm = (pt: number) => (pt * 25.4) / 72;
+  const items = (await page.getTextContent()).items.flatMap((it) =>
+    'str' in it && it.str.trim()
+      ? [
+          {
+            text: it.str,
+            left: mm(it.transform[4]),
+            right: mm(it.transform[4]! + it.width),
+            top: mm(height - it.transform[5]!),
+            size: Math.abs(it.transform[0]),
+          },
+        ]
+      : [],
+  );
+  await task.destroy();
+  return items;
+}
+
 /** Larghezza e altezza della prima pagina, in millimetri. */
 async function pageMm(bytes: Uint8Array) {
   const { width, height } = (await PDFDocument.load(bytes)).getPage(0).getSize();
@@ -195,6 +219,57 @@ describe('promemoria: versioni del modello (D217)', () => {
       expect(a, label).toBeDefined();
       expect(b!.top, label).toBeCloseTo(a!.top, 3);
     }
+  });
+
+  it('campo 22: il numero intero, a 8 punti, fino a tre cifre, prima del tipo ricetta (D232)', async () => {
+    for (const n of [3, 12, 990]) {
+      const items = await measured(
+        await renderPromemoria({ ...v2, numeroConfezioniPrestazioni: n }),
+      );
+      const label = items.find((x) => x.text === 'N.CONFEZIONI/PRESTAZIONI:')!;
+      const value = items.find((x) => x.text === String(n) && Math.abs(x.top - label.top) < 0.5);
+      expect(value, String(n)).toBeDefined();
+      expect(value!.size).toBeCloseTo(8, 1);
+      const next = items.find((x) => x.text === 'TIPO RICETTA:')!;
+      expect(value!.right).toBeLessThan(next.left);
+      expect(items.some((x) => x.text.includes('…') && Math.abs(x.top - label.top) < 0.5)).toBe(
+        false,
+      );
+    }
+  });
+
+  it('area delle prescrizioni piena: nessuna prescrizione sparisce, i testi lunghi finiscono con «…» (D232)', async () => {
+    const long = (i: number) =>
+      `ANALISI GENETICA DI PROVA NUMERO ${i} ` +
+      'PER LA RICERCA DI VARIANTI NEI GENI DI UN PANNELLO INVENTATO PER LA PROVA, CON SEQUENZIAMENTO E CONFERMA, ' +
+      'COMPRESA LA CONSULENZA E LA RELAZIONE CONCLUSIVA DEL LABORATORIO DI PROVA, SU CAMPIONE DI SANGUE';
+    const items = await measured(
+      await renderPromemoria({
+        ...v2,
+        tipo: 'specialist_ssn',
+        validitaGiorni: SPECIALIST_VALIDITY_DAYS,
+        righe: Array.from({ length: 10 }, (_, i) => ({
+          prescrizione: [`9${i}.12.3 (9${i}.12.3_${i}) – ${long(i)}`],
+          dettagli: ACCESS_TEXT_2024.subsequent,
+          quantita: 1,
+          nota: NO_NOTE,
+        })),
+        numeroConfezioniPrestazioni: 10,
+      }),
+    );
+    const head = items.find((x) => x.text.startsWith('PRESCRIZIONE VALIDA'))!;
+    const diagnosis = items.find((x) => x.text === 'QUESITO DIAGNOSTICO:')!;
+    const area = items.filter((x) => x.top > head.top && x.top < diagnosis.top);
+    for (let i = 0; i < 10; i++)
+      expect(
+        area.some((x) => x.text.startsWith(`9${i}.12.3 (9${i}.12.3_${i})`)),
+        `riga ${i + 1}`,
+      ).toBe(true);
+    expect(area.filter((x) => x.text === ACCESS_TEXT_2024.subsequent)).toHaveLength(10);
+    // Quantità e nota di ogni riga dentro l'area, sopra il quesito.
+    expect(area.filter((x) => x.text === NO_NOTE)).toHaveLength(10);
+    expect(area.some((x) => x.text.endsWith('…'))).toBe(true);
+    expect(Math.max(...area.map((x) => x.top))).toBeLessThan(diagnosis.top - 2);
   });
 
   it('carta: A5 orizzontale per difetto, con tutto il modello dentro la pagina (D222)', async () => {

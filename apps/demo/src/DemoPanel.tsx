@@ -1,3 +1,4 @@
+import { START_URL } from './start';
 import { useEffect, useRef, useState } from 'react';
 import { secondFactorCode, type Ready } from './bridge';
 
@@ -127,26 +128,34 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           dell’accesso.
         </p>
       </section>
-      <section aria-labelledby="dimo-codice" aria-live="polite">
+      <section aria-labelledby="dimo-codice">
         <h3 id="dimo-codice">Secondo fattore</h3>
-        {code ? (
-          <p>
-            Codice per <code>{code.username}</code>:{' '}
-            <strong className="dimo-codice">{group(code.code)}</strong>{' '}
-            <span className="dimo-tenue">(cambia fra {code.secondsLeft} s)</span>
-          </p>
-        ) : (
-          <p className="dimo-tenue">
-            Dopo la password il programma chiede di collegare un’app di autenticazione: qui
-            comparirà il codice che l’app mostrerebbe.
-          </p>
-        )}
+        {/* Si annuncia il codice quando cambia, non il conto alla rovescia di ogni secondo (D232). */}
+        <p aria-live="polite" className={code ? undefined : 'dimo-tenue'}>
+          {code ? (
+            <>
+              Codice per <code>{code.username}</code>:{' '}
+              <strong className="dimo-codice">{group(code.code)}</strong>
+            </>
+          ) : (
+            <>
+              Dopo la password il programma chiede di collegare un’app di autenticazione: qui
+              comparirà il codice che l’app mostrerebbe.
+            </>
+          )}
+        </p>
+        {code && <p className="dimo-tenue">Cambia fra {code.secondsLeft} s.</p>}
       </section>
       <p className="dimo-tenue">
-        Si riparte da capo ricaricando la pagina. I PDF si aprono in un visore qui dentro; stampa e
-        download non sono attivi nella dimostrazione.
+        Si riparte da capo con «Ricomincia da capo». I PDF si aprono in un visore qui dentro; stampa
+        e download non sono attivi nella dimostrazione.
       </p>
-      <button type="button" className="dimo-ricomincia" onClick={() => location.reload()}>
+      <button
+        type="button"
+        className="dimo-ricomincia"
+        // All'indirizzo d'avvio: da una pagina interna il Worker non si troverebbe (D232).
+        onClick={() => location.replace(START_URL)}
+      >
         Ricomincia da capo
       </button>
     </aside>

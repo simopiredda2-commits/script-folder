@@ -388,6 +388,76 @@ describe('AURA: nuovi assistiti (D199)', () => {
     );
   });
 
+  it('«Registra» e «Non registrare» insieme: «Non registrare» aspetta e trova l’assistito registrato (D232)', async () => {
+    const { p, candidateId } = await chooses('r');
+    const monitor = new pg.Client({ connectionString: t.url });
+    await monitor.connect();
+    // Un cancello all'ingresso del paziente: «Registra» ha già letto l'assistito e si ferma lì.
+    const GATE = 4620232;
+    const code = p.fiscalCode.replace(/[^A-Z0-9]/g, '');
+    const waiting = async (kind: 'advisory' | 'any') =>
+      (
+        await monitor.query<{ n: number }>(
+          kind === 'advisory'
+            ? `select count(*)::int as n from pg_locks where locktype = 'advisory' and not granted and objid = ${GATE} and database = (select oid from pg_database where datname = current_database())`
+            : `select count(*)::int as n from pg_locks where not granted and locktype <> 'advisory' and (database is null or database = (select oid from pg_database where datname = current_database()))`,
+        )
+      ).rows[0]!.n;
+    try {
+      await monitor.query('select pg_advisory_lock($1)', [GATE]);
+      await monitor.query(
+        `create function cancello_registra() returns trigger language plpgsql as $$ begin
+           perform pg_advisory_xact_lock_shared(${GATE});
+           return new;
+         end $$`,
+      );
+      await monitor.query(
+        `create trigger cancello_registra before insert on patient for each row
+           when (new.fiscal_code = '${code}') execute function cancello_registra()`,
+      );
+      const registering = post(`/api/aura/nuovi/${candidateId}/registra`, 'titolare');
+      await until(async () => (await waiting('advisory')) === 1);
+      let refusedAt = 0;
+      const refusing = post(`/api/aura/nuovi/${candidateId}/non-registrare`, 'segreteria').then(
+        (r) => {
+          refusedAt = Date.now();
+          return r;
+        },
+      );
+      // «Non registrare» resta fermo sulla riga dell'assistito, finché «Registra» non finisce.
+      await until(async () => (await waiting('any')) >= 1);
+      await new Promise((r) => setTimeout(r, 200));
+      expect(refusedAt).toBe(0);
+      await monitor.query('select pg_advisory_unlock($1)', [GATE]);
+      const [registered, refused] = await Promise.all([registering, refusing]);
+      expect(registered.statusCode, registered.body).toBe(201);
+      expect(refused.statusCode, refused.body).toBe(409);
+      expect(refused.json().errore).toBe('Non è più fra i nuovi assistiti: ricarica la pagina');
+    } finally {
+      await monitor.query('select pg_advisory_unlock_all()');
+      await monitor.query('drop trigger if exists cancello_registra on patient');
+      await monitor.query('drop function if exists cancello_registra()');
+      await monitor.end();
+    }
+    const [c] = await t.db.select().from(auraNewPatient).where(eq(auraNewPatient.id, candidateId));
+    expect(c!.status).toBe('registrato');
+    // Nel registro nessun «non registrato» riuscito per questo assistito.
+    const logged = await t.db
+      .select()
+      .from(accessLog)
+      .where(
+        and(
+          eq(accessLog.action, 'nuovo_assistito_non_registrato'),
+          eq(accessLog.outcome, 'riuscito'),
+        ),
+      );
+    expect(
+      logged.filter(
+        (l) => (l.details as { nuovoAssistito?: string }).nuovoAssistito === candidateId,
+      ),
+    ).toEqual([]);
+  });
+
   it('registrato a mano nel frattempo: «Registra» lo dice con il paziente, e l’assistito esce dall’elenco', async () => {
     const { p, candidateId } = await chooses('k');
     const manual = await post('/api/pazienti', 'titolare', {

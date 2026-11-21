@@ -396,14 +396,16 @@ async function renderPromemoria2024(d: PromemoriaDataV2, paper: PaperSize): Prom
   const diagnosisEnd = s.text('QUESITO DIAGNOSTICO:', M.left, ROW.diagnosis, { size: LABEL });
   if (d.quesitoDiagnostico)
     s.fitted(d.quesitoDiagnostico, diagnosisEnd + 1.2, ROW.diagnosis, M.right, 2, 3.2);
+  // Campo 22: il numero intero a 8 punti fino a tre cifre (10 righe da 99), e il campo 23 subito
+  // dopo, come nel facsimile nr. 0 («N.CONFEZIONI/PRESTAZIONI: 22 TIPO RICETTA: 23», D232).
   s.field(
     'N.CONFEZIONI/PRESTAZIONI:',
     String(d.numeroConfezioniPrestazioni),
     M.left,
     ROW.totals,
-    46,
+    50,
   );
-  s.field('TIPO RICETTA:', d.tipoRicetta, 47, ROW.totals, 86);
+  s.field('TIPO RICETTA:', d.tipoRicetta, 51, ROW.totals, 86);
   s.field('DATA:', ddmmyyyy(d.data), 87, ROW.totals, 126);
   s.field('CODICE FISCALE DEL MEDICO:', d.medico.codiceFiscale, 127, ROW.totals, M.right);
   s.field('CODICE AUTENTICAZIONE:', d.codiceAutenticazione, M.left, ROW.auth, 86);
@@ -427,7 +429,9 @@ function doctorName(d: PromemoriaDataV2) {
 
 /**
  * Area delle prescrizioni (2.1): si disegnano solo le righe usate, l'area resta grande quanto nel
- * facsimile nr. 0. Se le righe non ci stanno, il carattere si rimpicciolisce fino a MIN_SIZE.
+ * facsimile nr. 0. Se le righe non ci stanno, il carattere si rimpicciolisce fino a MIN_SIZE; se
+ * non bastasse, si accorciano i testi più lunghi, con «…» dove il testo continua: ogni
+ * prescrizione resta sul promemoria, con il suo codice, la quantità e la nota (D232).
  */
 function prescriptionTable(s: Sheet, d: PromemoriaDataV2) {
   const font = s.fonts.regular;
@@ -445,12 +449,20 @@ function prescriptionTable(s: Sheet, d: PromemoriaDataV2) {
 
   const textWidth = (M.qty - M.left - 3) * MM;
   const pad = 0.6;
-  const layout = (size: number) => {
+  /** Le righe di un testo, al più `max`: l'ultima tenuta finisce con «…» se il testo continua. */
+  const capped = (text: string, size: number, max: number) => {
+    const lines = wrap(font, text, size, textWidth);
+    if (lines.length <= max) return lines;
+    const kept = lines.slice(0, max);
+    kept[max - 1] = clip(font, `${kept[max - 1]} ${lines[max]}`, size, textWidth);
+    return kept;
+  };
+  const layout = (size: number, max = Infinity) => {
     const line = (size * 1.15) / MM;
     const rows = d.righe.map((r) => {
       const lines = [
-        ...r.prescrizione.flatMap((p) => wrap(font, p, size, textWidth)),
-        ...(r.dettagli ? wrap(font, r.dettagli, size, textWidth) : []),
+        ...r.prescrizione.flatMap((p) => capped(p, size, max)),
+        ...(r.dettagli ? capped(r.dettagli, size, max) : []),
       ];
       return { r, lines, height: lines.length * line + 2 * pad };
     });
@@ -465,6 +477,9 @@ function prescriptionTable(s: Sheet, d: PromemoriaDataV2) {
     size -= 0.25;
     plan = layout(size);
   }
+  // Ancora troppo lungo a MIN_SIZE: ogni testo al più `max` righe, finché tutto ci sta.
+  const longest = Math.max(1, ...plan.rows.map((x) => x.lines.length));
+  for (let max = longest - 1; plan.total > room && max >= 1; max--) plan = layout(size, max);
   let y: number = ROW.tableHead;
   for (const { r, lines, height } of plan.rows) {
     const bottom = Math.min(y + height, ROW.tableBottom);

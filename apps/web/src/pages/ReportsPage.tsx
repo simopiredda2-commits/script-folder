@@ -335,10 +335,7 @@ export function ReportsPage() {
               </div>
             )}
           </section>
-          <p className="aiuto">
-            PPIP e fatture non ci sono ancora: servono le regole del Piemonte per le prestazioni di
-            particolare impegno professionale e la fattura delle prestazioni private.
-          </p>
+          <p className="aiuto">Le fatture delle prestazioni private non ci sono ancora.</p>
         </>
       )}
     </>

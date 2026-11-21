@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
+import { parseMonth } from '../src/pages/PpipReportPage';
 
 type Handler = (method: string, body: unknown, search: string) => { status: number; body: unknown };
 
@@ -109,8 +110,10 @@ const record = (over: Record<string, unknown>) => ({
   stato: 'registrata',
   motivoAnnullamento: null,
   inviata: false,
+  inInvio: false,
   protocolloInvio: null,
   registrataDa: 'Dott.ssa Titolare Inventata',
+  altroArchivio: null,
   ...over,
 });
 
@@ -134,6 +137,7 @@ describe('prestazioni aggiuntive in cartella (D212)', () => {
               status: 200,
               body: {
                 puoScrivere: true,
+                archivio: 'a1',
                 prestazioni: [
                   record({}),
                   record({
@@ -155,6 +159,10 @@ describe('prestazioni aggiuntive in cartella (D212)', () => {
     render(<App />);
     const select = await screen.findByLabelText('Prestazione');
     await within(select).findByRole('option', { name: /A1 · Prima medicazione/ });
+    // Il catalogo con gli accordi della regione e dell'ASL dell'archivio (D232).
+    expect(calls.find((c) => c.path === '/api/prestazioni-aggiuntive/catalogo')?.search).toMatch(
+      /(^|&)archivio=a1(&|$)/,
+    );
     expect([...select.querySelectorAll('optgroup')].map((g) => g.getAttribute('label'))).toEqual([
       'A · eseguibili senza autorizzazione',
       'B · eseguibili con autorizzazione sanitaria',
@@ -189,6 +197,34 @@ describe('prestazioni aggiuntive in cartella (D212)', () => {
     expect(within(list).getByText('Da inviare')).toBeTruthy();
     expect(within(list).getByText('Inviata all’ASL (SIM-PPIP-2026-10-0001)')).toBeTruthy();
     expect(within(list).getAllByRole('button', { name: /^Annulla/ })).toHaveLength(1);
+  });
+
+  it('una prestazione di un altro archivio o in invio si legge e basta (D232)', async () => {
+    stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/oggi': ok({ data: '2026-11-20', appuntamenti: [], code: { daFirmare: 0 } }),
+      '/api/pazienti/p1': ok(PATIENT),
+      '/api/pazienti/p1/ppip': ok({
+        puoScrivere: true,
+        archivio: 'a1',
+        prestazioni: [
+          record({ id: 'r1', altroArchivio: 'Archivio della dottoressa di prima' }),
+          record({ id: 'r2', codice: 'A3', descrizione: 'Rimozione di punti', inInvio: true }),
+          record({ id: 'r3', codice: 'A4', descrizione: 'Cateterismo uretrale' }),
+        ],
+      }),
+      '/api/prestazioni-aggiuntive/catalogo': ok(CATALOG),
+    });
+    window.history.pushState({}, '', '/pazienti/p1/prestazioni-aggiuntive');
+    render(<App />);
+    const list = (await screen.findByRole('heading', { name: 'Prestazioni registrate' }))
+      .parentElement!;
+    await within(list).findByText(/Registrata nell’archivio «Archivio della dottoressa di prima»/);
+    expect(within(list).getByText('In invio con la distinta')).toBeTruthy();
+    // Si annulla solo la terza: le altre sono nella distinta di un altro archivio o partono.
+    const buttons = within(list).getAllByRole('button', { name: /^Annulla/ });
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0]!.textContent).toMatch(/A4/);
   });
 
   it('senza catalogo in vigore lo dice, con simbolo e parola', async () => {
@@ -227,6 +263,8 @@ const DISTINTA = (puoInviare: boolean, daInviare = 2) => ({
       autorizzazione: null,
       importo: 12.32,
       inviata: false,
+      inInvioDal: null,
+      pazienteNellArchivio: true,
       protocolloInvio: null,
     },
     {
@@ -244,6 +282,8 @@ const DISTINTA = (puoInviare: boolean, daInviare = 2) => ({
       autorizzazione: 'Distretto n. 12',
       importo: 18.48,
       inviata: false,
+      inInvioDal: null,
+      pazienteNellArchivio: true,
       protocolloInvio: null,
     },
   ],
@@ -258,8 +298,11 @@ const DISTINTA = (puoInviare: boolean, daInviare = 2) => ({
   ],
   totale: 30.8,
   daInviare,
-  invii: [],
+  inInvio: null as { dal: string; interrotto: boolean; righe: number } | null,
+  invii: [] as unknown[],
   puoInviare,
+  puoAnnullare: true,
+  invioAttivo: true,
   invioSimulato: true,
   formati: [
     {
@@ -321,8 +364,10 @@ describe('distinta del mese nell’archivio (D212)', () => {
     expect((send as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(send);
     await screen.findByText('Distinta inviata: 2 prestazioni, protocollo SIM-PPIP-2026-10-0001.');
+    // Partono le prestazioni che il titolare ha visto (D232).
     expect(calls.find((c) => c.path === '/api/archivi/a1/ppip/invio')?.body).toEqual({
       mese: '2026-10',
+      righe: ['r1', 'r2'],
     });
     await waitFor(() => expect(screen.queryByRole('button', { name: /Invia all’ASL/ })).toBeNull());
   });
@@ -339,5 +384,115 @@ describe('distinta del mese nell’archivio (D212)', () => {
     await screen.findByText('La distinta la manda il medico titolare dell’archivio.');
     expect(screen.getByRole('link', { name: 'Scarica la distinta in CSV' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Invia all’ASL/ })).toBeNull();
+  });
+
+  it('senza l’invio dal programma: la distinta consegnata a mano si segna, con le righe viste (D232)', async () => {
+    const calls = stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/oggi': ok({ data: '2026-11-20', appuntamenti: [], code: { daFirmare: 0 } }),
+      '/api/ppip/archivi': ok({ archivi: [{ id: 'a1', nome: 'Archivio di prova' }] }),
+      '/api/archivi/a1/ppip': ok({ ...DISTINTA(true), invioAttivo: false, invioSimulato: true }),
+      '/api/archivi/a1/ppip/consegna': ok({ righe: 2, totale: 30.8 }),
+    });
+    window.history.pushState({}, '', '/archivio/prestazioni-aggiuntive?mese=2026-10');
+    render(<App />);
+    await screen.findByText(/L’invio dal programma non è ancora collegato/);
+    expect(screen.queryByRole('button', { name: /Invia all’ASL/ })).toBeNull();
+    expect(screen.queryByText(/Invio simulato/)).toBeNull();
+    fireEvent.click(screen.getByText('Consegnata all’ASL fuori dal programma'));
+    const mark = screen.getByRole('button', { name: 'Segna come consegnate 2 prestazioni' });
+    expect((mark as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(
+      screen.getByLabelText('Ho consegnato all’ASL la distinta con queste prestazioni'),
+    );
+    fireEvent.change(screen.getByLabelText('Riferimento della consegna (facoltativo)'), {
+      target: { value: 'Caricata il 20/11' },
+    });
+    fireEvent.click(mark);
+    await screen.findByText('Distinta segnata come consegnata all’ASL: 2 prestazioni.');
+    expect(calls.find((c) => c.path === '/api/archivi/a1/ppip/consegna')?.body).toEqual({
+      mese: '2026-10',
+      righe: ['r1', 'r2'],
+      riferimento: 'Caricata il 20/11',
+    });
+  });
+
+  it('un invio rimasto senza risposta: si dice, e il titolare segna l’esito chiesto all’ASL', async () => {
+    const base = DISTINTA(true, 0);
+    const calls = stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/oggi': ok({ data: '2026-11-20', appuntamenti: [], code: { daFirmare: 0 } }),
+      '/api/ppip/archivi': ok({ archivi: [{ id: 'a1', nome: 'Archivio di prova' }] }),
+      '/api/archivi/a1/ppip': ok({
+        ...base,
+        righe: base.righe.map((r) => ({ ...r, inInvioDal: '2026-11-20T09:00:00.000Z' })),
+        inInvio: { dal: '2026-11-20T09:00:00.000Z', interrotto: true, righe: 2 },
+      }),
+      '/api/archivi/a1/ppip/esito': ok({ righe: 2, esito: 'non_arrivata' }),
+    });
+    window.history.pushState({}, '', '/archivio/prestazioni-aggiuntive?mese=2026-10');
+    render(<App />);
+    await screen.findByText(/è rimasto senza risposta: le 2 prestazioni restano «in invio»/);
+    expect(screen.getAllByText('In invio')).toHaveLength(2);
+    // Mentre una prestazione parte non si annulla, nemmeno dalla distinta.
+    expect(screen.queryByRole('button', { name: /^Annulla/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Non è arrivata: torna da inviare' }));
+    await screen.findByText(
+      /Segnato: la distinta non è arrivata\. 2 prestazioni tornano da inviare\./,
+    );
+    expect(calls.find((c) => c.path === '/api/archivi/a1/ppip/esito')?.body).toEqual({
+      mese: '2026-10',
+      esito: 'non_arrivata',
+    });
+  });
+
+  it('dalla distinta: annullamento con il motivo; il paziente passato a un altro medico senza collegamento', async () => {
+    const base = DISTINTA(true);
+    const calls = stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/oggi': ok({ data: '2026-11-20', appuntamenti: [], code: { daFirmare: 0 } }),
+      '/api/ppip/archivi': ok({ archivi: [{ id: 'a1', nome: 'Archivio di prova' }] }),
+      '/api/archivi/a1/ppip': ok({
+        ...base,
+        righe: [
+          { ...base.righe[0]!, pazienteNellArchivio: false, indirizzo: null },
+          base.righe[1]!,
+        ],
+      }),
+      '/api/archivi/a1/ppip/r1/annulla': ok({ id: 'r1', stato: 'annullata' }),
+    });
+    window.history.pushState({}, '', '/archivio/prestazioni-aggiuntive?mese=2026-10');
+    render(<App />);
+    const table = await screen.findByRole('table', {
+      name: 'Distinta di ottobre 2026, una riga per prestazione',
+    });
+    const [, first, second] = within(table).getAllByRole('row');
+    expect(within(first!).queryByRole('link')).toBeNull();
+    expect(within(first!).getByText('(ora assistito di un altro medico)')).toBeTruthy();
+    expect(within(second!).getByRole('link', { name: 'Rota Lina' })).toBeTruthy();
+    // L'indirizzo che manca si dice prima di mandare (comma 4).
+    expect(
+      screen.getByText(/1 prestazione da inviare non ha l’indirizzo dell’assistito/),
+    ).toBeTruthy();
+    fireEvent.click(within(first!).getByRole('button', { name: /Annulla A1 di Rota Lina/ }));
+    fireEvent.change(within(first!).getByLabelText('Motivo dell’annullamento'), {
+      target: { value: 'Registrata due volte' },
+    });
+    fireEvent.click(within(first!).getByRole('button', { name: 'Conferma l’annullamento' }));
+    await screen.findByText('Prestazione A1 di Rota Lina annullata.');
+    expect(calls.find((c) => c.path === '/api/archivi/a1/ppip/r1/annulla')?.body).toEqual({
+      motivo: 'Registrata due volte',
+    });
+  });
+
+  it('il mese scritto a mano come MM/AAAA, dove il browser non ha il selettore del mese', () => {
+    // Safari e Firefox da computer mostrano il campo del mese come testo libero.
+    expect(parseMonth('2026-10')).toBe('2026-10');
+    expect(parseMonth('10/2026')).toBe('2026-10');
+    expect(parseMonth(' 9/2026 ')).toBe('2026-09');
+    expect(parseMonth('09.2026')).toBe('2026-09');
+    expect(parseMonth('13/2026')).toBeNull();
+    expect(parseMonth('0/2026')).toBeNull();
+    expect(parseMonth('ottobre 2026')).toBeNull();
   });
 });

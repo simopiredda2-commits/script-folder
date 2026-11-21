@@ -111,6 +111,11 @@ describe('apertura del Fascicolo regionale dalla cartella (D220)', () => {
     const wrong = await open('titolare', { tipoDocumento: 'XYZ' });
     expect(wrong.statusCode).toBe(400);
     expect(wrong.json().errore).toMatch(/non previsto dalle specifiche/);
+    // Nemmeno i nomi che ogni oggetto ha dal suo prototipo (D232).
+    for (const tipoDocumento of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      const res = await open('titolare', { tipoDocumento });
+      expect(res.statusCode, tipoDocumento).toBe(400);
+    }
     // Nessuna richiesta parte con un tipo sbagliato; il tentativo resta nel registro.
     expect(access.received.length).toBe(before);
     expect((await lastLog(s.users.titolare.id))?.outcome).toBe('consentito');

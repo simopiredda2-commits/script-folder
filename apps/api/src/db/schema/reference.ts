@@ -46,6 +46,12 @@ export const referenceDataset = pgTable(
     validFrom: date().notNull(),
     /** «scaricamento» (il giorno del download) o «atto» (la data dichiarata nella trascrizione). */
     validFromBasis: text().notNull(),
+    /**
+     * Dove vale la versione, se non in tutta Italia (D232): la regione dello studio e l'ASL del
+     * titolare dell'archivio, come le dice la scheda della trascrizione («ambito»).
+     */
+    scopeRegion: text(),
+    scopeAsl: text(),
     act: text(),
     transcribedBy: text(),
     transcribedOn: date(),

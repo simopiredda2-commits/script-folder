@@ -26,7 +26,11 @@ const me = (roles: string[]) => ({
 });
 
 /** Il servizio finto: il controllo risponde quando lo decide la prova. */
-function service(roles: string[], check: () => Promise<Response>) {
+function service(
+  roles: string[],
+  check: () => Promise<Response>,
+  signed: object = { esito: 'accepted', nre: '0101A0000000001', messaggio: null },
+) {
   const calls: string[] = [];
   vi.stubGlobal(
     'fetch',
@@ -35,10 +39,7 @@ function service(roles: string[], check: () => Promise<Response>) {
       calls.push(`${init?.method ?? 'GET'} ${path}`);
       if (path === '/api/io') return Promise.resolve(json(200, me(roles)));
       if (path === '/api/ricette/r1/controlla') return check();
-      if (path === '/api/ricette/r1/firma-e-invia')
-        return Promise.resolve(
-          json(200, { esito: 'accepted', nre: '0101A0000000001', messaggio: null }),
-        );
+      if (path === '/api/ricette/r1/firma-e-invia') return Promise.resolve(json(200, signed));
       if (path === '/api/ricette/r1/da-firmare')
         return Promise.resolve(json(200, { stato: 'to_sign' }));
       return Promise.resolve(json(404, { errore: 'Non trovato' }));
@@ -123,5 +124,29 @@ describe('firma e invio a controllo finito (D230)', () => {
     const sign = await screen.findByRole('button', { name: 'Firma e invia' });
     await waitFor(() => expect(disabled(sign)).toBe(false));
     await screen.findByText(/Errore del servizio di prova/);
+  });
+
+  it('se il controllo resta senza risposta (rete, proxy) lo dice, e la firma si riaccende (D232)', async () => {
+    service(['owner_doctor'], () => Promise.reject(new TypeError('Failed to fetch')));
+    panel();
+    const sign = await screen.findByRole('button', { name: 'Firma e invia' });
+    await waitFor(() => expect(disabled(sign)).toBe(false));
+    await screen.findByText(/Controllo non riuscito: il servizio non ha risposto/);
+  });
+
+  it('ricetta partita senza i dati del promemoria: l’NRE e l’avviso, con simbolo e parola (D232)', async () => {
+    service(['owner_doctor'], () => Promise.resolve(checked()), {
+      esito: 'accepted',
+      nre: '0101A0000000002',
+      messaggio:
+        'Ricetta partita, NRE 0101A0000000002: i dati del promemoria non si sono potuti fissare, quindi il promemoria non si stampa.',
+    });
+    panel();
+    const sign = await screen.findByRole('button', { name: 'Firma e invia' });
+    await waitFor(() => expect(disabled(sign)).toBe(false));
+    await userEvent.click(sign);
+    await screen.findByText(/Ricetta inviata\. NRE/);
+    const warning = await screen.findByText(/il promemoria non si stampa/);
+    expect(warning.closest('[class*="avviso"]')).toBeTruthy();
   });
 });

@@ -290,6 +290,62 @@ export interface AdditionalServiceItem {
   validFrom: string;
 }
 
+/**
+ * Dove si guarda una banca dati che può valere solo in una regione o in un'ASL (D232): la regione
+ * dello studio e l'ASL del titolare dell'archivio. Senza, valgono solo le serie di tutta Italia.
+ */
+export interface ReferenceScope {
+  region?: string | null;
+  asl?: string | null;
+}
+
+/** Senza maiuscole, spazi e segni: «ASL TO3», «Asl To 3» e «ASL-TO3» sono la stessa ASL. */
+const scopeKey = (v: string | null | undefined) =>
+  (v ?? '')
+    .normalize('NFD')
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .toUpperCase();
+
+/** La versione vale dove la si guarda: nessun ambito, oppure la stessa regione e la stessa ASL. */
+function inScope(
+  d: { scopeRegion: string | null; scopeAsl: string | null },
+  scope: ReferenceScope,
+) {
+  if (d.scopeRegion && scopeKey(d.scopeRegion) !== scopeKey(scope.region)) return false;
+  if (d.scopeAsl && scopeKey(d.scopeAsl) !== scopeKey(scope.asl)) return false;
+  return true;
+}
+
+const specificity = (d: { scopeRegion: string | null; scopeAsl: string | null }) =>
+  d.scopeAsl ? 2 : d.scopeRegion ? 1 : 0;
+
+/**
+ * Per lo stesso codice in due serie: vale l'atto più recente; con la stessa data quello più
+ * vicino (ASL, poi regione, poi Italia); poi l'ultimo importato. Mai l'ordine delle righe (D232).
+ */
+function wins(
+  d: {
+    validFrom: string;
+    scopeRegion: string | null;
+    scopeAsl: string | null;
+    importedAt: Date;
+    id: string;
+  },
+  prev: {
+    validFrom: string;
+    scopeRegion: string | null;
+    scopeAsl: string | null;
+    importedAt: Date;
+    id: string;
+  },
+) {
+  if (d.validFrom !== prev.validFrom) return d.validFrom > prev.validFrom;
+  if (specificity(d) !== specificity(prev)) return specificity(d) > specificity(prev);
+  if (d.importedAt.getTime() !== prev.importedAt.getTime())
+    return d.importedAt.getTime() > prev.importedAt.getTime();
+  return d.id > prev.id;
+}
+
 /** Una voce del nomenclatore dei presidi del DPCM LEA (D218). */
 export interface SupplyCatalogItem {
   /** Un presidio con il suo codice, o una malattia rara che dà diritto ai presidi dell'allegato. */
@@ -1132,11 +1188,19 @@ export class ReferenceData {
    * sincrone per le regole. Senza la banca dati le funzioni restituiscono undefined (= non noto).
    */
   /**
-   * Le prestazioni aggiuntive in vigore alla data, di tutte le serie: accordo nazionale, regionale
-   * e, quando ci sarà, aziendale. Se lo stesso codice è in più serie vale l'atto più recente (D212).
+   * Le prestazioni aggiuntive in vigore alla data, di tutte le serie che valgono per l'archivio:
+   * l'accordo nazionale, quello regionale della regione dello studio e, quando ci sarà, quello
+   * aziendale dell'ASL del titolare (D212, D232). Se lo stesso codice è in più serie vale l'atto
+   * più recente; con la stessa data, quello più vicino (l'ASL prima della regione, la regione prima
+   * dell'Italia), poi l'ultimo importato.
    */
-  async additionalServices(date: string): Promise<AdditionalServiceItem[]> {
-    const sets = await this.inEffect('prestazioni_aggiuntive', date);
+  async additionalServices(
+    date: string,
+    scope: ReferenceScope = {},
+  ): Promise<AdditionalServiceItem[]> {
+    const sets = (await this.inEffect('prestazioni_aggiuntive', date)).filter((d) =>
+      inScope(d, scope),
+    );
     if (!sets.length) return [];
     const byId = new Map(sets.map((d) => [d.id, d]));
     const rows = await this.db
@@ -1159,7 +1223,7 @@ export class ReferenceData {
         validFrom: d.validFrom,
       };
       const prev = best.get(r.code);
-      if (!prev || prev.validFrom < item.validFrom) best.set(r.code, item);
+      if (!prev || wins(d, byId.get(prev.datasetId)!)) best.set(r.code, item);
     }
     return [...best.values()].sort(compareAdditionalServices);
   }

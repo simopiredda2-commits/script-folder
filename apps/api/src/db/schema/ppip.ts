@@ -70,6 +70,13 @@ export const ppipRecord = pgTable(
     patientId: uuid()
       .notNull()
       .references(() => patient.id),
+    /**
+     * Archivio in cui la prestazione è registrata: la distinta è del suo titolare anche se poi il
+     * paziente passa a un altro medico, come le ricette e i certificati (D200, D232).
+     */
+    archiveId: uuid()
+      .notNull()
+      .references(() => archive.id),
     performedOn: date().notNull(),
     code: text().notNull(),
     section: text().notNull(),
@@ -90,6 +97,12 @@ export const ppipRecord = pgTable(
     status: ppipStatus().notNull().default('active'),
     /** Invio in cui la prestazione è partita: dopo, non si annulla più qui. */
     reportId: uuid().references(() => ppipReport.id),
+    /**
+     * Invio della distinta in corso (D232): da quando e di chi. Finché c'è, la prestazione non si
+     * annulla e non parte con un altro invio; si toglie quando il portale risponde.
+     */
+    sendingSince: timestamp({ withTimezone: true }),
+    sendingBy: uuid().references(() => appUser.id),
     annulledAt: timestamp({ withTimezone: true }),
     annulledBy: uuid().references(() => appUser.id),
     annulReason: text(),
@@ -98,5 +111,9 @@ export const ppipRecord = pgTable(
       .references(() => appUser.id),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index().on(t.patientId), index().on(t.performedOn)],
+  (t) => [
+    index().on(t.patientId),
+    index().on(t.performedOn),
+    index().on(t.archiveId, t.performedOn),
+  ],
 );

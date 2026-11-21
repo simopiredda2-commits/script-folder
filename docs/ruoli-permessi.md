@@ -41,7 +41,8 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Esportare tutti i dati dell’archivio | Sì | No | No | No | No | No |
 | Importare dati da altri programmi nell’archivio | Sì | No | No | No | No | No |
 | Leggere ed esportare i riepiloghi dell’archivio per periodo | Sì | Sì | No | No | No | No |
-| Leggere le prestazioni aggiuntive (PPIP) e la distinta del mese | Sì | Sì | Sì | Sì | No | No |
+| Leggere le prestazioni aggiuntive (PPIP) del paziente | Sì | Sì | Sì | Sì | No | No |
+| Leggere e scaricare la distinta mensile delle prestazioni aggiuntive | Sì | Sì | No | No | No | No |
 | Registrare e annullare le prestazioni aggiuntive (PPIP) | Sì | Sì | Sì | Sì | No | No |
 | Inviare all’ASL la distinta mensile delle prestazioni aggiuntive | Sì | No | No | No | No | No |
 | Decidere che cosa vede la segreteria dell’archivio | Sì | No | No | No | No | No |

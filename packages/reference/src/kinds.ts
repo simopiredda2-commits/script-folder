@@ -239,8 +239,16 @@ export const KINDS = {
     /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */
     changeKey: ['entryType', 'code', 'description'],
     fields: {
-      /** «presidio» o «malattia_rara». */
-      entryType: { type: 'text', required: true },
+      /**
+       * «presidio» o «malattia_rara»: un altro valore ferma l'importazione, perché la voce finirebbe
+       * fra i presidi da prescrivere (D232).
+       */
+      entryType: {
+        type: 'text',
+        required: true,
+        pattern: /^(?:presidio|malattia_rara)$/,
+        patternLabel: '«presidio» o «malattia_rara»',
+      },
       /** Il codice come lo scrive l'allegato; due codici nella stessa cella: «A / B». */
       code: { type: 'text', required: true },
       description: { type: 'text', required: true },

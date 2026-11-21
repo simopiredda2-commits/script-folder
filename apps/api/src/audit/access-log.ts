@@ -81,6 +81,8 @@ export type AccessAction =
   | 'distinta_ppip'
   | 'esportazione_distinta_ppip'
   | 'invio_distinta_ppip'
+  | 'consegna_distinta_ppip'
+  | 'esito_distinta_ppip'
   | 'lettura_profilo_sanitario'
   | 'bozza_profilo_sanitario'
   | 'validazione_profilo_sanitario'

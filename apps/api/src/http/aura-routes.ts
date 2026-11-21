@@ -143,7 +143,13 @@ export function registerAuraRoutes(
         );
         if (!lock.rows[0]?.preso)
           throw new HttpError(409, 'Registrazione già in corso: ricarica la pagina tra poco');
-        const [c] = await tx.select().from(auraNewPatient).where(eq(auraNewPatient.id, id));
+        // Bloccato fino alla fine: «Non registrare» aspetta e poi trova l'assistito registrato,
+        // invece di uscire dall'elenco mentre il paziente entra (D232).
+        const [c] = await tx
+          .select()
+          .from(auraNewPatient)
+          .where(eq(auraNewPatient.id, id))
+          .for('update');
         if (c!.status !== 'da_registrare')
           throw new HttpError(
             409,
@@ -159,10 +165,13 @@ export function registerAuraRoutes(
           details: { fonte: 'AURA', nuovoAssistito: c!.id },
           choiceFromAura: true,
         });
-        await tx
+        const done = await tx
           .update(auraNewPatient)
           .set({ status: 'registrato', patientId: p.id, decidedBy: actor.userId, decidedAt: at })
-          .where(eq(auraNewPatient.id, id));
+          .where(and(eq(auraNewPatient.id, id), eq(auraNewPatient.status, 'da_registrare')))
+          .returning({ id: auraNewPatient.id });
+        if (!done.length)
+          throw new HttpError(409, 'Non è più fra i nuovi assistiti: ricarica la pagina');
         return p;
       });
     } catch (thrown) {
@@ -194,22 +203,24 @@ export function registerAuraRoutes(
     const c = await candidate(actor, id);
     await guardCandidate(actor, c, 'nuovo_assistito_non_registrato');
     const at = now();
-    const done = await withActor(db, actor.userId, (tx) =>
-      tx
+    // La riga dell'assistito è bloccata da un «Registra» in corso: si aspetta, e poi si vede com'è.
+    // La scelta e la sua riga del registro entrano insieme (D232).
+    await withActor(db, actor.userId, async (tx) => {
+      const done = await tx
         .update(auraNewPatient)
         .set({ status: 'non_registrato', decidedBy: actor.userId, decidedAt: at })
         .where(and(eq(auraNewPatient.id, id), eq(auraNewPatient.status, 'da_registrare')))
-        .returning({ id: auraNewPatient.id }),
-    );
-    if (done.length === 0)
-      throw new HttpError(409, 'Non è più fra i nuovi assistiti: ricarica la pagina');
-    await logAccess(db, {
-      studioId: actor.studioId,
-      userId: actor.userId,
-      action: 'nuovo_assistito_non_registrato',
-      outcome: 'riuscito',
-      workstation: actor.workstation,
-      details: { nuovoAssistito: id, archivio: c.archiveId },
+        .returning({ id: auraNewPatient.id });
+      if (done.length === 0)
+        throw new HttpError(409, 'Non è più fra i nuovi assistiti: ricarica la pagina');
+      await logAccess(tx, {
+        studioId: actor.studioId,
+        userId: actor.userId,
+        action: 'nuovo_assistito_non_registrato',
+        outcome: 'riuscito',
+        workstation: actor.workstation,
+        details: { nuovoAssistito: id, archivio: c.archiveId },
+      });
     });
     return { id, stato: 'non_registrato' };
   });
