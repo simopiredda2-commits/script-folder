@@ -8,12 +8,13 @@ import { logAccess, logAccessForPatients, type AccessAction } from '../audit/acc
 import type { Actor } from '../auth/service';
 import { annulBody } from '../clinical/entries';
 import type { Database } from '../db/client';
-import { archive, studio } from '../db/schema';
+import { archive, patient, studio } from '../db/schema';
 import { withActor } from '../db/tx';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
 import { distintaCsv, formatById, loadFormats } from '../ppip/formats';
 import {
   annulPpip,
+  archiveMovesOf,
   archiveScope,
   byService,
   catalogItem,
@@ -24,6 +25,7 @@ import {
   lockPpip,
   monthRows,
   monthSchema,
+  ppipArchiveFor,
   ppipBody,
   reportDeadline,
   reportsOf,
@@ -126,11 +128,20 @@ export function registerPpipRoutes(
     const actor = req.actor!;
     const { id } = params.parse(req.params);
     const { patient: p, context } = await guardPatient(db, actor, id, 'ppip.read', 'lettura_ppip');
+    const moves = await archiveMovesOf(db, id);
     return {
       prestazioni: await listPpip(db, id, p.archiveId),
       puoScrivere: can(actor, 'ppip.write', { ...context, now: now() }).allowed,
       // Per il catalogo: gli accordi della regione e dell'ASL dell'archivio (D232).
       archivio: p.archiveId,
+      // Chi aveva il paziente ogni giorno: la prestazione va nella distinta di quell'archivio (D240).
+      spostamenti: moves.map((m) => ({
+        giorno: m.day,
+        da: m.from,
+        daNome: m.fromName,
+        a: m.to,
+        aNome: m.toName,
+      })),
     };
   });
 
@@ -140,17 +151,33 @@ export function registerPpipRoutes(
     const { patient: p } = await guardPatient(db, actor, id, 'ppip.write', 'nuova_ppip');
     const body = ppipBody.parse(req.body);
     if (!reference) throw new HttpError(409, 'Le banche dati non sono disponibili');
+    // Nella distinta di chi aveva il paziente il giorno dell'esecuzione (D240), con il catalogo
+    // della regione e dell'ASL di quell'archivio (D232).
+    const moves = await archiveMovesOf(db, id);
+    const target = ppipArchiveFor(moves, p.archiveId, body.data, body.archivio);
     const item = await catalogItem(
       reference,
       body,
       studioDate(now()),
       p.deceasedOn ?? null,
-      await archiveScope(db, p.archiveId),
+      await archiveScope(db, target),
     );
-    // Nell'archivio in cui la guardia ha dato il permesso: lì va la distinta (D232).
-    const recordId = await withActor(db, actor.userId, (tx) =>
-      insertPpip(tx, { patientId: id, archiveId: p.archiveId }, actor.userId, body, item),
-    );
+    const recordId = await withActor(db, actor.userId, async (tx) => {
+      // Il paziente resta fermo fino alla fine, nell'archivio in cui la guardia ha dato il permesso
+      // e con gli spostamenti letti sopra: uno spostamento a metà cambierebbe la distinta (D240).
+      const [held] = await tx
+        .select({ archiveId: patient.archiveId })
+        .from(patient)
+        .where(eq(patient.id, id))
+        .for('share');
+      const still = await archiveMovesOf(tx, id);
+      if (held?.archiveId !== p.archiveId || JSON.stringify(still) !== JSON.stringify(moves))
+        throw new HttpError(
+          409,
+          'Nel frattempo il paziente è passato a un altro archivio: ricarica la pagina',
+        );
+      return insertPpip(tx, { patientId: id, archiveId: target }, actor.userId, body, item);
+    });
     return reply.status(201).send({ id: recordId });
   });
 
@@ -162,11 +189,11 @@ export function registerPpipRoutes(
     const { motivo } = annulBody.parse(req.body);
     await withActor(db, actor.userId, async (tx) => {
       const r = await lockPpip(tx, ppipId, { patientId: id });
-      // Registrata prima che il paziente cambiasse medico: è nella distinta dell'altro archivio.
+      // Nella distinta di un altro archivio, di chi aveva il paziente quel giorno (D232, D240).
       if (r.archiveId !== p.archiveId)
         throw new HttpError(
           409,
-          'La prestazione è nella distinta dell’archivio in cui è stata registrata: si annulla da quella distinta',
+          'La prestazione è nella distinta di un altro archivio, quello che aveva il paziente il giorno dell’esecuzione: si annulla da quella distinta',
         );
       await annulPpip(tx, r, actor.userId, motivo, now());
     });

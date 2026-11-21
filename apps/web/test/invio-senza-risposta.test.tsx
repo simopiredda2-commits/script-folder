@@ -190,22 +190,48 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     await s.findByRole('heading', { name: 'Promemoria della ricetta di Paola Inventata' });
   });
 
-  it('«È arrivata» senza il codice: niente codice nel corpo, e l’avviso del promemoria', async () => {
-    const { bodies } = service((b) => ({
-      stato: 'sent',
-      nre: b.nre,
-      messaggio:
-        'Ricetta segnata come arrivata, NRE MAN000000000002: senza il codice di autenticazione il promemoria non si stampa.',
-    }));
+  it('ricetta SSN: senza il codice di autenticazione «È arrivata» non parte (D240)', async () => {
+    const { bodies } = service((b) => ({ stato: 'sent', nre: b.nre, messaggio: null }));
     page();
     const s = await section();
     const form = await s.findByRole('form', { name: 'La ricetta è arrivata' });
+    const code = within(form).getByLabelText<HTMLInputElement>(
+      'Codice di autenticazione dato dall’ente',
+    );
+    expect(code.required).toBe(true);
+    expect(
+      within(form).getByText(/Se l’ente non dà il codice, segna «Non è arrivata»/),
+    ).toBeTruthy();
     await userEvent.type(within(form).getByLabelText(/Numero di ricetta/), 'MAN000000000002');
+    await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
+    expect(s.queryByText(/Confermi che la ricetta è arrivata/)).toBeNull();
+    // Un codice di soli spazi non basta: lo si dice prima della conferma.
+    await userEvent.type(code, '   ');
+    await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
+    await s.findByText(/Senza il codice di autenticazione la ricetta SSN non è valida/);
+    expect(s.queryByText(/Confermi che la ricetta è arrivata/)).toBeNull();
+    expect(bodies).toEqual([]);
+    // Resta l'altra strada: «Non è arrivata».
+    expect(s.getByRole('button', { name: 'Non è arrivata: torna da inviare' })).toBeTruthy();
+  });
+
+  it('presidi: il codice resta facoltativo, come nell’invio (D240)', async () => {
+    const { bodies } = service((b) => ({ stato: 'sent', nre: b.nre, messaggio: null }), {
+      tipo: 'devices',
+    });
+    page();
+    const s = await section();
+    const form = await s.findByRole('form', { name: 'La ricetta è arrivata' });
+    const code = within(form).getByLabelText<HTMLInputElement>(
+      'Codice di autenticazione (facoltativo)',
+    );
+    expect(code.required).toBe(false);
+    await userEvent.type(within(form).getByLabelText(/Numero di ricetta/), 'MAN000000000004');
     await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
     s.getByText(/senza il codice di autenticazione\?/);
     await userEvent.click(s.getByRole('button', { name: 'Sì, confermo' }));
-    await s.findByText(/senza il codice di autenticazione il promemoria non si stampa/);
-    expect(bodies).toEqual([{ esito: 'arrivata', nre: 'MAN000000000002' }]);
+    await s.findByText(/Ricetta segnata come arrivata/);
+    expect(bodies).toEqual([{ esito: 'arrivata', nre: 'MAN000000000004' }]);
   });
 
   it('ricetta bianca: NRBE e PIN dati dal Sistema TS (D239)', async () => {

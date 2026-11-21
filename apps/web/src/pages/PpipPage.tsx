@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
+import { archiveNames, archivesOnDay, type ArchiveMove } from '../lib/archive-moves';
 import { date, money, studioToday } from '../lib/format';
 import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
@@ -40,7 +41,10 @@ interface PpipRecord {
   inInvio: boolean;
   protocolloInvio: string | null;
   registrataDa: string;
-  /** Registrata in un altro archivio, prima che il paziente cambiasse medico: è nella sua distinta. */
+  /**
+   * Nella distinta di un altro archivio: quello che aveva il paziente il giorno dell'esecuzione,
+   * prima che cambiasse medico (D232, D240).
+   */
   altroArchivio: string | null;
 }
 
@@ -64,9 +68,12 @@ export const SECTION_LABEL = (sezione: string) =>
 export function PpipPage() {
   const { id } = useParams<{ id: string }>();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
-  const list = useApi<{ prestazioni: PpipRecord[]; puoScrivere: boolean; archivio: string }>(
-    `/api/pazienti/${id}/ppip`,
-  );
+  const list = useApi<{
+    prestazioni: PpipRecord[];
+    puoScrivere: boolean;
+    archivio: string;
+    spostamenti: ArchiveMove[];
+  }>(`/api/pazienti/${id}/ppip`);
   const [saved, setSaved] = useState<string | null>(null);
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
@@ -95,6 +102,7 @@ export function PpipPage() {
         <PpipForm
           patientId={id!}
           archiveId={list.data.archivio}
+          moves={list.data.spostamenti ?? []}
           onSaved={() => refresh('Prestazione registrata.')}
         />
       )}
@@ -179,8 +187,8 @@ function PpipItem({
       </p>
       {r.altroArchivio && (
         <p className="tenue">
-          Registrata nell’archivio «{r.altroArchivio}», prima che il paziente cambiasse medico: è
-          nella distinta di quell’archivio, e lì si annulla.
+          Nella distinta dell’archivio «{r.altroArchivio}», che aveva il paziente il giorno
+          dell’esecuzione: lì si annulla.
         </p>
       )}
       {r.note && <p className="tenue">Note: {r.note}</p>}
@@ -228,10 +236,13 @@ function PpipItem({
 function PpipForm({
   patientId,
   archiveId,
+  moves,
   onSaved,
 }: {
   patientId: string;
   archiveId: string;
+  /** Spostamenti del paziente fra gli archivi: dicono chi lo aveva il giorno dell'esecuzione. */
+  moves: ArchiveMove[];
   onSaved: () => void;
 }) {
   const today = studioToday();
@@ -242,13 +253,22 @@ function PpipForm({
     luogo: 'studio',
     autorizzazione: '',
     note: '',
+    archivio: '',
   };
   // Ricordato per paziente finché non si registra (D68, D129).
   const [f, setF, resetF] = usePersistentState(`bozza-ppip-${patientId}`, empty);
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(f.data);
+  // La distinta è di chi aveva il paziente il giorno dell'esecuzione (D240): il giorno di uno
+  // spostamento la sceglie chi registra.
+  const options = validDate ? archivesOnDay(moves, archiveId, f.data) : [archiveId];
+  const names = archiveNames(moves);
+  const choosing = options.length > 1;
+  const chosen = choosing && options.includes(f.archivio ?? '') ? f.archivio : '';
+  const target = choosing ? chosen || archiveId : options[0]!;
   const catalog = useApi<{ data: string; voci: CatalogItem[] }>(
-    /^\d{4}-\d{2}-\d{2}$/.test(f.data)
-      ? // Con gli accordi della regione e dell'ASL dell'archivio (D232).
-        `/api/prestazioni-aggiuntive/catalogo?data=${f.data}&archivio=${archiveId}`
+    validDate
+      ? // Con gli accordi della regione e dell'ASL dell'archivio della distinta (D232, D240).
+        `/api/prestazioni-aggiuntive/catalogo?data=${f.data}&archivio=${target}`
       : null,
   );
   const [busy, setBusy] = useState(false);
@@ -261,6 +281,16 @@ function PpipForm({
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    // Il giorno dello spostamento la distinta non si indovina: si sceglie (D240).
+    if (choosing && !chosen) {
+      setError(
+        new ApiError(
+          400,
+          `Il ${date(f.data)} il paziente è passato a un altro archivio: scegli in quale distinta va la prestazione.`,
+        ),
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -273,6 +303,7 @@ function PpipForm({
           luogo: f.luogo,
           autorizzazione: f.autorizzazione.trim() || undefined,
           note: f.note.trim() || undefined,
+          archivio: choosing ? chosen || undefined : undefined,
         },
       });
       resetF();
@@ -328,6 +359,37 @@ function PpipForm({
             </select>
           </div>
         </div>
+        {!choosing && target !== archiveId && (
+          <Notice kind="info">
+            Va nella distinta dell’archivio «{names.get(target) ?? target}»: il {date(f.data)} il
+            paziente era nel suo archivio, e il compenso è del medico che ha eseguito la
+            prestazione.
+          </Notice>
+        )}
+        {choosing && (
+          <fieldset className="scelta-in-riga">
+            <legend>
+              In quale distinta va? Il {date(f.data)} il paziente è passato a un altro archivio:
+              scegli quello del medico che lo aveva quando la prestazione è stata eseguita.
+            </legend>
+            {options.map((a, i) => (
+              <div className="casella" key={a}>
+                <input
+                  id={`ppip-archivio-${a}`}
+                  type="radio"
+                  name="ppip-archivio"
+                  required
+                  checked={chosen === a}
+                  onChange={() => setF((x) => ({ ...x, archivio: a }))}
+                />
+                <label htmlFor={`ppip-archivio-${a}`}>
+                  {names.get(a) ?? a}
+                  {i === 0 ? ' (prima dello spostamento)' : ' (dopo lo spostamento)'}
+                </label>
+              </div>
+            ))}
+          </fieldset>
+        )}
         <div id="ppip-voce" className="aiuto">
           {catalog.data && voci.length === 0 && (
             <Notice kind="avviso">

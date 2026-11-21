@@ -231,6 +231,7 @@ describe('storico delle modifiche e dati mai cancellati', () => {
       'certificate_delivery',
       'aft_activity',
       'aura_change',
+      'patient_archive_move',
     ];
     for (const { table_name } of res.rows) {
       if (appendOnly.includes(table_name)) continue;

@@ -230,31 +230,45 @@ describe('ricetta rimasta «in invio» (D233)', () => {
     expect((await manualRows(id))[0]).toMatchObject({ outcome: 'accepted' });
   });
 
-  it('«è arrivata» senza il codice: inviata, senza promemoria, e lo si dice', async () => {
+  it('«è arrivata» senza il codice: la ricetta SSN non è valida, non si segna (D240)', async () => {
     const id = await stuck();
     s.clock.advance(16 * 60_000);
-    const res = await settle('titolare', id, { esito: 'arrivata', nre: 'MAN000000000002' });
-    expect(res.statusCode, res.body).toBe(200);
-    expect(res.json().messaggio).toMatch(
-      /senza il codice di autenticazione il promemoria non si stampa/,
-    );
-    expect((await row(id)).status).toBe('sent');
+    for (const payload of [
+      { esito: 'arrivata', nre: 'MAN000000000002' },
+      { esito: 'arrivata', nre: 'MAN000000000002', codiceAutenticazione: null },
+    ]) {
+      const res = await settle('titolare', id, payload);
+      expect(res.statusCode, res.body).toBe(400);
+      expect(res.json().errore).toMatch(
+        /Senza il codice di autenticazione la ricetta SSN non è valida.*segna «Non è arrivata»/,
+      );
+    }
+    // Un codice di soli spazi non è un codice.
+    const blank = await settle('titolare', id, {
+      esito: 'arrivata',
+      nre: 'MAN000000000002',
+      codiceAutenticazione: '   ',
+    });
+    expect(blank.statusCode).toBe(400);
+    // Niente è cambiato: la ricetta resta «in invio», senza numero, e nel registro degli invii non
+    // c'è un esito; è ancora fra gli invii senza risposta.
+    expect(await row(id)).toMatchObject({ status: 'sending', nre: null, authCode: null });
+    expect(await manualRows(id)).toEqual([]);
+    expect(await inQueue(id)).toBeDefined();
     const docs = await t.db
       .select()
       .from(prescriptionDocument)
       .where(eq(prescriptionDocument.prescriptionId, id));
     expect(docs).toEqual([]);
-    expect((await req('titolare', 'GET', `/api/ricette/${id}/promemoria`)).statusCode).not.toBe(
-      200,
-    );
-    // La pagina sa che non c'è niente da consegnare, e perché (D239).
-    expect(await available(id)).toEqual({
-      promemoria: false,
-      soloNre: false,
-      email: false,
-      sms: false,
-      motivo: expect.stringMatching(/Manca il codice di autenticazione del SAC/),
+    // Con il codice chiesto all'ente, sì: inviata, con il promemoria.
+    const res = await settle('titolare', id, {
+      esito: 'arrivata',
+      nre: 'MAN000000000002',
+      codiceAutenticazione: 'MANAUT0002B',
     });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.json()).toMatchObject({ stato: 'sent', messaggio: null });
+    expect(await available(id)).toMatchObject({ promemoria: true });
   });
 
   it('un NRE con spazi o segni non entra; una ricetta non «in invio» non ha esito da segnare', async () => {
@@ -273,7 +287,11 @@ describe('ricetta rimasta «in invio» (D233)', () => {
     const id = await stuck();
     s.clock.advance(16 * 60_000);
     const [a, b] = await Promise.all([
-      settle('titolare', id, { esito: 'arrivata', nre: 'MAN000000000003' }),
+      settle('titolare', id, {
+        esito: 'arrivata',
+        nre: 'MAN000000000003',
+        codiceAutenticazione: 'MANAUT0003',
+      }),
       settle('titolare', id, { esito: 'non_arrivata' }),
     ]);
     expect([a.statusCode, b.statusCode].sort()).toEqual([200, 409]);

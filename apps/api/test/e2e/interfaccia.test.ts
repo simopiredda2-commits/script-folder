@@ -180,6 +180,59 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect(small, where).toEqual([]);
   }
 
+  /**
+   * Nessun pulsante è più stretto del suo contenuto (D242). Accanto a un testo lungo, «Aggiungi» si
+   * stringeva sotto la sua misura e il «+» usciva dal bordo: il bersaglio restava di 44 px, quindi la
+   * prova dei bersagli non lo vedeva.
+   */
+  async function expectNoClippedButtons(p: Page, where: string) {
+    const clipped = await p.evaluate(() =>
+      [...document.querySelectorAll('button, a.pulsante, summary')]
+        .filter((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          if (getComputedStyle(el).display === 'inline') return false;
+          return el.scrollWidth > el.clientWidth + 1;
+        })
+        .slice(0, 5)
+        .map(
+          (el) =>
+            `${el.tagName.toLowerCase()} «${(el.textContent ?? '').trim().slice(0, 40)}»: contenuto di ${el.scrollWidth} px in ${el.clientWidth} px`,
+        ),
+    );
+    expect(clipped, where).toEqual([]);
+  }
+
+  /**
+   * La ricetta in una schermata (D242): sul computer e sul tablet in orizzontale la pagina non
+   * scorre e «Prepara la ricetta» è in vista; scorrono, se serve, la ricerca e la ricetta.
+   */
+  async function expectOneScreen(p: Page, where: string) {
+    for (const v of [
+      { width: 1280, height: 800 },
+      { width: 1024, height: 768 },
+    ]) {
+      await p.setViewportSize(v);
+      const m = await p.evaluate(() => {
+        const b = [...document.querySelectorAll('button')]
+          .find((x) => x.textContent?.includes('Prepara la ricetta'))
+          ?.getBoundingClientRect();
+        return {
+          height: document.scrollingElement!.scrollHeight,
+          view: innerHeight,
+          button: b ? b.top >= 0 && b.bottom <= innerHeight : false,
+        };
+      });
+      expect(m.height, `${where} a ${v.width}×${v.height}: la pagina scorre`).toBeLessThanOrEqual(
+        m.view,
+      );
+      expect(m.button, `${where} a ${v.width}×${v.height}: «Prepara la ricetta» fuori vista`).toBe(
+        true,
+      );
+    }
+    await p.setViewportSize({ width: 1280, height: 900 });
+  }
+
   /** Su tablet, in verticale e in orizzontale, la pagina non scorre di lato. */
   async function expectTabletLayout(p: Page, where: string) {
     for (const v of TABLETS) {
@@ -197,6 +250,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       );
       expect(wide, `${where} a ${v.width}×${v.height}: elementi oltre il bordo`).toEqual([]);
       await expectTargets(p, `${where} a ${v.width}×${v.height}`);
+      await expectNoClippedButtons(p, `${where} a ${v.width}×${v.height}`);
     }
     await p.setViewportSize({ width: 1280, height: 900 });
   }
@@ -204,6 +258,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   const check = async (p: Page, where: string, tablet = false) => {
     await expectAccessible(p, where);
     await expectTargets(p, where);
+    await expectNoClippedButtons(p, where);
     if (tablet) await expectTabletLayout(p, where);
   };
 
@@ -462,11 +517,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .filter({ hasText: 'TEVA ITALIA' })
       .getByRole('button', { name: 'Aggiungi' })
       .click();
-    await page
-      .locator('.riga-ricetta')
-      .filter({ hasText: 'TEVA ITALIA' })
-      .getByLabel('Confezioni')
-      .fill('1');
+    // La riga aggiunta è chiusa: nome e sintesi; i campi si aprono solo col clic (D242).
+    const line = page.locator('.riga-ricetta').filter({ hasText: 'TEVA ITALIA' });
+    const opener = line.getByRole('button', { name: /TEVA ITALIA/ });
+    await line.getByText('1 confezione · posologia non indicata').waitFor();
+    await expect(opener.getAttribute('aria-expanded')).resolves.toBe('false');
+    await expect(line.getByLabel('Confezioni').isVisible()).resolves.toBe(false);
+    await opener.click();
+    await expect(opener.getAttribute('aria-expanded')).resolves.toBe('true');
+    await line.getByLabel('Confezioni').fill('1');
+    await line.getByLabel('Posologia').fill('1 compressa al giorno');
+    await line.getByText('1 confezione · 1 compressa al giorno').waitFor();
+    await opener.click();
+    await expect(line.getByLabel('Confezioni').isVisible()).resolves.toBe(false);
     // Anche la terapia in corso: la ricetta inviata finisce nel suo storico (D65).
     await page
       .locator('.risultato')
@@ -474,6 +537,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByRole('button', { name: 'Aggiungi' })
       .click();
     await page.locator('.riga-ricetta').filter({ hasText: 'Farmaco di prova 5 mg' }).waitFor();
+    // Con due farmaci la pagina sta in una schermata: non scorre, e i pulsanti sono in vista.
+    await expectOneScreen(page, 'nuova ricetta con due farmaci');
     await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
     await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await page.getByText(/Regole di prescrizione, versione/).waitFor();
@@ -504,15 +569,26 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await gotoNewPage(page, `${base}/pazienti/${s.richPatient}/ricetta`);
     await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
     await page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ }).click();
-    await page.getByLabel(/Oscura nome e indirizzo/).waitFor();
+    // Promemoria e oscuramento sono chiusi in «Altre opzioni», che dice la scelta in corso (D242).
+    const options = page.locator('details.altre-opzioni');
+    await options.getByText('nome e indirizzo in chiaro').waitFor();
+    await options.locator('summary').click();
+    await page.getByLabel(/Oscura nome e indirizzo/).check();
+    await options.getByText('nome e indirizzo oscurati').waitFor();
+    await page.getByLabel(/Oscura nome e indirizzo/).uncheck();
     await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
     const item = page.locator('.risultato').filter({ hasText: 'TEVA ITALIA' });
     await item.waitFor();
     await item.getByRole('button', { name: 'Aggiungi' }).click();
     await page.getByLabel('Bianca (a carico del paziente)').check();
     await expect(page.getByLabel(/Oscura nome e indirizzo/).count()).resolves.toBe(0);
+    await page
+      .locator('.riga-ricetta')
+      .getByRole('button', { name: /TEVA ITALIA/ })
+      .click();
     await page.getByLabel('Ripetibile (volte)').fill('2');
     await page.getByLabel('Validità (mesi)').fill('6');
+    await page.getByText(/ripetibile 2 volte · validità 6 mesi/).waitFor();
     await check(page, 'ricetta bianca ripetibile', true);
     await page.getByRole('button', { name: 'Ricomincia' }).click();
   });
@@ -636,10 +712,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .fill('PRESTAZIONE NUOVA DI PROVA');
     await check(page, 'prestazione scritta a mano');
     await page.getByRole('button', { name: 'Aggiungi in ricetta' }).click();
+    // I due codici si leggono già nella riga chiusa (D242).
     await page
       .locator('.riga-ricetta')
       .filter({ hasText: 'PRESTAZIONE NUOVA DI PROVA' })
-      .getByText('Catalogo NUOVO.1 · nomenclatore (DM) 99.99.1')
+      .getByText('quantità 1 · catalogo NUOVO.1 · nomenclatore (DM) 99.99.1')
       .waitFor();
     await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
     await page.getByRole('button', { name: 'Prepara la ricetta' }).click();

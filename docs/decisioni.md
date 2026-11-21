@@ -1735,3 +1735,56 @@ Non provato:
 - il portale vero dell'ASL e il SAR vero;
 - la regola dei 6 mesi sulla fonte regionale (D2);
 - WebKit e Firefox solo nella CI.
+
+**D240 · Risposte della fermata dopo la #29.** Simone ha risposto il 21/11/2026, con il pulsante:
+
+1. **Via alla #29**: unita a `main` con le verifiche su GitHub verdi.
+2. **I 6 mesi delle medicazioni avanzate** (D2): «Lo verifichiamo noi». Resta come oggi: ogni prescrizione del medico di famiglia dura al più 6 mesi (D123). È fra le verifiche di Simone e della Dr.ssa Rocca, in `docs/avanzamento.md` («Che cosa resta aperto»).
+3. **Prestazioni aggiuntive dopo «Sposta»** (B-F): «Secondo le regole». Ho letto le fonti:
+   - ACN della medicina generale 2022-2024, allegato 6, comma 4: il medico manda «il riepilogo delle prestazioni eseguite nel corso del mese precedente»; comma 6: «per le prestazioni rese, al medico spettano compensi»;
+   - ACN, art. 40, comma 1: la nuova scelta del cittadino «ai fini assistenziali, ha effetto immediato». L'art. 42 riguarda le quote per assistiti, non le prestazioni aggiuntive;
+   - AIR del Piemonte 2024: nulla sul cambio di medico per le prestazioni aggiuntive.
+
+   Il compenso quindi è del medico che ha eseguito la prestazione. Nel programma, fino a «Sposta», il paziente sta nell'archivio di prima, e lì lavorano il titolare, chi lo sostituisce e la segreteria. La prestazione va quindi nella distinta dell'archivio in cui il paziente stava il giorno dell'esecuzione. Scelte prese da me:
+   - **storico degli spostamenti**: ogni «Sposta» resta nella tabella `patient_archive_move`, di sola aggiunta. Il cambio di medico di AURA ha una riga per paziente, e un secondo cambio cancellava il primo. La migrazione 0047 ricostruisce gli spostamenti di prima dal registro degli accessi;
+   - **la distinta segue la data**: una prestazione eseguita prima del giorno dello spostamento va nella distinta dell'archivio di prima, anche se la si registra dopo; dal giorno dopo, in quella dell'archivio nuovo. Le prestazioni già registrate restano dove sono;
+   - **il giorno dello spostamento sceglie chi registra**: la data non dice l'ora, quindi la pagina chiede fra l'archivio di prima e quello di dopo. Il servizio rifiuta la registrazione senza la scelta, e negli altri giorni rifiuta un archivio diverso da quello del giorno;
+   - **chi registra** è chi ha accesso alla cartella, come prima. Dopo lo spostamento è chi lavora nell'archivio nuovo: il nuovo medico, la sua segreteria, il medico di prima se ha accesso a quell'archivio. La prestazione compare nella distinta del medico di prima, che la controlla prima di mandarla e da lì la può annullare;
+   - **la pagina lo dice prima**: «Va nella distinta dell'archivio «…»: il … il paziente era nel suo archivio». Il catalogo è quello della regione e dell'ASL di quell'archivio;
+   - **il paziente resta fermo** durante la registrazione. Uno spostamento a metà la ferma con 409;
+   - **esportazione** (regola 4): l'archivio porta con sé anche le prestazioni della sua distinta di pazienti passati a un altro medico, e gli spostamenti dall'archivio o verso. Non porta l'identità di quei pazienti, che ora stanno nell'archivio nuovo; nelle distinte già partite c'è.
+
+4. **Codice di autenticazione del SAC** (A3): «Obbligatorio». Per segnare come arrivata una ricetta SSN, farmaceutica o specialistica, serve il codice. Senza, la ricetta non è valida, come nell'invio normale, che tratta come rifiutata una ricetta accettata senza codice. Si chiede il codice all'ente; se l'ente non lo dà, si segna «Non è arrivata». Per i presidi il codice resta facoltativo, come nell'invio. Per la ricetta bianca servono NRBE e PIN, come prima (D239).
+
+Prove nuove: `apps/api/test/ppip-spostamenti.test.ts`, `packages/domain/test/spostamenti.test.ts`, `apps/web/test/spostamenti.test.ts`; rafforzate `invio-interrotto.test.ts`, `invio-senza-risposta.test.tsx`, `ppip.test.tsx`, `esportazione.test.ts`, `registro.test.ts` e la prova di «Sposta» della dimostrazione. 26 sabotaggi, nel registro di `docs/avanzamento.md`. Una prova che non vedeva il suo sabotaggio è stata rafforzata: il paziente fermo durante la registrazione.
+
+Non provato:
+
+- come l'ASL tratta una prestazione eseguita dal medico di prima dopo la nuova scelta del paziente in AURA, che vale subito (art. 40), e prima di «Sposta». Nel programma va nella distinta del medico che l'ha eseguita; le fonti non dicono come l'ASL la controlla;
+- il catalogo dell'archivio della distinta quando i due archivi hanno ASL diverse: nella prova i due archivi hanno lo stesso catalogo;
+- il SAR vero e il Sistema TS veri;
+- WebKit e Firefox anche in locale, oltre che nella CI (D241).
+
+**D241 · WebKit in locale e riquadro della dimostrazione.** Simone ha chiesto il 21/11/2026: «Non puoi installarlo? Webkit intendo».
+
+- **Come.** Chromium è già installato in `/opt/pw-browsers`. Le istruzioni di questo ambiente vietano di reinstallare Playwright e di lanciare `playwright install`, che renderebbe Chromium irraggiungibile. WebKit si scarica quindi con la stessa versione di Playwright del progetto (1.63.0) in una cartella a parte, indicata con `PLAYWRIGHT_BROWSERS_PATH`, che Chromium non usa. Le librerie di sistema arrivano da apt (`playwright install-deps`). Lo fa `scripts/browser-locali.sh`, anche per Firefox. Chromium funziona come prima.
+- **Rete.** Il download era bloccato dalla rete dell'ambiente: Simone ha approvato l'aggiunta di `playwright.download.prss.microsoft.com`, che vale anche per le sessioni future. Il contenitore si ricrea da zero, quindi WebKit si riscarica a ogni sessione nuova, circa 300 MB, con lo script e solo quando serve. Non l'ho messo nell'avvio della sessione: lo renderebbe lento per tutte.
+- **Che cosa ha trovato.** Con WebKit in locale la prova dell'interfaccia è verde, 55 prove su 55. La dimostrazione ha riprodotto il guasto visto su GitHub nella #30: «Ricomincia da capo» non si cliccava, perché il pulsante spariva. Causa: dopo ogni accesso il riquadro della dimostrazione si riduce da sé, e lo fa fino a un secondo dopo, quando rilegge lo stato del servizio. Chi lo apriva in quel secondo, anche a mano, lo vedeva richiudersi. Le prove lo aprivano proprio lì.
+- **Correzione.** Il servizio della dimostrazione dice da quando c'è la sessione. Il riquadro si riduce da sé una volta per sessione, ma non se lo si è aperto a mano dopo l'inizio della sessione. Aperto durante l'accesso, prima della sessione, si riduce come prima. La decisione è una funzione pura, provata senza browser (`apps/demo/prove/riquadro.unit.ts`, con le prove della dimostrazione). Le prove della dimostrazione aprono il riquadro in uno stato noto: se è aperto lo riducono, poi lo riaprono a mano.
+- **Esito.** Dopo la correzione la dimostrazione è verde in locale con i tre motori, WebKit, Chromium e Firefox: 31 prove ciascuno, 5 sulla decisione del riquadro e 26 nel browser. Firefox si è scaricato con lo stesso script, in un minuto. Simone ha chiesto: «firefox è necessario? se comporta troppo lavoro lasciamo perdere». Resta: non chiede lavoro, perché la prova parte da sola, e su GitHub la dimostrazione era caduta anche con Firefox.
+
+Non provato: il collegamento del pulsante con la decisione si prova solo nella dimostrazione, dove il guasto dipende dai tempi; Safari e Firefox veri, su computer e tablet.
+
+**D242 · Prove di Simone sulla dimostrazione: pulsanti, ricette in attesa della segreteria, ricetta in una schermata.** Simone, il 21/11/2026, provando la dimostrazione: «sistema formattazione pulsante (il + sembra esterno al pulsante). Inoltre non vedo le ricette in attesa da account segreteria. E' normale? Preferirei inoltre che la pagina stessa su una schermata unica, senza dover scendere con il mouse». Poi, con la schermata della ricetta: «facciamo in modo, se la causa è che ogni singolo farmaco apra i suoi menu, che questi pannelli sui singoli farmaci si aprano solo cliccando nel dettaglio del farmaco, non voglio che si debba fare scrolling».
+
+- **Pulsanti.** I pulsanti avevano una larghezza minima di 44 px, e quel minimo toglie quello automatico degli elementi flessibili. Accanto a un testo lungo, come la riga del farmaco con ditta e prezzi, il pulsante si stringeva sotto la misura del suo contenuto e il «+» usciva dal bordo. Ora i pulsanti non si stringono: va a capo il testo vicino. La prova dell'interfaccia controlla in ogni pagina che nessun pulsante sia più stretto del suo contenuto. Ha trovato anche «Chiudi tutte» delle cartelle aperte, sul tablet in verticale, ora corretto allo stesso modo.
+- **Ricette in attesa e segreteria.** Era voluto: le code le vedeva solo chi firma. La pagina però diceva alla segreteria «Qui sotto le ricette in attesa». Ora la segreteria vede le tre code (da firmare, invii non riusciti, invii senza risposta) in sola lettura. Le vede negli archivi che l'hanno confermata (D181), senza le ricette con una terapia riservata, come nella cartella. Firma ed esito restano del medico (regola 5). L'amministratore senza accesso clinico non le vede. Le righe di una ricetta si leggono dalla cartella, quindi la lettura resta registrata come prima.
+- **Ricetta in una schermata.**
+  - Ogni farmaco o prestazione in ricetta è una riga chiusa con il nome, su due righe al più, e una sintesi. Nella sintesi ci sono confezioni e posologia; per le prestazioni la quantità e i codici; e le scelte che vincolano il farmacista, se fatte. La riga si apre e si chiude col clic; aperta, il nome si legge intero.
+  - Canale del promemoria e oscuramento di nome e indirizzo stanno in «Altre opzioni», una riga che dice la scelta in corso e si apre col clic. L'esenzione resta in vista.
+  - Anche le banche dati in uso sono una riga che si apre. Una banca dati più vecchia del previsto si dice anche da chiusa.
+  - Sul computer e sul tablet in orizzontale (almeno 901 px di larghezza e 600 di altezza) la pagina è alta quanto lo schermo. Titolo e dati del paziente stanno in una riga; allergie ed esenzioni restano in vista. La ricerca e la ricetta scorrono ciascuna nel suo riquadro; il campo di ricerca e i pulsanti della ricetta restano in vista. Sugli schermi stretti, come il tablet in verticale, la pagina scorre come le altre.
+  - Misurato nella dimostrazione con due farmaci, uno dal nome lungo: la pagina non scorre a nessuna delle misure provate; la ricetta sta intera nel suo riquadro a 1280×800 e più. A 1280×720 e 1024×768 scorre la ricetta nel suo riquadro, con i pulsanti in vista.
+- **Banca dati dei farmaci nella dimostrazione.** Simone ha chiesto: «Il database sui farmaci è infinitamente ristretto rispetto all'originale o sbaglio?». Non sbaglia. La dimostrazione usa le banche dati d'esempio delle prove: 13 confezioni dell'anagrafica AIFA, mentre il file vero letto il 18/11/2026 ne ha 160.101. Il programma vero importa i file completi (`pnpm banche-dati:aggiorna`). Una dimostrazione con più farmaci è una domanda per la fermata.
+
+Non provato: i lettori di schermo veri sulle righe che si aprono; Safari e Firefox veri; schermi più bassi di 600 px, dove la pagina scorre come prima; la ricetta specialistica con molte prestazioni, che scorre nel suo riquadro.

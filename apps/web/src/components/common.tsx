@@ -82,9 +82,15 @@ export interface DatasetVersion {
 export function DataVersions({
   versions,
   label,
+  compact = false,
 }: {
   versions: DatasetVersion[] | undefined;
   label: string;
+  /**
+   * Chiuse in una riga, che si apre col clic (D242): nella ricetta, perché la pagina stia in una
+   * schermata. Una banca dati più vecchia del previsto si dice anche da chiuse.
+   */
+  compact?: boolean;
 }) {
   if (!versions) return null;
   if (versions.length === 0) {
@@ -95,9 +101,9 @@ export function DataVersions({
       </Notice>
     );
   }
-  return (
-    <div className="versioni">
-      <p className="versioni-titolo">{label} in uso</p>
+  const stale = versions.some((v) => v.stale);
+  const list = (
+    <>
       <ul>
         {versions.map((v) => (
           <li key={v.series}>
@@ -131,6 +137,28 @@ export function DataVersions({
       <Link className="versioni-aggiornamento" to="/strumenti?sezione=banche-dati">
         Aggiornamento delle banche dati
       </Link>
+    </>
+  );
+  if (compact)
+    return (
+      <details className="versioni versioni-chiuse">
+        <summary>
+          <Icon name="apri" />
+          {label} in uso
+          {stale && (
+            <strong className="versioni-vecchia">
+              {' '}
+              · <Icon name="avviso" /> più vecchia del previsto
+            </strong>
+          )}
+        </summary>
+        {list}
+      </details>
+    );
+  return (
+    <div className="versioni">
+      <p className="versioni-titolo">{label} in uso</p>
+      {list}
     </div>
   );
 }

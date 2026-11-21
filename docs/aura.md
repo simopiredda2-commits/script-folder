@@ -89,6 +89,7 @@ Ogni cambio di stato è una variazione in parole.
 - **«Non spostare».** Il paziente resta nell'archivio di prima e il cambio non si ripropone finché AURA non manda una scelta nuova (altro medico o altra data).
 - **La proposta decade** quando la scelta non vale più, quando il paziente torna dal titolare di prima, o quando è deceduto.
 - **Dopo lo spostamento** ricette e certificati di prima restano nello storico del paziente. Un'importazione fatta nell'archivio di prima non si annulla più per intero se ha scritto dati del paziente spostato.
+- **Storico degli spostamenti** (D240): ogni «Sposta» resta nella tabella `patient_archive_move`, con il giorno, i due archivi, chi l'ha fatto e il cambio di AURA. Non si modifica e non si cancella. Dice chi aveva il paziente in un giorno: una prestazione aggiuntiva eseguita prima dello spostamento va nella distinta dell'archivio di prima, anche se la si registra dopo (`docs/ppip.md`).
 
 **Risposte che non tornano.** Se AURA risponde con un profilo che ha un altro codice fiscale, nulla cambia: il collegamento si azzera e al controllo dopo il paziente si cerca di nuovo. Senza rete i dati restano quelli di prima, con il motivo.
 

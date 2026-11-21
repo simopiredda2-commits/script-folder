@@ -12,7 +12,10 @@ interface SettleOutcome {
 
 export interface InterruptedSendPanelProps {
   prescriptionId: string;
-  /** Tipo di ricetta: la bianca va al Sistema TS, con NRBE e PIN (D239). */
+  /**
+   * Tipo di ricetta: la bianca va al Sistema TS, con NRBE e PIN (D239); la SSN vuole anche il
+   * codice di autenticazione (D240).
+   */
   kind?: string;
   /** Quando era partito l'invio rimasto senza risposta, e chi l'aveva firmato. */
   signedAt: string;
@@ -31,8 +34,8 @@ type Pending =
  * Esito di un invio rimasto senza risposta (D233): il servizio si è fermato mentre aspettava
  * l'ente. Il medico chiede all'ente se la ricetta è arrivata e segna la risposta. «Non è arrivata»:
  * la ricetta torna da inviare. «È arrivata»: con il numero e, per la SSN, il codice di
- * autenticazione se l'ente lo dà; per la bianca NRBE e PIN. L'esito non si cambia dopo, quindi si
- * conferma prima di segnarlo (D239).
+ * autenticazione, senza il quale la ricetta non è valida (D240); per la bianca NRBE e PIN. L'esito
+ * non si cambia dopo, quindi si conferma prima di segnarlo (D239).
  */
 export function InterruptedSendPanel({
   prescriptionId,
@@ -43,6 +46,9 @@ export function InterruptedSendPanel({
   onChange,
 }: InterruptedSendPanelProps) {
   const white = kind === 'white';
+  // Farmaceutica e specialistica SSN: senza il codice di autenticazione la ricetta non è valida,
+  // come nell'invio (D240). Per i presidi il codice resta facoltativo, come nell'invio.
+  const ssn = kind === 'pharma_ssn' || kind === 'specialist_ssn';
   const [nre, setNre] = useState('');
   const [authCode, setAuthCode] = useState('');
   const [pin, setPin] = useState('');
@@ -199,6 +205,16 @@ export function InterruptedSendPanel({
             aria-label="La ricetta è arrivata"
             onSubmit={(e) => {
               e.preventDefault();
+              // Un codice di soli spazi non è un codice: lo si dice qui, prima della conferma.
+              if (ssn && !authCode.trim()) {
+                setError(
+                  new ApiError(
+                    400,
+                    'Senza il codice di autenticazione la ricetta SSN non è valida: chiedi all’ente il numero e il codice. Se l’ente non li dà, segna «Non è arrivata».',
+                  ),
+                );
+                return;
+              }
               setError(null);
               setPending({
                 esito: 'arrivata',
@@ -245,18 +261,24 @@ export function InterruptedSendPanel({
               </div>
             ) : (
               <div className="campo">
-                <label htmlFor={codeId}>Codice di autenticazione (facoltativo)</label>
+                <label htmlFor={codeId}>
+                  {ssn
+                    ? 'Codice di autenticazione dato dall’ente'
+                    : 'Codice di autenticazione (facoltativo)'}
+                </label>
                 <input
                   id={codeId}
                   className="codice"
                   value={authCode}
                   onChange={(e) => setAuthCode(e.target.value)}
+                  required={ssn}
                   aria-describedby={`${codeId}-aiuto`}
                   autoComplete="off"
                 />
                 <p className="aiuto" id={`${codeId}-aiuto`}>
-                  Serve per stampare il promemoria; senza, il promemoria non si stampa e al paziente
-                  bastano il numero di ricetta e il codice fiscale.
+                  {ssn
+                    ? 'Senza il codice la ricetta SSN non è valida e il promemoria non si stampa. Se l’ente non dà il codice, segna «Non è arrivata».'
+                    : 'Se l’ente lo dà, resta con la ricetta.'}
                 </p>
               </div>
             )}

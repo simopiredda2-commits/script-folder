@@ -18,6 +18,11 @@ interface QueueGroup {
     righe: number;
     errore: string | null;
     tipoErrore: string | null;
+    /**
+     * Falso per chi vede la coda senza firmare, la segreteria (D242): la ricetta si vede, la firma
+     * e l'esito restano del medico.
+     */
+    firmabile?: boolean;
     /** Solo negli invii senza risposta: quando era partito l'invio e chi l'aveva firmato. */
     firmataIl?: string;
     firmataDa?: string | null;
@@ -69,6 +74,8 @@ function QueueItem({
   onChange: (status: string, nre?: string) => void;
 }) {
   const { list, lines } = useLines(patientId, prescription.id);
+  const { isDoctor } = useSession();
+  const signable = isDoctor && prescription.firmabile !== false;
   return (
     <li className="ricetta-in-coda">
       <p>
@@ -82,7 +89,14 @@ function QueueItem({
       {prescription.errore && (
         <Notice kind="avviso">Ultimo invio non riuscito: {prescription.errore}</Notice>
       )}
-      {list.data && (
+      {!signable && (
+        <p className="tenue">
+          {status === 'error'
+            ? 'La corregge e la reinvia il medico.'
+            : 'In attesa della firma del medico.'}
+        </p>
+      )}
+      {signable && list.data && (
         <SendPanel
           prescriptionId={prescription.id}
           status={status}
@@ -206,6 +220,8 @@ function InterruptedItem({
 }) {
   const { lines } = useLines(patient.id, r.id);
   const [arrived, setArrived] = useState(false);
+  const { isDoctor } = useSession();
+  const signable = isDoctor && r.firmabile !== false;
   return (
     <li className="ricetta-in-coda">
       <p>
@@ -216,18 +232,26 @@ function InterruptedItem({
         </span>
       </p>
       <Lines lines={lines} />
-      <InterruptedSendPanel
-        prescriptionId={r.id}
-        kind={r.tipo}
-        signedAt={r.firmataIl ?? r.preparataIl}
-        signedBy={r.firmataDa ?? null}
-        settleFrom={r.esitoDal ?? null}
-        onChange={(status) => {
-          if (status === 'sent') setArrived(true);
-          // «Non è arrivata»: la ricetta passa fra gli invii non riusciti, che si ricaricano.
-          else onChanged();
-        }}
-      />
+      {!signable && (
+        <p className="tenue">
+          Invio partito il {dateTime(r.firmataIl ?? r.preparataIl)}
+          {r.firmataDa ? `, firmata da ${r.firmataDa}` : ''}: l’esito lo segna il medico.
+        </p>
+      )}
+      {signable && (
+        <InterruptedSendPanel
+          prescriptionId={r.id}
+          kind={r.tipo}
+          signedAt={r.firmataIl ?? r.preparataIl}
+          signedBy={r.firmataDa ?? null}
+          settleFrom={r.esitoDal ?? null}
+          onChange={(status) => {
+            if (status === 'sent') setArrived(true);
+            // «Non è arrivata»: la ricetta passa fra gli invii non riusciti, che si ricaricano.
+            else onChanged();
+          }}
+        />
+      )}
       {arrived && (
         <ReminderPanel
           prescriptionId={r.id}
@@ -275,9 +299,13 @@ function InterruptedQueue({ onChanged }: { onChanged: () => void }) {
   );
 }
 
-/** Coda «da firmare» del medico e invii non riusciti. */
+/**
+ * Coda «da firmare» del medico e invii non riusciti. La segreteria le vede in sola lettura (D242):
+ * la pagina le promette, «Qui sotto le ricette in attesa»; firma ed esito restano del medico.
+ */
 export function SignQueuePage() {
-  const { isDoctor } = useSession();
+  const { isDoctor, isSecretary } = useSession();
+  const sees = isDoctor || isSecretary;
   // Una ricetta che passa da una coda all'altra: gli invii non riusciti si ricaricano (D239).
   const [changes, setChanges] = useState(0);
   const changed = () => setChanges((n) => n + 1);
@@ -290,10 +318,11 @@ export function SignQueuePage() {
     target.scrollIntoView?.({ block: 'start' });
     target.focus({ preventScroll: true });
   }, [hash]);
+  const hidden = <p className="tenue">Le ricette in attesa le vedono il medico e la segreteria.</p>;
   return (
     <>
       <PageHeader title="Ricette" />
-      {!isDoctor && (
+      {!isDoctor && isSecretary && (
         <Notice kind="info">
           La segreteria prepara le ricette; firma e invio sono del medico. Qui sotto le ricette in
           attesa.
@@ -304,7 +333,7 @@ export function SignQueuePage() {
         <p className="tenue">
           Ogni ricetta passa i controlli delle regole di prescrizione prima dell’invio.
         </p>
-        {isDoctor ? (
+        {sees ? (
           <Queue
             path="/api/ricette/da-firmare"
             status="to_sign"
@@ -312,14 +341,14 @@ export function SignQueuePage() {
             onChanged={changed}
           />
         ) : (
-          <p className="tenue">La coda è visibile al medico.</p>
+          hidden
         )}
       </section>
       <section aria-labelledby="non-inviate">
         <h2 id="non-inviate" tabIndex={-1}>
           Invii non riusciti
         </h2>
-        {isDoctor ? (
+        {sees ? (
           <Queue
             path="/api/ricette/non-inviate"
             status="error"
@@ -327,14 +356,14 @@ export function SignQueuePage() {
             reloadKey={changes}
           />
         ) : (
-          <p className="tenue">La coda è visibile al medico.</p>
+          hidden
         )}
       </section>
       <section aria-labelledby="senza-risposta">
         <h2 id="senza-risposta" tabIndex={-1}>
           Invii senza risposta
         </h2>
-        {isDoctor ? (
+        {sees ? (
           <>
             <p className="tenue">
               Ricette rimaste «in invio». Se la risposta non arriva entro 15 minuti, il servizio si
@@ -343,7 +372,7 @@ export function SignQueuePage() {
             <InterruptedQueue onChanged={changed} />
           </>
         ) : (
-          <p className="tenue">La coda è visibile al medico.</p>
+          hidden
         )}
       </section>
     </>
