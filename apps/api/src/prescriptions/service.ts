@@ -118,8 +118,9 @@ const signSchema = z
 /**
  * Esito di un invio rimasto senza risposta (D233), come lo dice l'ente al medico. Il formato
  * dell'NRE non è nelle specifiche che abbiamo (A1): lettere e cifre, in maiuscolo come le vuole il
- * codice a barre del promemoria (D239). Il codice di autenticazione è facoltativo: senza, il
- * promemoria non si stampa. Per la ricetta bianca il Sistema TS dà NRBE e PIN (D239).
+ * codice a barre del promemoria (D239). Per la ricetta SSN serve anche il codice di autenticazione:
+ * senza, la ricetta non è valida (specifiche del Sistema TS, D240). Per la ricetta bianca il
+ * Sistema TS dà NRBE e PIN (D239).
  */
 const settleSchema = z.discriminatedUnion('esito', [
   z.object({ esito: z.literal('non_arrivata') }).strict(),
@@ -807,7 +808,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
    * ha chiesto se la ricetta è arrivata e segna la risposta:
    * - non arrivata: la ricetta torna in errore, come quando l'ente non risponde; si rimanda o si
    *   stampa la ricetta rossa;
-   * - arrivata: con l'NRE e, se l'ha, il codice di autenticazione, che serve al promemoria.
+   * - arrivata: con l'NRE e, per la ricetta SSN, il codice di autenticazione. Senza il codice la
+   *   ricetta SSN non è valida, come nell'invio (D240): non si segna come arrivata.
    * La ricetta resta bloccata finché l'esito non è scritto: due esiti insieme non passano tutti e
    * due, e l'invio di prima, se poi risponde, non scrive sopra.
    */
@@ -831,14 +833,20 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       );
     const authCode = white ? null : (arrived?.codiceAutenticazione ?? null);
     const ssn = p.kind === 'pharma_ssn' || p.kind === 'specialist_ssn';
+    // Come nell'invio: una ricetta SSN senza il codice di autenticazione non è valida (specifiche
+    // del Sistema TS, prescrizione, 5/12/2024). Scelta di Simone del 21/11/2026 (D240).
+    if (arrived && ssn && !authCode)
+      throw new HttpError(
+        400,
+        'Senza il codice di autenticazione la ricetta SSN non è valida: chiedi all’ente il numero (NRE) e il codice. Se l’ente non li dà, segna «Non è arrivata»',
+      );
     // Il messaggio partito con quell'invio, fotografato alla firma (D239): è la richiesta che resta
     // nel registro degli invii, e le sue righe e il paziente di allora vanno sul promemoria. Per
     // una ricetta firmata prima della fotografia, come l'aveva firmato chi l'ha mandata.
     const snapshot = p.sendingSnapshot as SendingSnapshot | null;
     const message = snapshot?.message ?? (await buildMessage(p, p.signedBy!, studioDate(signedAt)));
     let promemoria: Awaited<ReturnType<typeof buildPromemoriaData>> | null = null;
-    // Perché il promemoria non c'è: manca il codice, oppure i dati non si sono potuti fissare.
-    const noCode = arrived !== null && ssn && !authCode;
+    // Il promemoria manca solo se i dati non si sono potuti fissare: il codice c'è sempre (D240).
     let notFixed = false;
     if (arrived && ssn && authCode) {
       try {
@@ -944,11 +952,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       messaggio: arrived
         ? white
           ? `Ricetta bianca segnata come arrivata, NRBE ${arrived.nre}: il promemoria del Sistema TS non c’è, perché la risposta dell’invio non è arrivata. NRBE e PIN si dettano al paziente o gli si mandano per SMS.`
-          : noCode
-            ? `Ricetta segnata come arrivata, NRE ${arrived.nre}: senza il codice di autenticazione il promemoria non si stampa. Al paziente bastano il numero di ricetta e il codice fiscale.`
-            : notFixed
-              ? `Ricetta segnata come arrivata, NRE ${arrived.nre}: i dati del promemoria non si sono potuti fissare, quindi il promemoria non si stampa. Al paziente bastano il numero di ricetta e il codice fiscale.`
-              : null
+          : notFixed
+            ? `Ricetta segnata come arrivata, NRE ${arrived.nre}: i dati del promemoria non si sono potuti fissare, quindi il promemoria non si stampa. Al paziente bastano il numero di ricetta e il codice fiscale.`
+            : null
         : notArrived,
     };
   }
