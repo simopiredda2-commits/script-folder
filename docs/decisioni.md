@@ -1580,3 +1580,12 @@ Scelte prese qui, con il motivo:
 - **«È arrivata»**: il medico scrive il numero che l'ente gli ha dato, l'NRE della ricetta o il protocollo del certificato. Il formato dell'NRE non è ancora nelle specifiche che abbiamo (A1): si accettano lettere e cifre. Il codice di autenticazione è facoltativo: con il codice il promemoria si stampa come sempre; senza, il promemoria non si stampa e lo si dice, e al paziente bastano il numero di ricetta e il codice fiscale.
 - **Un esito tardivo dell'invio di prima** non cambia più la pratica. Succede se il servizio, rimasto fermo più di 15 minuti, poi risponde. La risposta resta nel registro degli invii e chi aspettava riceve «l'esito è stato segnato nel frattempo».
 - **Tracce**: l'esito segnato a mano entra nel registro degli invii con l'ambiente «manuale», insieme al cambio di stato; il registro degli accessi ha la richiesta, come per l'invio.
+
+Come si è fatto:
+
+- **Ricetta**: la coda «Invii senza risposta» nella pagina Ricette, con il conto in Oggi. Per ogni ricetta: quando era partito l'invio e chi l'aveva firmato, «Non è arrivata: torna da inviare» e il modulo «È arrivata», con l'NRE e il codice di autenticazione facoltativo.
+- **Certificato**: nella sua scheda, dopo 15 minuti, gli stessi due esiti, con il protocollo. Prima dei 15 minuti la scheda dice «Invio all'INPS in corso: aspetta la risposta».
+- **Tutti e due**: l'esito si scrive con la pratica bloccata e riletta, quindi due esiti insieme non passano tutti e due. L'invio scrive la sua risposta solo se la pratica è ancora «in invio» da quella firma.
+- **Una soglia sola**: i 15 minuti stanno nel dominio e valgono anche per le PPIP (D232).
+
+Prove: 13 del servizio, 7 dell'interfaccia, 2 del dominio; 26 sabotaggi. Al primo giro un sabotaggio del permesso non è stato rilevato: il permesso messo al posto giusto era uno che la segreteria non ha senza le terapie croniche, quindi la segreteria riceveva il rifiuto lo stesso. Rifatto con un permesso che la segreteria ha davvero, è diventato rosso. Non provati: un arresto vero del servizio, il SAR e l'INPS veri, la dimostrazione (lì gli invii non restano «in invio»).
