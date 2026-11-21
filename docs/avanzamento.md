@@ -1248,6 +1248,8 @@ Richieste di Simone del 21/11/2026, provando la dimostrazione, con due schermate
 
 **Domande per la fermata**: via alla #30; più farmaci nella dimostrazione.
 
+**Pausa** (richiesta di Simone del 21/11/2026: «Dopo queste lavorazione, pausa»). Finite le correzioni delle prove instabili, il lavoro si ferma. Le domande della fermata sono pronte con il pulsante; la #30 si unisce con il via e le prove su GitHub verdi. Alla ripresa: le schermate 07 e 08 e quello che Simone chiede.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:
