@@ -289,19 +289,44 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   };
 
   /**
-   * page.goto che aspetta la pagina nuova, al suo posto e ferma.
-   *
-   * Al suo posto: la pagina di prima porta un segno, e si va avanti quando il segno non c'è più
-   * (con WebKit, tornando all'indirizzo dove la prova precedente era finita, «la stessa prestazione
-   * già prescritta» era caduta una volta: CI su main, giro 170).
-   *
-   * Ferma: nessuna richiesta da mezzo secondo, i caratteri pronti, due fotogrammi. Le parti che
-   * arrivano dopo spostano la pagina: le impostazioni e le medicazioni avanzate sopra «Apri la
-   * distinta» nell'Archivio, il promemoria e i «già prescritti» sopra «Nuova ricetta da capo». Un
-   * clic in quel momento preme su un elemento e rilascia su un altro: Playwright controlla il
-   * bersaglio solo alla pressione, e il clic va perso senza errore. È la causa delle due prove
-   * cadute con WebKit sulle prove su GitHub del 21/11/2026 (giri 405 e 408), e la più probabile di
-   * quella del giro 170; il meccanismo è riprodotto in Chromium, WebKit e Firefox (D242).
+   * La pagina ferma dopo un caricamento: nessuna richiesta da mezzo secondo, i caratteri pronti,
+   * due fotogrammi. Le parti che arrivano dopo spostano la pagina: le impostazioni e le medicazioni
+   * avanzate sopra «Apri i riepiloghi» e «Apri la distinta» nell'Archivio, il promemoria e i «già
+   * prescritti» sopra «Nuova ricetta da capo». Un clic in quel momento preme su un elemento e
+   * rilascia su un altro: Playwright controlla il bersaglio solo alla pressione, e il clic va perso
+   * senza errore. È la causa delle tre prove cadute con WebKit sulle prove su GitHub del 21/11/2026
+   * (giri 405, 408 e 411); il meccanismo è riprodotto in Chromium, WebKit e Firefox (D242).
+   */
+  async function settle(p: Page) {
+    await p.waitForLoadState('networkidle');
+    await p.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    });
+  }
+
+  /** Ogni pagina della prova aspetta la pagina ferma dopo goto e reload (vedi settle). */
+  function settling(p: Page): Page {
+    const goto = p.goto.bind(p);
+    const reload = p.reload.bind(p);
+    p.goto = async (url, options) => {
+      const response = await goto(url, options);
+      await settle(p);
+      return response;
+    };
+    p.reload = async (options) => {
+      const response = await reload(options);
+      await settle(p);
+      return response;
+    };
+    return p;
+  }
+
+  /**
+   * page.goto che aspetta la pagina nuova al suo posto: la pagina di prima porta un segno, e si va
+   * avanti quando il segno non c'è più (con WebKit, tornando all'indirizzo dove la prova precedente
+   * era finita, «la stessa prestazione già prescritta» era caduta una volta: CI su main, giro 170).
+   * Poi la pagina ferma, come dopo ogni caricamento.
    */
   async function gotoNewPage(p: Page, url: string) {
     await p.evaluate(() => {
@@ -309,11 +334,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
     await p.goto(url);
     await p.waitForFunction(() => !(window as Window & { paginaDiPrima?: boolean }).paginaDiPrima);
-    await p.waitForLoadState('networkidle');
-    await p.evaluate(async () => {
-      await document.fonts.ready;
-      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-    });
+    await settle(p);
   }
 
   /**
@@ -497,7 +518,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect(browser.browserType().name()).toBe(ENGINE);
     doctor = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'it-IT' });
     await doctor.clock.setFixedTime(s.clock.now());
-    page = await doctor.newPage();
+    page = settling(await doctor.newPage());
   }, 120_000);
 
   afterAll(async () => {
@@ -820,7 +841,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       locale: 'it-IT',
     });
     await ctx.clock.setFixedTime(s.clock.now());
-    const sec = await ctx.newPage();
+    const sec = settling(await ctx.newPage());
     try {
       await loginInBrowser(sec, 'segreteria');
       await sec.goto(`${base}/pazienti/${s.richPatient}`);
@@ -1394,7 +1415,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
 
     await ctx.clock.setFixedTime(s.clock.now());
-    const admin = await ctx.newPage();
+    const admin = settling(await ctx.newPage());
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin
@@ -1445,7 +1466,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
 
     await ctx.clock.setFixedTime(s.clock.now());
-    const admin = await ctx.newPage();
+    const admin = settling(await ctx.newPage());
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin.goto(`${base}/strumenti?sezione=banche-dati`);
@@ -1598,7 +1619,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
 
     await ctx.clock.setFixedTime(s.clock.now());
-    const colleague = await ctx.newPage();
+    const colleague = settling(await ctx.newPage());
     try {
       await loginInBrowser(colleague, 'collega');
       await colleague.goto(`${base}/strumenti?sezione=aft`);
@@ -1655,7 +1676,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       locale: 'it-IT',
     });
     await ctx.clock.setFixedTime(s.clock.now());
-    const admin = await ctx.newPage();
+    const admin = settling(await ctx.newPage());
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin.goto(`${base}/strumenti?sezione=studio`);
@@ -1731,7 +1752,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       locale: 'it-IT',
     });
     await ctx.clock.setFixedTime(s.clock.now());
-    const admin = await ctx.newPage();
+    const admin = settling(await ctx.newPage());
     try {
       await loginInBrowser(admin, 'amministratore');
       await admin.goto(`${base}/strumenti?sezione=utenti`);
@@ -2429,7 +2450,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
     await anonymous.clock.setFixedTime(s.clock.now());
     try {
-      const p = await anonymous.newPage();
+      const p = settling(await anonymous.newPage());
       await p.goto(base);
       await p.getByRole('link', { name: /Ripristina con SPID o CIE/ }).click();
       await p.getByRole('heading', { level: 1, name: 'Ripristino con SPID o CIE' }).waitFor();
