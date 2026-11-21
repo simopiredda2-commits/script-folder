@@ -1227,6 +1227,23 @@ Domanda di Simone del 21/11/2026, durante il blocco: «Non puoi installarlo? Web
 
 **Non provato**: la prova dell'interfaccia con Firefox in locale (con WebKit sì, 55 su 55; Firefox nella CI); il collegamento del pulsante del riquadro con la decisione, che si prova solo nella dimostrazione, dove il guasto dipende dai tempi; Safari e Firefox veri.
 
+### Prove di Simone sulla dimostrazione (D242)
+
+Richieste di Simone del 21/11/2026, provando la dimostrazione, con due schermate: il pulsante «Aggiungi» con il «+» fuori dal bordo, la pagina Ricette della segreteria vuota, la ricetta con un pannello aperto per ogni farmaco.
+
+1. **Pulsanti mai più stretti del contenuto** (fatto). Causa: la larghezza minima di 44 px toglieva il minimo automatico degli elementi flessibili. Ora va a capo il testo vicino. Una prova nuova lo controlla in tutte le pagine della prova dell'interfaccia; ha trovato anche «Chiudi tutte» delle cartelle aperte sul tablet in verticale.
+2. **Ricette in attesa alla segreteria** (fatto). La pagina le prometteva («Qui sotto le ricette in attesa») ma le code le vedeva solo chi firma. Ora la segreteria vede in sola lettura da firmare, invii non riusciti e invii senza risposta, negli archivi che l'hanno confermata e senza le ricette con terapie riservate; firma ed esito restano del medico.
+3. **Ricetta in una schermata** (fatto). Ogni farmaco è una riga chiusa (nome e sintesi: confezioni, posologia, scelte per il farmacista) che si apre col clic. Promemoria e oscuramento stanno in «Altre opzioni», che dice la scelta in corso; l'esenzione resta in vista. Sul computer la pagina è alta quanto lo schermo e scorrono, se serve, la ricerca e la ricetta, ciascuna nel suo riquadro, con il campo di ricerca e i pulsanti in vista.
+4. **Banca dati della dimostrazione** (risposta). È un estratto: 13 confezioni dell'anagrafica AIFA contro le 160.101 del file vero. Il programma vero importa i file completi. Se servono più farmaci nella dimostrazione è una domanda per la fermata.
+
+**Come provarlo**: nella dimostrazione, entra come `segreteria`, ripeti una terapia dalla cartella e apri **Ricette**: la ricetta è «in attesa della firma del medico». Poi entra come `medico`, apri un paziente e **Nuova ricetta**, aggiungi due farmaci: le righe sono chiuse e la pagina non scorre; clic sulla riga per confezioni e posologia. Prove: `apps/api/test/coda-segreteria.test.ts`, `apps/web/test/coda-segreteria.test.tsx`, la prova dell'interfaccia (pulsanti, righe chiuse, schermata unica a 1280×800 e 1024×768) e quella della dimostrazione.
+
+**Non provato**: lettori di schermo veri sulle righe che si aprono; Safari e Firefox veri; schermi più bassi di 600 px, dove la pagina scorre come prima; la ricetta specialistica con molte prestazioni, che scorre nel suo riquadro.
+
+**Non fatto**: le schermate 07 e 08 di `docs/interfaccia.md` mostrano ancora la ricetta di prima; si rifanno con `schermate.ts` insieme alle prossime.
+
+**Domande per la fermata**: via alla #30; più farmaci nella dimostrazione.
+
 ## Richieste di Simone tra le fermate (18/11/2026)
 
 Annotate come decisioni per la tappa 6:

@@ -559,7 +559,21 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .filter({ hasText: /AMLODIPINA/i })
       .first();
     await result.getByRole('button', { name: 'Aggiungi' }).click();
-    await f.locator('.riga-ricetta').first().waitFor();
+    // La riga è chiusa: nome e sintesi; i campi si aprono col clic (D242). La pagina sta in una
+    // schermata: non scorre.
+    const line = f.locator('.riga-ricetta').first();
+    const opener = line.locator('.riga-ricetta-apri');
+    await line.getByText('1 confezione · posologia non indicata').waitFor();
+    expect(await opener.getAttribute('aria-expanded')).toBe('false');
+    await opener.click();
+    await line.getByLabel('Posologia').fill('1 compressa al giorno');
+    await opener.click();
+    await line.getByText('1 confezione · 1 compressa al giorno').waitFor();
+    expect(
+      await f.evaluate(() => document.scrollingElement!.scrollHeight <= innerHeight),
+      'la pagina della ricetta scorre',
+    ).toBe(true);
+    await expectAccessible('nuova ricetta con la riga chiusa');
     await f.getByRole('button', { name: 'Prepara la ricetta' }).click();
     await f.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await f.getByRole('button', { name: 'Firma e invia' }).click();
@@ -756,6 +770,18 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       };
       return { secretary: me.nome, name: `${p.paziente.firstName} ${p.paziente.lastName}` };
     }, id);
+    // La segreteria la vede fra le ricette in attesa, in sola lettura (D242): firma e invio sono
+    // del medico.
+    await go('/ricette');
+    await f.getByText(/Qui sotto le ricette in attesa/).waitFor();
+    await f
+      .locator('li.riquadro', { has: f.getByRole('link', { name, exact: true }) })
+      .locator('li.ricetta-in-coda', { hasText: `preparata da ${secretary}` })
+      .getByText('In attesa della firma del medico.')
+      .first()
+      .waitFor();
+    expect(await f.getByRole('button', { name: 'Firma e invia' }).count()).toBe(0);
+    await expectAccessible('ricette in attesa viste dalla segreteria');
     await login('medico');
     await go('/ricette');
     const group = f.locator('li.riquadro', { has: f.getByRole('link', { name, exact: true }) });

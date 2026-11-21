@@ -170,6 +170,44 @@ export function drugFacts(d: Drug): string[] {
   ].filter((x): x is string => !!x);
 }
 
+/**
+ * Una riga in ricetta, chiusa (D242): che cosa c'è senza aprirla. Confezioni e posologia per i
+ * farmaci, quantità e codici per le prestazioni; le scelte che vincolano il farmacista si dicono.
+ */
+export function lineSummary(
+  l: {
+    quantity: number;
+    posologyText?: string;
+    byActiveIngredient?: boolean;
+    notSubstitutable?: boolean;
+    repeatCount?: string;
+    validityMonths?: string;
+    serviceCode?: string | null;
+    serviceNationalCode?: string | null;
+  },
+  mode: 'farmaci' | 'specialistica',
+  white = false,
+): string {
+  if (mode === 'specialistica')
+    return [
+      `quantità ${l.quantity}`,
+      l.serviceCode && `catalogo ${l.serviceCode}`,
+      l.serviceNationalCode && `nomenclatore (DM) ${l.serviceNationalCode}`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  return [
+    `${l.quantity} ${l.quantity === 1 ? 'confezione' : 'confezioni'}`,
+    l.posologyText?.trim() || 'posologia non indicata',
+    l.byActiveIngredient && 'per principio attivo',
+    l.notSubstitutable && 'non sostituibile',
+    white && l.repeatCount && `ripetibile ${l.repeatCount} volte`,
+    white && l.validityMonths && `validità ${l.validityMonths} mesi`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
+
 export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica' }) {
   const { id } = useParams<{ id: string }>();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
@@ -211,6 +249,21 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
     for (const reset of [resetPriority, resetQuestion, resetDraft, resetObscured]) reset();
   };
   const [error, setError] = useState<ApiError | null>(null);
+  // Le righe in ricetta restano chiuse: si aprono col clic sulla riga (D242).
+  const [openLines, setOpenLines] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleLine = (key: string) =>
+    setOpenLines((open) => {
+      const next = new Set(open);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  // La pagina in una schermata (D242): la cornice prende l'altezza dello schermo e le due colonne
+  // scorrono ciascuna nel suo riquadro. Gli stili sono in global.css, solo per gli schermi larghi
+  // e alti abbastanza: altrove la pagina scorre come le altre.
+  useEffect(() => {
+    document.documentElement.classList.add('schermo-unico');
+    return () => document.documentElement.classList.remove('schermo-unico');
+  }, []);
 
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
@@ -288,8 +341,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
 
   const title = mode === 'farmaci' ? 'Nuova ricetta' : 'Ricetta specialistica';
   const locked = draft !== null;
+  // Titolo e dati del paziente: in una riga sola quando la pagina sta in una schermata (D242).
   const header = (
-    <>
+    <div className="testata-ricetta">
       <PageHeader
         title={title}
         trail={
@@ -302,7 +356,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         }
       />
       <PatientBanner patient={p} summary={record.data.riepilogo} />
-    </>
+    </div>
   );
 
   // Paziente deceduto: la ricetta non si fa (R19, D199). Lo si dice subito, con il rimedio.
@@ -333,7 +387,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             {mode === 'farmaci' ? 'Banca dati farmaci' : 'Catalogo regionale'}
           </h2>
           {mode === 'farmaci' && (
-            <fieldset className="scelta" disabled={locked}>
+            <fieldset className="scelta scelta-in-riga" disabled={locked}>
               <legend>Tipo di ricetta</legend>
               {[
                 ['pharma_ssn', 'Farmaceutica SSN'],
@@ -374,6 +428,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           <DataVersions
             versions={shownVersions}
             label={mode === 'farmaci' ? 'Banche dati dei farmaci' : 'Catalogo'}
+            compact
           />
           <ErrorMessage error={search.error} />
           <ul className="risultati" aria-live="polite">
@@ -489,21 +544,29 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             </p>
           )}
           <ol className="righe-ricetta">
-            {lines.map((l, n) => (
-              <li key={l.key} className="riga-ricetta">
-                <fieldset disabled={locked}>
-                  <legend>
-                    {n + 1}. {l.drugName ?? l.serviceDescription}
+            {lines.map((l, n) => {
+              const name = l.drugName ?? l.serviceDescription;
+              const open = openLines.has(l.key);
+              return (
+                <li key={l.key} className={`riga-ricetta${open ? ' aperta' : ''}`}>
+                  <div className="riga-ricetta-testa">
+                    <button
+                      type="button"
+                      className="riga-ricetta-apri"
+                      aria-expanded={open}
+                      aria-controls={`dettagli-${l.key}`}
+                      onClick={() => toggleLine(l.key)}
+                    >
+                      <Icon name="apri" />
+                      <span className="riga-ricetta-testo">
+                        <strong className="riga-ricetta-nome">
+                          {n + 1}. {name}
+                        </strong>
+                        <span className="tenue">{lineSummary(l, mode, kind === 'white')}</span>
+                      </span>
+                    </button>
                     {l.aifaNote && <span className="etichetta">Nota {l.aifaNote}</span>}
-                  </legend>
-                  {mode === 'specialistica' && l.serviceCode && (
-                    <p className="codice tenue">
-                      Catalogo {l.serviceCode}
-                      {l.serviceNationalCode
-                        ? ` · nomenclatore (DM) ${l.serviceNationalCode}`
-                        : ' · nomenclatore (DM) dal catalogo in uso'}
-                    </p>
-                  )}
+                  </div>
                   {mode === 'specialistica' && (l.serviceCode || l.serviceDescription) && (
                     <AlreadyPrescribed
                       patientId={id!}
@@ -511,122 +574,142 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                       description={l.serviceDescription ?? null}
                     />
                   )}
-                  <div className="campi-riga">
-                    <div className="campo campo-stretto">
-                      <label htmlFor={`q-${l.key}`}>
-                        {mode === 'farmaci' ? 'Confezioni' : 'Quantità'}
-                      </label>
-                      <input
-                        id={`q-${l.key}`}
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={l.quantity}
-                        onChange={(e) =>
-                          update(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })
-                        }
-                      />
-                    </div>
-                    {mode === 'farmaci' && (
-                      <div className="campo">
-                        <label htmlFor={`p-${l.key}`}>Posologia</label>
-                        <input
-                          id={`p-${l.key}`}
-                          list={posologyTexts.length ? 'posologie-studio' : undefined}
-                          value={l.posologyText ?? ''}
-                          onChange={(e) => update(l.key, { posologyText: e.target.value })}
-                        />
-                      </div>
+                  <fieldset
+                    id={`dettagli-${l.key}`}
+                    className="riga-ricetta-dettagli"
+                    disabled={locked}
+                    hidden={!open}
+                  >
+                    <legend className="visivamente-nascosto">
+                      Dettagli della riga {n + 1}: {name}
+                    </legend>
+                    {mode === 'specialistica' && l.serviceCode && (
+                      <p className="codice tenue">
+                        Catalogo {l.serviceCode}
+                        {l.serviceNationalCode
+                          ? ` · nomenclatore (DM) ${l.serviceNationalCode}`
+                          : ' · nomenclatore (DM) dal catalogo in uso'}
+                      </p>
                     )}
-                  </div>
-                  {mode === 'farmaci' && (
-                    <>
-                      <div className="casella">
-                        <input
-                          type="checkbox"
-                          id={`pa-${l.key}`}
-                          checked={!!l.byActiveIngredient}
-                          onChange={(e) => update(l.key, { byActiveIngredient: e.target.checked })}
-                        />
-                        <label htmlFor={`pa-${l.key}`}>
-                          Per principio attivo{' '}
-                          <span className="tenue">· il farmacista può dare un equivalente</span>
+                    <div className="campi-riga">
+                      <div className="campo campo-stretto">
+                        <label htmlFor={`q-${l.key}`}>
+                          {mode === 'farmaci' ? 'Confezioni' : 'Quantità'}
                         </label>
-                      </div>
-                      <div className="casella">
                         <input
-                          type="checkbox"
-                          id={`ns-${l.key}`}
-                          checked={!!l.notSubstitutable}
-                          onChange={(e) => update(l.key, { notSubstitutable: e.target.checked })}
+                          id={`q-${l.key}`}
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={l.quantity}
+                          onChange={(e) =>
+                            update(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })
+                          }
                         />
-                        <label htmlFor={`ns-${l.key}`}>
-                          Non sostituibile{' '}
-                          <span className="tenue">
-                            · vincola il farmacista; serve una motivazione (R13)
-                          </span>
-                        </label>
                       </div>
-                      {l.notSubstitutable && (
+                      {mode === 'farmaci' && (
                         <div className="campo">
-                          <label htmlFor={`nsm-${l.key}`}>
-                            Motivazione della non sostituibilità
-                          </label>
+                          <label htmlFor={`p-${l.key}`}>Posologia</label>
                           <input
-                            id={`nsm-${l.key}`}
-                            value={l.notSubstitutableReason ?? ''}
-                            onChange={(e) =>
-                              update(l.key, { notSubstitutableReason: e.target.value })
-                            }
+                            id={`p-${l.key}`}
+                            list={posologyTexts.length ? 'posologie-studio' : undefined}
+                            value={l.posologyText ?? ''}
+                            onChange={(e) => update(l.key, { posologyText: e.target.value })}
                           />
                         </div>
                       )}
-                      {kind === 'white' && (
-                        <div className="campi-riga">
-                          <div className="campo campo-stretto">
-                            <label htmlFor={`rip-${l.key}`}>Ripetibile (volte)</label>
-                            <input
-                              id={`rip-${l.key}`}
-                              inputMode="numeric"
-                              value={l.repeatCount ?? ''}
-                              onChange={(e) =>
-                                update(l.key, { repeatCount: e.target.value.replace(/\D/g, '') })
-                              }
-                              aria-describedby={`rip-aiuto-${l.key}`}
-                            />
-                          </div>
-                          <div className="campo campo-stretto">
-                            <label htmlFor={`val-${l.key}`}>Validità (mesi)</label>
-                            <input
-                              id={`val-${l.key}`}
-                              inputMode="numeric"
-                              value={l.validityMonths ?? ''}
-                              onChange={(e) =>
-                                update(l.key, {
-                                  validityMonths: e.target.value.replace(/\D/g, ''),
-                                })
-                              }
-                              aria-describedby={`rip-aiuto-${l.key}`}
-                            />
-                          </div>
-                          <p className="aiuto" id={`rip-aiuto-${l.key}`}>
-                            Solo se diversi dalla regola del farmaco: altrimenti vale quella, e il
-                            SAC controlla le ripetizioni.
-                          </p>
+                    </div>
+                    {mode === 'farmaci' && (
+                      <>
+                        <div className="casella">
+                          <input
+                            type="checkbox"
+                            id={`pa-${l.key}`}
+                            checked={!!l.byActiveIngredient}
+                            onChange={(e) =>
+                              update(l.key, { byActiveIngredient: e.target.checked })
+                            }
+                          />
+                          <label htmlFor={`pa-${l.key}`}>
+                            Per principio attivo{' '}
+                            <span className="tenue">· il farmacista può dare un equivalente</span>
+                          </label>
                         </div>
-                      )}
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    className="pulsante pulsante-piatto"
-                    onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
-                  >
-                    <Icon name="annulla" /> <span>Togli dalla ricetta</span>
-                  </button>
-                </fieldset>
-              </li>
-            ))}
+                        <div className="casella">
+                          <input
+                            type="checkbox"
+                            id={`ns-${l.key}`}
+                            checked={!!l.notSubstitutable}
+                            onChange={(e) => update(l.key, { notSubstitutable: e.target.checked })}
+                          />
+                          <label htmlFor={`ns-${l.key}`}>
+                            Non sostituibile{' '}
+                            <span className="tenue">
+                              · vincola il farmacista; serve una motivazione (R13)
+                            </span>
+                          </label>
+                        </div>
+                        {l.notSubstitutable && (
+                          <div className="campo">
+                            <label htmlFor={`nsm-${l.key}`}>
+                              Motivazione della non sostituibilità
+                            </label>
+                            <input
+                              id={`nsm-${l.key}`}
+                              value={l.notSubstitutableReason ?? ''}
+                              onChange={(e) =>
+                                update(l.key, { notSubstitutableReason: e.target.value })
+                              }
+                            />
+                          </div>
+                        )}
+                        {kind === 'white' && (
+                          <div className="campi-riga">
+                            <div className="campo campo-stretto">
+                              <label htmlFor={`rip-${l.key}`}>Ripetibile (volte)</label>
+                              <input
+                                id={`rip-${l.key}`}
+                                inputMode="numeric"
+                                value={l.repeatCount ?? ''}
+                                onChange={(e) =>
+                                  update(l.key, { repeatCount: e.target.value.replace(/\D/g, '') })
+                                }
+                                aria-describedby={`rip-aiuto-${l.key}`}
+                              />
+                            </div>
+                            <div className="campo campo-stretto">
+                              <label htmlFor={`val-${l.key}`}>Validità (mesi)</label>
+                              <input
+                                id={`val-${l.key}`}
+                                inputMode="numeric"
+                                value={l.validityMonths ?? ''}
+                                onChange={(e) =>
+                                  update(l.key, {
+                                    validityMonths: e.target.value.replace(/\D/g, ''),
+                                  })
+                                }
+                                aria-describedby={`rip-aiuto-${l.key}`}
+                              />
+                            </div>
+                            <p className="aiuto" id={`rip-aiuto-${l.key}`}>
+                              Solo se diversi dalla regola del farmaco: altrimenti vale quella, e il
+                              SAC controlla le ripetizioni.
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="pulsante pulsante-piatto"
+                      onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))}
+                    >
+                      <Icon name="annulla" /> <span>Togli dalla ricetta</span>
+                    </button>
+                  </fieldset>
+                </li>
+              );
+            })}
           </ol>
           {posologyTexts.length > 0 && (
             <datalist id="posologie-studio">
@@ -640,7 +723,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             <legend>Dati della ricetta</legend>
             {mode === 'specialistica' && (
               <>
-                <fieldset className="scelta">
+                <fieldset className="scelta scelta-in-riga">
                   <legend>Tipo di accesso</legend>
                   {Object.entries(ACCESS_TYPE).map(([v, label]) => (
                     <div key={v} className="casella">
@@ -655,7 +738,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                     </div>
                   ))}
                 </fieldset>
-                <fieldset className="scelta">
+                <fieldset className="scelta scelta-in-riga">
                   <legend>Classe di priorità</legend>
                   {Object.entries(PRIORITY).map(([v, label]) => (
                     <div key={v} className="casella">
@@ -682,6 +765,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 </div>
               </>
             )}
+            {/* L'esenzione resta sempre in vista (D242). */}
             <div className="campo">
               <label htmlFor="esenzione">Esenzione</label>
               <select
@@ -697,41 +781,65 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 ))}
               </select>
             </div>
-            {kind !== 'white' && (
-              <div className="casella">
-                <input
-                  type="checkbox"
-                  id="oscurato"
-                  checked={obscured}
-                  onChange={(e) => setObscured(e.target.checked)}
-                />
-                <label htmlFor="oscurato">
-                  <strong>Oscura nome e indirizzo</strong>{' '}
+            {/*
+              Promemoria e oscuramento, usati di rado: chiusi in una riga che dice la scelta in
+              corso, si aprono col clic (D242).
+            */}
+            <details className="altre-opzioni">
+              <summary>
+                <Icon name="apri" />
+                <span>
+                  Altre opzioni:{' '}
                   <span className="tenue">
-                    Lo chiede il paziente: non compaiono sul promemoria né all’erogatore; il codice
-                    fiscale resta.
+                    {[
+                      channel
+                        ? `promemoria: ${(REMINDER_CHANNEL[channel] ?? channel).toLowerCase()}`
+                        : 'promemoria con il canale del paziente',
+                      kind !== 'white' &&
+                        (obscured ? 'nome e indirizzo oscurati' : 'nome e indirizzo in chiaro'),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
-                </label>
+                </span>
+              </summary>
+              <div className="campo">
+                <label htmlFor="canale">Promemoria al paziente</label>
+                <select id="canale" value={channel} onChange={(e) => setChannel(e.target.value)}>
+                  <option value="">Il canale scelto dal paziente</option>
+                  {Object.entries(REMINDER_CHANNEL).map(([v, label]) => (
+                    <option key={v} value={v}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <p className="aiuto">
+                  Solo i canali scelti dal paziente e i suoi recapiti o dei delegati (R15, R16).
+                </p>
               </div>
-            )}
-            <div className="campo">
-              <label htmlFor="canale">Promemoria al paziente</label>
-              <select id="canale" value={channel} onChange={(e) => setChannel(e.target.value)}>
-                <option value="">Il canale scelto dal paziente</option>
-                {Object.entries(REMINDER_CHANNEL).map(([v, label]) => (
-                  <option key={v} value={v}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <p className="aiuto">
-                Solo i canali scelti dal paziente e i suoi recapiti o dei delegati (R15, R16).
-              </p>
-            </div>
+              {kind !== 'white' && (
+                <div className="casella">
+                  <input
+                    type="checkbox"
+                    id="oscurato"
+                    checked={obscured}
+                    onChange={(e) => setObscured(e.target.checked)}
+                  />
+                  <label htmlFor="oscurato">
+                    <strong>Oscura nome e indirizzo</strong>{' '}
+                    <span className="tenue">
+                      Lo chiede il paziente: non compaiono sul promemoria né all’erogatore; il
+                      codice fiscale resta.
+                    </span>
+                  </label>
+                </div>
+              )}
+            </details>
           </fieldset>
           <ErrorMessage error={error} />
+          {/* I pulsanti restano in vista in fondo al riquadro, anche quando la ricetta scorre (D242). */}
           {!draft && (
-            <div className="azioni">
+            <div className="azioni azioni-ricetta">
               <button
                 type="button"
                 className="pulsante pulsante-primario"
@@ -740,6 +848,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               >
                 <Icon name="ricette" /> <span>Prepara la ricetta</span>
               </button>
+              {lines.length > 0 && (
+                <button type="button" className="pulsante" onClick={startOver}>
+                  <Icon name="ripeti" /> <span>Ricomincia</span>
+                </button>
+              )}
             </div>
           )}
           {draft && draft.status === 'sent' && (
@@ -770,10 +883,10 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               />
             </>
           )}
-          {(draft || lines.length > 0) && (
+          {draft && (
             <div className="azioni">
               <button type="button" className="pulsante" onClick={startOver}>
-                <Icon name="ripeti" /> <span>{draft ? 'Nuova ricetta da capo' : 'Ricomincia'}</span>
+                <Icon name="ripeti" /> <span>Nuova ricetta da capo</span>
               </button>
             </div>
           )}
