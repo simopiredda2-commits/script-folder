@@ -55,7 +55,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 - Se una tappa richiede un valore che non c'è nei requisiti (una soglia, la fonte di una regola): costruisci il meccanismo, lascia il valore vuoto con la nota «da completare» e prosegui.
 - Ogni controllo nuovo si prova con un **sabotaggio**: rompi apposta, verifica che diventi rosso, ripristina. Il registro dei sabotaggi è in `docs/avanzamento.md`.
 - Se trovi un conflitto tra queste istruzioni e i requisiti, non scegliere da solo: è una domanda per la fermata.
-- Workflow e lavorazioni pesanti (molti agenti) solo se strettamente necessari.
+- **Agenti e workflow solo con il via di Simone** (domanda di Simone del 21/11/2026: «chi ha autorizzato gli agenti?»). Prima di lanciarne anche uno solo, compresi i revisori di una revisione indipendente, lo si chiede alla fermata con il pulsante: quanti, per che cosa, che cosa leggono e che cosa cambiano. Senza il via si lavora da soli.
 
 ## Come si procede
 

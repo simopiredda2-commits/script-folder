@@ -1658,7 +1658,7 @@ Prove: trascrizione e mappatura (`packages/reference/test/lea.test.ts`), regola 
 
 Non provato: il controllo di una persona su quantità e intestazioni (con le 87 righe, A8); quali medicazioni la Dr.ssa Rocca sceglierà; WebKit e Firefox solo nella CI.
 
-**D239 · Revisione dalla #26 alla #28 e correzioni.** Come chiesto alla fermata (D237), quattro revisori indipendenti hanno letto il codice unito dalla #26 alla #28 e quello nuovo di D238: invii fermi «in invio» (A), servizio (B), interfaccia e dimostrazione (C), presidi (D). Ho verificato ogni segnalazione sul codice e, dove serviva, con una prova. V vuol dire vera e corretta; N non è un difetto o non si corregge, con il motivo; F è una domanda per la fermata.
+**D239 · Revisione dalla #26 alla #28 e correzioni.** Come chiesto alla fermata (D237), quattro revisori indipendenti hanno letto il codice unito dalla #26 alla #28 e quello nuovo di D238: invii fermi «in invio» (A), servizio (B), interfaccia e dimostrazione (C), presidi (D). I revisori erano quattro agenti che hanno solo letto il codice; le correzioni le ho fatte io. Gli agenti li ho decisi io, senza un via esplicito di Simone: alla sua domanda del 21/11/2026 («chi ha autorizzato gli agenti?») la regola di `CLAUDE.md` è diventata «agenti e workflow solo con il via di Simone». Ho verificato ogni segnalazione sul codice e, dove serviva, con una prova. V vuol dire vera e corretta; N non è un difetto o non si corregge, con il motivo; F è una domanda per la fermata.
 
 Invii fermi di ricetta e certificato (#27, D233):
 

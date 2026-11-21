@@ -466,6 +466,25 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       has: f.getByRole('link', { name, exact: true }),
     });
     const form = group.getByRole('form', { name: 'La ricetta è arrivata' });
+    // Se il modulo non compare, l'errore dice che cosa mostra la sezione, che cosa risponde il
+    // servizio e che ora è nella pagina (D234): con WebKit una volta non è comparso, senza dire
+    // perché (D239).
+    await form.waitFor({ timeout: 30_000 }).catch(async (err: unknown) => {
+      const shown = await section
+        .innerText({ timeout: 2_000 })
+        .catch(() => '(sezione non trovata)');
+      const answer = await f
+        .evaluate(async () => {
+          const res = await fetch('/api/ricette/senza-risposta');
+          return `${res.status} ${await res.text()}`;
+        })
+        .catch((e: unknown) => String(e));
+      const now = await f.evaluate(() => new Date().toISOString()).catch(() => '?');
+      throw new Error(
+        `Il modulo «La ricetta è arrivata» non è comparso per ${name}. Ora nella pagina: ${now}.\nLa sezione mostra:\n${shown}\nIl servizio risponde:\n${answer}`,
+        { cause: err },
+      );
+    });
     await form.getByLabel(/Numero di ricetta/).fill('DIMO00000000001');
     await form.getByLabel(/Codice di autenticazione/).fill('DIMOAUT01');
     await form.getByRole('button', { name: /È arrivata/ }).click();
