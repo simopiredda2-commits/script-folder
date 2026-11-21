@@ -101,7 +101,7 @@ Le schermate si rigenerano con `test/e2e/schermate.ts` (istruzioni in testa al f
 - **Terapia**: nuova, modifica, sospensione con motivo (la reazione avversa va tra le allergie), ripresa, schema orario da stampare (D80–D83). I controlli formali si vedono prima di salvare, vicino al campo, e il servizio li ripete.
 - **Promemoria** (tappa 7): dopo l’invio, nell’editor, nella coda delle ricette e nello storico. La ricetta bianca consegna solo il PDF del SAC (D93).
 - **Voci cliniche** (tappa 9): dalla cartella, sotto la testata, «Voci cliniche», «Parametri», «Piani terapeutici», «Privacy». Le voci le scrive il medico; non si cancellano, si annullano con un motivo e restano in elenco, barrate. Nessun giudizio sui valori e nessun calcolo (regola 3, R12).
-- **Seguito e presidi** (tappa 10): dalla cartella, «Seguito delle prestazioni» e «Presidi». Il referto si allega dal computer (PDF o immagine) e si apre in una scheda nuova, senza script.
+- **Seguito e presidi** (tappa 10): dalla cartella, «Seguito delle prestazioni» e «Presidi». Il referto si allega dal computer (PDF o immagine) e si apre in una scheda nuova, senza script. Con le trascrizioni controllate, la voce si sceglie dal nomenclatore degli allegati 2 e 3 e riempie prodotto e codice; per l'allegato 2 sotto la scelta c'è la quantità dell'allegato, con l'intestazione della sua colonna (D238). Le voci che il titolare sceglie come medicazioni avanzate, nella pagina **Archivio** (riquadro «Medicazioni avanzate», che la schermata 16 non ha ancora), stanno solo in quella categoria.
 - **Grafico dei parametri**: una scala per grafico; colori validati per il contrasto e per chi confonde i colori, forma del punto come seconda codifica, valore in fondo alla linea; il cursore si muove anche con le frecce (il grafico si raggiunge con il tasto Tab) e annuncia i valori; la tabella sotto ha gli stessi numeri (D118).
 - **Accesso**: password e secondo fattore; dopo 5 minuti senza attività la sessione si blocca e si sblocca con il codice. All'uscita il browser non conserva dati dei pazienti.
 
@@ -121,7 +121,7 @@ Negli avvisi il collegamento sta in una frase: lo controlla `apps/web/test/avvis
 ## Che cosa non c'è ancora
 
 - Agenda e prenotazione (proposta: da Ready!). Nei riepiloghi, PPIP e fatture (D201).
-- Stampa della prescrizione dei presidi nel modulo dell'ASL e codici del nomenclatore (D123).
+- Stampa della prescrizione dei presidi nel modulo dell'ASL (D123). I codici del nomenclatore degli allegati 2 e 3 ci sono, da controllare (D218, D236).
 - Dettatura vocale del diario: non c'è, per le regole 7 e 8 (D119, domanda per la fermata finale).
 - Elenco ufficiale dei vaccini: i vaccini hanno un nome libero (D176). Le diagnosi ICD-9-CM si cercano per descrizione dalla tappa 17 (D186). Gli elenchi dello studio (posologie, pacchetti di prestazioni, medici suggeritori, contatti) ci sono (D175).
 - Schede UVG regionali, percorsi (diabete, BPCO, scompenso): nel modello dei dati, non nell'interfaccia.
