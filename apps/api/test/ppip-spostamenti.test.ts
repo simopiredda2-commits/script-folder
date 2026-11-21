@@ -234,6 +234,29 @@ describe('prestazioni aggiuntive dopo «Sposta»: nella distinta di chi aveva il
     expect(his.tabelle.patient_archive_move!.map((m) => m.patient_id)).toEqual([moved]);
   });
 
+  it('durante la registrazione il paziente resta fermo: uno spostamento aspetta', async () => {
+    // La registrazione si ferma all'inserimento, dopo aver letto paziente e spostamenti.
+    await monitor.query('begin');
+    await monitor.query('lock table ppip_record in share mode');
+    const pending = register('collega', '2026-11-19');
+    for (let i = 0; ; i++) {
+      const { rows } = await monitor.query<{ n: number }>(
+        `select count(*)::int as n from pg_locks
+          where relation = 'ppip_record'::regclass and not granted`,
+      );
+      if (rows[0]!.n > 0) break;
+      if (i > 300) throw new Error('La registrazione non è arrivata all’inserimento');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    // Uno spostamento ora non prende il paziente: lo tiene la registrazione.
+    await expect(
+      monitor.query('select id from patient where id = $1 for update nowait', [moved]),
+    ).rejects.toThrow(/could not obtain lock/);
+    await monitor.query('rollback');
+    const res = await pending;
+    expect(res.statusCode, res.body).toBe(201);
+  });
+
   it('uno spostamento a metà della registrazione la ferma: si ricarica la pagina', async () => {
     // Un altro spostamento in corso tiene il paziente e lo riporta alla titolare.
     await monitor.query('begin');
