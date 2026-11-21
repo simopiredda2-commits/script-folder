@@ -1136,7 +1136,7 @@ Nello stesso branch, ripartito da `main`. Durante la pausa Simone ha mandato i f
 2. **Il prodotto della prescrizione di presidi** arriva a 500 caratteri, nel servizio e nell'interfaccia: la voce più lunga dell'allegato 2 ne ha 401.
 3. **Allegati 7 e 8 confrontati con i decreti** (fatto, D236): le modifiche dei fogli R1–R6 e D1 del DM e dell'allegato D del DPCM ci sono tutte. Due differenze di scrittura, con lo stesso senso: condizione 051 ed esempio di RFG102. La trascrizione segue il PDF; da controllare (B2).
 4. **Allegato 11 e allegato 1 del DM**: letti, non si trascrivono (testo, non elenchi). L'allegato 11 del Ministero ha già la modifica dell'allegato V.
-5. **Nella dimostrazione** (D224): i nomenclatori degli allegati 2 e 3 si vedono nella scheda Presidi, prima del controllo, per guardarli dove servono. Il riquadro lo dice. Una prova della dimostrazione.
+5. **Nella dimostrazione** (D224): i nomenclatori degli allegati 2 e 3 si vedono nella scheda Presidi, prima del controllo, per guardarli dove servono. Il riquadro lo dice. Una prova della dimostrazione. Dimostrazione ripubblicata nello stesso artifact (versione 11).
 6. **Registro delle provenienze**: i tre PDF del DM e il PDF dell'allegato 2, con le impronte.
 
 **Come provarlo**: `pnpm test` e `pnpm lint`. Prove nuove: `packages/reference/test/lea.test.ts` (allegato 2 e confronto con i fogli R e D), `apps/api/test/nomenclatore-presidi.test.ts` (importazione nel database, scheda dei presidi, prodotto di 401 caratteri registrato, 501 no), `apps/web/test/presidi.test.tsx` (allegato 2 nella sua categoria). Nella dimostrazione: entra come `medico`, apri un paziente, **Presidi**, categoria «Dispositivi medici monouso», «Dal nomenclatore (allegato 2)». 14 sabotaggi, nel registro in fondo.
