@@ -1793,3 +1793,9 @@ Non provato: il collegamento del pulsante con la decisione si prova solo nella d
 - **Banca dati dei farmaci nella dimostrazione.** Simone ha chiesto: «Il database sui farmaci è infinitamente ristretto rispetto all'originale o sbaglio?». Non sbaglia. La dimostrazione usa le banche dati d'esempio delle prove: 13 confezioni dell'anagrafica AIFA, mentre il file vero letto il 18/11/2026 ne ha 160.101. Il programma vero importa i file completi (`pnpm banche-dati:aggiorna`). Una dimostrazione con più farmaci è una domanda per la fermata.
 
 Non provato: i lettori di schermo veri sulle righe che si aprono; Safari e Firefox veri; schermi più bassi di 600 px, dove la pagina scorre come prima; la ricetta specialistica con molte prestazioni, che scorre nel suo riquadro.
+
+**D243 · Risposte della fermata dopo la #30.** Simone ha risposto il 21/11/2026, con il pulsante:
+
+1. **Via alla #30**: «Via, unisci». Unita a `main` (commit 799d009) con le 14 verifiche su GitHub verdi, anche con WebKit e Firefox.
+2. **Più farmaci nella dimostrazione**: «Resta l'estratto, ma poi ricordami che dobbiamo integrare il database». Nella dimostrazione restano le 13 confezioni d'esempio. Alla ripresa si ricorda a Simone di integrare il database dei farmaci; che cosa vuol dire di preciso (tutta l'anagrafica AIFA nella dimostrazione, o altro) si chiede a lui allora.
+3. **Pausa**: chiesta da Simone il 21/11/2026, dopo le correzioni delle prove instabili («Dopo queste lavorazione, pausa»).
