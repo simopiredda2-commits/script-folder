@@ -1628,3 +1628,11 @@ Scelte prese da me:
 Prove: trascrizione (`packages/reference/test/lea.test.ts`), importazione nel database con il servizio e la registrazione della voce più lunga (`apps/api/test/nomenclatore-presidi.test.ts`), scheda dei presidi (`apps/web/test/presidi.test.tsx`), dimostrazione nel browser. 14 sabotaggi, nel registro di `docs/avanzamento.md`.
 
 Non provato: il controllo di una persona sulle 87 righe e sul confronto con i decreti; le quantità massime nella prescrizione; WebKit e Firefox solo nella CI.
+
+**D237 · Risposte della fermata dopo l'unione della #27.** Via alla #28, unita con le verifiche su GitHub verdi (D236). Le altre risposte di Simone:
+
+- **Quantità dell'allegato 2**: «Mostrarla accanto alla voce». Quando si sceglie una voce dal nomenclatore, il programma scrive la quantità stampata nell'allegato, con l'intestazione della sua colonna, senza controlli sul fabbisogno.
+- **Medicazioni del gruppo 04.49**: Simone ha scritto «decide il medico (che nel ns caso sarà la Dr.ssa Rocca, in altri sarà il titolare dell'ambulatorio)». Quindi quali voci sono medicazioni avanzate lo sceglie il medico titolare, per il suo archivio. Per quelle vale la regola dello specialista (D123): prima prescrizione dello specialista, poi il medico di famiglia per al massimo 6 mesi.
+- **Dopo l'unione**: «Revisione dalla #26 alla #28». Una revisione indipendente del codice unito dalla #26 alla #28, come quella della #25 (D231), con le correzioni dei difetti veri.
+
+Si fanno nello stesso branch, ripartito da `main`: prima le due modifiche, poi la revisione. La revisione guarda anche il codice nuovo di questo blocco, che andrà nella stessa pull request.
