@@ -1,7 +1,7 @@
 import { SimulatedGateway, type SimulatedOutcome } from '@mmg/integrations';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { archiveSecretary, prescription, therapy } from '../src/db/schema';
+import { archiveSecretary, patient, prescription, therapy } from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -129,7 +129,15 @@ describe('code delle ricette viste dalla segreteria (D242)', () => {
 
   // Ultima del file: toglie alla segreteria la conferma sull'archivio del collega.
   it('la segreteria vede le code degli archivi che l’hanno confermata, non degli altri', async () => {
-    const theirs = await toSign('collega', s.patients.collega[0]!, {
+    // Lo stato dei pazienti dello scenario cambia da un giro all'altro, e per un deceduto la
+    // ricetta non si fa (R19): qui il paziente del collega è in carico (prove su GitHub del
+    // 21/11/2026, giro 408).
+    const theirPatient = s.patients.collega[0]!;
+    await t.db
+      .update(patient)
+      .set({ status: 'active', deceasedOn: null, deathCauseIcd: null })
+      .where(eq(patient.id, theirPatient));
+    const theirs = await toSign('collega', theirPatient, {
       drugName: 'Farmaco di prova 5 mg',
     });
     expect(await find('segreteria', 'da-firmare', theirs)).toMatchObject({ firmabile: false });

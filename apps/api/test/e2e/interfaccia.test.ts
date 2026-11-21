@@ -289,13 +289,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   };
 
   /**
-   * page.goto che aspetta la pagina nuova. Con WebKit, tornando all'indirizzo dove la prova
-   * precedente era finita, «la stessa prestazione già prescritta» è caduta una volta (CI su main,
-   * giro 170): il campo di ricerca restava bloccato dalla ricetta ricordata, come se «Nuova ricetta
-   * da capo» fosse stato cercato nella pagina di prima o in quella nuova ancora vuota. Causa
-   * probabile, non provata (qui WebKit non c'è): page.goto che risponde prima che la pagina nuova
-   * prenda il posto di quella di prima, come in un difetto segnalato a Playwright per WebKit. La
-   * pagina di prima porta un segno; si va avanti quando il segno non c'è più.
+   * page.goto che aspetta la pagina nuova, al suo posto e ferma.
+   *
+   * Al suo posto: la pagina di prima porta un segno, e si va avanti quando il segno non c'è più
+   * (con WebKit, tornando all'indirizzo dove la prova precedente era finita, «la stessa prestazione
+   * già prescritta» era caduta una volta: CI su main, giro 170).
+   *
+   * Ferma: nessuna richiesta da mezzo secondo, i caratteri pronti, due fotogrammi. Le parti che
+   * arrivano dopo spostano la pagina: le impostazioni e le medicazioni avanzate sopra «Apri la
+   * distinta» nell'Archivio, il promemoria e i «già prescritti» sopra «Nuova ricetta da capo». Un
+   * clic in quel momento preme su un elemento e rilascia su un altro: Playwright controlla il
+   * bersaglio solo alla pressione, e il clic va perso senza errore. È la causa delle due prove
+   * cadute con WebKit sulle prove su GitHub del 21/11/2026 (giri 405 e 408), e la più probabile di
+   * quella del giro 170; il meccanismo è riprodotto in Chromium, WebKit e Firefox (D242).
    */
   async function gotoNewPage(p: Page, url: string) {
     await p.evaluate(() => {
@@ -303,6 +309,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     });
     await p.goto(url);
     await p.waitForFunction(() => !(window as Window & { paginaDiPrima?: boolean }).paginaDiPrima);
+    await p.waitForLoadState('networkidle');
+    await p.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+    });
   }
 
   /**
@@ -593,10 +604,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('nell’editor: oscuramento per le SSN, ripetibilità per la ricetta bianca (tappa 7)', async () => {
-    // Di nuovo lo stesso indirizzo: la ricetta inviata è ancora ricordata.
-    await gotoNewPage(page, `${base}/pazienti/${s.richPatient}/ricetta`);
-    await page.getByRole('heading', { level: 1, name: 'Nuova ricetta' }).waitFor();
-    await page.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ }).click();
+    // Di nuovo lo stesso indirizzo: la ricetta inviata è ancora ricordata, e si ricomincia.
+    await freshPrescription(
+      page,
+      `${base}/pazienti/${s.richPatient}/ricetta`,
+      'Nuova ricetta',
+      'Farmaco, principio attivo, codice AIC o ATC',
+    );
     // Promemoria e oscuramento sono chiusi in «Altre opzioni», che dice la scelta in corso (D242).
     const options = page.locator('details.altre-opzioni');
     await options.getByText('nome e indirizzo in chiaro').waitFor();
