@@ -432,7 +432,7 @@ describe('AURA: nuovi assistiti (D199)', () => {
       const [registered, refused] = await Promise.all([registering, refusing]);
       expect(registered.statusCode, registered.body).toBe(201);
       expect(refused.statusCode, refused.body).toBe(409);
-      expect(refused.json().errore).toBe('Non è più fra i nuovi assistiti: ricarica la pagina');
+      expect(refused.json().errore).toMatch(/^Non è più fra i nuovi assistiti/);
     } finally {
       await monitor.query('select pg_advisory_unlock_all()');
       await monitor.query('drop trigger if exists cancello_registra on patient');
@@ -607,5 +607,48 @@ describe('AURA: nuovi assistiti (D199)', () => {
     expect(tried.map((r) => [r.userId, (r.details as { motivo?: string }).motivo])).toEqual([
       [s.users.titolare.id, 'codice fiscale già registrato per questo paziente'],
     ]);
+  });
+
+  it('«Non registrare» mentre AURA porta la scelta a un altro medico dello studio: non passa (D239)', async () => {
+    const { candidateId } = await chooses('sposta');
+    const holder = new pg.Client({ connectionString: t.url });
+    await holder.connect();
+    try {
+      // Una notifica di AURA in corso tiene la riga dell'assistito: «Non registrare» ha già
+      // controllato il permesso sull'archivio del titolare, e aspetta lì.
+      await holder.query('begin');
+      await holder.query('select 1 from aura_new_patient where id = $1 for update', [candidateId]);
+      let done = false;
+      const refusing = post(`/api/aura/nuovi/${candidateId}/non-registrare`, 'segreteria').finally(
+        () => {
+          done = true;
+        },
+      );
+      for (let i = 0; !done && i < 500; i++) {
+        const { rows } = await holder.query<{ n: number }>(
+          "select count(*)::int as n from pg_stat_activity where datname = current_database() and wait_event_type = 'Lock'",
+        );
+        if (rows[0]!.n > 0) break;
+        await new Promise((r) => setTimeout(r, 10));
+      }
+      expect(done).toBe(false);
+      // La scelta passa al collega: l'assistito è suo, nel suo archivio.
+      await holder.query(
+        'update aura_new_patient set archive_id = $1, doctor_user_id = $2 where id = $3',
+        [s.archives.collega, s.users.collega.id, candidateId],
+      );
+      await holder.query('commit');
+      const res = await refusing;
+      expect(res.statusCode, res.body).toBe(409);
+      expect(res.json().errore).toMatch(/di questo medico/);
+    } finally {
+      await holder.query('rollback');
+      await holder.end();
+    }
+    const [row] = await t.db
+      .select()
+      .from(auraNewPatient)
+      .where(eq(auraNewPatient.id, candidateId));
+    expect(row).toMatchObject({ status: 'da_registrare', archiveId: s.archives.collega });
   });
 });

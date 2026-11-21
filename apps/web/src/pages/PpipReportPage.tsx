@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
@@ -129,12 +129,26 @@ export function PpipReportPage() {
   const d = useApi<Distinta>(own ? `/api/archivi/${own.id}/ppip?mese=${mese}` : null);
   const [monthError, setMonthError] = useState<string | null>(null);
   const [format, setFormat] = useState('acn-allegato-6');
-  const [checked, setChecked] = useState(false);
-  const [delivered, setDelivered] = useState(false);
+  // «Ho controllato» e «Ho consegnato» valgono per le prestazioni viste quando si spuntano: se la
+  // distinta cambia (mese, archivio, righe), si tolgono da sole (D239).
+  const [checkedFor, setCheckedFor] = useState<string | null>(null);
+  const [deliveredFor, setDeliveredFor] = useState<string | null>(null);
   const [reference, setReference] = useState('');
   const [sending, setSending] = useState(false);
+  // Dopo un'azione si aspetta la distinta ricaricata: fino ad allora i pulsanti restano spenti,
+  // così un secondo clic non trova la distinta di prima (D239).
+  const [staleData, setStaleData] = useState<Distinta | null | undefined>(undefined);
+  const [confirming, setConfirming] = useState<'arrivata' | 'non_arrivata' | null>(null);
   const [sendError, setSendError] = useState<ApiError | null>(null);
   const [sent, setSent] = useState<string | null>(null);
+  const result = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (staleData !== undefined && (d.data !== staleData || d.error)) setStaleData(undefined);
+  }, [d.data, d.error, staleData]);
+  // Dopo l'azione il fuoco va al risultato: il pulsante premuto può non esserci più (WCAG 2.4.3).
+  useEffect(() => {
+    if (sent || sendError) result.current?.focus();
+  }, [sent, sendError]);
 
   if (archives.loading && !archives.data) return <Loading what="archivi" />;
   if (archives.data && !own) return <Navigate to="/" replace />;
@@ -148,19 +162,25 @@ export function PpipReportPage() {
 
   /** Le prestazioni da inviare che il titolare vede: partono solo quelle (D232). */
   const toSend = (d.data?.righe ?? []).filter((r) => !r.inviata && !r.inInvioDal).map((r) => r.id);
+  const seenKey = `${own.id}|${mese}|${[...toSend].sort().join(',')}`;
+  const checked = checkedFor === seenKey;
+  const delivered = deliveredFor === seenKey;
+  const busy = sending || staleData !== undefined;
 
   /** Una richiesta della distinta; dopo, la distinta si ricarica e il controllo si rifà. */
   async function act(run: () => Promise<string>) {
     setSending(true);
     setSendError(null);
     setSent(null);
+    setConfirming(null);
     try {
       setSent(await run());
     } catch (err) {
       setSendError(failure(err));
     } finally {
-      setChecked(false);
-      setDelivered(false);
+      setCheckedFor(null);
+      setDeliveredFor(null);
+      setStaleData(d.data ?? null);
       setSending(false);
       d.reload();
     }
@@ -364,6 +384,7 @@ export function PpipReportPage() {
                                   row={r}
                                   onDone={(m) => {
                                     setSent(m);
+                                    setStaleData(d.data ?? null);
                                     d.reload();
                                   }}
                                 />
@@ -486,32 +507,77 @@ export function PpipReportPage() {
                     <button
                       type="button"
                       className="pulsante"
-                      disabled={sending}
-                      onClick={() => void settle('arrivata')}
+                      disabled={busy || confirming !== null}
+                      onClick={() => setConfirming('arrivata')}
                     >
                       <Icon name="fatto" /> <span>È arrivata all’ASL</span>
                     </button>
                     <button
                       type="button"
                       className="pulsante"
-                      disabled={sending}
-                      onClick={() => void settle('non_arrivata')}
+                      disabled={busy || confirming !== null}
+                      onClick={() => setConfirming('non_arrivata')}
                     >
                       <Icon name="annulla" /> <span>Non è arrivata: torna da inviare</span>
                     </button>
+                  </div>
+                )}
+                {x.inInvio?.interrotto && confirming && (
+                  // L'esito non si cambia dopo: si rilegge e si conferma (WCAG 3.3.4, D239).
+                  <div className="conferma-esito" role="group" aria-label="Conferma dell’esito">
+                    <p>
+                      {confirming === 'arrivata' ? (
+                        <>
+                          Confermi che la distinta è <strong>arrivata</strong> all’ASL
+                          {reference.trim() ? (
+                            <>
+                              {' '}
+                              con il riferimento <strong>{reference.trim()}</strong>
+                            </>
+                          ) : (
+                            ', senza un riferimento'
+                          )}
+                          ? Le prestazioni risultano partite e non si annullano più.
+                        </>
+                      ) : (
+                        <>
+                          Confermi che la distinta <strong>non è arrivata</strong> all’ASL? Le
+                          prestazioni tornano da inviare: se in realtà fosse arrivata, mandarla di
+                          nuovo farebbe un doppione.
+                        </>
+                      )}
+                    </p>
+                    <div className="azioni">
+                      <button
+                        type="button"
+                        className="pulsante pulsante-primario"
+                        disabled={busy}
+                        onClick={() => void settle(confirming)}
+                      >
+                        <Icon name="fatto" /> <span>Sì, confermo</span>
+                      </button>
+                      <button
+                        type="button"
+                        className="pulsante"
+                        disabled={busy}
+                        onClick={() => setConfirming(null)}
+                      >
+                        <Icon name="annulla" /> <span>Torna indietro</span>
+                      </button>
+                    </div>
                   </div>
                 )}
                 {x.invioAttivo ? (
                   x.invioSimulato && (
                     <Notice kind="info">
                       Invio simulato: il collegamento vero si scrive quando Regione e ASL diranno
-                      come si manda la distinta (D212). Intanto la distinta si scarica in CSV.
+                      come si manda la distinta. Intanto la distinta si scarica in CSV.
                     </Notice>
                   )
                 ) : (
                   <Notice kind="info">
                     L’invio dal programma non è ancora collegato: si completa quando Regione e ASL
-                    diranno come si manda la distinta (D212). Scarica la distinta in CSV, consegnala
+                    diranno come si manda la distinta. Scarica la distinta in CSV, consegnala
                     all’ASL e segnala qui come consegnata.
                   </Notice>
                 )}
@@ -524,7 +590,7 @@ export function PpipReportPage() {
                             id="ppip-controllata"
                             type="checkbox"
                             checked={checked}
-                            onChange={(e) => setChecked(e.target.checked)}
+                            onChange={(e) => setCheckedFor(e.target.checked ? seenKey : null)}
                           />
                           <label htmlFor="ppip-controllata">
                             Ho controllato la distinta: le prestazioni da inviare sono quelle
@@ -535,7 +601,7 @@ export function PpipReportPage() {
                           <button
                             type="button"
                             className="pulsante pulsante-primario"
-                            disabled={!checked || sending}
+                            disabled={!checked || busy}
                             onClick={() => void send()}
                           >
                             <Icon name="firma" />{' '}
@@ -557,7 +623,7 @@ export function PpipReportPage() {
                           id="ppip-consegnata"
                           type="checkbox"
                           checked={delivered}
-                          onChange={(e) => setDelivered(e.target.checked)}
+                          onChange={(e) => setDeliveredFor(e.target.checked ? seenKey : null)}
                         />
                         <label htmlFor="ppip-consegnata">
                           Ho consegnato all’ASL la distinta con queste prestazioni
@@ -578,7 +644,7 @@ export function PpipReportPage() {
                         <button
                           type="button"
                           className="pulsante"
-                          disabled={!delivered || sending}
+                          disabled={!delivered || busy}
                           onClick={() => void deliver()}
                         >
                           <Icon name="fatto" />{' '}
@@ -595,8 +661,10 @@ export function PpipReportPage() {
             ) : (
               <p className="tenue">La distinta la manda il medico titolare dell’archivio.</p>
             )}
-            {sent && <Notice kind="fatto">{sent}</Notice>}
-            <ErrorMessage error={sendError} />
+            <div ref={result} tabIndex={-1} className="esito-distinta">
+              {sent && <Notice kind="fatto">{sent}</Notice>}
+              <ErrorMessage error={sendError} />
+            </div>
             {x.invii.length > 0 && (
               <>
                 <h3>Invii del mese</h3>
@@ -637,9 +705,12 @@ function AnnulFromReport({
 }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   async function annul(e: FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    setBusy(true);
     setError(null);
     try {
       await api(`/api/archivi/${archiveId}/ppip/${row.id}/annulla`, {
@@ -650,6 +721,8 @@ function AnnulFromReport({
       onDone(`Prestazione ${row.codice} di ${row.cognome} ${row.nome} annullata.`);
     } catch (err) {
       setError(failure(err));
+    } finally {
+      setBusy(false);
     }
   }
   return (
@@ -678,7 +751,7 @@ function AnnulFromReport({
               onChange={(e) => setReason(e.target.value)}
             />
           </div>
-          <button type="submit" className="pulsante pulsante-primario">
+          <button type="submit" className="pulsante pulsante-primario" disabled={busy}>
             <Icon name="annulla" /> <span>Conferma l’annullamento</span>
           </button>
         </form>

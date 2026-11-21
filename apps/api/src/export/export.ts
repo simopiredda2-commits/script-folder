@@ -78,7 +78,7 @@ export const HANDLED_SEPARATELY: Record<string, string> = {
   pss_file:
     'i PDF del Profilo Sanitario Sintetico: sezione documenti_profilo del JSON, cartella profilo-sanitario/ nello ZIP',
   aura_new_patient:
-    'esportata per archivio: i nuovi assistiti segnalati da AURA (D199), anche quelli non registrati',
+    'esportata per archivio: i nuovi assistiti segnalati da AURA, anche quelli non registrati',
 };
 
 type Row = Record<string, unknown>;
@@ -175,6 +175,11 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
   tables.ppip_report = await rows(
     db,
     sql`select * from ppip_report where archive_id = ${archiveId} order by sent_at, id`,
+  );
+  // Invii della distinta ancora senza esito, con la distinta come è partita (D239).
+  tables.ppip_sending = await rows(
+    db,
+    sql`select * from ppip_sending where archive_id = ${archiveId} order by started_at, id`,
   );
   // Segreteria confermata o tolta dal titolare per questo archivio (D181): tutte le decisioni.
   tables.archive_secretary = await rows(

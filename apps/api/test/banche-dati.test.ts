@@ -198,6 +198,12 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       source: 'piemonte_dpc',
     });
     expect(dpc!.originSha256).toMatch(/^[0-9a-f]{64}$/);
+    // L'AIR d'esempio vale solo in Piemonte, come la trascrizione vera (D232, D239).
+    const air = await t.db
+      .select({ region: referenceDataset.scopeRegion, asl: referenceDataset.scopeAsl })
+      .from(referenceDataset)
+      .where(eq(referenceDataset.series, 'piemonte-prestazioni-aggiuntive'));
+    expect(air).toEqual([{ region: 'Piemonte', asl: null }]);
   });
 
   it('diagnosi ICD-9-CM (D186): il catalogo e poi le aggiunte COVID-19 del DM 28/10/2020', async () => {

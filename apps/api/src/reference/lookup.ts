@@ -11,6 +11,7 @@ import {
   type MappingSet,
   SERVICE_SEARCH_DATA,
   searchDiagnoses,
+  scopeKey,
   searchServices,
   type ServiceIndex,
 } from '@mmg/reference';
@@ -298,13 +299,6 @@ export interface ReferenceScope {
   region?: string | null;
   asl?: string | null;
 }
-
-/** Senza maiuscole, spazi e segni: «ASL TO3», «Asl To 3» e «ASL-TO3» sono la stessa ASL. */
-const scopeKey = (v: string | null | undefined) =>
-  (v ?? '')
-    .normalize('NFD')
-    .replace(/[^\p{L}\p{N}]/gu, '')
-    .toUpperCase();
 
 /** La versione vale dove la si guarda: nessun ambito, oppure la stessa regione e la stessa ASL. */
 function inScope(

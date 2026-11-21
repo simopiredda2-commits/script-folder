@@ -63,7 +63,12 @@ export const referenceDataset = pgTable(
     /** Chi ha lanciato l'importazione (utente del sistema o del servizio). */
     importedBy: text().notNull(),
   },
-  (t) => [unique().on(t.series, t.sha256), index().on(t.kind, t.validFrom)],
+  // La stessa tabella una volta per serie e ambito: con un ambito diverso è la correzione di una
+  // versione importata con l'ambito sbagliato (D239).
+  (t) => [
+    unique().on(t.series, t.sha256, t.scopeRegion, t.scopeAsl).nullsNotDistinct(),
+    index().on(t.kind, t.validFrom),
+  ],
 );
 
 const datasetId = () =>

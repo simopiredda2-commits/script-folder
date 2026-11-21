@@ -162,6 +162,29 @@ const transcriptionSchema = z
 
 export type Transcription = z.infer<typeof transcriptionSchema>;
 
+/** Dove vale una versione: la regione, l'ASL, o tutte e due null per tutta Italia (D232). */
+export interface DatasetScope {
+  region: string | null;
+  asl: string | null;
+}
+
+/** Senza maiuscole, spazi e segni: «ASL TO3», «Asl To 3» e «ASL-TO3» sono la stessa ASL. */
+export const scopeKey = (v: string | null | undefined) =>
+  (v ?? '')
+    .normalize('NFD')
+    .replace(/[^\p{L}\p{N}]/gu, '')
+    .toUpperCase();
+
+/** Lo stesso ambito: stessa regione e stessa ASL, confrontate come dice scopeKey. */
+export const sameScope = (a: DatasetScope, b: DatasetScope) =>
+  scopeKey(a.region) === scopeKey(b.region) && scopeKey(a.asl) === scopeKey(b.asl);
+
+/** L'ambito a parole, per i rapporti d'importazione. */
+export const scopeText = (s: DatasetScope) =>
+  s.region || s.asl
+    ? [s.region && `regione ${s.region}`, s.asl && `ASL ${s.asl}`].filter(Boolean).join(', ')
+    : 'tutta Italia';
+
 export interface TranscriptionFile {
   /** Percorso della scheda JSON, relativo alla cartella delle trascrizioni. */
   path: string;

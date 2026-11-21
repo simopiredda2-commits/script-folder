@@ -75,15 +75,16 @@ Il titolare la manda dopo aver spuntato «Ho controllato la distinta». La disti
 
 L'invio va in tre passi (D232):
 
-1. le prestazioni passano «in invio», tutte insieme: nessun altro invio le manda e nessuno le annulla;
-2. il programma manda la distinta al portale, fuori da ogni transazione;
+1. le prestazioni passano «in invio», tutte insieme: nessun altro invio le manda e nessuno le annulla. La distinta come parte si fissa nella tabella `ppip_sending` (D239), finché l'invio non ha un esito;
+2. il programma manda la distinta al portale, fuori da ogni transazione, e aspetta al più il tempo massimo dello studio (D94, D239);
 3. alla risposta, l'esito, il segno sulle prestazioni e il registro degli accessi si scrivono insieme.
 
 L'esito dipende dalla risposta:
 
 - accolta: le prestazioni sono «Inviata all'ASL» con il protocollo;
 - non accolta, o ASL non raggiungibile: tornano da inviare;
-- **nessuna risposta chiara** (il collegamento si interrompe, il servizio si ferma a metà): le prestazioni restano «in invio», perché la distinta potrebbe essere arrivata e rimandarla la farebbe arrivare due volte. Dopo 15 minuti la distinta lo dice e il titolare, dopo averlo chiesto all'ASL, segna l'esito: «È arrivata all'ASL», con il riferimento se l'ASL lo dà, e le prestazioni risultano partite; oppure «Non è arrivata: torna da inviare».
+- **nessuna risposta chiara** (il collegamento si interrompe, il servizio si ferma a metà): le prestazioni restano «in invio», perché la distinta potrebbe essere arrivata e rimandarla la farebbe arrivare due volte. Dopo 15 minuti la distinta lo dice e il titolare, dopo averlo chiesto all'ASL, segna l'esito: «È arrivata all'ASL», con il riferimento se l'ASL lo dà, e le prestazioni risultano partite; oppure «Non è arrivata: torna da inviare». Prima di segnarlo lo conferma, perché l'esito non si cambia dopo (D239). L'esito segnato registra la distinta come era partita, quella fissata al primo passo, non com'è adesso: un indirizzo corretto nel frattempo non cambia ciò che è partito. Lo stesso vale se il portale non risponde entro il tempo massimo.
+- **risposta arrivata dopo l'esito segnato a mano**: chi aspettava riceve «Nel frattempo l'esito di questo invio è stato segnato a mano». La risposta resta fra gli invii della distinta, con l'ora in cui era partita e la frase «Risposta del portale arrivata dopo l'esito segnato a mano», e nel registro degli accessi come «fallito». Le prestazioni restano come le ha segnate il titolare: prima di mandarle di nuovo, chiede all'ASL (D233, D239).
 
 **Consegnata all'ASL fuori dal programma** (D232): se la distinta arriva all'ASL in un altro modo, per esempio con il CSV sul portale regionale, il titolare spunta la conferma, scrive il riferimento della consegna se c'è e segna come partite le prestazioni controllate. Da lì non si annullano più, come quelle mandate dal programma.
 

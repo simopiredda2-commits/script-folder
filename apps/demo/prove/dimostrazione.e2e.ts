@@ -641,6 +641,8 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await f.getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' }).waitFor();
     await f.getByLabel('Categoria').selectOption('monouso');
     const select = f.getByLabel('Dal nomenclatore (allegato 2)');
+    // Prima che si contino, le voci devono essere arrivate dal servizio (D239).
+    await select.locator('option', { hasText: '· 09.30.24.063' }).waitFor({ state: 'attached' });
     // 87 voci in 21 gruppi, più la voce «scrivi a mano».
     expect(await select.locator('optgroup').count()).toBe(21);
     expect(await select.locator('option').count()).toBe(88);
@@ -675,6 +677,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await f.getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' }).waitFor();
     await f.getByLabel('Categoria').selectOption('monouso');
     const monouso = f.getByLabel('Dal nomenclatore (allegato 2)');
+    await monouso.locator('option', { hasText: '· 09.30.24.063' }).waitFor({ state: 'attached' });
     // L'alginato 15 x 15 non è più fra i monouso: 86 voci, più «scrivi a mano».
     expect(await monouso.locator('option').count()).toBe(87);
     expect(await monouso.locator('option', { hasText: '· 04.49.03.103' }).count()).toBe(0);
@@ -1001,9 +1004,11 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     // maiuscole, e il codice c'è ancora. Così la prova non dipende da quelle di prima.
     await login('medico');
     await login('medico', 'Medico');
-    // Il codice si annuncia quando cambia; il conto alla rovescia di ogni secondo no.
-    const live = await f.locator('#dimostrazione [aria-live]').allInnerTexts();
-    expect(live.join(' ')).not.toMatch(/Cambia fra/);
+    // Il codice si annuncia quando cambia; il conto alla rovescia di ogni secondo no. Si legge con
+    // il riquadro aperto: ridotto, non ci sarebbe niente da leggere (D239).
+    const live = (await fromPanel((p) => p.locator('[aria-live]').allInnerTexts())).join(' ');
+    expect(live).toMatch(/Codice per medico:/);
+    expect(live).not.toMatch(/Cambia fra/);
   });
 
   it('un documento del servizio che non arriva: il visore lo dice, senza errori non gestiti (D232)', async () => {

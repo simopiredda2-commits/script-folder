@@ -437,6 +437,11 @@ describe('distinta del mese nell’archivio (D212)', () => {
     // Mentre una prestazione parte non si annulla, nemmeno dalla distinta.
     expect(screen.queryByRole('button', { name: /^Annulla/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Non è arrivata: torna da inviare' }));
+    // Prima si conferma (WCAG 3.3.4, D239): niente parte finché non si dice sì.
+    const confirm = screen.getByRole('group', { name: 'Conferma dell’esito' });
+    expect(within(confirm).getByText(/Confermi che la distinta/)).toBeTruthy();
+    expect(calls.some((c) => c.path === '/api/archivi/a1/ppip/esito')).toBe(false);
+    fireEvent.click(within(confirm).getByRole('button', { name: 'Sì, confermo' }));
     await screen.findByText(
       /Segnato: la distinta non è arrivata\. 2 prestazioni tornano da inviare\./,
     );
@@ -444,6 +449,164 @@ describe('distinta del mese nell’archivio (D212)', () => {
       mese: '2026-10',
       esito: 'non_arrivata',
     });
+    // Il fuoco va al risultato, non alla pagina (WCAG 2.4.3).
+    await waitFor(() => expect(document.activeElement?.className).toBe('esito-distinta'));
+  });
+
+  it('«Torna indietro» non segna l’esito', async () => {
+    const base = DISTINTA(true, 0);
+    const calls = stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/oggi': ok({ data: '2026-11-20', appuntamenti: [], code: { daFirmare: 0 } }),
+      '/api/ppip/archivi': ok({ archivi: [{ id: 'a1', nome: 'Archivio di prova' }] }),
+      '/api/archivi/a1/ppip': ok({
+        ...base,
+        righe: base.righe.map((r) => ({ ...r, inInvioDal: '2026-11-20T09:00:00.000Z' })),
+        inInvio: { dal: '2026-11-20T09:00:00.000Z', interrotto: true, righe: 2 },
+      }),
+    });
+    window.history.pushState({}, '', '/archivio/prestazioni-aggiuntive?mese=2026-10');
+    render(<App />);
+    fireEvent.click(await screen.findByRole('button', { name: 'È arrivata all’ASL' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Torna indietro' }));
+    expect(screen.queryByRole('group', { name: 'Conferma dell’esito' })).toBeNull();
+    expect(calls.some((c) => c.path === '/api/archivi/a1/ppip/esito')).toBe(false);
+  });
+
+  it('«Ho controllato» vale per le prestazioni viste: se la distinta cambia si toglie (D239)', async () => {
+    let annulled = false;
+    const base = DISTINTA(true);
+    stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/oggi': ok({ data: '2026-11-20', appuntamenti: [], code: { daFirmare: 0 } }),
+      '/api/ppip/archivi': ok({ archivi: [{ id: 'a1', nome: 'Archivio di prova' }] }),
+      '/api/archivi/a1/ppip': () => ({
+        status: 200,
+        body: annulled ? { ...base, righe: [base.righe[0]!], daInviare: 1 } : base,
+      }),
+      '/api/archivi/a1/ppip/r2/annulla': () => {
+        annulled = true;
+        return { status: 200, body: { id: 'r2', stato: 'annullata' } };
+      },
+    });
+    window.history.pushState({}, '', '/archivio/prestazioni-aggiuntive?mese=2026-10');
+    render(<App />);
+    const box = await screen.findByLabelText<HTMLInputElement>(/Ho controllato la distinta/);
+    fireEvent.click(box);
+    expect(box.checked).toBe(true);
+    // Una prestazione esce dalla distinta: le righe da inviare non sono più quelle controllate.
+    fireEvent.click(screen.getAllByRole('button', { name: /^Annulla/ })[1]!);
+    fireEvent.change(screen.getByLabelText('Motivo dell’annullamento'), {
+      target: { value: 'Registrata due volte' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Conferma l’annullamento' }));
+    await screen.findByRole('button', { name: 'Invia all’ASL 1 prestazione' });
+    expect(screen.getByLabelText<HTMLInputElement>(/Ho controllato la distinta/).checked).toBe(
+      false,
+    );
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Invia all’ASL 1 prestazione' })
+        .disabled,
+    ).toBe(true);
+  });
+
+  it('l’annullamento dalla distinta parte una volta sola, anche con due clic (D239)', async () => {
+    let posts = 0;
+    let answer: () => void = () => {};
+    const json = (body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        const path = url.split('?')[0]!;
+        if (path === '/api/io') return Promise.resolve(json(me('owner_doctor')));
+        if (path === '/api/oggi')
+          return Promise.resolve(json({ data: '2026-11-20', appuntamenti: [], code: {} }));
+        if (path === '/api/ppip/archivi')
+          return Promise.resolve(json({ archivi: [{ id: 'a1', nome: 'Archivio di prova' }] }));
+        if (path === '/api/archivi/a1/ppip') return Promise.resolve(json(DISTINTA(true)));
+        if (path === '/api/archivi/a1/ppip/r1/annulla') {
+          posts += 1;
+          return new Promise<Response>((r) => {
+            answer = () => r(json({ id: 'r1', stato: 'annullata' }));
+          });
+        }
+        return Promise.resolve(json({}));
+      }),
+    );
+    window.history.pushState({}, '', '/archivio/prestazioni-aggiuntive?mese=2026-10');
+    render(<App />);
+    fireEvent.click((await screen.findAllByRole('button', { name: /^Annulla/ }))[0]!);
+    fireEvent.change(screen.getByLabelText('Motivo dell’annullamento'), {
+      target: { value: 'Registrata due volte' },
+    });
+    const confirm = screen.getByRole<HTMLButtonElement>('button', {
+      name: 'Conferma l’annullamento',
+    });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    await waitFor(() => expect(confirm.disabled).toBe(true));
+    expect(posts).toBe(1);
+    answer();
+    await screen.findByText('Prestazione A1 di Rota Lina annullata.');
+  });
+
+  it('dopo l’esito i pulsanti restano spenti finché la distinta non è ricaricata (D239)', async () => {
+    const base = DISTINTA(true, 0);
+    const interrupted = {
+      ...base,
+      righe: base.righe.map((r) => ({ ...r, inInvioDal: '2026-11-20T09:00:00.000Z' })),
+      inInvio: { dal: '2026-11-20T09:00:00.000Z', interrotto: true, righe: 2 },
+    };
+    let loads = 0;
+    let release: () => void = () => {};
+    const json = (body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        const path = url.split('?')[0]!;
+        if (path === '/api/io') return Promise.resolve(json(me('owner_doctor')));
+        if (path === '/api/oggi')
+          return Promise.resolve(json({ data: '2026-11-20', appuntamenti: [], code: {} }));
+        if (path === '/api/ppip/archivi')
+          return Promise.resolve(json({ archivi: [{ id: 'a1', nome: 'Archivio di prova' }] }));
+        if (path === '/api/archivi/a1/ppip/esito')
+          return Promise.resolve(json({ righe: 2, esito: 'non_arrivata' }));
+        if (path === '/api/archivi/a1/ppip') {
+          loads += 1;
+          if (loads === 1) return Promise.resolve(json(interrupted));
+          // La distinta ricaricata arriva quando la prova lo dice.
+          return new Promise<Response>((r) => {
+            release = () => r(json({ ...base, daInviare: 2 }));
+          });
+        }
+        return Promise.resolve(json({}));
+      }),
+    );
+    window.history.pushState({}, '', '/archivio/prestazioni-aggiuntive?mese=2026-10');
+    render(<App />);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Non è arrivata: torna da inviare' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, confermo' }));
+    await screen.findByText(/Segnato: la distinta non è arrivata/);
+    await waitFor(() => expect(loads).toBe(2));
+    // La distinta di prima è ancora lì, ma i suoi pulsanti non si premono.
+    expect(
+      screen.getByRole<HTMLButtonElement>('button', { name: 'Non è arrivata: torna da inviare' })
+        .disabled,
+    ).toBe(true);
+    release();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Non è arrivata: torna da inviare' })).toBeNull(),
+    );
   });
 
   it('dalla distinta: annullamento con il motivo; il paziente passato a un altro medico senza collegamento', async () => {

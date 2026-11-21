@@ -204,15 +204,27 @@ export function registerAuraRoutes(
     await guardCandidate(actor, c, 'nuovo_assistito_non_registrato');
     const at = now();
     // La riga dell'assistito è bloccata da un «Registra» in corso: si aspetta, e poi si vede com'è.
-    // La scelta e la sua riga del registro entrano insieme (D232).
+    // La scelta e la sua riga del registro entrano insieme (D232). Vale solo per l'archivio e il
+    // medico su cui si è controllato il permesso: se intanto AURA ha cambiato la scelta, non passa
+    // (D239).
     await withActor(db, actor.userId, async (tx) => {
       const done = await tx
         .update(auraNewPatient)
         .set({ status: 'non_registrato', decidedBy: actor.userId, decidedAt: at })
-        .where(and(eq(auraNewPatient.id, id), eq(auraNewPatient.status, 'da_registrare')))
+        .where(
+          and(
+            eq(auraNewPatient.id, id),
+            eq(auraNewPatient.status, 'da_registrare'),
+            eq(auraNewPatient.archiveId, c.archiveId),
+            eq(auraNewPatient.doctorUserId, c.doctorUserId),
+          ),
+        )
         .returning({ id: auraNewPatient.id });
       if (done.length === 0)
-        throw new HttpError(409, 'Non è più fra i nuovi assistiti: ricarica la pagina');
+        throw new HttpError(
+          409,
+          'Non è più fra i nuovi assistiti di questo medico: ricarica la pagina',
+        );
       await logAccess(tx, {
         studioId: actor.studioId,
         userId: actor.userId,

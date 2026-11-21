@@ -187,7 +187,7 @@ export function prepareRow(
     return {
       ok: false,
       errors: [
-        'Fuori dalla produzione si importano solo pazienti inventati: il codice fiscale deve avere la X in dodicesima posizione (D12)',
+        'Fuori dalla produzione si importano solo pazienti inventati: il codice fiscale deve avere la X in dodicesima posizione',
       ],
       warnings,
     };

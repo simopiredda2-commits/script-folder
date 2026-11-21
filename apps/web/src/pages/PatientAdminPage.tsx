@@ -222,7 +222,7 @@ const GROUPS: Group[] = [
         label: 'Email del datore di lavoro (facoltativa)',
         type: 'email',
         maxLength: 200,
-        help: 'Per i certificati INPS: al datore di lavoro va solo il numero di protocollo, nessun dato clinico (D88).',
+        help: 'Per i certificati INPS: al datore di lavoro va solo il numero di protocollo, nessun dato clinico.',
       },
     ],
   },

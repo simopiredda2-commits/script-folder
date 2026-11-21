@@ -300,9 +300,12 @@ def genera_trascrizioni(impronte: dict[str, str]) -> None:
                         ("air-piemonte-2024", "piemonte-prestazioni-aggiuntive")):
         scheda = json.loads((vere / f"{nome}.json").read_text("utf-8"))
         righe = (vere / f"{nome}.csv").read_text("utf-8").splitlines()
+        # Anche l'ambito: senza, l'AIR del Piemonte varrebbe in tutta Italia (D232, D239).
+        ambito = {"ambito": scheda["ambito"]} if "ambito" in scheda else {}
         trascrizione(f"ppip/{nome}", righe, {
             "tipo": "prestazioni_aggiuntive", "serie": serie, "fonte": None, "chiave": None,
-            "sha256_origine": None, "atto": scheda["atto"], "in_vigore_dal": scheda["in_vigore_dal"]})
+            "sha256_origine": None, "atto": scheda["atto"], "in_vigore_dal": scheda["in_vigore_dal"],
+            **ambito})
     trascrizione("piemonte_esenzioni_prestazioni/esenzioni_prestazioni_prova", [
         "esenzione;prestazione",
         "T01;89.7",
