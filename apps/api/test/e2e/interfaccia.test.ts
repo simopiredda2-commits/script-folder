@@ -204,6 +204,32 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   }
 
   /**
+   * Il segno del prodotto poggia sulla base del nome (D242): il bordo in basso del tratto sta sulla
+   * base delle lettere. Centrato come riquadro, il corpo della cartella scendeva 3-4 px sotto.
+   */
+  async function expectLogoOnBase(p: Page, where: string) {
+    const gap = await p.evaluate(() => {
+      const logo = document.querySelector('.brand-logo')!;
+      const path = logo.querySelector('svg path') as SVGPathElement;
+      const ctm = path.getScreenCTM()!;
+      const box = path.getBBox();
+      const half = Number(path.getAttribute('stroke-width')) / 2;
+      const inkBottom = ctm.f + ctm.d * (box.y + box.height + half);
+      // La base delle lettere: un elemento vuoto in riga con il nome ci poggia sopra.
+      const probe = document.createElement('span');
+      probe.style.cssText = 'display:inline-block;width:0;height:0';
+      logo.querySelector('span')!.appendChild(probe);
+      const baseline = probe.getBoundingClientRect().bottom;
+      probe.remove();
+      return inkBottom - baseline;
+    });
+    expect(
+      Math.abs(gap),
+      `${where}: il segno sta ${gap.toFixed(2)} px sotto la base del nome`,
+    ).toBeLessThanOrEqual(0.5);
+  }
+
+  /**
    * La ricetta in una schermata (D242): sul computer e sul tablet in orizzontale la pagina non
    * scorre e «Prepara la ricetta» è in vista; scorrono, se serve, la ricerca e la ricetta.
    */
@@ -474,9 +500,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   it('accesso: password, attivazione del secondo fattore, poi «Oggi»', async () => {
     await page.goto(base);
     await check(page, 'pagina di accesso');
+    await expectLogoOnBase(page, 'pagina di accesso');
     await loginInBrowser(page, 'titolare');
     await page.getByText('Controllo di prova').waitFor();
     await check(page, 'Oggi', true);
+    await expectLogoOnBase(page, 'testata');
   });
 
   it('il menu ha simbolo e nome insieme (D67)', async () => {

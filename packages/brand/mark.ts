@@ -4,11 +4,52 @@ import { scriptColors, uiColors } from './tokens';
 export { previousMark } from './mark-previous';
 
 /**
+ * Ingombro dell'inchiostro di un segno fatto di segmenti (M, L, H, V, Z), in unità della sua
+ * viewBox: i vertici più mezzo spessore. Con estremi e giunzioni tondi è proprio il bordo del
+ * tratto, in alto, in basso e ai lati.
+ */
+export function markInk(paths: readonly string[], stroke: number) {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const d of paths) {
+    let x = 0;
+    let y = 0;
+    for (const [, cmd, args] of d.matchAll(/([MLHVZ])([^MLHVZ]*)/g)) {
+      const n = args!
+        .trim()
+        .split(/[\s,]+/)
+        .filter(Boolean)
+        .map(Number);
+      if (cmd === 'M' || cmd === 'L') [x, y] = n as [number, number];
+      else if (cmd === 'H') x = n[0]!;
+      else if (cmd === 'V') y = n[0]!;
+      xs.push(x);
+      ys.push(y);
+    }
+  }
+  const half = stroke / 2;
+  return {
+    left: Math.min(...xs) - half,
+    right: Math.max(...xs) + half,
+    top: Math.min(...ys) - half,
+    bottom: Math.max(...ys) + half,
+  };
+}
+
+/**
  * Segno del prodotto: la proposta B, «linguetta a picco», scelta da Simone alla prima fermata
  * (D33). Linea continua, spessore costante, estremi arrotondati; tavolozza di SCRIPT.
  */
 export const productMark = {
   viewBox: `0 0 ${chosenMarkDesign.viewBox} ${chosenMarkDesign.viewBox}`,
+  /** Lato della viewBox. */
+  size: chosenMarkDesign.viewBox,
+  /**
+   * Dove il segno poggia, in unità della viewBox: il bordo in basso del tratto. Accanto al nome
+   * il segno sta su questa linea, sulla base delle lettere (D242): centrato come riquadro, il
+   * corpo della cartella, che pesa in basso, scendeva sotto il nome.
+   */
+  base: markInk(chosenMarkDesign.paths, chosenMarkDesign.stroke).bottom,
   paths: chosenMarkDesign.paths,
   strokeWidth: chosenMarkDesign.stroke,
   /** Su fondo chiaro. */

@@ -18,7 +18,7 @@ import {
   proposals,
   type MarkDesign,
 } from '../logo-proposals';
-import { productMark } from '../mark';
+import { markInk, productMark } from '../mark';
 import { previousMark } from '../mark-previous';
 import { scriptColors } from '../tokens';
 
@@ -102,13 +102,24 @@ function svgDoc(width: number, height: number, body: string, background?: string
 
 /**
  * Segno con il nome: il segno alto quanto la riga, il nome alto due terzi del segno. Con `tile`
- * il segno è l'icona gialla dei fondi scuri (D214).
+ * il segno è l'icona gialla dei fondi scuri (D214). Con `onBase` il segno poggia sulla base del
+ * nome, come nell'interfaccia (D242); altrimenti il nome è centrato, come nelle proposte della
+ * prima fermata.
  */
-function lockup(m: MarkDesign, p: Palette, height: number, background = false, tile = false) {
+function lockup(
+  m: MarkDesign,
+  p: Palette,
+  height: number,
+  background = false,
+  tile = false,
+  onBase = false,
+) {
   const markSize = height;
   const cap = height * 0.5;
   const gap = height * 0.28;
-  const baseline = height / 2 + cap / 2;
+  const baseline = onBase
+    ? (markInk(m.paths, m.stroke).bottom * markSize) / m.viewBox
+    : height / 2 + cap / 2;
   const name = nameGroup(p.name, markSize + gap, baseline, cap);
   const width = markSize + gap + name.width;
   const mark = tile ? tileGroup(m, 0, 0, markSize) : markGroup(m, p.mark, 0, 0, markSize);
@@ -207,7 +218,7 @@ const chosen = chosenMarkDesign;
 const view = chosen.viewBox;
 write(logoDir, 'segno.svg', svgDoc(view, view, markGroup(chosen, light.mark, 0, 0, view)));
 write(logoDir, 'segno-su-scuro.svg', svgDoc(view, view, tileGroup(chosen, 0, 0, view)));
-write(logoDir, 'con-nome.svg', lockup(chosen, light, 64).svg);
+write(logoDir, 'con-nome.svg', lockup(chosen, light, 64, false, false, true).svg);
 write(logoDir, 'con-nome-su-scuro.svg', lockup(chosen, dark, 64, false, true).svg);
 write(logoDir, 'tavola-su-scuro.svg', tileBoard(chosen));
 // Nelle schede del browser con il tema scuro, la favicon diventa l'icona gialla.
