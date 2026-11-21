@@ -37,6 +37,11 @@ const cookies = new Map<string, string>();
 /** Segreti del secondo fattore, letti all'attivazione: per mostrare il codice a chi prova. */
 const secrets = new Map<string, string>();
 let pendingUser: string | null = null;
+/**
+ * Da quando c'è la sessione di adesso (D241), per il riquadro della dimostrazione: si riduce da sé
+ * una volta per sessione, dopo l'accesso.
+ */
+let sessionSince: number | null = null;
 /** La sessione unica con il database (D223): le richieste passano una alla volta. */
 let session: SingleSession | null = null;
 
@@ -145,6 +150,8 @@ function remember(setCookie: string) {
       (k === 'max-age' && Number(v) <= 0) || (k === 'expires' && Date.parse(v ?? '') <= Date.now())
     );
   });
+  if (name === SESSION_COOKIE_NAME && (expired || value === '' || value !== cookies.get(name)))
+    sessionSince = expired || value === '' ? null : Date.now();
   if (expired || value === '') cookies.delete(name);
   else cookies.set(name, value);
 }
@@ -181,7 +188,10 @@ function handleNow(request: WireRequest): Promise<WireResponse> {
         o += c.length;
       }
       if (loginBody && res.statusCode === 200) watchLogin(loginBody, bytes);
-      if (request.url === '/api/uscita') cookies.delete(SESSION_COOKIE_NAME);
+      if (request.url === '/api/uscita') {
+        cookies.delete(SESSION_COOKIE_NAME);
+        sessionSince = null;
+      }
       resolve({ status: res.statusCode, headers: out, body: bytes.buffer });
     });
     res.once('error', (err: Error) => reject(err));
@@ -214,6 +224,9 @@ function watchLogin(body: Record<string, unknown>, response: Uint8Array) {
 
 /** C'è una sessione aperta nel barattolo dei cookie. */
 export const loggedIn = () => cookies.has(SESSION_COOKIE_NAME);
+
+/** Da quando c'è la sessione aperta, in millisecondi; nessuna sessione, null. */
+export const currentSessionSince = () => (cookies.has(SESSION_COOKIE_NAME) ? sessionSince : null);
 
 /** Il codice del secondo fattore di chi sta entrando, come lo mostrerebbe la sua app. */
 export function currentCode(): { username: string; code: string; secondsLeft: number } | null {

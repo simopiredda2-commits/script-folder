@@ -55,7 +55,7 @@ _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 3. **I 6 mesi delle medicazioni avanzate** sul vademecum della Regione (D2): per ogni prescrizione del medico di famiglia, come fa oggi il programma, o in tutto dalla prima prescrizione dello specialista. Risposta di Simone del 21/11/2026: «Lo verifichiamo noi» (D240). Il sito della Regione non si raggiunge da qui.
 4. Primo giro di `sync/` dal computer dello studio, con le intestazioni ISTAT (D55, D56); due versioni vere dell'anagrafica AIFA una dopo l'altra.
 5. Stampa vera: promemoria del modello del 2024 con l'OCR-A, su A5 e su A4 (D222), anche con una ricetta lunga che riempie l'area delle prescrizioni (D232); codici a barre letti in farmacia (D211, D217); ricetta rossa sui moduli veri.
-6. Lettori di schermo e tablet veri; WebKit e Firefox anche fuori dalla CI; un riavvio vero di Postgres con il servizio acceso (D207); una giornata di lavoro con la Dr.ssa Rocca.
+6. Lettori di schermo e tablet veri; Safari e Firefox veri, su computer e tablet: qui girano i motori di Playwright, nella CI e, con `scripts/browser-locali.sh`, anche nel contenitore (D241); un riavvio vero di Postgres con il servizio acceso (D207); una giornata di lavoro con la Dr.ssa Rocca.
 
 _C. Decisioni o materiali di Simone_
 
@@ -1209,11 +1209,22 @@ Nello stesso branch, ripartito da `main`, le risposte della fermata dopo l'union
 - come l'ASL tratta una prestazione eseguita dal medico di prima dopo la nuova scelta del paziente in AURA e prima di «Sposta» (A6 di «Che cosa resta aperto»);
 - il catalogo dell'archivio della distinta quando i due archivi hanno ASL diverse;
 - il SAR vero e il Sistema TS veri;
-- WebKit e Firefox solo nella CI.
+- Firefox solo nella CI; WebKit anche in locale (D241).
 
 **Domande per la fermata**: via alla #30.
 
 **Prossimo passo**: la fermata. Poi le risposte di Regione, ASL e CSI (A); le verifiche per la fine sono in «Che cosa resta aperto».
+
+### WebKit in locale e riquadro della dimostrazione (D241)
+
+Domanda di Simone del 21/11/2026, durante il blocco: «Non puoi installarlo? Webkit intendo».
+
+1. **WebKit in locale** (fatto): `scripts/browser-locali.sh` scarica WebKit, e se serve Firefox, in una cartella a parte, con le librerie di sistema; il Chromium già installato non cambia. La rete dell'ambiente ora permette `playwright.download.prss.microsoft.com`, con l'approvazione di Simone. In ogni sessione nuova lo script va rilanciato.
+2. **Guasto della dimostrazione** (corretto): con WebKit in locale si è riprodotto quello visto su GitHub nella #30, «Ricomincia da capo» che non si cliccava. Dopo un accesso il riquadro si riduceva da sé fino a un secondo dopo, anche se lo si era appena aperto. Ora si riduce una volta per sessione, e non se lo si è aperto a mano dopo l'accesso; le prove lo aprono in uno stato noto.
+
+**Come provarlo**: `scripts/browser-locali.sh`, poi `eval "$(scripts/browser-locali.sh --env)"` e `E2E_BROWSER=webkit pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts`, o `pnpm --filter @mmg/demo build` e `DEMO_BROWSER=webkit pnpm --filter @mmg/demo test:browser`. La decisione del riquadro: `apps/demo/prove/riquadro.unit.ts`. 4 sabotaggi, nel registro in fondo.
+
+**Non provato**: Firefox in locale (lo script lo scarica; qui è rimasto alla CI); il collegamento del pulsante del riquadro con la decisione, che si prova solo nella dimostrazione, dove il guasto dipende dai tempi; Safari e Firefox veri.
 
 ## Richieste di Simone tra le fermate (18/11/2026)
 
@@ -3386,3 +3397,7 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D240: la scelta arriva al servizio                                                                            | PpipPage.tsx: scelta non mandata                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D240: la copia nella pagina dice chi aveva il paziente quel giorno                                            | archive-moves.ts (pagina): sempre l'archivio di adesso                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D240: nella dimostrazione, dopo «Sposta», la pagina dice la distinta di prima                                 | PpipPage.tsx: avviso tolto, dimostrazione costruita                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D241: aperto a mano dopo l'accesso, il riquadro resta aperto                                                  | panel-state.ts: si riduce sempre                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D241: il riquadro si riduce una volta per sessione                                                            | panel-state.ts: si riduce a ogni lettura                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D241: aperto a mano durante l'accesso, il riquadro si riduce come prima                                       | panel-state.ts: non si riduce più se aperto a mano                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D241: dopo un'uscita la sessione nuova riduce di nuovo il riquadro                                            | panel-state.ts: decide una volta sola                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

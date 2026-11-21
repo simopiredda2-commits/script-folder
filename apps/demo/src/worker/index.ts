@@ -4,7 +4,7 @@
  */
 import './shims/globals';
 import type { FromWorker, ToWorker } from '../protocol';
-import { currentCode, DEMO_PASSWORD, handle, loggedIn, start } from './server';
+import { currentCode, currentSessionSince, DEMO_PASSWORD, handle, loggedIn, start } from './server';
 
 const post = (message: FromWorker, transfer: Transferable[] = []) =>
   (self as unknown as Worker).postMessage(message, transfer);
@@ -42,6 +42,11 @@ self.onmessage = (event: MessageEvent<ToWorker>) => {
       },
     );
   } else if (m.type === 'code') {
-    post({ type: 'code', code: currentCode(), loggedIn: loggedIn() });
+    post({
+      type: 'code',
+      code: currentCode(),
+      loggedIn: loggedIn(),
+      sessionSince: currentSessionSince(),
+    });
   }
 };

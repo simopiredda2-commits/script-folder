@@ -184,12 +184,30 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     }, path);
 
   /**
+   * Apre il riquadro della dimostrazione in uno stato noto (D241). Dopo un accesso il riquadro si
+   * riduce da sé, entro un secondo: se è ancora aperto lo si riduce, poi lo si apre a mano, e
+   * aperto a mano non si richiude da sé mentre lo si legge.
+   */
+  async function openPanel() {
+    const opener = f.locator('button.dimo-apri');
+    const panel = f.locator('#dimostrazione');
+    if (!(await opener.count()))
+      await panel
+        .getByRole('button', { name: 'Riduci il riquadro della dimostrazione' })
+        .click({ timeout: 5_000 })
+        // Se intanto si è ridotto da sé, il pulsante non c'è più: va bene lo stesso.
+        .catch(() => undefined);
+    await opener.click();
+    await panel.getByRole('heading', { level: 2, name: 'Dimostrazione' }).waitFor();
+    return panel;
+  }
+
+  /**
    * Il codice del secondo fattore nel riquadro aperto, per questo utente e diverso da quello che ha
    * già usato (lo stesso codice non vale due volte).
    */
   async function codeFor(username: string) {
-    const opener = f.locator('button.dimo-apri');
-    if (await opener.count()) await opener.click();
+    await openPanel();
     const line = f.locator('#dimostrazione p', { hasText: `Codice per ${username}:` });
     for (let i = 0; i < 80; i++) {
       if (await line.count()) {
@@ -209,13 +227,10 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
    * riduce di nuovo, perché aperto copre la pagina.
    */
   async function fromPanel<T>(read: (panel: Locator) => Promise<T>): Promise<T> {
-    const opener = f.locator('button.dimo-apri');
-    if (await opener.count()) await opener.click();
-    const panel = f.locator('#dimostrazione');
-    await panel.getByRole('heading', { level: 2, name: 'Dimostrazione' }).waitFor();
+    const panel = await openPanel();
     const value = await read(panel);
     await panel.getByRole('button', { name: 'Riduci il riquadro della dimostrazione' }).click();
-    await opener.waitFor();
+    await f.locator('button.dimo-apri').waitFor();
     return value;
   }
 
@@ -1089,8 +1104,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   it('«Ricomincia da capo» da una pagina interna: la dimostrazione riparte (D232)', async () => {
     const before = problems.length;
     await go('/archivio/riepiloghi');
-    const opener = f.locator('button.dimo-apri');
-    if (await opener.count()) await opener.click();
+    await openPanel();
     await f.getByRole('button', { name: 'Ricomincia da capo' }).click();
     // Se non riparte, la prova dice che cosa mostra la pagina, con il tempo del primo avvio per
     // confronto: con WebKit è caduta una volta su main dicendo solo che l'attesa era scaduta (prove

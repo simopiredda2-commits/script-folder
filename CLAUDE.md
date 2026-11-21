@@ -93,7 +93,8 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 - `APP_AMBIENTE`: «prova» (per difetto: solo pazienti inventati dove si controlla, seed ammesso) o «produzione» (seed vietato), D170.
 - `APP_PROXY_FIDATI`: indirizzi o reti dei proxy inversi davanti al servizio (vuota per difetto: X-Forwarded-For si ignora), per l'indirizzo vero nel registro dei tentativi falliti (D179).
 - `AURA_AGGIORNAMENTO`: ora del controllo di ogni notte su AURA, ora di Roma (per esempio `02:30`). Vuota per difetto: niente giro di notte; restano le notifiche, il pulsante e il controllo prima della ricetta (D197).
-- La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e alcuni siti pubblici, solo per leggere specifiche, decreti e dati aperti (Sistema TS, Gazzetta Ufficiale, Normattiva, INPS, AIFA anche `drive.aifa.gov.it`, Regione Piemonte, Ministero della Salute, due ASL; D92, D148). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7).
+- La sessione in cloud usa l'ambiente «Folder»: raggiunge i registri dei pacchetti e alcuni siti pubblici, solo per leggere specifiche, decreti e dati aperti (Sistema TS, Gazzetta Ufficiale, Normattiva, INPS, AIFA anche `drive.aifa.gov.it`, Regione Piemonte, Ministero della Salute, due ASL; D92, D148). Gli altri siti istituzionali no; il prodotto non chiama nessuno di questi siti (regola 7). Raggiunge anche `playwright.download.prss.microsoft.com`, solo per scaricare WebKit e Firefox per le prove (D241).
+- Browser per le prove: Chromium è già installato in `/opt/pw-browsers`; non si reinstalla Playwright e non si lancia `playwright install` in quella cartella. WebKit e Firefox si scaricano con `scripts/browser-locali.sh` in una cartella a parte, a ogni sessione nuova e solo quando servono (circa 300 MB ciascuno, D241).
 
 ## Comandi
 
@@ -121,6 +122,7 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 | `pnpm --filter @mmg/brand tokens:css`                                                                                                                                      | Rigenera `tokens.css` da `tokens.ts`                                                                                               |
 | `pnpm --filter @mmg/brand logo:proposte`                                                                                                                                   | Rigenera le proposte di logo e le tavole di `docs/logo.md`                                                                         |
 | `scripts/sabotaggio.sh -f FILE -s 'GUASTO' -t 'PROVA'`                                                                                                                     | Prova un controllo: rosso col guasto, verde dopo il ripristino                                                                     |
+| `scripts/browser-locali.sh [webkit] [firefox]`, poi `eval "$(scripts/browser-locali.sh --env)"`                                                                            | WebKit e Firefox per le prove in locale, con `E2E_BROWSER` o `DEMO_BROWSER` come nella CI (D241)                                   |
 
 Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano). Il servizio vuole anche `APP_ENCRYPTION_KEY` (in cloud la imposta l'hook).
 
