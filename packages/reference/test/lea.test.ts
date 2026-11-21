@@ -203,9 +203,9 @@ describe('allegato 3 del DPCM LEA: presidi per diabete e malattie rare (D218)', 
   });
 
   it('il tipo della voce è «presidio» o «malattia_rara»: un altro valore è un problema (D232)', () => {
-    const header = 'tipo;codice;descrizione;gruppo;allegato';
+    const header = 'tipo;codice;descrizione;gruppo;allegato;quantita;intestazione_quantita';
     const bad = readTable(
-      Buffer.from(`${header}\nmalattia rara;RCG060;Malattia di prova;Malattie rare;3\n`, 'utf8'),
+      Buffer.from(`${header}\nmalattia rara;RCG060;Malattia di prova;Malattie rare;3;;\n`, 'utf8'),
       'prova.csv',
     );
     const read = extractRecords(mappingForTranscription(loadMappings(), 'presidi')!, bad);
@@ -265,6 +265,21 @@ describe('allegato 3 del DPCM LEA: presidi per diabete e malattie rare (D218)', 
     expect(rare('RCG074')).toMatch(/\(es\. Deficit di 3 Idrossiacil Coa Deidrogenasi a catena$/);
     expect(rare('RN1370')).toBe('ALSTRÖM, SINDROME DI');
     expect(rare('RCG162')).toBe('SINDROMI DA NEOPLASIE ENDOCRINE MULTIPLE (es MEN2)');
+  });
+
+  it('l’allegato 3 ha le stesse colonne, vuote: non stampa quantità', () => {
+    expect(table3[0]).toEqual([
+      'tipo',
+      'codice',
+      'descrizione',
+      'gruppo',
+      'allegato',
+      'quantita',
+      'intestazione_quantita',
+      'pagina_gu',
+    ]);
+    for (const r of read3.records)
+      expect([r.quantity ?? '', r.quantityHeading ?? '']).toEqual(['', '']);
   });
 });
 
@@ -385,7 +400,7 @@ describe('allegato 2 del DPCM LEA: ausili monouso (D236)', () => {
     });
   });
 
-  it('quantità e pagina restano nel CSV come stampate, ma non si importano', () => {
+  it('quantità e intestazione della loro colonna, come stampate, si importano (D237)', () => {
     expect(table2[0]).toEqual([
       'tipo',
       'codice',
@@ -393,17 +408,37 @@ describe('allegato 2 del DPCM LEA: ausili monouso (D236)', () => {
       'gruppo',
       'allegato',
       'quantita',
+      'intestazione_quantita',
       'pagina_pdf',
     ]);
-    expect(cell('09.15.03.003', 'quantita')).toBe('4');
-    expect(cell('09.15.03.021', 'quantita')).toBe('');
-    expect(cell('09.18.05.003', 'quantita')).toBe('20 + 60');
-    expect(cell('09.31.06.006', 'quantita')).toBe('2/anno');
-    expect(cell('09.30.12.045', 'quantita')).toBe('120');
-    expect(cell('09.31.06.009', 'pagina_pdf')).toBe('10');
-    expect(Object.keys(item('09.15.03.003')).sort()).toEqual(
-      ['annex', 'code', 'description', 'entryType', 'group'].sort(),
+    expect(item('09.15.03.003')).toMatchObject({ quantity: '4', quantityHeading: 'quantità/anno' });
+    expect(item('09.18.05.003')).toMatchObject({
+      quantity: '20 + 60',
+      quantityHeading: 'quantità erogabile',
+    });
+    expect(item('09.31.06.006').quantity).toBe('2/anno');
+    expect(item('09.30.12.045').quantity).toBe('120');
+    // 09.30.12, 09.30.21 e 09.30.24 non hanno un'intestazione loro: quella sopra, della classe 09.30.
+    for (const c of ['09.30.04.060', '09.30.12.042', '09.30.21.018', '09.30.24.063'])
+      expect(item(c).quantityHeading, c).toBe('quantità massima erogabile');
+    const counts = Object.fromEntries(
+      ['quantità erogabile', 'quantità massima erogabile', 'quantità/anno', ''].map((h) => [
+        h,
+        read2.records.filter((r) => (r.quantityHeading ?? '') === h).length,
+      ]),
     );
+    expect(counts).toEqual({
+      'quantità erogabile': 36,
+      'quantità massima erogabile': 14,
+      'quantità/anno': 8,
+      '': 29,
+    });
+    // Senza colonna delle quantità (09.18.24, 09.18.30, 04.49, lubrificante) niente quantità; le
+    // due voci 09.15 aggiunte dal foglio M1 hanno la colonna ma la cella vuota.
+    for (const r of read2.records.filter((x) => !x.quantityHeading))
+      expect(r.quantity ?? '').toBe('');
+    expect(cell('09.15.03.021', 'quantita')).toBe('');
+    expect(cell('09.31.06.009', 'pagina_pdf')).toBe('10');
   });
 });
 

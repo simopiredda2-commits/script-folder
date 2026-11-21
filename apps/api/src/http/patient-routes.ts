@@ -1,5 +1,5 @@
 import { unseenLockCount } from '../auth/account-locks';
-import { can, ROLE_LABELS } from '@mmg/domain';
+import { ADVANCED_DRESSING_CODE, can, ROLE_LABELS } from '@mmg/domain';
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -21,12 +21,13 @@ import {
   therapy,
 } from '../db/schema';
 import { withActor } from '../db/tx';
+import { advancedCodesOf } from '../clinical/supplies';
 import { buildCsvZip } from '../export/csv';
 import { buildExport } from '../export/export';
 import { guardPatient, loadArchiveContext, visibleArchives } from '../patients/access';
 import { labResults, latestMeasurements, timeline } from '../patients/timeline';
 import { studioDate } from '../prescriptions/rules-check';
-import type { AifaChange, DrugShortage, ReferenceData } from '../reference/lookup';
+import { ReferenceData, type AifaChange, type DrugShortage } from '../reference/lookup';
 import { HttpError } from './errors';
 
 const idParams = z.object({ id: z.uuid() });
@@ -317,6 +318,21 @@ export function registerPatientRoutes(
     .object({
       segreteriaLeggeDiario: z.boolean(),
       segreteriaLeggeRiepilogo: z.boolean(),
+      /**
+       * Le voci del gruppo 04.49 dell'allegato 2 che il titolare considera medicazioni avanzate,
+       * con la regola dello specialista (D237). L'elenco intero: sostituisce quello di prima.
+       */
+      medicazioniAvanzate: z
+        .array(
+          z
+            .string()
+            .trim()
+            .regex(
+              ADVANCED_DRESSING_CODE,
+              'Solo voci del gruppo 04.49 dell’allegato 2 del DPCM LEA',
+            ),
+        )
+        .max(50),
     })
     .partial()
     .strict();
@@ -356,6 +372,7 @@ export function registerPatientRoutes(
     return {
       segreteriaLeggeDiario: ctx.settings.secretaryCanReadDiary,
       segreteriaLeggeRiepilogo: ctx.settings.secretaryCanReadSummary,
+      medicazioniAvanzate: await advancedCodesOf(db, id),
     };
   });
 
@@ -369,6 +386,21 @@ export function registerPatientRoutes(
       parsed.success ? Object.keys(parsed.data) : [],
     );
     const body = settingsBody.parse(req.body);
+    // Solo voci del nomenclatore in uso: una voce che non c'è non si potrebbe scegliere (D237).
+    const advanced = body.medicazioniAvanzate && [...new Set(body.medicazioniAvanzate)].sort();
+    if (advanced?.length) {
+      const known = new Set(
+        (await new ReferenceData(db).supplyCatalog(studioDate(now())))
+          .filter((i) => i.entryType === 'presidio' && i.annex === '2')
+          .map((i) => i.code),
+      );
+      const unknown = advanced.filter((c) => !known.has(c));
+      if (unknown.length)
+        throw new HttpError(
+          400,
+          `Non sono voci del nomenclatore dell’allegato 2 in uso: ${unknown.join(', ')}`,
+        );
+    }
     const [row] = await withActor(db, req.actor!.userId, (tx) =>
       tx
         .update(archive)
@@ -379,6 +411,7 @@ export function registerPatientRoutes(
           ...(body.segreteriaLeggeRiepilogo !== undefined
             ? { secretaryCanReadSummary: body.segreteriaLeggeRiepilogo }
             : {}),
+          ...(advanced !== undefined ? { advancedDressingCodes: advanced } : {}),
         })
         .where(eq(archive.id, id))
         .returning(),
@@ -386,6 +419,7 @@ export function registerPatientRoutes(
     return {
       segreteriaLeggeDiario: row!.secretaryCanReadDiary,
       segreteriaLeggeRiepilogo: row!.secretaryCanReadSummary,
+      medicazioniAvanzate: row!.advancedDressingCodes,
     };
   });
 

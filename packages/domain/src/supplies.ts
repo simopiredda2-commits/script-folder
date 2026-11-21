@@ -67,6 +67,28 @@ export function supplyCategory(key: string): SupplyCategoryInfo | undefined {
 /** Medicazioni avanzate: massimo di mesi per la prescrizione del medico di famiglia (vademecum). */
 export const ADVANCED_DRESSING_MAX_MONTHS = 6;
 
+/**
+ * Le voci fra cui il titolare sceglie le sue medicazioni avanzate: il gruppo 04.49 dell'allegato 2
+ * del DPCM LEA, «prodotti per il trattamento delle lesioni cutanee» (D237).
+ */
+export const ADVANCED_DRESSING_CODE = /^04\.49\.\d{2}\.\d{3}$/;
+
+/**
+ * Una voce che il titolare dell'archivio considera medicazione avanzata si prescrive in quella
+ * categoria, dove vale la regola dello specialista (D237). Vuoto se va bene; senza codice non c'è
+ * niente da controllare.
+ */
+export function advancedDressingIssues(
+  p: { category: string; code?: string | null },
+  advancedCodes: readonly string[],
+): string[] {
+  const code = p.code?.trim();
+  if (!code || p.category === 'medicazione_avanzata' || !advancedCodes.includes(code)) return [];
+  return [
+    `La voce ${code} è fra le medicazioni avanzate scelte dal titolare dell’archivio: si prescrive nella categoria «Medicazioni avanzate»`,
+  ];
+}
+
 /** Ultimo giorno coperto da una prescrizione di `months` mesi dal giorno `start` (compreso). */
 export function supplyEndOn(start: string, months: number): string {
   const [y, m, d] = start.split('-').map(Number) as [number, number, number];

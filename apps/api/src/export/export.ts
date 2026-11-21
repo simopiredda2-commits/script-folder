@@ -269,7 +269,17 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
       indirizzo: a.studio.address,
       tipo: a.studio.kind,
     },
-    archivio: { id: a.archive.id, nome: a.archive.name },
+    archivio: {
+      id: a.archive.id,
+      nome: a.archive.name,
+      // Le scelte del titolare sul suo archivio: che cosa vede la segreteria (D30) e quali voci
+      // del nomenclatore sono medicazioni avanzate (D238).
+      impostazioni: {
+        segreteria_legge_diario: a.archive.secretaryCanReadDiary,
+        segreteria_legge_riepilogo: a.archive.secretaryCanReadSummary,
+        medicazioni_avanzate: a.archive.advancedDressingCodes,
+      },
+    },
     medico: {
       id: a.owner.id,
       nome: a.owner.displayName,

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ADVANCED_DRESSING_CODE,
   ADVANCED_DRESSING_MAX_MONTHS,
+  advancedDressingIssues,
   SUPPLY_CATEGORIES,
   sniffAttachmentType,
   supplyEndOn,
@@ -62,5 +64,33 @@ describe('presidi e assistenza integrativa', () => {
     ).toBe('image/png');
     expect(sniffAttachmentType(new TextEncoder().encode('<html>'))).toBeNull();
     expect(sniffAttachmentType(new Uint8Array([]))).toBeNull();
+  });
+
+  it('medicazioni avanzate scelte dal titolare: solo fra le medicazioni avanzate (D237)', () => {
+    const chosen = ['04.49.03.103', '04.49.06.203'];
+    expect(advancedDressingIssues({ category: 'monouso', code: '04.49.03.103' }, chosen)).toEqual([
+      'La voce 04.49.03.103 è fra le medicazioni avanzate scelte dal titolare dell’archivio: si prescrive nella categoria «Medicazioni avanzate»',
+    ]);
+    // Anche con spazi intorno al codice, come può arrivare da una prescrizione di prima.
+    expect(
+      advancedDressingIssues({ category: 'monouso', code: ' 04.49.06.203 ' }, chosen),
+    ).toHaveLength(1);
+    expect(
+      advancedDressingIssues({ category: 'medicazione_avanzata', code: '04.49.03.103' }, chosen),
+    ).toEqual([]);
+    expect(advancedDressingIssues({ category: 'monouso', code: '04.49.09.303' }, chosen)).toEqual(
+      [],
+    );
+    expect(advancedDressingIssues({ category: 'monouso', code: null }, chosen)).toEqual([]);
+    expect(advancedDressingIssues({ category: 'monouso', code: '04.49.03.103' }, [])).toEqual([]);
+    // Le voci fra cui si sceglie: il gruppo 04.49, con il codice intero.
+    expect(['04.49.03.103', '04.49.27.903'].every((c) => ADVANCED_DRESSING_CODE.test(c))).toBe(
+      true,
+    );
+    expect(
+      ['09.18.04.003', '04.49', '04.49.03.10', '04.49.03.1033'].some((c) =>
+        ADVANCED_DRESSING_CODE.test(c),
+      ),
+    ).toBe(false);
   });
 });

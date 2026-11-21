@@ -1636,3 +1636,24 @@ Non provato: il controllo di una persona sulle 87 righe e sul confronto con i de
 - **Dopo l'unione**: «Revisione dalla #26 alla #28». Una revisione indipendente del codice unito dalla #26 alla #28, come quella della #25 (D231), con le correzioni dei difetti veri.
 
 Si fanno nello stesso branch, ripartito da `main`: prima le due modifiche, poi la revisione. La revisione guarda anche il codice nuovo di questo blocco, che andrà nella stessa pull request.
+
+**D238 · Quantità accanto alla voce e medicazioni avanzate scelte dal titolare.** Le due modifiche chieste alla fermata (D237):
+
+- **Quantità dell'allegato 2**: si importano con la trascrizione e si mostrano sotto la scelta dal nomenclatore, nella scheda dei presidi: «Quantità nel nomenclatore: 120 («quantità massima erogabile»). Il fabbisogno lo decide il medico.» Nessun controllo sul fabbisogno.
+- **Medicazioni avanzate**: nella pagina dell'archivio il medico titolare sceglie quali voci del gruppo 04.49 dell'allegato 2 sono medicazioni avanzate. Quelle voci si prescrivono solo nella categoria «Medicazioni avanzate», con la regola dello specialista (D123).
+
+Scelte prese da me:
+
+1. **Intestazione della quantità**: quella stampata sulla colonna, perché il numero da solo non dice se è al mese o all'anno, erogabile o massimo. Per 09.30.12, 09.30.21 e 09.30.24, che non hanno un'intestazione loro, quella più vicina sopra la voce, della classe 09.30 («quantità massima erogabile»). Dove la tabella non ha la colonna (09.18.24, 09.18.30, 04.49, lubrificante) niente quantità e niente riga. Le quantità restano testo come stampato («20 + 60», «2/anno»).
+2. **Allegato 3**: le stesse due colonne, vuote, perché l'allegato 3 non stampa quantità.
+3. **L'elenco sta nell'archivio**, vuoto per difetto: finché il titolare non sceglie, le voci 04.49 restano fra i dispositivi monouso, come prima (D236). Lo sceglie solo il titolare (permesso `archive.settings`, come «Che cosa vede la segreteria»). In medicina di gruppo ognuno per il suo archivio.
+4. **Solo voci del gruppo 04.49 del nomenclatore in uso**: il servizio rifiuta un codice di altra forma e uno che il nomenclatore controllato non ha. Doppioni tolti, codici in ordine.
+5. **La regola sta nel servizio, non solo nell'interfaccia**: una voce scelta non si prescrive in un'altra categoria. Vale anche per il rinnovo di una prescrizione fatta prima della scelta. Altrimenti la regola dello specialista si aggirerebbe con l'altra categoria. Un prodotto scritto a mano, senza codice, non si controlla: il programma non sa che cosa sia.
+6. **Registro**: la modifica delle impostazioni dell'archivio prende il nome dei campi che cambia. «Che cosa vede la segreteria: modifica», «Medicazioni avanzate: modifica», «Impostazioni dell’archivio: modifica» se cambiano insieme; la lettura «Impostazioni dell’archivio: consultazione». Mai i valori (D30).
+7. **Dopo il salvataggio** le caselle mostrano l'elenco come l'ha salvato il servizio, anche se le impostazioni non si ricaricano.
+8. **Dimostrazione**: nel database di partenza nessuna scelta, così Simone la prova dall'archivio. La prova automatica sceglie l'alginato 15 x 15 e lo prescrive con lo specialista.
+9. **Esportazione completa** (regola 4): l'archivio esportato porta le impostazioni del titolare, che cosa vede la segreteria e le medicazioni avanzate. Prima non c'erano nemmeno quelle della segreteria. Il permesso `archive.settings` ora si chiama «Decidere che cosa vede la segreteria dell’archivio e quali sono le medicazioni avanzate» (`docs/ruoli-permessi.md`).
+
+Prove: trascrizione e mappatura (`packages/reference/test/lea.test.ts`), regola (`packages/domain/test/presidi.test.ts`), servizio (`apps/api/test/nomenclatore-presidi.test.ts`), registro (`apps/api/test/archivio-autorizzazioni.test.ts`), interfaccia (`apps/web/test/medicazioni-avanzate.test.tsx`), dimostrazione nel browser. I sabotaggi sono nel registro di `docs/avanzamento.md`.
+
+Non provato: il controllo di una persona su quantità e intestazioni (con le 87 righe, A8); quali medicazioni la Dr.ssa Rocca sceglierà; WebKit e Firefox solo nella CI.

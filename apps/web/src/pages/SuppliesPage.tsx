@@ -25,6 +25,9 @@ interface CatalogItem {
   gruppo: string;
   allegato: string;
   atto: string | null;
+  /** La quantità stampata nell'allegato e l'intestazione della sua colonna, se ci sono (D237). */
+  quantita?: string | null;
+  intestazioneQuantita?: string | null;
 }
 
 interface Catalog {
@@ -73,9 +76,12 @@ export function SuppliesPage() {
   const { id } = useParams<{ id: string }>();
   const { isDoctor } = useSession();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
-  const supplies = useApi<{ presidi: Supply[]; puoScrivere: boolean }>(
-    `/api/pazienti/${id}/presidi`,
-  );
+  const supplies = useApi<{
+    presidi: Supply[];
+    puoScrivere: boolean;
+    /** Le voci dell'allegato 2 che il titolare considera medicazioni avanzate (D237). */
+    medicazioniAvanzate?: string[];
+  }>(`/api/pazienti/${id}/presidi`);
   const categories = useApi<{ categorie: Category[] }>('/api/presidi/categorie');
   const catalog = useApi<Catalog>('/api/presidi/nomenclatore');
   const problems = useApi<EntryList>(
@@ -110,6 +116,7 @@ export function SuppliesPage() {
           patientId={id!}
           categories={categories.data.categorie}
           catalog={catalog.data ?? { presidi: [], malattieRare: [] }}
+          advancedCodes={supplies.data?.medicazioniAvanzate ?? []}
           problems={(problems.data?.voci ?? []).map((v) => ({
             id: v.id,
             nome: String(v.dettaglio?.descrizione ?? ''),
@@ -256,12 +263,14 @@ function SupplyForm({
   patientId,
   categories,
   catalog,
+  advancedCodes,
   problems,
   onSaved,
 }: {
   patientId: string;
   categories: Category[];
   catalog: Catalog;
+  advancedCodes: string[];
   problems: { id: string; nome: string }[];
   onSaved: () => void;
 }) {
@@ -292,12 +301,21 @@ function SupplyForm({
     setF((x) => ({ ...x, [k]: e.target.value }));
   const category = categories.find((c) => c.chiave === f.categoria);
   const advanced = f.categoria === 'medicazione_avanzata';
-  // Il nomenclatore dell'allegato della categoria, se trascritto e controllato (D218).
-  const annex = category?.allegato ?? null;
-  const items = annex ? catalog.presidi.filter((i) => i.allegato === annex) : [];
+  // Il nomenclatore dell'allegato della categoria, se trascritto e controllato (D218). Le voci
+  // dell'allegato 2 che il titolare considera medicazioni avanzate stanno solo in quella categoria,
+  // dove vale la regola dello specialista (D237).
+  const advancedSet = new Set(advancedCodes);
+  const isAdvanced = (i: CatalogItem) => i.allegato === '2' && advancedSet.has(i.codice);
+  const annex = advanced ? '2' : (category?.allegato ?? null);
+  const items = annex
+    ? catalog.presidi.filter(
+        (i) => i.allegato === annex && (advanced ? isAdvanced(i) : !isAdvanced(i)),
+      )
+    : [];
   const groups = [...new Set(items.map((i) => i.gruppo))];
   const rare = annex ? catalog.malattieRare.filter((i) => i.allegato === annex) : [];
   const chosen = items.findIndex((i) => i.descrizione === f.prodotto && i.codice === f.codice);
+  const chosenItem = chosen >= 0 ? items[chosen] : undefined;
   // La voce vuota è «scrivi a mano»: prodotto e codice si svuotano, e non diventano quelli della
   // prima voce (Number('') è 0). Un codice rimasto da un'altra voce sarebbe sbagliato (D232).
   const pick = (index: string) => {
@@ -388,7 +406,11 @@ function SupplyForm({
             <select
               id="presidio-nomenclatore"
               value={chosen >= 0 ? String(chosen) : ''}
-              aria-describedby="presidio-nomenclatore-aiuto"
+              aria-describedby={
+                chosenItem?.quantita
+                  ? 'presidio-nomenclatore-aiuto presidio-nomenclatore-quantita'
+                  : 'presidio-nomenclatore-aiuto'
+              }
               onChange={(e) => pick(e.target.value)}
             >
               <option value="">Scrivi il prodotto o scegli dal nomenclatore</option>
@@ -407,6 +429,14 @@ function SupplyForm({
             <p className="aiuto" id="presidio-nomenclatore-aiuto">
               Riempie prodotto e codice. Fonte: {items[0]!.atto ?? `allegato ${annex}`}.
             </p>
+            {chosenItem?.quantita && (
+              // La quantità come la stampa l'allegato, senza controlli sul fabbisogno (D237).
+              <p className="aiuto" id="presidio-nomenclatore-quantita">
+                Quantità nel nomenclatore: <strong>{chosenItem.quantita}</strong>
+                {chosenItem.intestazioneQuantita ? ` («${chosenItem.intestazioneQuantita}»)` : ''}.
+                Il fabbisogno lo decide il medico.
+              </p>
+            )}
             {rare.length > 0 && (
               <details className="malattie-rare">
                 <summary>Malattie rare che danno diritto a questi presidi (art. 13)</summary>

@@ -355,6 +355,9 @@ export interface SupplyCatalogItem {
   group: string;
   /** Allegato del DPCM: «2» o «3». */
   annex: string;
+  /** La quantità stampata nell'allegato e l'intestazione della sua colonna, se ci sono (D237). */
+  quantity: string | null;
+  quantityHeading: string | null;
   series: string;
   act: string | null;
   validFrom: string;
@@ -1251,6 +1254,8 @@ export class ReferenceData {
         description: r.description,
         group: r.group,
         annex: r.annex,
+        quantity: r.quantity || null,
+        quantityHeading: r.quantityHeading || null,
         series: d.series,
         act: d.act,
         validFrom: d.validFrom,

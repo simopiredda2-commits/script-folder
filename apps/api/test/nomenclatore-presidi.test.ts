@@ -15,6 +15,8 @@ interface Catalog {
     gruppo: string;
     allegato: string;
     atto: string;
+    quantita: string | null;
+    intestazioneQuantita: string | null;
   }[];
   malattieRare: { codice: string; descrizione: string; allegato: string }[];
 }
@@ -148,5 +150,125 @@ describe('nomenclatore dei presidi dalle trascrizioni dei LEA (D218, D236)', () 
     );
     expect((await post('x'.repeat(500))).statusCode).toBe(201);
     expect((await post('x'.repeat(501))).statusCode).toBe(400);
+  });
+
+  it('la quantità come la stampa l’allegato, con l’intestazione della sua colonna (D237)', async () => {
+    const c = await catalog();
+    const at = (code: string) => c.presidi.find((p) => p.codice === code)!;
+    expect(at('09.18.05.003')).toMatchObject({
+      quantita: '20 + 60',
+      intestazioneQuantita: 'quantità erogabile',
+    });
+    expect(at('09.15.03.003')).toMatchObject({
+      quantita: '4',
+      intestazioneQuantita: 'quantità/anno',
+    });
+    expect(at('09.30.21.003')).toMatchObject({
+      quantita: '120',
+      intestazioneQuantita: 'quantità massima erogabile',
+    });
+    expect(at('09.31.06.006').quantita).toBe('2/anno');
+    // Dove l'allegato non dà la quantità (04.49) e nell'allegato 3: niente.
+    expect(at('04.49.03.103')).toMatchObject({ quantita: null, intestazioneQuantita: null });
+    expect(at('09.15.03.021')).toMatchObject({ quantita: null });
+    for (const p of c.presidi.filter((x) => x.allegato === '3'))
+      expect([p.quantita, p.intestazioneQuantita]).toEqual([null, null]);
+  });
+
+  describe('medicazioni avanzate scelte dal titolare (D237)', () => {
+    const settings = () => `/api/archivi/${s.archives.titolare}/impostazioni`;
+    const supplies = () => `/api/pazienti/${s.richPatient}/presidi`;
+    const send = (
+      method: 'GET' | 'PATCH' | 'POST',
+      url: string,
+      cookie: string,
+      payload?: object,
+    ) => s.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    const dressing = (extra: object = {}) => ({
+      categoria: 'medicazione_avanzata',
+      prodotto: 'medicazioni in alginato (classe M040402 - Cnd): cm 15 x 15',
+      codice: '04.49.03.103',
+      quantitaMensile: 10,
+      unita: 'pezzi',
+      mesi: 3,
+      dal: studioDayFrom(s.clock.now(), 0),
+      ...extra,
+    });
+
+    it('le sceglie solo il titolare, fra le voci 04.49 del nomenclatore in uso', async () => {
+      expect((await send('GET', settings(), doctor)).json()).toMatchObject({
+        medicazioniAvanzate: [],
+      });
+      const secretary = await login(s, 'segreteria');
+      expect(
+        (await send('PATCH', settings(), secretary, { medicazioniAvanzate: ['04.49.03.103'] }))
+          .statusCode,
+      ).toBe(403);
+      // Fuori dal gruppo 04.49, o una voce che il nomenclatore non ha: no.
+      const outside = await send('PATCH', settings(), doctor, {
+        medicazioniAvanzate: ['09.18.04.003'],
+      });
+      expect(outside.statusCode).toBe(400);
+      expect(outside.body).toMatch(/gruppo 04\.49/);
+      const unknown = await send('PATCH', settings(), doctor, {
+        medicazioniAvanzate: ['04.49.99.999'],
+      });
+      expect(unknown.statusCode).toBe(400);
+      expect(unknown.body).toMatch(/04\.49\.99\.999/);
+      // Doppioni tolti, in ordine.
+      const ok = await send('PATCH', settings(), doctor, {
+        medicazioniAvanzate: ['04.49.06.203', '04.49.03.103', '04.49.03.103'],
+      });
+      expect(ok.statusCode, ok.body).toBe(200);
+      expect(ok.json()).toMatchObject({ medicazioniAvanzate: ['04.49.03.103', '04.49.06.203'] });
+      expect((await send('GET', supplies(), doctor)).json()).toMatchObject({
+        medicazioniAvanzate: ['04.49.03.103', '04.49.06.203'],
+      });
+    });
+
+    it('una voce scelta si prescrive solo fra le medicazioni avanzate, con la regola dello specialista', async () => {
+      const monouso = await send('POST', supplies(), doctor, dressing({ categoria: 'monouso' }));
+      expect(monouso.statusCode).toBe(400);
+      expect(monouso.body).toMatch(/medicazioni avanzate scelte dal titolare/);
+      // Fra le medicazioni avanzate, la prima prescrizione è dello specialista.
+      const first = await send('POST', supplies(), doctor, dressing());
+      expect(first.statusCode).toBe(400);
+      expect(first.body).toMatch(/la prima prescrizione è dello specialista/);
+      const ok = await send(
+        'POST',
+        supplies(),
+        doctor,
+        dressing({ primoSpecialista: 'Dr. Vulnologo di prova', primoSpecialistaIl: '2026-01-10' }),
+      );
+      expect(ok.statusCode, ok.body).toBe(201);
+      // Una voce non scelta resta fra i monouso, come prima.
+      const other = await send(
+        'POST',
+        supplies(),
+        doctor,
+        dressing({ categoria: 'monouso', codice: '04.49.09.303' }),
+      );
+      expect(other.statusCode, other.body).toBe(201);
+    });
+
+    it('anche il rinnovo: una voce scelta dopo la prima prescrizione cambia categoria', async () => {
+      const first = await send(
+        'POST',
+        supplies(),
+        doctor,
+        dressing({ categoria: 'monouso', codice: '04.49.18.603' }),
+      );
+      expect(first.statusCode, first.body).toBe(201);
+      const renewUrl = `${supplies()}/${first.json<{ id: string }>().id}/rinnova`;
+      await send('PATCH', settings(), doctor, {
+        medicazioniAvanzate: ['04.49.03.103', '04.49.06.203', '04.49.18.603'],
+      });
+      const renew = await send('POST', renewUrl, doctor, {});
+      expect(renew.statusCode).toBe(400);
+      expect(renew.body).toMatch(/04\.49\.18\.603 è fra le medicazioni avanzate/);
+      // Tolta dall'elenco, il rinnovo passa.
+      await send('PATCH', settings(), doctor, { medicazioniAvanzate: ['04.49.03.103'] });
+      expect((await send('POST', renewUrl, doctor, {})).statusCode).toBe(201);
+    });
   });
 });

@@ -10,9 +10,19 @@ import { useApi } from '../lib/useApi';
 interface Settings {
   segreteriaLeggeDiario: boolean;
   segreteriaLeggeRiepilogo: boolean;
+  /** Le voci dell'allegato 2 che il titolare considera medicazioni avanzate (D237). */
+  medicazioniAvanzate: string[];
+}
+type Flag = 'segreteriaLeggeDiario' | 'segreteriaLeggeRiepilogo';
+
+/** Una voce del nomenclatore dei presidi del DPCM LEA (D218, D236). */
+interface CatalogItem {
+  codice: string;
+  descrizione: string;
+  allegato: string;
 }
 
-const SETTINGS: { key: keyof Settings; name: string; explanation: string }[] = [
+const SETTINGS: { key: Flag; name: string; explanation: string }[] = [
   {
     key: 'segreteriaLeggeRiepilogo',
     name: 'La segreteria legge il riepilogo clinico',
@@ -95,7 +105,7 @@ export function ArchivePage() {
 
   if (!own) return <Navigate to="/" replace />;
 
-  async function change(key: keyof Settings, value: boolean, name: string) {
+  async function change(key: Flag, value: boolean, name: string) {
     setError(null);
     setSaved(null);
     setBusy(true);
@@ -153,6 +163,14 @@ export function ArchivePage() {
           </p>
           {saved && <Notice kind="fatto">{saved}</Notice>}
         </section>
+
+        {settings.data && (
+          <AdvancedDressings
+            archiveId={own.id}
+            codes={settings.data.medicazioniAvanzate ?? []}
+            onSaved={() => settings.reload()}
+          />
+        )}
 
         <section className="riquadro" aria-labelledby="titolo-esportazione">
           <h2 id="titolo-esportazione">
@@ -617,6 +635,115 @@ function AlertsSection({ archiveId }: { archiveId: string }) {
           <p className="aiuto">Fonte: {a.fonte}.</p>
         </>
       )}
+    </section>
+  );
+}
+
+/**
+ * Le medicazioni avanzate le sceglie il medico titolare per il suo archivio (D237), fra le voci del
+ * gruppo 04.49 dell'allegato 2 del DPCM LEA. Per quelle vale la regola dello specialista (D123):
+ * nella scheda dei presidi stanno nella categoria «Medicazioni avanzate».
+ */
+function AdvancedDressings({
+  archiveId,
+  codes,
+  onSaved,
+}: {
+  archiveId: string;
+  codes: string[];
+  onSaved: () => void;
+}) {
+  const catalog = useApi<{ presidi: CatalogItem[] }>('/api/presidi/nomenclatore');
+  // La scelta in corso: null finché non si tocca una casella; dopo il salvataggio, l'elenco salvato
+  // come lo rende il servizio, senza aspettare che le impostazioni si ricarichino.
+  const [picked, setPicked] = useState<Set<string> | null>(null);
+  const [changed, setChanged] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const current = picked ?? new Set(codes);
+  const items = (catalog.data?.presidi ?? []).filter(
+    (i) => i.allegato === '2' && i.codice.startsWith('04.49.'),
+  );
+
+  const toggle = (code: string, on: boolean) => {
+    const next = new Set(current);
+    if (on) next.add(code);
+    else next.delete(code);
+    setPicked(next);
+    setChanged(true);
+    setSaved(null);
+  };
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setSaved(null);
+    try {
+      const res = await api<{ medicazioniAvanzate: string[] }>(
+        `/api/archivi/${archiveId}/impostazioni`,
+        { method: 'PATCH', body: { medicazioniAvanzate: [...current] } },
+      );
+      setPicked(new Set(res.medicazioniAvanzate));
+      setChanged(false);
+      setSaved(
+        res.medicazioniAvanzate.length
+          ? `Medicazioni avanzate salvate: ${res.medicazioniAvanzate.length}.`
+          : 'Nessuna medicazione avanzata: le voci restano fra i dispositivi monouso.',
+      );
+      onSaved();
+    } catch (err) {
+      setError(failure(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="riquadro" aria-labelledby="titolo-medicazioni-avanzate">
+      <h2 id="titolo-medicazioni-avanzate">
+        <Icon name="terapia" /> Medicazioni avanzate
+      </h2>
+      <p>
+        Scegli quali medicazioni del nomenclatore (allegato 2 del DPCM LEA, gruppo 04.49) consideri
+        avanzate. Per quelle vale la regola dello specialista: la prima prescrizione è sua, poi il
+        medico di famiglia le prescrive per al massimo 6 mesi. Nella scheda dei presidi stanno nella
+        categoria «Medicazioni avanzate».
+      </p>
+      {catalog.loading && !catalog.data && <Loading what="nomenclatore dei presidi" />}
+      <ErrorMessage error={catalog.error} />
+      {catalog.data && items.length === 0 && (
+        <p className="tenue">
+          Il nomenclatore dell’allegato 2 non è ancora in uso: la sua trascrizione aspetta il
+          controllo.
+        </p>
+      )}
+      {items.length > 0 && (
+        <form onSubmit={(e) => void save(e)}>
+          <fieldset className="scelta" disabled={busy}>
+            <legend className="visivamente-nascosto">Medicazioni avanzate del nomenclatore</legend>
+            {items.map((i) => (
+              <div key={i.codice} className="casella">
+                <input
+                  type="checkbox"
+                  id={`avanzata-${i.codice}`}
+                  checked={current.has(i.codice)}
+                  onChange={(e) => toggle(i.codice, e.target.checked)}
+                />
+                <label htmlFor={`avanzata-${i.codice}`}>
+                  {i.descrizione} <span className="codice">{i.codice}</span>
+                </label>
+              </div>
+            ))}
+          </fieldset>
+          <button type="submit" className="pulsante" disabled={busy || !changed}>
+            <Icon name="fatto" /> <span>Salva le medicazioni avanzate</span>
+          </button>
+        </form>
+      )}
+      <ErrorMessage error={error} />
+      {saved && <Notice kind="fatto">{saved}</Notice>}
     </section>
   );
 }

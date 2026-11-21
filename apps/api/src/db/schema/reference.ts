@@ -265,6 +265,10 @@ export const refSupply = pgTable(
     description: text().notNull(),
     group: text().notNull(),
     annex: text().notNull(),
+    /** La quantità come la stampa l'allegato, se c'è; si mostra accanto alla voce (D237). */
+    quantity: text(),
+    /** L'intestazione stampata della colonna delle quantità (D237). */
+    quantityHeading: text(),
   },
   (t) => [index().on(t.datasetId, t.entryType)],
 );

@@ -256,6 +256,10 @@ export const KINDS = {
       group: { type: 'text', required: true },
       /** Numero dell'allegato del DPCM: «2» o «3». */
       annex: { type: 'text', required: true },
+      /** La quantità come la stampa l'allegato («60», «20 + 60», «2/anno»), se c'è (D237). */
+      quantity: { type: 'text' },
+      /** L'intestazione stampata della colonna delle quantità («quantità erogabile»…) (D237). */
+      quantityHeading: { type: 'text' },
     },
   },
   esenzioni_prestazioni: {

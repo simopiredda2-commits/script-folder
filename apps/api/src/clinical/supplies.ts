@@ -8,7 +8,7 @@ import {
 import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from '../db/client';
-import { appUser, clinicalEntry, problemDetail, supplyPrescription } from '../db/schema';
+import { appUser, archive, clinicalEntry, problemDetail, supplyPrescription } from '../db/schema';
 import type { Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
 
@@ -57,6 +57,15 @@ export function bodyIssues(b: SupplyBody): string[] {
     firstSpecialistOn: b.primoSpecialistaIl,
     startOn: b.dal,
   });
+}
+
+/** Le voci dell'allegato 2 che il titolare dell'archivio considera medicazioni avanzate (D237). */
+export async function advancedCodesOf(db: Database | Tx, archiveId: string): Promise<string[]> {
+  const [a] = await db
+    .select({ codes: archive.advancedDressingCodes })
+    .from(archive)
+    .where(eq(archive.id, archiveId));
+  return a?.codes ?? [];
 }
 
 /** L'indicazione dev'essere un problema di questo paziente. */

@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-20.4",
+  "versione": "2026-11-21.1",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -252,10 +252,12 @@
         "code": "codice",
         "description": "descrizione",
         "group": "gruppo",
-        "annex": "allegato"
+        "annex": "allegato",
+        "quantity": "quantita",
+        "quantityHeading": "intestazione_quantita"
       },
       "vecchiaDopoGiorni": null,
-      "nota": "Formato della trascrizione definito in docs/banche-dati.md, «Presidi del DPCM LEA» (D218). Nessuna soglia di vecchiaia: il nomenclatore cambia solo con un decreto."
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md, «Presidi del DPCM LEA» (D218, D236, D237). Nessuna soglia di vecchiaia: il nomenclatore cambia solo con un decreto."
     }
   ]
 }

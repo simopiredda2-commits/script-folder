@@ -762,15 +762,31 @@ describe('archivio del titolare: autorizzazioni, registro di amministrazione, av
       expect((await call(s, c.titolare, 'GET', url)).statusCode).toBe(200);
       const patch = await call(s, c.titolare, 'PATCH', url, { segreteriaLeggeDiario: false });
       expect(patch.statusCode, patch.body).toBe(200);
+      // Le medicazioni avanzate del titolare (D237), da sole e insieme a un'altra impostazione.
+      for (const body of [
+        { medicazioniAvanzate: [] },
+        { medicazioniAvanzate: [], segreteriaLeggeDiario: false },
+      ]) {
+        const res = await call(s, c.titolare, 'PATCH', url, body);
+        expect(res.statusCode, res.body).toBe(200);
+      }
       const righe = (await page(c.titolare, '?limite=10')).righe.filter(
         (r) => r.area === 'Impostazioni dell’archivio',
       );
-      expect(righe.slice(0, 2).map((r) => [r.azione, r.dettaglio])).toEqual([
+      expect(righe.slice(0, 4).map((r) => [r.azione, r.dettaglio])).toEqual([
+        [
+          'Impostazioni dell’archivio: modifica',
+          'Archivio «Archivio Marchi» · campi cambiati: segreteria legge diario, medicazioni avanzate',
+        ],
+        [
+          'Medicazioni avanzate: modifica',
+          'Archivio «Archivio Marchi» · campi cambiati: medicazioni avanzate',
+        ],
         [
           'Che cosa vede la segreteria: modifica',
           'Archivio «Archivio Marchi» · campi cambiati: segreteria legge diario',
         ],
-        ['Che cosa vede la segreteria: consultazione', 'Archivio «Archivio Marchi»'],
+        ['Impostazioni dell’archivio: consultazione', 'Archivio «Archivio Marchi»'],
       ]);
       expect(JSON.stringify(righe)).not.toMatch(/false|true/);
     });

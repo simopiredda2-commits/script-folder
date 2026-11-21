@@ -641,12 +641,50 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     expect(chosen).toMatch(/^mutanda pannolone \(tipo pull-on \)/);
     expect(chosen).toHaveLength(401);
     expect(await f.getByLabel('Codice del nomenclatore').inputValue()).toBe('09.30.24.063');
+    // La quantità dell'allegato, con l'intestazione della sua colonna (D237).
+    expect(await f.getByText(/^Quantità nel nomenclatore/).innerText()).toBe(
+      'Quantità nel nomenclatore: 120 («quantità massima erogabile»). Il fabbisogno lo decide il medico.',
+    );
     await f.getByLabel('Fabbisogno al mese').fill('120');
     await f.getByLabel('Unità').fill('pezzi');
     await f.getByRole('button', { name: /Registra la prescrizione/ }).click();
     await f.getByText('Prescrizione registrata.').waitFor();
     // Nell'elenco il prodotto intero, con il codice.
     await f.getByRole('region', { name: 'Prescrizioni' }).getByText(chosen).first().waitFor();
+  });
+
+  it('medicazioni avanzate: il titolare sceglie l’alginato; poi si prescrive solo lì, con lo specialista (D237)', async () => {
+    await go('/archivio');
+    const section = f.getByRole('region', { name: 'Medicazioni avanzate' });
+    await section.getByLabel(/cm 15 x 15 .* 04\.49\.03\.103/).check();
+    await section.getByRole('button', { name: 'Salva le medicazioni avanzate' }).click();
+    await section.getByText('Medicazioni avanzate salvate: 1.').waitFor();
+
+    const id = (await patients())[0]!.id;
+    await go(`/pazienti/${id}/presidi`);
+    await f.getByRole('heading', { level: 1, name: 'Presidi e assistenza integrativa' }).waitFor();
+    await f.getByLabel('Categoria').selectOption('monouso');
+    const monouso = f.getByLabel('Dal nomenclatore (allegato 2)');
+    // L'alginato 15 x 15 non è più fra i monouso: 86 voci, più «scrivi a mano».
+    expect(await monouso.locator('option').count()).toBe(87);
+    expect(await monouso.locator('option', { hasText: '· 04.49.03.103' }).count()).toBe(0);
+    await f.getByLabel('Categoria').selectOption('medicazione_avanzata');
+    const advanced = f.getByLabel('Dal nomenclatore (allegato 2)');
+    await advanced.locator('option', { hasText: '· 04.49.03.103' }).waitFor({ state: 'attached' });
+    expect(await advanced.locator('option').count()).toBe(2);
+    await advanced.selectOption(
+      await advanced.locator('option', { hasText: '· 04.49.03.103' }).getAttribute('value'),
+    );
+    await f.getByLabel('Fabbisogno al mese').fill('10');
+    await f.getByLabel('Unità').fill('pezzi');
+    // La regola delle medicazioni avanzate: la prima prescrizione dello specialista è obbligatoria.
+    for (const label of ['Prima prescrizione: specialista', 'Prima prescrizione: data'])
+      expect(await f.getByLabel(label).getAttribute('required'), label).not.toBeNull();
+    const month = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    await f.getByLabel('Prima prescrizione: specialista').fill('Dr. Vulnologo di prova');
+    await f.getByLabel('Prima prescrizione: data').fill(month);
+    await f.getByRole('button', { name: /Registra la prescrizione/ }).click();
+    await f.getByText('Prescrizione registrata.').waitFor();
   });
 
   it('la segreteria prepara la ripetizione; il medico la trova da firmare e la manda', async () => {

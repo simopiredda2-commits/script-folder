@@ -406,16 +406,25 @@ export function describeAdminEntry(
       azione = done ? 'Autorizzazione revocata' : 'Revoca di un’autorizzazione';
       grantText();
       break;
-    case 'impostazioni_archivio':
+    case 'impostazioni_archivio': {
       area = 'Impostazioni dell’archivio';
+      // Le impostazioni sono due cose diverse: che cosa vede la segreteria (D30) e le medicazioni
+      // avanzate del titolare (D237). La modifica si chiama come i campi che cambia.
+      const secretary = campi.length > 0 && campi.every((c) => c.startsWith('segreteria'));
+      const dressings = campi.length > 0 && campi.every((c) => c === 'medicazioniAvanzate');
       azione =
         text(d.fase) === 'modifica'
-          ? 'Che cosa vede la segreteria: modifica'
+          ? secretary
+            ? 'Che cosa vede la segreteria: modifica'
+            : dressings
+              ? 'Medicazioni avanzate: modifica'
+              : 'Impostazioni dell’archivio: modifica'
           : text(d.fase) === 'lettura'
-            ? 'Che cosa vede la segreteria: consultazione'
+            ? 'Impostazioni dell’archivio: consultazione'
             : // Righe scritte prima che le due fasi fossero distinte.
-              'Che cosa vede la segreteria: consultazione o modifica';
+              'Impostazioni dell’archivio: consultazione o modifica';
       break;
+    }
     case 'impostazioni_aft': {
       area = 'AFT';
       const aftName = text(d.aft) && names.afts.get(text(d.aft)!);
