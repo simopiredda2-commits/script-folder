@@ -1,3 +1,4 @@
+import { INTERRUPTED_SEND_AFTER_MINUTES } from '@mmg/domain';
 import { rulesetAt, value } from '@mmg/rules';
 import { and, asc, count, eq, gte, inArray, isNotNull, lt, lte, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
@@ -99,6 +100,23 @@ export function registerTodayRoutes(
               .from(prescription)
               .where(
                 and(inArray(prescription.archiveId, archives), eq(prescription.status, status)),
+              )
+          )[0]?.n ?? 0)
+        : null;
+    // Ricette «in invio» da più di INTERRUPTED_SEND_AFTER_MINUTES: l'esito lo segna il medico (D233).
+    const interruptedBefore = new Date(now().getTime() - INTERRUPTED_SEND_AFTER_MINUTES * 60_000);
+    const countInterrupted = async (archives: string[]) =>
+      archives.length
+        ? ((
+            await db
+              .select({ n: count() })
+              .from(prescription)
+              .where(
+                and(
+                  inArray(prescription.archiveId, archives),
+                  eq(prescription.status, 'sending'),
+                  lt(prescription.signedAt, interruptedBefore),
+                ),
               )
           )[0]?.n ?? 0)
         : null;
@@ -254,6 +272,7 @@ export function registerTodayRoutes(
       code: {
         daFirmare: await countStatus(signArchives, 'to_sign'),
         nonInviate: await countStatus(signArchives.length ? signArchives : draftArchives, 'error'),
+        senzaRisposta: await countInterrupted(signArchives),
         richiesteAperte: openRequests,
         pianiInScadenza: plans,
         giorniAvvisoPiani: warnDays,

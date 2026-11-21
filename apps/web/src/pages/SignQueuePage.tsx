@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { InterruptedSendPanel } from '../components/InterruptedSendPanel';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { dateTime, PRESCRIPTION_KIND } from '../lib/format';
@@ -17,6 +18,9 @@ interface QueueGroup {
     righe: number;
     errore: string | null;
     tipoErrore: string | null;
+    /** Solo negli invii senza risposta: quando era partito l'invio e chi l'aveva firmato. */
+    firmataIl?: string;
+    firmataDa?: string | null;
   }[];
 }
 
@@ -158,6 +162,63 @@ function Queue({
   );
 }
 
+/**
+ * Invii rimasti senza risposta da più di 15 minuti (D233): il servizio si è fermato mentre
+ * aspettava il SAR. Il medico ne segna l'esito chiesto all'ente.
+ */
+function InterruptedQueue() {
+  const queue = useApi<{ pazienti: QueueGroup[] }>('/api/ricette/senza-risposta');
+  const [settled, setSettled] = useState<{ id: string; patientId: string; kind: string }[]>([]);
+  if (queue.loading && !queue.data) return <Loading what="ricette" />;
+  if (!queue.data) return <ErrorMessage error={queue.error} />;
+  const groups = queue.data.pazienti;
+  if (groups.length === 0 && settled.length === 0)
+    return <p className="tenue">Nessun invio rimasto senza risposta.</p>;
+  return (
+    <ul className="coda-ricette">
+      {groups.map((g) => (
+        <li key={g.paziente.id} className="riquadro">
+          <h3>
+            <Link to={`/pazienti/${g.paziente.id}`}>
+              {g.paziente.nome} {g.paziente.cognome}
+            </Link>
+          </h3>
+          <ul>
+            {g.ricette.map((r) => (
+              <li key={r.id} className="ricetta-in-coda">
+                <p>
+                  <strong>{PRESCRIPTION_KIND[r.tipo] ?? r.tipo}</strong>
+                  <span className="tenue">
+                    {' '}
+                    · preparata da {r.preparataDa}, {dateTime(r.preparataIl)}
+                  </span>
+                </p>
+                <InterruptedSendPanel
+                  prescriptionId={r.id}
+                  signedAt={r.firmataIl ?? r.preparataIl}
+                  signedBy={r.firmataDa ?? null}
+                  onChange={(status) => {
+                    if (status === 'sent')
+                      setSettled((xs) => [
+                        ...xs,
+                        { id: r.id, patientId: g.paziente.id, kind: r.tipo },
+                      ]);
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
+        </li>
+      ))}
+      {settled.map((x) => (
+        <li key={x.id} className="riquadro">
+          <ReminderPanel prescriptionId={x.id} patientId={x.patientId} kind={x.kind} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** Coda «da firmare» del medico e invii non riusciti. */
 export function SignQueuePage() {
   const { isDoctor } = useSession();
@@ -189,6 +250,20 @@ export function SignQueuePage() {
         <h2 id="non-inviate">Invii non riusciti</h2>
         {isDoctor ? (
           <Queue path="/api/ricette/non-inviate" status="error" empty="Nessun invio in sospeso." />
+        ) : (
+          <p className="tenue">La coda è visibile al medico.</p>
+        )}
+      </section>
+      <section aria-labelledby="senza-risposta">
+        <h2 id="senza-risposta">Invii senza risposta</h2>
+        {isDoctor ? (
+          <>
+            <p className="tenue">
+              Ricette rimaste «in invio» da più di 15 minuti: il servizio si è fermato mentre
+              aspettava il SAR. Si chiede all’ente se sono arrivate.
+            </p>
+            <InterruptedQueue />
+          </>
         ) : (
           <p className="tenue">La coda è visibile al medico.</p>
         )}

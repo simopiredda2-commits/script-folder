@@ -24,6 +24,8 @@ interface Today {
   code: {
     daFirmare: number | null;
     nonInviate: number | null;
+    /** Ricette rimaste «in invio» da più di 15 minuti (D233). */
+    senzaRisposta: number | null;
     richiesteAperte: number | null;
     pianiInScadenza: {
       pazienteId: string;
@@ -108,6 +110,15 @@ export function TodayPage() {
                   <Icon name="avviso" />
                   <span>Invii non riusciti</span>
                   <strong>{code.nonInviate}</strong>
+                </Link>
+              </li>
+            )}
+            {code.senzaRisposta !== null && code.senzaRisposta > 0 && (
+              <li>
+                <Link to="/ricette#senza-risposta" className="coda coda-avviso">
+                  <Icon name="avviso" />
+                  <span>Invii senza risposta</span>
+                  <strong>{code.senzaRisposta}</strong>
                 </Link>
               </li>
             )}

@@ -8,8 +8,17 @@
  * Sistema TS non rispondono, si stampa la ricetta rossa (ripiego cartaceo).
  *
  * «In invio» è uno stato tecnico di pochi istanti: impedisce di inviare due volte la stessa
- * ricetta mentre la risposta del SAR è in arrivo (decisione D36).
+ * ricetta mentre la risposta del SAR è in arrivo (decisione D36). Se il servizio si ferma proprio
+ * allora, la ricetta resta «in invio»: dopo INTERRUPTED_SEND_AFTER_MINUTES il medico ne segna
+ * l'esito, chiesto all'ente (D233).
  */
+
+/**
+ * Dopo quanto un invio senza risposta si considera interrotto: chi aspetta la risposta smette al
+ * più dopo il tempo dello studio (8 secondi per difetto, D94), quindi dopo 15 minuti l'invio non è
+ * più in corso (D232, D233). Vale per ricette, certificati e distinte delle prestazioni aggiuntive.
+ */
+export const INTERRUPTED_SEND_AFTER_MINUTES = 15;
 export const PRESCRIPTION_STATUSES = [
   'draft',
   'to_sign',
@@ -68,7 +77,13 @@ export type PrescriptionEvent =
   /** Annullamento: prima dell'invio è solo locale, dopo passa dal SAR. */
   | 'cancel'
   /** Ripiego sulla ricetta rossa quando il sistema non risponde. */
-  | 'print_paper';
+  | 'print_paper'
+  /**
+   * Esito di un invio rimasto senza risposta, segnato dal medico dopo averlo chiesto all'ente
+   * (D233): arrivata, con l'NRE, oppure non arrivata.
+   */
+  | 'settle_arrived'
+  | 'settle_not_arrived';
 
 export interface TransitionContext {
   /** Tipo dell'ultimo errore d'invio, se la ricetta è in errore. */
@@ -131,6 +146,11 @@ export function transition(
         );
       }
       return no('La ricetta rossa si stampa solo quando il SAR o il Sistema TS non rispondono');
+    case 'settle_arrived':
+      return from === 'sending' ? ok('sent') : no('Nessun invio senza risposta da chiudere');
+    case 'settle_not_arrived':
+      // L'ente ha detto che non è arrivata: come quando non risponde, si rimanda o si stampa.
+      return from === 'sending' ? ok('error') : no('Nessun invio senza risposta da chiudere');
   }
 }
 
