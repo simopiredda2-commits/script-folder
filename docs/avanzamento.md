@@ -1483,6 +1483,14 @@ Durante la tappa 11 (terzo giro):
 
 Nessuna per ora. Le domande nuove si scrivono qui durante il blocco (D237).
 
+## Richieste di Simone durante la pausa (22–23/11/2026), da fare alla ripresa
+
+1. **Anteprima del PDF prima della firma**: il promemoria con «Bozza – non valida» al posto dell'NRE.
+2. **Pagina Ricette con tutte le ricette in corso**, non solo quelle della segreteria. Le parole di Simone: «è sufficiente che nell'elenco "ricette" ci siano quelle da confermare, confermate (dal medico per ricetta fatta dal medico stesso o confermate quelle della segreteria), non confermate o non accolte». Il menu di stampa e invio (promemoria, solo NRE, email) deve stare anche lì, non solo nella cartella.
+3. **Pulsante «Archivia ricette confermate»**: toglie dall'elenco quelle già evase, cioè inviate o stampate. Restano nello storico del paziente.
+4. **Ricetta del medico in un passo solo**: quando prescrive il medico, la conferma è la sua. Oggi sono due clic, «Prepara la ricetta» e poi «Firma e invia». L'invio con le credenziali del medico resta obbligatorio (Sistema TS, SAR).
+5. Promemoria sul database dei farmaci (D243).
+
 ## Risposte della fermata dopo l'unione della #29 (21/11/2026)
 
 Simone ha risposto con il pulsante il 21/11/2026 (D243).
