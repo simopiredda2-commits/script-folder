@@ -29,6 +29,9 @@ const PATHS = {
   lucchetto: ['M6 11h12v9H6z', 'M8.5 11V8a3.5 3.5 0 0 1 7 0v3'],
   indietro: ['M15 5l-7 7 7 7'],
   apri: ['M9 5l7 7-7 7'],
+  /** Il «+» in un quadrato, che dice da sé che si apre un sottomenu (D246); aperto, «−». */
+  espandi: ['M4 4h16v16H4z', 'M12 8v8', 'M8 12h8'],
+  comprimi: ['M4 4h16v16H4z', 'M8 12h8'],
   annulla: ['M6 6l12 12', 'M18 6L6 18'],
   archivio: ['M4 4h16v5H4z', 'M5 9v11h14V9', 'M10 13h4'],
   strumenti: ['M4 7h9', 'M17 7h3', 'M15 5v4', 'M4 17h3', 'M11 17h9', 'M9 15v4'],

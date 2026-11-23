@@ -267,10 +267,13 @@ export function RecordPage() {
         )}
 
         <section className="riquadro" aria-labelledby="titolo-terapia">
-          <h2 id="titolo-terapia">
-            <Icon name="terapia" /> Terapia in corso
-          </h2>
-          <ColourLegend />
+          {/* La legenda piccola, a destra del titolo (D246). */}
+          <div className="riquadro-testa">
+            <h2 id="titolo-terapia">
+              <Icon name="terapia" /> Terapia in corso
+            </h2>
+            <ColourLegend />
+          </div>
           <div className="azioni">
             {isDoctor && (
               <Link className="pulsante" to={`/pazienti/${id}/terapie/nuova`}>
@@ -329,12 +332,7 @@ export function RecordPage() {
                         <AifaChangeNote key={`${c.kind}-${c.text}`} change={c} />
                       ))}
                     </div>
-                    <Link
-                      to={`/pazienti/${id}/terapie/${t.id}`}
-                      className="pulsante pulsante-piatto"
-                    >
-                      <Icon name="storico" /> <span>Scheda e storico</span>
-                    </Link>
+                    {/* Il nome apre scheda e storico: niente pulsante che lo ripeta (D246). */}
                   </li>
                 ))}
               </ul>

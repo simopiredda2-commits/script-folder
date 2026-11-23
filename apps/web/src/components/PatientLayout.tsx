@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation, useParams } from 'react-router';
+import { Link, Outlet, useLocation, useParams } from 'react-router';
 import { useSession } from '../lib/session';
 import type { Patient, Summary } from '../pages/RecordPage';
 import { Icon, type IconName } from './Icon';
@@ -40,6 +40,8 @@ interface Section {
   doctorOnly?: boolean;
   /** Le scorciatoie per prescrivere, in testa al menu; la prima è il pulsante principale. */
   prescribe?: 'primary' | true;
+  /** Altre pagine della cartella in cui la voce resta evidenziata. */
+  also?: readonly string[];
 }
 
 /**
@@ -47,12 +49,18 @@ interface Section {
  * riepilogo e le voci, nell'ordine di prima; «Esami» (i referti) accanto ai parametri.
  */
 export const RECORD_SECTIONS: readonly Section[] = [
-  { to: 'ricetta', label: 'Nuova ricetta', icon: 'ricette', prescribe: 'primary' },
+  // I farmaci prescritti stanno nella ricetta (D246): la loro pagina completa resta sotto questa voce.
+  {
+    to: 'ricetta',
+    label: 'Nuova ricetta',
+    icon: 'ricette',
+    prescribe: 'primary',
+    also: ['farmaci'],
+  },
   { to: 'specialistica', label: 'Specialistica', icon: 'specialistica', prescribe: true },
   { to: 'certificati', label: 'Certificati', icon: 'firma', prescribe: true, doctorOnly: true },
   { to: '', label: 'Riepilogo', icon: 'info', end: true },
   { to: 'amministrazione', label: 'Dati amministrativi', icon: 'pazienti' },
-  { to: 'farmaci', label: 'Farmaci prescritti', icon: 'terapia' },
   { to: 'visite-ed-esami', label: 'Visite ed esami prescritti', icon: 'specialistica' },
   { to: 'voci', label: 'Voci cliniche', icon: 'storico' },
   { to: 'parametri', label: 'Parametri', icon: 'esami' },
@@ -137,22 +145,32 @@ function RecordMenu({ base, doctor }: { base: string; doctor: boolean }) {
   return (
     <nav className="menu-cartella" aria-label="Sezioni della cartella">
       <ul ref={list}>
-        {RECORD_SECTIONS.filter((s) => doctor || !s.doctorOnly).map((s) => (
-          <li key={s.label} className={s.prescribe ? 'menu-cartella-prescrivi' : undefined}>
-            <NavLink
-              to={s.to ? `${base}/${s.to}` : base}
-              end={s.end}
-              className={
-                s.prescribe === 'primary'
-                  ? 'menu-cartella-voce menu-cartella-primaria'
-                  : 'menu-cartella-voce'
-              }
-            >
-              <Icon name={s.icon} />
-              <span>{s.label}</span>
-            </NavLink>
-          </li>
-        ))}
+        {RECORD_SECTIONS.filter((s) => doctor || !s.doctorOnly).map((s) => {
+          const path = s.to ? `${base}/${s.to}` : base;
+          // La voce aperta: la sua pagina (e quelle sotto, se non è «end»), o una di `also`.
+          const here =
+            pathname === path ||
+            (!s.end && pathname.startsWith(`${path}/`)) ||
+            (s.also ?? []).some(
+              (x) => pathname === `${base}/${x}` || pathname.startsWith(`${base}/${x}/`),
+            );
+          return (
+            <li key={s.label} className={s.prescribe ? 'menu-cartella-prescrivi' : undefined}>
+              <Link
+                to={path}
+                aria-current={here ? 'page' : undefined}
+                className={
+                  s.prescribe === 'primary'
+                    ? 'menu-cartella-voce menu-cartella-primaria'
+                    : 'menu-cartella-voce'
+                }
+              >
+                <Icon name={s.icon} />
+                <span>{s.label}</span>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

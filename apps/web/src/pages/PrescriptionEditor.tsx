@@ -9,6 +9,8 @@ import {
   type DatasetVersion,
 } from '../components/common';
 import { Icon } from '../components/Icon';
+import type { PrescribedDrug } from '../components/Prescribed';
+import { byGroup, PrescribedDrugList } from '../components/PrescribedDrugs';
 import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
 import { RegistryNote, type DrugRegistry } from '../components/Registries';
 import {
@@ -208,12 +210,61 @@ export function lineSummary(
     .join(' · ');
 }
 
+/** La riga di una terapia in corso: il farmaco della terapia, con la sua posologia. */
+function therapyLine(t: TherapyRow): Omit<Line, 'key'> {
+  return {
+    therapyId: t.id,
+    drugAic: t.drugAic,
+    drugName: t.drugName,
+    activeIngredient: t.activeIngredient,
+    aifaNote: t.aifaNote,
+    quantity: 1,
+    posologyText: posology(t),
+  };
+}
+
+/**
+ * La riga da aggiungere per un farmaco prescritto (D246): la terapia in corso con la sua
+ * posologia; un farmaco prescritto senza terapia, se ha l'AIC. Nessuna riga per le terapie
+ * sospese o concluse (si riprendono dalla scheda) e per i farmaci senza AIC (si cercano nella
+ * banca dati: la ricetta di prima poteva essere per principio attivo).
+ */
+export function lineFromPrescribed(
+  d: PrescribedDrug,
+  therapies: readonly TherapyRow[],
+): Omit<Line, 'key'> | null {
+  if (d.terapia) {
+    if (d.terapia.stato !== 'active') return null;
+    const t = therapies.find((x) => x.id === d.terapia!.id);
+    return t ? therapyLine(t) : null;
+  }
+  if (!d.aic) return null;
+  return {
+    drugAic: d.aic,
+    drugName: d.farmaco,
+    activeIngredient: d.principioAttivo,
+    aifaNote: d.notaAifa,
+    quantity: 1,
+  };
+}
+
 export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica' }) {
   const { id } = useParams<{ id: string }>();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
   const therapies = useApi<{ terapie: TherapyRow[] }>(
     mode === 'farmaci' ? `/api/pazienti/${id}/terapie` : null,
   );
+  // I farmaci prescritti stanno qui, dove si prescrive (D246): ultima ricetta, tipo, storico.
+  const prescribed = useApi<{ farmaci?: PrescribedDrug[] }>(
+    mode === 'farmaci' ? `/api/pazienti/${id}/farmaci-prescritti` : null,
+  );
+  // L'elenco si mostra quando anche le terapie sono lette: prima il pulsante «Aggiungi» delle
+  // terapie in corso comparirebbe dopo, spostando le righe sotto il cursore (D242, D246).
+  const prescribedList = prescribed.data?.farmaci;
+  const prescribedDrugs = therapies.loading ? undefined : prescribedList;
+  // Solo se i farmaci prescritti non si leggono si aggiunge dalla terapia in corso, come prima:
+  // mentre si leggono, niente, perché l'elenco di ripiego sparirebbe subito.
+  const fromTherapies = !prescribed.loading && !prescribedList;
   // La ricetta in corso è ricordata per paziente (D68): si passa a un'altra cartella e si torna.
   const k = (field: string) => `ricetta:${id}:${mode}:${field}`;
   const [kind, setKind, resetKind] = usePersistentState(
@@ -499,7 +550,43 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           {mode === 'specialistica' && (
             <ManualServiceForm disabled={locked} onAdd={(l) => add({ ...l, quantity: 1 })} />
           )}
-          {mode === 'farmaci' && (therapies.data?.terapie ?? []).length > 0 && (
+          {mode === 'farmaci' && prescribedDrugs && prescribedDrugs.length > 0 && (
+            <>
+              {/* I farmaci prescritti (D246): in vista nome, tipo e ultima ricetta; il resto e
+                  lo storico col «+». Si aggiungono le terapie in corso, con la loro posologia, e
+                  i farmaci prescritti senza terapia che hanno l'AIC. Prima le terapie in corso,
+                  come nei gruppi della pagina. */}
+              <h3 id="titolo-farmaci-prescritti">Farmaci prescritti</h3>
+              <PrescribedDrugList
+                drugs={byGroup(prescribedDrugs)}
+                patientId={id!}
+                label="titolo-farmaci-prescritti"
+                action={(d) => {
+                  const line = lineFromPrescribed(d, therapies.data?.terapie ?? []);
+                  return (
+                    line && (
+                      <button
+                        type="button"
+                        className="pulsante"
+                        disabled={locked}
+                        onClick={() => add(line)}
+                      >
+                        <Icon name="aggiungi" /> <span>Aggiungi</span>
+                        <span className="visivamente-nascosto"> {d.farmaco}</span>
+                      </button>
+                    )
+                  );
+                }}
+              />
+              <p className="aiuto">
+                <Link to={`/pazienti/${id}/farmaci`}>
+                  Tutti i farmaci prescritti, con le ricette fatte con altri programmi
+                </Link>
+              </p>
+            </>
+          )}
+          {/* Chi non legge i farmaci prescritti aggiunge dalla terapia in corso, come prima. */}
+          {mode === 'farmaci' && fromTherapies && (therapies.data?.terapie ?? []).length > 0 && (
             <>
               <h3>Dalla terapia in corso</h3>
               <ul className="risultati">
@@ -515,17 +602,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                         type="button"
                         className="pulsante"
                         disabled={locked}
-                        onClick={() =>
-                          add({
-                            therapyId: t.id,
-                            drugAic: t.drugAic,
-                            drugName: t.drugName,
-                            activeIngredient: t.activeIngredient,
-                            aifaNote: t.aifaNote,
-                            quantity: 1,
-                            posologyText: posology(t),
-                          })
-                        }
+                        onClick={() => add(therapyLine(t))}
                       >
                         <Icon name="aggiungi" /> <span>Aggiungi</span>
                       </button>

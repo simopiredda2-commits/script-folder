@@ -199,7 +199,7 @@ try {
   await page.goto(`${base}/pazienti/${diabetes2PatientId}/ricetta`);
   // Dulaglutide: in DPC con nota AIFA 100 e piano terapeutico (elenco della Regione Piemonte).
   await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('dulaglutide');
-  // Si aspetta il risultato della ricerca, non la terapia in corso (anche lei è un risultato).
+  // Si aspetta il risultato della ricerca: i farmaci prescritti, sotto, hanno righe loro (D246).
   const withPlan = page.locator('.risultato').filter({ hasText: 'TRULICITY' });
   await withPlan.waitFor();
   await withPlan.getByRole('button', { name: 'Aggiungi' }).click();
@@ -211,6 +211,19 @@ try {
     .evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await page.evaluate(() => window.scrollBy(0, -160));
   await shot(page, '07-ricetta-con-controlli');
+
+  // I farmaci prescritti dentro «Nuova ricetta» (D246): una riga per farmaco; una, con
+  // un'ultima ricetta, aperta col «+» per vedere i dati e le ultime ricette con l'NRE.
+  await page.goto(`${base}/pazienti/${patientId}/ricetta`);
+  const prescribed = page.getByRole('list', { name: 'Farmaci prescritti' });
+  const withLast = prescribed
+    .getByRole('listitem')
+    .filter({ has: page.locator('.farmaco-ultima-data') })
+    .first();
+  await withLast.waitFor();
+  await withLast.locator('.farmaco-apri').click();
+  await withLast.getByRole('table').waitFor();
+  await shot(page, '75-farmaci-prescritti-nella-ricetta');
 
   await page.goto(`${base}/pazienti/${patientId}/specialistica`);
   await page.getByLabel('Prestazione, branca o codice').fill('prova');

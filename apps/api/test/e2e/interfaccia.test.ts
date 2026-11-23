@@ -335,6 +335,42 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
    * Apre una sezione dei dati amministrativi (D244): si vede una sezione alla volta, e il suo
    * pulsante resta premuto, come nelle sezioni di Strumenti.
    */
+  /**
+   * La legenda dei colori piccola (D246): due colonne, a destra; sulla riga del titolo se c'è
+   * posto, altrimenti subito sotto.
+   */
+  async function expectLegend(p: Page, where: string, title: string, box: string) {
+    const m = await p.evaluate(
+      ([title, box]) => {
+        const legend = document.querySelector(`${box} .legenda-colori`)!;
+        const r = legend.getBoundingClientRect();
+        const t = document.querySelector(title)!.getBoundingClientRect();
+        const b = document.querySelector(box)!.getBoundingClientRect();
+        const lefts = new Set(
+          [...legend.querySelectorAll('li')].map((li) =>
+            Math.round(li.getBoundingClientRect().left),
+          ),
+        );
+        return {
+          columns: lefts.size,
+          right: b.right - r.right,
+          place:
+            r.top < t.bottom && r.left >= t.right
+              ? 'accanto'
+              : r.top >= t.bottom - 1
+                ? 'sotto'
+                : 'altrove',
+          size: parseFloat(getComputedStyle(legend).fontSize),
+        };
+      },
+      [title, box] as const,
+    );
+    expect(m.columns, `${where}: colonne della legenda`).toBe(2);
+    expect(m.right, `${where}: la legenda non è a destra`).toBeLessThanOrEqual(1);
+    expect(m.place, `${where}: dove sta la legenda`).not.toBe('altrove');
+    expect(m.size, `${where}: la legenda non è piccola`).toBeLessThan(14);
+  }
+
   async function adminSection(p: Page, name: string) {
     const group = p.getByRole('group', { name: 'Sezioni dei dati amministrativi' });
     await group.getByRole('button', { name, exact: true }).click();
@@ -670,7 +706,9 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       'Certificati',
       'Riepilogo',
     ]);
-    expect(labels.length).toBeGreaterThanOrEqual(18);
+    // I farmaci prescritti stanno dentro «Nuova ricetta» (D246): nel menu non hanno una voce.
+    expect(labels).not.toContain('Farmaci prescritti');
+    expect(labels.length).toBeGreaterThanOrEqual(17);
     for (const label of labels) {
       await menu.getByRole('link', { name: label, exact: true }).click();
       await menu.locator('[aria-current="page"]', { hasText: label }).waitFor();
@@ -747,11 +785,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await line.getByText('1 confezione · 1 compressa al giorno').waitFor();
     await opener.click();
     await expect(line.getByLabel('Confezioni').isVisible()).resolves.toBe(false);
-    // Anche la terapia in corso: la ricetta inviata finisce nel suo storico (D65).
+    // Anche la terapia in corso, dai farmaci prescritti accanto alla ricerca (D246): la ricetta
+    // inviata finisce nel suo storico (D65).
     await page
-      .locator('.risultato')
+      .getByRole('list', { name: 'Farmaci prescritti' })
+      .getByRole('listitem')
       .filter({ hasText: 'Farmaco di prova 5 mg' })
-      .getByRole('button', { name: 'Aggiungi' })
+      .getByRole('button', { name: 'Aggiungi Farmaco di prova 5 mg' })
       .click();
     await page.locator('.riga-ricetta').filter({ hasText: 'Farmaco di prova 5 mg' }).waitFor();
     // Con due farmaci la pagina sta in una schermata: non scorre, e i pulsanti sono in vista.
@@ -862,11 +902,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'storico della prestazione');
   });
 
-  it('farmaci prescritti con i colori e la legenda; visite ed esami nei loro menu (D152)', async () => {
+  it('farmaci prescritti con i colori e la legenda, dentro «Nuova ricetta»; visite ed esami nei loro menu (D152, D246)', async () => {
     await page.goto(`${base}/pazienti/${s.richPatient}`);
     await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
-    // La legenda è sempre nello stesso punto: subito sotto «Terapia in corso».
-    await expect(page.locator('#titolo-terapia + .legenda-colori').count()).resolves.toBe(1);
+    // La legenda piccola, a due colonne, a destra di «Terapia in corso» (D246).
+    await expectLegend(page, 'riepilogo', '#titolo-terapia', '.riquadro-testa');
     const chronic = page.locator('li.farmaco-cronica').filter({ hasText: 'Farmaco di prova 5 mg' });
     await chronic.first().waitFor();
     // Il colore viene davvero dai token: sfondo azzurro e barra blu, con la parola «Cronica».
@@ -878,12 +918,23 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     ).resolves.toEqual(['rgb(211, 232, 250)', 'rgb(31, 111, 178)']);
     await chronic.first().getByText('Cronica', { exact: true }).waitFor();
 
+    // I farmaci prescritti stanno dentro «Nuova ricetta» (D246); tutti, con le ricette fatte con
+    // altri programmi, dal collegamento sotto l'elenco. Il menu resta su «Nuova ricetta».
+    const menu = page.getByRole('navigation', { name: 'Sezioni della cartella' });
+    await menu.getByRole('link', { name: 'Nuova ricetta', exact: true }).click();
     await page
-      .getByRole('navigation', { name: 'Sezioni della cartella' })
-      .getByRole('link', { name: 'Farmaci prescritti' })
+      .getByRole('list', { name: 'Farmaci prescritti' })
+      .getByRole('listitem')
+      .first()
+      .waitFor();
+    await page
+      .getByRole('link', {
+        name: 'Tutti i farmaci prescritti, con le ricette fatte con altri programmi',
+      })
       .click();
     await page.getByRole('heading', { name: 'Farmaci prescritti', level: 1 }).waitFor();
-    await page.getByText('Legenda dei colori').waitFor();
+    await menu.locator('[aria-current="page"]', { hasText: 'Nuova ricetta' }).waitFor();
+    await expectLegend(page, 'farmaci prescritti', '.intestazione-riga h1', '.intestazione-riga');
     const occasional = page
       .locator('section')
       .filter({ has: page.getByRole('heading', { name: 'Prescritti senza terapia in cartella' }) });
@@ -891,30 +942,35 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .locator('li.farmaco-non-in-corso')
       .filter({ hasText: /AMLODIPINA/ });
     await amlodipine.first().waitFor();
-    await amlodipine
-      .first()
-      .getByText(/(inviata|inviate) o su carta/)
-      .waitFor();
-    // L'ultima ricetta a colpo d'occhio: giorno e confezioni, in una colonna uguale per ogni riga,
-    // e le voci dalla più recente (D245).
-    // L'ultima ricetta a colpo d'occhio: giorno e confezioni, in una colonna allineata, e le voci
-    // dalla più recente (D245). «Nessuna» solo se nessuna ricetta è stata inviata o stampata.
+    // In vista solo il nome, come si prende e l'ultima ricetta, con giorno e confezioni; il resto
+    // è chiuso e si apre col «+» (D246). L'ultima ricetta in una colonna allineata, le voci dalla
+    // più recente (D245).
     const rows = await page.locator('.elenco-farmaci > li').evaluateAll((els) =>
       els.map((e) => ({
         last: (e.querySelector('.farmaco-ultima') as HTMLElement).innerText,
-        counts: (e.querySelector('.farmaco-conti') as HTMLElement).innerText,
+        closed:
+          (e.querySelector('.farmaco-dettagli') as HTMLElement).hidden &&
+          e.querySelector('.farmaco-apri')!.getAttribute('aria-expanded') === 'false',
       })),
     );
-    expect(rows.some((r) => /\d{2}\/\d{2}\/\d{4}/.test(r.last))).toBe(true);
+    expect(rows.length).toBeGreaterThan(1);
     for (const r of rows) {
-      if (r.last === 'Ultima ricetta\nnessuna')
-        expect(r.counts, 'nessuna ultima ricetta, ma ricette inviate').toMatch(
-          /^(0 ricette inviate o su carta|nessuna ricetta)/,
-        );
-      else
-        expect(r.last).toMatch(
-          /^Ultima ricetta\n\d{2}\/\d{2}\/\d{4}\n(\d+ confezion[ei]|confezioni non indicate)(\ncon un altro programma)?$/,
-        );
+      expect(r.closed, `${r.last}: la riga è già aperta`).toBe(true);
+      expect(r.last).toMatch(
+        /^Ultima ricetta\n(nessuna|\d{2}\/\d{2}\/\d{4} · (\d+ confezion[ei]|confezioni non indicate))$/,
+      );
+    }
+    // «Nessuna» solo se nessuna ricetta è stata inviata o stampata: lo dicono i conti della riga.
+    const none = page
+      .locator('.elenco-farmaci > li')
+      .filter({ has: page.locator('.farmaco-ultima', { hasText: 'nessuna' }) });
+    for (const row of await none.all()) {
+      await row.locator('.farmaco-apri').click();
+      await expect(
+        row.locator('.farmaco-conti').innerText(),
+        'nessuna ultima ricetta, ma ricette inviate',
+      ).resolves.toMatch(/(^|\n)(0 ricette inviate o su carta|nessuna ricetta)/);
+      await row.locator('.farmaco-apri').click();
     }
     const column = await page.evaluate(() =>
       [...document.querySelectorAll('.elenco-farmaci .farmaco-ultima')].map(
@@ -933,7 +989,17 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       expect(days, 'dall’ultima ricetta più recente').toEqual([...days].sort().reverse());
     }
     await check(page, 'farmaci prescritti', true);
-    await amlodipine.first().getByRole('link', { name: 'Storico' }).click();
+    // Col «+» si aprono i dati del farmaco e le sue ultime ricette con l'NRE; poi lo storico.
+    const opener = amlodipine.first().locator('.farmaco-apri');
+    await opener.click();
+    await expect(opener.getAttribute('aria-expanded')).resolves.toBe('true');
+    await amlodipine
+      .first()
+      .getByText(/(inviata|inviate) o su carta/)
+      .waitFor();
+    await amlodipine.first().getByRole('columnheader', { name: 'NRE' }).waitFor();
+    await check(page, 'farmaci prescritti, una voce aperta');
+    await amlodipine.first().getByRole('link', { name: 'Storico completo' }).click();
     await page.getByRole('heading', { name: 'Storico delle prescrizioni' }).waitFor();
     await page.locator('table').getByText(/NRE/).first().waitFor();
     await check(page, 'storico di un farmaco senza terapia');
