@@ -76,36 +76,40 @@ function InlineHistory({ patientId, d }: { patientId: string; d: PrescribedDrug 
   const past = history.data.ricettePassate ?? [];
   if (voci.length === 0 && past.length === 0)
     return <p className="tenue">Nessuna ricetta di questo farmaco.</p>;
+  const lines = [
+    ...voci.slice(0, SHOWN).map((v) => ({
+      key: `${v.ricetta.id}-${v.riga.farmaco ?? ''}`,
+      day: v.ricetta.inviataIl ?? v.ricetta.cartaceaIl ?? v.ricetta.preparataIl,
+      quantity: v.riga.quantita,
+      status: PRESCRIPTION_STATUS[v.ricetta.stato] ?? v.ricetta.stato,
+      nre: v.ricetta.nre,
+    })),
+    ...past.slice(0, Math.max(0, SHOWN - voci.length)).map((r) => ({
+      key: r.id,
+      day: r.data,
+      quantity: r.quantita,
+      status: r.annullataIl ? 'Annullata' : 'Con un altro programma',
+      nre: null,
+    })),
+  ];
+  // Una riga per ricetta, che va a capo fra un dato e l'altro e mai dentro un dato: nella colonna
+  // stretta della ricetta una tabella a quattro colonne usciva dal riquadro (D249). La tabella
+  // intera è nello storico completo.
   return (
-    <table className="tabella tabella-compatta">
-      <caption className="visivamente-nascosto">Ultime ricette di {d.farmaco}</caption>
-      <thead>
-        <tr>
-          <th scope="col">Data</th>
-          <th scope="col">Confezioni</th>
-          <th scope="col">Stato</th>
-          <th scope="col">NRE</th>
-        </tr>
-      </thead>
-      <tbody>
-        {voci.slice(0, SHOWN).map((v) => (
-          <tr key={`${v.ricetta.id}-${v.riga.farmaco ?? ''}`}>
-            <td>{date(v.ricetta.inviataIl ?? v.ricetta.cartaceaIl ?? v.ricetta.preparataIl)}</td>
-            <td>{v.riga.quantita}</td>
-            <td>{PRESCRIPTION_STATUS[v.ricetta.stato] ?? v.ricetta.stato}</td>
-            <td className="codice">{v.ricetta.nre ?? '—'}</td>
-          </tr>
-        ))}
-        {past.slice(0, Math.max(0, SHOWN - voci.length)).map((r) => (
-          <tr key={r.id}>
-            <td>{date(r.data)}</td>
-            <td>{r.quantita ?? '—'}</td>
-            <td>{r.annullataIl ? 'Annullata' : 'Con un altro programma'}</td>
-            <td>—</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <ul className="ricette-in-riga" aria-label={`Ultime ricette di ${d.farmaco}`}>
+      {lines.map((l) => (
+        <li key={l.key}>
+          <span className="farmaco-ultima-data">{date(l.day)}</span> ·{' '}
+          <span>{packages(l.quantity)}</span> · <span>{l.status}</span>
+          {l.nre && (
+            <>
+              {' '}
+              · <span className="codice">NRE {l.nre}</span>
+            </>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -200,6 +204,79 @@ export function PrescribedDrugItem({
         )}
       </div>
     </li>
+  );
+}
+
+/**
+ * «Aggiungi» di un farmaco prescritto (D249): c'è su ogni farmaco, scritto più piccolo, con il
+ * bersaglio sempre di 44 px. Il nome del farmaco è per chi usa un lettore di schermo.
+ */
+export function AddDrugButton({
+  name,
+  disabled,
+  onClick,
+}: {
+  name: string;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="pulsante pulsante-piccolo"
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <Icon name="aggiungi" size={16} /> <span>Aggiungi</span>
+      <span className="visivamente-nascosto"> {name}</span>
+    </button>
+  );
+}
+
+/** Confezioni di una riga: da 1 a 99, come il campo della riga in ricetta. */
+export const MAX_PACKS = 99;
+
+/**
+ * Le confezioni di un farmaco già in ricetta (D250): «−» e «+» al posto di «Aggiungi», così una
+ * riga non si ripete e il numero cambia dove si sceglie il farmaco. Almeno una confezione; la
+ * riga si toglie dalla ricetta.
+ */
+export function PackStepper({
+  name,
+  quantity,
+  disabled,
+  onChange,
+}: {
+  name: string;
+  quantity: number;
+  disabled?: boolean;
+  onChange: (quantity: number) => void;
+}) {
+  return (
+    <span className="confezioni-passo" role="group" aria-label={`Confezioni di ${name} in ricetta`}>
+      <button
+        type="button"
+        className="pulsante pulsante-piccolo"
+        disabled={disabled || quantity <= 1}
+        onClick={() => onChange(quantity - 1)}
+        aria-label={`Una confezione in meno di ${name}`}
+      >
+        <span aria-hidden="true">−</span>
+      </button>
+      <span className="confezioni-numero" aria-live="polite">
+        <span aria-hidden="true">{quantity} conf.</span>
+        <span className="visivamente-nascosto">{packages(quantity)} in ricetta</span>
+      </span>
+      <button
+        type="button"
+        className="pulsante pulsante-piccolo"
+        disabled={disabled || quantity >= MAX_PACKS}
+        onClick={() => onChange(quantity + 1)}
+        aria-label={`Una confezione in più di ${name}`}
+      >
+        <span aria-hidden="true">+</span>
+      </button>
+    </span>
   );
 }
 

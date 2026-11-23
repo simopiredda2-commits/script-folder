@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import {
   DataVersions,
@@ -10,7 +10,13 @@ import {
 } from '../components/common';
 import { Icon } from '../components/Icon';
 import type { PrescribedDrug } from '../components/Prescribed';
-import { byGroup, PrescribedDrugList } from '../components/PrescribedDrugs';
+import {
+  AddDrugButton,
+  byGroup,
+  packages as packsText,
+  PackStepper,
+  PrescribedDrugList,
+} from '../components/PrescribedDrugs';
 import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
 import { RegistryNote, type DrugRegistry } from '../components/Registries';
 import {
@@ -23,7 +29,8 @@ import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
 import { ACCESS_TYPE, date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
-import { usePersistentState } from '../lib/storage';
+import { readStored, usePersistentState, writeStored } from '../lib/storage';
+import { useMoreBelow } from '../lib/useMoreBelow';
 import {
   count,
   listPath,
@@ -210,7 +217,10 @@ export function lineSummary(
     .join(' · ');
 }
 
-/** La riga di una terapia in corso: il farmaco della terapia, con la sua posologia. */
+/**
+ * La riga di una terapia in corso: il farmaco della terapia, con la sua posologia e le confezioni
+ * per ricetta della sua scheda, come «Ripeti le terapie scelte» (D250).
+ */
 function therapyLine(t: TherapyRow): Omit<Line, 'key'> {
   return {
     therapyId: t.id,
@@ -218,34 +228,74 @@ function therapyLine(t: TherapyRow): Omit<Line, 'key'> {
     drugName: t.drugName,
     activeIngredient: t.activeIngredient,
     aifaNote: t.aifaNote,
-    quantity: 1,
+    quantity: t.packsPerPrescription ?? 1,
     posologyText: posology(t),
   };
 }
 
 /**
- * La riga da aggiungere per un farmaco prescritto (D246): la terapia in corso con la sua
- * posologia; un farmaco prescritto senza terapia, se ha l'AIC. Nessuna riga per le terapie
- * sospese o concluse (si riprendono dalla scheda) e per i farmaci senza AIC (si cercano nella
- * banca dati: la ricetta di prima poteva essere per principio attivo).
+ * Lo stesso farmaco di una riga già in ricetta (D250): la stessa terapia; altrimenti la stessa
+ * confezione (AIC); senza AIC lo stesso nome. Così «Aggiungi» non ripete una riga: cambia le
+ * confezioni di quella che c'è.
+ */
+export function sameDrug(
+  a: Pick<Line, 'therapyId' | 'drugAic' | 'drugName'>,
+  b: Pick<Line, 'therapyId' | 'drugAic' | 'drugName'>,
+): boolean {
+  if (a.therapyId && b.therapyId) return a.therapyId === b.therapyId;
+  if (a.drugAic && b.drugAic) return a.drugAic === b.drugAic;
+  return !a.drugAic && !b.drugAic && !!a.drugName && a.drugName === b.drugName;
+}
+
+/** Le confezioni di tutte le righe della ricetta (D250): il totale che vedono le regole R2–R4. */
+export const totalPacks = (lines: readonly Pick<Line, 'quantity'>[]) =>
+  lines.reduce((n, l) => n + l.quantity, 0);
+
+/**
+ * La riga da aggiungere per un farmaco prescritto: c'è per ogni farmaco (D249). La terapia in
+ * corso porta la sua posologia ed entra nel suo storico (D65). Una terapia sospesa o conclusa, o
+ * un farmaco prescritto senza terapia, entra come farmaco, senza posologia: per confezione se ha
+ * l'AIC, altrimenti per principio attivo o, se manca anche quello, per nome. Che cosa manca lo
+ * dicono i controlli della ricetta.
  */
 export function lineFromPrescribed(
   d: PrescribedDrug,
   therapies: readonly TherapyRow[],
-): Omit<Line, 'key'> | null {
-  if (d.terapia) {
-    if (d.terapia.stato !== 'active') return null;
+): Omit<Line, 'key'> {
+  if (d.terapia?.stato === 'active') {
     const t = therapies.find((x) => x.id === d.terapia!.id);
-    return t ? therapyLine(t) : null;
+    if (t) return therapyLine(t);
   }
-  if (!d.aic) return null;
   return {
     drugAic: d.aic,
     drugName: d.farmaco,
     activeIngredient: d.principioAttivo,
     aifaNote: d.notaAifa,
     quantity: 1,
+    ...(!d.aic && d.principioAttivo ? { byActiveIngredient: true } : {}),
   };
+}
+
+/** Dove si ricorda la ricetta in corso di un paziente, nella scheda del browser (D68). */
+const draftKey = (patientId: string, mode: 'farmaci' | 'specialistica', field: string) =>
+  `ricetta:${patientId}:${mode}:${field}`;
+
+/** La ricetta in corso del paziente è già preparata: non si aggiungono righe (D249). */
+export const currentPrescriptionLocked = (patientId: string) =>
+  readStored(draftKey(patientId, 'farmaci', 'bozza'), null) !== null;
+
+/**
+ * Aggiunge una riga alla ricetta in corso del paziente da un'altra pagina, come «Aggiungi» nella
+ * ricetta (D249). Se la ricetta è già preparata non aggiunge niente e dà false.
+ */
+export function addToCurrentPrescription(patientId: string, line: Omit<Line, 'key'>): boolean {
+  if (currentPrescriptionLocked(patientId)) return false;
+  const key = draftKey(patientId, 'farmaci', 'righe');
+  const lines = readStored<Line[]>(key, []);
+  // Il farmaco già in ricetta non si ripete: le confezioni si cambiano nella ricetta (D250).
+  if (!lines.some((l) => sameDrug(l, line)))
+    writeStored(key, [...lines, { ...line, key: newKey() }]);
+  return true;
 }
 
 export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica' }) {
@@ -260,13 +310,16 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   );
   // L'elenco si mostra quando anche le terapie sono lette: prima il pulsante «Aggiungi» delle
   // terapie in corso comparirebbe dopo, spostando le righe sotto il cursore (D242, D246).
+  // I due riquadri scorrono da soli: un'ombra in fondo dice che sotto c'è altro (D249).
+  const searchBox = useMoreBelow();
+  const lineBox = useMoreBelow();
   const prescribedList = prescribed.data?.farmaci;
   const prescribedDrugs = therapies.loading ? undefined : prescribedList;
   // Solo se i farmaci prescritti non si leggono si aggiunge dalla terapia in corso, come prima:
   // mentre si leggono, niente, perché l'elenco di ripiego sparirebbe subito.
   const fromTherapies = !prescribed.loading && !prescribedList;
   // La ricetta in corso è ricordata per paziente (D68): si passa a un'altra cartella e si torna.
-  const k = (field: string) => `ricetta:${id}:${mode}:${field}`;
+  const k = (field: string) => draftKey(id!, mode, field);
   const [kind, setKind, resetKind] = usePersistentState(
     k('tipo'),
     mode === 'farmaci' ? 'pharma_ssn' : 'specialist_ssn',
@@ -326,7 +379,10 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
     versionKinds.includes(v.kind),
   );
 
-  const add = (l: Omit<Line, 'key'>) => setLines((ls) => [...ls, { ...l, key: newKey() }]);
+  const add = (l: Omit<Line, 'key'>) =>
+    setLines((ls) =>
+      mode === 'farmaci' && ls.some((x) => sameDrug(x, l)) ? ls : [...ls, { ...l, key: newKey() }],
+    );
   // Le posologie dello studio, come suggerimenti nella posologia delle righe dei farmaci.
   const posologyTexts = [...new Set((posologies.data?.voci ?? []).map((p) => p.etichetta))];
   const update = (key: string, patch: Partial<Line>) =>
@@ -392,6 +448,21 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
 
   const title = mode === 'farmaci' ? 'Nuova ricetta' : 'Ricetta specialistica';
   const locked = draft !== null;
+  // Un farmaco già in ricetta ha «− N +» al posto di «Aggiungi» (D250): le confezioni si scelgono
+  // dove si sceglie il farmaco, e il totale in ricetta cambia con loro.
+  const drugAction = (line: Omit<Line, 'key'>, name: string, button: ReactNode) => {
+    const inPrescription = lines.find((x) => sameDrug(x, line));
+    return inPrescription ? (
+      <PackStepper
+        name={name}
+        quantity={inPrescription.quantity}
+        disabled={locked}
+        onChange={(quantity) => update(inPrescription.key, { quantity })}
+      />
+    ) : (
+      button
+    );
+  };
   // Titolo e dati del paziente: in una riga sola quando la pagina sta in una schermata (D242).
   const header = (
     <div className="testata-ricetta">
@@ -433,7 +504,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
       {header}
 
       <div className="griglia-ricetta">
-        <section className="riquadro" aria-labelledby="titolo-cerca">
+        <section
+          className="riquadro ombre-scorrimento"
+          aria-labelledby="titolo-cerca"
+          ref={searchBox}
+        >
           <h2 id="titolo-cerca">
             {mode === 'farmaci' ? 'Banca dati farmaci' : 'Catalogo regionale'}
           </h2>
@@ -483,34 +558,39 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           />
           <ErrorMessage error={search.error} />
           <ul className="risultati" aria-live="polite">
-            {search.data?.farmaci?.map((d) => (
-              <li key={d.aic} className="risultato">
-                <div>
-                  <strong>{d.name ?? d.activeIngredient}</strong>
-                  <div className="tenue">{drugFacts(d).join(' · ')}</div>
-                  <div className="codice tenue">AIC {d.aic}</div>
-                  {isSuspended(d.adminState) && <SuspendedNote />}
-                  {d.shortage && <ShortageNote shortage={d.shortage} />}
-                  <RegistryNote registries={d.registries ?? []} />
-                </div>
-                <button
-                  type="button"
-                  className="pulsante"
-                  disabled={locked}
-                  onClick={() =>
-                    add({
-                      drugAic: d.aic,
-                      drugName: [d.name, d.pack].filter(Boolean).join(' '),
-                      activeIngredient: d.activeIngredient,
-                      aifaNote: d.aifaNote,
-                      quantity: 1,
-                    })
-                  }
-                >
-                  <Icon name="aggiungi" /> <span>Aggiungi</span>
-                </button>
-              </li>
-            ))}
+            {search.data?.farmaci?.map((d) => {
+              const line = {
+                drugAic: d.aic,
+                drugName: [d.name, d.pack].filter(Boolean).join(' '),
+                activeIngredient: d.activeIngredient,
+                aifaNote: d.aifaNote,
+                quantity: 1,
+              };
+              return (
+                <li key={d.aic} className="risultato">
+                  <div>
+                    <strong>{d.name ?? d.activeIngredient}</strong>
+                    <div className="tenue">{drugFacts(d).join(' · ')}</div>
+                    <div className="codice tenue">AIC {d.aic}</div>
+                    {isSuspended(d.adminState) && <SuspendedNote />}
+                    {d.shortage && <ShortageNote shortage={d.shortage} />}
+                    <RegistryNote registries={d.registries ?? []} />
+                  </div>
+                  {drugAction(
+                    line,
+                    line.drugName,
+                    <button
+                      type="button"
+                      className="pulsante"
+                      disabled={locked}
+                      onClick={() => add(line)}
+                    >
+                      <Icon name="aggiungi" /> <span>Aggiungi</span>
+                    </button>,
+                  )}
+                </li>
+              );
+            })}
             {search.data?.prestazioni?.map((s) => (
               <li key={s.regionalCode} className="risultato">
                 <ServiceResultText s={s} />
@@ -553,9 +633,8 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           {mode === 'farmaci' && prescribedDrugs && prescribedDrugs.length > 0 && (
             <>
               {/* I farmaci prescritti (D246): in vista nome, tipo e ultima ricetta; il resto e
-                  lo storico col «+». Si aggiungono le terapie in corso, con la loro posologia, e
-                  i farmaci prescritti senza terapia che hanno l'AIC. Prima le terapie in corso,
-                  come nei gruppi della pagina. */}
+                  lo storico col «+». «Aggiungi» su ogni farmaco (D249). Prima le terapie in
+                  corso, come nei gruppi della pagina. */}
               <h3 id="titolo-farmaci-prescritti">Farmaci prescritti</h3>
               <PrescribedDrugList
                 drugs={byGroup(prescribedDrugs)}
@@ -563,18 +642,10 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 label="titolo-farmaci-prescritti"
                 action={(d) => {
                   const line = lineFromPrescribed(d, therapies.data?.terapie ?? []);
-                  return (
-                    line && (
-                      <button
-                        type="button"
-                        className="pulsante"
-                        disabled={locked}
-                        onClick={() => add(line)}
-                      >
-                        <Icon name="aggiungi" /> <span>Aggiungi</span>
-                        <span className="visivamente-nascosto"> {d.farmaco}</span>
-                      </button>
-                    )
+                  return drugAction(
+                    line,
+                    d.farmaco,
+                    <AddDrugButton name={d.farmaco} disabled={locked} onClick={() => add(line)} />,
                   );
                 }}
               />
@@ -598,14 +669,18 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                         <strong>{t.drugName}</strong>
                         <div className="tenue">{posology(t)}</div>
                       </div>
-                      <button
-                        type="button"
-                        className="pulsante"
-                        disabled={locked}
-                        onClick={() => add(therapyLine(t))}
-                      >
-                        <Icon name="aggiungi" /> <span>Aggiungi</span>
-                      </button>
+                      {drugAction(
+                        therapyLine(t),
+                        t.drugName,
+                        <button
+                          type="button"
+                          className="pulsante"
+                          disabled={locked}
+                          onClick={() => add(therapyLine(t))}
+                        >
+                          <Icon name="aggiungi" /> <span>Aggiungi</span>
+                        </button>,
+                      )}
                     </li>
                   ))}
               </ul>
@@ -613,8 +688,19 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           )}
         </section>
 
-        <section className="riquadro" aria-labelledby="titolo-ricetta">
+        <section
+          className="riquadro ombre-scorrimento"
+          aria-labelledby="titolo-ricetta"
+          ref={lineBox}
+        >
           <h2 id="titolo-ricetta">In ricetta</h2>
+          {/* Il totale delle confezioni, che cambia con «− N +» e con il campo della riga (D250):
+              è quello che contano i limiti per ricetta (R2–R4) quando si prepara la ricetta. */}
+          {mode === 'farmaci' && lines.length > 0 && (
+            <p className="totale-confezioni" aria-live="polite">
+              <span className="contatore">{packsText(totalPacks(lines))}</span> in ricetta
+            </p>
+          )}
           {lines.length === 0 && (
             <p className="tenue">
               Aggiungi un {mode === 'farmaci' ? 'farmaco' : 'prestazione'} dalla ricerca.

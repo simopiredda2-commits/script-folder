@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useParams } from 'react-router';
 import { useSession } from '../lib/session';
+import { useMoreBelow } from '../lib/useMoreBelow';
 import type { Patient, Summary } from '../pages/RecordPage';
 import { Icon, type IconName } from './Icon';
 import { PatientFacts } from './PatientFacts';
@@ -90,6 +91,14 @@ export function PatientLayout() {
   const shown = band && band.patient.id === id ? band : null;
   const base = `/pazienti/${id}`;
   const content = useRef<HTMLDivElement>(null);
+  const markContent = useMoreBelow();
+  const contentRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      content.current = node;
+      markContent(node);
+    },
+    [markContent],
+  );
   const { pathname, hash } = useLocation();
 
   // Il contenuto scorre nel suo riquadro, che resta lo stesso da una voce all'altra: a ogni voce
@@ -122,8 +131,8 @@ export function PatientLayout() {
           {/* Il riquadro scorre da solo (D244): si raggiunge anche da tastiera, per scorrerlo con
               le frecce quando non ha collegamenti o campi (WCAG 2.1.1). */}
           <div
-            className="cartella-contenuto"
-            ref={content}
+            className="cartella-contenuto ombre-scorrimento"
+            ref={contentRef}
             role="region"
             aria-label="Contenuto della cartella"
             tabIndex={0}
@@ -139,6 +148,7 @@ export function PatientLayout() {
 /** Il menu delle voci, sempre in vista; la voce aperta è evidenziata e, nella striscia, in vista. */
 function RecordMenu({ base, doctor }: { base: string; doctor: boolean }) {
   const list = useRef<HTMLUListElement>(null);
+  const markMenu = useMoreBelow();
   const { pathname } = useLocation();
   useEffect(() => {
     // Nella striscia orizzontale (schermi stretti) la voce aperta entra nel riquadro, senza
@@ -151,7 +161,11 @@ function RecordMenu({ base, doctor }: { base: string; doctor: boolean }) {
       ul.scrollLeft = Math.max(0, left - 16);
   }, [pathname]);
   return (
-    <nav className="menu-cartella" aria-label="Sezioni della cartella">
+    <nav
+      className="menu-cartella ombre-scorrimento"
+      aria-label="Sezioni della cartella"
+      ref={markMenu}
+    >
       <ul ref={list}>
         {RECORD_SECTIONS.filter((s) => doctor || !s.doctorOnly).map((s) => {
           const path = s.to ? `${base}/${s.to}` : base;

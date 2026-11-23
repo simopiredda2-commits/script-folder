@@ -794,8 +794,70 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByRole('button', { name: 'Aggiungi Farmaco di prova 5 mg' })
       .click();
     await page.locator('.riga-ricetta').filter({ hasText: 'Farmaco di prova 5 mg' }).waitFor();
+    // Il farmaco in ricetta ha «− N +» al posto di «Aggiungi»: le confezioni cambiano nella riga
+    // in ricetta e nel totale (D250). Si torna a una, per i limiti della ricetta che viene dopo.
+    const inPrescription = page
+      .getByRole('list', { name: 'Farmaci prescritti' })
+      .getByRole('listitem')
+      .filter({ hasText: 'Farmaco di prova 5 mg' })
+      .first();
+    const total = page.locator('.totale-confezioni');
+    await total.getByText('2 confezioni').waitFor();
+    await inPrescription
+      .getByRole('button', { name: 'Una confezione in più di Farmaco di prova 5 mg' })
+      .click();
+    await total.getByText('3 confezioni').waitFor();
+    await page
+      .locator('.riga-ricetta')
+      .filter({ hasText: 'Farmaco di prova 5 mg' })
+      .getByText(/^2 confezioni · /)
+      .waitFor();
+    await inPrescription
+      .getByRole('button', { name: 'Una confezione in meno di Farmaco di prova 5 mg' })
+      .click();
+    await total.getByText('2 confezioni').waitFor();
     // Con due farmaci la pagina sta in una schermata: non scorre, e i pulsanti sono in vista.
     await expectOneScreen(page, 'nuova ricetta con due farmaci');
+    // A misura di MacBook (1440×780, D249): il tipo di ricetta in una riga; «Aggiungi» su ogni
+    // farmaco prescritto, sulla riga del nome; un'ombra in fondo al riquadro dice che sotto c'è
+    // altro e sparisce in fondo; anche il menu della cartella, più lungo dello schermo, la ha.
+    await page.setViewportSize({ width: 1440, height: 780 });
+    // Il nome del gruppo non prende una riga: c'è solo per i lettori di schermo.
+    await expect(
+      page.locator('.scelta-in-riga').evaluate((e) => e.getBoundingClientRect().height),
+    ).resolves.toBeLessThan(56);
+    await expect(
+      page
+        .locator('.scelta-in-riga .casella')
+        .evaluateAll(
+          (els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size,
+        ),
+    ).resolves.toBe(1);
+    const rowsAt1440 = await page.getByRole('list', { name: 'Farmaci prescritti' }).evaluate((ul) =>
+      [...ul.children].map((li) => {
+        const name = li.querySelector('.farmaco-apri')!.getBoundingClientRect();
+        const add = li.querySelector('.farmaco-azione button')?.getBoundingClientRect();
+        return !!add && add.top < name.bottom && add.bottom > name.top;
+      }),
+    );
+    expect(rowsAt1440.length).toBeGreaterThan(1);
+    expect(rowsAt1440, '«Aggiungi» sulla riga del nome, su ogni farmaco').not.toContain(false);
+    const searchBox = page.locator('section[aria-labelledby="titolo-cerca"]');
+    await expect.poll(() => searchBox.evaluate((e) => e.hasAttribute('data-sotto'))).toBe(true);
+    await expect(searchBox.evaluate((e) => getComputedStyle(e, '::after').opacity)).resolves.toBe(
+      '1',
+    );
+    await searchBox.evaluate((e) => e.scrollTo(0, e.scrollHeight));
+    await expect.poll(() => searchBox.evaluate((e) => e.hasAttribute('data-sotto'))).toBe(false);
+    await searchBox.evaluate((e) => e.scrollTo(0, 0));
+    await expect
+      .poll(() =>
+        page
+          .getByRole('navigation', { name: 'Sezioni della cartella' })
+          .evaluate((e) => e.hasAttribute('data-sotto')),
+      )
+      .toBe(true);
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
     await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await page.getByText(/Regole di prescrizione, versione/).waitFor();
@@ -943,6 +1005,47 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByRole('listitem')
       .first()
       .waitFor();
+    // La riga aperta sta nel suo riquadro anche dove la colonna è più stretta: le ultime ricette,
+    // con l'NRE, vanno a capo invece di uscire a destra e far scorrere il riquadro di lato (D249).
+    const openInEditor = page
+      .getByRole('list', { name: 'Farmaci prescritti' })
+      .getByRole('listitem')
+      .filter({ hasText: /AMLODIPINA/ })
+      .first();
+    await openInEditor.locator('.farmaco-apri').click();
+    await openInEditor
+      .getByRole('list', { name: /^Ultime ricette di / })
+      .getByText(/^NRE /)
+      .first()
+      .waitFor();
+    for (const width of [1100, 1280, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(
+        openInEditor.evaluate((li) => {
+          const right = li.getBoundingClientRect().right + 0.5;
+          const parts = [...li.querySelectorAll('.ricette-in-riga li > span')];
+          const nre = [...li.querySelectorAll('.ricette-in-riga .codice')];
+          const box = li.closest('section')!;
+          return {
+            inside:
+              parts.length > 0 && parts.every((e) => e.getBoundingClientRect().right <= right),
+            // Una riga sola: Chrome dà un rettangolo per ogni pezzo di testo, si contano le righe.
+            whole:
+              nre.length > 0 &&
+              nre.every(
+                (e) => new Set([...e.getClientRects()].map((r) => Math.round(r.top))).size === 1,
+              ),
+            sideways: box.scrollWidth > box.clientWidth,
+          };
+        }),
+        `la riga aperta sta nel riquadro a ${width} px`,
+      ).resolves.toEqual({ inside: true, whole: true, sideways: false });
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openInEditor.locator('.farmaco-apri').click();
+    // La ricetta di prima è stata inviata: si riparte da una nuova, così «Aggiungi» è attivo.
+    const restart = page.getByRole('button', { name: 'Nuova ricetta da capo' });
+    if (await restart.count()) await restart.click();
     await page
       .getByRole('link', {
         name: 'Tutti i farmaci prescritti, con le ricette fatte con altri programmi',
@@ -970,6 +1073,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       })),
     );
     expect(rows.length).toBeGreaterThan(1);
+    // «Aggiungi» su ogni farmaco anche nella pagina intera (D249).
+    await expect(
+      page.locator('.elenco-farmaci > li .farmaco-azione button:not([disabled])').count(),
+    ).resolves.toBe(rows.length);
     for (const r of rows) {
       expect(r.closed, `${r.last}: la riga è già aperta`).toBe(true);
       expect(r.last).toMatch(
@@ -1013,11 +1120,30 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .first()
       .getByText(/(inviata|inviate) o su carta/)
       .waitFor();
-    await amlodipine.first().getByRole('columnheader', { name: 'NRE' }).waitFor();
+    await amlodipine
+      .first()
+      .getByRole('list', { name: /^Ultime ricette di / })
+      .getByText(/^NRE /)
+      .first()
+      .waitFor();
     await check(page, 'farmaci prescritti, una voce aperta');
     await amlodipine.first().getByRole('link', { name: 'Storico completo' }).click();
     await page.getByRole('heading', { name: 'Storico delle prescrizioni' }).waitFor();
     await page.locator('table').getByText(/NRE/).first().waitFor();
+    // Dalla pagina intera «Aggiungi» mette il farmaco nella ricetta in corso e apre la ricetta
+    // (D249); poi lo si toglie, per le prove che vengono dopo.
+    await page.goBack();
+    await page.getByRole('heading', { name: 'Farmaci prescritti', level: 1 }).waitFor();
+    await amlodipine
+      .first()
+      .getByRole('button', { name: /^Aggiungi/ })
+      .click();
+    const added = page.locator('.riga-ricetta').filter({ hasText: /AMLODIPINA/ });
+    await added.waitFor();
+    await menu.locator('[aria-current="page"]', { hasText: 'Nuova ricetta' }).waitFor();
+    await added.locator('.riga-ricetta-apri').click();
+    await added.getByRole('button', { name: 'Togli dalla ricetta' }).click();
+    await expect(page.locator('.riga-ricetta').count()).resolves.toBe(0);
     await check(page, 'storico di un farmaco senza terapia');
 
     await page.goto(`${base}/pazienti/${s.richPatient}`);
