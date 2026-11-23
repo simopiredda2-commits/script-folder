@@ -843,6 +843,9 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect(rowsAt1440.length).toBeGreaterThan(1);
     expect(rowsAt1440, '«Aggiungi» sulla riga del nome, su ogni farmaco').not.toContain(false);
     const searchBox = page.locator('section[aria-labelledby="titolo-cerca"]');
+    // Dall'alto: i clic su «−» e «+» possono averlo fatto scorrere fino in fondo (WebKit), dove
+    // giustamente il segno non c'è.
+    await searchBox.evaluate((e) => e.scrollTo(0, 0));
     await expect.poll(() => searchBox.evaluate((e) => e.hasAttribute('data-sotto'))).toBe(true);
     await expect(searchBox.evaluate((e) => getComputedStyle(e, '::after').opacity)).resolves.toBe(
       '1',
