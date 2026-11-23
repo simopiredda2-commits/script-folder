@@ -1490,6 +1490,8 @@ Nessuna per ora. Le domande nuove si scrivono qui durante il blocco (D237).
 3. **Pulsante «Archivia ricette confermate»**: toglie dall'elenco quelle già evase, cioè inviate o stampate. Restano nello storico del paziente.
 4. **Ricetta del medico in un passo solo**: quando prescrive il medico, la conferma è la sua. Oggi sono due clic, «Prepara la ricetta» e poi «Firma e invia». L'invio con le credenziali del medico resta obbligatorio (Sistema TS, SAR).
 5. Promemoria sul database dei farmaci (D243).
+6. **Esenzioni nella schermata iniziale del paziente**: oggi la testata mostra solo il codice. Vanno mostrate le esenzioni pertinenti, cioè quelle in corso, con la descrizione e la scadenza.
+7. **Cartella in una schermata**, senza dover scorrere troppo, come già fatto per la ricetta (D242).
 
 ## Risposte della fermata dopo l'unione della #29 (21/11/2026)
 
