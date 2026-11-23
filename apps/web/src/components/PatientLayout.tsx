@@ -119,7 +119,15 @@ export function PatientLayout() {
         </div>
         <div className="cartella-corpo">
           <RecordMenu base={base} doctor={isDoctor} />
-          <div className="cartella-contenuto" ref={content}>
+          {/* Il riquadro scorre da solo (D244): si raggiunge anche da tastiera, per scorrerlo con
+              le frecce quando non ha collegamenti o campi (WCAG 2.1.1). */}
+          <div
+            className="cartella-contenuto"
+            ref={content}
+            role="region"
+            aria-label="Contenuto della cartella"
+            tabIndex={0}
+          >
             <Outlet />
           </div>
         </div>

@@ -957,7 +957,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     for (const r of rows) {
       expect(r.closed, `${r.last}: la riga è già aperta`).toBe(true);
       expect(r.last).toMatch(
-        /^Ultima ricetta\n(nessuna|\d{2}\/\d{2}\/\d{4} · (\d+ confezion[ei]|confezioni non indicate))$/,
+        /^Ultima ricetta\n(nessuna|\d{2}\/\d{2}\/\d{4} · (\d+ confezion[ei]|confezioni non indicate))(\ncon un altro programma)?$/,
       );
     }
     // «Nessuna» solo se nessuna ricetta è stata inviata o stampata: lo dicono i conti della riga.
@@ -2286,11 +2286,12 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Programma con cui è stata fatta').fill('Programma di prova');
     await check(page, 'ricetta fatta con un altro programma', true);
     await page.getByRole('button', { name: 'Registra la ricetta' }).click();
+    // La riga del farmaco dice da dove viene l'ultima ricetta, anche chiusa (D246).
     await page
-      .getByText(/Con un altro programma/)
-      .first()
+      .locator('.elenco-farmaci > li')
+      .filter({ hasText: 'Farmaco di un altro programma' })
+      .locator('.farmaco-ultima', { hasText: 'con un altro programma' })
       .waitFor();
-    await page.getByText('Farmaco di un altro programma').first().waitFor();
 
     // Una terapia in corso, conclusa dalla sua pagina: non si sospende e non si ripete più.
     const [t1] = await withActor(t.db, s.users.titolare.id, (tx) =>

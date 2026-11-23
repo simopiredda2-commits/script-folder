@@ -1830,5 +1830,13 @@ Non provato: i lettori di schermo veri sul menu del nome e sulla striscia del me
 - **La riga si adatta alla larghezza dell'elenco**, non dello schermo. Nella colonna stretta della ricetta va su tre righe: il nome per intero; il tipo; l'ultima ricetta, con il pulsante accanto. Nella pagina intera l'ultima ricetta resta nella sua colonna allineata (D245).
 - **Legenda**: più piccola (13 px invece di 14, campioni più piccoli), in due colonne di tre voci, a destra del titolo. Nella pagina dei farmaci prescritti sta sulla riga del titolo. Nel riepilogo il riquadro è stretto: la legenda va subito sotto «Terapia in corso», dove stava prima, ma a destra. Il titolo «Legenda dei colori» non si vede più, ma resta per chi usa un lettore di schermo.
 - **Riepilogo**: tolto il pulsante «Scheda e storico» dalle righe della terapia, perché il nome porta già alla scheda.
+- **Due correzioni trovate dalla prova completa**, che la prova a filtro non vedeva. Primo: il riquadro del contenuto della cartella (D244) ora si raggiunge da tastiera, per scorrerlo con le frecce quando non ha collegamenti o campi; axe-core lo segnalava sullo storico lungo di un farmaco. Secondo: la riga chiusa dice «con un altro programma» sotto l'ultima ricetta, quando viene da lì, come nella D245.
 
 Non provato: i lettori di schermo veri sul «+» e sulla legenda; Safari e Firefox veri (le prove usano i motori WebKit e Firefox di Playwright).
+
+**D247 · Fermata dopo la #31: audit alla fine, con Cowork; ordine dentro i gruppi; database dopo i punti 1–4.** Simone ha risposto con il pulsante il 23/11/2026, dopo avere chiesto di fare in fretta.
+
+- **Via alla #31**: «Via, unisci». Si unisce con le prove su GitHub verdi.
+- **Audit dall'esterno**: «Cowork, a meno che aspettiamo che Folder, al netto del collaudo finale, sia chiuso e quindi attendiamo audit. Che ne dici?». Scelta: l'audit si fa con Cowork, una volta sola, quando il programma è chiuso a parte il collaudo finale, cioè dopo i punti 1–4 e il database dei farmaci. Motivo: le pagine che cambieranno (Ricette, ricetta del medico in un passo, anteprima del PDF) sono proprio quelle che un audit di oggi guarderebbe, e il lavoro andrebbe rifatto. Il testo per Cowork si prepara allora, sulle pagine nuove. Qui non parte nessun agente (regola di `CLAUDE.md`).
+- **Ordine dei farmaci prescritti**: «Dentro i gruppi», come ora, nella pagina e nella ricetta (D245, D246).
+- **Database dei farmaci nella dimostrazione** (D243): «Dopo i punti 1-4. Ma tieni a mente cosa resta da fare». L'elenco in ordine è in `docs/avanzamento.md`, «Che cosa resta da fare, in ordine».

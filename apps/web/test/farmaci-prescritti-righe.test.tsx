@@ -208,7 +208,10 @@ describe('farmaci prescritti in una riga, con i dettagli che si aprono (D246)', 
     expect(
       within(item).getByText('1 ricetta inviata o su carta · 1 confezione negli ultimi 12 mesi'),
     ).toBeTruthy();
-    expect(within(item).getByText('L’ultima ricetta è fatta con un altro programma.')).toBeTruthy();
+    // Da dove viene l'ultima ricetta si vede anche a riga chiusa.
+    expect(item.querySelector('.farmaco-ultima')!.textContent).toBe(
+      'Ultima ricetta02/10/2026 · 1 confezionecon un altro programma',
+    );
     await within(item).findByRole('table');
     expect(within(item).getByRole('link', { name: 'Storico completo' }).getAttribute('href')).toBe(
       '/pazienti/p1/farmaci/storico?aic=900000029',

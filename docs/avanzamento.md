@@ -1534,6 +1534,31 @@ Il primo passo dell'ordine concordato con Simone (punti 6–9 qui sopra), con le
 
 - Fermata: via alla pull request; audit dall'esterno sulla dimostrazione (Cowork, o revisori lanciati qui solo con il via di Simone); poi i punti 1–4 (anteprima del PDF, pagina Ricette con tutte le ricette e «Archivia ricette confermate», ricetta del medico in un passo).
 
+## Risposte della fermata dopo la #31 (23/11/2026)
+
+Simone ha risposto con il pulsante il 23/11/2026 (D247).
+
+- **Via**: «Via, unisci». Pull request #31 da unire con le prove su GitHub verdi.
+- **Audit dall'esterno**: con Cowork, una volta sola, a programma chiuso salvo il collaudo finale (dopo i punti 1–4 e il database). Lo ha proposto Simone («a meno che aspettiamo che Folder, al netto del collaudo finale, sia chiuso»), con la domanda «Che ne dici?»; la scelta e il motivo sono in D247.
+- **Ordine dei farmaci prescritti**: dentro i gruppi, come ora.
+- **Database dei farmaci**: «Dopo i punti 1-4. Ma tieni a mente cosa resta da fare».
+
+**Che cosa resta da fare, in ordine**
+
+1. Anteprima del PDF prima della firma, con «Bozza – non valida» al posto dell'NRE (punto 1 delle richieste della pausa).
+2. Pagina Ricette con tutte le ricette in corso e il menu di stampa e invio; «Archivia ricette confermate» (punti 2 e 3).
+3. Ricetta del medico in un passo solo, con l'invio sempre con le sue credenziali (punto 4).
+4. Database dei farmaci nella dimostrazione (D243): che cosa vuol dire di preciso (i rimborsabili di classe A e H, o tutta l'anagrafica AIFA) si chiede a Simone allora.
+5. Audit con Cowork sulla dimostrazione, a programma chiuso (D247).
+6. Collaudo finale: le verifiche di Simone e della Dr.ssa Rocca in «Che cosa resta aperto».
+
+## Domande della fermata dopo la #31 (chiuse)
+
+1. **Via alla #31**: A. unisci (consigliata); B. prima provo la dimostrazione.
+2. **Audit**: A. Cowork sulla dimostrazione (consigliata); B. tre revisori qui; C. tutti e due; D. niente audit per ora.
+3. **Ordine dei farmaci prescritti**: A. dentro i gruppi (consigliata); B. un elenco solo per data.
+4. **Database dei farmaci**: A. dopo i punti 1–4 (consigliata); B. adesso, i rimborsabili; C. adesso, tutta l'anagrafica.
+
 ## Risposte della fermata dopo l'unione della #29 (21/11/2026)
 
 Simone ha risposto con il pulsante il 21/11/2026 (D243).
@@ -3546,3 +3571,5 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D246: elenco mostrato prima delle terapie                                                                     | PrescriptionEditor.tsx: senza l'attesa delle terapie                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D246: ripiego mostrato mentre si leggono i farmaci prescritti                                                 | PrescriptionEditor.tsx: ripiego anche durante la lettura                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D244: il piede non fa posto al pulsante della dimostrazione                                                   | demo.css: piede senza il posto del pulsante                                                                               | La prima volta la prova scelta non faceva l'accesso ed era rossa anche senza guasto. Con l'accesso e l'accesso regionale: rosso, poi verde                                                                                                                                                                       |
+| D246: riquadro del contenuto che scorre ma non si raggiunge da tastiera                                       | PatientLayout.tsx: com'era prima della correzione                                                                         | Rosso nella prova completa prima della correzione, verde dopo (axe-core: scrollable-region-focusable)                                                                                                                                                                                                            |
+| D246: riga chiusa senza «con un altro programma»                                                              | PrescribedDrugs.tsx: com'era prima della correzione                                                                       | Rosso nella prova completa prima della correzione, verde dopo (prova della tappa 15)                                                                                                                                                                                                                             |

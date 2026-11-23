@@ -164,6 +164,7 @@ export function PrescribedDrugItem({
         ) : (
           <span className="tenue">nessuna</span>
         )}
+        {last?.altroProgramma && <span className="tenue">con un altro programma</span>}
       </p>
       <div id={details} className="farmaco-dettagli" hidden={!open}>
         {open && (
@@ -183,9 +184,6 @@ export function PrescribedDrugItem({
               )}
               {t?.stato === 'ended' && t.fine && <span>Conclusa il {date(t.fine)}</span>}
               {t?.motivoSospensione && <span>Sospesa: {t.motivoSospensione}</span>}
-              {last?.altroProgramma && (
-                <span>L’ultima ricetta è fatta con un altro programma.</span>
-              )}
             </p>
             <InlineHistory patientId={patientId} d={d} />
             <Link to={historyHref(patientId, d.storico)} className="pulsante pulsante-piatto">
