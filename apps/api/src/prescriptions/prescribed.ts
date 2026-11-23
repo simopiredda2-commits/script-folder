@@ -11,6 +11,7 @@ import {
   pastCounts,
   visibleHistorical,
 } from './historical';
+import { studioDate } from './rules-check';
 import {
   emptyTarget,
   isServiceLine,
@@ -73,6 +74,43 @@ function counts(rows: Row[], since: Date) {
       .filter(({ p }) => PRESCRIBED.has(p.status) && when(p) >= since)
       .reduce((n, { line }) => n + line.quantity, 0),
   };
+}
+
+/**
+ * L'ultima ricetta di una voce, prescritta davvero (inviata o su carta), con le sue confezioni:
+ * nell'elenco si legge a colpo d'occhio (richiesta di Simone del 23/11/2026). Conta anche una
+ * ricetta fatta con un altro programma, se è la più recente.
+ */
+export interface LastPrescription {
+  /** Il giorno della ricetta nello studio, AAAA-MM-GG. */
+  il: string;
+  /** Confezioni (o quantità) della voce in quella ricetta; null se la ricetta passata non le dice. */
+  quantita: number | null;
+  /** Fatta con un altro programma (tappa 15). */
+  altroProgramma: boolean;
+}
+
+type PastRow = Awaited<ReturnType<typeof visibleHistorical>>[number];
+
+function lastPrescription(rows: Row[], past: PastRow[]): LastPrescription | null {
+  const prescribed = rows.filter(({ p }) => PRESCRIBED.has(p.status));
+  const ours = prescribed.length ? latest(prescribed)!.p : null;
+  const mine: LastPrescription | null = ours && {
+    il: studioDate(when(ours)),
+    // Più righe della stessa voce nella stessa ricetta: le confezioni si sommano.
+    quantita: prescribed
+      .filter(({ p }) => p.id === ours.id)
+      .reduce((n, { line }) => n + line.quantity, 0),
+    altroProgramma: false,
+  };
+  // Le ricette passate valide, già dalla più recente.
+  const before = activeHistorical(past)[0];
+  const theirs: LastPrescription | null = before
+    ? { il: before.prescribedOn, quantita: before.quantity, altroProgramma: true }
+    : null;
+  // Nello stesso giorno vale la nostra: la ricetta passata non dice l'ora.
+  if (!mine || !theirs) return mine ?? theirs;
+  return theirs.il > mine.il ? theirs : mine;
 }
 
 async function loadRows(db: Database, patientId: string): Promise<Row[]> {
@@ -196,6 +234,7 @@ export async function prescribedDrugs(
           motivoSospensione: t.suspendedReason,
         },
         ...counts(mine, since),
+        ultimaPrescrizione: lastPrescription(mine, minePast),
         /** Ricette dello stesso farmaco fatte con un altro programma (tappa 15). */
         altroProgramma: pastCounts(minePast),
       };
@@ -229,14 +268,23 @@ export async function prescribedDrugs(
       /** Prescritto senza una terapia in cartella. */
       terapia: null,
       ...counts(mine, since),
+      ultimaPrescrizione: lastPrescription(mine, minePast),
       altroProgramma: pastCounts(minePast),
     };
   });
 
   const byName = (a: { farmaco: string }, b: { farmaco: string }) =>
     a.farmaco.localeCompare(b.farmaco, 'it', { sensitivity: 'base' });
+  // Dall'ultima ricetta più recente (richiesta di Simone del 23/11/2026); le voci mai prescritte
+  // in fondo. A parità, per nome. L'interfaccia divide in gruppi e tiene quest'ordine.
+  type Entry = { farmaco: string; ultimaPrescrizione: LastPrescription | null };
+  const byLast = (a: Entry, b: Entry) => {
+    const x = a.ultimaPrescrizione?.il ?? '';
+    const y = b.ultimaPrescrizione?.il ?? '';
+    return x === y ? byName(a, b) : x < y ? 1 : -1;
+  };
   return {
-    farmaci: [...fromTherapies.sort(byName), ...occasional.sort(byName)],
+    farmaci: [...fromTherapies.sort(byLast), ...occasional.sort(byLast)],
     /** Le ricette fatte con un altro programma, una per una, anche le annullate (tappa 15). */
     ricettePassate: await historicalViews(db, pastAll),
     /** Chi può registrarne o annullarne: il medico, come per le voci cliniche. */

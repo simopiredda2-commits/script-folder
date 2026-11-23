@@ -1,5 +1,5 @@
 import { START_URL } from './start';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { secondFactorCode, type Ready } from './bridge';
 import { autoReduce } from './panel-state';
 
@@ -18,6 +18,19 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
   const decidedFor = useRef<number | null>(null);
   /** Quando lo si è aperto a mano l'ultima volta. */
   const openedByHand = useRef(0);
+  const pill = useRef<HTMLButtonElement>(null);
+
+  // Ridotto, il pulsante sta in basso a destra, nel piede del programma: il piede gli fa posto
+  // della sua larghezza, così non copre né le scritte del piede né il contenuto (richiesta di
+  // Simone del 23/11/2026). La larghezza cambia con il codice.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    const button = pill.current;
+    if (open || !button) return;
+    root.style.setProperty('--dimo-posto', `${Math.ceil(button.getBoundingClientRect().width)}px`);
+    root.classList.add('dimo-ridotto');
+    return () => root.classList.remove('dimo-ridotto');
+  }, [open, code?.code]);
 
   useEffect(() => {
     let alive = true;
@@ -43,6 +56,7 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
   if (!open)
     return (
       <button
+        ref={pill}
         type="button"
         className="dimo-apri"
         onClick={() => {

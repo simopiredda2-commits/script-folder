@@ -124,6 +124,7 @@ try {
   await shot(page, '02-oggi');
 
   // Tappa 8: credenziali dei servizi; il codice di sessione serve prima di mandare le ricette.
+  await page.locator('.utente-apri').click();
   await page.locator('.utente').getByRole('link', { name: 'Credenziali' }).click();
   await page.getByRole('heading', { level: 1, name: 'Credenziali dei servizi' }).waitFor();
   await shot(page, '19-credenziali');
@@ -555,11 +556,9 @@ try {
   await page.getByLabel(/La segreteria legge il riepilogo clinico/).waitFor();
   await shot(page, '16-archivio');
 
-  // Tappa 14: autorizzazioni sull'archivio e avvisi sugli accessi anomali (D177).
-  await page
-    .getByRole('table', { name: /Autorizzazioni date sull’archivio/ })
-    .scrollIntoViewIfNeeded();
-  await page.getByRole('heading', { level: 2, name: 'Avvisi sugli accessi anomali' }).waitFor();
+  // Tappa 14: autorizzazioni sull'archivio (D177), nella loro sezione (D244).
+  await page.goto(`${base}/archivio?sezione=autorizzazioni`);
+  await page.getByRole('table', { name: /Autorizzazioni date sull’archivio/ }).waitFor();
   await shot(page, '50-archivio-autorizzazioni-e-avvisi', true);
 
   // Tappa 14: elenchi dello studio e registro di amministrazione (D175, D177).
@@ -604,7 +603,7 @@ try {
   await page.goto(`${base}/pazienti/nuovo`);
   await page.getByRole('heading', { level: 1, name: 'Nuovo paziente' }).waitFor();
   await shot(page, '44-nuovo-paziente', true);
-  await page.goto(`${base}/pazienti/${patientId}/amministrazione`);
+  await page.goto(`${base}/pazienti/${patientId}/amministrazione#promemoria`);
   await page.getByRole('heading', { level: 2, name: 'Canale del promemoria' }).waitFor();
   await shot(page, '45-dati-amministrativi', true);
 

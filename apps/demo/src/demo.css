@@ -153,6 +153,25 @@
   align-items: center;
   cursor: pointer;
 }
+/*
+ * Ridotto, il pulsante sta dentro il piede del programma, in basso a destra: il piede è alto quanto
+ * il pulsante con un margine e gli lascia a destra il posto della sua larghezza (la misura il
+ * riquadro). Così non copre né «Solo pazienti inventati…» né il contenuto sopra il piede (richiesta
+ * di Simone del 23/11/2026). Sotto i 700 px il posto è sotto le scritte del piede.
+ */
+.dimo-apri {
+  bottom: max(6px, env(safe-area-inset-bottom, 0px));
+}
+html.dimo-ridotto .app-footer {
+  min-height: calc(var(--size-min-target) + 12px);
+  padding-right: calc(var(--dimo-posto, 16rem) + 24px);
+}
+@media (max-width: 699.98px) {
+  html.dimo-ridotto .app-footer {
+    padding-right: max(12px, env(safe-area-inset-right, 0px));
+    padding-bottom: calc(var(--size-min-target) + 12px);
+  }
+}
 .dimo-codice-breve {
   font-family: var(--font-mono);
   background: var(--color-mark);

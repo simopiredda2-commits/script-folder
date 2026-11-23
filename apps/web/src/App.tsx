@@ -37,6 +37,7 @@ import { TemplateCertificatesPage } from './pages/TemplateCertificatesPage';
 import { TherapyForm } from './pages/TherapyForm';
 import { TodayPage } from './pages/TodayPage';
 import { NewPatientPage } from './pages/NewPatientPage';
+import { PatientLayout } from './components/PatientLayout';
 import { PatientAdminPage } from './pages/PatientAdminPage';
 
 /** Le schermate dopo l'accesso. */
@@ -57,33 +58,33 @@ function Screens() {
           <Route path="/" element={<TodayPage />} />
           <Route path="/pazienti" element={<PatientsPage />} />
           <Route path="/pazienti/nuovo" element={<NewPatientPage />} />
-          <Route path="/pazienti/:id/amministrazione" element={<PatientAdminPage />} />
-          <Route path="/pazienti/:id" element={<RecordPage />} />
-          <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
-          <Route
-            path="/pazienti/:id/specialistica"
-            element={<PrescriptionEditor mode="specialistica" />}
-          />
-          <Route path="/pazienti/:id/esami" element={<ExamsPage />} />
-          <Route path="/pazienti/:id/certificati" element={<CertificatesPage />} />
-          <Route path="/pazienti/:id/voci" element={<ClinicalEntriesPage />} />
-          <Route path="/pazienti/:id/parametri" element={<MeasurementsPage />} />
-          <Route path="/pazienti/:id/privacy" element={<PrivacyPage />} />
-          <Route path="/pazienti/:id/piani" element={<PlansPage />} />
-          <Route path="/pazienti/:id/seguito" element={<FollowUpPage />} />
-          <Route path="/pazienti/:id/presidi" element={<SuppliesPage />} />
-          <Route path="/pazienti/:id/prestazioni-aggiuntive" element={<PpipPage />} />
-          <Route path="/pazienti/:id/profilo-sanitario" element={<HealthProfilePage />} />
-          <Route path="/pazienti/:id/fascicolo-regionale" element={<FseAccessPage />} />
-          <Route path="/pazienti/:id/certificati-modelli" element={<TemplateCertificatesPage />} />
-          <Route path="/pazienti/:id/terapie/nuova" element={<TherapyForm />} />
-          <Route path="/pazienti/:id/terapie/:therapyId" element={<TherapyPage />} />
-          <Route path="/pazienti/:id/terapie/:therapyId/modifica" element={<TherapyForm />} />
-          <Route path="/pazienti/:id/schema-orario" element={<SchedulePage />} />
-          <Route path="/pazienti/:id/prestazioni" element={<ServiceHistoryPage />} />
-          <Route path="/pazienti/:id/farmaci" element={<PrescribedDrugsPage />} />
-          <Route path="/pazienti/:id/farmaci/storico" element={<DrugHistoryPage />} />
-          <Route path="/pazienti/:id/visite-ed-esami" element={<PrescribedServicesPage />} />
+          {/* La cartella del paziente (D244): fascia fissa, menu delle voci, pagina scelta. */}
+          <Route path="/pazienti/:id" element={<PatientLayout />}>
+            <Route index element={<RecordPage />} />
+            <Route path="amministrazione" element={<PatientAdminPage />} />
+            <Route path="ricetta" element={<PrescriptionEditor mode="farmaci" />} />
+            <Route path="specialistica" element={<PrescriptionEditor mode="specialistica" />} />
+            <Route path="esami" element={<ExamsPage />} />
+            <Route path="certificati" element={<CertificatesPage />} />
+            <Route path="voci" element={<ClinicalEntriesPage />} />
+            <Route path="parametri" element={<MeasurementsPage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
+            <Route path="piani" element={<PlansPage />} />
+            <Route path="seguito" element={<FollowUpPage />} />
+            <Route path="presidi" element={<SuppliesPage />} />
+            <Route path="prestazioni-aggiuntive" element={<PpipPage />} />
+            <Route path="profilo-sanitario" element={<HealthProfilePage />} />
+            <Route path="fascicolo-regionale" element={<FseAccessPage />} />
+            <Route path="certificati-modelli" element={<TemplateCertificatesPage />} />
+            <Route path="terapie/nuova" element={<TherapyForm />} />
+            <Route path="terapie/:therapyId" element={<TherapyPage />} />
+            <Route path="terapie/:therapyId/modifica" element={<TherapyForm />} />
+            <Route path="schema-orario" element={<SchedulePage />} />
+            <Route path="prestazioni" element={<ServiceHistoryPage />} />
+            <Route path="farmaci" element={<PrescribedDrugsPage />} />
+            <Route path="farmaci/storico" element={<DrugHistoryPage />} />
+            <Route path="visite-ed-esami" element={<PrescribedServicesPage />} />
+          </Route>
           <Route path="/ricette" element={<SignQueuePage />} />
           <Route path="/banche-dati" element={<DataSearchPage />} />
           <Route path="/archivio" element={<ArchivePage />} />

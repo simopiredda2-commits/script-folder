@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, Navigate } from 'react-router';
+import { Link, Navigate, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
@@ -88,12 +88,28 @@ const failure = (e: unknown) =>
   e instanceof ApiError ? e : new ApiError(0, 'Servizio non raggiungibile');
 
 /**
+ * Le sezioni dell'Archivio, una alla volta come in Strumenti (D244): la sezione aperta sta
+ * nell'indirizzo («?sezione=esportazione»).
+ */
+const SECTIONS = [
+  { key: 'segreteria', label: 'Che cosa vede la segreteria' },
+  { key: 'medicazioni', label: 'Medicazioni avanzate' },
+  { key: 'esportazione', label: 'Esportazione completa' },
+  { key: 'riepiloghi', label: 'Riepiloghi' },
+  { key: 'prestazioni', label: 'Prestazioni aggiuntive' },
+  { key: 'autorizzazioni', label: 'Autorizzazioni' },
+  { key: 'avvisi', label: 'Avvisi sugli accessi' },
+] as const;
+
+/**
  * L'archivio del medico titolare (D84): che cosa vede la segreteria (D30), esportazione completa
  * in formato aperto (regola 4), autorizzazioni a sostituti e colleghi di gruppo e avvisi sugli
  * accessi anomali (tappa 14). Solo per chi è titolare di un archivio; ogni azione è registrata.
  */
 export function ArchivePage() {
   const { state } = useSession();
+  const [params, setParams] = useSearchParams();
+  const open = SECTIONS.find((x) => x.key === params.get('sezione')) ?? SECTIONS[0];
   const own = state.status === 'ready' ? state.me.archivio : null;
   const settings = useApi<Settings>(own ? `/api/archivi/${own.id}/impostazioni` : null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -132,7 +148,20 @@ export function ArchivePage() {
         Archivio: <strong>{own.nome}</strong>. I dati sono tuoi: decidi che cosa vede la segreteria
         e puoi scaricarli tutti quando vuoi.
       </p>
-      <div className="griglia-cartella">
+      <div className="schede" role="group" aria-label="Sezioni dell’archivio">
+        {SECTIONS.map((x) => (
+          <button
+            key={x.key}
+            type="button"
+            className="scheda"
+            aria-pressed={open.key === x.key}
+            onClick={() => setParams({ sezione: x.key }, { replace: true })}
+          >
+            {x.label}
+          </button>
+        ))}
+      </div>
+      {open.key === 'segreteria' && (
         <section className="riquadro" aria-labelledby="titolo-segreteria">
           <h2 id="titolo-segreteria">
             <Icon name="lucchetto" /> Che cosa vede la segreteria
@@ -163,15 +192,22 @@ export function ArchivePage() {
           </p>
           {saved && <Notice kind="fatto">{saved}</Notice>}
         </section>
+      )}
 
-        {settings.data && (
-          <AdvancedDressings
-            archiveId={own.id}
-            codes={settings.data.medicazioniAvanzate ?? []}
-            onSaved={() => settings.reload()}
-          />
-        )}
+      {open.key === 'medicazioni' && settings.loading && !settings.data && (
+        <Loading what="impostazioni" />
+      )}
+      {/* Le impostazioni che non si ricaricano si dicono anche qui, non solo nella segreteria. */}
+      {open.key === 'medicazioni' && <ErrorMessage error={settings.error} />}
+      {open.key === 'medicazioni' && settings.data && (
+        <AdvancedDressings
+          archiveId={own.id}
+          codes={settings.data.medicazioniAvanzate ?? []}
+          onSaved={() => settings.reload()}
+        />
+      )}
 
+      {open.key === 'esportazione' && (
         <section className="riquadro" aria-labelledby="titolo-esportazione">
           <h2 id="titolo-esportazione">
             <Icon name="archivio" /> Esportazione completa
@@ -197,7 +233,9 @@ export function ArchivePage() {
             sua impronta SHA-256, per controllare che sia integro.
           </p>
         </section>
+      )}
 
+      {open.key === 'riepiloghi' && (
         <section className="riquadro" aria-labelledby="titolo-riepiloghi">
           <h2 id="titolo-riepiloghi">
             <Icon name="storico" /> Riepiloghi
@@ -207,7 +245,9 @@ export function ArchivePage() {
             <Icon name="storico" /> <span>Apri i riepiloghi</span>
           </Link>
         </section>
+      )}
 
+      {open.key === 'prestazioni' && (
         <section className="riquadro" aria-labelledby="titolo-ppip-archivio">
           <h2 id="titolo-ppip-archivio">
             <Icon name="firma" /> Prestazioni aggiuntive
@@ -220,9 +260,9 @@ export function ArchivePage() {
             <Icon name="firma" /> <span>Apri la distinta</span>
           </Link>
         </section>
-      </div>
-      <GrantsSection archiveId={own.id} />
-      <AlertsSection archiveId={own.id} />
+      )}
+      {open.key === 'autorizzazioni' && <GrantsSection archiveId={own.id} />}
+      {open.key === 'avvisi' && <AlertsSection archiveId={own.id} />}
     </>
   );
 }

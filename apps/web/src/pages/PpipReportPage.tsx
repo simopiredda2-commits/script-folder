@@ -228,8 +228,8 @@ export function PpipReportPage() {
         trail={
           ownsArchive ? (
             <>
-              <Link to="/archivio">Archivio</Link> <span aria-hidden="true">/</span>{' '}
-              <span>Prestazioni aggiuntive</span>
+              <Link to="/archivio?sezione=prestazioni">Archivio</Link>{' '}
+              <span aria-hidden="true">/</span> <span>Prestazioni aggiuntive</span>
             </>
           ) : undefined
         }

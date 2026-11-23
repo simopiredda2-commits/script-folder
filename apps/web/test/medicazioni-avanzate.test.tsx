@@ -349,7 +349,7 @@ describe('archivio: le medicazioni avanzate le sceglie il titolare (D237)', () =
 
   it('solo le voci 04.49 del nomenclatore, con quelle già scelte; si salva l’elenco intero', async () => {
     const calls = archiveRoutes(CATALOG);
-    window.history.pushState({}, '', '/archivio');
+    window.history.pushState({}, '', '/archivio?sezione=medicazioni');
     render(<App />);
     const section = (await screen.findByRole('heading', { name: 'Medicazioni avanzate' })).closest(
       'section',
@@ -370,7 +370,7 @@ describe('archivio: le medicazioni avanzate le sceglie il titolare (D237)', () =
 
   it('dopo il salvataggio le caselle dicono che cosa ha salvato il servizio, anche se le impostazioni non si ricaricano', async () => {
     archiveRoutes(CATALOG, true);
-    window.history.pushState({}, '', '/archivio');
+    window.history.pushState({}, '', '/archivio?sezione=medicazioni');
     render(<App />);
     const section = (await screen.findByRole('heading', { name: 'Medicazioni avanzate' })).closest(
       'section',
@@ -392,7 +392,7 @@ describe('archivio: le medicazioni avanzate le sceglie il titolare (D237)', () =
 
   it('con il nomenclatore non ancora in uso la pagina lo dice, senza caselle', async () => {
     archiveRoutes({ presidi: [], malattieRare: [] }, false, []);
-    window.history.pushState({}, '', '/archivio');
+    window.history.pushState({}, '', '/archivio?sezione=medicazioni');
     render(<App />);
     const section = (await screen.findByRole('heading', { name: 'Medicazioni avanzate' })).closest(
       'section',
@@ -403,7 +403,7 @@ describe('archivio: le medicazioni avanzate le sceglie il titolare (D237)', () =
 
   it('una voce scelta che il nomenclatore in uso non ha più si vede e si toglie (D239)', async () => {
     const calls = archiveRoutes(CATALOG, false, ['04.49.06.203', '04.49.99.999']);
-    window.history.pushState({}, '', '/archivio');
+    window.history.pushState({}, '', '/archivio?sezione=medicazioni');
     render(<App />);
     const section = (await screen.findByRole('heading', { name: 'Medicazioni avanzate' })).closest(
       'section',
@@ -429,7 +429,7 @@ describe('archivio: le medicazioni avanzate le sceglie il titolare (D237)', () =
 
   it('anche con il nomenclatore non in uso le voci già scelte si vedono, per toglierle', async () => {
     archiveRoutes({ presidi: [], malattieRare: [] }, false, ['04.49.06.203']);
-    window.history.pushState({}, '', '/archivio');
+    window.history.pushState({}, '', '/archivio?sezione=medicazioni');
     render(<App />);
     const section = (await screen.findByRole('heading', { name: 'Medicazioni avanzate' })).closest(
       'section',

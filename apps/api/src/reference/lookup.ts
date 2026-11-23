@@ -1159,6 +1159,25 @@ export class ReferenceData {
       .limit(limit);
   }
 
+  /**
+   * Le descrizioni delle esenzioni dal catalogo in vigore alla data, per codice (D244). Un codice
+   * che il catalogo non ha, o un catalogo che non c'è, resta senza descrizione: non se ne inventa
+   * una.
+   */
+  async exemptionDescriptions(codes: readonly string[], date: string) {
+    const out = new Map<string, string>();
+    const wanted = [...new Set(codes.map((c) => c.trim()).filter(Boolean))];
+    if (!wanted.length) return out;
+    const ids = await this.ids('esenzioni', date);
+    if (!ids.length) return out;
+    for (const r of await this.db
+      .select({ code: refExemption.code, description: refExemption.description })
+      .from(refExemption)
+      .where(and(inArray(refExemption.datasetId, ids), inArray(refExemption.code, wanted))))
+      if (!out.has(r.code)) out.set(r.code, r.description);
+    return out;
+  }
+
   async municipality(cadastralCode: string, date: string) {
     const ids = await this.ids('comuni', date);
     if (!ids.length) return undefined;

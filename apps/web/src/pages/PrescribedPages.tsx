@@ -38,6 +38,31 @@ function PastTag({ c }: { c: PrescribedDrug | PrescribedService }) {
   );
 }
 
+/** «1 confezione», «2 confezioni»; una ricetta passata può non dirlo. */
+const packages = (n: number | null) =>
+  n === null ? 'confezioni non indicate' : n === 1 ? '1 confezione' : `${n} confezioni`;
+
+/**
+ * L'ultima ricetta a colpo d'occhio, in colonna su ogni riga: il giorno e le confezioni
+ * (richiesta di Simone del 23/11/2026).
+ */
+function LastPrescription({ last }: { last: PrescribedDrug['ultimaPrescrizione'] }) {
+  return (
+    <p className="farmaco-ultima">
+      <span className="farmaco-ultima-titolo">Ultima ricetta</span>
+      {last ? (
+        <>
+          <span className="farmaco-ultima-data">{date(last.il)}</span>
+          <span>{packages(last.quantita)}</span>
+          {last.altroProgramma && <span className="tenue">con un altro programma</span>}
+        </>
+      ) : (
+        <span className="tenue">nessuna</span>
+      )}
+    </p>
+  );
+}
+
 function DrugRow({ d, patientId }: { d: PrescribedDrug; patientId: string }) {
   const t = d.terapia;
   return (
@@ -65,7 +90,8 @@ function DrugRow({ d, patientId }: { d: PrescribedDrug; patientId: string }) {
           {d.aic && <span className="codice tenue">AIC {d.aic}</span>}
         </span>
         <span className="farmaco-conti tenue">
-          {countsText(d)}
+          {/* Il giorno dell'ultima ricetta sta nella sua colonna, non qui. */}
+          {countsText({ ...d, ultimaIl: null })}
           {d.ultimi12Mesi > 0 && ` · ${d.ultimi12Mesi} negli ultimi 12 mesi`}
           {t?.stato === 'active' && t.tipo === 'cycle' && t.fine && ` · fino al ${date(t.fine)}`}
           {t?.stato === 'ended' && t.fine && ` · conclusa il ${date(t.fine)}`}
@@ -75,6 +101,8 @@ function DrugRow({ d, patientId }: { d: PrescribedDrug; patientId: string }) {
       <Link to={historyHref(patientId, d.storico)} className="pulsante pulsante-piatto">
         <Icon name="storico" /> <span>{t ? 'Scheda e storico' : 'Storico'}</span>
       </Link>
+      {/* Ultima colonna, a filo del bordo destro: allineata in ogni riga e in ogni gruppo. */}
+      <LastPrescription last={d.ultimaPrescrizione} />
     </li>
   );
 }
@@ -111,7 +139,8 @@ function DrugGroup({
 /**
  * Tutti i farmaci prescritti al paziente (D152): in corso, sospesi o conclusi, e quelli
  * prescritti senza una terapia in cartella. Ognuno apre il suo storico (D65). Dalla tappa 15 anche
- * le ricette fatte con un altro programma, contate a parte e in un riquadro loro.
+ * le ricette fatte con un altro programma, contate a parte e in un riquadro loro. In ogni gruppo
+ * dall'ultima ricetta più recente, con giorno e confezioni in vista (D245).
  */
 export function PrescribedDrugsPage() {
   const { id } = useParams<{ id: string }>();

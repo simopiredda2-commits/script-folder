@@ -113,6 +113,8 @@ describe('uscita', () => {
     );
     render(<App />);
     expect(await screen.findByRole('navigation', { name: 'Cartelle aperte' })).toBeTruthy();
+    // Esci sta nel menu che si apre col clic sul nome, in alto a destra (D244).
+    await userEvent.click(document.querySelector<HTMLButtonElement>('.utente-apri')!);
     await userEvent.click(screen.getByRole('button', { name: 'Esci' }));
     await screen.findByRole('heading', { name: 'Accesso' });
     expect(sessionStorage.length).toBe(0);

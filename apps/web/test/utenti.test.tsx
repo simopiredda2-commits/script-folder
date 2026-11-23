@@ -90,7 +90,9 @@ describe('password temporanea (tappa 14)', () => {
       passwordAttuale: 'Temporanea-1234',
       nuovaPassword: 'una frase lunga e nuova',
     });
-    // Dal menu dell'utente si torna al cambio della password quando si vuole.
+    // Dal menu dell'utente (clic sul nome, in alto a destra: D244) si torna al cambio della
+    // password quando si vuole.
+    await user.click(document.querySelector<HTMLButtonElement>('.utente-apri')!);
     expect(screen.getByRole('link', { name: 'Password' }).getAttribute('href')).toBe(
       '/profilo/password',
     );

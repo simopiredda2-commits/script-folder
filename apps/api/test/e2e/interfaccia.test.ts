@@ -259,6 +259,95 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await p.setViewportSize({ width: 1280, height: 900 });
   }
 
+  /**
+   * La cartella in una schermata (D244): sul computer e sul tablet in orizzontale la pagina non
+   * scorre; restano in vista il nome del paziente nella fascia, il menu della cartella con la voce
+   * aperta evidenziata e il titolo della pagina; scorre, se serve, solo il contenuto.
+   */
+  async function expectRecordFrame(p: Page, where: string, open: string) {
+    for (const v of [
+      { width: 1280, height: 800 },
+      { width: 1024, height: 768 },
+    ]) {
+      await p.setViewportSize(v);
+      const m = await p.evaluate(() => {
+        const inView = (selector: string) => {
+          const r = document.querySelector(selector)?.getBoundingClientRect();
+          return !!r && r.height > 0 && r.top >= 0 && r.bottom <= innerHeight;
+        };
+        const menu = 'nav[aria-label="Sezioni della cartella"]';
+        return {
+          height: document.scrollingElement!.scrollHeight,
+          view: innerHeight,
+          name: inView('.cartella-fascia .testata-nome'),
+          menu: inView(menu),
+          title: inView('.cartella-contenuto h1'),
+          open: [...document.querySelectorAll(`${menu} [aria-current="page"]`)].map((e) =>
+            e.textContent?.trim(),
+          ),
+        };
+      });
+      const at = `${where} a ${v.width}×${v.height}`;
+      expect(m.height, `${at}: la pagina scorre`).toBeLessThanOrEqual(m.view);
+      expect(m.name, `${at}: il nome del paziente fuori vista`).toBe(true);
+      expect(m.menu, `${at}: il menu della cartella fuori vista`).toBe(true);
+      expect(m.title, `${at}: il titolo fuori vista`).toBe(true);
+      expect(m.open, `${at}: la voce aperta nel menu`).toEqual([open]);
+    }
+    await p.setViewportSize({ width: 1280, height: 900 });
+  }
+
+  /**
+   * La testata (D244): a 1280 px marchio, menu e nome di chi è entrato in una riga, il nome in alto
+   * a destra; a 1024 px il nome resta in alto a destra e il menu va sulla riga sotto.
+   */
+  async function expectHeaderRows(p: Page) {
+    const rows = async () =>
+      p.evaluate(async () => {
+        // La cornice misura dopo il cambio di misura (ResizeObserver): due fotogrammi.
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        const box = (selector: string) =>
+          document.querySelector(`.app-header ${selector}`)!.getBoundingClientRect();
+        const logo = box('.marchio-link');
+        const menu = box('.menu');
+        const user = box('.utente');
+        return {
+          userBeside: Math.abs(user.top + user.height / 2 - (logo.top + logo.height / 2)) < 12,
+          menuBeside: Math.abs(menu.top + menu.height / 2 - (logo.top + logo.height / 2)) < 12,
+          menuBelow: menu.top >= user.bottom - 1,
+          rightEdge: innerWidth - user.right,
+        };
+      });
+    await p.setViewportSize({ width: 1280, height: 800 });
+    const wide = await rows();
+    expect(wide.userBeside, 'a 1280 px il nome sta sulla riga del marchio').toBe(true);
+    expect(wide.menuBeside, 'a 1280 px il menu sta sulla riga del marchio').toBe(true);
+    expect(wide.rightEdge, 'a 1280 px il nome sta a destra').toBeLessThan(40);
+    await p.setViewportSize({ width: 1024, height: 768 });
+    const narrow = await rows();
+    expect(narrow.userBeside, 'a 1024 px il nome sta sulla riga del marchio').toBe(true);
+    expect(narrow.menuBelow, 'a 1024 px il menu va sotto').toBe(true);
+    expect(narrow.rightEdge, 'a 1024 px il nome sta a destra').toBeLessThan(40);
+    await p.setViewportSize({ width: 1280, height: 900 });
+  }
+
+  /**
+   * Apre una sezione dei dati amministrativi (D244): si vede una sezione alla volta, e il suo
+   * pulsante resta premuto, come nelle sezioni di Strumenti.
+   */
+  async function adminSection(p: Page, name: string) {
+    const group = p.getByRole('group', { name: 'Sezioni dei dati amministrativi' });
+    await group.getByRole('button', { name, exact: true }).click();
+    await group.locator('[aria-pressed="true"]', { hasText: name }).waitFor();
+  }
+
+  /** Apre una sezione dell'Archivio (D244): una alla volta, come in Strumenti. */
+  async function archiveSection(p: Page, name: string) {
+    const group = p.getByRole('group', { name: 'Sezioni dell’archivio' });
+    await group.getByRole('button', { name, exact: true }).click();
+    await group.locator('[aria-pressed="true"]', { hasText: name }).waitFor();
+  }
+
   /** Su tablet, in verticale e in orizzontale, la pagina non scorre di lato. */
   async function expectTabletLayout(p: Page, where: string) {
     for (const v of TABLETS) {
@@ -266,8 +355,9 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       const wide = await p.evaluate(() =>
         [...document.querySelectorAll('body *')]
           .filter((el) => el.getBoundingClientRect().right > window.innerWidth + 0.5)
-          // Le tabelle larghe e la barra delle cartelle aperte scorrono nel loro riquadro.
-          .filter((el) => !el.closest('.tabella-scorrevole, .schede-aperte'))
+          // Le tabelle larghe, la barra delle cartelle aperte e la striscia del menu della
+          // cartella (D244) scorrono nel loro riquadro; il riquadro stesso resta dentro il bordo.
+          .filter((el) => !el.closest('.tabella-scorrevole, .schede-aperte, .menu-cartella li'))
           .slice(0, 5)
           .map(
             (el) =>
@@ -560,10 +650,77 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByText('Farmaco di prova 5 mg').first().waitFor();
     await page.locator('.parametri').getByText('74 kg').waitFor();
     await check(page, 'cartella', true);
+    await expectRecordFrame(page, 'riepilogo', 'Riepilogo');
     await page.getByRole('button', { name: 'Ricette', exact: true }).click();
     await expect(
       page.getByRole('button', { name: 'Ricette', exact: true }).getAttribute('aria-pressed'),
     ).resolves.toBe('true');
+  });
+
+  it('ogni voce della cartella in una schermata, con il menu sempre in vista (D244)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page.locator('.cartella-fascia .testata-nome').waitFor();
+    await expectHeaderRows(page);
+    const menu = page.getByRole('navigation', { name: 'Sezioni della cartella' });
+    const labels = (await menu.getByRole('link').allInnerTexts()).map((t) => t.trim());
+    // Le scorciatoie per prescrivere in testa, poi il riepilogo e le voci.
+    expect(labels.slice(0, 4)).toEqual([
+      'Nuova ricetta',
+      'Specialistica',
+      'Certificati',
+      'Riepilogo',
+    ]);
+    expect(labels.length).toBeGreaterThanOrEqual(18);
+    for (const label of labels) {
+      await menu.getByRole('link', { name: label, exact: true }).click();
+      await menu.locator('[aria-current="page"]', { hasText: label }).waitFor();
+      await page.locator('.cartella-contenuto h1').waitFor();
+      await settle(page);
+      // Ogni pagina nuova parte dall'alto del suo riquadro.
+      await expect(
+        page.locator('.cartella-contenuto').evaluate((e) => e.scrollTop),
+        `${label}: il contenuto non parte dall'alto`,
+      ).resolves.toBe(0);
+      await expectRecordFrame(page, label, label);
+      await expectAccessible(page, `cartella, ${label}`);
+      await expectTargets(page, `cartella, ${label}`);
+      // Si scorre il contenuto fino in fondo, per la voce dopo.
+      await page.locator('.cartella-contenuto').evaluate((e) => (e.scrollTop = e.scrollHeight));
+    }
+    // Fra le sezioni dei dati amministrativi i dati sono già caricati: senza il ritorno in cima
+    // la sezione nuova si aprirebbe a metà (D244). Su uno schermo basso, dove l'identità (e poi
+    // la residenza, più alta) non sta nel riquadro.
+    await page.setViewportSize({ width: 1280, height: 660 });
+    await menu.getByRole('link', { name: 'Dati amministrativi', exact: true }).click();
+    await page.getByRole('heading', { level: 2, name: 'Identità' }).waitFor();
+    const content = page.locator('.cartella-contenuto');
+    await content.evaluate((e) => (e.scrollTop = e.scrollHeight));
+    expect(
+      await content.evaluate((e) => e.scrollTop),
+      'l’identità è più alta del riquadro',
+    ).toBeGreaterThan(0);
+    // Il clic sulla pagina, senza lo scorrimento che Playwright fa prima di ogni clic per
+    // mostrare il pulsante: quello riporterebbe in cima da sé, e la prova non vedrebbe niente.
+    const sections = page.getByRole('group', { name: 'Sezioni dei dati amministrativi' });
+    await sections
+      .getByRole('button', { name: 'Residenza e recapiti', exact: true })
+      .evaluate((b) => (b as HTMLButtonElement).click());
+    await sections.locator('[aria-pressed="true"]', { hasText: 'Residenza e recapiti' }).waitFor();
+    await page.getByRole('heading', { level: 2, name: 'Residenza e recapiti' }).waitFor();
+    await expect(
+      content.evaluate((e) => e.scrollTop),
+      'la sezione nuova non parte dall’alto',
+    ).resolves.toBe(0);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    // Aperte da sole, anche le pagine che non mostrano la testata danno il paziente alla fascia.
+    const [rich] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    for (const path of ['certificati', 'schema-orario']) {
+      await page.goto(`${base}/pazienti/${s.richPatient}/${path}`);
+      await page
+        .getByRole('region', { name: `Paziente: ${rich!.firstName} ${rich!.lastName}` })
+        .locator('.testata-nome')
+        .waitFor();
+    }
   });
 
   it('nuova ricetta dalla banca dati: controlli, firma e invio con NRE', async () => {
@@ -736,8 +893,45 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await amlodipine.first().waitFor();
     await amlodipine
       .first()
-      .getByText(/inviate o su carta/)
+      .getByText(/(inviata|inviate) o su carta/)
       .waitFor();
+    // L'ultima ricetta a colpo d'occhio: giorno e confezioni, in una colonna uguale per ogni riga,
+    // e le voci dalla più recente (D245).
+    // L'ultima ricetta a colpo d'occhio: giorno e confezioni, in una colonna allineata, e le voci
+    // dalla più recente (D245). «Nessuna» solo se nessuna ricetta è stata inviata o stampata.
+    const rows = await page.locator('.elenco-farmaci > li').evaluateAll((els) =>
+      els.map((e) => ({
+        last: (e.querySelector('.farmaco-ultima') as HTMLElement).innerText,
+        counts: (e.querySelector('.farmaco-conti') as HTMLElement).innerText,
+      })),
+    );
+    expect(rows.some((r) => /\d{2}\/\d{2}\/\d{4}/.test(r.last))).toBe(true);
+    for (const r of rows) {
+      if (r.last === 'Ultima ricetta\nnessuna')
+        expect(r.counts, 'nessuna ultima ricetta, ma ricette inviate').toMatch(
+          /^(0 ricette inviate o su carta|nessuna ricetta)/,
+        );
+      else
+        expect(r.last).toMatch(
+          /^Ultima ricetta\n\d{2}\/\d{2}\/\d{4}\n(\d+ confezion[ei]|confezioni non indicate)(\ncon un altro programma)?$/,
+        );
+    }
+    const column = await page.evaluate(() =>
+      [...document.querySelectorAll('.elenco-farmaci .farmaco-ultima')].map(
+        (e) => e.getBoundingClientRect().left,
+      ),
+    );
+    // Allineata a meno di un pixel (le righe colorate hanno la barra più spessa).
+    expect(
+      Math.max(...column) - Math.min(...column),
+      'la colonna dell’ultima ricetta è allineata',
+    ).toBeLessThanOrEqual(1);
+    for (const section of await page.locator('section:has(.elenco-farmaci)').all()) {
+      const days = (await section.locator('.farmaco-ultima-data').allInnerTexts()).map((d) =>
+        d.split('/').reverse().join('-'),
+      );
+      expect(days, 'dall’ultima ricetta più recente').toEqual([...days].sort().reverse());
+    }
     await check(page, 'farmaci prescritti', true);
     await amlodipine.first().getByRole('link', { name: 'Storico' }).click();
     await page.getByRole('heading', { name: 'Storico delle prescrizioni' }).waitFor();
@@ -1087,6 +1281,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await summary.uncheck();
     await page.getByText('La segreteria legge il riepilogo clinico: spento.').waitFor();
     await check(page, 'archivio', true);
+    // Una sezione alla volta, come in Strumenti (D244): l'esportazione dal suo pulsante.
+    await archiveSection(page, 'Esportazione completa');
     const link = page.getByRole('link', { name: /Scarica in JSON/ });
     await expect(link.getAttribute('href')).resolves.toBe('/api/esportazione?formato=json');
     const res = await page.request.get(`${base}/api/esportazione?formato=json`);
@@ -1096,6 +1292,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
   it('credenziali dei servizi: mai rilette; codice di sessione revocato, chiesto e attivato (D100–D102)', async () => {
     await page.goto(base);
+    // Credenziali, password e uscita stanno nel menu del nome, in alto a destra (D244).
+    await page.locator('.utente-apri').click();
     await page.locator('.utente').getByRole('link', { name: 'Credenziali' }).click();
     await page.getByRole('heading', { level: 1, name: 'Credenziali dei servizi' }).waitFor();
     const rupar = page.getByRole('region', { name: 'RUPAR Piemonte' });
@@ -1813,7 +2011,16 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
     // Dati amministrativi: il canale del promemoria scelto dal paziente (R15).
     await page.getByRole('link', { name: 'Dati amministrativi' }).first().click();
+    // Si apre l'identità; le altre sezioni dal sottomenu, una alla volta (D244).
+    await page.getByRole('heading', { level: 2, name: 'Identità' }).waitFor();
+    await expect(
+      page.getByRole('heading', { level: 2, name: 'Canale del promemoria' }).count(),
+    ).resolves.toBe(0);
+    await adminSection(page, 'Canale del promemoria');
     await page.getByRole('heading', { level: 2, name: 'Canale del promemoria' }).waitFor();
+    await expect(page.getByRole('heading', { level: 2, name: 'Identità' }).count()).resolves.toBe(
+      0,
+    );
     await check(page, 'dati amministrativi', true);
     await page.getByRole('button', { name: 'Modifica canale del promemoria' }).click();
     await page
@@ -1845,6 +2052,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.locator('.testata-paziente').getByText('temporaneo', { exact: true }).waitFor();
     // La scelta del titolare c'è, in corso, con la scadenza.
     await page.getByRole('link', { name: 'Dati amministrativi' }).first().click();
+    await adminSection(page, 'Scelta del medico');
     const choices = page.getByRole('table', { name: 'Scelte del medico registrate' });
     const row = choices
       .getByRole('row')
@@ -1939,7 +2147,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('archivio: autorizzazione al sostituto e sua revoca, avvisi da completare; registro di amministrazione (tappa 14, D177)', async () => {
-    await page.goto(`${base}/archivio`);
+    await page.goto(`${base}/archivio?sezione=autorizzazioni`);
     await page.getByRole('heading', { level: 2, name: 'Autorizzazioni sull’archivio' }).waitFor();
     await page.getByLabel('Medico', { exact: true }).selectOption({ index: 1 });
     await page.getByLabel('Dal', { exact: true }).fill(studioDate(s.clock.now()));
@@ -1954,6 +2162,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await row.getByRole('button', { name: /^Revoca/ }).click();
     await row.getByText('Revocata').waitFor();
     // Avvisi: con le soglie vuote la pagina dice che cosa completare, con la fonte.
+    await archiveSection(page, 'Avvisi sugli accessi');
     await page.getByRole('heading', { level: 2, name: 'Avvisi sugli accessi anomali' }).waitFor();
     await page.getByText('Soglie da completare.').waitFor();
     await check(page, 'archivio: avvisi sugli accessi anomali');
@@ -2239,7 +2448,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       exemptions: [{ code: '013', prescriptionCode: null, validFrom: '2026-01-01', validTo: null }],
       choices: [],
     });
-    await page.goto(`${base}/pazienti/${s.richPatient}/amministrazione`);
+    // Una sezione alla volta (D244): «#aura» apre quella di AURA.
+    await page.goto(`${base}/pazienti/${s.richPatient}/amministrazione#aura`);
     const section = page.getByRole('region', { name: 'AURA, anagrafe regionale' });
     await section.getByText('Collegamento simulato', { exact: false }).waitFor();
     await section.getByRole('button', { name: 'Aggiorna da AURA' }).click();
@@ -2247,6 +2457,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await section.getByText('Allineato con AURA').waitFor();
     await section.getByRole('rowheader', { name: /Esenzione 013 dal 01\/01\/2026/ }).waitFor();
     await check(page, 'AURA nei dati amministrativi', true);
+    await adminSection(page, 'Esenzioni');
     const exemptions = page.getByRole('region', { name: 'Esenzioni' });
     const row = exemptions.getByRole('row', { name: /013/ });
     await row.getByText('AURA').waitFor();
@@ -2317,7 +2528,9 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await region.getByRole('button', { name: `Registra ${name}` }).click();
     await region.getByText(`${name}: registrato con i dati di AURA.`).waitFor();
     await region.getByRole('link', { name: 'Apri la cartella' }).click();
-    await page.getByRole('heading', { level: 1, name }).waitFor();
+    // Il nome sta nella fascia della cartella; il titolo è la voce aperta (D244).
+    await page.getByRole('region', { name: `Paziente: ${name}` }).waitFor();
+    await page.getByRole('heading', { level: 1, name: 'Riepilogo' }).waitFor();
     await page.getByRole('heading', { name: 'Terapia in corso' }).waitFor();
     // Esenzione e scelta sono arrivate da AURA.
     await page.locator('.testata-avvisi').getByText('Esenzione 013').waitFor();
@@ -2391,9 +2604,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         .getByText(`Il paziente risulta deceduto il ${diedIt}: la ricetta non si fa.`)
         .waitFor();
       await page.locator('.testata-paziente').getByText(`deceduto il ${diedIt}`).waitFor();
-      await expect(page.getByRole('link', { name: 'dati amministrativi' }).count()).resolves.toBe(
-        1,
-      );
+      // Il rimedio nell'avviso; «Dati amministrativi» c'è anche nel menu della cartella (D244).
+      await expect(
+        page.getByRole('alert').getByRole('link', { name: 'dati amministrativi' }).count(),
+      ).resolves.toBe(1);
     }
     await check(page, 'ricetta per un paziente deceduto', true);
 
@@ -2540,7 +2754,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
   });
 
   it('riepiloghi per periodo (D201): dall’Archivio, accessibili anche su tablet, con il CSV', async () => {
-    await page.goto(`${base}/archivio`);
+    await page.goto(`${base}/archivio?sezione=riepiloghi`);
     await page.getByRole('link', { name: 'Apri i riepiloghi' }).click();
     await page.getByRole('heading', { level: 1, name: 'Riepiloghi' }).waitFor();
     await page
@@ -2749,7 +2963,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'prestazioni aggiuntive in cartella', true);
 
     // Dall'archivio, la distinta del mese finito.
-    await gotoNewPage(page, `${base}/archivio`);
+    await gotoNewPage(page, `${base}/archivio?sezione=prestazioni`);
     await page.getByRole('link', { name: 'Apri la distinta' }).click();
     await page.getByRole('heading', { level: 1, name: 'Prestazioni aggiuntive' }).waitFor();
     await page

@@ -58,6 +58,11 @@ export interface PastPrescription {
 
 /** Un farmaco prescritto, come lo restituisce il servizio (D152). */
 export interface PrescribedDrug extends Counts {
+  /**
+   * L'ultima ricetta prescritta davvero (inviata o su carta), anche fatta con un altro programma,
+   * con le confezioni della voce; null se non ce n'è (richiesta di Simone del 23/11/2026).
+   */
+  ultimaPrescrizione: { il: string; quantita: number | null; altroProgramma: boolean } | null;
   chiave: string;
   storico: HistoryKey;
   farmaco: string;
@@ -115,7 +120,9 @@ export function countsText(c: Counts): string {
   const past = pastCountsText(c);
   if (c.ricette === 0) return past || 'nessuna ricetta';
   const parts = [
-    `${c.prescritte === 1 ? '1 ricetta' : `${c.prescritte} ricette`} inviate o su carta`,
+    c.prescritte === 1
+      ? '1 ricetta inviata o su carta'
+      : `${c.prescritte} ricette inviate o su carta`,
   ];
   if (c.ultimaIl) parts[0] += `, ultima il ${date(c.ultimaIl)}`;
   if (c.inPreparazione > 0) parts.push(`${c.inPreparazione} in preparazione`);

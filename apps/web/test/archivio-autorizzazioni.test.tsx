@@ -101,7 +101,8 @@ const alertsOff = {
 };
 
 describe('Archivio: autorizzazioni e avvisi sugli accessi anomali (tappa 14)', () => {
-  beforeEach(() => window.history.pushState({}, '', '/archivio'));
+  // L'Archivio apre una sezione alla volta (D244): si parte dalle autorizzazioni.
+  beforeEach(() => window.history.pushState({}, '', '/archivio?sezione=autorizzazioni'));
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
@@ -199,10 +200,11 @@ describe('Archivio: autorizzazioni e avvisi sugli accessi anomali (tappa 14)', (
       1,
     );
 
-    // Avvisi: soglie vuote, spenti, con la fonte.
-    const alerts = screen
-      .getByRole('heading', { name: 'Avvisi sugli accessi anomali' })
-      .closest('section')!;
+    // Avvisi: soglie vuote, spenti, con la fonte; si aprono con il loro pulsante (D244).
+    await user.click(screen.getByRole('button', { name: 'Avvisi sugli accessi' }));
+    const alerts = (
+      await screen.findByRole('heading', { name: 'Avvisi sugli accessi anomali' })
+    ).closest('section')!;
     expect(within(alerts).getByText('Soglie da completare.')).toBeTruthy();
     for (const r of RULES) expect(within(alerts).getByText(`${r}.`)).toBeTruthy();
     expect(within(alerts).getByText(/Fonte: Garante/)).toBeTruthy();
@@ -255,6 +257,7 @@ describe('Archivio: autorizzazioni e avvisi sugli accessi anomali (tappa 14)', (
       }),
     });
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/archivio?sezione=avvisi');
     render(<App />);
     const table = await screen.findByRole('table', { name: /Accessi anomali dal 21\/10\/2026/ });
     const row = within(table).getAllByRole('row')[1]!;
@@ -379,5 +382,32 @@ describe('Strumenti › AFT: nome, ASL e codice (tappa 14)', () => {
       codice: 'AFT-01',
     });
     await waitFor(() => expect(screen.getByText(/AFT Nord di prova/)).toBeTruthy());
+  });
+  it('una sezione alla volta, come in Strumenti: si cambia con il suo pulsante (D244)', async () => {
+    stubFetch({
+      '/api/io': ok(ME),
+      '/api/oggi': ok(TODAY),
+      '/api/archivi/a1/impostazioni': ok({
+        segreteriaLeggeDiario: false,
+        segreteriaLeggeRiepilogo: false,
+      }),
+    });
+    window.history.pushState({}, '', '/archivio');
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { name: /Che cosa vede la segreteria/ });
+    expect(screen.queryByRole('heading', { name: /Esportazione completa/ })).toBeNull();
+    const group = screen.getByRole('group', { name: 'Sezioni dell’archivio' });
+    const pressed = () =>
+      within(group)
+        .getAllByRole('button')
+        .filter((b) => b.getAttribute('aria-pressed') === 'true')
+        .map((b) => b.textContent);
+    expect(pressed()).toEqual(['Che cosa vede la segreteria']);
+    await user.click(within(group).getByRole('button', { name: 'Esportazione completa' }));
+    await screen.findByRole('heading', { name: /Esportazione completa/ });
+    expect(screen.queryByRole('heading', { name: /Che cosa vede la segreteria/ })).toBeNull();
+    expect(pressed()).toEqual(['Esportazione completa']);
+    expect(window.location.search).toBe('?sezione=esportazione');
   });
 });

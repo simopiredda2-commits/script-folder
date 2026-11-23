@@ -107,8 +107,8 @@ export function ReportsPage() {
         trail={
           ownsArchive ? (
             <>
-              <Link to="/archivio">Archivio</Link> <span aria-hidden="true">/</span>{' '}
-              <span>Riepiloghi</span>
+              <Link to="/archivio?sezione=riepiloghi">Archivio</Link>{' '}
+              <span aria-hidden="true">/</span> <span>Riepiloghi</span>
             </>
           ) : undefined
         }
