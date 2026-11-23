@@ -142,7 +142,13 @@ export function PrescribedDrugItem({
         <span className="farmaco-nome">{d.farmaco}</span>
       </button>
       <span className="farmaco-tipo">
-        <span className="etichetta">{t ? THERAPY_KIND[t.tipo] : 'Senza terapia'}</span>
+        {/* Come si prende lo dicono sfondo e tratto della barra, spiegati dalla legenda: la
+            parola solo per chi usa un lettore di schermo (D248). Senza terapia, la parola si vede. */}
+        {t ? (
+          <span className="visivamente-nascosto">{THERAPY_KIND[t.tipo]}</span>
+        ) : (
+          <span className="etichetta">Senza terapia</span>
+        )}
         {origin && (
           <span className="etichetta etichetta-tipologia" title={origin.label}>
             <span aria-hidden="true">{origin.text}</span>

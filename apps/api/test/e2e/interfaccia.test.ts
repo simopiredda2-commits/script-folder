@@ -916,7 +916,23 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         return [css.backgroundColor, css.borderLeftColor];
       }),
     ).resolves.toEqual(['rgb(211, 232, 250)', 'rgb(31, 111, 178)']);
-    await chronic.first().getByText('Cronica', { exact: true }).waitFor();
+    // Il tipo lo dicono colore e tratto della barra, spiegati dalla legenda: la parola «Cronica»
+    // non occupa posto nella riga, resta per chi usa un lettore di schermo (D248).
+    await expect(
+      chronic.first().evaluate((el) => getComputedStyle(el).borderLeftStyle),
+    ).resolves.toBe('solid');
+    await expect(
+      chronic.first().locator('.etichetta', { hasText: 'Cronica' }).count(),
+    ).resolves.toBe(0);
+    await expect(
+      chronic.first().locator('.visivamente-nascosto', { hasText: 'Cronica' }).count(),
+    ).resolves.toBe(1);
+    // Nella legenda gli stessi tratti: continuo, doppio, a puntini; grigio continuo non in corso.
+    await expect(
+      page
+        .locator('.riquadro-testa .legenda-colori .campione')
+        .evaluateAll((els) => els.map((e) => getComputedStyle(e).borderLeftStyle)),
+    ).resolves.toEqual(['solid', 'double', 'dotted', 'solid']);
 
     // I farmaci prescritti stanno dentro «Nuova ricetta» (D246); tutti, con le ricette fatte con
     // altri programmi, dal collegamento sotto l'elenco. Il menu resta su «Nuova ricetta».

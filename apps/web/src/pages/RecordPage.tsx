@@ -322,7 +322,8 @@ export function RecordPage() {
                       </Link>
                       <span className="tenue">{posology(t)}</span>
                       <span>
-                        <span className="etichetta">{THERAPY_KIND[t.kind]}</span>
+                        {/* Il tipo lo dicono sfondo e tratto della barra, con la legenda (D248). */}
+                        <span className="visivamente-nascosto">{THERAPY_KIND[t.kind]}</span>
                         <OriginTag origin={originOf(t)} />
                         {t.aifaNote && <span className="etichetta">Nota {t.aifaNote}</span>}
                         {t.reserved && <span className="etichetta">Riservata</span>}

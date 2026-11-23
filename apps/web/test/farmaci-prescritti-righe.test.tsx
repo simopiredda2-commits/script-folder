@@ -145,9 +145,12 @@ describe('farmaci prescritti in una riga, con i dettagli che si aprono (D246)', 
     expect(open.getAttribute('aria-expanded')).toBe('false');
     // Il «+» dice da sé che la voce si apre.
     expect(open.querySelector('path[d="M12 8v8"]')).not.toBeNull();
-    expect(item.querySelector('.farmaco-tipo')!.textContent).toBe(
-      'CronicaSSuggerita dallo specialista',
-    );
+    // Il tipo lo dicono sfondo e barra, con la legenda: a vista solo S, la parola per chi usa un
+    // lettore di schermo (D248).
+    expect(
+      [...item.querySelectorAll('.farmaco-tipo .etichetta')].map((e) => e.textContent),
+    ).toEqual(['SSuggerita dallo specialista']);
+    expect(item.querySelector('.farmaco-tipo .visivamente-nascosto')!.textContent).toBe('Cronica');
     expect(item.querySelector('.farmaco-ultima')!.textContent).toBe(
       'Ultima ricetta10/11/2026 · 2 confezioni',
     );

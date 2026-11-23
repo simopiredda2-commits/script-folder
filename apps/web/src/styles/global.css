@@ -1127,29 +1127,35 @@ a.coda:hover {
   font-weight: 600;
 }
 
-/* Farmaci nella cartella (D152): lo sfondo tenue dice come si prende il farmaco e la barra a
-   sinistra lo ripete in colore pieno; la parola c'è sempre. Senza colore: non in corso. */
+/* Farmaci nella cartella (D152, D248): lo sfondo tenue dice come si prende il farmaco e la
+   barra a sinistra lo ripete in colore pieno, con un tratto suo, per chi non distingue i colori
+   (WCAG 1.4.1): continuo la cronica, doppio il ciclo, a puntini al bisogno. La legenda li spiega;
+   la parola resta solo per i lettori di schermo. Senza colore: non in corso. */
 .farmaco {
   --farmaco-sfondo: var(--color-surface);
   --farmaco-barra: var(--color-border);
+  --farmaco-tratto: solid;
   background: var(--farmaco-sfondo);
-  border-left: 6px solid var(--farmaco-barra);
+  border-left: 6px var(--farmaco-tratto) var(--farmaco-barra);
   border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 .farmaco-cronica {
   --farmaco-sfondo: var(--color-therapy-chronic-surface);
   --farmaco-barra: var(--color-therapy-chronic-edge);
+  --farmaco-tratto: solid;
 }
 
 .farmaco-ciclo {
   --farmaco-sfondo: var(--color-therapy-cycle-surface);
   --farmaco-barra: var(--color-therapy-cycle-edge);
+  --farmaco-tratto: double;
 }
 
 .farmaco-al-bisogno {
   --farmaco-sfondo: var(--color-therapy-as-needed-surface);
   --farmaco-barra: var(--color-therapy-as-needed-edge);
+  --farmaco-tratto: dotted;
 }
 
 .farmaco-non-in-corso {
@@ -1230,13 +1236,14 @@ a.coda:hover {
   margin-left: auto;
 }
 
-/* I campioni della legenda prendono i colori dalle stesse classi delle righe. */
+/* I campioni della legenda prendono colori e tratto dalle stesse classi delle righe; alti
+   abbastanza perché si vedano il doppio e i puntini (D248). */
 .campione {
   display: inline-block;
   width: 1.25rem;
-  height: 0.875rem;
+  height: 1.125rem;
   background: var(--farmaco-sfondo, var(--color-surface));
-  border-left: 4px solid var(--farmaco-barra, var(--color-border));
+  border-left: 6px var(--farmaco-tratto, solid) var(--farmaco-barra, var(--color-border));
   border-radius: 0 3px 3px 0;
 }
 

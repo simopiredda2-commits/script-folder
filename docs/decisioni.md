@@ -1840,3 +1840,11 @@ Non provato: i lettori di schermo veri sul «+» e sulla legenda; Safari e Firef
 - **Audit dall'esterno**: «Cowork, a meno che aspettiamo che Folder, al netto del collaudo finale, sia chiuso e quindi attendiamo audit. Che ne dici?». Scelta: l'audit si fa con Cowork, una volta sola, quando il programma è chiuso a parte il collaudo finale, cioè dopo i punti 1–4 e il database dei farmaci. Motivo: le pagine che cambieranno (Ricette, ricetta del medico in un passo, anteprima del PDF) sono proprio quelle che un audit di oggi guarderebbe, e il lavoro andrebbe rifatto. Il testo per Cowork si prepara allora, sulle pagine nuove. Qui non parte nessun agente (regola di `CLAUDE.md`).
 - **Ordine dei farmaci prescritti**: «Dentro i gruppi», come ora, nella pagina e nella ricetta (D245, D246).
 - **Database dei farmaci nella dimostrazione** (D243): «Dopo i punti 1-4. Ma tieni a mente cosa resta da fare». L'elenco in ordine è in `docs/avanzamento.md`, «Che cosa resta da fare, in ordine».
+
+**D248 · Nelle righe dei farmaci niente parola del tipo: lo dicono colore e tratto della barra, spiegati dalla legenda.** Richiesta di Simone del 23/11/2026: «Aggiungere le diciture alla legenda (es. Cronica quando c'è già lo sfondo) non ha senso e aumenta lo spazio utilizzato».
+
+- **Tolte dalle righe** le parole «Cronica», «Ciclo con data di fine», «Al bisogno»: nei farmaci prescritti (pagina e ricetta) e nella terapia in corso del riepilogo. Restano le parole che il colore non dice: «Senza terapia», «Sospesa», «Conclusa», «Riservata», S e H.
+- **Il colore da solo non basta** a chi distingue male i colori (WCAG 1.4.1, nei requisiti con WCAG 2.2 AA). Per questo la barra a sinistra ha un tratto per tipo: continuo la cronica, doppio il ciclo, a puntini al bisogno; grigio continuo ciò che non è in corso. La legenda mostra gli stessi tratti, con campioni un po' più alti perché il doppio e i puntini si vedano. Non serve spazio in più nella riga.
+- **Per chi usa un lettore di schermo** la parola del tipo resta, nascosta alla vista.
+
+Non provato: come si vedono i tratti su schermi a bassa risoluzione e in stampa; i lettori di schermo veri.
