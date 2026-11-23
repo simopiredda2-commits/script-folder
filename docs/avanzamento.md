@@ -1493,7 +1493,7 @@ Nessuna per ora. Le domande nuove si scrivono qui durante il blocco (D237).
 6. **Esenzioni nella schermata iniziale del paziente**: oggi la testata mostra solo il codice. Vanno mostrate le esenzioni pertinenti, cioè quelle in corso, con la descrizione e la scadenza.
 7. **Cartella in una schermata**, senza dover scorrere troppo, come già fatto per la ricetta (D242).
 8. **Dati amministrativi a sezioni**. Oggi il menu porta alla sezione cliccata dentro un'unica pagina lunga. Simone vuole che si apra solo la sezione cliccata: «preferirei si aprissero solo i relativi sottomenu cliccati e non tutti». Lo stesso criterio vale per le altre pagine lunghe (Strumenti, Archivio).
-9. **Menu della cartella sempre in vista**. Oggi, aperta una voce, per tornare al menu del paziente bisogna cliccare sul suo nome. Simone: «questo menu sarebbe opportuno si leggesse sempre». Il menu delle voci della cartella deve restare visibile in ogni pagina del paziente.
+9. **Menu della cartella sempre in vista**. Oggi, aperta una voce, per tornare al menu del paziente bisogna cliccare sul suo nome. Simone: «questo menu sarebbe opportuno si leggesse sempre». Il menu delle voci della cartella deve restare visibile in ogni pagina del paziente. È quello delle 14 voci, da «Dati amministrativi» a «Fascicolo regionale», oggi su tre righe (schermata di Simone). Va reso compatto, per esempio una colonna laterale o una barra fissa, e la voce aperta va evidenziata.
 
 ## Risposte della fermata dopo l'unione della #29 (21/11/2026)
 
