@@ -1485,6 +1485,11 @@ Nessuna per ora. Le domande nuove si scrivono qui durante il blocco (D237).
 
 ## Richieste di Simone durante la pausa (22–23/11/2026), da fare alla ripresa
 
+**Ordine concordato con Simone il 23/11/2026 («Bene, ok»)**:
+1. Prima una struttura unica per la cartella del paziente: menu delle voci sempre in vista e compatto, con la voce aperta evidenziata; testata fissa con allergie ed esenzioni in corso; sezioni lunghe che si aprono una per volta; la pagina in una schermata, come la ricetta, con una prova automatica in ogni pagina. Questo copre i punti 6–9.
+2. Poi la dimostrazione ripubblicata.
+3. Poi un audit dall'esterno sulla dimostrazione, sui percorsi veri (visita, ricetta, certificato, segreteria): con Cowork, oppure con revisori lanciati qui solo con il via di Simone.
+
 1. **Anteprima del PDF prima della firma**: il promemoria con «Bozza – non valida» al posto dell'NRE.
 2. **Pagina Ricette con tutte le ricette in corso**, non solo quelle della segreteria. Le parole di Simone: «è sufficiente che nell'elenco "ricette" ci siano quelle da confermare, confermate (dal medico per ricetta fatta dal medico stesso o confermate quelle della segreteria), non confermate o non accolte». Il menu di stampa e invio (promemoria, solo NRE, email) deve stare anche lì, non solo nella cartella.
 3. **Pulsante «Archivia ricette confermate»**: toglie dall'elenco quelle già evase, cioè inviate o stampate. Restano nello storico del paziente.
