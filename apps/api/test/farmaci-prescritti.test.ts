@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { accessLog, therapy } from '../src/db/schema';
+import { accessLog, historicalPrescription, therapy } from '../src/db/schema';
+import { studioDate } from '../src/prescriptions/rules-check';
 import { withActor } from '../src/db/tx';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -24,6 +25,7 @@ interface DrugEntry {
   annullate: number;
   ultimaIl: string | null;
   ultimi12Mesi: number;
+  ultimaPrescrizione: { il: string; quantita: number | null; altroProgramma: boolean } | null;
 }
 
 interface ServiceEntry {
@@ -345,5 +347,122 @@ describe('farmaci e prestazioni prescritti nella cartella (D152)', () => {
         .where(and(eq(accessLog.patientId, s.richPatient), eq(accessLog.action, action)));
       expect(logged.length, action).toBeGreaterThan(0);
     }
+  });
+  it('l’ultima ricetta di ogni farmaco con le sue confezioni, e l’elenco dalla più recente (D245)', async () => {
+    const pharma = (lines: object[]) => draft({ kind: 'pharma_ssn', lines });
+    const day = () => studioDate(s.clock.now());
+    // Giorni dopo: la sessione di prima è scaduta, si rientra.
+    const later = async (days: number) => {
+      s.clock.advance(days * 86_400_000);
+      doctor = await login(s, 'titolare');
+    };
+    const first = day();
+    const before = await drugs();
+    // Tutte le ricette dello stesso giorno: a parità, per nome; la terapia mai prescritta in fondo.
+    expect(before.find((e) => e.terapia?.id === ids.suspended)!.ultimaPrescrizione).toBeNull();
+    expect(before.filter((e) => e.terapia).at(-1)!.terapia!.id).toBe(ids.suspended);
+    expect(before.find((e) => e.aic === '900000029')!.ultimaPrescrizione).toEqual({
+      il: first,
+      quantita: 1,
+      altroProgramma: false,
+    });
+
+    await later(2);
+    const second = day();
+    await send(
+      await pharma([
+        {
+          drugName: 'Occasionale per AIC 20 mg',
+          drugAic: '900000037',
+          activeIngredient: 'principio occasionale',
+          quantity: 2,
+        },
+      ]),
+    );
+    // Due righe dello stesso farmaco nella stessa ricetta: le confezioni si sommano.
+    await send(
+      await draft({
+        kind: 'white',
+        lines: [
+          { therapyId: ids.cycle, drugName: 'Ciclo di prova 500 mg', quantity: 2 },
+          { therapyId: ids.cycle, drugName: 'Ciclo di prova 500 mg', quantity: 1 },
+        ],
+      }),
+    );
+    // Un farmaco prescritto solo con il programma di prima: la sua ultima ricetta è quella.
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx.insert(historicalPrescription).values({
+        patientId: s.richPatient,
+        archiveId: s.archives.titolare,
+        kind: 'farmaco',
+        prescribedOn: second,
+        drugName: 'Farmaco solo passato',
+        quantity: 2,
+        sourceProgram: 'Programma di prova',
+        recordedBy: s.users.titolare.id,
+      }),
+    );
+    // Una bozza più recente non è una ricetta prescritta.
+    await later(1);
+    await pharma([
+      {
+        drugName: 'Occasionale per AIC 10 mg',
+        drugAic: '900000029',
+        activeIngredient: 'principio occasionale',
+        quantity: 2,
+      },
+    ]);
+    // Una ricetta fatta con un altro programma, la più recente di tutte, senza le confezioni.
+    await later(1);
+    const third = day();
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx.insert(historicalPrescription).values({
+        patientId: s.richPatient,
+        archiveId: s.archives.titolare,
+        kind: 'farmaco',
+        prescribedOn: third,
+        drugName: 'PRINCIPIO SOLO 20MG',
+        activeIngredient: 'principio solo',
+        sourceProgram: 'Programma di prova',
+        recordedBy: s.users.titolare.id,
+      }),
+    );
+
+    const after = await drugs();
+    const last = (pick: (e: DrugEntry) => boolean) => after.find(pick)!.ultimaPrescrizione;
+    expect(last((e) => e.aic === '900000037')).toEqual({
+      il: second,
+      quantita: 2,
+      altroProgramma: false,
+    });
+    expect(last((e) => e.terapia?.id === ids.cycle)).toEqual({
+      il: second,
+      quantita: 3,
+      altroProgramma: false,
+    });
+    expect(last((e) => e.aic === '900000029')).toEqual({
+      il: first,
+      quantita: 1,
+      altroProgramma: false,
+    });
+    expect(last((e) => e.storico.farmaco === 'Farmaco solo passato')).toEqual({
+      il: second,
+      quantita: 2,
+      altroProgramma: true,
+    });
+    expect(last((e) => e.storico.principio === 'principio solo')).toEqual({
+      il: third,
+      quantita: null,
+      altroProgramma: true,
+    });
+    // Le terapie, poi le voci senza terapia: in ogni parte dalla più recente.
+    expect(after.filter((e) => e.terapia)[0]!.terapia!.id).toBe(ids.cycle);
+    expect(after.filter((e) => !e.terapia).map((e) => e.storico)).toEqual([
+      { principio: 'principio solo' },
+      { farmaco: 'Farmaco solo passato' },
+      { aic: '900000037' },
+      { farmaco: 'Galenico scritto a mano' },
+      { aic: '900000029' },
+    ]);
   });
 });

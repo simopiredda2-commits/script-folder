@@ -4,6 +4,7 @@ import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common'
 import { DiagnosisCodeInfo, DiagnosisSearch } from '../components/DiagnosisSearch';
 import { Icon } from '../components/Icon';
 import { InterruptedCertificatePanel } from '../components/InterruptedCertificatePanel';
+import { useBand } from '../components/PatientLayout';
 import { PrintHint } from '../components/PrintHint';
 import { api, ApiError } from '../lib/api';
 import {
@@ -18,6 +19,7 @@ import { date, dateTime, studioToday } from '../lib/format';
 import { useSession } from '../lib/session';
 import { usePersistentState } from '../lib/storage';
 import { useApi } from '../lib/useApi';
+import type { Patient, Summary } from './RecordPage';
 
 const EMPTY_ADDRESS: CertAddress = { via: '', civico: '', cap: '', comune: '', provincia: '' };
 
@@ -128,9 +130,8 @@ function Problems({ error }: { error: ApiError | null }) {
 export function CertificatesPage() {
   const { id = '' } = useParams();
   const { isDoctor } = useSession();
-  const record = useApi<{ paziente: { firstName: string; lastName: string } }>(
-    `/api/pazienti/${id}`,
-  );
+  const record = useApi<{ paziente: Patient; riepilogo?: Summary | null }>(`/api/pazienti/${id}`);
+  useBand(record.data?.paziente, record.data?.riepilogo);
   const list = useApi<CertificateList>(isDoctor ? `/api/pazienti/${id}/certificati` : null);
   // Il certificato che si sta scrivendo resta ricordato per paziente, come la ricetta (D68, D129).
   const [draft, setDraft] = usePersistentState<Draft | null>(`bozza-certificato-${id}`, null);

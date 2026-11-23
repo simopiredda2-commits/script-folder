@@ -236,9 +236,11 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
 
   /** L'accesso; `typed` è il nome utente come lo scrive chi prova, anche con le maiuscole. */
   async function login(username: string, typed = username) {
-    const exit = f.getByRole('button', { name: 'Esci', exact: true });
-    if (await exit.count()) {
-      await exit.click();
+    // «Esci» sta nel menu che si apre col clic sul nome, in alto a destra (D244).
+    const userMenu = f.locator('.utente-apri');
+    if (await userMenu.count()) {
+      await userMenu.click();
+      await f.getByRole('button', { name: 'Esci', exact: true }).click();
       await f.getByLabel('Nome utente', { exact: true }).waitFor();
     }
     // Dopo l'accesso il programma torna alla pagina di prima: si riparte da «Oggi».
@@ -329,6 +331,49 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     expect(violations, where).toEqual([]);
   }
 
+  /**
+   * Il pulsante ridotto della dimostrazione sta dentro il piede, a destra, e non copre né le
+   * scritte del piede né il contenuto sopra (richiesta di Simone del 23/11/2026): sul computer,
+   * sul tablet in orizzontale e in verticale, con la pagina in fondo.
+   */
+  async function expectPillClear(where: string) {
+    const reduce = f
+      .locator('#dimostrazione')
+      .getByRole('button', { name: 'Riduci il riquadro della dimostrazione' });
+    if (await reduce.count()) await reduce.click();
+    await f.locator('button.dimo-apri').waitFor();
+    for (const v of [
+      { width: 1280, height: 900 },
+      { width: 1024, height: 768 },
+      { width: 820, height: 1180 },
+    ]) {
+      await page.setViewportSize(v);
+      const m = await f.evaluate(async () => {
+        scrollTo(0, document.scrollingElement!.scrollHeight);
+        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+        const pill = document.querySelector('button.dimo-apri')!.getBoundingClientRect();
+        const footer = document.querySelector('.app-footer')!.getBoundingClientRect();
+        const covered = [...document.querySelectorAll('.app-footer > *')]
+          .map((e) => e.getBoundingClientRect())
+          .filter(
+            (r) =>
+              r.left < pill.right &&
+              r.right > pill.left &&
+              r.top < pill.bottom &&
+              r.bottom > pill.top,
+          ).length;
+        return {
+          inside: pill.top >= footer.top - 0.5 && pill.bottom <= footer.bottom + 0.5,
+          covered,
+        };
+      });
+      const at = `${where} a ${v.width}×${v.height}`;
+      expect(m.inside, `${at}: il pulsante esce dal piede e copre il contenuto`).toBe(true);
+      expect(m.covered, `${at}: il pulsante copre le scritte del piede`).toBe(0);
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+  }
+
   /** Bersagli di almeno 44×44 px nelle parti della dimostrazione (riquadro, visore, conferma). */
   async function expectDemoTargets(selector: string, where: string) {
     const small = await f.evaluate(
@@ -397,7 +442,8 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await news.getByText(`${newPatient}: registrato con i dati di AURA.`).waitFor();
 
     // L'anagrafica diversa: l'ASL di AURA si usa con un clic, dai dati amministrativi.
-    await go(`/pazienti/${await patientId(registry)}/amministrazione`);
+    // Una sezione alla volta (D244): «#aura» apre quella di AURA.
+    await go(`/pazienti/${await patientId(registry)}/amministrazione#aura`);
     const section = f.getByRole('region', { name: 'AURA, anagrafe regionale' });
     await section
       .getByRole('heading', { name: 'Anagrafica diversa in AURA, da confermare' })
@@ -574,6 +620,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       'la pagina della ricetta scorre',
     ).toBe(true);
     await expectAccessible('nuova ricetta con la riga chiusa');
+    await expectPillClear('nuova ricetta');
     await f.getByRole('button', { name: 'Prepara la ricetta' }).click();
     await f.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await f.getByRole('button', { name: 'Firma e invia' }).click();
@@ -714,7 +761,8 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   });
 
   it('medicazioni avanzate: il titolare sceglie l’alginato; poi si prescrive solo lì, con lo specialista (D237)', async () => {
-    await go('/archivio');
+    // Una sezione alla volta (D244): le medicazioni avanzate dal loro indirizzo.
+    await go('/archivio?sezione=medicazioni');
     const section = f.getByRole('region', { name: 'Medicazioni avanzate' });
     await section.getByLabel(/cm 15 x 15 .* 04\.49\.03\.103/).check();
     await section.getByRole('button', { name: 'Salva le medicazioni avanzate' }).click();

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { useOpenRecords } from '../lib/openRecords';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { useBandPublisher } from '../components/PatientLayout';
+import { PatientFacts } from '../components/PatientFacts';
 import { ColourLegend, drugRowClass, originOf, OriginTag } from '../components/DrugColours';
 import { ServicesSection, type PrescribedService } from '../components/Prescribed';
 import { Icon } from '../components/Icon';
@@ -12,7 +14,7 @@ import {
   type DrugShortage,
 } from '../components/Shortage';
 import { api, ApiError, query } from '../lib/api';
-import { age, date, maskedFiscalCode, THERAPY_KIND, TIMELINE_KIND } from '../lib/format';
+import { date, THERAPY_KIND, TIMELINE_KIND } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 import { RegistrySection, type Registry } from './RegistrySection';
@@ -38,6 +40,8 @@ export interface Summary {
   problemiAttivi: { id: string; descrizione: string; codice: string | null; dal: string | null }[];
   pianiTerapeutici: { farmaco: string; scadenza: string }[];
   esenzioni: { codice: string; dal: string; al: string | null }[];
+  /** Le esenzioni in corso oggi, con la descrizione del catalogo, per la testata (D244). */
+  esenzioniInCorso?: { codice: string; descrizione: string | null; al: string | null }[];
   parametri: { data: string; parametro: string; valore: string; unita: string }[];
 }
 
@@ -88,13 +92,6 @@ export interface TherapyFull extends TherapyRow {
   suspendedReason: string | null;
 }
 
-const STATUS: Record<string, string> = {
-  active: 'in carico',
-  revoked: 'revocato',
-  deceased: 'deceduto',
-  temporary: 'temporaneo',
-};
-
 export const posology = (t: TherapyRow) =>
   [t.dose && `${t.dose} ${t.doseUnit ?? ''}`.trim(), t.frequency, t.timeOfDay]
     .filter(Boolean)
@@ -102,7 +99,8 @@ export const posology = (t: TherapyRow) =>
 
 /**
  * Testata della cartella: chi è il paziente, allergie ed esenzioni sempre in vista. Ogni pagina
- * di un paziente la mostra, e aprendola il paziente entra tra le cartelle aperte (D68).
+ * di un paziente la mostra, e aprendola il paziente entra tra le cartelle aperte (D68). Dentro la
+ * cartella (D244) la passa alla fascia fissa in alto, che resta mentre si cambia pagina.
  */
 export function PatientBanner({
   patient,
@@ -111,9 +109,9 @@ export function PatientBanner({
   patient: Patient;
   summary?: Summary | null;
 }) {
-  const [showCf, setShowCf] = useState(false);
   const { open } = useOpenRecords();
   const location = useLocation();
+  const publish = useBandPublisher();
   useEffect(() => {
     open({
       id: patient.id,
@@ -124,51 +122,10 @@ export function PatientBanner({
     });
     // Solo all'apertura del paziente: i cambi di pagina li segue la barra delle cartelle.
   }, [patient.id]);
-  return (
-    <div className="testata-paziente">
-      <p className="testata-dati">
-        <span>{age(patient.birthDate)} anni</span>
-        <span>{patient.sex === 'F' ? 'donna' : 'uomo'}</span>
-        <span>
-          {patient.sex === 'F' ? 'Nata' : 'Nato'} il {date(patient.birthDate)}
-        </span>
-        <span className="codice">
-          {showCf ? patient.fiscalCode : maskedFiscalCode(patient.fiscalCode)}
-        </span>
-        <button
-          type="button"
-          className="pulsante pulsante-piatto"
-          onClick={() => setShowCf((v) => !v)}
-          aria-pressed={showCf}
-        >
-          {showCf ? 'Nascondi il codice fiscale' : 'Mostra il codice fiscale'}
-        </button>
-        {patient.status !== 'active' && (
-          <span className="etichetta">
-            {STATUS[patient.status] ?? patient.status}
-            {patient.status === 'deceased' && patient.deceasedOn
-              ? ` il ${date(patient.deceasedOn)}`
-              : ''}
-          </span>
-        )}
-      </p>
-      {summary && (
-        <ul className="testata-avvisi" aria-label="In evidenza">
-          {summary.allergie.map((a) => (
-            <li key={a.sostanza} className="pillola pillola-pericolo">
-              Allergia: {a.sostanza}
-            </li>
-          ))}
-          {summary.esenzioni.map((e) => (
-            <li key={e.codice} className="pillola">
-              Esenzione {e.codice}
-              {e.al ? ` fino al ${date(e.al)}` : ''}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+  useEffect(() => {
+    publish?.({ patient, summary });
+  }, [publish, patient, summary]);
+  return publish ? null : <PatientFacts patient={patient} summary={summary} />;
 }
 
 function Forbidden({ error, what }: { error: ApiError | null; what: string }) {
@@ -236,77 +193,19 @@ export function RecordPage() {
 
   return (
     <>
+      {/* Il nome sta nella fascia fissa della cartella (D244): qui il titolo è la voce del menu. */}
       <PageHeader
-        title={`${p.firstName} ${p.lastName}`}
+        title="Riepilogo"
         trail={
           <>
             <Link to="/pazienti">Pazienti</Link> <span aria-hidden="true">/</span>{' '}
-            <span>Cartella</span>
-          </>
-        }
-        actions={
-          <>
-            <Link className="pulsante pulsante-primario" to={`/pazienti/${id}/ricetta`}>
-              <Icon name="ricette" /> <span>Nuova ricetta</span>
-            </Link>
-            <Link className="pulsante" to={`/pazienti/${id}/specialistica`}>
-              <Icon name="specialistica" /> <span>Specialistica</span>
-            </Link>
-            <Link className="pulsante" to={`/pazienti/${id}/esami`}>
-              <Icon name="esami" /> <span>Esami</span>
-            </Link>
-            {isDoctor && (
-              <Link className="pulsante" to={`/pazienti/${id}/certificati`}>
-                <Icon name="firma" /> <span>Certificati</span>
-              </Link>
-            )}
+            <span>
+              {p.firstName} {p.lastName}
+            </span>
           </>
         }
       />
       <PatientBanner patient={p} summary={riepilogo} />
-      <nav className="collegamenti-cartella" aria-label="Sezioni della cartella">
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/amministrazione`}>
-          <Icon name="pazienti" /> <span>Dati amministrativi</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/farmaci`}>
-          <Icon name="terapia" /> <span>Farmaci prescritti</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/visite-ed-esami`}>
-          <Icon name="specialistica" /> <span>Visite ed esami prescritti</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/voci`}>
-          <Icon name="storico" /> <span>Voci cliniche</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/parametri`}>
-          <Icon name="esami" /> <span>Parametri</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/piani`}>
-          <Icon name="terapia" /> <span>Piani terapeutici</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/presidi`}>
-          <Icon name="terapia" /> <span>Presidi</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/prestazioni-aggiuntive`}>
-          <Icon name="firma" /> <span>Prestazioni aggiuntive</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/seguito`}>
-          <Icon name="specialistica" /> <span>Seguito delle prestazioni</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/privacy`}>
-          <Icon name="lucchetto" /> <span>Privacy</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/certificati-modelli`}>
-          <Icon name="ricette" /> <span>Altri certificati</span>
-        </Link>
-        <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/profilo-sanitario`}>
-          <Icon name="archivio" /> <span>Profilo sanitario sintetico</span>
-        </Link>
-        {isDoctor && (
-          <Link className="pulsante pulsante-piatto" to={`/pazienti/${id}/fascicolo-regionale`}>
-            <Icon name="archivio" /> <span>Fascicolo regionale</span>
-          </Link>
-        )}
-      </nav>
 
       <div className="griglia-cartella">
         {riepilogo ? (
@@ -368,10 +267,13 @@ export function RecordPage() {
         )}
 
         <section className="riquadro" aria-labelledby="titolo-terapia">
-          <h2 id="titolo-terapia">
-            <Icon name="terapia" /> Terapia in corso
-          </h2>
-          <ColourLegend />
+          {/* La legenda piccola, a destra del titolo (D246). */}
+          <div className="riquadro-testa">
+            <h2 id="titolo-terapia">
+              <Icon name="terapia" /> Terapia in corso
+            </h2>
+            <ColourLegend />
+          </div>
           <div className="azioni">
             {isDoctor && (
               <Link className="pulsante" to={`/pazienti/${id}/terapie/nuova`}>
@@ -420,7 +322,8 @@ export function RecordPage() {
                       </Link>
                       <span className="tenue">{posology(t)}</span>
                       <span>
-                        <span className="etichetta">{THERAPY_KIND[t.kind]}</span>
+                        {/* Il tipo lo dicono sfondo e tratto della barra, con la legenda (D248). */}
+                        <span className="visivamente-nascosto">{THERAPY_KIND[t.kind]}</span>
                         <OriginTag origin={originOf(t)} />
                         {t.aifaNote && <span className="etichetta">Nota {t.aifaNote}</span>}
                         {t.reserved && <span className="etichetta">Riservata</span>}
@@ -430,12 +333,7 @@ export function RecordPage() {
                         <AifaChangeNote key={`${c.kind}-${c.text}`} change={c} />
                       ))}
                     </div>
-                    <Link
-                      to={`/pazienti/${id}/terapie/${t.id}`}
-                      className="pulsante pulsante-piatto"
-                    >
-                      <Icon name="storico" /> <span>Scheda e storico</span>
-                    </Link>
+                    {/* Il nome apre scheda e storico: niente pulsante che lo ripeta (D246). */}
                   </li>
                 ))}
               </ul>

@@ -37,13 +37,14 @@ export function OriginTag({ origin }: { origin: TherapyOrigin | null }) {
 
 /**
  * Legenda dei colori: la stessa per ogni paziente e sempre nello stesso punto, in testa
- * all'elenco dei farmaci (nella cartella sotto «Terapia in corso», nella pagina dei farmaci
- * prescritti sotto la testata).
+ * all'elenco dei farmaci: a destra del titolo «Terapia in corso» nella cartella e del titolo
+ * della pagina dei farmaci prescritti. Piccola, su due colonne (D246, richiesta di Simone:
+ * «rimpicciolisci la legenda, puoi anche incolonnarla su due colonne sulla destra»).
  */
 export function ColourLegend() {
   return (
     <div className="legenda-colori">
-      <p className="legenda-titolo" id="legenda-colori-farmaci">
+      <p className="visivamente-nascosto" id="legenda-colori-farmaci">
         Legenda dei colori
       </p>
       <ul aria-labelledby="legenda-colori-farmaci">
@@ -59,15 +60,17 @@ export function ColourLegend() {
         <li>
           <span className="etichetta etichetta-tipologia" aria-hidden="true">
             S
-          </span>
+          </span>{' '}
+          Suggerita dallo specialista
+        </li>
+        <li>
           <span className="etichetta etichetta-tipologia" aria-hidden="true">
             H
           </span>{' '}
-          Suggerita dallo specialista (S), da ricovero (H)
+          Da ricovero
         </li>
         <li>
-          <span className="campione farmaco-non-in-corso" aria-hidden="true" /> Non in corso:
-          sospesa, conclusa o prescritta senza terapia
+          <span className="campione farmaco-non-in-corso" aria-hidden="true" /> Non in corso
         </li>
       </ul>
     </div>

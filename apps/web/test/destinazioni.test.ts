@@ -31,11 +31,11 @@ describe('destinazioni della tappa 15 nell’interfaccia', () => {
       altroProgramma: { ricette: 1, ultimaIl: '2025-03-10' },
     };
     expect(countsText(both)).toBe(
-      '1 ricetta inviate o su carta, ultima il 10/11/2026 · 1 ricetta fatta con un altro programma, il 10/03/2025',
+      '1 ricetta inviata o su carta, ultima il 10/11/2026 · 1 ricetta fatta con un altro programma, il 10/03/2025',
     );
     // Le annullate non si contano: il servizio manda zero, e non si dice nulla.
     expect(countsText({ ...both, altroProgramma: { ricette: 0, ultimaIl: null } })).toBe(
-      '1 ricetta inviate o su carta, ultima il 10/11/2026',
+      '1 ricetta inviata o su carta, ultima il 10/11/2026',
     );
   });
 

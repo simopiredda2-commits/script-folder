@@ -60,6 +60,34 @@ export function registerPatientRoutes(
   deps: PatientRouteDeps = {},
 ) {
   const now = deps.now ?? (() => new Date());
+  const reference = deps.reference ?? new ReferenceData(db);
+
+  /**
+   * Le esenzioni in corso oggi, per la testata della cartella (D244): iniziate e non scadute, con
+   * la descrizione del catalogo in vigore. Le altre restano nei dati amministrativi e nelle scelte
+   * della ricetta, come prima.
+   */
+  async function currentExemptions(rows: { codice: string; dal: string; al: string | null }[]) {
+    const today = studioDate(now());
+    // Lo stesso codice due volte (un rinnovo che si sovrappone): resta quello che dura di più.
+    const byCode = new Map<string, { codice: string; al: string | null }>();
+    for (const e of rows) {
+      if (e.dal > today || (e.al !== null && e.al < today)) continue;
+      const seen = byCode.get(e.codice);
+      if (!seen || (seen.al !== null && (e.al === null || e.al > seen.al))) byCode.set(e.codice, e);
+    }
+    const current = [...byCode.values()].sort((a, b) => a.codice.localeCompare(b.codice));
+    const descriptions = await reference.exemptionDescriptions(
+      current.map((e) => e.codice),
+      today,
+    );
+    return current.map((e) => ({
+      codice: e.codice,
+      descrizione: descriptions.get(e.codice.trim()) ?? null,
+      al: e.al,
+    }));
+  }
+
   app.get('/api/io', async (req) => {
     const actor = req.actor!;
     // L'archivio di cui l'utente è titolare: impostazioni ed esportazione dall'interfaccia.
@@ -195,7 +223,13 @@ export function registerPatientRoutes(
           parametri: await latestMeasurements(db, id, reservedAllowed),
         }
       : null;
-    return { paziente: p, riepilogo: summary };
+    return {
+      paziente: p,
+      riepilogo: summary && {
+        ...summary,
+        esenzioniInCorso: await currentExemptions(summary.esenzioni),
+      },
+    };
   });
 
   app.get('/api/pazienti/:id/diario', { config: { patientScoped: true } }, async (req) => {

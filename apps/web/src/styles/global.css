@@ -246,7 +246,7 @@ legend {
   gap: 0.5rem;
   min-height: var(--size-min-target);
   min-width: var(--size-min-target);
-  padding: 0 0.875rem;
+  padding: 0 0.5rem;
   border-radius: var(--radius);
   color: var(--color-text);
   font-weight: 600;
@@ -278,23 +278,111 @@ legend {
 }
 
 .utente {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+  position: relative;
   margin-left: auto;
 }
 
+/* Il nome di chi è entrato è il pulsante del suo menu (credenziali, password, uscita). */
+.utente-apri {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--size-min-target);
+  padding: 0.25rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: right;
+  cursor: pointer;
+}
+
+.utente-apri:hover {
+  background: var(--color-surface-muted);
+}
+
+.utente-apri .icona {
+  transform: rotate(90deg);
+}
+
+.utente-apri[aria-expanded='true'] .icona {
+  transform: rotate(-90deg);
+}
+
+/* Nome e postazione, ciascuno su una riga; un nome molto lungo finisce con i puntini (il testo
+   intero resta al lettore di schermo e nel menu). */
 .utente-nome {
   display: flex;
   flex-direction: column;
+  max-width: 14rem;
   line-height: 1.25;
   font-weight: 600;
+}
+
+.utente-chi,
+.utente-ruolo {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .utente-ruolo {
   font-weight: 400;
   font-size: 0.8125rem;
   color: var(--color-text-muted);
+}
+
+/* In cima al menu: ruoli e postazione per intero. */
+.utente-dettagli {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-divider);
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+}
+
+.utente-menu {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  /* Largo almeno quanto il nome, e quanto basta per i ruoli su una riga, entro i 22rem. */
+  width: max-content;
+  min-width: max(100%, 13rem);
+  max-width: min(22rem, calc(100vw - 2rem));
+  padding: 0.25rem;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: 0 0.5rem 1.5rem rgb(14 20 53 / 0.18);
+}
+
+.utente-menu .pulsante {
+  justify-content: flex-start;
+}
+
+/*
+ * La testata in una riga quando ci sta: marchio, menu, chi è entrato in alto a destra. Quando non
+ * ci sta (lo misura la cornice, D244), marchio e nome sulla prima riga e il menu sulla seconda,
+ * intero (richiesta di Simone del 23/11/2026: prima le righe erano due, a 1024 px tre).
+ */
+.app-header {
+  column-gap: 1rem;
+}
+
+.app-header.testata-due-righe .menu {
+  order: 3;
+  flex-basis: 100%;
+}
+
+.app-header.testata-due-righe .utente {
+  order: 2;
 }
 
 /* Cartelle aperte insieme (D68) ------------------------------------------------------------ */
@@ -1039,29 +1127,35 @@ a.coda:hover {
   font-weight: 600;
 }
 
-/* Farmaci nella cartella (D152): lo sfondo tenue dice come si prende il farmaco e la barra a
-   sinistra lo ripete in colore pieno; la parola c'è sempre. Senza colore: non in corso. */
+/* Farmaci nella cartella (D152, D248): lo sfondo tenue dice come si prende il farmaco e la
+   barra a sinistra lo ripete in colore pieno, con un tratto suo, per chi non distingue i colori
+   (WCAG 1.4.1): continuo la cronica, doppio il ciclo, a puntini al bisogno. La legenda li spiega;
+   la parola resta solo per i lettori di schermo. Senza colore: non in corso. */
 .farmaco {
   --farmaco-sfondo: var(--color-surface);
   --farmaco-barra: var(--color-border);
+  --farmaco-tratto: solid;
   background: var(--farmaco-sfondo);
-  border-left: 6px solid var(--farmaco-barra);
+  border-left: 6px var(--farmaco-tratto) var(--farmaco-barra);
   border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 .farmaco-cronica {
   --farmaco-sfondo: var(--color-therapy-chronic-surface);
   --farmaco-barra: var(--color-therapy-chronic-edge);
+  --farmaco-tratto: solid;
 }
 
 .farmaco-ciclo {
   --farmaco-sfondo: var(--color-therapy-cycle-surface);
   --farmaco-barra: var(--color-therapy-cycle-edge);
+  --farmaco-tratto: double;
 }
 
 .farmaco-al-bisogno {
   --farmaco-sfondo: var(--color-therapy-as-needed-surface);
   --farmaco-barra: var(--color-therapy-as-needed-edge);
+  --farmaco-tratto: dotted;
 }
 
 .farmaco-non-in-corso {
@@ -1094,24 +1188,18 @@ a.coda:hover {
   font-weight: 600;
 }
 
+/* La legenda piccola, su due colonne, a destra del titolo (D246). */
 .legenda-colori {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.25rem 0.75rem;
-  margin: 0 0 0.75rem;
-  font-size: 0.875rem;
-}
-
-.legenda-titolo {
   margin: 0;
-  font-weight: 600;
+  font-size: 0.8125rem;
+  line-height: 1.3;
 }
 
 .legenda-colori ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem 1rem;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(3, auto);
+  gap: 0.125rem 1rem;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1120,20 +1208,42 @@ a.coda:hover {
 .legenda-colori li {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.375rem;
 }
 
 .legenda-colori .etichetta {
   margin-right: 0;
+  padding: 0 0.3rem;
+  font-size: 0.75rem;
 }
 
-/* I campioni della legenda prendono i colori dalle stesse classi delle righe. */
+/* Titolo di un riquadro con qualcosa a destra (la legenda), sulla stessa riga. */
+.riquadro-testa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.riquadro-testa h2 {
+  margin: 0;
+}
+
+/* Se il riquadro è stretto la legenda va sotto il titolo, sempre a destra. */
+.riquadro-testa .legenda-colori {
+  margin-left: auto;
+}
+
+/* I campioni della legenda prendono colori e tratto dalle stesse classi delle righe; alti
+   abbastanza perché si vedano il doppio e i puntini (D248). */
 .campione {
   display: inline-block;
-  width: 1.75rem;
+  width: 1.25rem;
   height: 1.125rem;
   background: var(--farmaco-sfondo, var(--color-surface));
-  border-left: 4px solid var(--farmaco-barra, var(--color-border));
+  border-left: 6px var(--farmaco-tratto, solid) var(--farmaco-barra, var(--color-border));
   border-radius: 0 3px 3px 0;
 }
 
@@ -1143,15 +1253,134 @@ a.coda:hover {
   list-style: none;
 }
 
-.elenco-farmaci .farmaco {
+/*
+ * Un farmaco prescritto in una riga (D246): a sinistra il nome con il «+» e, sotto, come si
+ * prende; a destra, sempre nella stessa colonna, l'ultima ricetta (D245); in mezzo il pulsante
+ * della riga, se c'è. Aperta, sotto tutto, i dettagli e lo storico.
+ */
+.elenco-farmaci .farmaco-voce {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.25rem 1rem;
+  grid-template-columns: minmax(0, 1fr) auto 11.5rem;
+  grid-template-areas:
+    'apri azione ultima'
+    'tipo azione ultima'
+    'dettagli dettagli dettagli';
+  gap: 0 0.75rem;
   align-items: center;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.farmaco-apri {
+  grid-area: apri;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: var(--size-min-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.farmaco-apri .icona {
+  flex: none;
+  color: var(--color-primary);
+}
+
+.farmaco-apri:hover .farmaco-nome {
+  text-decoration: underline;
+}
+
+.farmaco-tipo {
+  grid-area: tipo;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding-left: 1.75rem;
+}
+
+.farmaco-tipo .etichetta {
+  margin-right: 0;
+  font-size: 0.8125rem;
+}
+
+.farmaco-azione {
+  grid-area: azione;
+}
+
+.farmaco-ultima {
+  grid-area: ultima;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.farmaco-ultima-titolo {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.farmaco-ultima-data {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.farmaco-dettagli {
+  grid-area: dettagli;
+  padding: 0.25rem 0 0.5rem 1.75rem;
+  font-size: 0.875rem;
 }
 
 .farmaco-conti {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem 1rem;
+  margin: 0 0 0.5rem;
+}
+
+/* Le ultime ricette di un farmaco, dentro la riga aperta. */
+.tabella-compatta {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.tabella-compatta th,
+.tabella-compatta td {
+  padding: 0.125rem 0.5rem 0.125rem 0;
+}
+
+/*
+ * Dove l'elenco è stretto (la colonna della ricetta, i telefoni) la riga va su tre righe: il
+ * nome per intero; il tipo; l'ultima ricetta, con il pulsante accanto (D246). Lo decide la
+ * larghezza dell'elenco, non dello schermo.
+ */
+.elenco-farmaci {
+  container-type: inline-size;
+}
+
+@container (max-width: 40rem) {
+  .elenco-farmaci .farmaco-voce {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'apri apri'
+      'tipo azione'
+      'ultima azione'
+      'dettagli dettagli';
+  }
+
+  .farmaco-ultima {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0 0.375rem;
+    padding-left: 1.75rem;
+  }
 }
 
 /* Collegamenti nelle tabelle delle prestazioni prescritte e della distinta delle PPIP: bersaglio
@@ -1460,7 +1689,7 @@ a.coda:hover {
  * riquadro. I pulsanti della ricetta restano in vista. Su schermi stretti o bassi la pagina scorre
  * come le altre.
  */
-@media (min-width: 901px) and (min-height: 600px) {
+@media screen and (min-width: 901px) and (min-height: 600px) {
   html.schermo-unico .app-shell {
     height: 100vh;
     height: 100dvh;
@@ -1769,13 +1998,247 @@ textarea[aria-invalid='true'] {
   font-size: 0.875rem;
 }
 
+/*
+ * La cartella del paziente (D244): fascia fissa con nome, dati, allergie, esenzioni in corso e
+ * scorciatoie; menu delle voci sempre in vista, con la voce aperta evidenziata; sotto, la pagina.
+ * Da 1100 px di larghezza il menu è una colonna a sinistra; sotto, una striscia in una riga che
+ * scorre di lato. Da 901 px di larghezza e 600 di altezza la cornice è alta quanto lo schermo e
+ * scorre solo il contenuto: fascia e menu restano dove sono.
+ */
+.cartella {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cartella-fascia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.25rem;
+  padding: 0.125rem 0.75rem;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.cartella-fascia .testata-paziente {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1.25rem;
+  margin: 0;
+}
+
+.cartella-fascia .testata-dati,
+.cartella-fascia .testata-avvisi {
+  margin: 0;
+}
+
+/* Nome e dati in una riga: il nome in grassetto, della stessa misura (richiesta di Simone). */
+.testata-nome {
+  font-weight: 700;
+}
+
+.cartella-fascia .pillola {
+  padding: 0.125rem 0.625rem;
+  font-size: 0.875rem;
+}
+
+/* Una descrizione lunga dell'esenzione non allarga la fascia: si legge per intero nei dati
+   amministrativi. */
+.pillola-esenzione {
+  max-width: 34rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cartella-corpo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.cartella-contenuto {
+  min-width: 0;
+}
+
+/* Gli elementi posizionati (testi per i lettori di schermo, menu) restano dentro il riquadro che
+   scorre: senza, allungavano la pagina intera (dati amministrativi). */
+.cartella-contenuto,
+.menu-cartella {
+  position: relative;
+}
+
+.cartella-contenuto .intestazione-pagina {
+  margin-bottom: 0.75rem;
+}
+
+.cartella-contenuto .intestazione-pagina h1 {
+  font-size: 1.5rem;
+}
+
+/* Dentro la cartella il percorso ripeteva il nome: dove si è lo dice il menu evidenziato. */
+.cartella-contenuto .briciole {
+  display: none;
+}
+
+/* Le scorciatoie per prescrivere in testa al menu, separate dalle voci. */
+.menu-cartella ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 0.25rem;
+  /* Striscia: una riga sola, che scorre di lato (tablet in verticale, finestre strette). */
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.menu-cartella li {
+  flex: 0 0 auto;
+}
+
+.menu-cartella-voce {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--size-min-target);
+  padding: 0 0.75rem;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.menu-cartella-voce:hover {
+  background: var(--color-surface-muted);
+}
+
+/* «Nuova ricetta», il pulsante principale: blu con il testo chiaro, anche al passaggio del mouse.
+   Aperta, diventa gialla come le altre voci aperte. Il selettore doppio vince su quelli delle
+   voci, che vengono dopo (prima il testo restava scuro sul blu). */
+.menu-cartella-voce.menu-cartella-primaria:not([aria-current='page']) {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.menu-cartella-voce.menu-cartella-primaria:not([aria-current='page']):hover {
+  background: var(--color-primary);
+  text-decoration: underline;
+}
+
+/* La voce aperta: l'evidenziatore, sfondo giallo e testo scuro (D69). */
+.menu-cartella-voce[aria-current='page'] {
+  background: var(--color-mark);
+  color: var(--color-on-mark);
+}
+
+/* Nella striscia, un filo dopo l'ultima scorciatoia; nella colonna, sotto. */
+.menu-cartella-prescrivi + li:not(.menu-cartella-prescrivi) {
+  margin-left: 0.25rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--color-divider);
+}
+
+@media (min-width: 1100px) {
+  .cartella-corpo {
+    grid-template-columns: 15rem minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .menu-cartella ul {
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  .menu-cartella-prescrivi + li:not(.menu-cartella-prescrivi) {
+    margin: 0.25rem 0 0;
+    padding: 0.25rem 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--color-divider);
+  }
+
+  .menu-cartella-voce {
+    white-space: normal;
+    padding: 0.25rem 0.75rem;
+  }
+}
+
+@media screen and (min-width: 901px) and (min-height: 600px) {
+  html.cartella-aperta .app-shell {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  html.cartella-aperta .app-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  html.cartella-aperta .cartella {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  html.cartella-aperta .cartella-corpo {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  html.cartella-aperta .cartella-contenuto {
+    min-height: 0;
+    overflow-y: auto;
+    /* Il bordo di fuoco e le ombre dei riquadri non si tagliano contro il bordo che scorre. */
+    padding: 0 0.25rem 0.5rem;
+  }
+
+  /* La ricetta tiene la sua schermata (D242): il contenuto non scorre, scorrono i suoi riquadri. */
+  html.cartella-aperta.schermo-unico .cartella-contenuto {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
+
+@media screen and (min-width: 1100px) and (min-height: 600px) {
+  html.cartella-aperta .cartella-corpo {
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  html.cartella-aperta .menu-cartella {
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
 @media print {
   .app-header,
   .app-footer,
   .schede-aperte-contenitore,
+  .menu-cartella,
+  .cartella-fascia,
   .salta,
   .no-stampa {
     display: none !important;
+  }
+
+  /* In stampa la cartella torna una pagina che scorre, senza riquadri fissi (D244). */
+  .cartella-corpo {
+    display: block;
+  }
+
+  .cartella-contenuto {
+    overflow: visible !important;
   }
 
   body,

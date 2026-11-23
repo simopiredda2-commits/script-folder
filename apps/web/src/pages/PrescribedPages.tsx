@@ -1,8 +1,9 @@
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
-import { ColourLegend, drugRowClass, OriginTag } from '../components/DrugColours';
+import { ColourLegend } from '../components/DrugColours';
 import { Icon } from '../components/Icon';
 import { PastPrescriptionsSection } from '../components/PastPrescriptions';
+import { drugGroup, PrescribedDrugList } from '../components/PrescribedDrugs';
 import {
   countsText,
   historyHref,
@@ -11,14 +12,8 @@ import {
   type PrescribedDrug,
   type PrescribedService,
 } from '../components/Prescribed';
-import { date, THERAPY_KIND } from '../lib/format';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
-
-const THERAPY_STATUS: Record<string, string> = {
-  suspended: 'Sospesa',
-  ended: 'Conclusa',
-};
 
 /** Le ricette fatte con un altro programma che i due elenchi restituiscono (tappa 15). */
 interface WithPast {
@@ -35,47 +30,6 @@ function PastTag({ c }: { c: PrescribedDrug | PrescribedService }) {
       <Icon name="archivio" size={16} />{' '}
       {c.ricette > 0 ? 'Anche con un altro programma' : 'Con un altro programma'}
     </span>
-  );
-}
-
-function DrugRow({ d, patientId }: { d: PrescribedDrug; patientId: string }) {
-  const t = d.terapia;
-  return (
-    <li className={drugRowClass(t)}>
-      <div className="terapia-testo">
-        <Link to={historyHref(patientId, d.storico)} className="terapia-nome">
-          {d.farmaco}
-        </Link>
-        {d.principioAttivo && d.principioAttivo.toLowerCase() !== d.farmaco.toLowerCase() && (
-          <span className="tenue">Principio attivo: {d.principioAttivo}</span>
-        )}
-        <span>
-          {t ? (
-            <span className="etichetta">{THERAPY_KIND[t.tipo]}</span>
-          ) : (
-            <span className="etichetta">Prescritto senza terapia</span>
-          )}
-          {t && THERAPY_STATUS[t.stato] && (
-            <span className="etichetta">{THERAPY_STATUS[t.stato]}</span>
-          )}
-          <OriginTag origin={t?.tipologia ?? null} />
-          <PastTag c={d} />
-          {d.notaAifa && <span className="etichetta">Nota {d.notaAifa}</span>}
-          {t?.riservata && <span className="etichetta">Riservata</span>}
-          {d.aic && <span className="codice tenue">AIC {d.aic}</span>}
-        </span>
-        <span className="farmaco-conti tenue">
-          {countsText(d)}
-          {d.ultimi12Mesi > 0 && ` · ${d.ultimi12Mesi} negli ultimi 12 mesi`}
-          {t?.stato === 'active' && t.tipo === 'cycle' && t.fine && ` · fino al ${date(t.fine)}`}
-          {t?.stato === 'ended' && t.fine && ` · conclusa il ${date(t.fine)}`}
-          {t?.motivoSospensione && ` · sospesa: ${t.motivoSospensione}`}
-        </span>
-      </div>
-      <Link to={historyHref(patientId, d.storico)} className="pulsante pulsante-piatto">
-        <Icon name="storico" /> <span>{t ? 'Scheda e storico' : 'Storico'}</span>
-      </Link>
-    </li>
   );
 }
 
@@ -98,11 +52,7 @@ function DrugGroup({
       {drugs.length === 0 ? (
         <p className="tenue">{empty}</p>
       ) : (
-        <ul className="elenco-farmaci">
-          {drugs.map((d) => (
-            <DrugRow key={d.chiave} d={d} patientId={patientId} />
-          ))}
-        </ul>
+        <PrescribedDrugList drugs={drugs} patientId={patientId} label={id} />
       )}
     </section>
   );
@@ -111,7 +61,8 @@ function DrugGroup({
 /**
  * Tutti i farmaci prescritti al paziente (D152): in corso, sospesi o conclusi, e quelli
  * prescritti senza una terapia in cartella. Ognuno apre il suo storico (D65). Dalla tappa 15 anche
- * le ricette fatte con un altro programma, contate a parte e in un riquadro loro.
+ * le ricette fatte con un altro programma, contate a parte e in un riquadro loro. In ogni gruppo
+ * dall'ultima ricetta più recente, con giorno e confezioni in vista (D245).
  */
 export function PrescribedDrugsPage() {
   const { id } = useParams<{ id: string }>();
@@ -123,11 +74,12 @@ export function PrescribedDrugsPage() {
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
   const list = drugs.data?.farmaci ?? [];
-  const active = list.filter((d) => d.terapia?.stato === 'active');
-  const stopped = list.filter((d) => d.terapia && d.terapia.stato !== 'active');
-  const occasional = list.filter((d) => !d.terapia);
+  const active = list.filter((d) => drugGroup(d) === 0);
+  const stopped = list.filter((d) => drugGroup(d) === 1);
+  const occasional = list.filter((d) => drugGroup(d) === 2);
   return (
     <>
+      {/* La legenda piccola, a destra del titolo (D246). */}
       <PageHeader
         title="Farmaci prescritti"
         trail={
@@ -138,9 +90,9 @@ export function PrescribedDrugsPage() {
             <span aria-hidden="true">/</span> <span>Farmaci prescritti</span>
           </>
         }
+        actions={<ColourLegend />}
       />
       <PatientBanner patient={p} summary={record.data.riepilogo} />
-      <ColourLegend />
       {drugs.loading && !drugs.data && <Loading what="farmaci" />}
       {drugs.error?.status === 403 ? (
         <Notice kind="info">I farmaci prescritti non sono visibili con il tuo ruolo.</Notice>

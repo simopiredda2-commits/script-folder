@@ -124,6 +124,7 @@ try {
   await shot(page, '02-oggi');
 
   // Tappa 8: credenziali dei servizi; il codice di sessione serve prima di mandare le ricette.
+  await page.locator('.utente-apri').click();
   await page.locator('.utente').getByRole('link', { name: 'Credenziali' }).click();
   await page.getByRole('heading', { level: 1, name: 'Credenziali dei servizi' }).waitFor();
   await shot(page, '19-credenziali');
@@ -198,7 +199,7 @@ try {
   await page.goto(`${base}/pazienti/${diabetes2PatientId}/ricetta`);
   // Dulaglutide: in DPC con nota AIFA 100 e piano terapeutico (elenco della Regione Piemonte).
   await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('dulaglutide');
-  // Si aspetta il risultato della ricerca, non la terapia in corso (anche lei è un risultato).
+  // Si aspetta il risultato della ricerca: i farmaci prescritti, sotto, hanno righe loro (D246).
   const withPlan = page.locator('.risultato').filter({ hasText: 'TRULICITY' });
   await withPlan.waitFor();
   await withPlan.getByRole('button', { name: 'Aggiungi' }).click();
@@ -210,6 +211,19 @@ try {
     .evaluate((el) => el.scrollIntoView({ block: 'start' }));
   await page.evaluate(() => window.scrollBy(0, -160));
   await shot(page, '07-ricetta-con-controlli');
+
+  // I farmaci prescritti dentro «Nuova ricetta» (D246): una riga per farmaco; una, con
+  // un'ultima ricetta, aperta col «+» per vedere i dati e le ultime ricette con l'NRE.
+  await page.goto(`${base}/pazienti/${patientId}/ricetta`);
+  const prescribed = page.getByRole('list', { name: 'Farmaci prescritti' });
+  const withLast = prescribed
+    .getByRole('listitem')
+    .filter({ has: page.locator('.farmaco-ultima-data') })
+    .first();
+  await withLast.waitFor();
+  await withLast.locator('.farmaco-apri').click();
+  await withLast.getByRole('table').waitFor();
+  await shot(page, '75-farmaci-prescritti-nella-ricetta');
 
   await page.goto(`${base}/pazienti/${patientId}/specialistica`);
   await page.getByLabel('Prestazione, branca o codice').fill('prova');
@@ -555,11 +569,9 @@ try {
   await page.getByLabel(/La segreteria legge il riepilogo clinico/).waitFor();
   await shot(page, '16-archivio');
 
-  // Tappa 14: autorizzazioni sull'archivio e avvisi sugli accessi anomali (D177).
-  await page
-    .getByRole('table', { name: /Autorizzazioni date sull’archivio/ })
-    .scrollIntoViewIfNeeded();
-  await page.getByRole('heading', { level: 2, name: 'Avvisi sugli accessi anomali' }).waitFor();
+  // Tappa 14: autorizzazioni sull'archivio (D177), nella loro sezione (D244).
+  await page.goto(`${base}/archivio?sezione=autorizzazioni`);
+  await page.getByRole('table', { name: /Autorizzazioni date sull’archivio/ }).waitFor();
   await shot(page, '50-archivio-autorizzazioni-e-avvisi', true);
 
   // Tappa 14: elenchi dello studio e registro di amministrazione (D175, D177).
@@ -604,7 +616,7 @@ try {
   await page.goto(`${base}/pazienti/nuovo`);
   await page.getByRole('heading', { level: 1, name: 'Nuovo paziente' }).waitFor();
   await shot(page, '44-nuovo-paziente', true);
-  await page.goto(`${base}/pazienti/${patientId}/amministrazione`);
+  await page.goto(`${base}/pazienti/${patientId}/amministrazione#promemoria`);
   await page.getByRole('heading', { level: 2, name: 'Canale del promemoria' }).waitFor();
   await shot(page, '45-dati-amministrativi', true);
 

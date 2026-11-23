@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { DiagnosisCodeInfo, DiagnosisSearch } from '../components/DiagnosisSearch';
 import { Icon, type IconName } from '../components/Icon';
@@ -1347,20 +1347,29 @@ const SECTIONS: { id: string; title: string }[] = [
  * Dati amministrativi del paziente (tappa 15): identità, residenza e recapiti, dati SSN, stato e
  * decesso, cittadini stranieri, lavoro, canale del promemoria, nucleo familiare, esenzioni,
  * scelta del medico. Medico e segreteria li scrivono allo stesso modo (registry.write).
+ *
+ * Si apre una sezione alla volta, scelta dal sottomenu (richiesta di Simone del 22/11/2026:
+ * «preferirei si aprissero solo i relativi sottomenu cliccati e non tutti»). La sezione aperta sta
+ * nell'indirizzo, dopo il cancelletto: «…/amministrazione#aura» apre AURA (D244).
  */
 export function PatientAdminPage() {
   const { id } = useParams<{ id: string }>();
+  const { hash } = useLocation();
+  const navigate = useNavigate();
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
   const admin = useApi<AdminView>(`/api/pazienti/${id}/amministrazione`);
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
+  const wanted = decodeURIComponent(hash.slice(1));
+  const open = SECTIONS.some((s) => s.id === wanted) ? wanted : SECTIONS[0]!.id;
   // La testata (nome, nascita, codice fiscale, stato, esenzioni) si ricarica solo quando cambia:
   // ogni apertura della cartella resta nel registro.
   const reload = () => {
     admin.reload();
     record.reload();
   };
+  const group = GROUPS.find((g) => g.id === open);
 
   return (
     <>
@@ -1381,30 +1390,39 @@ export function PatientAdminPage() {
       <ErrorMessage error={admin.error} />
       {admin.data && (
         <>
-          <nav className="collegamenti-cartella" aria-label="Gruppi dei dati amministrativi">
+          {/* Come le sezioni di Strumenti: un pulsante per sezione, quella aperta premuta. */}
+          <div className="schede" role="group" aria-label="Sezioni dei dati amministrativi">
             {SECTIONS.map((s) => (
-              <a key={s.id} className="pulsante pulsante-piatto" href={`#${s.id}`}>
+              <button
+                key={s.id}
+                type="button"
+                className="scheda"
+                aria-pressed={s.id === open}
+                onClick={() => void navigate({ hash: s.id }, { replace: true })}
+              >
                 {s.title}
-              </a>
+              </button>
             ))}
-          </nav>
-          <IdentitySection view={admin.data} onSaved={reload} />
-          {GROUPS.map((g) => (
+          </div>
+          {open === 'identita' && <IdentitySection view={admin.data} onSaved={reload} />}
+          {group && (
             <FieldsSection
-              key={g.id}
-              group={g}
-              view={admin.data!}
-              onSaved={BANNER_GROUPS.has(g.id) ? reload : admin.reload}
+              key={group.id}
+              group={group}
+              view={admin.data}
+              onSaved={BANNER_GROUPS.has(group.id) ? reload : admin.reload}
             />
-          ))}
-          <FamilySection view={admin.data} onSaved={admin.reload} />
-          <AuraSection
-            patientId={admin.data.paziente.id}
-            canWrite={admin.data.puoScrivere}
-            onUpdated={reload}
-          />
-          <ExemptionsSection view={admin.data} onSaved={reload} />
-          <ChoicesSection view={admin.data} onSaved={admin.reload} />
+          )}
+          {open === 'nucleo' && <FamilySection view={admin.data} onSaved={admin.reload} />}
+          {open === 'aura' && (
+            <AuraSection
+              patientId={admin.data.paziente.id}
+              canWrite={admin.data.puoScrivere}
+              onUpdated={reload}
+            />
+          )}
+          {open === 'esenzioni' && <ExemptionsSection view={admin.data} onSaved={reload} />}
+          {open === 'scelta' && <ChoicesSection view={admin.data} onSaved={admin.reload} />}
         </>
       )}
     </>

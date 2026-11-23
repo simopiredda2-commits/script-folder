@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { ErrorMessage, Loading, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
+import { useBand } from '../components/PatientLayout';
 import { PrintHint } from '../components/PrintHint';
 import { date, studioToday } from '../lib/format';
 import { useSession } from '../lib/session';
 import { patientReading, scheduleMoment, SCHEDULE_MOMENTS } from '../lib/therapy';
 import { useApi } from '../lib/useApi';
-import type { Patient, TherapyFull } from './RecordPage';
+import type { Patient, Summary, TherapyFull } from './RecordPage';
 
 /** Fino a quando: il ciclo e le terapie con una fine hanno la data; le altre continuano. */
 function until(t: TherapyFull): string {
@@ -23,7 +24,8 @@ function until(t: TherapyFull): string {
 export function SchedulePage() {
   const { id } = useParams<{ id: string }>();
   const { state } = useSession();
-  const record = useApi<{ paziente: Patient }>(`/api/pazienti/${id}`);
+  const record = useApi<{ paziente: Patient; riepilogo?: Summary | null }>(`/api/pazienti/${id}`);
+  useBand(record.data?.paziente, record.data?.riepilogo);
   const therapies = useApi<{ terapie: TherapyFull[] }>(`/api/pazienti/${id}/terapie`);
   const [withReserved, setWithReserved] = useState(false);
 
