@@ -348,25 +348,34 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       { width: 820, height: 1180 },
     ]) {
       await page.setViewportSize(v);
-      const m = await f.evaluate(async () => {
-        scrollTo(0, document.scrollingElement!.scrollHeight);
-        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-        const pill = document.querySelector('button.dimo-apri')!.getBoundingClientRect();
-        const footer = document.querySelector('.app-footer')!.getBoundingClientRect();
-        const covered = [...document.querySelectorAll('.app-footer > *')]
-          .map((e) => e.getBoundingClientRect())
-          .filter(
-            (r) =>
-              r.left < pill.right &&
-              r.right > pill.left &&
-              r.top < pill.bottom &&
-              r.bottom > pill.top,
-          ).length;
-        return {
-          inside: pill.top >= footer.top - 0.5 && pill.bottom <= footer.bottom + 0.5,
-          covered,
-        };
-      });
+      const measure = () =>
+        f.evaluate(async () => {
+          scrollTo(0, document.scrollingElement!.scrollHeight);
+          await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+          const pill = document.querySelector('button.dimo-apri')!.getBoundingClientRect();
+          const footer = document.querySelector('.app-footer')!.getBoundingClientRect();
+          const covered = [...document.querySelectorAll('.app-footer > *')]
+            .map((e) => e.getBoundingClientRect())
+            .filter(
+              (r) =>
+                r.left < pill.right &&
+                r.right > pill.left &&
+                r.top < pill.bottom &&
+                r.bottom > pill.top,
+            ).length;
+          return {
+            inside: pill.top >= footer.top - 0.5 && pill.bottom <= footer.bottom + 0.5,
+            covered,
+          };
+        });
+      // Dopo il cambio di misura la cornice può impaginare in ritardo (WebKit nella CI, 24/11/2026,
+      // verde nell'altro giro dello stesso codice): si misura finché la pagina è ferma, al massimo
+      // 5 secondi. Un pulsante davvero fuori dal piede resta fuori e la prova resta rossa.
+      let m = await measure();
+      for (const end = Date.now() + 5000; (!m.inside || m.covered > 0) && Date.now() < end;) {
+        await page.waitForTimeout(200);
+        m = await measure();
+      }
       const at = `${where} a ${v.width}×${v.height}`;
       expect(m.inside, `${at}: il pulsante esce dal piede e copre il contenuto`).toBe(true);
       expect(m.covered, `${at}: il pulsante copre le scritte del piede`).toBe(0);
