@@ -48,7 +48,7 @@ const queue = (id: string, firmabile: boolean, extra: object = {}) => ({
   ],
 });
 
-function service(me: object, firmabile: boolean) {
+function service(me: object, firmabile: boolean, drafts = false) {
   const calls: string[] = [];
   let archived = false;
   vi.stubGlobal(
@@ -75,6 +75,14 @@ function service(me: object, firmabile: boolean) {
                 }),
           ),
         );
+      if (path === '/api/ricette/in-bozza')
+        return Promise.resolve(json(200, drafts ? queue('r5', true) : { pazienti: [] }));
+      if (path === '/api/ricette/r5/annulla' && init?.method === 'POST')
+        return Promise.resolve(json(200, { esito: 'accepted' }));
+      if (path === '/api/ricette/r5/controlla')
+        return Promise.resolve(
+          json(200, { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 }),
+        );
       if (path === '/api/ricette/da-firmare')
         return Promise.resolve(json(200, queue('r1', firmabile)));
       if (path === '/api/ricette/non-inviate')
@@ -98,7 +106,7 @@ function service(me: object, firmabile: boolean) {
       if (path === '/api/pazienti/p1/ricette')
         return Promise.resolve(
           json(200, {
-            ricette: ['r1', 'r2', 'r3'].map((id) => ({
+            ricette: ['r1', 'r2', 'r3', 'r5'].map((id) => ({
               id,
               righe: [
                 {
@@ -174,8 +182,8 @@ describe('ricette in attesa viste dalla segreteria (D242)', () => {
   it('chi non è medico né segreteria non chiede le code', async () => {
     const calls = service(who('administrator', 'Amministratore dello studio'), false);
     page();
-    const toSign = await section('Da firmare');
-    toSign.getByText('Le ricette in attesa le vedono il medico e la segreteria.');
+    // Una frase sola, senza le sezioni (audit 17, D259).
+    await screen.findByText('Le ricette le vedono il medico e la segreteria.');
     expect(calls.filter((c) => c.startsWith('/api/ricette/'))).toEqual([]);
   });
 });
@@ -199,7 +207,41 @@ describe('ricette confermate e archiviazione (D254)', () => {
   it('chi non è medico né segreteria non le chiede', async () => {
     const calls = service(who('administrator', 'Amministratore dello studio'), false);
     page();
-    await section('Confermate');
+    await screen.findByText('Le ricette le vedono il medico e la segreteria.');
     expect(calls.filter((c) => c.includes('/api/ricette/'))).toEqual([]);
+  });
+});
+
+describe('le bozze nella pagina Ricette (audit, D259)', () => {
+  const doctor = who('owner_doctor', 'Medico titolare');
+
+  it('la bozza salvata si ritrova in «In bozza»: si firma da lì, o si annulla', async () => {
+    const calls = service(doctor, true, true);
+    render(
+      <SessionProvider>
+        <MemoryRouter>
+          <SignQueuePage />
+        </MemoryRouter>
+      </SessionProvider>,
+    );
+    const section = (await screen.findByRole('heading', { name: 'In bozza' })).closest('section')!;
+    await within(section).findByText('Farmaco di prova 5 mg × 1');
+    expect(await within(section).findByRole('button', { name: 'Firma e invia' })).toBeTruthy();
+    within(section).getByRole('button', { name: 'Annulla la bozza' }).click();
+    await vi.waitFor(() => expect(calls).toContain('POST /api/ricette/r5/annulla'));
+  });
+
+  it('l’amministratore legge una frase sola, non una per sezione (audit 17)', async () => {
+    service(who('administrator', 'Amministratore dello studio'), false);
+    render(
+      <SessionProvider>
+        <MemoryRouter>
+          <SignQueuePage />
+        </MemoryRouter>
+      </SessionProvider>,
+    );
+    await screen.findByText('Le ricette le vedono il medico e la segreteria.');
+    expect(screen.queryByRole('heading', { name: 'In bozza' })).toBeNull();
+    expect(screen.getAllByText(/le vedono il medico e la segreteria/)).toHaveLength(1);
   });
 });

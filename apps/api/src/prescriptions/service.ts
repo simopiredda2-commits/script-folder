@@ -1284,6 +1284,14 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return queue(actor, 'to_sign');
   }
 
+  /**
+   * «In bozza» (audit, D259): le bozze che chi guarda ha preparato e non ha ancora mandato, così
+   * una ricetta salvata non si dimentica. Le bozze degli altri restano loro.
+   */
+  async function draftQueue(actor: Actor) {
+    return queue(actor, 'draft', { mine: true });
+  }
+
   /** «Invii non riusciti»: ricette in errore, con il motivo. */
   async function failedQueue(actor: Actor) {
     return queue(actor, 'error');
@@ -1340,7 +1348,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
   async function queue(
     actor: Actor,
     status: PrescriptionStatus | PrescriptionStatus[],
-    opts: { signer?: boolean; confirmed?: boolean } = {},
+    opts: { signer?: boolean; confirmed?: boolean; mine?: boolean } = {},
   ) {
     const statuses = Array.isArray(status) ? status : [status];
     const signable = new Set(await visibleArchives(db, actor, 'prescription.sign_send'));
@@ -1380,6 +1388,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           inArray(prescription.archiveId, archives),
           inArray(prescription.status, statuses),
           opts.confirmed ? isNull(prescription.archivedAt) : undefined,
+          opts.mine ? eq(prescription.preparedBy, actor.userId) : undefined,
         ),
       )
       .orderBy(patient.lastName, patient.firstName, prescription.preparedAt);
@@ -1492,6 +1501,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     cancel,
     printPaper,
     toSignQueue,
+    draftQueue,
     failedQueue,
     interruptedQueue,
     confirmedQueue,
