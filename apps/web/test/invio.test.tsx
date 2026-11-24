@@ -248,6 +248,52 @@ describe('ricetta del medico in un passo (D255)', () => {
     expect(changes).toEqual(['sent']);
   });
 
+  it('l’informazione R1 sulla validità, che c’è sempre, non ferma il passo unico', async () => {
+    const calls = service(['owner_doctor'], () =>
+      Promise.resolve(
+        json(200, {
+          versioneRegole: 'prova-1',
+          problemi: [
+            {
+              ruleId: 'R1',
+              severity: 'info',
+              message: 'La ricetta vale 30 giorni',
+              remedy: null,
+              lineId: null,
+            },
+          ],
+          bloccanti: 0,
+        }),
+      ),
+    );
+    panel('draft', null, false, true);
+    await screen.findByText('Ricetta inviata.', { exact: false });
+    expect(signs(calls)).toHaveLength(1);
+  });
+
+  it('un’altra informazione ferma il passo unico (R21, farmaco carente)', async () => {
+    const calls = service(['owner_doctor'], () =>
+      Promise.resolve(
+        json(200, {
+          versioneRegole: 'prova-1',
+          problemi: [
+            {
+              ruleId: 'R21',
+              severity: 'info',
+              message: 'Farmaco carente secondo l’elenco AIFA',
+              remedy: null,
+              lineId: 'l1',
+            },
+          ],
+          bloccanti: 0,
+        }),
+      ),
+    );
+    panel('draft', null, false, true);
+    await screen.findByText(/La ricetta non è ancora partita/);
+    expect(signs(calls)).toHaveLength(0);
+  });
+
   it('con un problema dei controlli si ferma: niente invio, lo dice, si firma con il pulsante', async () => {
     const calls = service(['owner_doctor'], () => Promise.resolve(warned()));
     panel('draft', null, false, true);

@@ -48,6 +48,13 @@ export interface SendPanelProps {
 const failure = (e: unknown, message: string) =>
   e instanceof ApiError ? e : new ApiError(0, message);
 
+/**
+ * L'informazione R1, «la ricetta vale 30 giorni», accompagna ogni ricetta SSN e non chiede nulla al
+ * medico: non ferma il passo unico (D255). Ogni altro problema, anche solo informativo, lo ferma.
+ */
+const routine = (p: RuleIssue) => p.ruleId === 'R1' && p.severity === 'info';
+const toLookAt = (c: CheckResult) => c.problemi.filter((p) => !routine(p));
+
 export function SendPanel({
   prescriptionId,
   status,
@@ -102,15 +109,15 @@ export function SendPanel({
   // In un passo (D255): un tentativo solo, al primo controllo finito, riuscito o no. Si firma solo
   // se è riuscito senza problemi; «Controlla di nuovo» poi non firma da sé.
   // Chi firma vede sempre i controlli prima (D230): con un problema qualsiasi, anche solo
-  // informativo, ci si ferma e si firma con il pulsante.
+  // informativo, ci si ferma e si firma con il pulsante; tranne la validità della R1 (routine).
   const signNow = useRef<() => Promise<void>>(async () => {});
   const autoTried = useRef(false);
   useEffect(() => {
     if (!autoSign || !isDoctor || autoTried.current || checking || (!check && !error)) return;
     autoTried.current = true;
-    if (check && check.problemi.length === 0 && !error) void signNow.current();
+    if (check && toLookAt(check).length === 0 && !error) void signNow.current();
   }, [autoSign, isDoctor, checking, check, error]);
-  const stopped = !!autoSign && isDoctor && !!check && check.problemi.length > 0;
+  const stopped = !!autoSign && isDoctor && !!check && toLookAt(check).length > 0;
 
   // L'ente non ha risposto: all'invio appena fatto, o all'ultimo invio della ricetta (D239).
   const unreachable = outcome

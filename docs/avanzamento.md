@@ -1569,12 +1569,16 @@ Punto 4 delle richieste della pausa (D255).
 
 **Fatto**
 
-- Per il medico, nella ricetta, il pulsante è «Firma e invia»: salva, controlla e, se il controllo non ha nulla da dire, invia con le credenziali del medico. Con un problema qualsiasi del controllo si ferma, lo dice, e il medico firma dal pannello dopo averlo visto.
+- Per il medico, nella ricetta, il pulsante è «Firma e invia»: salva, controlla e, se il controllo non ha nulla da dire, invia con le credenziali del medico. Con un problema qualsiasi del controllo si ferma, lo dice, e il medico firma dal pannello dopo averlo visto; tranne l'informazione R1 sulla validità di 30 giorni, che c'è in ogni ricetta SSN.
 - «Salva in bozza» resta accanto per l'anteprima del promemoria o per firmare dopo. La segreteria fa come prima.
 
 **Come provarlo**
 
 - `apps/web/test/invio.test.tsx`: invio da sé a controllo pulito, una volta sola; fermata con un avviso, poi firma con il pulsante; nessuna firma con il controllo non riuscito, nemmeno dopo «Controlla di nuovo»; nessuna firma senza il passo unico; la segreteria mai. Nella prova dell'interfaccia la ricetta specialistica parte con un clic; nella dimostrazione anche.
+
+**Da sapere**
+
+- Il primo giro della prova nel browser ha mostrato che l'informazione R1, «la ricetta vale 30 giorni», c'è in ogni ricetta SSN: fermandosi su ogni informazione il passo unico non ci sarebbe mai stato. La R1 non ferma; le altre informazioni sì (D255).
 
 **Non provato**
 
@@ -3724,3 +3728,5 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D255: la fermata sui controlli si dice                                                                        | SendPanel.tsx: avviso «non ancora partita» tolto                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D255: il medico ha «Firma e invia» e «Salva in bozza», la segreteria «Prepara la ricetta»                     | PrescriptionEditor.tsx: pulsanti di prima anche al medico                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D255: «Firma e invia» dell'editor accende il passo unico                                                      | PrescriptionEditor.tsx: salvataggio senza il passo unico (rosso con la prova dell'editor)                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: l'informazione R1 sulla validità non ferma il passo unico                                               | SendPanel.tsx: anche la R1 ferma                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: le altre informazioni (R11, R21, R22) fermano il passo unico                                            | SendPanel.tsx: nessuna informazione ferma                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
