@@ -106,4 +106,38 @@ describe('elenco dei pazienti: ricerca e indirizzo', () => {
     expect(screen.getByText(/l’amministratore dello\s+studio no/)).toBeTruthy();
     expect(screen.queryByText('Nessun paziente trovato.')).toBeNull();
   });
+
+  it('un risultato: «1 paziente»; lo stato in parole, come nella cartella (audit D259)', async () => {
+    const row = (id: string, cognome: string, stato: string) => ({
+      id,
+      nome: 'Paziente',
+      cognome,
+      dataNascita: '1950-01-01',
+      codiceFiscale: 'NVNPZN50A41X000X',
+      stato,
+    });
+    const answer = (pazienti: unknown[]) =>
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(url === '/api/pazienti/nuovo' ? { archivi: [] } : { pazienti }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+        ),
+      );
+    vi.stubGlobal('fetch', answer([row('p1', 'Inventato', 'temporary')]));
+    renderPatients([]);
+    expect(await screen.findByText('1 paziente')).toBeTruthy();
+    expect(screen.getByText('temporaneo')).toBeTruthy();
+    expect(screen.queryByText('temporary')).toBeNull();
+    cleanup();
+    vi.stubGlobal(
+      'fetch',
+      answer([row('p1', 'Primo', 'revoked'), row('p2', 'Secondo', 'deceased')]),
+    );
+    renderPatients([]);
+    expect(await screen.findByText('2 pazienti')).toBeTruthy();
+    expect(screen.getByText('revocato')).toBeTruthy();
+    expect(screen.getByText('deceduto')).toBeTruthy();
+  });
 });

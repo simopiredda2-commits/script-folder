@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { age, date, maskedFiscalCode } from '../lib/format';
 import type { Patient, Summary } from '../pages/RecordPage';
 
-const STATUS: Record<string, string> = {
+/** Lo stato del paziente in parole, come nella fascia della cartella e nell'elenco dei pazienti. */
+export const PATIENT_STATUS: Record<string, string> = {
   active: 'in carico',
   revoked: 'revocato',
   deceased: 'deceduto',
@@ -55,7 +56,7 @@ export function PatientFacts({
         </button>
         {patient.status !== 'active' && (
           <span className="etichetta">
-            {STATUS[patient.status] ?? patient.status}
+            {PATIENT_STATUS[patient.status] ?? patient.status}
             {patient.status === 'deceased' && patient.deceasedOn
               ? ` il ${date(patient.deceasedOn)}`
               : ''}

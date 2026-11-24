@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { api, ApiError } from '../lib/api';
 import { CREDENTIALS_PATH } from '../lib/credentials';
+import { sentence } from '../lib/format';
 import { useSession } from '../lib/session';
 import { ErrorMessage, IssueList, Notice, type RuleIssue } from './common';
 import { Icon } from './Icon';
@@ -230,8 +231,8 @@ export function SendPanel({
         <Notice kind="errore">
           <p>
             La ricetta non può partire: {blocked.join(', ')}{' '}
-            {blocked.length === 1 ? 'blocca' : 'bloccano'}. Correggi la ricetta come dice il
-            controllo qui sotto, poi firma.
+            {blocked.length === 1 ? 'blocca' : 'bloccano'}. Che cosa correggere, e dove, lo dice il
+            controllo qui sotto.
           </p>
           {onEdit && (
             <button type="button" className="pulsante" onClick={onEdit}>
@@ -326,7 +327,7 @@ export function SendPanel({
       {outcome?.esito === 'auth' && (
         <Notice kind="errore">
           <p>
-            {outcome.messaggio} La ricetta non cambia: si rimanda così com’è.{' '}
+            {sentence(outcome.messaggio)} La ricetta non cambia: si rimanda così com’è.{' '}
             <Link to={CREDENTIALS_PATH}>Apri «Credenziali dei servizi»</Link>
           </p>
         </Notice>

@@ -47,7 +47,8 @@ export function credentialAlerts(
     if (!s.impostate && !s.accessoRegionale) {
       alerts.push({
         kind: 'avviso',
-        text: `Mancano le credenziali ${s.nome} (${s.uso.toLowerCase()}).`,
+        // Solo la prima lettera in minuscolo: sigle e nomi propri restano come sono (audit D259).
+        text: `Mancano le credenziali ${s.nome} (${s.uso.charAt(0).toLowerCase()}${s.uso.slice(1)}).`,
       });
       continue;
     }

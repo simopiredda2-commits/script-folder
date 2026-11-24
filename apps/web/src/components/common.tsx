@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { ApiError } from '../lib/api';
 import { CREDENTIALS_PATH, isCredentialError } from '../lib/credentials';
-import { date, dateTime } from '../lib/format';
+import { date, dateTime, sentence } from '../lib/format';
 import { Icon } from './Icon';
 
 /** Stato di caricamento, annunciato a chi usa un lettore di schermo. */
@@ -33,7 +33,10 @@ export function ErrorMessage({ error }: { error: ApiError | null }) {
     <div className="messaggio messaggio-errore" role="alert">
       <Icon name="avviso" />
       <span>
-        {error.message}
+        {/* Seguito dal collegamento, il messaggio chiude la frase col punto (audit D259). */}
+        {isCredentialError(error.details) && fields.length === 0
+          ? sentence(error.message)
+          : error.message}
         {fields.length > 0 && `: ${fields.join('; ')}`}
         {isCredentialError(error.details) && (
           <>

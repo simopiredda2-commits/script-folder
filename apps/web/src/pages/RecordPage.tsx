@@ -186,7 +186,9 @@ export function RecordPage() {
       setRepeatDone(
         isDoctor
           ? `${r.ricette.length === 1 ? 'Preparata 1 ricetta' : `Preparate ${r.ricette.length} ricette`} in bozza.`
-          : `${r.ricette.length === 1 ? 'Preparata 1 ricetta' : `Preparate ${r.ricette.length} ricette`}: sono nella coda «da firmare» del medico.`,
+          : r.ricette.length === 1
+            ? 'Preparata 1 ricetta: è nella coda «da firmare» del medico.'
+            : `Preparate ${r.ricette.length} ricette: sono nella coda «da firmare» del medico.`,
       );
     } catch (e) {
       setRepeatError(e instanceof ApiError ? e : null);
