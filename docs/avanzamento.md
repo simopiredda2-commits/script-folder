@@ -1563,6 +1563,12 @@ Pull request #31 unita in `main` (commit 297121d) con le 14 verifiche su GitHub 
 - Le confezioni nell'ultima ricetta compaiono solo se c'è una ricetta: nella dimostrazione molte terapie non ne hanno («nessuna»). Ricette già inviate nei dati della dimostrazione sono nell'elenco «Che cosa resta da fare», con il database dei farmaci.
 - Il contatore delle confezioni (R11) conta le confezioni delle ricette inviate, quindi anche quelle scelte con «− N +». Però oggi non calcola mai la copertura: le unità per confezione non arrivano da nessuna banca dati che abbiamo (D59, D250). Domanda per la prossima fermata: da dove prenderle (la descrizione della confezione AIFA, per esempio «28 compresse»; un campo nella scheda della terapia; o una banca dati con licenza).
 
+## Chiusura del blocco D252–D255 (24/11/2026)
+
+- Prove in locale: tutte le prove dell'interfaccia (unitarie) verdi; la prova nel browser con Chromium 56 su 56; la dimostrazione costruita, 31 prove su 31 con Chromium. WebKit e Firefox girano nella CI.
+- Dimostrazione ripubblicata nello stesso indirizzo, con le confermate e la ricetta in un passo.
+- Schermate rifatte, con la nuova 74 delle ricette confermate.
+
 ## Ricetta del medico in un passo (24/11/2026)
 
 Punto 4 delle richieste della pausa (D255).
