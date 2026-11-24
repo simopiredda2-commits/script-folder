@@ -1563,6 +1563,12 @@ Pull request #31 unita in `main` (commit 297121d) con le 14 verifiche su GitHub 
 - Le confezioni nell'ultima ricetta compaiono solo se c'è una ricetta: nella dimostrazione molte terapie non ne hanno («nessuna»). Ricette già inviate nei dati della dimostrazione sono nell'elenco «Che cosa resta da fare», con il database dei farmaci.
 - Il contatore delle confezioni (R11) conta le confezioni delle ricette inviate, quindi anche quelle scelte con «− N +». Però oggi non calcola mai la copertura: le unità per confezione non arrivano da nessuna banca dati che abbiamo (D59, D250). Domanda per la prossima fermata: da dove prenderle (la descrizione della confezione AIFA, per esempio «28 compresse»; un campo nella scheda della terapia; o una banca dati con licenza).
 
+## Unione della #32 (24/11/2026)
+
+Pull request #32 unita in `main` (commit 1350cde) con il via dato in anticipo da Simone («Ti autorizzo sin da ora a unire. A domani», D251) e le 14 verifiche su GitHub verdi. Con WebKit una prova cadeva: il riquadro della ricerca, fatto scorrere in fondo dai clic su «−» e «+», giustamente non aveva il segno «c'è altro sotto». La prova ora lo riporta in cima prima di controllare; riprodotto e verificato in locale con WebKit. Dimostrazione ripubblicata (versione 20).
+
+**Prossimo passo**: alla prossima fermata, la domanda sulle unità per confezione per il contatore R11 (D250); poi l'ordine di «Che cosa resta da fare, in ordine».
+
 ## Risposte della fermata dopo la #31 (23/11/2026)
 
 Simone ha risposto con il pulsante il 23/11/2026 (D247).
