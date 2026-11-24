@@ -287,6 +287,15 @@ export function lineFromPrescribed(
   };
 }
 
+/**
+ * Una riga che la segreteria può preparare (D259): una terapia cronica in corso, come in «Ripeti
+ * le terapie scelte». Il servizio lo controlla di nuovo.
+ */
+export function repeatable(line: Pick<Line, 'therapyId'>, therapies: readonly TherapyRow[]) {
+  const t = therapies.find((x) => x.id === line.therapyId);
+  return !!t && t.kind === 'chronic' && t.status === 'active' && !t.reserved;
+}
+
 /** Dove si ricorda la ricetta in corso di un paziente, nella scheda del browser (D68). */
 const draftKey = (patientId: string, mode: 'farmaci' | 'specialistica', field: string) =>
   `ricetta:${patientId}:${mode}:${field}`;
@@ -362,6 +371,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   // Il medico firma e invia in un passo (D255). Non si ricorda: tornando alla bozza, il medico
   // vede i controlli e firma con il pulsante.
   const { isDoctor } = useSession();
+  // La segreteria prepara solo le ripetizioni delle terapie croniche in corso (requisiti, «Ruoli»;
+  // audit, D259): «Aggiungi» c'è solo su quelle; la ricerca resta per consultare.
+  const repeatOnly = !isDoctor;
   const [oneStep, setOneStep] = useState(false);
   const startOver = () => {
     for (const reset of [resetKind, resetLines, resetExemption, resetChannel, resetAccess]) reset();
@@ -516,6 +528,19 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
       </>
     );
 
+  if (repeatOnly && mode === 'specialistica')
+    return (
+      <>
+        {header}
+        <Notice kind="info">
+          <p>
+            La ricetta specialistica la prepara il medico. La segreteria prepara le ripetizioni
+            delle terapie croniche, dalla <Link to={`/pazienti/${id}/ricetta`}>Nuova ricetta</Link>.
+          </p>
+        </Notice>
+      </>
+    );
+
   return (
     <>
       {header}
@@ -549,6 +574,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 </div>
               ))}
             </fieldset>
+          )}
+          {repeatOnly && mode === 'farmaci' && (
+            <p className="aiuto" id="solo-ripetizioni">
+              La segreteria prepara solo le ripetizioni delle terapie croniche in corso: si
+              aggiungono dai farmaci prescritti, qui sotto. La ricerca serve a consultare la banca
+              dati.
+            </p>
           )}
           <div role="search" className="ricerca">
             <label htmlFor="cerca-voce">
@@ -595,18 +627,19 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                     {d.shortage && <ShortageNote shortage={d.shortage} />}
                     <RegistryNote registries={d.registries ?? []} />
                   </div>
-                  {drugAction(
-                    line,
-                    line.drugName,
-                    <button
-                      type="button"
-                      className="pulsante"
-                      disabled={locked}
-                      onClick={() => add(line)}
-                    >
-                      <Icon name="aggiungi" /> <span>Aggiungi</span>
-                    </button>,
-                  )}
+                  {!repeatOnly &&
+                    drugAction(
+                      line,
+                      line.drugName,
+                      <button
+                        type="button"
+                        className="pulsante"
+                        disabled={locked}
+                        onClick={() => add(line)}
+                      >
+                        <Icon name="aggiungi" /> <span>Aggiungi</span>
+                      </button>,
+                    )}
                 </li>
               );
             })}
@@ -661,6 +694,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 label="titolo-farmaci-prescritti"
                 action={(d) => {
                   const line = lineFromPrescribed(d, therapies.data?.terapie ?? []);
+                  if (repeatOnly && !repeatable(line, therapies.data?.terapie ?? [])) return null;
                   return drugAction(
                     line,
                     d.farmaco,
@@ -681,7 +715,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               <h3>Dalla terapia in corso</h3>
               <ul className="risultati">
                 {therapies
-                  .data!.terapie.filter((t) => t.status === 'active')
+                  .data!.terapie.filter(
+                    (t) => t.status === 'active' && (!repeatOnly || t.kind === 'chronic'),
+                  )
                   .map((t) => (
                     <li key={t.id} className="risultato">
                       <div>
@@ -731,7 +767,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           )}
           {lines.length === 0 && (
             <p className="tenue">
-              Aggiungi un {mode === 'farmaci' ? 'farmaco' : 'prestazione'} dalla ricerca.
+              {repeatOnly
+                ? 'Aggiungi una terapia cronica in corso dai farmaci prescritti.'
+                : mode === 'farmaci'
+                  ? 'Aggiungi un farmaco dalla ricerca.'
+                  : 'Aggiungi una prestazione dalla ricerca.'}
             </p>
           )}
           <ol className="righe-ricetta">

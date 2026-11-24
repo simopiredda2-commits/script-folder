@@ -350,8 +350,23 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     );
   }
 
-  /** Il medico prepara una ricetta nuova (bozza). Il corpo si valida dopo la guardia. */
+  /**
+   * Una ricetta nuova (bozza). Il medico la prepara come vuole; la segreteria solo come ripetizione
+   * di terapie croniche (requisiti, «Ruoli»), anche dalla «Nuova ricetta» (audit, D259). Il corpo si
+   * valida dopo la guardia.
+   */
   async function createDraft(actor: Actor, patientId: string, body: unknown) {
+    const [row] = await db
+      .select({ archiveId: patient.archiveId })
+      .from(patient)
+      .where(and(eq(patient.id, patientId), eq(patient.studioId, actor.studioId)));
+    const doctor =
+      !row ||
+      can(actor, 'prescription.draft', {
+        ...(await loadArchiveContext(db, row.archiveId)),
+        now: now(),
+      }).allowed;
+    if (!doctor) return createRepeatDraft(actor, patientId, body);
     const { patient: p } = await guardPatient(
       db,
       actor,
@@ -361,6 +376,80 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     );
     assertNotDeceased(p);
     return insertDraft(actor, patientId, p.archiveId, draftSchema.parse(body), 'draft');
+  }
+
+  /**
+   * La bozza della segreteria dalla «Nuova ricetta» (D259): ogni riga è una terapia cronica in
+   * corso del paziente, non riservata, come in «Ripeti le terapie scelte». Della riga contano la
+   * terapia e le confezioni; farmaco, nota AIFA e posologia vengono dalla scheda della terapia,
+   * non da ciò che manda il browser. Le regole (R2–R4) controllano le confezioni prima della firma.
+   */
+  async function createRepeatDraft(actor: Actor, patientId: string, body: unknown) {
+    const { patient: p, context } = await guardPatient(
+      db,
+      actor,
+      patientId,
+      'prescription.draft_repeat',
+      'ricetta_ripetizione',
+      { therapyKind: 'chronic' },
+    );
+    assertNotDeceased(p);
+    const input = draftSchema.parse(body);
+    if (input.kind === 'specialist_ssn')
+      // Registrata come richiesta negata: la ricetta specialistica la prepara il medico.
+      await guardPatient(db, actor, patientId, 'prescription.draft', 'ricetta_bozza');
+    const ids = input.lines.map((l) => l.therapyId);
+    if (ids.some((id) => !id))
+      throw new HttpError(
+        403,
+        'La segreteria prepara solo le ripetizioni delle terapie croniche in corso: si aggiungono dai farmaci prescritti',
+      );
+    const rows = await db
+      .select()
+      .from(therapy)
+      .where(and(eq(therapy.patientId, patientId), inArray(therapy.id, ids as string[])));
+    const byId = new Map(rows.map((t) => [t.id, t]));
+    const lines = [];
+    for (const l of input.lines) {
+      const t = byId.get(l.therapyId!);
+      if (!t) throw new HttpError(404, 'Terapia non trovata');
+      const decision = can(actor, 'prescription.draft_repeat', {
+        ...context,
+        resource: { therapyKind: t.kind, reserved: t.reserved },
+        now: now(),
+      });
+      if (!decision.allowed)
+        await guardPatient(
+          db,
+          actor,
+          patientId,
+          'prescription.draft_repeat',
+          'ricetta_ripetizione',
+          {
+            therapyKind: t.kind,
+            reserved: t.reserved,
+          },
+        );
+      if (t.status !== 'active') throw new HttpError(409, `Terapia non attiva: ${t.drugName}`);
+      if ((input.kind === 'white') !== t.notReimbursable)
+        throw new HttpError(
+          400,
+          `${t.drugName}: la terapia va in ricetta ${t.notReimbursable ? 'bianca' : 'SSN'}`,
+        );
+      lines.push({
+        therapyId: t.id,
+        drugAic: t.drugAic,
+        drugName: t.drugName,
+        activeIngredient: t.activeIngredient,
+        quantity: l.quantity,
+        aifaNote: t.aifaNote,
+        byActiveIngredient: t.byActiveIngredient,
+        notSubstitutable: t.notSubstitutable,
+        notSubstitutableReason: t.notSubstitutableReason,
+        posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
+      });
+    }
+    return insertDraft(actor, patientId, p.archiveId, { ...input, lines }, 'draft');
   }
 
   /**
