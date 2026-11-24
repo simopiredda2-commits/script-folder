@@ -216,7 +216,8 @@ export function SendPanel({
       <h3>Controlli prima dell’invio</h3>
       {stopped && !outcome && (
         <Notice kind="avviso">
-          La ricetta non è ancora partita: i controlli qui sotto si vedono prima della firma.
+          La ricetta non è ancora partita. Guarda i controlli qui sotto e conferma con «Ho visto i
+          controlli: firma e invia».
         </Notice>
       )}
       {check && (
@@ -325,7 +326,9 @@ export function SendPanel({
             onClick={() => void sign()}
             disabled={busy || checking}
           >
-            <Icon name="firma" /> <span>Firma e invia</span>
+            {/* Fermato il passo unico, il medico conferma di aver visto i controlli (D256). */}
+            <Icon name="firma" />{' '}
+            <span>{stopped ? 'Ho visto i controlli: firma e invia' : 'Firma e invia'}</span>
           </button>
         ) : (
           status === 'draft' && (

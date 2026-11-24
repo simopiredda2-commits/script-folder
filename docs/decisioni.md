@@ -1913,3 +1913,9 @@ Non provato: Safari e Firefox veri; la stampa su carta dal menu della pagina.
 - **«Ricomincia» accanto al titolo «In ricetta»**: con tre pulsanti in fondo, a 1280 px «Ricomincia» andava a capo e toglieva spazio alla ricetta (lo ha mostrato la schermata). Svuota la lista, quindi sta con la lista; in fondo restano «Firma e invia» e «Salva in bozza», in una riga. La prova nel browser lo controlla a 1280 px.
 
 Non provato: Safari e Firefox veri; le credenziali vere del Sistema TS.
+
+**D256 · Risposte della fermata dopo la #33 (24/11/2026).** Simone ha risposto con il pulsante.
+
+- **Via**: «Unisci». Pull request #33 unita in `main` (commit 8c91d72) con le 14 verifiche su GitHub verdi.
+- **Ricetta del medico in un passo**: «Ok Tutto tranne R1 con pulsante che faccia confermare comunque il medico per procedere». Il passo unico si ferma su ogni problema dei controlli tranne la R1, come in D255. Quando si ferma, il medico procede solo con un pulsante di conferma esplicito, «Ho visto i controlli: firma e invia», non con lo stesso «Firma e invia» di prima.
+- **Database dei farmaci nella dimostrazione**: «Ok classe A e h ma tenendo a mente che tutto il resto sarà da integrare». Nella dimostrazione i rimborsabili di classe A e H dalle liste AIFA. Il resto dell'anagrafica (classe C, senza obbligo di prescrizione, confezioni non rimborsate) resta da integrare: è annotato in «Che cosa resta da fare».
