@@ -244,16 +244,25 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         const b = document
           .querySelector('.azioni-ricetta .pulsante-primario')
           ?.getBoundingClientRect();
+        // I pulsanti in fondo alla ricetta, in una riga sola (D255).
+        const rows = new Set(
+          [...document.querySelectorAll('.azioni-ricetta > button')].map((x) =>
+            Math.round(x.getBoundingClientRect().top),
+          ),
+        );
         return {
           height: document.scrollingElement!.scrollHeight,
           view: innerHeight,
           button: b ? b.top >= 0 && b.bottom <= innerHeight : false,
+          rows: rows.size,
         };
       });
       expect(m.height, `${where} a ${v.width}×${v.height}: la pagina scorre`).toBeLessThanOrEqual(
         m.view,
       );
       expect(m.button, `${where} a ${v.width}×${v.height}: «Firma e invia» fuori vista`).toBe(true);
+      if (v.width >= 1280)
+        expect(m.rows, `${where} a ${v.width}×${v.height}: i pulsanti vanno a capo`).toBe(1);
     }
     await p.setViewportSize({ width: 1280, height: 900 });
   }

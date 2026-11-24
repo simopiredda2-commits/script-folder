@@ -1910,5 +1910,6 @@ Non provato: Safari e Firefox veri; la stampa su carta dal menu della pagina.
 - **«Salva in bozza»** resta accanto, per il medico che vuole l'anteprima del promemoria (D253) o firmare dopo: è il percorso di prima.
 - **Una volta sola**: il passo unico vale al momento del clic. Tornando su una bozza, il medico vede i controlli e firma con il pulsante.
 - **La segreteria** non cambia: «Prepara la ricetta», poi «Manda alla firma del medico».
+- **«Ricomincia» accanto al titolo «In ricetta»**: con tre pulsanti in fondo, a 1280 px «Ricomincia» andava a capo e toglieva spazio alla ricetta (lo ha mostrato la schermata). Svuota la lista, quindi sta con la lista; in fondo restano «Firma e invia» e «Salva in bozza», in una riga. La prova nel browser lo controlla a 1280 px.
 
 Non provato: Safari e Firefox veri; le credenziali vere del Sistema TS.

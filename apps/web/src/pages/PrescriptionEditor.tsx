@@ -700,7 +700,16 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           aria-labelledby="titolo-ricetta"
           ref={lineBox}
         >
-          <h2 id="titolo-ricetta">In ricetta</h2>
+          {/* «Ricomincia» svuota questa lista: sta accanto al titolo, così in fondo restano solo i
+              pulsanti della firma e della bozza, in una riga anche a 1280 px (D255). */}
+          <div className="riquadro-testa">
+            <h2 id="titolo-ricetta">In ricetta</h2>
+            {!draft && lines.length > 0 && (
+              <button type="button" className="pulsante pulsante-piatto" onClick={startOver}>
+                <Icon name="ripeti" /> <span>Ricomincia</span>
+              </button>
+            )}
+          </div>
           {/* Il totale delle confezioni, che cambia con «− N +» e con il campo della riga (D250):
               è quello che contano i limiti per ricetta (R2–R4) quando si prepara la ricetta. */}
           {mode === 'farmaci' && lines.length > 0 && (
@@ -1038,11 +1047,6 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   onClick={() => void save()}
                 >
                   <Icon name="ricette" /> <span>Prepara la ricetta</span>
-                </button>
-              )}
-              {lines.length > 0 && (
-                <button type="button" className="pulsante" onClick={startOver}>
-                  <Icon name="ripeti" /> <span>Ricomincia</span>
                 </button>
               )}
             </div>
