@@ -65,7 +65,14 @@ function service() {
                   ? { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 }
                   : path === '/api/ricette/r1/firma-e-invia'
                     ? { esito: 'accepted', nre: '0101A0000000009', messaggio: null }
-                    : {};
+                    : // Dopo l'invio compare il promemoria, che legge stampa, recapiti e consegne.
+                      path === '/api/stampa/preferenze'
+                      ? { postazione: { scritta: '', riconosciuta: null }, preferenze: [] }
+                      : path === `/api/pazienti/${PATIENT_ID}/recapiti-promemoria`
+                        ? { paziente: { email: null, telefono: null }, deleghe: [] }
+                        : path === '/api/ricette/r1/promemoria/consegne'
+                          ? { consegne: [], carta: null }
+                          : {};
       return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
     }),
   );
