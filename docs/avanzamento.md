@@ -1481,7 +1481,7 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Nessuna per ora: quelle della fermata dopo la #37 hanno avuto risposta il 24/11/2026 (D262). Le domande nuove si scrivono qui durante il blocco (D237).
+Nessuna per ora: quelle della fermata dopo la #38 hanno avuto risposta il 24/11/2026 (D263). Le domande nuove si scrivono qui durante il blocco (D237).
 
 ## Richieste di Simone durante la pausa (22–23/11/2026), da fare alla ripresa
 
@@ -1497,7 +1497,7 @@ Nessuna per ora: quelle della fermata dopo la #37 hanno avuto risposta il 24/11/
 2. **Pagina Ricette con tutte le ricette in corso**, non solo quelle della segreteria. Le parole di Simone: «è sufficiente che nell'elenco "ricette" ci siano quelle da confermare, confermate (dal medico per ricetta fatta dal medico stesso o confermate quelle della segreteria), non confermate o non accolte». Il menu di stampa e invio (promemoria, solo NRE, email) deve stare anche lì, non solo nella cartella.
 3. **Pulsante «Archivia ricette confermate»**: toglie dall'elenco quelle già evase, cioè inviate o stampate. Restano nello storico del paziente.
 4. **Ricetta del medico in un passo solo**: quando prescrive il medico, la conferma è la sua. Oggi sono due clic, «Prepara la ricetta» e poi «Firma e invia». L'invio con le credenziali del medico resta obbligatorio (Sistema TS, SAR).
-5. Promemoria sul database dei farmaci (D243). Ricordato alla ripresa del 23/11/2026; risposta di Simone: «Più avanti». Resta da fare, si ricorda alla prossima fermata.
+5. Promemoria sul database dei farmaci (D243). Ricordato alla ripresa del 23/11/2026; risposta di Simone: «Più avanti». Fatto poi: le classi A e H nella dimostrazione con la D257, l'anagrafica AIFA intera con la D261.
 6. **Esenzioni nella schermata iniziale del paziente**: oggi la testata mostra solo il codice. Vanno mostrate le esenzioni pertinenti, cioè quelle in corso, con la descrizione e la scadenza.
 7. **Cartella in una schermata**, senza dover scorrere troppo, come già fatto per la ricetta (D242).
 8. **Dati amministrativi a sezioni**. Oggi il menu porta alla sezione cliccata dentro un'unica pagina lunga. Simone vuole che si apra solo la sezione cliccata: «preferirei si aprissero solo i relativi sottomenu cliccati e non tutti». Lo stesso criterio vale per le altre pagine lunghe (Strumenti, Archivio).
@@ -1586,6 +1586,16 @@ Il resoconto di Cowork (32 difetti, nessuno che blocca, 15 importanti e 17 minor
 - Nella dimostrazione, il codice del pulsante riletto subito dopo un accesso o un'uscita: non ha una prova a sé, lo copre il giro di ogni secondo.
 
 **Prossimo passo**: le domande della fermata qui sotto; poi il collaudo finale.
+
+## Risposte della fermata dopo la #38 (24/11/2026)
+
+Simone ha risposto con il pulsante (D263): «Unisci» per la #38; gli esiti del collaudo si leggono «Quando ve lo dico». Prima aveva chiesto se il collaudo si può fare nei prossimi giorni: sì, anche un po' alla volta. Pull request #38 unita (63bb217); il branch riparte da `main`.
+
+**Fatto**
+
+- Il promemoria sul database dei farmaci (D243), ancora fra le richieste da ricordare, è chiuso: le classi A e H sono nella dimostrazione dalla D257, l'anagrafica AIFA intera dalla D261.
+
+**Prossimo passo**: il collaudo, fatto da Simone e dalla Dr.ssa Rocca nei prossimi giorni, nella pagina del collaudo. Quando scrivono qui che hanno segnato un gruppo di voci, si leggono gli esiti e si correggono le voci «Da correggere», ognuna con la sua prova; le voci «Non ancora» restano in `docs/collaudo.md` con il motivo.
 
 ## Risposte della fermata dopo la #37 (24/11/2026)
 
@@ -1831,7 +1841,7 @@ Simone ha risposto con il pulsante il 23/11/2026 (D247).
 Simone ha risposto con il pulsante il 21/11/2026 (D243).
 
 - **Via**: «Via, unisci». Pull request #30 unita in `main` (commit 799d009), con le 14 verifiche su GitHub verdi, anche con WebKit e Firefox.
-- **Più farmaci nella dimostrazione**: «Resta l'estratto, ma poi ricordami che dobbiamo integrare il database». Restano le 13 confezioni d'esempio. **Da ricordare a Simone alla ripresa**: integrare il database dei farmaci; che cosa vuol dire di preciso si chiede a lui allora.
+- **Più farmaci nella dimostrazione**: «Resta l'estratto, ma poi ricordami che dobbiamo integrare il database». Restano le 13 confezioni d'esempio. **Da ricordare a Simone alla ripresa**: integrare il database dei farmaci; che cosa vuol dire di preciso si chiede a lui allora. Fatto poi con la D257 e la D261.
 - **Pausa**: chiesta da Simone dopo le correzioni delle prove instabili.
 
 ## Domande della fermata dopo l'unione della #29 (chiuse)
