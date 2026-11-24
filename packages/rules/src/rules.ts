@@ -113,8 +113,42 @@ const choiceInForce = (
 const latestDate = (dates: (string | null)[]) =>
   dates.filter((d): d is string => d !== null).sort((a, b) => b.localeCompare(a))[0] ?? null;
 
+/**
+ * R1 per la ricetta specialistica, dalle versioni delle regole che hanno i giorni della Regione
+ * (D.D. 710/2026, punto 4; D260): primo accesso o altra tipologia di accesso (successivo o
+ * diretto). Per le prestazioni da prenotare il termine è quello della prenotazione, e la ricetta
+ * prenotata in tempo vale fino all'erogazione. La fonte mostrata è quella della Regione.
+ */
+function specialistValidity(rule: Rule, ctx: RuleContext, first: number, other: number): Issue {
+  const source = rule.sources.find((s) => s.title.startsWith('Regione'))?.title;
+  const booking =
+    'se la prestazione si prenota è il termine per prenotare, e la ricetta prenotata in tempo vale fino all’erogazione';
+  const type = ctx.prescription.accessType;
+  if (type === null)
+    return {
+      ruleId: 'R1',
+      severity: severityOf(rule),
+      source,
+      message: `La ricetta vale ${first} giorni per il primo accesso e ${other} per gli altri accessi; ${booking}`,
+    };
+  const days = type === 'first' ? first : other;
+  const until = addDays(ctx.date, days - 1);
+  const label = type === 'first' ? 'Primo accesso' : 'Altra tipologia di accesso';
+  return {
+    ruleId: 'R1',
+    severity: severityOf(rule),
+    source,
+    message: `${label}: la ricetta vale ${days} giorni, fino al ${italian(until)} compreso; ${booking}`,
+  };
+}
+
 const evaluators: Record<RuleId, Evaluator> = {
   R1: (rule, ctx) => {
+    if (ctx.prescription.kind === 'specialist_ssn') {
+      const first = value(rule, 'specialistFirstAccessDays');
+      const other = value(rule, 'specialistOtherAccessDays');
+      if (first !== null && other !== null) return [specialistValidity(rule, ctx, first, other)];
+    }
     const days = value(rule, 'validityDays');
     if (ctx.prescription.kind === 'white' || days === null) return [];
     // Conteggio inclusivo: il giorno di compilazione è il primo (come nell'esempio di R11).

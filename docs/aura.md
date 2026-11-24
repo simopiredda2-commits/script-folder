@@ -44,10 +44,11 @@ Un controllo alla volta per paziente (D198): ogni controllo prende un blocco nel
 
 **Stato del paziente** (D198), secondo le scelte del titolare dell'archivio arrivate da AURA:
 
-- scelta cessata e nessuna in corso: il paziente passa a «revocato», da solo;
-- di nuovo una scelta in corso: torna «in carico», da solo;
+- scelta cessata e nessuna in corso: il paziente passa a «revocato», da solo, anche se era temporaneo (D260);
+- di nuovo una scelta in corso: torna «in carico», da solo, o «temporaneo» se la scelta ha una scadenza, come alla registrazione (D260);
+- una scelta temporanea solo scaduta, non cessata: lo stato non cambia, e alla ricetta avvisa la R20;
 - scelte di altri medici o scritte a mano: lo stato non cambia;
-- pazienti deceduti o temporanei: non si toccano.
+- pazienti deceduti: non si toccano.
 
 Ogni cambio di stato è una variazione in parole.
 

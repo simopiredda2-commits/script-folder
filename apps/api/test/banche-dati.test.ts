@@ -990,7 +990,8 @@ describe('banche dati via HTTP e nelle regole', () => {
     });
     expect(res.statusCode, res.body).toBe(201);
     const check = (await post(`/api/ricette/${res.json().id}/controlla`)).json();
-    expect(check.versioneRegole).toBe('2026-11-20.1');
+    // La versione in vigore oggi: dalla 2026-11-20.1 in poi c'è la R22.
+    expect(String(check.versioneRegole).localeCompare('2026-11-20.1')).toBeGreaterThanOrEqual(0);
     const r22 = check.problemi.filter((p: { ruleId: string }) => p.ruleId === 'R22');
     // Solo la ranitidina: l'amlodipina è «Autorizzata» nella stessa anagrafica.
     expect(r22).toEqual([

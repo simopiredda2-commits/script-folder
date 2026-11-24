@@ -184,6 +184,14 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           una persona abbia controllato la trascrizione; nel programma entra dopo il controllo.
         </p>
       </section>
+      <section aria-labelledby="dimo-catalogo">
+        <h3 id="dimo-catalogo">Specialistica</h3>
+        <p>
+          Nella cartella, in <strong>Specialistica</strong>, si sceglie dal catalogo regionale del
+          Piemonte: la D.D. 590/2026 con le modifiche della D.D. 710/2026. Anche qui si vede prima
+          che una persona abbia controllato la trascrizione; nel programma entra dopo il controllo.
+        </p>
+      </section>
       <section aria-labelledby="dimo-codice">
         <h3 id="dimo-codice">Secondo fattore</h3>
         {/* Si annuncia il codice quando cambia, non il conto alla rovescia di ogni secondo (D232). */}

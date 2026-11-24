@@ -2,9 +2,11 @@
  * Database di partenza della dimostrazione (D221), preparato in Node una volta per costruzione:
  * tutte le migrazioni e le banche dati d'esempio, cioè `sync/` lanciato sul sito d'esempio
  * (fixtures/banche-dati) e importato come fa `pnpm banche-dati:importa -- --esempio`. In più il
- * nomenclatore dei presidi degli allegati 2 e 3 del DPCM LEA (D218, D236), che nel programma entra
- * solo dopo il controllo di una persona (A8): qui si vede prima, e il riquadro lo dice. Nessun
- * paziente: i dati dimostrativi si creano nel browser all'avvio, con le date di quel giorno.
+ * nomenclatore dei presidi degli allegati 2 e 3 del DPCM LEA (D218, D236) e il catalogo regionale
+ * delle prestazioni del Piemonte, D.D. 590/2026 con le modifiche della D.D. 710/2026 (D159, D260),
+ * che nel programma entrano solo dopo il controllo di una persona (A8): qui si vedono prima, e il
+ * riquadro lo dice. Il catalogo vero prende il posto di quello d'esempio, nella stessa serie.
+ * Nessun paziente: i dati dimostrativi si creano nel browser all'avvio, con le date di quel giorno.
  *
  *   tsx apps/demo/scripts/prepara-database.ts DESTINAZIONE.tar.gz
  */
@@ -30,8 +32,18 @@ import { importReferenceData } from '../../api/src/reference/importer';
 const dest = process.argv[2];
 if (!dest) throw new Error('Indica il file da scrivere (.tar.gz)');
 
-/** Le trascrizioni dei presidi del DPCM LEA che la dimostrazione mostra prima del controllo. */
-const SUPPLY_TRANSCRIPTIONS = ['allegato-2-ausili-monouso', 'allegato-3-presidi'];
+/**
+ * Le trascrizioni che la dimostrazione mostra prima del controllo, per cartella: i presidi del DPCM
+ * LEA e il catalogo regionale (la versione intera della D.D. 590 e le due date della D.D. 710).
+ */
+const UNCHECKED_TRANSCRIPTIONS = {
+  lea: ['allegato-2-ausili-monouso', 'allegato-3-presidi'],
+  piemonte_catalogo: [
+    'dd590-2026-allegato-a',
+    'dd710-2026-dal-2026-10-30',
+    'dd710-2026-dal-2027-01-13',
+  ],
+};
 /** «Controllato da» nella copia della dimostrazione: dice che nessuno l'ha controllata. */
 const DEMO_UNCHECKED = 'nessuno: copia della dimostrazione, ancora da controllare (A8)';
 
@@ -118,30 +130,34 @@ try {
     mappings: loadMappings(),
     importedBy: 'dimostrazione nel browser (banche dati d’esempio)',
   });
-  // Il nomenclatore dei presidi: le trascrizioni del programma, copiate con chi le ha controllate.
+  // Presidi e catalogo regionale: le trascrizioni del programma, copiate con chi le ha controllate.
   // Non vengono da sync (atti non scaricati): una cartella di sync vuota, perché i file d'esempio
-  // sono già entrati sopra.
-  const supplies = join(work, 'trascrizioni-presidi');
+  // sono già entrati sopra. Le modifiche della D.D. 710 partono dalla D.D. 590 (la versione prima
+  // della loro data) e, alla stessa data del catalogo d'esempio, vince l'importazione più recente.
+  const unchecked = join(work, 'trascrizioni-da-controllare');
   const noSync = join(work, 'senza-sync');
-  mkdirSync(join(supplies, 'lea'), { recursive: true });
   mkdirSync(noSync);
   writeFileSync(join(noSync, 'stato.json'), JSON.stringify({ versione: 1, file: {} }));
-  for (const base of SUPPLY_TRANSCRIPTIONS) {
-    const from = (ext: string) => join(REGIONAL_TRANSCRIPTIONS, 'lea', `${base}.${ext}`);
-    cpSync(from('csv'), join(supplies, 'lea', `${base}.csv`));
-    const sheet = JSON.parse(readFileSync(from('json'), 'utf-8')) as Record<string, unknown>;
-    writeFileSync(
-      join(supplies, 'lea', `${base}.json`),
-      JSON.stringify({ ...sheet, controllato_da: DEMO_UNCHECKED }),
-    );
+  for (const [dir, bases] of Object.entries(UNCHECKED_TRANSCRIPTIONS)) {
+    mkdirSync(join(unchecked, dir), { recursive: true });
+    for (const base of bases) {
+      const from = (ext: string) => join(REGIONAL_TRANSCRIPTIONS, dir, `${base}.${ext}`);
+      cpSync(from('csv'), join(unchecked, dir, `${base}.csv`));
+      const sheet = JSON.parse(readFileSync(from('json'), 'utf-8')) as Record<string, unknown>;
+      writeFileSync(
+        join(unchecked, dir, `${base}.json`),
+        JSON.stringify({ ...sheet, controllato_da: DEMO_UNCHECKED }),
+      );
+    }
   }
   report.push(
     ...(await importReferenceData({
       db,
       syncDir: noSync,
-      transcriptionsDir: supplies,
+      transcriptionsDir: unchecked,
       mappings: loadMappings(),
-      importedBy: 'dimostrazione nel browser (presidi del DPCM LEA, da controllare)',
+      importedBy:
+        'dimostrazione nel browser (presidi del DPCM LEA e catalogo regionale, da controllare)',
     })),
   );
   const refused = report.filter((r) => r.outcome !== 'importato' && r.outcome !== 'gia_importato');

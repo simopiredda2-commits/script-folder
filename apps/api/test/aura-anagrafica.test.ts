@@ -172,6 +172,90 @@ describe('AURA: revoca e anagrafica da confermare (D198)', () => {
     expect((await statusChanges())[1]).toMatch(/^Paziente di nuovo in carico: Scelta di /);
   });
 
+  /** Cessa in AURA le scelte del titolare: quella di partenza e quella della prova di prima. */
+  const endOwnerChoices = (expiresOn: string | null) => {
+    for (const chosenOn of ['2024-03-01', daysAgo(1)])
+      aura.setChoice(auraId, {
+        doctorFiscalCode: ownerCf,
+        chosenOn,
+        expiresOn,
+        endedOn: daysAgo(2),
+        endReason: 'revoca',
+      });
+  };
+
+  it('temporaneo con la scelta del titolare cessata: revocato da solo, come chi è in carico (D260); con una scelta in scadenza torna temporaneo', async () => {
+    await t.db.update(patient).set({ status: 'temporary' }).where(eq(patient.id, s.richPatient));
+    const before = (await statusChanges()).length;
+    endOwnerChoices(daysAgo(-60));
+    await until(async () => (await rich()).status === 'revoked');
+    expect((await statusChanges()).slice(before)).toEqual([
+      expect.stringMatching(/^Paziente revocato: Scelta di .+ cessata il .+ \(revoca\)$/),
+    ]);
+    // Una scelta nuova con la scadenza: torna temporaneo, come alla registrazione da AURA (D199).
+    aura.setChoice(auraId, {
+      doctorFiscalCode: ownerCf,
+      chosenOn: daysAgo(0),
+      expiresOn: daysAgo(-90),
+      endedOn: null,
+      endReason: null,
+    });
+    await until(async () => (await rich()).status === 'temporary');
+    expect((await statusChanges()).slice(before)).toEqual([
+      expect.stringMatching(/^Paziente revocato: /),
+      expect.stringMatching(/^Paziente di nuovo temporaneo: Scelta di .+, in scadenza il /),
+    ]);
+    // Come prima, per le prove che seguono: in carico, con una scelta senza scadenza.
+    aura.setChoice(auraId, {
+      doctorFiscalCode: ownerCf,
+      chosenOn: daysAgo(0),
+      expiresOn: null,
+      endedOn: null,
+      endReason: null,
+    });
+    expect((await post(`/api/pazienti/${s.richPatient}/aura`)).json()).toMatchObject({
+      esito: 'aggiornato',
+    });
+    await t.db.update(patient).set({ status: 'active' }).where(eq(patient.id, s.richPatient));
+  });
+
+  it('temporaneo con la scelta solo scaduta, non cessata: resta temporaneo (alla ricetta avvisa la R20)', async () => {
+    await t.db.update(patient).set({ status: 'temporary' }).where(eq(patient.id, s.richPatient));
+    const before = (await statusChanges()).length;
+    // La scelta della prova di prima cessa; resta una scelta temporanea scaduta tre giorni fa.
+    aura.setChoice(auraId, {
+      doctorFiscalCode: ownerCf,
+      chosenOn: daysAgo(0),
+      expiresOn: null,
+      endedOn: daysAgo(0),
+      endReason: 'revoca',
+    });
+    aura.setChoice(auraId, {
+      doctorFiscalCode: ownerCf,
+      chosenOn: daysAgo(100),
+      expiresOn: daysAgo(3),
+      endedOn: null,
+      endReason: null,
+    });
+    expect((await post(`/api/pazienti/${s.richPatient}/aura`)).json()).toMatchObject({
+      esito: 'aggiornato',
+    });
+    expect((await rich()).status).toBe('temporary');
+    expect((await statusChanges()).slice(before)).toEqual([]);
+    // Come prima, per le prove che seguono.
+    aura.setChoice(auraId, {
+      doctorFiscalCode: ownerCf,
+      chosenOn: daysAgo(0),
+      expiresOn: null,
+      endedOn: null,
+      endReason: null,
+    });
+    expect((await post(`/api/pazienti/${s.richPatient}/aura`)).json()).toMatchObject({
+      esito: 'aggiornato',
+    });
+    await t.db.update(patient).set({ status: 'active' }).where(eq(patient.id, s.richPatient));
+  });
+
   it('anagrafica diversa in AURA: si vede come differenza e non entra da sola', async () => {
     const before = await rich();
     expect(before.residenceProvince).toBeTruthy();

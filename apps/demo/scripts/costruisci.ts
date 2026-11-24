@@ -44,7 +44,18 @@ writeFileSync(
   join(OUT, 'pglite-dati.txt'),
   gzipSync(readFileSync(join(PGLITE, 'pglite.data')), { level: 9 }).toString('base64'),
 );
-writeFileSync(join(OUT, 'database.txt'), readFileSync(databaseFile).toString('base64'));
+// Il database va in parti: l'artifact accetta file di testo fino a 16 MB (D256), e con il catalogo
+// regionale (D260) il database li supera. database.txt elenca le parti, che unite nell'ordine
+// ridanno il testo in base64 intero (server.ts).
+const PART = 12_000_000;
+const encoded = readFileSync(databaseFile).toString('base64');
+const databaseParts: string[] = [];
+for (let i = 0; i * PART < encoded.length; i++) {
+  const name = `database-${i + 1}.txt`;
+  writeFileSync(join(OUT, name), encoded.slice(i * PART, (i + 1) * PART));
+  databaseParts.push(name);
+}
+writeFileSync(join(OUT, 'database.txt'), `${databaseParts.join('\n')}\n`);
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');
 const pick = (re: RegExp, what: string) => {
@@ -116,13 +127,18 @@ const TYPES: Record<string, string> = {
   '.wasm': 'application/wasm',
   '.txt': 'text/plain',
 };
-const files = [...referenced, 'pglite.wasm', 'initdb.wasm', 'pglite-dati.txt', 'database.txt'].map(
-  (name) => ({
-    name,
-    type: TYPES[name.slice(name.lastIndexOf('.'))]!,
-    bytes: statSync(join(OUT, name)).size,
-  }),
-);
+const files = [
+  ...referenced,
+  'pglite.wasm',
+  'initdb.wasm',
+  'pglite-dati.txt',
+  'database.txt',
+  ...databaseParts,
+].map((name) => ({
+  name,
+  type: TYPES[name.slice(name.lastIndexOf('.'))]!,
+  bytes: statSync(join(OUT, name)).size,
+}));
 writeFileSync(join(OUT, 'file.json'), `${JSON.stringify(files, null, 2)}\n`);
 // L'artifact accetta al massimo 16 MB per la pagina e per ogni file di testo (D256): con i
 // farmaci di classe A e H il database si avvicina al limite, e qui ci si ferma prima di pubblicare.

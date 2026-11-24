@@ -1,4 +1,5 @@
 import type { PrescriptionLineMessage, ReceiptMessage } from '@mmg/integrations';
+import { specialistValidityDays } from '@mmg/rules';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
@@ -189,7 +190,10 @@ export const SSN_RECIPE_TYPE = 'Assist. SSN';
 /**
  * Validità della ricetta specialistica ai fini della prenotazione, nell'intestazione della
  * prescrizione: 180 giorni, o meno se la Regione lo ha comunicato al Sistema TS (specifiche del
- * 28/02/2024, 2.1). Per il Piemonte un valore minore non è noto: da completare con il collaudo.
+ * 28/02/2024, 2.1). Per il Piemonte i giorni vengono dalla regola R1 in vigore alla data della
+ * ricetta, secondo il tipo di accesso (D.D. 710/2026, punto 4; D260); questo valore resta per le
+ * versioni delle regole che non li hanno. Che la Regione li abbia comunicati al Sistema TS si
+ * vede al collaudo.
  */
 export const SPECIALIST_VALIDITY_DAYS = 180;
 
@@ -423,7 +427,10 @@ export async function buildPromemoriaData(
     tipologia,
     altro: null,
     priorita: specialist ? p.priority : null,
-    validitaGiorni: specialist ? SPECIALIST_VALIDITY_DAYS : null,
+    validitaGiorni: specialist
+      ? ((p.accessType && specialistValidityDays(accepted.compiledAt, p.accessType)) ??
+        SPECIALIST_VALIDITY_DAYS)
+      : null,
     righe,
     fraseDpc: accepted.messages?.find((m) => m.code === DPC_MESSAGE_CODE)?.text.trim() || null,
     quesitoDiagnostico: p.diagnosticQuestion,

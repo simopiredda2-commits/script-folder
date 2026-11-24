@@ -55,7 +55,20 @@ const fetchBytes = async (base: string, name: string) => (await download(base, n
 
 /** I dati binari arrivano come testo in base64 (l'artifact serve solo tipi noti), forse compressi. */
 async function fetchBase64(base: string, name: string, gunzip: boolean): Promise<ArrayBuffer> {
-  const text = await (await download(base, name)).text();
+  return decodeBase64(await (await download(base, name)).text(), gunzip);
+}
+
+/**
+ * Il database arriva in parti di testo in base64, perché l'artifact accetta file di testo fino a
+ * 16 MB (D256, D260): database.txt dice quali, in ordine, e unite ridanno il testo intero.
+ */
+async function fetchDatabase(base: string): Promise<ArrayBuffer> {
+  const names = (await (await download(base, 'database.txt')).text()).split('\n').filter(Boolean);
+  const parts = await Promise.all(names.map(async (n) => (await download(base, n)).text()));
+  return decodeBase64(parts.join(''), false);
+}
+
+async function decodeBase64(text: string, gunzip: boolean): Promise<ArrayBuffer> {
   const binary = atob(text);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
@@ -74,13 +87,13 @@ export async function start(
   interrupted: InterruptedHints;
 }> {
   progress(
-    'Scarico il database e il programma (circa 20 MB, solo la prima volta che il browser li vede)…',
+    'Scarico il database e il programma (circa 28 MB, solo la prima volta che il browser li vede)…',
   );
   const [wasm, initdb, data, dump] = await Promise.all([
     fetchBytes(base, 'pglite.wasm'),
     fetchBytes(base, 'initdb.wasm'),
     fetchBase64(base, 'pglite-dati.txt', true),
-    fetchBase64(base, 'database.txt', false),
+    fetchDatabase(base),
   ]);
   progress('Avvio il database nel browser…');
   const [pgliteWasmModule, initdbWasmModule] = await Promise.all([

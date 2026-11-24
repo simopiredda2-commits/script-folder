@@ -1481,14 +1481,7 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Dall'audit di Cowork (D259):
-
-1. **Validità della ricetta specialistica** (S10): oggi 30 giorni come R1 dei requisiti; la D.D. 710/2026 della Regione (punto 4, con la DGR 4-4878/2022) dice 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto.
-2. **Temporaneo con la scelta cessata in AURA** (28): revocato in automatico come chi è in carico, o temporaneo con l'avviso R20 come oggi.
-3. **Catalogo delle prestazioni nella dimostrazione** (S3): la trascrizione del catalogo regionale, segnata «da controllare» come i presidi (D236), o resta la sola «Visita di prova».
-4. **Via alla pull request** dell'audit.
-
-Le domande nuove si scrivono qui durante il blocco (D237).
+Nessuna per ora: quelle dell'audit di Cowork hanno avuto risposta il 24/11/2026 (D260). Le domande nuove si scrivono qui durante il blocco (D237).
 
 ## Richieste di Simone durante la pausa (22–23/11/2026), da fare alla ripresa
 
@@ -1593,6 +1586,28 @@ Il resoconto di Cowork (32 difetti, nessuno che blocca, 15 importanti e 17 minor
 - Nella dimostrazione, il codice del pulsante riletto subito dopo un accesso o un'uscita: non ha una prova a sé, lo copre il giro di ogni secondo.
 
 **Prossimo passo**: le domande della fermata qui sotto; poi il collaudo finale.
+
+## Risposte della fermata dopo la #35 (24/11/2026)
+
+Simone ha risposto con il pulsante (D260): validità della specialistica dalla D.D. 710/2026, temporaneo con la scelta cessata revocato in automatico, catalogo regionale nella dimostrazione «da controllare», unione della #35. Pull request #35 unita (ecb760f); il branch riparte da `main`.
+
+**Fatto**
+
+- **Validità della ricetta specialistica**: regole versione 2026-11-24.1, in vigore dal 24/11/2026. R1 dice 60 giorni per il primo accesso e 180 per l'altra tipologia di accesso, con la fonte della Regione (D.D. 710/2026, punto 4). Il promemoria stampa gli stessi giorni «ai fini della prenotazione». Per i farmaci restano 30 giorni.
+- **Temporaneo con la scelta cessata in AURA**: diventa revocato da solo, come chi è in carico. Se torna con una scelta in scadenza, torna temporaneo. Una scelta solo scaduta non cambia lo stato.
+- **Catalogo regionale nella dimostrazione**: la D.D. 590/2026 con le modifiche della 710, «controllato da: nessuno», detto nel riquadro. Il database della dimostrazione va in due parti, per stare nei 16 MB per file dell'artifact.
+
+**Come provarlo**
+
+- `pnpm test` e `pnpm lint`. Prove nuove: `packages/rules/test/regole.test.ts` (R1 della specialistica, versione 2026-11-24.1), `apps/api/test/promemoria.test.ts` (60 giorni sul promemoria del primo accesso), `apps/api/test/aura-anagrafica.test.ts` (temporaneo revocato, poi di nuovo temporaneo; scelta solo scaduta).
+- Dimostrazione: `pnpm --filter @mmg/demo build` e `pnpm --filter @mmg/demo test:browser`. La prova della specialistica legge il riquadro e trova la «VISITA CARDIOLOGICA DI CONTROLLO CON ECG» del catalogo vero.
+
+**Non provato**
+
+- La validità sul promemoria con un collaudo del Sistema TS.
+- La dimostrazione con il catalogo vero su Safari e Firefox veri.
+
+**Prossimo passo**: il collaudo finale (D247).
 
 ## Risposte della fermata dopo la #34 (24/11/2026)
 
@@ -3935,3 +3950,14 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D259: il pulsante della dimostrazione non copre comandi, con la pagina in alto e a metà                       | demo.css: pulsante fisso in fondo allo schermo (rosso a 820×1180)                                                         | Rosso, poi verde (32 su 32)                                                                                                                                                                                                                                                                                      |
 | D259: il pulsante ridotto della dimostrazione dice di chi è il codice                                         | DemoPanel.tsx: «codice:» senza il nome dell’utente                                                                        | Rosso, poi verde (32 su 32)                                                                                                                                                                                                                                                                                      |
 | D259: la revoca annunciata da AURA simulata cade su un paziente in carico                                     | worker/aura.ts: revoca su chiunque (cade su un temporaneo)                                                                | Rosso, poi verde (32 su 32)                                                                                                                                                                                                                                                                                      |
+| D260: R1 della specialistica: 60 giorni per il primo accesso, 180 per gli altri accessi                       | rules.ts: tipi di accesso scambiati                                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D260: dalla versione 2026-11-24.1 la specialistica usa i giorni della Regione                                 | rules.ts: i giorni della Regione non si usano                                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D260: l’informazione R1 della specialistica porta la fonte della Regione                                      | rules.ts: fonte della tabella AIFA                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D260: i giorni per il promemoria secondo il tipo di accesso                                                   | ruleset.ts: tipi di accesso scambiati                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D260: il promemoria del primo accesso dice 60 giorni per prenotare                                            | promemoria.ts: sempre 180 giorni                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D260: AURA revoca da solo il temporaneo con la scelta cessata                                                 | aura/service.ts: solo chi è in carico                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D260: con una scelta in scadenza il revocato torna temporaneo                                                 | aura/service.ts: torna sempre in carico                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D260: AURA non cambia lo stato del paziente deceduto                                                          | aura/service.ts: il deceduto non è escluso all’inizio                                                                     | Verde: il guasto non cambia nulla, perché il deceduto non entra in nessuno dei due passaggi di stato. La riga superflua è tolta; la prova del deceduto (D198) resta verde                                                                                                                                        |
+| D260: una scelta solo scaduta, non cessata, non revoca il temporaneo                                          | aura/service.ts: la scadenza conta come cessazione                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D260: nella dimostrazione il catalogo regionale vero, con la visita cardiologica (prova nel browser)          | prepara-database.ts: catalogo regionale non importato                                                                     | Rosso, poi verde (32 su 32)                                                                                                                                                                                                                                                                                      |
+| D260: il riquadro della dimostrazione dice che il catalogo è da controllare (prova nel browser)               | DemoPanel.tsx: frase tolta                                                                                                | Rosso, poi verde (32 su 32)                                                                                                                                                                                                                                                                                      |

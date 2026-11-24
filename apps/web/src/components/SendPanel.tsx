@@ -58,8 +58,9 @@ const failure = (e: unknown, message: string) =>
   e instanceof ApiError ? e : new ApiError(0, message);
 
 /**
- * L'informazione R1, «la ricetta vale 30 giorni», accompagna ogni ricetta SSN e non chiede nulla al
- * medico: non ferma il passo unico (D255). Ogni altro problema, anche solo informativo, lo ferma.
+ * L'informazione R1 sulla validità (30 giorni; per la specialistica 60 o 180 secondo il tipo di
+ * accesso, D260) accompagna ogni ricetta SSN e non chiede nulla al medico: non ferma il passo unico
+ * (D255). Ogni altro problema, anche solo informativo, lo ferma.
  */
 const routine = (p: RuleIssue) => p.ruleId === 'R1' && p.severity === 'info';
 const toLookAt = (c: CheckResult) => c.problemi.filter((p) => !routine(p));

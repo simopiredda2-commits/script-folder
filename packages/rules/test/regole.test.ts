@@ -5,6 +5,7 @@ import {
   loadRulesets,
   RULE_IDS,
   rulesetAt,
+  specialistValidityDays,
   type DrugFacts,
   type LineContext,
   type RuleContext,
@@ -93,6 +94,7 @@ describe('dati delle regole', () => {
       '2026-11-19.2',
       '2026-11-19.3',
       '2026-11-20.1',
+      '2026-11-24.1',
     ]);
     const upTo17 = RULE_IDS.filter((id) => !['R18', 'R19', 'R20', 'R21', 'R22'].includes(id));
     for (const rs of all.slice(0, 2)) {
@@ -197,6 +199,32 @@ describe('dati delle regole', () => {
     }
   });
 
+  it('dalla 2026-11-24.1 R1 ha i giorni della specialistica della Regione (D260); il resto come la 2026-11-20.1', () => {
+    const all = loadRulesets();
+    const v7 = all.find((r) => r.version === '2026-11-20.1')!;
+    const v8 = all.find((r) => r.version === '2026-11-24.1')!;
+    expect(v8.effectiveFrom).toBe('2026-11-24');
+    expect(rulesetAt('2026-11-24').version).toBe('2026-11-24.1');
+    expect(rulesetAt('2026-11-23').version).toBe('2026-11-20.1');
+    expect(v8.rules).toHaveLength(v7.rules.length);
+    for (const r of v8.rules) {
+      if (r.id === 'R1') {
+        expect(r.values).toEqual({
+          validityDays: 30,
+          specialistFirstAccessDays: 60,
+          specialistOtherAccessDays: 180,
+        });
+        expect(r.behavior).toBe('inform');
+        expect(r.sources[0]).toEqual(v7.rules.find((x) => x.id === 'R1')!.sources[0]);
+        expect(r.sources[1]!.title).toMatch(/^Regione Piemonte, D\.D\. 30 ottobre 2026, n\. 710/);
+        expect(r.sources[1]!.title).toMatch(/punto 4/);
+        expect(r.sources.at(-1)!.title).toMatch(/D260/);
+      } else {
+        expect(r, r.id).toEqual(v7.rules.find((x) => x.id === r.id));
+      }
+    }
+  });
+
   it('la versione .2 rende R11 solo informativo (seconda fermata); la .1 resta com’era', () => {
     const [v1, v2] = loadRulesets();
     expect(v1!.rules.find((r) => r.id === 'R11')!.behavior).toBe('warn');
@@ -244,6 +272,51 @@ describe('R1 · validità di 30 giorni', () => {
   });
   it('non riguarda la ricetta bianca', () => {
     expect(of(ctx({ prescription: { kind: 'white' } }), 'R1')).toHaveLength(0);
+  });
+});
+
+describe('R1 · validità della ricetta specialistica (D.D. 710/2026, D260)', () => {
+  const specialist = (accessType: 'first' | 'subsequent' | null, date = '2026-11-24') =>
+    of(ctx({ date, prescription: { kind: 'specialist_ssn', accessType } }), 'R1');
+
+  it('primo accesso: 60 giorni, contando il giorno di compilazione, con la fonte della Regione', () => {
+    const [issue, ...rest] = specialist('first');
+    expect(rest).toEqual([]);
+    expect(issue!.severity).toBe('info');
+    expect(issue!.message).toBe(
+      'Primo accesso: la ricetta vale 60 giorni, fino al 22/01/2027 compreso; se la prestazione si prenota è il termine per prenotare, e la ricetta prenotata in tempo vale fino all’erogazione',
+    );
+    expect(issue!.source).toMatch(/^Regione Piemonte, D\.D\. 30 ottobre 2026, n\. 710.*punto 4/);
+  });
+
+  it('altra tipologia di accesso (successivo o diretto): 180 giorni', () => {
+    expect(specialist('subsequent')[0]!.message).toMatch(
+      /^Altra tipologia di accesso: la ricetta vale 180 giorni, fino al 22\/05\/2027 compreso;/,
+    );
+  });
+
+  it('senza tipo di accesso dice tutti e due i termini (R14 ferma comunque la ricetta)', () => {
+    expect(specialist(null)[0]!.message).toMatch(
+      /^La ricetta vale 60 giorni per il primo accesso e 180 per gli altri accessi;/,
+    );
+  });
+
+  it('la ricetta dei farmaci resta a 30 giorni, con la fonte di prima', () => {
+    const [issue] = of(ctx({ date: '2026-11-24' }), 'R1');
+    expect(issue!.message).toBe('La ricetta vale 30 giorni: fino al 23/12/2026 compreso');
+    expect(issue!.source).toBe('Tabella AIFA di classificazione dei medicinali');
+  });
+
+  it('con le versioni di prima anche la specialistica vale 30 giorni', () => {
+    expect(specialist('first', '2026-11-23')[0]!.message).toBe(
+      'La ricetta vale 30 giorni: fino al 22/12/2026 compreso',
+    );
+  });
+
+  it('il promemoria prende gli stessi giorni dalla versione in vigore', () => {
+    expect(specialistValidityDays('2026-11-24', 'first')).toBe(60);
+    expect(specialistValidityDays('2026-11-24', 'subsequent')).toBe(180);
+    expect(specialistValidityDays('2026-11-23', 'first')).toBeNull();
   });
 });
 
@@ -418,8 +491,8 @@ describe('R5, R6 · piano terapeutico', () => {
       sentLines: sent,
       prescription: { lines: [line({ quantity: 2 })] },
     });
-    // In vigore il 25/11/2026: la 2026-11-20.1, con R6 come nella 2026-11-19.1 (D181).
-    expect(run(c).rulesVersion).toBe('2026-11-20.1');
+    // In vigore il 25/11/2026: la 2026-11-24.1, con R6 come nella 2026-11-19.1 (D181).
+    expect(run(c).rulesVersion).toBe('2026-11-24.1');
     expect(blocks(c, 'R6')).toBe(true);
     expect(of(c, 'R6')[0]!.message).toBe(
       'Farmaco di prova 5 mg: il piano autorizza 4 confezioni, già prescritte 3, di cui 2 con un altro programma; residuo 1',
@@ -957,7 +1030,7 @@ describe('R19 e R20 · stato del paziente alla ricetta (D199)', () => {
 
   it('le ricette controllate con la versione precedente restano com’erano', () => {
     const before = loadRulesets().filter(
-      (r) => !['2026-11-19.2', '2026-11-19.3', '2026-11-20.1'].includes(r.version),
+      (r) => !['2026-11-19.2', '2026-11-19.3', '2026-11-20.1', '2026-11-24.1'].includes(r.version),
     );
     const dead = withStatus('deceased');
     expect(checkPrescription(dead, before).issues.some((i) => i.ruleId === 'R19')).toBe(false);
