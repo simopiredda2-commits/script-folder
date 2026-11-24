@@ -13,6 +13,8 @@ jobs:
   typescript:
     name: Lint, tipi e prove (TypeScript)
     runs-on: ubuntu-24.04
+    # Di solito 7 minuti (D258).
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16
@@ -50,6 +52,8 @@ jobs:
   interfaccia:
     name: Interfaccia con ${{ matrix.browser }}
     runs-on: ubuntu-24.04
+    # Di solito 5 minuti. Una prova bloccata (D258) si ferma qui invece che dopo sei ore.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -88,13 +92,16 @@ jobs:
           node -e "require('playwright')[process.env.E2E_BROWSER].launch()
           .then(async (b) => { console.log(process.env.E2E_BROWSER, b.version()); await b.close(); })"
       - name: Prova dell'interfaccia
-        run: pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts
+        # Ogni prova scritta appena finisce: se il lavoro si ferma, si vede dopo quale (D258).
+        run: pnpm exec vitest run apps/api/test/e2e/interfaccia.test.ts --reporter=verbose
 
   # La dimostrazione nel browser (D221, D223): costruita e provata dentro una cornice con la
   # sandbox dell'artifact, con i tre motori.
   dimostrazione:
     name: Dimostrazione con ${{ matrix.browser }}
     runs-on: ubuntu-24.04
+    # Di solito 7 minuti (D258).
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -115,7 +122,9 @@ jobs:
       - name: Costruzione della dimostrazione
         run: pnpm --filter @mmg/demo build
       - name: Prova della dimostrazione
-        run: pnpm --filter @mmg/demo test:browser
+        # Come `test:browser`, con ogni prova scritta appena finisce (D258). Il parametro va a
+        # vitest direttamente: dopo il nome dello script pnpm lo prenderebbe per sé.
+        run: pnpm --filter @mmg/demo exec vitest run --config vitest.browser.config.ts --reporter=verbose
 
   sync:
     name: Prove di sync/ (Python)

@@ -1563,7 +1563,24 @@ Pull request #31 unita in `main` (commit 297121d) con le 14 verifiche su GitHub 
 - Le confezioni nell'ultima ricetta compaiono solo se c'è una ricetta: nella dimostrazione molte terapie non ne hanno («nessuna»). Ricette già inviate nei dati della dimostrazione sono nell'elenco «Che cosa resta da fare», con il database dei farmaci.
 - Il contatore delle confezioni (R11) conta le confezioni delle ricette inviate, quindi anche quelle scelte con «− N +». Però oggi non calcola mai la copertura: le unità per confezione non arrivano da nessuna banca dati che abbiamo (D59, D250). Domanda per la prossima fermata: da dove prenderle (la descrizione della confezione AIFA, per esempio «28 compresse»; un campo nella scheda della terapia; o una banca dati con licenza).
 
-## Domande della fermata dopo la #34
+## Risposte della fermata dopo la #34 (24/11/2026)
+
+Simone ha risposto con il pulsante (D258).
+
+- **Via**: «Unisci». Pull request #34 unita (commit 3da9015) con le 14 verifiche su GitHub verdi; branch ripartito da `main`. Prima dell'unione: corretta una prova instabile della ricetta in un passo (il servizio finto non dava i dati del promemoria) e rilanciata una volta la prova dell'interfaccia con Firefox, rimasta ferma senza scrivere nulla.
+- **Audit con Cowork**: «Prepara istruzioni». Sono in `docs/audit-cowork.md`; Cowork lo fa partire Simone.
+
+**Fatto dopo l'unione**
+
+- CI: ogni prova con i browser scritta appena finisce, e un tempo massimo per i lavori (20 minuti per interfaccia e dimostrazione, 30 per lint, tipi e prove). Un blocco come quello di oggi si ferma presto e dice dopo quale prova.
+
+**Non provato**
+
+- Il tempo massimo con una prova bloccata apposta: è il meccanismo di GitHub.
+
+**Prossimo passo**: il resoconto di Cowork. Ogni punto si verifica qui; i difetti veri si correggono, il resto si annota. Poi il collaudo finale.
+
+## Domande della fermata dopo la #34 (chiuse)
 
 1. **Via alla #34**: A. unisci con le prove su GitHub verdi (consigliata); B. prima provo la dimostrazione.
 2. **Audit con Cowork** (punto 7, D247): l'elenco concordato è chiuso. A. preparo le istruzioni per Cowork (che cosa guardare nella dimostrazione e nel repository) e lo fai partire tu (consigliata); B. lo fai partire tu senza istruzioni; C. più avanti.
@@ -1712,7 +1729,7 @@ Simone ha risposto con il pulsante il 23/11/2026 (D247).
 4. Unità per confezione per il contatore R11 (D250): fatto, dall'anagrafica AIFA (D252). Quando ci sarà la banca dati con licenza, servirà a trovare le differenze con il numero letto da AIFA.
 5. Conferma esplicita del medico quando il passo unico si ferma sui controlli (D256): fatta. Il pulsante del pannello diventa «Ho visto i controlli: firma e invia»; prova in `apps/web/test/invio.test.tsx`, sabotaggio nel registro.
 6. Database dei farmaci nella dimostrazione: i rimborsabili di classe A e H dalle liste AIFA (D256): fatto (D257). Con il database, qualche ricetta già inviata nei dati della dimostrazione, così le righe dei farmaci prescritti mostrano data e confezioni dell'ultima ricetta (D249). **Da tenere a mente**: il resto dell'anagrafica AIFA (classe C, senza obbligo di prescrizione, non rimborsate) è da integrare.
-7. Audit con Cowork sulla dimostrazione, a programma chiuso (D247).
+7. Audit con Cowork sulla dimostrazione, a programma chiuso (D247): istruzioni pronte in `docs/audit-cowork.md` (D258); lo fa partire Simone, poi le correzioni.
 8. Collaudo finale: le verifiche di Simone e della Dr.ssa Rocca in «Che cosa resta aperto».
 
 ## Domande della fermata dopo la #31 (chiuse)
