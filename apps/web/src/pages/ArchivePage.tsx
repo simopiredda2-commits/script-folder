@@ -6,6 +6,7 @@ import { api, ApiError } from '../lib/api';
 import { date, dateTime, studioToday, time } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { AccessLogTable, type AccessRow } from './AccessLogPage';
 
 interface Settings {
   segreteriaLeggeDiario: boolean;
@@ -99,6 +100,7 @@ const SECTIONS = [
   { key: 'prestazioni', label: 'Prestazioni aggiuntive' },
   { key: 'autorizzazioni', label: 'Autorizzazioni' },
   { key: 'avvisi', label: 'Avvisi sugli accessi' },
+  { key: 'registro', label: 'Registro degli accessi' },
 ] as const;
 
 /**
@@ -263,7 +265,37 @@ export function ArchivePage() {
       )}
       {open.key === 'autorizzazioni' && <GrantsSection archiveId={own.id} />}
       {open.key === 'avvisi' && <AlertsSection archiveId={own.id} />}
+      {open.key === 'registro' && <AccessLogSection archiveId={own.id} />}
     </>
+  );
+}
+
+/**
+ * Registro degli accessi alle cartelle dell'archivio (audit D259): chi ha aperto quale cartella,
+ * quando, da dove e perché, consentito o negato. Lo legge il titolare; la lettura resta registrata.
+ */
+function AccessLogSection({ archiveId }: { archiveId: string }) {
+  const log = useApi<{ registro: AccessRow[]; altri: boolean }>(
+    `/api/archivi/${archiveId}/registro`,
+  );
+  return (
+    <section className="riquadro" aria-labelledby="titolo-registro-archivio">
+      <h2 id="titolo-registro-archivio">Registro degli accessi</h2>
+      <p className="tenue">
+        Ogni accesso alle cartelle dei pazienti dell’archivio, anche quelli negati. Il registro non
+        si modifica; per un paziente solo, apri la sua cartella › Registro degli accessi.
+      </p>
+      {log.loading && !log.data && <Loading what="registro degli accessi" />}
+      <ErrorMessage error={log.error} />
+      {log.data && (
+        <AccessLogTable
+          rows={log.data.registro}
+          more={log.data.altri}
+          labelledBy="titolo-registro-archivio"
+          withPatient
+        />
+      )}
+    </section>
   );
 }
 

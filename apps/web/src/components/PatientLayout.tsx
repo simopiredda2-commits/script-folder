@@ -74,6 +74,8 @@ export const RECORD_SECTIONS: readonly Section[] = [
   { to: 'certificati-modelli', label: 'Altri certificati', icon: 'ricette' },
   { to: 'profilo-sanitario', label: 'Profilo sanitario sintetico', icon: 'archivio' },
   { to: 'fascicolo-regionale', label: 'Fascicolo regionale', icon: 'archivio', doctorOnly: true },
+  // Lo legge il titolare dell'archivio (audit D259); agli altri la pagina lo dice.
+  { to: 'registro', label: 'Registro degli accessi', icon: 'lucchetto', doctorOnly: true },
 ];
 
 /**

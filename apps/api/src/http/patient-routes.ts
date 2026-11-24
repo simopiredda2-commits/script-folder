@@ -329,6 +329,9 @@ export function registerPatientRoutes(
     return { paziente: updated };
   });
 
+  /** Quante righe del registro si mostrano alla volta: le più recenti (audit D259). */
+  const ACCESS_LOG_ROWS = 300;
+
   app.get('/api/pazienti/:id/registro', { config: { patientScoped: true } }, async (req) => {
     const actor = req.actor!;
     const { id } = idParams.parse(req.params);
@@ -337,14 +340,58 @@ export function registerPatientRoutes(
       .select({
         quando: accessLog.at,
         utente: accessLog.userId,
+        // Il nome di chi ha fatto l'accesso e il motivo scritto con l'accesso (audit D259).
+        nome: appUser.displayName,
         azione: accessLog.action,
         esito: accessLog.outcome,
         postazione: accessLog.workstation,
+        motivo: sql<string | null>`${accessLog.details}->>'motivo'`,
       })
       .from(accessLog)
+      .leftJoin(appUser, eq(appUser.id, accessLog.userId))
       .where(eq(accessLog.patientId, id))
-      .orderBy(desc(accessLog.seq));
-    return { registro: rows };
+      .orderBy(desc(accessLog.seq))
+      .limit(ACCESS_LOG_ROWS + 1);
+    return { registro: rows.slice(0, ACCESS_LOG_ROWS), altri: rows.length > ACCESS_LOG_ROWS };
+  });
+
+  /**
+   * Registro degli accessi alle cartelle di un archivio (audit D259): lo legge il titolare, come
+   * quello del singolo paziente (ruoli-permessi.md). Le righe più recenti, con il paziente; anche
+   * questa lettura resta nel registro.
+   */
+  app.get('/api/archivi/:id/registro', async (req) => {
+    const actor = req.actor!;
+    const { id } = archiveParams.parse(req.params);
+    const ctx = await loadArchiveContext(db, id);
+    const decision = can(actor, 'access_log.read', { ...ctx, now: new Date() });
+    await logAccess(db, {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      action: 'lettura_registro_archivio',
+      outcome: decision.allowed ? 'consentito' : 'negato',
+      workstation: actor.workstation,
+      details: { archivio: id, motivo: decision.reason },
+    });
+    if (!decision.allowed) throw new HttpError(403, decision.reason);
+    const rows = await db
+      .select({
+        quando: accessLog.at,
+        nome: appUser.displayName,
+        pazienteId: patient.id,
+        paziente: sql<string>`${patient.lastName} || ' ' || ${patient.firstName}`,
+        azione: accessLog.action,
+        esito: accessLog.outcome,
+        postazione: accessLog.workstation,
+        motivo: sql<string | null>`${accessLog.details}->>'motivo'`,
+      })
+      .from(accessLog)
+      .innerJoin(patient, eq(patient.id, accessLog.patientId))
+      .leftJoin(appUser, eq(appUser.id, accessLog.userId))
+      .where(and(eq(patient.archiveId, id), eq(patient.studioId, actor.studioId)))
+      .orderBy(desc(accessLog.seq))
+      .limit(ACCESS_LOG_ROWS + 1);
+    return { registro: rows.slice(0, ACCESS_LOG_ROWS), altri: rows.length > ACCESS_LOG_ROWS };
   });
 
   const archiveParams = z.object({ id: z.uuid() });
