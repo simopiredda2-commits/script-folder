@@ -27,6 +27,8 @@ export interface SendPanelProps {
   lastErrorKind?: string | null;
   /** Nomi delle righe, per le conferme delle note AIFA. */
   lineNames: Record<string, string>;
+  /** Ricetta SSN: prima della firma si vede l'anteprima del promemoria (D253). */
+  preview?: boolean;
   /** Nuovo stato della ricetta dopo un'azione, con l'NRE se è stata inviata. */
   onChange?: (status: string, nre?: string) => void;
 }
@@ -46,6 +48,7 @@ export function SendPanel({
   status,
   lastErrorKind,
   lineNames,
+  preview,
   onChange,
 }: SendPanelProps) {
   const { isDoctor } = useSession();
@@ -269,6 +272,17 @@ export function SendPanel({
         >
           <Icon name="ripeti" /> <span>Controlla di nuovo</span>
         </button>
+        {/* Il promemoria com'è prima della firma, con «BOZZA – NON VALIDA» al posto dell'NRE. */}
+        {preview && checkable && (
+          <a
+            className="pulsante"
+            href={`/api/ricette/${prescriptionId}/promemoria/anteprima`}
+            target="_blank"
+            rel="noopener"
+          >
+            <Icon name="stampa" /> <span>Anteprima del promemoria (PDF)</span>
+          </a>
+        )}
         {isDoctor ? (
           <button
             type="button"

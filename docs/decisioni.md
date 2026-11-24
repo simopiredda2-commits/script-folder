@@ -1881,3 +1881,13 @@ Non provato: lettori di schermo veri sul «− N +»; Safari vero.
 - **Da tenere a mente**: con la banca dati con licenza si confronteranno le unità lette da AIFA con le sue, per trovare le differenze.
 
 Non provato: l'anagrafica AIFA intera (solo il file d'esempio).
+
+**D253 · Anteprima del promemoria prima della firma.** Punto 1 delle richieste della pausa: «il promemoria con "Bozza – non valida" al posto dell'NRE».
+
+- **Che cosa**: il promemoria del modello del 2024 (D217), costruito dalla ricetta com'è al momento, con «BOZZA – NON VALIDA» nel riquadro dell'NRE al posto dei due codici a barre e «—» al posto del codice di autenticazione. Il codice fiscale a barre e tutti gli altri campi restano: si vede il foglio vero.
+- **Quando**: per le ricette SSN in bozza, da firmare o non riuscite. Dopo l'invio c'è il promemoria vero; la ricetta bianca non ha anteprima, perché il suo promemoria lo produce il SAC.
+- **Il medico**: chi ha già firmato; altrimenti il medico che guarda; per la segreteria il medico scelto dal paziente, scelta in corso e non annullata. Senza, nessuna anteprima e il messaggio lo dice: il promemoria porta il codice fiscale del medico e non si inventa.
+- **Non è una consegna**: non entra in `reminder_delivery` e non si salva; si rifà a ogni richiesta. L'accesso alla cartella resta nel registro, con l'azione «anteprima_promemoria».
+- **Dove**: accanto a «Firma e invia», nella ricetta e nella coda «da firmare».
+
+Non provato: stampa su carta; Safari e Firefox veri.

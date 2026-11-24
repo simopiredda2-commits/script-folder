@@ -1042,6 +1042,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 prescriptionId={draft.id}
                 status={draft.status}
                 lineNames={draft.lineIds}
+                preview={kind !== 'white'}
                 onChange={(status, nre) => setDraft({ ...draft, status, ...(nre ? { nre } : {}) })}
               />
             </>

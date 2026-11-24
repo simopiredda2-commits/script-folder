@@ -1,6 +1,6 @@
 import type { ReminderSender } from '@mmg/integrations';
 import { delegationValidOn } from '@mmg/domain';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import type { AccessAction } from '../audit/access-log';
 import type { Actor } from '../auth/service';
@@ -9,6 +9,7 @@ import {
   appUser,
   delegation,
   patient,
+  patientChoice,
   prescription,
   prescriptionDocument,
   reminderDelivery,
@@ -18,7 +19,7 @@ import { guardPatient } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
 import { printSettingsFor } from '../admin/print-service';
 import { DEFAULT_REMINDER_PAPER, renderPromemoria, renderSoloNre } from './pdf';
-import type { PromemoriaData } from './promemoria';
+import { buildPromemoriaPreview, type PromemoriaData } from './promemoria';
 
 export interface ReminderDeps {
   db: Database;
@@ -143,6 +144,53 @@ export function createReminderService(deps: ReminderDeps) {
       outcome: 'stampato',
     });
     return pdf;
+  }
+
+  /**
+   * Anteprima prima della firma (D253): il promemoria della ricetta non ancora inviata, con
+   * «BOZZA – NON VALIDA» al posto dell'NRE. Non è una consegna: non entra nelle consegne.
+   */
+  async function preview(actor: Actor, id: string) {
+    const { p } = await guarded(actor, id, 'anteprima_promemoria');
+    if (p.kind === 'white')
+      throw new HttpError(
+        409,
+        'Il promemoria della ricetta bianca lo produce il SAC all’invio: l’anteprima vale per le ricette SSN',
+      );
+    if (p.status !== 'draft' && p.status !== 'to_sign' && p.status !== 'error')
+      throw new HttpError(
+        409,
+        'L’anteprima vale prima dell’invio: per una ricetta inviata si stampa il promemoria',
+      );
+    // Il medico che firmerà: chi ha già firmato, il medico che la guarda, o il medico scelto dal
+    // paziente quando la prepara la segreteria.
+    let doctorId = p.signedBy;
+    const doctor =
+      actor.roles.includes('owner_doctor') || actor.roles.includes('substitute_doctor');
+    if (!doctorId && doctor) doctorId = actor.userId;
+    if (!doctorId) {
+      const [choice] = await db
+        .select({ doctor: patientChoice.doctorUserId })
+        .from(patientChoice)
+        .where(
+          and(
+            eq(patientChoice.patientId, p.patientId),
+            isNull(patientChoice.endedOn),
+            isNull(patientChoice.annulledAt),
+          ),
+        )
+        .orderBy(desc(patientChoice.chosenOn))
+        .limit(1);
+      doctorId = choice?.doctor ?? null;
+    }
+    if (!doctorId)
+      throw new HttpError(
+        409,
+        'Per l’anteprima serve il medico che firmerà: il paziente non ha una scelta del medico in corso',
+      );
+    const data = await buildPromemoriaPreview(db, p.id, doctorId, studioDate(now()));
+    const bytes = await renderPromemoria(data, await chosenPaper(actor));
+    return { bytes, name: 'promemoria-bozza.pdf' };
   }
 
   /** A chi va: il recapito del paziente, oppure quello di una delega valida oggi (R16). */
@@ -347,5 +395,5 @@ export function createReminderService(deps: ReminderDeps) {
     };
   }
 
-  return { print, send, deliveries, contacts };
+  return { print, preview, send, deliveries, contacts };
 }

@@ -865,6 +865,13 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await page.getByText(/Regole di prescrizione, versione/).waitFor();
     await check(page, 'ricetta con i controlli');
+    // Prima della firma l'anteprima del promemoria, con «BOZZA – NON VALIDA» al posto dell'NRE (D253).
+    const previewHref = await page
+      .getByRole('link', { name: 'Anteprima del promemoria (PDF)' })
+      .getAttribute('href');
+    const previewPdf = await page.request.get(`${base}${previewHref}`);
+    expect(previewPdf.status()).toBe(200);
+    expect(previewPdf.headers()['content-type']).toBe('application/pdf');
     await signAndSend(page);
   });
 

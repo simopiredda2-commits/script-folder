@@ -38,6 +38,11 @@ export interface PromemoriaDataV2 {
   nre: string;
   /** Campo 26. */
   codiceAutenticazione: string;
+  /**
+   * Anteprima prima della firma (D253): al posto dell'NRE, che non c'è ancora, «BOZZA – NON
+   * VALIDA», senza codici a barre. Mai nei dati fissati all'invio.
+   */
+  bozza?: true;
   assistito: {
     /** Campo 9: a barre e in chiaro. */
     codiceFiscale: string;
@@ -172,6 +177,9 @@ export const RELEASE_TEXT_2024 =
 /** Campo 10 senza codice di esenzione. */
 export const NOT_EXEMPT = 'NON ESENTE';
 
+/** Al posto dell'NRE nell'anteprima prima della firma (D253). */
+export const DRAFT_TEXT = 'BOZZA – NON VALIDA';
+
 /** Campo 20 vuoto: la nota non si può compilare (specifiche del 28/02/2024). */
 export const NO_NOTE = '---';
 
@@ -299,6 +307,8 @@ export async function buildPromemoriaData(
   sent?: readonly PrescriptionLineMessage[],
   /** Il paziente com'era alla firma, per l'esito segnato a mano (D239); altrimenti com'è ora. */
   patientAt?: PromemoriaPatient | null,
+  /** Il medico del promemoria se la ricetta non è ancora firmata: l'anteprima (D253). */
+  doctorId?: string,
 ): Promise<PromemoriaDataV2> {
   const [row] = await db
     .select({ p: prescription, pt: patient, st: studio })
@@ -320,7 +330,7 @@ export async function buildPromemoriaData(
     .select({ name: appUser.displayName, profile: doctorProfile })
     .from(appUser)
     .leftJoin(doctorProfile, eq(doctorProfile.userId, appUser.id))
-    .where(eq(appUser.id, p.signedBy!));
+    .where(eq(appUser.id, doctorId ?? p.signedBy!));
   if (!doctor?.profile?.fiscalCode)
     throw new HttpError(
       409,
@@ -434,4 +444,26 @@ export async function buildPromemoriaData(
     dicitura: RELEASE_TEXT_2024,
     fraseRegionale: null,
   };
+}
+
+/**
+ * L'anteprima del promemoria prima della firma (D253): gli stessi dati del promemoria vero, dalla
+ * ricetta com'è ora e con il medico che la firmerà, ma con «BOZZA – NON VALIDA» al posto dell'NRE
+ * e senza codice di autenticazione. Non si salva: si rifà a ogni richiesta.
+ */
+export async function buildPromemoriaPreview(
+  db: Database,
+  prescriptionId: string,
+  doctorId: string,
+  date: string,
+): Promise<PromemoriaDataV2> {
+  const data = await buildPromemoriaData(
+    db,
+    prescriptionId,
+    { nre: DRAFT_TEXT, authCode: '—', sacDoctorName: null, compiledAt: date },
+    undefined,
+    null,
+    doctorId,
+  );
+  return { ...data, bozza: true };
 }

@@ -1563,6 +1563,24 @@ Pull request #31 unita in `main` (commit 297121d) con le 14 verifiche su GitHub 
 - Le confezioni nell'ultima ricetta compaiono solo se c'è una ricetta: nella dimostrazione molte terapie non ne hanno («nessuna»). Ricette già inviate nei dati della dimostrazione sono nell'elenco «Che cosa resta da fare», con il database dei farmaci.
 - Il contatore delle confezioni (R11) conta le confezioni delle ricette inviate, quindi anche quelle scelte con «− N +». Però oggi non calcola mai la copertura: le unità per confezione non arrivano da nessuna banca dati che abbiamo (D59, D250). Domanda per la prossima fermata: da dove prenderle (la descrizione della confezione AIFA, per esempio «28 compresse»; un campo nella scheda della terapia; o una banca dati con licenza).
 
+## Anteprima del promemoria prima della firma (24/11/2026)
+
+Punto 1 delle richieste della pausa (D253).
+
+**Fatto**
+
+- Nella ricetta e nella coda «da firmare», accanto a «Firma e invia», «Anteprima del promemoria (PDF)» per le ricette SSN non ancora inviate. È il promemoria vero, dalla ricetta com'è ora, con «BOZZA – NON VALIDA» al posto dei codici a barre dell'NRE e «—» al posto del codice di autenticazione.
+- Il medico del promemoria è chi firmerà: il medico che guarda, o il medico scelto dal paziente se guarda la segreteria. Senza una scelta in corso la segreteria non ha l'anteprima, e il messaggio lo dice.
+- Non è una consegna e non si salva; l'accesso resta nel registro.
+
+**Come provarlo**
+
+- In `apps/api/test/promemoria.test.ts` l'anteprima: testo del PDF, nessun codice a barre dell'NRE, la segreteria con e senza scelta del medico, nessuna consegna, niente anteprima dopo l'invio né per la bianca. In `apps/web/test/invio.test.tsx` il collegamento; nella prova dell'interfaccia il PDF dal collegamento.
+
+**Non provato**
+
+- Stampa su carta dell'anteprima; Safari e Firefox veri.
+
 ## Dopo l'unione della #32 – unità per confezione dall'anagrafica AIFA (24/11/2026)
 
 Risposta di Simone alla domanda sul contatore R11: «AIFA. La banca dati con licenza verificherà eventuali discrepanze. Tienilo a mente» (D252).
@@ -1601,7 +1619,7 @@ Simone ha risposto con il pulsante il 23/11/2026 (D247).
 
 **Che cosa resta da fare, in ordine**
 
-1. Anteprima del PDF prima della firma, con «Bozza – non valida» al posto dell'NRE (punto 1 delle richieste della pausa).
+1. Anteprima del PDF prima della firma, con «Bozza – non valida» al posto dell'NRE (punto 1 delle richieste della pausa): fatta (D253).
 2. Pagina Ricette con tutte le ricette in corso e il menu di stampa e invio; «Archivia ricette confermate» (punti 2 e 3).
 3. Ricetta del medico in un passo solo, con l'invio sempre con le sue credenziali (punto 4).
 4. Unità per confezione per il contatore R11 (D250): fatto, dall'anagrafica AIFA (D252). Quando ci sarà la banca dati con licenza, servirà a trovare le differenze con il numero letto da AIFA.
@@ -3652,3 +3670,6 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D252: descrizione AIFA mai letta                                                                              | pack-units.ts: nessuna unità letta                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D252: unità per confezione non passate alle regole                                                            | lookup.ts: numero non messo nei fatti del farmaco                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D252: unità per confezione anche con una posologia in un'altra unità                                          | rules-check.ts: controllo dell'unità tolto                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D253: anteprima con i codici a barre dell'NRE                                                                 | pdf.ts: riquadro dell'NRE come nel promemoria vero                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D253: anteprima anche di una ricetta inviata                                                                  | service.ts: controllo dello stato tolto                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D253: collegamento all'anteprima anche per la ricetta bianca                                                  | SendPanel.tsx: collegamento senza la condizione                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

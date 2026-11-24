@@ -101,6 +101,7 @@ function QueueItem({
           prescriptionId={prescription.id}
           status={status}
           lastErrorKind={prescription.tipoErrore}
+          preview={prescription.tipo !== 'white'}
           lineNames={Object.fromEntries(
             lines.map((l) => [l.id, l.drugName ?? l.serviceDescription ?? '']),
           )}

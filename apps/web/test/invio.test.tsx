@@ -53,7 +53,7 @@ function service(
 
 const checked = () => json(200, { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 });
 
-function panel(status = 'draft', lastErrorKind: string | null = null) {
+function panel(status = 'draft', lastErrorKind: string | null = null, preview = false) {
   render(
     <SessionProvider>
       <MemoryRouter>
@@ -62,6 +62,7 @@ function panel(status = 'draft', lastErrorKind: string | null = null) {
           status={status}
           lastErrorKind={lastErrorKind}
           lineNames={{}}
+          preview={preview}
         />
       </MemoryRouter>
     </SessionProvider>,
@@ -195,5 +196,19 @@ describe('firma e invio a controllo finito (D230)', () => {
     panel('error', 'timeout');
     await screen.findByRole('button', { name: 'Firma e invia' });
     expect(screen.queryByRole('button', { name: 'Stampa la ricetta rossa' })).toBeNull();
+  });
+});
+
+describe('anteprima del promemoria prima della firma (D253)', () => {
+  it('per la ricetta SSN non inviata c’è il collegamento al PDF; per la bianca no', async () => {
+    service(['owner_doctor'], () => Promise.resolve(checked()));
+    panel('draft', null, true);
+    const link = await screen.findByRole('link', { name: 'Anteprima del promemoria (PDF)' });
+    expect(link.getAttribute('href')).toBe('/api/ricette/r1/promemoria/anteprima');
+    cleanup();
+    service(['owner_doctor'], () => Promise.resolve(checked()));
+    panel('draft', null, false);
+    await screen.findByRole('button', { name: 'Controlla di nuovo' });
+    expect(screen.queryByRole('link', { name: 'Anteprima del promemoria (PDF)' })).toBeNull();
   });
 });
