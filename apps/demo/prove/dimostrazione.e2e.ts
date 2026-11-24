@@ -738,6 +738,51 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     ).toBeGreaterThan(1);
   });
 
+  it('anagrafica AIFA intera (D261): l’alprazolam di classe C ferma la ricetta SSN con la R8; l’ibuprofene da banco', async () => {
+    // Il riquadro dice che la banca dati è l'anagrafica intera, con due esempi da cercare.
+    const hint = await fromPanel((panel) =>
+      panel.getByRole('region', { name: 'Per entrare' }).innerText(),
+    );
+    expect(hint).toMatch(
+      /La banca dati è l’anagrafica AIFA intera: anche classe C, come l’alprazolam/,
+    );
+    expect(hint).toMatch(/come l’ibuprofene da banco/);
+    const id = (await patients())[0]!.id;
+    await go(`/pazienti/${id}/ricetta`);
+    const restart = f.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    const search = f.getByLabel('Farmaco, principio attivo, codice AIC o ATC');
+    // Classe C con obbligo di ricetta: nelle liste A e H non c'è, e lo dice il regime dell'anagrafica.
+    await search.fill('alprazolam');
+    const found = f.locator('.risultato').filter({ hasText: /ALPRAZOLAM/i });
+    await found.first().waitFor();
+    expect(await found.count()).toBeGreaterThan(1);
+    expect(await found.filter({ hasText: /\bclasse [AH]\b/ }).count()).toBe(0);
+    await found
+      .first()
+      .getByText(/Medicinali soggetti a prescrizione medica/)
+      .waitFor();
+    await found.first().getByRole('button', { name: 'Aggiungi' }).click();
+    await f.locator('.riga-ricetta').first().waitFor();
+    // Il passo unico si ferma: l'informazione della R8 chiede di guardare, non blocca (D59, D256).
+    await f.getByRole('button', { name: 'Firma e invia' }).click();
+    await f
+      .getByText(
+        /: non è negli elenchi AIFA dei farmaci di classe A e H in vigore; la banca dati non dice se è a carico del SSN\. Se non lo è, si prescrive su ricetta bianca/,
+      )
+      .first()
+      .waitFor({ timeout: 30_000 });
+    await f.getByRole('button', { name: 'Ho visto i controlli: firma e invia' }).waitFor();
+    // Senza obbligo di prescrizione, da banco: il regime con le parole dell'anagrafica AIFA.
+    await go(`/banche-dati`);
+    await f.getByLabel('Nome commerciale, principio attivo, codice AIC o ATC').fill('ibuprofene');
+    await f
+      .locator('.risultato')
+      .filter({ hasText: 'Medicinali non soggetti a prescrizione medica, da banco.' })
+      .first()
+      .waitFor();
+  });
+
   it('voci cliniche e Profilo sanitario: preparato, validato, firmato e pubblicato; PDF nel visore', async () => {
     const id = (await patients())[0]!.id;
     await go(`/pazienti/${id}/voci`);

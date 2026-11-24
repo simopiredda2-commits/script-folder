@@ -1,11 +1,12 @@
-"""Estratti AIFA per la dimostrazione (D256): i farmaci di classe A e H.
+"""Dati AIFA per la dimostrazione (D256, D261): liste di classe A e H e anagrafica intera.
 
 Legge i file scaricati da AIFA (dati aperti, licenza CC BY 4.0) e scrive in DESTINAZIONE:
 
 - le liste di classe A e di classe H per principio attivo, intere e senza cambiare un byte;
-- l'anagrafica delle confezioni con le sole righe dei codici AIC che stanno in una delle due
-  liste, ognuna senza cambiare un byte, nell'ordine del file, con la sua intestazione;
-- SHA256SUMS con le impronte dei contenuti (non compressi) e dei file d'origine.
+- l'anagrafica delle confezioni intera, senza cambiare un byte: anche classe C, farmaci senza
+  obbligo di prescrizione e confezioni non rimborsate (D261; fino alla D257 c'erano solo le righe
+  dei codici AIC delle due liste);
+- SHA256SUMS con le impronte dei contenuti (non compressi), che sono quelle dei file d'origine.
 
 Ogni file si scrive compresso con gzip, con la data a zero: lo stesso ingresso dà gli stessi byte.
 Solo libreria standard. Da lanciare con `python3 -I`, i file scaricati come argomenti:
@@ -47,28 +48,29 @@ def main() -> None:
         raise SystemExit(__doc__)
     a_path, h_path, ana_path, dest = sys.argv[1:]
     a_raw, h_raw, ana_raw = (open(p, "rb").read() for p in (a_path, h_path, ana_path))
-    wanted = class_codes(a_raw, "AIC") | class_codes(h_raw, "Codice AIC")
+    listed = class_codes(a_raw, "AIC") | class_codes(h_raw, "Codice AIC")
 
     lines = ana_raw.split(b"\n")
-    header, rows = lines[0], [line for line in lines[1:] if line.strip()]
+    rows = [line for line in lines[1:] if line.strip()]
     # Ogni riga dell'anagrafica comincia con il codice AIC fra virgolette: "000367045";...
-    kept = [line for line in rows if line[1:10].decode("ascii", "replace") in wanted]
-    extract = header + b"\n" + b"\n".join(kept) + b"\n"
+    in_lists = sum(1 for line in rows if line[1:10].decode("ascii", "replace") in listed)
 
     os.makedirs(dest, exist_ok=True)
     outputs = {
         os.path.basename(a_path): a_raw,
         os.path.basename(h_path): h_raw,
-        "confezioni_fornitura.csv": extract,
+        "confezioni_fornitura.csv": ana_raw,
     }
     sums = []
     for name, data in outputs.items():
         write_gz(os.path.join(dest, name + ".gz"), data)
         sums.append(f"{hashlib.sha256(data).hexdigest()}  {name}")
-    sums.append(f"{hashlib.sha256(ana_raw).hexdigest()}  origine:confezioni_fornitura.csv")
     with open(os.path.join(dest, "SHA256SUMS"), "w", encoding="utf-8") as out:
         out.write("\n".join(sums) + "\n")
-    print(f"codici AIC nelle liste: {len(wanted)}; righe dell'anagrafica tenute: {len(kept)}")
+    print(
+        f"confezioni nell'anagrafica: {len(rows)}; con un codice AIC nelle liste A e H: {in_lists};"
+        f" fuori dalle liste: {len(rows) - in_lists}"
+    )
 
 
 if __name__ == "__main__":

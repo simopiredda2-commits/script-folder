@@ -140,8 +140,8 @@ const files = [
   bytes: statSync(join(OUT, name)).size,
 }));
 writeFileSync(join(OUT, 'file.json'), `${JSON.stringify(files, null, 2)}\n`);
-// L'artifact accetta al massimo 16 MB per la pagina e per ogni file di testo (D256): con i
-// farmaci di classe A e H il database si avvicina al limite, e qui ci si ferma prima di pubblicare.
+// L'artifact accetta al massimo 16 MB per la pagina e per ogni file di testo (D256): il database va
+// in parti (D260), e qui ci si ferma prima di pubblicare un file più grande.
 const LIMIT = 16_000_000;
 const tooBig = [
   ...files.filter((f) => f.type.startsWith('text/') && f.bytes > LIMIT).map((f) => f.name),
@@ -151,3 +151,9 @@ if (tooBig.length) throw new Error(`Oltre i 16 MB che l'artifact accetta: ${tooB
 const mb = (n: number) => `${(n / 1e6).toFixed(1)} MB`;
 console.log(`\nPagina: ${mb(page.length)} · ${basename(OUT)}/`);
 for (const f of files) console.log(`  ${f.name.padEnd(36)} ${f.type.padEnd(26)} ${mb(f.bytes)}`);
+// Una pubblicazione dell'artifact porta al massimo 64 MB: oltre, si pubblica in più volte allo
+// stesso indirizzo, o solo i file cambiati (D261).
+const total = page.length + files.reduce((n, f) => n + f.bytes, 0);
+console.log(
+  `In tutto: ${mb(total)}${total > 64_000_000 ? ' (oltre i 64 MB di una pubblicazione)' : ''}`,
+);

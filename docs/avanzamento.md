@@ -1481,7 +1481,7 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Nessuna per ora: quelle dell'audit di Cowork hanno avuto risposta il 24/11/2026 (D260). Le domande nuove si scrivono qui durante il blocco (D237).
+Nessuna per ora: quelle della fermata dopo la #36 hanno avuto risposta il 24/11/2026 (D261). Le domande nuove si scrivono qui durante il blocco (D237).
 
 ## Richieste di Simone durante la pausa (22–23/11/2026), da fare alla ripresa
 
@@ -1586,6 +1586,31 @@ Il resoconto di Cowork (32 difetti, nessuno che blocca, 15 importanti e 17 minor
 - Nella dimostrazione, il codice del pulsante riletto subito dopo un accesso o un'uscita: non ha una prova a sé, lo copre il giro di ogni secondo.
 
 **Prossimo passo**: le domande della fermata qui sotto; poi il collaudo finale.
+
+## Risposte della fermata dopo la #36 (24/11/2026)
+
+Simone ha risposto con il pulsante (D261): «Unisci» e «Prima i farmaci», cioè il resto dell'anagrafica AIFA nella dimostrazione, poi il collaudo. Pull request #36 unita (ca10812); il branch riparte da `main`.
+
+**Fatto**
+
+- **Anagrafica AIFA intera nella dimostrazione**: tutte le 160.100 confezioni del file del 20/11/2026, senza cambiare un byte. Oltre alle 13.053 delle liste di classe A e H, le 147.047 che nelle liste non ci sono: classe C, farmaci senza obbligo di ricetta (anche da banco e omeopatici) e confezioni non rimborsate. Il database della dimostrazione va in quattro parti; la prima volta si scaricano circa 58 MB.
+- **R8 sulla ricetta SSN**: per un farmaco che non è negli elenchi di classe A e H in vigore informa, senza bloccare, che la banca dati non dice se è a carico del SSN e che, se non lo è, si prescrive su ricetta bianca. Prima taceva. Come ogni informazione, ferma il passo unico finché il medico non conferma.
+- **Regime di fornitura in vista**: accanto al farmaco, con le parole dell'anagrafica AIFA, nella ricerca della ricetta, della scheda della terapia e di «Farmaci e prestazioni».
+- **Riquadro della dimostrazione**: dice che la banca dati è l'anagrafica intera, con due esempi da cercare (alprazolam, ibuprofene da banco).
+- **Collaudo finale preparato**: `docs/collaudo.md`, 43 voci in cinque parti, e la pagina del collaudo (https://claude.ai/artifact/X58AnakriJzqaApLjHa5kR), fatta dallo stesso documento, dove Simone e la Dr.ssa Rocca segnano l'esito di ogni voce. Gli esiti restano nel database della pagina e Claude li rilegge.
+
+**Come provarlo**
+
+- `pnpm test` e `pnpm lint`. Prove nuove: `packages/rules/test/regole.test.ts` (R8 fuori dagli elenchi), `apps/api/test/banche-dati.test.ts` (classe degli elenchi nei fatti; R8 sulla ricetta SSN con la TACHIPIRINA d'esempio, nulla sulla bianca), `apps/api/test/variazioni-aifa.test.ts` (senza elenchi in vigore la classe resta non nota; alla data vale la versione in vigore), `apps/web/test/farmaci-carenti.test.tsx` (regime di fornitura).
+- Dimostrazione: `pnpm --filter @mmg/demo build` e `pnpm --filter @mmg/demo test:browser`. La prova nuova legge il riquadro, cerca l'alprazolam, lo mette in una ricetta SSN e vede il passo unico fermarsi con la R8; poi trova l'ibuprofene da banco in «Farmaci e prestazioni».
+- Sabotaggi: righe «D261» nel registro.
+
+**Non provato**
+
+- Safari e Firefox veri con il database più grande (in CI sì, con WebKit e Firefox di Playwright); un tablet vero.
+- Il tempo di una ricerca di farmaci su un computer lento: qui, con lo stesso motore del browser, circa 0,4 secondi.
+
+**Prossimo passo**: il collaudo finale con la pagina; poi le correzioni di ciò che è «Da correggere».
 
 ## Risposte della fermata dopo la #35 (24/11/2026)
 
@@ -1774,7 +1799,7 @@ Simone ha risposto con il pulsante il 23/11/2026 (D247).
 3. Ricetta del medico in un passo solo, con l'invio sempre con le sue credenziali (punto 4): fatta (D255).
 4. Unità per confezione per il contatore R11 (D250): fatto, dall'anagrafica AIFA (D252). Quando ci sarà la banca dati con licenza, servirà a trovare le differenze con il numero letto da AIFA.
 5. Conferma esplicita del medico quando il passo unico si ferma sui controlli (D256): fatta. Il pulsante del pannello diventa «Ho visto i controlli: firma e invia»; prova in `apps/web/test/invio.test.tsx`, sabotaggio nel registro.
-6. Database dei farmaci nella dimostrazione: i rimborsabili di classe A e H dalle liste AIFA (D256): fatto (D257). Con il database, qualche ricetta già inviata nei dati della dimostrazione, così le righe dei farmaci prescritti mostrano data e confezioni dell'ultima ricetta (D249). **Da tenere a mente**: il resto dell'anagrafica AIFA (classe C, senza obbligo di prescrizione, non rimborsate) è da integrare.
+6. Database dei farmaci nella dimostrazione: i rimborsabili di classe A e H dalle liste AIFA (D256): fatto (D257). Con il database, qualche ricetta già inviata nei dati della dimostrazione, così le righe dei farmaci prescritti mostrano data e confezioni dell'ultima ricetta (D249). Il resto dell'anagrafica AIFA (classe C, senza obbligo di prescrizione, non rimborsate): fatto (D261).
 7. Audit con Cowork sulla dimostrazione, a programma chiuso (D247): istruzioni pronte in `docs/audit-cowork.md` (D258); lo fa partire Simone, poi le correzioni.
 8. Collaudo finale: le verifiche di Simone e della Dr.ssa Rocca in «Che cosa resta aperto».
 
@@ -3961,3 +3986,13 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D260: una scelta solo scaduta, non cessata, non revoca il temporaneo                                          | aura/service.ts: la scadenza conta come cessazione                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D260: nella dimostrazione il catalogo regionale vero, con la visita cardiologica (prova nel browser)          | prepara-database.ts: catalogo regionale non importato                                                                     | Rosso, poi verde (32 su 32)                                                                                                                                                                                                                                                                                      |
 | D260: il riquadro della dimostrazione dice che il catalogo è da controllare (prova nel browser)               | DemoPanel.tsx: frase tolta                                                                                                | Rosso, poi verde (32 su 32)                                                                                                                                                                                                                                                                                      |
+| D261: la R8 informa sul farmaco fuori dagli elenchi AIFA di classe A e H                                      | rules.ts: la condizione non scatta mai                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D261: l’informazione della R8 fuori dagli elenchi non blocca                                                  | rules.ts: severità della regola, che blocca                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D261: sulla ricetta bianca la R8 non dice nulla                                                               | rules.ts: R8 anche sulla ricetta bianca                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D261: senza elenchi di classe in vigore la classe resta non nota                                              | lookup.ts: classe degli elenchi anche senza elenchi in vigore                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D261: la classe H degli elenchi arriva alla regola                                                            | lookup.ts: la classe H scritta come assente                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D261: R8 sulla ricetta SSN con la TACHIPIRINA d’esempio, senza bloccare l’invio                               | lookup.ts: classe degli elenchi tolta                                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D261: il regime di fornitura dell’anagrafica AIFA accanto al farmaco                                          | PrescriptionEditor.tsx: regime tolto dai dati brevi                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D261: un regime di fornitura fatto di soli spazi non si scrive                                                | PrescriptionEditor.tsx: regime scritto senza togliere gli spazi                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D261: il riquadro dice che la banca dati è l’anagrafica AIFA intera (prova nel browser)                       | DemoPanel.tsx: frase tolta                                                                                                | Rosso, poi verde (33 su 33)                                                                                                                                                                                                                                                                                      |
+| D261: nella dimostrazione l’alprazolam di classe C e l’ibuprofene da banco (prova nel browser)                | dati/aifa: l’estratto delle sole classi A e H al posto dell’anagrafica intera                                             | Rosso, poi verde (33 su 33)                                                                                                                                                                                                                                                                                      |

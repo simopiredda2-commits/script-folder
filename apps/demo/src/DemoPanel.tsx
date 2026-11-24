@@ -127,10 +127,11 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
         <p>
           Per le ricette entra come <code>medico</code>: <strong>Pazienti</strong>, apri un
           paziente, <strong>Nuova ricetta</strong>. Farmaci d’esempio: amlodipina, atorvastatina,
-          metformina. Per inviare una ricetta SSN serve prima l’accesso regionale: dal nome in alto,{' '}
-          <strong>Credenziali</strong>, <strong>Entra con SPID o CIE</strong>, poi{' '}
-          <strong>Entra con SPID (simulato)</strong>. L’amministratore dello studio non apre le
-          cartelle.
+          metformina. La banca dati è l’anagrafica AIFA intera: anche classe C, come l’alprazolam, e
+          farmaci senza obbligo di ricetta, come l’ibuprofene da banco. Per inviare una ricetta SSN
+          serve prima l’accesso regionale: dal nome in alto, <strong>Credenziali</strong>,{' '}
+          <strong>Entra con SPID o CIE</strong>, poi <strong>Entra con SPID (simulato)</strong>.
+          L’amministratore dello studio non apre le cartelle.
         </p>
       </section>
       <section aria-labelledby="dimo-aura">

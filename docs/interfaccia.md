@@ -143,6 +143,7 @@ Negli avvisi il collegamento sta in una frase: lo controlla `apps/web/test/avvis
 - Il modulo della segnalazione online di AIFA non è stato aperto da qui: l'indirizzo è quello della pagina AIFA, letta il 19/11/2026 (D202).
 - Stampa della ricetta rossa nel modulo conforme: da completare con le specifiche. Il promemoria segue le specifiche di stampa del 28/02/2024 (D217).
 - Tema scuro.
+- Le schermate sono di prima della D261: accanto al farmaco, nei risultati della ricerca, non hanno ancora il regime di fornitura dell'anagrafica AIFA (per esempio «Medicinali soggetti a prescrizione medica»).
 
 ## Che cosa non è stato provato
 

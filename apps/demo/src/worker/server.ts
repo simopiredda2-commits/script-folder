@@ -87,7 +87,7 @@ export async function start(
   interrupted: InterruptedHints;
 }> {
   progress(
-    'Scarico il database e il programma (circa 28 MB, solo la prima volta che il browser li vede)…',
+    'Scarico il database e il programma (circa 58 MB, solo la prima volta che il browser li vede)…',
   );
   const [wasm, initdb, data, dump] = await Promise.all([
     fetchBytes(base, 'pglite.wasm'),

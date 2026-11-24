@@ -71,6 +71,36 @@ describe('farmaci carenti e lista di trasparenza nell’interfaccia (D202)', () 
     expect(drugFacts(generic).at(-1)).toBe('In distribuzione diretta');
   });
 
+  it('il regime di fornitura con le parole dell’anagrafica AIFA, dopo la classe (D261)', () => {
+    expect(
+      drugFacts({ ...DRUG, supplyRegime: 'Medicinali soggetti a prescrizione medica' }).slice(0, 4),
+    ).toEqual([
+      '5 MG COMPRESSE- 28 COMPRESSE',
+      'ditta VIATRIS PHARMA S.R.L.',
+      'classe A',
+      'Medicinali soggetti a prescrizione medica',
+    ]);
+    // Fuori dalle liste A e H: nessuna classe, ma il regime dice che non serve la ricetta.
+    const otc: Drug = {
+      ...DRUG,
+      aic: '012745093',
+      name: 'TACHIPIRINA',
+      pack: '500 MG COMPRESSE-20 COMPRESSE',
+      drugClass: null,
+      price: null,
+      referencePrice: null,
+      priceDifference: null,
+      holder: null,
+      supplyRegime: 'Medicinali non soggetti a prescrizione medica, da banco.',
+    };
+    expect(drugFacts(otc)).toEqual([
+      '500 MG COMPRESSE-20 COMPRESSE',
+      'Medicinali non soggetti a prescrizione medica, da banco.',
+    ]);
+    // Senza regime nell'anagrafica non si scrive nulla.
+    expect(drugFacts({ ...otc, supplyRegime: '  ' })).toEqual(['500 MG COMPRESSE-20 COMPRESSE']);
+  });
+
   it('Oggi: i farmaci in terapia carenti con i pazienti, che si aprono con un clic', async () => {
     const today = (farmaciCarenti: unknown) => ({
       data: '2026-11-19',

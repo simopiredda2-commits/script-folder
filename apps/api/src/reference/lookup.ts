@@ -567,6 +567,9 @@ export class ReferenceData {
       // Classe A: a carico del SSN (classificazione AIFA). Le altre classi non dicono da sole
       // se il farmaco è prescrivibile dal medico di medicina generale: restano non note.
       if (classA) facts.reimbursableSsn = true;
+      // La classe degli elenchi in vigore, o null se non hanno la confezione: la R8 lo dice senza
+      // dedurne «non a carico» (D59, D261). Senza elenchi in vigore resta non nota.
+      if (classIds.length) facts.listedClass = classA ? 'A' : pick(c.map((x) => x.drugClass));
       if (aifaNote) facts.aifaNote = aifaNote;
       // L'elenco DPC dice quando il piano serve; quando non c'è, non dice che non serve.
       if (inDpc?.planRequired === true) facts.requiresPlan = true;
