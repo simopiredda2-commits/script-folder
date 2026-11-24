@@ -420,8 +420,10 @@ function ConfirmedQueue({ reloadKey }: { reloadKey: number }) {
               onClick={() => void archive()}
               disabled={busy}
             >
-              <Icon name="archivio" /> <span>Archivia ricette confermate</span>{' '}
-              <span className="tenue">({count})</span>
+              <Icon name="archivio" />{' '}
+              <span>
+                Archivia ricette confermate <span className="tenue">({count})</span>
+              </span>
             </button>
           </div>
           <ul className="coda-ricette">

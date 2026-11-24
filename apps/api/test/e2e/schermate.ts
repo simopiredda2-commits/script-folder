@@ -175,7 +175,7 @@ try {
   await page
     .getByRole('heading', { level: 2, name: 'Confermate' })
     .evaluate((el) => el.scrollIntoView({ block: 'start' }));
-  await shot(page, '74-ricette-confermate');
+  await shot(page, '76-ricette-confermate');
 
   // Il paziente della ricetta appena inviata: cartella, scheda della terapia con lo storico.
   const sent = await db.execute<{ patient_id: string; therapy_id: string }>(sql`
