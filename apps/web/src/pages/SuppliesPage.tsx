@@ -394,6 +394,7 @@ function SupplyForm({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [itemFilter, setItemFilter] = useState('');
   const set = (k: keyof typeof empty) => (e: { target: { value: string } }) =>
     setF((x) => ({ ...x, [k]: e.target.value }));
   const category = categories.find((c) => c.chiave === f.categoria);
@@ -409,10 +410,20 @@ function SupplyForm({
         (i) => i.allegato === annex && (advanced ? isAdvanced(i) : !isAdvanced(i)),
       )
     : [];
-  const groups = [...new Set(items.map((i) => i.gruppo))];
   const rare = annex ? catalog.malattieRare.filter((i) => i.allegato === annex) : [];
   const chosen = items.findIndex((i) => i.descrizione === f.prodotto && i.codice === f.codice);
   const chosenItem = chosen >= 0 ? items[chosen] : undefined;
+  // Una ricerca per parole, in qualunque ordine, al posto di scorrere decine di voci lunghe
+  // (suggerimento S12 dell'audit, D259); la voce già scelta resta nell'elenco.
+  const words = itemFilter.toLocaleLowerCase('it').split(/\s+/).filter(Boolean);
+  const matches = (i: CatalogItem) =>
+    words.every((w) =>
+      `${i.descrizione} ${i.codice} ${i.gruppo}`.toLocaleLowerCase('it').includes(w),
+    );
+  const shown = (i: CatalogItem, index: number) => index === chosen || matches(i);
+  // Quante voci hanno le parole: la voce già scelta resta in elenco ma non si conta.
+  const shownCount = items.filter(matches).length;
+  const groups = [...new Set(items.filter(shown).map((i) => i.gruppo))];
   // La voce vuota è «scrivi a mano»: prodotto e codice si svuotano, e non diventano quelli della
   // prima voce (Number('') è 0). Un codice rimasto da un'altra voce sarebbe sbagliato (D232).
   const pick = (index: string) => {
@@ -507,6 +518,28 @@ function SupplyForm({
         </div>
         {items.length > 0 && (
           <div className="campo">
+            <label htmlFor="presidio-nomenclatore-cerca">Cerca nel nomenclatore</label>
+            <input
+              id="presidio-nomenclatore-cerca"
+              type="search"
+              value={itemFilter}
+              autoComplete="off"
+              aria-describedby="presidio-nomenclatore-trovate"
+              onChange={(e) => setItemFilter(e.target.value)}
+            />
+            <p className="aiuto" id="presidio-nomenclatore-trovate" role="status">
+              {words.length === 0
+                ? `${items.length} voci: scrivi una o più parole per restringere l’elenco.`
+                : shownCount === 0
+                  ? 'Nessuna voce con queste parole.'
+                  : shownCount === 1
+                    ? '1 voce con queste parole.'
+                    : `${shownCount} voci con queste parole.`}
+            </p>
+          </div>
+        )}
+        {items.length > 0 && (
+          <div className="campo">
             <label htmlFor="presidio-nomenclatore">Dal nomenclatore (allegato {annex})</label>
             <select
               id="presidio-nomenclatore"
@@ -522,7 +555,7 @@ function SupplyForm({
               {groups.map((g) => (
                 <optgroup key={g} label={g}>
                   {items.map((i, index) =>
-                    i.gruppo === g ? (
+                    i.gruppo === g && shown(i, index) ? (
                       <option key={`${i.codice}-${i.descrizione}`} value={String(index)}>
                         {i.descrizione} · {i.codice}
                       </option>

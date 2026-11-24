@@ -1396,6 +1396,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         firmataDa: sql<
           string | null
         >`(select u.display_name from app_user u where u.id = ${prescription.signedBy})`,
+        // Le consegne del promemoria riuscite (anche le stampe di prima dell'audit): «Archivia
+        // ricette confermate» chiede prima di archiviare quelle senza (suggerimento S7, D259).
+        consegne: sql<number>`(select count(*)::int from reminder_delivery d where d.prescription_id = ${prescription.id} and d.outcome in ('consegnato', 'stampato'))`,
         // Il codice fiscale partito con l'invio (D239): con quello si controlla l'NRBE (D259).
         codiceFiscaleInviato: sql<
           string | null
@@ -1456,7 +1459,13 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         tipoErrore: r.tipoErrore,
         firmabile: signable.has(r.archiveId),
         ...(opts.confirmed
-          ? { stato: r.stato, nre: r.nre, inviataIl: r.inviataIl, cartaceaIl: r.cartaceaIl }
+          ? {
+              stato: r.stato,
+              nre: r.nre,
+              inviataIl: r.inviataIl,
+              cartaceaIl: r.cartaceaIl,
+              consegne: r.consegne,
+            }
           : {}),
         ...(opts.signer
           ? {

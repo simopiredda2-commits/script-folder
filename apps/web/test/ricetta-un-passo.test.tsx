@@ -137,9 +137,24 @@ describe('ricetta del medico in un passo (D255)', () => {
     editor();
     fireEvent.click(await screen.findByRole('button', { name: 'Salva in bozza' }));
     await screen.findByText('Ricetta preparata in bozza. Si controlla e poi si firma.');
+    // «Salva in bozza» non c'è più: il fuoco va ai controlli, non alla pagina (audit D259).
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toBe('Controlli prima dell’invio'),
+    );
     const sign = await screen.findByRole('button', { name: 'Firma e invia' });
     await waitFor(() => expect((sign as HTMLButtonElement).disabled).toBe(false));
     expect(signs(calls)).toHaveLength(0);
+  });
+});
+
+describe('con la tastiera (suggerimento S6 dell’audit, D259)', () => {
+  it('«Vai a "In ricetta"» porta il fuoco alla ricetta, senza passare dai risultati', async () => {
+    service();
+    editor();
+    const skip = await screen.findByRole('link', { name: 'Vai a «In ricetta»' });
+    expect(skip.getAttribute('href')).toBe('#titolo-ricetta');
+    fireEvent.click(skip);
+    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'In ricetta' }));
   });
 });
 
@@ -148,6 +163,10 @@ describe('dopo l’arresto si corregge la ricetta, senza rifarla (audit, D259)',
     const calls = service({ blocked: true });
     editor();
     fireEvent.click(await screen.findByRole('button', { name: 'Firma e invia' }));
+    // Fermato il passo unico, il fuoco va all'arresto che dice che cosa correggere (audit D259).
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toMatch(/^La ricetta non può partire: R2 blocca/),
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Modifica la ricetta' }));
     // Di nuovo in modifica: la ricerca accesa, la riga di prima ancora in ricetta.
     await waitFor(() =>

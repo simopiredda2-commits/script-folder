@@ -342,12 +342,42 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .getByRole('button', { name: 'Riduci il riquadro della dimostrazione' });
     if (await reduce.count()) await reduce.click();
     await f.locator('button.dimo-apri').waitFor();
+    // Il pulsante dice di chi è il codice (suggerimento S5 dell'audit, D259).
+    await f
+      .locator('button.dimo-apri')
+      .getByText(/^codice per medico: \d{3} \d{3}$/)
+      .waitFor();
     for (const v of [
       { width: 1280, height: 900 },
       { width: 1024, height: 768 },
       { width: 820, height: 1180 },
+      { width: 768, height: 1024 },
     ]) {
       await page.setViewportSize(v);
+      // Con la pagina in alto e a metà il pulsante non copre comandi del programma: dove la pagina
+      // scorre, non le sta sopra (audit D259, «Aggiungi» coperto a 768×1024).
+      for (const at of [0, 0.5]) {
+        const under = await f.evaluate(async (at) => {
+          const doc = document.scrollingElement!;
+          scrollTo(0, (doc.scrollHeight - innerHeight) * at);
+          await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+          const pill = document.querySelector('button.dimo-apri')!.getBoundingClientRect();
+          return [...document.querySelectorAll('#root a, #root button, #root input, #root select')]
+            .filter((e) => {
+              const r = e.getBoundingClientRect();
+              return (
+                r.width > 0 &&
+                r.height > 0 &&
+                r.left < pill.right &&
+                r.right > pill.left &&
+                r.top < pill.bottom &&
+                r.bottom > pill.top
+              );
+            })
+            .map((e) => (e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 40));
+        }, at);
+        expect(under, `${where} a ${v.width}×${v.height}, pagina a ${at * 100}%`).toEqual([]);
+      }
       const measure = () =>
         f.evaluate(async () => {
           scrollTo(0, document.scrollingElement!.scrollHeight);
@@ -439,12 +469,25 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     const registry = text.match(/un’ASL diversa per (.+), da confermare/)![1]!;
     const deceased = text.match(/il decesso di (.+), da confermare/)![1]!;
     const exemption = text.match(/un’esenzione nuova per (.+);/)![1]!;
+    const revoked = text.match(/la revoca di (.+);/)![1]!;
     await login('medico');
+    // La revoca annunciata c'è davvero: il paziente era in carico e ora è revocato (audit 28).
+    expect(
+      await f.evaluate(async (wanted) => {
+        const list = (await (await fetch('/api/pazienti')).json()) as {
+          pazienti: { nome: string; cognome: string; stato: string }[];
+        };
+        return list.pazienti.find((p) => `${p.nome} ${p.cognome}` === wanted)?.stato ?? null;
+      }, revoked),
+    ).toBe('revoked');
 
     const changes = f.getByRole('region', { name: 'Variazioni da AURA' });
     await changes.getByText(`AURA segnala il decesso di ${deceased}`, { exact: false }).waitFor();
     await changes.getByRole('link', { name: exemption }).first().waitFor();
-    await changes.getByText(/nuova – Esenzione 013/).waitFor();
+    await changes
+      .getByText(/ – Esenzione 013 .*\(nuova, /)
+      .first()
+      .waitFor();
 
     const news = f.getByRole('region', { name: 'Nuovi assistiti in AURA' });
     await news.getByRole('button', { name: `Registra ${newPatient}` }).click();

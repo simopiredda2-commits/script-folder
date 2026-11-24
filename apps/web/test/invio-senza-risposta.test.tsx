@@ -182,6 +182,8 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     expect(s.getByText(/Confermi che la ricetta è arrivata con NRE/).textContent).toMatch(
       /MAN000000000001.*MANAUT0001/,
     );
+    // Il modulo non c'è più: la domanda prende il fuoco (WCAG 2.4.3, audit D259).
+    expect(document.activeElement).toBe(s.getByRole('group', { name: 'Conferma dell’esito' }));
     await userEvent.click(s.getByRole('button', { name: 'Sì, confermo' }));
     await s.findByText(/Ricetta segnata come arrivata/);
     expect(bodies).toEqual([

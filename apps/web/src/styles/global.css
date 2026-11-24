@@ -143,6 +143,29 @@ legend {
   top: 0.5rem;
 }
 
+/*
+ * Un salto dentro un riquadro (suggerimento S6, D259): nascosto finché non prende il fuoco, poi in
+ * alto a sinistra del riquadro. Non esce mai dal riquadro, che scorra o no.
+ */
+.riquadro:has(> .salta-riquadro) {
+  position: relative;
+}
+
+.salta.salta-riquadro {
+  top: 0.5rem;
+  left: 0.5rem;
+}
+
+.salta.salta-riquadro:not(:focus) {
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+}
+
 .icona {
   flex: none;
 }
@@ -605,6 +628,16 @@ legend {
   .griglia-cartella,
   .griglia-ricetta {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /*
+   * La ricerca e i suoi risultati scorrono nel loro riquadro, con l'ombra se sotto c'è altro: «In
+   * ricetta» e «Firma e invia» restano subito sotto, non dopo trenta risultati (audit D259).
+   */
+  .griglia-ricetta > .riquadro:first-child {
+    max-height: 50vh;
+    max-height: 50dvh;
+    overflow-y: auto;
   }
 
   .app-main {
@@ -2776,4 +2809,14 @@ textarea[aria-invalid='true'] {
 
 .segnaposto dd {
   margin: 0;
+}
+
+/*
+ * Un collegamento da solo nel suo paragrafo è un bersaglio da 44 px (audit D259): l'eccezione di
+ * WCAG vale per i collegamenti dentro una frase, che restano in riga.
+ */
+.collegamento-solo a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-min-target);
 }

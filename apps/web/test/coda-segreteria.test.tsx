@@ -48,7 +48,7 @@ const queue = (id: string, firmabile: boolean, extra: object = {}) => ({
   ],
 });
 
-function service(me: object, firmabile: boolean, drafts = false) {
+function service(me: object, firmabile: boolean, drafts = false, deliveries?: number) {
   const calls: string[] = [];
   let archived = false;
   vi.stubGlobal(
@@ -72,6 +72,7 @@ function service(me: object, firmabile: boolean, drafts = false) {
                   nre: '010000000004',
                   inviataIl: '2026-11-20T09:30:00Z',
                   firmataDa: 'Medico inventato',
+                  ...(deliveries === undefined ? {} : { consegne: deliveries }),
                 }),
           ),
         );
@@ -201,6 +202,40 @@ describe('ricette confermate e archiviazione (D254)', () => {
     done.getByRole('button', { name: /Archivia ricette confermate \(1\)/ }).click();
     await done.findByText(/1 ricetta archiviata: restano nello storico dei pazienti/);
     await done.findByText('Nessuna ricetta confermata da archiviare.');
+    expect(calls).toContain('POST /api/ricette/archivia-confermate');
+  });
+
+  it('senza nessuna consegna del promemoria, prima la domanda con il nome (suggerimento S7)', async () => {
+    const calls = service(who('owner_doctor', 'Medico titolare'), true, false, 0);
+    page();
+    const done = await section('Confermate');
+    await done.findByText('010000000004');
+    done.getByRole('button', { name: /Archivia ricette confermate \(1\)/ }).click();
+    const question = await done.findByRole('group', {
+      name: 'Ricette senza consegna del promemoria',
+    });
+    expect(question.textContent).toMatch(
+      /1 ricetta non ha nessuna consegna del promemoria: Paola Inventata\./,
+    );
+    expect(document.activeElement).toBe(question);
+    // «Torna indietro»: nessuna archiviazione.
+    within(question).getByRole('button', { name: 'Torna indietro' }).click();
+    await done.findByRole('button', { name: /Archivia ricette confermate \(1\)/ });
+    expect(calls).not.toContain('POST /api/ricette/archivia-confermate');
+    done.getByRole('button', { name: /Archivia ricette confermate \(1\)/ }).click();
+    (await done.findByRole('button', { name: 'Sì, archivia' })).click();
+    await done.findByText(/1 ricetta archiviata/);
+    expect(calls).toContain('POST /api/ricette/archivia-confermate');
+  });
+
+  it('con una consegna non chiede: archivia subito', async () => {
+    const calls = service(who('owner_doctor', 'Medico titolare'), true, false, 1);
+    page();
+    const done = await section('Confermate');
+    await done.findByText('010000000004');
+    done.getByRole('button', { name: /Archivia ricette confermate \(1\)/ }).click();
+    await done.findByText(/1 ricetta archiviata/);
+    expect(done.queryByRole('group', { name: 'Ricette senza consegna del promemoria' })).toBeNull();
     expect(calls).toContain('POST /api/ricette/archivia-confermate');
   });
 

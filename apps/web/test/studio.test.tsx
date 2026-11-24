@@ -118,6 +118,16 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
     const user = userEvent.setup();
     render(<StudioSection />);
     await user.type(await screen.findByLabelText('Regione'), 'PIEMONTE');
+    // L'aiuto dice i limiti in chiaro e non rimanda a pagine che l'amministratore non apre (audit D259).
+    expect(
+      screen.getByLabelText('Intestazione dello studio').getAttribute('aria-describedby'),
+    ).toBe('studio-intestazione-aiuto');
+    expect(document.getElementById('studio-intestazione-aiuto')!.textContent).toMatch(
+      /^Al massimo \d+ righe di \d+ caratteri; la prima si stampa in neretto\./,
+    );
+    expect(document.getElementById('studio-intestazione-aiuto')!.textContent).not.toMatch(
+      /Strumenti › Impaginazione/,
+    );
     await user.type(
       screen.getByLabelText('Intestazione dello studio'),
       'Studio di prova{enter}{enter}  Via di Prova 1  ',

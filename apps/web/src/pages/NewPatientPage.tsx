@@ -560,7 +560,7 @@ export function NewPatientPage() {
         </fieldset>
         <FormError error={error} labels={LABELS}>
           {duplicate && (
-            <p>
+            <p className="collegamento-solo">
               <Link to={`/pazienti/${duplicate.id}`}>
                 Apri la cartella del paziente già registrato
               </Link>

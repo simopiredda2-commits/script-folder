@@ -101,20 +101,32 @@ const body = (d: Draft) => ({
 });
 
 /** Problemi dei controlli dell'INPS ripetuti qui, con il codice. */
-function Problems({ error }: { error: ApiError | null }) {
+export function Problems({ error }: { error: ApiError | null }) {
   const problems = (
     error?.details as { problemi?: { code: string; message: string }[] } | undefined
   )?.problemi;
-  if (!problems?.length) return <ErrorMessage error={error} />;
+  // Durante l'invio il modulo è spento e il pulsante premuto perde il fuoco: lo prende l'elenco di
+  // ciò che va corretto (WCAG 2.4.3, audit D259).
+  const ref = useRef<HTMLDivElement>(null);
+  const count = problems?.length ?? 0;
+  useEffect(() => {
+    if (count > 0) ref.current?.focus();
+  }, [count, error]);
+  if (!problems?.length) return <ErrorMessage error={error} focus />;
   return (
-    <div className="messaggio messaggio-errore" role="alert">
+    <div ref={ref} tabIndex={-1} className="messaggio messaggio-errore" role="alert">
       <Icon name="blocco" />
       <div>
         <p>Da correggere prima dell’invio:</p>
         <ul>
           {problems.map((p) => (
+            // Prima il messaggio, il codice in fondo: un numero davanti si leggeva come parte
+            // della frase (suggerimento S8 dell'audit, D259).
             <li key={`${p.code}-${p.message}`}>
-              <span className="codice">{p.code}</span> {p.message}
+              {p.message}{' '}
+              <span className="tenue">
+                (codice <span className="codice">{p.code}</span>)
+              </span>
             </li>
           ))}
         </ul>

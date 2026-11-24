@@ -148,8 +148,14 @@ describe('code delle ricette viste dalla segreteria (D242)', () => {
     const theirs = await send('collega', theirPatient, 'Farmaco del collega di prova');
     const waiting = await toSign('titolare', s.richPatient, { drugName: 'Farmaco in attesa' });
     const seen = await find('titolare', 'confermate', sent);
-    expect(seen).toMatchObject({ stato: 'sent' });
+    expect(seen).toMatchObject({ stato: 'sent', consegne: 0 });
     expect((seen as unknown as { nre: string }).nre).toMatch(/\S/);
+    // Una consegna su carta: la ricetta la conta, e «Archivia» non chiede più (suggerimento S7).
+    const paper = await req('titolare', 'POST', `/api/ricette/${sent}/promemoria/consegna-carta`, {
+      formato: 'completo',
+    });
+    expect(paper.statusCode, paper.body).toBe(200);
+    expect(await find('titolare', 'confermate', sent)).toMatchObject({ consegne: 1 });
     // La segreteria le vede anche lei; quelle da firmare non sono confermate.
     expect(await find('segreteria', 'confermate', sent)).toBeDefined();
     expect(await find('titolare', 'confermate', waiting)).toBeUndefined();

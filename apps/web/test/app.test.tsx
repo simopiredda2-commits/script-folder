@@ -121,4 +121,27 @@ describe('interfaccia', () => {
     ).toBe('/ricette#in-bozza');
     expect(screen.getByText('Dott.ssa Medico Inventato')).toBeTruthy();
   });
+
+  it('solo amministratore: niente Pazienti e Ricette nel menu (suggerimento S11, D259)', async () => {
+    fakeService({
+      '/api/io': {
+        status: 200,
+        body: {
+          ...ME,
+          nome: 'Amministratore inventato',
+          ruoli: [{ codice: 'administrator', nome: 'Amministratore dello studio' }],
+        },
+      },
+      '/api/oggi': { status: 200, body: TODAY },
+    });
+    render(<App />);
+    const nav = await screen.findByRole('navigation', { name: 'Sezioni' });
+    await within(nav).findByRole('link', { name: /^Farmaci e prestazioni/ });
+    const labels = within(nav)
+      .getAllByRole('link')
+      .map((a) => a.textContent?.trim());
+    expect(labels).not.toContain('Pazienti');
+    expect(labels.some((l) => l?.startsWith('Ricette'))).toBe(false);
+    expect(labels).toContain('Oggi');
+  });
 });

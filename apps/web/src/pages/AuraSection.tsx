@@ -391,6 +391,15 @@ interface StudioChanges {
 const toPanel = (p: Who) => `/pazienti/${p.id}/amministrazione#aura`;
 
 /**
+ * «nuova» o «cambiata» per esenzione, scelta e anagrafica, che aprono la descrizione; la voce tolta
+ * lo dice già («non c'è più in AURA»), e stato e archivio sono frasi intere.
+ */
+const changeWord = (v: AuraChange) =>
+  ['esenzione', 'scelta', 'anagrafica'].includes(v.tipo) && v.variazione !== 'tolta'
+    ? CHANGE_LABEL[v.variazione].toLowerCase()
+    : null;
+
+/**
  * Pagina Oggi: le anagrafiche di AURA da confermare (il decesso in evidenza) e le variazioni
  * arrivate negli ultimi giorni, dei pazienti che l'utente vede. Senza nulla da mostrare non c'è.
  */
@@ -402,6 +411,14 @@ export function AuraChangesToday() {
   if (list.length === 0 && pending.length === 0) return null;
   const deaths = pending.filter((p) => p.decesso);
   const registry = pending.filter((p) => p.campi.length > 0);
+  // Un cambio di medico, una riga (audit D259): la proposta di spostamento dice già la scelta nuova;
+  // le righe della scelta dello stesso aggiornamento restano nel pannello del paziente.
+  const moves = new Set(
+    list.filter((v) => v.tipo === 'archivio').map((v) => `${v.paziente.id}|${v.quando}`),
+  );
+  const shown = list.filter(
+    (v) => !(v.tipo === 'scelta' && moves.has(`${v.paziente.id}|${v.quando}`)),
+  );
   return (
     <section aria-labelledby="titolo-aura-oggi" className="riquadro">
       <h2 id="titolo-aura-oggi">
@@ -443,13 +460,18 @@ export function AuraChangesToday() {
             {plural(r.data?.giorni ?? 7, 'giorno', 'giorni')}.
           </p>
           <ul className="elenco-semplice">
-            {list.map((v) => (
+            {shown.map((v) => (
               <li key={`${v.quando}-${v.paziente.id}-${v.descrizione}`}>
                 <Link to={toPanel(v.paziente)}>
                   {v.paziente.nome} {v.paziente.cognome}
-                </Link>
-                : {CHANGE_LABEL[v.variazione].toLowerCase()} – {v.descrizione}
-                <span className="tenue"> ({dateTime(v.quando)})</span>
+                </Link>{' '}
+                – {v.descrizione}
+                {/* «nuova» o «cambiata» accanto a ciò che è cambiato, non al nome (audit D259). */}
+                <span className="tenue">
+                  {' '}
+                  ({changeWord(v) ? `${changeWord(v)}, ` : ''}
+                  {dateTime(v.quando)})
+                </span>
               </li>
             ))}
           </ul>
@@ -594,7 +616,7 @@ export function AuraNewPatientsToday() {
       )}
       <ErrorMessage error={error} />
       {existing && (
-        <p>
+        <p className="collegamento-solo">
           <Link to={`/pazienti/${existing.id}`}>Apri la cartella del paziente già registrato</Link>
         </p>
       )}

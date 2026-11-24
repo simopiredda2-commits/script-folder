@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
 import { normalizePrescriptionNumber, nrbeProblem, nreProblem } from '../lib/prescription-numbers';
-import { ErrorMessage, Notice } from './common';
+import { ConfirmQuestion, ErrorMessage, Notice } from './common';
 import { Icon } from './Icon';
 
 interface SettleOutcome {
@@ -144,57 +144,43 @@ export function InterruptedSendPanel({
         fermato mentre aspettava {ente}. Chiedi all’ente se la ricetta è arrivata, poi segna qui
         l’esito.
       </Notice>
-      <ErrorMessage error={error} />
+      <ErrorMessage error={error} focus />
       {pending ? (
         // L'esito non si cambia dopo: si rilegge e si conferma (WCAG 3.3.4).
-        <div className="conferma-esito" role="group" aria-label="Conferma dell’esito">
-          <p>
-            {pending.esito === 'non_arrivata' ? (
-              <>
-                Confermi che la ricetta <strong>non è arrivata</strong>? Torna da inviare: se in
-                realtà fosse arrivata, rimandarla farebbe un doppione.
-              </>
-            ) : (
-              <>
-                Confermi che la ricetta è arrivata con {number}{' '}
-                <strong className="codice">{pending.nre}</strong>
-                {pending.pin ? (
-                  <>
-                    {' '}
-                    e PIN <strong className="codice">{pending.pin}</strong>
-                  </>
-                ) : pending.codiceAutenticazione ? (
-                  <>
-                    {' '}
-                    e codice di autenticazione{' '}
-                    <strong className="codice">{pending.codiceAutenticazione}</strong>
-                  </>
-                ) : (
-                  ', senza il codice di autenticazione'
-                )}
-                ? Un numero sbagliato non si corregge dopo.
-              </>
-            )}
-          </p>
-          <div className="azioni">
-            <button
-              type="button"
-              className="pulsante pulsante-primario"
-              disabled={busy}
-              onClick={() => void settle(pending)}
-            >
-              <Icon name="fatto" /> <span>Sì, confermo</span>
-            </button>
-            <button
-              type="button"
-              className="pulsante"
-              disabled={busy}
-              onClick={() => setPending(null)}
-            >
-              <Icon name="annulla" /> <span>Torna indietro</span>
-            </button>
-          </div>
-        </div>
+        <ConfirmQuestion
+          label="Conferma dell’esito"
+          yes="Sì, confermo"
+          busy={busy}
+          onYes={() => void settle(pending)}
+          onBack={() => setPending(null)}
+        >
+          {pending.esito === 'non_arrivata' ? (
+            <>
+              Confermi che la ricetta <strong>non è arrivata</strong>? Torna da inviare: se in
+              realtà fosse arrivata, rimandarla farebbe un doppione.
+            </>
+          ) : (
+            <>
+              Confermi che la ricetta è arrivata con {number}{' '}
+              <strong className="codice">{pending.nre}</strong>
+              {pending.pin ? (
+                <>
+                  {' '}
+                  e PIN <strong className="codice">{pending.pin}</strong>
+                </>
+              ) : pending.codiceAutenticazione ? (
+                <>
+                  {' '}
+                  e codice di autenticazione{' '}
+                  <strong className="codice">{pending.codiceAutenticazione}</strong>
+                </>
+              ) : (
+                ', senza il codice di autenticazione'
+              )}
+              ? Un numero sbagliato non si corregge dopo.
+            </>
+          )}
+        </ConfirmQuestion>
       ) : (
         <>
           <div className="azioni">

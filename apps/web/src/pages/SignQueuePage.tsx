@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, useLocation } from 'react-router';
-import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { ConfirmQuestion, ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { InterruptedSendPanel } from '../components/InterruptedSendPanel';
 import { ReminderPanel } from '../components/ReminderPanel';
@@ -37,6 +37,8 @@ interface QueueGroup {
     nre?: string | null;
     inviataIl?: string | null;
     cartaceaIl?: string | null;
+    /** Solo fra le confermate: le consegne del promemoria riuscite (suggerimento S7, D259). */
+    consegne?: number;
   }[];
 }
 
@@ -405,11 +407,17 @@ function ConfirmedQueue({ reloadKey }: { reloadKey: number }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [archived, setArchived] = useState<number | null>(null);
+  const [asking, setAsking] = useState(false);
   if (queue.loading && !queue.data) return <Loading what="ricette" />;
   if (!queue.data) return <ErrorMessage error={queue.error} />;
   const groups = queue.data.pazienti;
   const count = groups.reduce((n, g) => n + g.ricette.length, 0);
+  // Le ricette senza nessuna consegna del promemoria: prima di archiviarle si chiede (S7, D259).
+  const undelivered = groups.flatMap((g) =>
+    g.ricette.filter((r) => r.consegne === 0).map(() => `${g.paziente.nome} ${g.paziente.cognome}`),
+  );
   async function archive() {
+    setAsking(false);
     setBusy(true);
     setError(null);
     try {
@@ -442,8 +450,8 @@ function ConfirmedQueue({ reloadKey }: { reloadKey: number }) {
             <button
               type="button"
               className="pulsante"
-              onClick={() => void archive()}
-              disabled={busy}
+              onClick={() => (undelivered.length > 0 ? setAsking(true) : void archive())}
+              disabled={busy || asking}
             >
               <Icon name="archivio" />{' '}
               <span>
@@ -451,6 +459,21 @@ function ConfirmedQueue({ reloadKey }: { reloadKey: number }) {
               </span>
             </button>
           </div>
+          {asking && (
+            <ConfirmQuestion
+              label="Ricette senza consegna del promemoria"
+              yes="Sì, archivia"
+              busy={busy}
+              onYes={() => void archive()}
+              onBack={() => setAsking(false)}
+            >
+              {undelivered.length === 1
+                ? '1 ricetta non ha nessuna consegna del promemoria'
+                : `${undelivered.length} ricette non hanno nessuna consegna del promemoria`}
+              : {[...new Set(undelivered)].join(', ')}. Archiviate escono da questa pagina; il
+              promemoria resta nello storico delle prescrizioni del paziente. Le archivi lo stesso?
+            </ConfirmQuestion>
+          )}
           <ul className="coda-ricette">
             {groups.map((g) => (
               <li key={g.paziente.id} className="riquadro">

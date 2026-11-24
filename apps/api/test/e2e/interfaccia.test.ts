@@ -157,10 +157,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       };
       for (const el of document.querySelectorAll('a, button, input, select, textarea, summary')) {
         if (!visible(el) || el.closest('.salta')) continue;
-        // Eccezione WCAG: collegamenti dentro una frase.
+        // Eccezione WCAG: collegamenti dentro una frase. Un collegamento da solo nel suo
+        // paragrafo non è in una frase: è un bersaglio come gli altri (audit D259).
+        const words = (e: Element) => (e.textContent ?? '').replace(/\s+/g, ' ').trim();
+        const sentence = el.parentElement?.closest('p');
         if (
           el.tagName === 'A' &&
-          el.parentElement?.closest('p') &&
+          sentence &&
+          words(sentence) !== words(el) &&
           getComputedStyle(el).display === 'inline'
         )
           continue;
@@ -775,6 +779,22 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.locator('.risultato').filter({ hasText: 'TEVA ITALIA' }).waitFor();
     await page.getByText('Banche dati dei farmaci in uso').waitFor();
     await check(page, 'nuova ricetta con risultati', true);
+    // Su tablet in verticale la ricerca scorre nel suo riquadro, alto al massimo metà schermo:
+    // «In ricetta» sta nella prima schermata, non dopo tutti i risultati (audit D259).
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await expect(
+      page.evaluate(() => {
+        scrollTo(0, 0);
+        const box = document.querySelector('section[aria-labelledby="titolo-cerca"]')!;
+        const css = getComputedStyle(box);
+        return {
+          box: [css.maxHeight, css.overflowY],
+          inView:
+            document.getElementById('titolo-ricetta')!.getBoundingClientRect().top < innerHeight,
+        };
+      }),
+    ).resolves.toEqual({ box: ['512px', 'auto'], inView: true });
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page
       .locator('.risultato')
       .filter({ hasText: 'TEVA ITALIA' })
@@ -1670,6 +1690,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     );
     await page.getByRole('button', { name: 'Registra', exact: true }).click();
     await page.getByText('Voce registrata.').waitFor();
+    // Durante il salvataggio il modulo è spento: il fuoco va all'esito, non alla pagina (D259).
+    await expect(
+      page.evaluate(() => document.activeElement?.textContent?.trim() ?? ''),
+    ).resolves.toBe('Voce registrata.');
     const item = page.locator('.voce').filter({ hasText: 'Problema della prova nel browser' });
     await item.waitFor();
     await check(page, 'voci cliniche', true);
@@ -1856,6 +1880,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('button', { name: 'Firma e pubblica' }).click();
     await page.getByText('Profilo firmato e pubblicato nel Fascicolo.').waitFor();
     await page.getByRole('heading', { name: 'Versioni nel Fascicolo' }).waitFor();
+    // L'identificativo del documento con il suo nome (suggerimento S9 dell'audit, D259).
+    await page
+      .getByText(/^Identificativo nel Fascicolo: \S+$/)
+      .first()
+      .waitFor();
     const signed = page.getByRole('link', { name: 'PDF firmato della versione 1' });
     const res = await page.request.get(`${base}${await signed.getAttribute('href')}`);
     expect(res.status()).toBe(200);

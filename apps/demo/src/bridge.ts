@@ -79,6 +79,9 @@ export function startService(
   });
 }
 
+/** L'evento che il riquadro ascolta per rileggere subito il codice. */
+export const ACCESS_CHANGED = 'dimostrazione-accesso';
+
 /** Il codice del secondo fattore di chi sta entrando, se si conosce. */
 export function secondFactorCode(): Promise<Omit<CodeMessage, 'type'>> {
   return new Promise((resolve) => {
@@ -115,6 +118,10 @@ export async function callService(request: Request): Promise<Response> {
     pending.set(id, { resolve, reject });
     send({ type: 'request', id, request: wire }, wire.body ? [wire.body] : []);
   });
+  // Dopo un accesso o un'uscita il codice del riquadro cambia subito: senza aspettare il giro di
+  // ogni secondo, che mostrava ancora il codice di chi era entrato prima (suggerimento S5, D259).
+  if (url.pathname.startsWith('/api/accesso') || url.pathname === '/api/uscita')
+    queueMicrotask(() => window.dispatchEvent(new Event(ACCESS_CHANGED)));
   const nullBody = [101, 204, 205, 304].includes(response.status);
   return new Response(nullBody ? null : response.body, {
     status: response.status,

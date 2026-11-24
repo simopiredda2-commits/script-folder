@@ -146,6 +146,36 @@ describe('presidi: scelta dal nomenclatore del DPCM LEA (D218)', () => {
     );
   });
 
+  it('una ricerca per parole restringe l’elenco; la voce scelta resta (suggerimento S12)', async () => {
+    routes(CATALOG);
+    window.history.pushState({}, '', '/pazienti/p1/presidi');
+    render(<App />);
+    const select = await screen.findByLabelText<HTMLSelectElement>('Dal nomenclatore (allegato 3)');
+    const search = screen.getByLabelText('Cerca nel nomenclatore');
+    const names = () => [...select.querySelectorAll('option')].map((o) => o.textContent);
+    expect(screen.getByText(/^3 voci: scrivi una o più parole/)).toBeTruthy();
+    // Parole in qualunque ordine, anche nel codice.
+    fireEvent.change(search, { target: { value: 'prova minilancette' } });
+    expect(names()).toEqual([
+      'Scrivi il prodotto o scegli dal nomenclatore',
+      'Minilancette pungidito di prova · V0104',
+    ]);
+    expect(screen.getByText('1 voce con queste parole.')).toBeTruthy();
+    fireEvent.change(select, { target: { value: select.options[1]!.value } });
+    // Un'altra ricerca: la voce scelta resta, con quelle trovate.
+    fireEvent.change(search, { target: { value: 'W0201060102' } });
+    expect(names()).toEqual([
+      'Scrivi il prodotto o scegli dal nomenclatore',
+      'Minilancette pungidito di prova · V0104',
+      'Apparecchio di prova · W0201060102 / Z12040115',
+    ]);
+    expect(screen.getByLabelText<HTMLInputElement>('Prodotto').value).toBe(
+      'Minilancette pungidito di prova',
+    );
+    fireEvent.change(search, { target: { value: 'nessuna voce così' } });
+    expect(screen.getByText('Nessuna voce con queste parole.')).toBeTruthy();
+  });
+
   it('tornare a «scrivi a mano» svuota prodotto e codice, non sceglie la prima voce (D232)', async () => {
     const calls = routes(CATALOG);
     window.history.pushState({}, '', '/pazienti/p1/presidi');

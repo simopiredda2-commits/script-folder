@@ -4,7 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { CREDENTIALS_PATH } from '../lib/credentials';
 import { sentence } from '../lib/format';
 import { useSession } from '../lib/session';
-import { ErrorMessage, IssueList, Notice, type RuleIssue } from './common';
+import { ErrorMessage, IssueList, Notice, ResultNotice, type RuleIssue } from './common';
 import { Icon } from './Icon';
 
 interface CheckResult {
@@ -39,6 +39,12 @@ export interface SendPanelProps {
   onChange?: (status: string, nre?: string) => void;
   /** Torna a modificare la ricetta, dove si può (l'editor): «Modifica la ricetta» (D259). */
   onEdit?: () => void;
+  /**
+   * Arrivato dopo un'azione nell'editor («Salva in bozza», «Firma e invia»): il pulsante premuto
+   * non c'è più e il fuoco va ai controlli; se il passo unico si ferma, all'arresto (WCAG 2.4.3,
+   * audit D259). Nella coda «da firmare» no: lì i pannelli sono tanti e nessuno ha premuto nulla.
+   */
+  focusOnArrival?: boolean;
 }
 
 /**
@@ -74,8 +80,14 @@ export function SendPanel({
   autoSign,
   onChange,
   onEdit,
+  focusOnArrival,
 }: SendPanelProps) {
   const { isDoctor } = useSession();
+  const heading = useRef<HTMLHeadingElement>(null);
+  const arrival = useRef(focusOnArrival);
+  useEffect(() => {
+    if (arrival.current) heading.current?.focus();
+  }, []);
   const [check, setCheck] = useState<CheckResult | null>(null);
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
   const [reasons, setReasons] = useState<Record<string, string>>({});
@@ -131,6 +143,8 @@ export function SendPanel({
   const stopped = !!autoSign && isDoctor && !!check && toLookAt(check).length > 0;
   // Con un blocco non si firma: si dice che cosa correggere, e dove (D259).
   const blocked = [...new Set(hardBlocks(check).map((p) => p.ruleId))];
+  // Fermato il passo unico, l'arresto prende il fuoco: il pulsante premuto non c'è più (D259).
+  const Stop = autoSign ? ResultNotice : Notice;
 
   // L'ente non ha risposto: all'invio appena fatto, o all'ultimo invio della ricetta (D239).
   const unreachable = outcome
@@ -226,9 +240,11 @@ export function SendPanel({
 
   return (
     <div className="pannello-invio">
-      <h3>Controlli prima dell’invio</h3>
+      <h3 ref={heading} tabIndex={-1}>
+        Controlli prima dell’invio
+      </h3>
       {blocked.length > 0 && !outcome && (
-        <Notice kind="errore">
+        <Stop kind="errore">
           <p>
             La ricetta non può partire: {blocked.join(', ')}{' '}
             {blocked.length === 1 ? 'blocca' : 'bloccano'}. Che cosa correggere, e dove, lo dice il
@@ -239,10 +255,10 @@ export function SendPanel({
               <Icon name="ricette" /> <span>Modifica la ricetta</span>
             </button>
           )}
-        </Notice>
+        </Stop>
       )}
       {stopped && blocked.length === 0 && !outcome && (
-        <Notice kind="avviso">
+        <Stop kind="avviso">
           <p>
             La ricetta non è ancora partita. Guarda i controlli qui sotto e conferma con «Ho visto i
             controlli: firma e invia».
@@ -252,7 +268,7 @@ export function SendPanel({
               <Icon name="ricette" /> <span>Modifica la ricetta</span>
             </button>
           )}
-        </Notice>
+        </Stop>
       )}
       {check && (
         <>

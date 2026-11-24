@@ -259,7 +259,9 @@ describe('AURA nell’interfaccia (D197)', () => {
     );
     const link = await screen.findByRole('link', { name: 'Paziente Inventato' });
     expect(link.getAttribute('href')).toBe('/pazienti/p1/amministrazione#aura');
-    expect(screen.getByText(/nuova – Esenzione 013/)).toBeTruthy();
+    // «nuova» accanto all'esenzione, non dopo il nome (audit D259).
+    expect(screen.getByText('– Esenzione 013 dal 01/01/2025, senza scadenza')).toBeTruthy();
+    expect(screen.getByText(/^\(nuova, 19\/11\/2026 alle \d{2}:\d{2}\)$/)).toBeTruthy();
     first.unmount();
     vi.unstubAllGlobals();
     stub({ 'GET /api/aura/variazioni?giorni=7': { variazioni: 'non un elenco' } });
@@ -270,6 +272,59 @@ describe('AURA nell’interfaccia (D197)', () => {
     );
     await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
     expect(second.container.textContent).toBe('');
+  });
+
+  it('pagina Oggi: un cambio di medico è una riga sola, la proposta di spostamento (audit D259)', async () => {
+    const who = { id: 'p1', cognome: 'Inventato', nome: 'Paziente' };
+    const at = '2026-11-19T08:00:00Z';
+    stub({
+      'GET /api/aura/variazioni?giorni=7': {
+        disponibile: true,
+        giorni: 7,
+        variazioni: [
+          {
+            quando: at,
+            tipo: 'scelta',
+            variazione: 'nuova',
+            descrizione: 'Scelta di Medica Nuova dal 18/11/2026',
+            paziente: who,
+          },
+          {
+            quando: at,
+            tipo: 'scelta',
+            variazione: 'tolta',
+            descrizione: 'Scelta di Medico Prima: non c’è più in AURA',
+            paziente: who,
+          },
+          {
+            quando: at,
+            tipo: 'archivio',
+            variazione: 'nuova',
+            descrizione:
+              'Scelta in AURA di Medica Nuova dal 18/11/2026: lo spostamento nel suo archivio lo decide Medico Prima',
+            paziente: who,
+          },
+          // Un'altra volta, senza spostamento: resta.
+          {
+            quando: '2026-11-17T08:00:00Z',
+            tipo: 'scelta',
+            variazione: 'cambiata',
+            descrizione: 'Scelta di Medico Prima dal 01/01/2020, fino al 31/12/2026',
+            paziente: who,
+          },
+        ],
+      },
+    });
+    render(
+      <MemoryRouter>
+        <AuraChangesToday />
+      </MemoryRouter>,
+    );
+    await screen.findByText(/– Scelta in AURA di Medica Nuova dal 18\/11\/2026/);
+    const rows = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(rows).toHaveLength(2);
+    expect(rows.join('\n')).not.toMatch(/non c’è più in AURA|Scelta di Medica Nuova dal/);
+    expect(screen.getByText(/^\(cambiata, 17\/11\/2026 alle \d{2}:\d{2}\)$/)).toBeTruthy();
   });
 
   it('nuovi assistiti in Oggi (D199): chi, scelta e scadenza; «Registra» con un clic porta alla cartella', async () => {

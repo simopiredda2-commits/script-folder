@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router';
-import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { ConfirmQuestion, ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { date, dateTime, money, plural, studioToday } from '../lib/format';
@@ -524,48 +524,34 @@ export function PpipReportPage() {
                 )}
                 {x.inInvio?.interrotto && confirming && (
                   // L'esito non si cambia dopo: si rilegge e si conferma (WCAG 3.3.4, D239).
-                  <div className="conferma-esito" role="group" aria-label="Conferma dell’esito">
-                    <p>
-                      {confirming === 'arrivata' ? (
-                        <>
-                          Confermi che la distinta è <strong>arrivata</strong> all’ASL
-                          {reference.trim() ? (
-                            <>
-                              {' '}
-                              con il riferimento <strong>{reference.trim()}</strong>
-                            </>
-                          ) : (
-                            ', senza un riferimento'
-                          )}
-                          ? Le prestazioni risultano partite e non si annullano più.
-                        </>
-                      ) : (
-                        <>
-                          Confermi che la distinta <strong>non è arrivata</strong> all’ASL? Le
-                          prestazioni tornano da inviare: se in realtà fosse arrivata, mandarla di
-                          nuovo farebbe un doppione.
-                        </>
-                      )}
-                    </p>
-                    <div className="azioni">
-                      <button
-                        type="button"
-                        className="pulsante pulsante-primario"
-                        disabled={busy}
-                        onClick={() => void settle(confirming)}
-                      >
-                        <Icon name="fatto" /> <span>Sì, confermo</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="pulsante"
-                        disabled={busy}
-                        onClick={() => setConfirming(null)}
-                      >
-                        <Icon name="annulla" /> <span>Torna indietro</span>
-                      </button>
-                    </div>
-                  </div>
+                  <ConfirmQuestion
+                    label="Conferma dell’esito"
+                    yes="Sì, confermo"
+                    busy={busy}
+                    onYes={() => void settle(confirming)}
+                    onBack={() => setConfirming(null)}
+                  >
+                    {confirming === 'arrivata' ? (
+                      <>
+                        Confermi che la distinta è <strong>arrivata</strong> all’ASL
+                        {reference.trim() ? (
+                          <>
+                            {' '}
+                            con il riferimento <strong>{reference.trim()}</strong>
+                          </>
+                        ) : (
+                          ', senza un riferimento'
+                        )}
+                        ? Le prestazioni risultano partite e non si annullano più.
+                      </>
+                    ) : (
+                      <>
+                        Confermi che la distinta <strong>non è arrivata</strong> all’ASL? Le
+                        prestazioni tornano da inviare: se in realtà fosse arrivata, mandarla di
+                        nuovo farebbe un doppione.
+                      </>
+                    )}
+                  </ConfirmQuestion>
                 )}
                 {x.invioAttivo ? (
                   x.invioSimulato && (

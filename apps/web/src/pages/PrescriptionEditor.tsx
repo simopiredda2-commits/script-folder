@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import {
   DataVersions,
@@ -392,6 +392,10 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   // audit, D259): «Aggiungi» c'è solo su quelle; la ricerca resta per consultare.
   const repeatOnly = !isDoctor;
   const [oneStep, setOneStep] = useState(false);
+  const lineHeading = useRef<HTMLHeadingElement>(null);
+  // La bozza è nata qui, adesso, da un clic: il pannello dei controlli prende il fuoco (D259). Una
+  // bozza ricordata, ritrovata tornando alla pagina, no.
+  const [arrived, setArrived] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [justAdded, setJustAdded] = useState<Omit<Line, 'key'> | null>(null);
   /**
@@ -512,6 +516,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
       }>(`/api/pazienti/${id}/ricette`);
       const created = list.ricette.find((x) => x.id === r.id);
       setOneStep(sign);
+      setArrived(true);
       setDraft({
         id: r.id,
         status: created?.status ?? 'draft',
@@ -604,6 +609,18 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           <h2 id="titolo-cerca">
             {mode === 'farmaci' ? 'Banca dati farmaci' : 'Catalogo regionale'}
           </h2>
+          {/* Con la tastiera, un salto a «In ricetta» senza passare da ogni risultato: compare
+              quando prende il fuoco (suggerimento S6 dell'audit, D259). */}
+          <a
+            className="salta salta-riquadro"
+            href="#titolo-ricetta"
+            onClick={(e) => {
+              e.preventDefault();
+              lineHeading.current?.focus();
+            }}
+          >
+            Vai a «In ricetta»
+          </a>
           {mode === 'farmaci' && (
             <fieldset className="scelta scelta-in-riga" disabled={locked}>
               <legend>Tipo di ricetta</legend>
@@ -753,7 +770,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   );
                 }}
               />
-              <p className="aiuto">
+              <p className="collegamento-solo aiuto">
                 <Link to={`/pazienti/${id}/farmaci`}>
                   Tutti i farmaci prescritti, con le ricette fatte con altri programmi
                 </Link>
@@ -802,7 +819,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           {/* «Ricomincia» svuota questa lista: sta accanto al titolo, così in fondo restano solo i
               pulsanti della firma e della bozza, in una riga anche a 1280 px (D255). */}
           <div className="riquadro-testa">
-            <h2 id="titolo-ricetta">In ricetta</h2>
+            <h2 id="titolo-ricetta" ref={lineHeading} tabIndex={-1}>
+              In ricetta
+            </h2>
             {!draft && lines.length > 0 && (
               <button
                 type="button"
@@ -1188,6 +1207,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 lineNames={draft.lineIds}
                 preview={kind !== 'white'}
                 autoSign={oneStep}
+                focusOnArrival={arrived}
                 onEdit={() => void editAgain()}
                 onChange={(status, nre) => setDraft({ ...draft, status, ...(nre ? { nre } : {}) })}
               />

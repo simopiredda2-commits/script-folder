@@ -174,7 +174,7 @@ export function HealthProfilePage() {
             ))}
           </ul>
           {o.mancano.some((m) => m.startsWith('Medico:')) && o.puoFirmare && (
-            <p>
+            <p className="collegamento-solo">
               <Link to="/profilo/recapiti">Apri «Recapiti di studio»</Link>
             </p>
           )}
@@ -407,7 +407,10 @@ export function HealthProfilePage() {
                   {v.pubblicatoIl && <> il {dateTime(v.pubblicatoIl)}</>}
                   {v.sostituitoIl && <>; sostituita il {dateTime(v.sostituitoIl)}</>}
                 </p>
-                <p className="tenue codice">{v.documento}</p>
+                {/* L'identificativo con il suo nome, non un codice da solo (suggerimento S9, D259). */}
+                <p className="tenue">
+                  Identificativo nel Fascicolo: <span className="codice">{v.documento}</span>
+                </p>
                 <a
                   className="pulsante pulsante-piatto"
                   href={`${base}/${v.id}/pdf`}

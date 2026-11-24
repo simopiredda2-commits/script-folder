@@ -26,11 +26,30 @@ function fieldMessages(error: ApiError): string[] {
   return [...new Set(messages)].slice(0, 5);
 }
 
-export function ErrorMessage({ error }: { error: ApiError | null }) {
+export function ErrorMessage({
+  error,
+  focus = false,
+}: {
+  error: ApiError | null;
+  /**
+   * L'errore di un'azione che toglie o spegne il pulsante premuto prende il fuoco, che altrimenti
+   * finirebbe sulla pagina (WCAG 2.4.3, audit D259).
+   */
+  focus?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focus && error) ref.current?.focus();
+  }, [focus, error]);
   if (!error) return null;
   const fields = fieldMessages(error);
   return (
-    <div className="messaggio messaggio-errore" role="alert">
+    <div
+      ref={ref}
+      tabIndex={focus ? -1 : undefined}
+      className="messaggio messaggio-errore"
+      role="alert"
+    >
       <Icon name="avviso" />
       <span>
         {/* Seguito dal collegamento, il messaggio chiude la frase col punto (audit D259). */}

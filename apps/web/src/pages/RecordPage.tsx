@@ -215,7 +215,7 @@ export function RecordPage() {
         {riepilogo ? (
           <section className="riquadro" aria-labelledby="titolo-problemi">
             <h2 id="titolo-problemi">Problemi attivi</h2>
-            <p>
+            <p className="collegamento-solo">
               <Link to={`/pazienti/${id}/voci?tipo=problema`}>Problemi e diagnosi</Link>
             </p>
             {riepilogo.problemiAttivi.length === 0 ? (
@@ -244,7 +244,7 @@ export function RecordPage() {
               </ul>
             )}
             <h3>Parametri</h3>
-            <p>
+            <p className="collegamento-solo">
               <Link to={`/pazienti/${id}/parametri`}>Andamento dei parametri</Link>
             </p>
             {riepilogo.parametri.length === 0 ? (
@@ -397,7 +397,7 @@ export function RecordPage() {
             </>
           )}
 
-          <p>
+          <p className="collegamento-solo">
             <Link to={`/pazienti/${id}/farmaci`}>
               Tutti i farmaci prescritti, con il loro storico
             </Link>

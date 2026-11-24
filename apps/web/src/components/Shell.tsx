@@ -29,6 +29,9 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/banche-dati', label: 'Farmaci e prestazioni', icon: 'farmaci' },
 ];
 
+/** Le voci che servono solo a chi ha un ruolo clinico: medico, sostituto, segreteria. */
+const CLINICAL_ONLY = new Set(['/pazienti', '/ricette']);
+
 /**
  * Cartelle aperte insieme (D68): una scheda per paziente, che riporta all'ultima pagina vista.
  * Il paziente attivo è evidenziato; nome e cognome per intero, per non scambiare i pazienti.
@@ -243,8 +246,11 @@ export function Shell({ children }: { children: ReactNode }) {
       : null;
   const me = state.status === 'ready' ? state.me : null;
   const header = useRef<HTMLElement>(null);
+  // Chi è solo amministratore non apre cartelle né ricette: Pazienti e Ricette non sono nel suo
+  // menu, invece di portare a pagine vuote (suggerimento S11 dell'audit, D259).
+  const clinical = !me || me.ruoli.some((r) => r.codice !== 'administrator');
   const items = [
-    ...NAV,
+    ...NAV.filter((n) => clinical || !CLINICAL_ONLY.has(n.to)),
     ...(me?.archivio
       ? [{ to: '/archivio', label: 'Archivio', icon: 'archivio' as const, end: false }]
       : []),

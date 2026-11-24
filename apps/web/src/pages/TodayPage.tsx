@@ -248,7 +248,7 @@ function CredentialAlerts() {
           {a.text}
         </Notice>
       ))}
-      <p>
+      <p className="collegamento-solo">
         <Link to={CREDENTIALS_PATH}>Apri «Credenziali dei servizi»</Link>
       </p>
     </section>

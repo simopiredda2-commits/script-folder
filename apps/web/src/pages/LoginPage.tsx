@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { ErrorMessage, Notice } from '../components/common';
 import { Logo } from '../components/Logo';
 import { Signature } from '../components/Signature';
@@ -25,6 +25,14 @@ export function LoginPage() {
   const [step, setStep] = useState<Step>({ kind: 'password' });
   const [error, setError] = useState<ApiError | null>(null);
   const [busy, setBusy] = useState(false);
+  // Durante la richiesta il pulsante è spento e perde il fuoco: con un errore il fuoco torna al
+  // campo da riscrivere, già selezionato (WCAG 2.4.3, audit D259). L'errore lo legge l'avviso.
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const codeInput = useRef<HTMLInputElement>(null);
+  const retype = (input: HTMLInputElement | null) => {
+    input?.focus();
+    input?.select();
+  };
 
   async function submitPassword(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -52,6 +60,7 @@ export function LoginPage() {
       );
     } catch (err) {
       setError(err instanceof ApiError ? err : null);
+      retype(passwordInput.current);
     } finally {
       setBusy(false);
     }
@@ -70,6 +79,7 @@ export function LoginPage() {
       await refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err : null);
+      retype(codeInput.current);
     } finally {
       setBusy(false);
     }
@@ -93,6 +103,7 @@ export function LoginPage() {
             <div className="campo">
               <label htmlFor="password">Password</label>
               <input
+                ref={passwordInput}
                 id="password"
                 name="password"
                 type="password"
@@ -116,7 +127,7 @@ export function LoginPage() {
             <button type="submit" className="pulsante pulsante-primario" disabled={busy}>
               Continua
             </button>
-            <p>
+            <p className="collegamento-solo">
               <a href="/ripristino">
                 Password o codice persi, o conto bloccato? Ripristina con SPID o CIE
               </a>
@@ -139,6 +150,7 @@ export function LoginPage() {
             <div className="campo">
               <label htmlFor="codice">Codice a 6 cifre</label>
               <input
+                ref={codeInput}
                 id="codice"
                 name="codice"
                 inputMode="numeric"
