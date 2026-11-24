@@ -11,6 +11,7 @@
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { PGlite } from '@electric-sql/pglite';
 import { loadMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
 import { drizzle } from 'drizzle-orm/pglite';
@@ -19,8 +20,10 @@ import { readMigrations } from '../../api/src/db/migrate';
 import * as schema from '../../api/src/db/schema';
 import {
   EXAMPLE_TRANSCRIPTIONS,
+  EXAMPLES_DIR,
   runSyncOnExample,
   serveExampleSite,
+  type ExampleSite,
 } from '../../api/src/reference/example-site';
 import { importReferenceData } from '../../api/src/reference/importer';
 
@@ -32,10 +35,56 @@ const SUPPLY_TRANSCRIPTIONS = ['allegato-2-ausili-monouso', 'allegato-3-presidi'
 /** «Controllato da» nella copia della dimostrazione: dice che nessuno l'ha controllata. */
 const DEMO_UNCHECKED = 'nessuno: copia della dimostrazione, ancora da controllare (A8)';
 
+/**
+ * Farmaci di classe A e H (D256): sul sito d'esempio le liste di AIFA intere al posto degli
+ * estratti, e nell'anagrafica le righe d'esempio, che servono alle prove e alle simulazioni
+ * (confezione sospesa, farmaco fuori dalle liste), più le confezioni delle due classi che
+ * l'esempio non ha. `sync/` e l'importazione restano quelli veri.
+ */
+const DEMO_AIFA = join(import.meta.dirname, '..', 'dati', 'aifa');
+const CLASS_LISTS = [
+  'Classe-A_per_principio-attivo_30-6-2026.csv',
+  'Classe-H_per_principio-attivo_30-6-2026.csv',
+];
+const unzip = (name: string) => gunzipSync(readFileSync(join(DEMO_AIFA, `${name}.gz`)));
+/** Il codice AIC di una riga dell'anagrafica: comincia con il codice fra virgolette. */
+const aicOf = (line: Buffer) => line.subarray(1, 10).toString('latin1');
+const lines = (data: Buffer) => {
+  const out: Buffer[] = [];
+  let start = 0;
+  for (let i = data.indexOf(10); i !== -1; i = data.indexOf(10, start)) {
+    out.push(data.subarray(start, i));
+    start = i + 1;
+  }
+  if (start < data.length) out.push(data.subarray(start));
+  return out.filter((l) => l.length > 0);
+};
+
+function useDemoDrugs(site: ExampleSite) {
+  for (const name of CLASS_LISTS)
+    site.override(`aifa/documents/20142/3815901/${name}`, unzip(name));
+  const example = lines(
+    readFileSync(join(EXAMPLES_DIR, 'sito', 'aifa', 'farmaci', 'confezioni_fornitura.csv')),
+  );
+  const [header, ...rows] = lines(unzip('confezioni_fornitura.csv'));
+  if (!header!.equals(example[0]!)) throw new Error('Anagrafica AIFA: intestazioni diverse');
+  const known = new Set(example.slice(1).map(aicOf));
+  const added = rows.filter((r) => !known.has(aicOf(r)));
+  const all = [...example, ...added];
+  site.override(
+    'aifa/farmaci/confezioni_fornitura.csv',
+    Buffer.concat(all.flatMap((l) => [l, Buffer.from('\n')])),
+  );
+  console.log(
+    `Farmaci di classe A e H: ${added.length} confezioni oltre alle ${known.size} d'esempio`,
+  );
+}
+
 const work = mkdtempSync(join(tmpdir(), 'mmg-dimostrazione-'));
 try {
   const syncDir = join(work, 'dati-pubblici');
   const site = await serveExampleSite();
+  useDemoDrugs(site);
   try {
     const run = await runSyncOnExample(site, syncDir);
     if (run.code !== 0)

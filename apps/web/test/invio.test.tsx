@@ -304,7 +304,11 @@ describe('ricetta del medico in un passo (D255)', () => {
       screen.getByLabelText('Motivo per procedere nonostante l’avviso R18'),
       'Codice nuovo',
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Firma e invia' }));
+    // Si procede solo con la conferma esplicita del medico (D256).
+    expect(screen.queryByRole('button', { name: 'Firma e invia' })).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Ho visto i controlli: firma e invia' }),
+    );
     await screen.findByText('Ricetta inviata.', { exact: false });
     expect(signs(calls)).toHaveLength(1);
   });

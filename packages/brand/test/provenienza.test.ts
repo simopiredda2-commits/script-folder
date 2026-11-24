@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { repoRoot } from './nome-prodotto';
 
@@ -41,6 +43,20 @@ function exampleFiles(): Set<string> {
   return new Set([...src.matchAll(/"([^"/]+\.(?:pdf|xlsx))"/g)].map((m) => m[1]!));
 }
 
+/** Estratti dei dati aperti AIFA per la dimostrazione (D256), con le impronte dei contenuti. */
+const DEMO_AIFA = 'apps/demo/dati/aifa/';
+
+/** I file compressi di `apps/demo/dati/aifa/SHA256SUMS`, con l'impronta del contenuto. */
+function demoAifaSums(): Map<string, string> {
+  const sums = new Map<string, string>();
+  for (const line of read(`${DEMO_AIFA}SHA256SUMS`).split('\n')) {
+    const [hash, name] = line.trim().split(/\s+/);
+    if (hash && name && !name.startsWith('origine:')) sums.set(`${name}.gz`, hash);
+  }
+  return sums;
+}
+const DEMO_AIFA_SUMS = demoAifaSums();
+
 /** Da dove viene un file; `null` se non ha una provenienza dichiarata. */
 function originOf(path: string, shots: Set<string>, examples: Set<string>): string | null {
   if (path.startsWith('docs/schermate/') && shots.has(path.slice('docs/schermate/'.length)))
@@ -51,6 +67,8 @@ function originOf(path: string, shots: Set<string>, examples: Set<string>): stri
     return 'marchi (packages/brand: SHA256SUMS o genera-proposte-logo.ts)';
   if (path === 'apps/web/public/favicon.svg')
     return 'segno del logo (packages/brand/scripts/genera-proposte-logo.ts)';
+  if (path.startsWith(DEMO_AIFA) && DEMO_AIFA_SUMS.has(path.slice(DEMO_AIFA.length)))
+    return 'dati aperti AIFA, CC BY 4.0 (apps/demo/dati/aifa/LEGGIMI.md)';
   return null;
 }
 
@@ -136,6 +154,15 @@ describe('provenienza dei file (regola 2)', () => {
     expect(originOf('docs/manuale.pdf', shots, examples)).toBeNull();
     expect(originOf('fixtures/banche-dati/sito/manuale.pdf', shots, examples)).toBeNull();
     expect(originOf('apps/web/public/immagine.png', shots, examples)).toBeNull();
+    expect(originOf('apps/demo/dati/aifa/altro.csv.gz', shots, examples)).toBeNull();
+  });
+
+  it('estratti AIFA della dimostrazione: il contenuto ha l’impronta di SHA256SUMS (D256)', () => {
+    expect(DEMO_AIFA_SUMS.size).toBe(3);
+    for (const [file, hash] of DEMO_AIFA_SUMS) {
+      const content = gunzipSync(readFileSync(join(repoRoot, DEMO_AIFA, file)));
+      expect(createHash('sha256').update(content).digest('hex'), file).toBe(hash);
+    }
   });
 
   it('dipendenze di produzione: solo licenze permissive', { timeout: 120_000 }, () => {

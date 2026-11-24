@@ -1913,3 +1913,20 @@ Non provato: Safari e Firefox veri; la stampa su carta dal menu della pagina.
 - **«Ricomincia» accanto al titolo «In ricetta»**: con tre pulsanti in fondo, a 1280 px «Ricomincia» andava a capo e toglieva spazio alla ricetta (lo ha mostrato la schermata). Svuota la lista, quindi sta con la lista; in fondo restano «Firma e invia» e «Salva in bozza», in una riga. La prova nel browser lo controlla a 1280 px.
 
 Non provato: Safari e Firefox veri; le credenziali vere del Sistema TS.
+
+**D256 · Risposte della fermata dopo la #33 (24/11/2026).** Simone ha risposto con il pulsante.
+
+- **Via**: «Unisci». Pull request #33 unita in `main` (commit 8c91d72) con le 14 verifiche su GitHub verdi.
+- **Ricetta del medico in un passo**: «Ok Tutto tranne R1 con pulsante che faccia confermare comunque il medico per procedere». Il passo unico si ferma su ogni problema dei controlli tranne la R1, come in D255. Quando si ferma, il medico procede solo con un pulsante di conferma esplicito, «Ho visto i controlli: firma e invia», non con lo stesso «Firma e invia» di prima.
+- **Database dei farmaci nella dimostrazione**: «Ok classe A e h ma tenendo a mente che tutto il resto sarà da integrare». Nella dimostrazione i rimborsabili di classe A e H dalle liste AIFA. Il resto dell'anagrafica (classe C, senza obbligo di prescrizione, confezioni non rimborsate) resta da integrare: è annotato in «Che cosa resta da fare».
+
+**D257 · Farmaci di classe A e H nella dimostrazione, con le ricette già inviate.** Risposta di Simone alla fermata dopo la #33 (D256): «Ok classe A e h ma tenendo a mente che tutto il resto sarà da integrare».
+
+- **Che cosa entra**: le liste intere di AIFA di classe A (10.766 righe) e H (2.487) del 30/6/2026, e le 13.053 confezioni autorizzate dell'anagrafica del 20/11/2026 con un codice AIC in una delle due liste, senza cambiare un byte. Altri 200 codici delle liste del 30/6 non sono più nell'anagrafica e restano solo nelle liste. Restano anche le 13 confezioni d'esempio, che servono alle prove e alle simulazioni (confezione sospesa, farmaco fuori dalle liste).
+- **Come entra**: gli estratti compressi stanno in `apps/demo/dati/aifa/` (850 KB), con `LEGGIMI.md` e le impronte in `SHA256SUMS`. Lo script è `apps/demo/scripts/estrai-aifa.py`. Alla costruzione prendono il posto dei file del sito d'esempio; `sync/` e l'importazione restano quelli veri. La prova delle provenienze ammette in quella cartella solo gli archivi elencati, e controlla che il contenuto abbia l'impronta scritta.
+- **Peso**: il database della dimostrazione passa da 8 a 12,9 MB. L'artifact accetta 16 MB per file: la costruzione ora si ferma prima di pubblicare un file più grande.
+- **Ricette già inviate**: ogni paziente del medico con terapie croniche ha una ricetta inviata nei giorni scorsi, con l'NRE, il codice di autenticazione di una serie del simulatore che i nuovi invii non usano, e il controllo delle regole. È già archiviata (D254), quindi non affolla le confermate. Le date non vanno prima della prima versione delle regole (18/11/2026): una ricetta del programma ha sempre il controllo in vigore quel giorno. Prima di quella data ci sono le ricette di altri programmi, già nei dati dimostrativi (D176).
+- **Principio attivo nei risultati**: con la banca dati intera, cercando «ramipril» uscivano prima i marchi (ALAMUT, KRUPIL…) senza il principio attivo. Nella ricetta e nella scheda della terapia il risultato mostra il principio attivo quando il nome non lo contiene, come già la ricerca delle banche dati.
+- **Da tenere a mente**: classe C, farmaci senza obbligo di prescrizione e confezioni non rimborsate non ci sono. Sono da integrare.
+
+Non provato: Safari e Firefox veri con il database più grande, che è più lento da caricare; tablet veri.

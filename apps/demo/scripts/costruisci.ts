@@ -124,6 +124,14 @@ const files = [...referenced, 'pglite.wasm', 'initdb.wasm', 'pglite-dati.txt', '
   }),
 );
 writeFileSync(join(OUT, 'file.json'), `${JSON.stringify(files, null, 2)}\n`);
+// L'artifact accetta al massimo 16 MB per la pagina e per ogni file di testo (D256): con i
+// farmaci di classe A e H il database si avvicina al limite, e qui ci si ferma prima di pubblicare.
+const LIMIT = 16_000_000;
+const tooBig = [
+  ...files.filter((f) => f.type.startsWith('text/') && f.bytes > LIMIT).map((f) => f.name),
+  ...(Buffer.byteLength(page) > LIMIT ? ['pagina.html'] : []),
+];
+if (tooBig.length) throw new Error(`Oltre i 16 MB che l'artifact accetta: ${tooBig.join(', ')}`);
 const mb = (n: number) => `${(n / 1e6).toFixed(1)} MB`;
 console.log(`\nPagina: ${mb(page.length)} · ${basename(OUT)}/`);
 for (const f of files) console.log(`  ${f.name.padEnd(36)} ${f.type.padEnd(26)} ${mb(f.bytes)}`);

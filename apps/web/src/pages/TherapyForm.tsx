@@ -34,7 +34,7 @@ import {
   type ListItem,
 } from '../lib/studio-lists';
 import { useApi } from '../lib/useApi';
-import { drugFacts, useDebounced, type Drug } from './PrescriptionEditor';
+import { drugFacts, ingredientOf, useDebounced, type Drug } from './PrescriptionEditor';
 import { PatientBanner, type Patient, type Summary, type TherapyFull } from './RecordPage';
 
 type Kind = 'chronic' | 'as_needed' | 'cycle';
@@ -370,7 +370,9 @@ function DrugChooser({
           <li key={d.aic} className="risultato">
             <div>
               <strong>{d.name ?? d.activeIngredient}</strong>
-              <div className="tenue">{drugFacts(d).join(' · ')}</div>
+              <div className="tenue">
+                {[ingredientOf(d), ...drugFacts(d)].filter(Boolean).join(' · ')}
+              </div>
               <div className="codice tenue">AIC {d.aic}</div>
               {isSuspended(d.adminState) && <SuspendedNote />}
               {d.shortage && <ShortageNote shortage={d.shortage} />}

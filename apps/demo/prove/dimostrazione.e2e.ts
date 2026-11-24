@@ -348,25 +348,34 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       { width: 820, height: 1180 },
     ]) {
       await page.setViewportSize(v);
-      const m = await f.evaluate(async () => {
-        scrollTo(0, document.scrollingElement!.scrollHeight);
-        await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
-        const pill = document.querySelector('button.dimo-apri')!.getBoundingClientRect();
-        const footer = document.querySelector('.app-footer')!.getBoundingClientRect();
-        const covered = [...document.querySelectorAll('.app-footer > *')]
-          .map((e) => e.getBoundingClientRect())
-          .filter(
-            (r) =>
-              r.left < pill.right &&
-              r.right > pill.left &&
-              r.top < pill.bottom &&
-              r.bottom > pill.top,
-          ).length;
-        return {
-          inside: pill.top >= footer.top - 0.5 && pill.bottom <= footer.bottom + 0.5,
-          covered,
-        };
-      });
+      const measure = () =>
+        f.evaluate(async () => {
+          scrollTo(0, document.scrollingElement!.scrollHeight);
+          await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+          const pill = document.querySelector('button.dimo-apri')!.getBoundingClientRect();
+          const footer = document.querySelector('.app-footer')!.getBoundingClientRect();
+          const covered = [...document.querySelectorAll('.app-footer > *')]
+            .map((e) => e.getBoundingClientRect())
+            .filter(
+              (r) =>
+                r.left < pill.right &&
+                r.right > pill.left &&
+                r.top < pill.bottom &&
+                r.bottom > pill.top,
+            ).length;
+          return {
+            inside: pill.top >= footer.top - 0.5 && pill.bottom <= footer.bottom + 0.5,
+            covered,
+          };
+        });
+      // Dopo il cambio di misura la cornice può impaginare in ritardo (WebKit nella CI, 24/11/2026,
+      // verde nell'altro giro dello stesso codice): si misura finché la pagina è ferma, al massimo
+      // 5 secondi. Un pulsante davvero fuori dal piede resta fuori e la prova resta rossa.
+      let m = await measure();
+      for (const end = Date.now() + 5000; (!m.inside || m.covered > 0) && Date.now() < end;) {
+        await page.waitForTimeout(200);
+        m = await measure();
+      }
       const at = `${where} a ${v.width}×${v.height}`;
       expect(m.inside, `${at}: il pulsante esce dal piede e copre il contenuto`).toBe(true);
       expect(m.covered, `${at}: il pulsante copre le scritte del piede`).toBe(0);
@@ -628,6 +637,36 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .getByText(/Ricetta inviata/)
       .first()
       .waitFor({ timeout: 30_000 });
+  });
+
+  it('farmaci di classe A e H: la ricerca trova il ramipril; i farmaci prescritti hanno l’ultima ricetta già inviata (D256)', async () => {
+    type Prescribed = { farmaci?: { ultimaPrescrizione: { altroProgramma: boolean } | null }[] };
+    const id = await firstPatient(
+      (id) => `/api/pazienti/${id}/farmaci-prescritti`,
+      (b) =>
+        !!(b as Prescribed | null)?.farmaci?.some(
+          (d) => d.ultimaPrescrizione && !d.ultimaPrescrizione.altroProgramma,
+        ),
+    );
+    expect(id, 'nessun paziente con una ricetta già inviata').not.toBeNull();
+    await go(`/pazienti/${id}/ricetta`);
+    const restart = f.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    // L'ultima ricetta, con la data, nella riga del farmaco prescritto (D245, D249).
+    await f.locator('.farmaco-ultima-data').first().waitFor();
+    // Un farmaco di classe A che le 13 confezioni d'esempio non avevano.
+    await f.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('ramipril');
+    await f
+      .locator('.risultato')
+      .filter({ hasText: /RAMIPRIL/i })
+      .first()
+      .waitFor();
+    expect(
+      await f
+        .locator('.risultato')
+        .filter({ hasText: /RAMIPRIL/i })
+        .count(),
+    ).toBeGreaterThan(1);
   });
 
   it('voci cliniche e Profilo sanitario: preparato, validato, firmato e pubblicato; PDF nel visore', async () => {

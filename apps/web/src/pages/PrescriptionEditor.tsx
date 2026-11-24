@@ -163,6 +163,16 @@ function AlreadyPrescribed({
 }
 
 /** Descrizione breve di un farmaco della banca dati: confezione, ditta, classe, nota, DPC, piano. */
+/**
+ * Il principio attivo, quando il nome non lo dice già: cercando «ramipril» i marchi (ALAMUT,
+ * KRUPIL) e le associazioni non si capiscono senza (D256). Come nella ricerca delle banche dati.
+ */
+export function ingredientOf(d: Pick<Drug, 'name' | 'activeIngredient'>): string | null {
+  const ingredient = d.activeIngredient?.trim();
+  if (!ingredient) return null;
+  return d.name?.toUpperCase().includes(ingredient.toUpperCase()) ? null : ingredient;
+}
+
 export function drugFacts(d: Drug): string[] {
   return [
     d.pack,
@@ -577,7 +587,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 <li key={d.aic} className="risultato">
                   <div>
                     <strong>{d.name ?? d.activeIngredient}</strong>
-                    <div className="tenue">{drugFacts(d).join(' · ')}</div>
+                    <div className="tenue">
+                      {[ingredientOf(d), ...drugFacts(d)].filter(Boolean).join(' · ')}
+                    </div>
                     <div className="codice tenue">AIC {d.aic}</div>
                     {isSuspended(d.adminState) && <SuspendedNote />}
                     {d.shortage && <ShortageNote shortage={d.shortage} />}
