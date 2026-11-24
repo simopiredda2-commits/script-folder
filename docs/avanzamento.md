@@ -1563,6 +1563,11 @@ Pull request #31 unita in `main` (commit 297121d) con le 14 verifiche su GitHub 
 - Le confezioni nell'ultima ricetta compaiono solo se c'è una ricetta: nella dimostrazione molte terapie non ne hanno («nessuna»). Ricette già inviate nei dati della dimostrazione sono nell'elenco «Che cosa resta da fare», con il database dei farmaci.
 - Il contatore delle confezioni (R11) conta le confezioni delle ricette inviate, quindi anche quelle scelte con «− N +». Però oggi non calcola mai la copertura: le unità per confezione non arrivano da nessuna banca dati che abbiamo (D59, D250). Domanda per la prossima fermata: da dove prenderle (la descrizione della confezione AIFA, per esempio «28 compresse»; un campo nella scheda della terapia; o una banca dati con licenza).
 
+## Domande della fermata dopo la #34
+
+1. **Via alla #34**: A. unisci con le prove su GitHub verdi (consigliata); B. prima provo la dimostrazione.
+2. **Audit con Cowork** (punto 7, D247): l'elenco concordato è chiuso. A. preparo le istruzioni per Cowork (che cosa guardare nella dimostrazione e nel repository) e lo fai partire tu (consigliata); B. lo fai partire tu senza istruzioni; C. più avanti.
+
 ## Dopo l'unione della #33 – farmaci di classe A e H e conferma esplicita (24/11/2026)
 
 Le risposte della fermata dopo la #33 (D256).
