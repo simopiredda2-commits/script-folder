@@ -36,13 +36,14 @@ interface Delivery {
 }
 
 const CHANNEL: Record<string, string> = {
-  stampa_promemoria: 'Promemoria stampato',
-  stampa_nre: 'Foglio con l’NRE stampato',
+  stampa_promemoria: 'Promemoria su carta',
+  stampa_nre: 'Foglio con l’NRE su carta',
   email: 'Email',
   sms: 'SMS',
 };
 
 const OUTCOME: Record<string, string> = {
+  // Le stampe registrate all'apertura del PDF, prima dell'audit (D259).
   stampato: 'stampato',
   consegnato: 'consegnato',
   rifiutato: 'rifiutato',
@@ -54,7 +55,8 @@ const OUTCOME: Record<string, string> = {
  * dati fissati all'invio; per primo quello delle preferenze di stampa della postazione (tappa 14),
  * con il suggerimento di stampante e copie. Ricetta bianca: solo il PDF prodotto dal SAC. Email e
  * SMS solo a un recapito del paziente o di un delegato con delega valida (R16); ogni consegna è
- * registrata.
+ * registrata. Aprire il PDF non è una consegna (audit D259): quella su carta la segna chi ha dato
+ * il foglio, con «Consegnato su carta».
  */
 export function ReminderPanel({
   prescriptionId,
@@ -83,6 +85,8 @@ export function ReminderPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // Il PDF aperto in questo riquadro: la sua consegna su carta si segna dopo averlo dato.
+  const [opened, setOpened] = useState<'completo' | 'nre' | null>(null);
   const white = kind === 'white';
   const base = `/api/ricette/${prescriptionId}/promemoria`;
   const field = channel === 'email' ? 'email' : 'telefono';
@@ -106,6 +110,26 @@ export function ReminderPanel({
       ]
     : [];
   const chosen = options.some((o) => o.value === target) ? target : (options[0]?.value ?? '');
+
+  async function markPaper(formato: 'completo' | 'nre') {
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    try {
+      await api(`${base}/consegna-carta`, { method: 'POST', body: { formato } });
+      setOpened(null);
+      setDone(
+        formato === 'nre'
+          ? 'Consegna del foglio con l’NRE registrata.'
+          : 'Consegna del promemoria su carta registrata.',
+      );
+      deliveries.reload();
+    } catch (e) {
+      setError(e instanceof ApiError ? e : null);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function send() {
     setBusy(true);
@@ -146,7 +170,7 @@ export function ReminderPanel({
             target="_blank"
             rel="noopener"
             aria-describedby={describedBy}
-            onClick={() => setTimeout(deliveries.reload, 800)}
+            onClick={() => setOpened('nre')}
           >
             <Icon name="stampa" /> <span>Solo NRE (PDF)</span>
           </a>
@@ -158,7 +182,7 @@ export function ReminderPanel({
             target="_blank"
             rel="noopener"
             aria-describedby={describedBy}
-            onClick={() => setTimeout(deliveries.reload, 800)}
+            onClick={() => setOpened('completo')}
           >
             <Icon name="stampa" />{' '}
             <span>{white ? 'Promemoria del SAC (PDF)' : 'Promemoria (PDF)'}</span>
@@ -171,12 +195,29 @@ export function ReminderPanel({
             target="_blank"
             rel="noopener"
             aria-describedby={describedBy}
-            onClick={() => setTimeout(deliveries.reload, 800)}
+            onClick={() => setOpened('nre')}
           >
             <Icon name="stampa" /> <span>Solo NRE (PDF)</span>
           </a>
         )}
       </div>
+      {opened && (
+        <div className="consegna-carta" role="group" aria-label="Consegna su carta">
+          <p>
+            Aprire il PDF non è una consegna. Quando hai stampato{' '}
+            {opened === 'nre' ? 'il foglio con l’NRE' : 'il promemoria'} e l’hai dato al paziente o
+            al delegato, segnalo qui.
+          </p>
+          <button
+            type="button"
+            className="pulsante"
+            disabled={busy}
+            onClick={() => void markPaper(opened)}
+          >
+            <Icon name="fatto" /> <span>Consegnato su carta</span>
+          </button>
+        </div>
+      )}
       <PrintHint kind={white ? 'promemoria_bianca' : 'promemoria'} id={hintId} />
       {!white && (
         // Mezzo foglio A4 (D217): A5 per difetto, A4 se scelto in Strumenti › Stampa (D222). La

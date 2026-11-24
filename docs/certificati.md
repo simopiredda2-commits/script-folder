@@ -84,7 +84,7 @@ Ogni chiamata all'INPS, riuscita o no, resta in `certificate_submission` con ric
 | SMS al lavoratore         | Protocollo, data di rilascio, durata della prognosi, nome e cognome del lavoratore e del medico                 | Disciplinare, 4.2                                     |
 | Email al datore di lavoro | Protocollo con nome e cognome del lavoratore, come nell'attestato, se il lavoratore lo chiede; mai dati clinici | D88, D108; allegato B; l'attestato lo dà l'INPS (3.5) |
 
-Ogni stampa e consegna resta in `certificate_delivery`, che non si modifica. Email e SMS passano dal simulatore (regola 7).
+Ogni consegna resta in `certificate_delivery`, che non si modifica. Email e SMS passano dal simulatore (regola 7). Aprire il PDF di copia o attestato non è una consegna (audit D259): resta nel registro degli accessi (`stampa_certificato`), e la consegna su carta la segna chi ha dato il foglio al lavoratore, con «Consegnato su carta» (`POST /api/certificati/:id/consegna-carta`, esito «consegnato»). Le stampe registrate prima all'apertura del PDF restano con l'esito «stampato».
 
 ## Chi fa che cosa
 

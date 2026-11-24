@@ -47,6 +47,10 @@ export function registerCertificateRoutes(
       return reply.send(Buffer.from(pdf.bytes));
     });
   }
+  // Consegna su carta segnata da chi l'ha fatta: aprire il PDF non è una consegna (audit D259).
+  app.post('/api/certificati/:id/consegna-carta', scoped, async (req) =>
+    service.paperDelivered(req.actor!, id(req.params), req.body),
+  );
   app.post('/api/certificati/:id/consegna', scoped, async (req) =>
     service.deliver(req.actor!, id(req.params), req.body),
   );

@@ -524,6 +524,8 @@ function CertificateCard({
   const [newEnd, setNewEnd] = useState('');
   const [reason, setReason] = useState('');
   const [askedByWorker, setAskedByWorker] = useState(false);
+  // Il PDF aperto: la sua consegna su carta si segna dopo averlo dato (audit D259).
+  const [opened, setOpened] = useState<'copia' | 'attestato' | null>(null);
   const base = `/api/certificati/${c.id}`;
   const k = (s: string) => `${s}-${c.id}`;
 
@@ -641,10 +643,22 @@ function CertificateCard({
         )}
         {c.stato === 'sent' && (
           <>
-            <a className="pulsante" href={`${base}/copia`} target="_blank" rel="noopener">
+            <a
+              className="pulsante"
+              href={`${base}/copia`}
+              target="_blank"
+              rel="noopener"
+              onClick={() => setOpened('copia')}
+            >
               <Icon name="stampa" /> <span>Copia per il lavoratore (PDF)</span>
             </a>
-            <a className="pulsante" href={`${base}/attestato`} target="_blank" rel="noopener">
+            <a
+              className="pulsante"
+              href={`${base}/attestato`}
+              target="_blank"
+              rel="noopener"
+              onClick={() => setOpened('attestato')}
+            >
               <Icon name="stampa" /> <span>Attestato (PDF)</span>
             </a>
             <button
@@ -674,6 +688,34 @@ function CertificateCard({
           </>
         )}
       </div>
+      {c.stato === 'sent' && opened && (
+        <div className="consegna-carta" role="group" aria-label="Consegna su carta">
+          <p>
+            Aprire il PDF non è una consegna. Quando hai stampato{' '}
+            {opened === 'copia' ? 'la copia' : 'l’attestato'} e l’hai dato al lavoratore, segnalo
+            qui.
+          </p>
+          <button
+            type="button"
+            className="pulsante"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                await api(`${base}/consegna-carta`, {
+                  method: 'POST',
+                  body: { documento: opened },
+                });
+                setOpened(null);
+                return opened === 'copia'
+                  ? 'Consegna della copia su carta registrata.'
+                  : 'Consegna dell’attestato su carta registrata.';
+              })
+            }
+          >
+            <Icon name="fatto" /> <span>Consegnato su carta</span>
+          </button>
+        </div>
+      )}
       {/* Preferenze di stampa della postazione per la copia e l'attestato (tappa 14). */}
       {c.stato === 'sent' && <PrintHint kind="certificato_inps" />}
       {c.stato === 'sent' && !contacts.email && (

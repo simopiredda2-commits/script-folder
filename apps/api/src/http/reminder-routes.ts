@@ -30,6 +30,12 @@ export function registerReminderRoutes(
     return reply.send(Buffer.from(pdf.bytes));
   });
 
+  // Consegna su carta segnata da chi l'ha fatta: aprire il PDF non è una consegna (audit D259).
+  app.post('/api/ricette/:id/promemoria/consegna-carta', scoped, async (req) => {
+    const { id } = params.parse(req.params);
+    return service.paperDelivered(req.actor!, id, req.body);
+  });
+
   app.post('/api/ricette/:id/promemoria/invio', scoped, async (req) => {
     const { id } = params.parse(req.params);
     return service.send(req.actor!, id, req.body);

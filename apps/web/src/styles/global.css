@@ -2367,6 +2367,20 @@ textarea[aria-invalid='true'] {
   margin: 0.5rem 0;
 }
 
+/* Consegna su carta, segnata da chi ha dato il foglio (audit D259). */
+.consegna-carta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.consegna-carta p {
+  flex: 1 1 20rem;
+  margin: 0;
+}
+
 /* Distinta consegnata all'ASL fuori dal programma (D232). */
 .consegna-distinta {
   margin-top: 1rem;

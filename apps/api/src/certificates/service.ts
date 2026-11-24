@@ -959,24 +959,41 @@ export function createCertificateService(deps: CertificateDeps) {
     });
   }
 
-  /** Copia per il lavoratore (allegato A) o attestato (allegato B), in PDF. */
+  /**
+   * Copia per il lavoratore (allegato A) o attestato (allegato B), in PDF. Aprirlo non è una
+   * consegna (audit D259): resta nel registro degli accessi; la consegna su carta la segna chi ha
+   * dato il foglio (`paperDelivered`).
+   */
   async function pdf(actor: Actor, id: string, which: 'copia' | 'attestato') {
     const c = await load(id, actor.studioId);
     await guard(actor, c.patientId, 'stampa_certificato');
     const data = await printData(c);
     const bytes =
       which === 'copia' ? await renderWorkerCopy(data) : await renderEmployerCertificate(data);
-    await deliveryRow(
-      actor,
-      c,
-      which === 'copia' ? 'stampa_copia' : 'stampa_attestato',
-      null,
-      'stampato',
-    );
     return {
       bytes,
       name: `${which === 'copia' ? 'certificato' : 'attestato'}-${c.protocol}.pdf`,
     };
+  }
+
+  /** Copia o attestato stampati e dati al lavoratore: lo segna chi l'ha fatto (audit D259). */
+  async function paperDelivered(actor: Actor, id: string, body: unknown) {
+    const c = await load(id, actor.studioId);
+    await guard(actor, c.patientId, 'consegna_certificato');
+    const { documento } = z
+      .object({ documento: z.enum(['copia', 'attestato']) })
+      .strict()
+      .parse(body ?? {});
+    // Solo per un certificato inviato e ancora valido, come la stampa.
+    await printData(c);
+    await deliveryRow(
+      actor,
+      c,
+      documento === 'copia' ? 'stampa_copia' : 'stampa_attestato',
+      null,
+      'consegnato',
+    );
+    return { consegnato: true };
   }
 
   /**
@@ -1097,6 +1114,7 @@ export function createCertificateService(deps: CertificateDeps) {
     cancel,
     settleInterrupted,
     pdf,
+    paperDelivered,
     deliver,
     deliveries,
   };
