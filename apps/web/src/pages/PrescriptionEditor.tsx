@@ -41,6 +41,7 @@ import {
   type PackageService,
 } from '../lib/studio-lists';
 import { useApi } from '../lib/useApi';
+import { useSession } from '../lib/session';
 import { PatientBanner, posology, type Patient, type Summary, type TherapyRow } from './RecordPage';
 
 export interface Drug {
@@ -348,9 +349,14 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
     lineIds: Record<string, string>;
     nre?: string;
   } | null>(k('bozza'), null);
+  // Il medico firma e invia in un passo (D255). Non si ricorda: tornando alla bozza, il medico
+  // vede i controlli e firma con il pulsante.
+  const { isDoctor } = useSession();
+  const [oneStep, setOneStep] = useState(false);
   const startOver = () => {
     for (const reset of [resetKind, resetLines, resetExemption, resetChannel, resetAccess]) reset();
     for (const reset of [resetPriority, resetQuestion, resetDraft, resetObscured]) reset();
+    setOneStep(false);
   };
   const [error, setError] = useState<ApiError | null>(null);
   // Le righe in ricetta restano chiuse: si aprono col clic sulla riga (D242).
@@ -388,7 +394,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const update = (key: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
-  async function save() {
+  async function save(sign = false) {
     setError(null);
     try {
       const body = {
@@ -434,6 +440,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         }[];
       }>(`/api/pazienti/${id}/ricette`);
       const created = list.ricette.find((x) => x.id === r.id);
+      setOneStep(sign);
       setDraft({
         id: r.id,
         status: created?.status ?? 'draft',
@@ -1001,16 +1008,38 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           </fieldset>
           <ErrorMessage error={error} />
           {/* I pulsanti restano in vista in fondo al riquadro, anche quando la ricetta scorre (D242). */}
+          {/* Il medico firma e invia in un passo; «Salva in bozza» per l'anteprima o per dopo (D255). */}
           {!draft && (
             <div className="azioni azioni-ricetta">
-              <button
-                type="button"
-                className="pulsante pulsante-primario"
-                disabled={lines.length === 0}
-                onClick={() => void save()}
-              >
-                <Icon name="ricette" /> <span>Prepara la ricetta</span>
-              </button>
+              {isDoctor ? (
+                <>
+                  <button
+                    type="button"
+                    className="pulsante pulsante-primario"
+                    disabled={lines.length === 0}
+                    onClick={() => void save(true)}
+                  >
+                    <Icon name="firma" /> <span>Firma e invia</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="pulsante"
+                    disabled={lines.length === 0}
+                    onClick={() => void save()}
+                  >
+                    <Icon name="ricette" /> <span>Salva in bozza</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="pulsante pulsante-primario"
+                  disabled={lines.length === 0}
+                  onClick={() => void save()}
+                >
+                  <Icon name="ricette" /> <span>Prepara la ricetta</span>
+                </button>
+              )}
               {lines.length > 0 && (
                 <button type="button" className="pulsante" onClick={startOver}>
                   <Icon name="ripeti" /> <span>Ricomincia</span>
@@ -1037,12 +1066,17 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           )}
           {draft && draft.status !== 'sent' && draft.status !== 'paper' && (
             <>
-              <Notice kind="fatto">Ricetta preparata in bozza. Si controlla e poi si firma.</Notice>
+              {!oneStep && (
+                <Notice kind="fatto">
+                  Ricetta preparata in bozza. Si controlla e poi si firma.
+                </Notice>
+              )}
               <SendPanel
                 prescriptionId={draft.id}
                 status={draft.status}
                 lineNames={draft.lineIds}
                 preview={kind !== 'white'}
+                autoSign={oneStep}
                 onChange={(status, nre) => setDraft({ ...draft, status, ...(nre ? { nre } : {}) })}
               />
             </>

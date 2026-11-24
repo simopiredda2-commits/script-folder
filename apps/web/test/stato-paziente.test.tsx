@@ -3,36 +3,48 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { studioToday } from '../src/lib/format';
 import { OpenRecordsProvider } from '../src/lib/openRecords';
+import { SessionProvider } from '../src/lib/session';
 import { NewPatientPage } from '../src/pages/NewPatientPage';
 import { PrescriptionEditor } from '../src/pages/PrescriptionEditor';
 
 const PATIENT_ID = '00000000-0000-4000-8000-000000000001';
 
+/** Chi guarda: un medico inventato; l'editor lo chiede alla sessione (D255). */
+const DOCTOR = {
+  id: 'u1',
+  nome: 'Medico inventato',
+  ruoli: [{ codice: 'owner_doctor', nome: 'Medico titolare' }],
+  postazione: 'Studio',
+  archivio: null,
+};
+
 /** Il servizio finto: la cartella con lo stato dato, il resto vuoto. */
-function stub(status: string, deceasedOn: string | null) {
+function stub(status: string, deceasedOn: string | null, me: object = DOCTOR) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) => {
       const body =
-        url.startsWith(`/api/pazienti/${PATIENT_ID}?`) || url === `/api/pazienti/${PATIENT_ID}`
-          ? {
-              paziente: {
-                id: PATIENT_ID,
-                firstName: 'Paziente',
-                lastName: 'Inventato',
-                sex: 'M',
-                birthDate: '1950-01-01',
-                birthPlaceName: null,
-                fiscalCode: 'NVNPZN50A01X000A',
-                phone: null,
-                email: null,
-                asl: null,
-                status,
-                deceasedOn,
-              },
-              riepilogo: null,
-            }
-          : {};
+        url === '/api/io'
+          ? me
+          : url.startsWith(`/api/pazienti/${PATIENT_ID}?`) || url === `/api/pazienti/${PATIENT_ID}`
+            ? {
+                paziente: {
+                  id: PATIENT_ID,
+                  firstName: 'Paziente',
+                  lastName: 'Inventato',
+                  sex: 'M',
+                  birthDate: '1950-01-01',
+                  birthPlaceName: null,
+                  fiscalCode: 'NVNPZN50A01X000A',
+                  phone: null,
+                  email: null,
+                  asl: null,
+                  status,
+                  deceasedOn,
+                },
+                riepilogo: null,
+              }
+            : {};
       return Promise.resolve(
         new Response(JSON.stringify(body), {
           status: 200,
@@ -45,13 +57,15 @@ function stub(status: string, deceasedOn: string | null) {
 
 const renderEditor = () =>
   render(
-    <OpenRecordsProvider>
-      <MemoryRouter initialEntries={[`/pazienti/${PATIENT_ID}/ricetta`]}>
-        <Routes>
-          <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
-        </Routes>
-      </MemoryRouter>
-    </OpenRecordsProvider>,
+    <SessionProvider>
+      <OpenRecordsProvider>
+        <MemoryRouter initialEntries={[`/pazienti/${PATIENT_ID}/ricetta`]}>
+          <Routes>
+            <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
+          </Routes>
+        </MemoryRouter>
+      </OpenRecordsProvider>
+    </SessionProvider>,
   );
 
 describe('stato del paziente nella ricetta (D199)', () => {
@@ -81,6 +95,20 @@ describe('stato del paziente nella ricetta (D199)', () => {
     renderEditor();
     expect(await screen.findByRole('heading', { name: 'Banca dati farmaci' })).toBeTruthy();
     expect(screen.queryByText(/la ricetta non si fa/)).toBeNull();
+  });
+
+  it('il medico firma e invia in un passo, o salva in bozza; la segreteria prepara (D255)', async () => {
+    stub('active', null);
+    renderEditor();
+    await screen.findByRole('button', { name: 'Firma e invia' });
+    screen.getByRole('button', { name: 'Salva in bozza' });
+    expect(screen.queryByRole('button', { name: 'Prepara la ricetta' })).toBeNull();
+    cleanup();
+    stub('active', null, { ...DOCTOR, ruoli: [{ codice: 'secretary', nome: 'Segreteria' }] });
+    renderEditor();
+    await screen.findByRole('button', { name: 'Prepara la ricetta' });
+    expect(screen.queryByRole('button', { name: 'Firma e invia' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Salva in bozza' })).toBeNull();
   });
 
   it('nuovo paziente temporaneo: lo stato e le date della scelta vanno con il paziente', async () => {

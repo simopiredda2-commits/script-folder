@@ -1902,3 +1902,13 @@ Non provato: stampa su carta; Safari e Firefox veri.
 - **Niente «togli dall'archivio»**: ciò che serve dopo è nello storico del paziente.
 
 Non provato: Safari e Firefox veri; la stampa su carta dal menu della pagina.
+
+**D255 · Ricetta del medico in un passo.** Punto 4 delle richieste della pausa: «quando prescrive il medico, la conferma è la sua. Oggi sono due clic, «Prepara la ricetta» e poi «Firma e invia». L'invio con le credenziali del medico resta obbligatorio».
+
+- **Per il medico** il pulsante della ricetta è «Firma e invia»: salva la ricetta, la controlla con le regole di prescrizione e, se il controllo non ha nulla da dire, la invia con le credenziali del medico. È lo stesso invio di prima: stessi controlli nel servizio, stesso registro, stesse credenziali. Senza credenziali o senza codice di sessione l'invio non parte e il messaggio porta a «Credenziali dei servizi».
+- **Quando ci si ferma**: con un problema qualsiasi del controllo, anche solo informativo, l'invio non parte e il pannello lo dice: «La ricetta non è ancora partita». Il medico vede i controlli, conferma le note o scrive i motivi, e firma con il pulsante del pannello. Chi firma vede sempre i controlli prima (D230). Ci si ferma anche se il controllo non riesce; «Controlla di nuovo» poi non firma da sé.
+- **«Salva in bozza»** resta accanto, per il medico che vuole l'anteprima del promemoria (D253) o firmare dopo: è il percorso di prima.
+- **Una volta sola**: il passo unico vale al momento del clic. Tornando su una bozza, il medico vede i controlli e firma con il pulsante.
+- **La segreteria** non cambia: «Prepara la ricetta», poi «Manda alla firma del medico».
+
+Non provato: Safari e Firefox veri; le credenziali vere del Sistema TS.

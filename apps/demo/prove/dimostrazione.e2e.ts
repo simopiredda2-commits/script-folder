@@ -621,7 +621,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     ).toBe(true);
     await expectAccessible('nuova ricetta con la riga chiusa');
     await expectPillClear('nuova ricetta');
-    await f.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    await f.getByRole('button', { name: 'Salva in bozza' }).click();
     await f.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await f.getByRole('button', { name: 'Firma e invia' }).click();
     await f
@@ -664,7 +664,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await f.getByLabel('Prestazione, branca o codice').fill('visita');
     await f.locator('.risultato').first().getByRole('button', { name: 'Aggiungi' }).click();
     await f.getByLabel('Quesito diagnostico').fill('Quesito dimostrativo');
-    await f.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    // Ricetta del medico in un passo (D255): «Firma e invia» salva, controlla e invia.
     await f.getByRole('button', { name: 'Firma e invia' }).click();
     await f
       .getByText(/Ricetta inviata/)

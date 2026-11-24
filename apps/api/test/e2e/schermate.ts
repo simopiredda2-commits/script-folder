@@ -203,7 +203,7 @@ try {
   const withPlan = page.locator('.risultato').filter({ hasText: 'TRULICITY' });
   await withPlan.waitFor();
   await withPlan.getByRole('button', { name: 'Aggiungi' }).click();
-  await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+  await page.getByRole('button', { name: 'Salva in bozza' }).click();
   await page.getByText(/Regole di prescrizione, versione/).waitFor();
   // I controlli in alto nella schermata, con un po' di spazio sopra.
   await page

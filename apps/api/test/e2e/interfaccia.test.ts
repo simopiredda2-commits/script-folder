@@ -231,7 +231,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
   /**
    * La ricetta in una schermata (D242): sul computer e sul tablet in orizzontale la pagina non
-   * scorre e «Prepara la ricetta» è in vista; scorrono, se serve, la ricerca e la ricetta.
+   * scorre e il pulsante principale («Firma e invia» per il medico, D255) è in vista; scorrono, se
+   * serve, la ricerca e la ricetta.
    */
   async function expectOneScreen(p: Page, where: string) {
     for (const v of [
@@ -240,8 +241,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     ]) {
       await p.setViewportSize(v);
       const m = await p.evaluate(() => {
-        const b = [...document.querySelectorAll('button')]
-          .find((x) => x.textContent?.includes('Prepara la ricetta'))
+        const b = document
+          .querySelector('.azioni-ricetta .pulsante-primario')
           ?.getBoundingClientRect();
         return {
           height: document.scrollingElement!.scrollHeight,
@@ -252,9 +253,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       expect(m.height, `${where} a ${v.width}×${v.height}: la pagina scorre`).toBeLessThanOrEqual(
         m.view,
       );
-      expect(m.button, `${where} a ${v.width}×${v.height}: «Prepara la ricetta» fuori vista`).toBe(
-        true,
-      );
+      expect(m.button, `${where} a ${v.width}×${v.height}: «Firma e invia» fuori vista`).toBe(true);
     }
     await p.setViewportSize({ width: 1280, height: 900 });
   }
@@ -861,7 +860,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       )
       .toBe(true);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    // «Salva in bozza»: i controlli e l'anteprima prima della firma (D253, D255).
+    await page.getByRole('button', { name: 'Salva in bozza' }).click();
     await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await page.getByText(/Regole di prescrizione, versione/).waitFor();
     await check(page, 'ricetta con i controlli');
@@ -965,7 +965,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByRole('button', { name: 'Aggiungi' })
       .click();
     await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
-    await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    // Ricetta del medico in un passo (D255): «Firma e invia» salva, controlla e invia.
     await signAndSend(page);
     await page.goto(`${base}/pazienti/${s.richPatient}`);
     await page.getByRole('link', { name: 'Visita di prova' }).click();
@@ -1194,7 +1194,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByText('quantità 1 · catalogo NUOVO.1 · nomenclatore (DM) 99.99.1')
       .waitFor();
     await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
-    await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    await page.getByRole('button', { name: 'Salva in bozza' }).click();
     await page
       .getByLabel('Motivo per procedere nonostante l’avviso R18')
       .fill('Codice nuovo, il catalogo del programma non è ancora aggiornato');

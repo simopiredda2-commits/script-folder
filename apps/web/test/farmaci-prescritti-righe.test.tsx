@@ -5,6 +5,7 @@ import { ColourLegend } from '../src/components/DrugColours';
 import type { PrescribedDrug } from '../src/components/Prescribed';
 import { byGroup, packages, PrescribedDrugList } from '../src/components/PrescribedDrugs';
 import { OpenRecordsProvider } from '../src/lib/openRecords';
+import { SessionProvider } from '../src/lib/session';
 import {
   addToCurrentPrescription,
   currentPrescriptionLocked,
@@ -15,6 +16,15 @@ import {
 } from '../src/pages/PrescriptionEditor';
 import { PrescribedDrugsPage } from '../src/pages/PrescribedPages';
 import type { TherapyRow } from '../src/pages/RecordPage';
+
+/** Chi guarda: un medico inventato; l'editor lo chiede alla sessione (D255). */
+const DOCTOR = {
+  id: 'u1',
+  nome: 'Medico inventato',
+  ruoli: [{ codice: 'owner_doctor', nome: 'Medico titolare' }],
+  postazione: 'Studio',
+  archivio: null,
+};
 
 /** Farmaci e terapie inventati, come li restituisce il servizio. */
 const THERAPY: TherapyRow = {
@@ -401,24 +411,28 @@ describe('i farmaci prescritti nella ricetta (D246)', () => {
           return new Response(JSON.stringify({ errore: 'Errore di prova' }), { status: 500 });
       }
       const body =
-        path === `/api/pazienti/${PATIENT_ID}`
-          ? RECORD
-          : path === `/api/pazienti/${PATIENT_ID}/terapie`
-            ? { terapie: [THERAPY] }
-            : path === `/api/pazienti/${PATIENT_ID}/farmaci-prescritti`
-              ? { farmaci: [SUSPENDED, CHRONIC, OCCASIONAL] }
-              : {};
+        path === '/api/io'
+          ? DOCTOR
+          : path === `/api/pazienti/${PATIENT_ID}`
+            ? RECORD
+            : path === `/api/pazienti/${PATIENT_ID}/terapie`
+              ? { terapie: [THERAPY] }
+              : path === `/api/pazienti/${PATIENT_ID}/farmaci-prescritti`
+                ? { farmaci: [SUSPENDED, CHRONIC, OCCASIONAL] }
+                : {};
       return new Response(JSON.stringify(body), { status: 200 });
     });
     vi.stubGlobal('fetch', fetch);
     return render(
-      <OpenRecordsProvider>
-        <MemoryRouter initialEntries={[`/pazienti/${PATIENT_ID}/ricetta`]}>
-          <Routes>
-            <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
-          </Routes>
-        </MemoryRouter>
-      </OpenRecordsProvider>,
+      <SessionProvider>
+        <OpenRecordsProvider>
+          <MemoryRouter initialEntries={[`/pazienti/${PATIENT_ID}/ricetta`]}>
+            <Routes>
+              <Route path="/pazienti/:id/ricetta" element={<PrescriptionEditor mode="farmaci" />} />
+            </Routes>
+          </MemoryRouter>
+        </OpenRecordsProvider>
+      </SessionProvider>,
     );
   }
 
