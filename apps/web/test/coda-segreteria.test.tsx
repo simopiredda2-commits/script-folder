@@ -50,12 +50,31 @@ const queue = (id: string, firmabile: boolean, extra: object = {}) => ({
 
 function service(me: object, firmabile: boolean) {
   const calls: string[] = [];
+  let archived = false;
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
+    vi.fn((url: string, init?: RequestInit) => {
       const path = url.split('?')[0]!;
-      calls.push(path);
+      calls.push(init?.method === 'POST' ? `POST ${path}` : path);
       if (path === '/api/io') return Promise.resolve(json(200, me));
+      if (path === '/api/ricette/archivia-confermate' && init?.method === 'POST') {
+        archived = true;
+        return Promise.resolve(json(200, { archiviate: 1 }));
+      }
+      if (path === '/api/ricette/confermate')
+        return Promise.resolve(
+          json(
+            200,
+            archived
+              ? { pazienti: [] }
+              : queue('r4', false, {
+                  stato: 'sent',
+                  nre: '010000000004',
+                  inviataIl: '2026-11-20T09:30:00Z',
+                  firmataDa: 'Medico inventato',
+                }),
+          ),
+        );
       if (path === '/api/ricette/da-firmare')
         return Promise.resolve(json(200, queue('r1', firmabile)));
       if (path === '/api/ricette/non-inviate')
@@ -158,5 +177,29 @@ describe('ricette in attesa viste dalla segreteria (D242)', () => {
     const toSign = await section('Da firmare');
     toSign.getByText('Le ricette in attesa le vedono il medico e la segreteria.');
     expect(calls.filter((c) => c.startsWith('/api/ricette/'))).toEqual([]);
+  });
+});
+
+describe('ricette confermate e archiviazione (D254)', () => {
+  it('la segreteria vede le confermate con il menu di stampa e le archivia', async () => {
+    const calls = service(who('secretary', 'Segreteria'), false);
+    page();
+    const done = await section('Confermate');
+    await done.findByText('010000000004');
+    done.getByText(/inviata il/);
+    // Il menu di stampa e invio si apre a richiesta.
+    const menu = done.getByRole('button', { name: 'Stampa e invio del promemoria' });
+    expect(menu.getAttribute('aria-expanded')).toBe('false');
+    done.getByRole('button', { name: /Archivia ricette confermate \(1\)/ }).click();
+    await done.findByText(/1 ricetta archiviata: restano nello storico dei pazienti/);
+    await done.findByText('Nessuna ricetta confermata da archiviare.');
+    expect(calls).toContain('POST /api/ricette/archivia-confermate');
+  });
+
+  it('chi non è medico né segreteria non le chiede', async () => {
+    const calls = service(who('administrator', 'Amministratore dello studio'), false);
+    page();
+    await section('Confermate');
+    expect(calls.filter((c) => c.includes('/api/ricette/'))).toEqual([]);
   });
 });

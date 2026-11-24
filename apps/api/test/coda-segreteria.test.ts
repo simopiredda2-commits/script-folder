@@ -123,8 +123,56 @@ describe('code delle ricette viste dalla segreteria (D242)', () => {
   });
 
   it('l’amministratore senza accesso clinico non vede le code', async () => {
-    for (const path of ['da-firmare', 'non-inviate', 'senza-risposta'])
+    for (const path of ['da-firmare', 'non-inviate', 'senza-risposta', 'confermate'])
       expect(await queue('amministratore', path), path).toEqual([]);
+  });
+
+  it('confermate (D254): inviate in elenco, con l’NRE; «Archivia» toglie ciò che si vede, per tutti', async () => {
+    const theirPatient = s.patients.collega[0]!;
+    await t.db
+      .update(patient)
+      .set({ status: 'active', deceasedOn: null, deathCauseIcd: null })
+      .where(eq(patient.id, theirPatient));
+    const send = async (who: string, patientId: string, drugName: string) => {
+      const id = await toSign(who, patientId, { drugName });
+      const res = await req(who, 'POST', `/api/ricette/${id}/firma-e-invia`, {});
+      expect(res.statusCode, res.body).toBe(200);
+      return id;
+    };
+    const archive = async (who: string) => {
+      const res = await req(who, 'POST', '/api/ricette/archivia-confermate', {});
+      expect(res.statusCode, res.body).toBe(200);
+      return res.json<{ archiviate: number }>().archiviate;
+    };
+    const sent = await send('titolare', s.richPatient, 'Farmaco confermato di prova');
+    const theirs = await send('collega', theirPatient, 'Farmaco del collega di prova');
+    const waiting = await toSign('titolare', s.richPatient, { drugName: 'Farmaco in attesa' });
+    const seen = await find('titolare', 'confermate', sent);
+    expect(seen).toMatchObject({ stato: 'sent' });
+    expect((seen as unknown as { nre: string }).nre).toMatch(/\S/);
+    // La segreteria le vede anche lei; quelle da firmare non sono confermate.
+    expect(await find('segreteria', 'confermate', sent)).toBeDefined();
+    expect(await find('titolare', 'confermate', waiting)).toBeUndefined();
+    // Il titolare archivia le sue: quelle del collega, che non vede, restano.
+    expect(await archive('titolare')).toBeGreaterThan(0);
+    expect(await find('titolare', 'confermate', sent)).toBeUndefined();
+    expect(await find('segreteria', 'confermate', sent)).toBeUndefined();
+    expect(await find('collega', 'confermate', theirs)).toBeDefined();
+    expect(await find('titolare', 'da-firmare', waiting)).toBeDefined();
+    const [row] = await t.db.select().from(prescription).where(eq(prescription.id, sent));
+    expect(row).toMatchObject({ status: 'sent', archivedBy: s.users.titolare.id });
+    expect(row!.archivedAt).not.toBeNull();
+    // Restano nello storico del paziente.
+    const list = await req('titolare', 'GET', `/api/pazienti/${s.richPatient}/ricette`);
+    expect(list.json<{ ricette: { id: string }[] }>().ricette.map((r) => r.id)).toContain(sent);
+    // Con niente da archiviare, niente cambia.
+    expect(await archive('titolare')).toBe(0);
+    // Due richieste insieme: ogni ricetta si archivia una volta sola.
+    const twice = await send('titolare', s.richPatient, 'Farmaco archiviato due volte');
+    const [a, b] = await Promise.all([archive('titolare'), archive('segreteria')]);
+    expect(a + b).toBe(2);
+    expect(await find('collega', 'confermate', theirs)).toBeUndefined();
+    expect(await find('titolare', 'confermate', twice)).toBeUndefined();
   });
 
   // Ultima del file: toglie alla segreteria la conferma sull'archivio del collega.

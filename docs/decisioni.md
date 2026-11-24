@@ -1891,3 +1891,14 @@ Non provato: l'anagrafica AIFA intera (solo il file d'esempio).
 - **Dove**: accanto a «Firma e invia», nella ricetta e nella coda «da firmare».
 
 Non provato: stampa su carta; Safari e Firefox veri.
+
+**D254 · Ricette confermate nella pagina Ricette, con «Archivia ricette confermate».** Punti 2 e 3 delle richieste della pausa. Le parole di Simone: «è sufficiente che nell'elenco "ricette" ci siano quelle da confermare, confermate (dal medico per ricetta fatta dal medico stesso o confermate quelle della segreteria), non confermate o non accolte».
+
+- **Le parti della pagina**: «Da firmare» (da confermare), «Confermate» (nuova), «Invii non riusciti» e «Invii senza risposta» (non accolte, o con l'esito ancora da sapere). Le ricette del medico e quelle preparate dalla segreteria stanno insieme: la conferma è sempre la firma del medico.
+- **Confermate**: le ricette inviate, con l'NRE, e quelle stampate sulla ricetta rossa, non ancora archiviate. Per le inviate c'è «Stampa e invio del promemoria», che apre lo stesso pannello della ricetta: promemoria completo o solo NRE, email al paziente o al delegato. La ricetta rossa no: il foglio stampato è già la ricetta.
+- **Chi le vede**: come le altre code (D242). Il medico le vede negli archivi dove firma, la segreteria negli archivi che l'hanno confermata. Senza le ricette con una terapia riservata dove le riservate non si leggono.
+- **Archivia per tutto lo studio, non per persona**: la pagina è l'elenco di lavoro dello studio. Un archivio per persona lascerebbe alla segreteria ricette già chiuse dal medico. Si archiviano solo le confermate che chi lo chiede vede: il titolare non tocca quelle del collega.
+- **Che cosa cambia**: solo l'elenco della pagina. Stato, promemoria e consegne restano; la ricetta resta nello storico del paziente, con il suo promemoria. Si scrivono chi ha archiviato e quando. Due richieste insieme non contano due volte la stessa ricetta.
+- **Niente «togli dall'archivio»**: ciò che serve dopo è nello storico del paziente.
+
+Non provato: Safari e Firefox veri; la stampa su carta dal menu della pagina.
