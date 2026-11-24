@@ -1481,7 +1481,7 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Nessuna per ora: quelle della fermata dopo la #36 hanno avuto risposta il 24/11/2026 (D261). Le domande nuove si scrivono qui durante il blocco (D237).
+Nessuna per ora: quelle della fermata dopo la #37 hanno avuto risposta il 24/11/2026 (D262). Le domande nuove si scrivono qui durante il blocco (D237).
 
 ## Richieste di Simone durante la pausa (22–23/11/2026), da fare alla ripresa
 
@@ -1586,6 +1586,22 @@ Il resoconto di Cowork (32 difetti, nessuno che blocca, 15 importanti e 17 minor
 - Nella dimostrazione, il codice del pulsante riletto subito dopo un accesso o un'uscita: non ha una prova a sé, lo copre il giro di ogni secondo.
 
 **Prossimo passo**: le domande della fermata qui sotto; poi il collaudo finale.
+
+## Risposte della fermata dopo la #37 (24/11/2026)
+
+Simone ha risposto con il pulsante (D262): «Unisci» per la #37; per il collaudo ha chiesto se convenisse aspettare l'integrazione con il SAR e con AURA, poi ha scelto «Adesso, il resto dopo». Pull request #37 unita (a314423); il branch riparte da `main`.
+
+**Fatto**
+
+- Nel documento e nella pagina del collaudo, la riga «Quando» sulle voci legate al SAR e ad AURA: G11, G14, E1 ed E2 dopo l'integrazione; di G2 e G4 adesso tutto tranne le notizie di AURA e l'invio al SAR. Nella pagina, un filtro per «Adesso» e «Dopo l'integrazione». Pagina ripubblicata nello stesso indirizzo.
+- Le schermate di `docs/schermate/`, rifatte tutte: 70 cambiano, 6 restano uguali. Hanno il regime di fornitura accanto al farmaco (D261) e i cambiamenti dalla #35 in poi, che ancora non avevano: bozze in Ricette e in Oggi, blocco in cima ai controlli, codici AIC delle terapie dimostrative. Il programma che fotografa cercava una terapia con l'amlodipina senza codice AIC, che dalla D259 non c'è più: ora prende la prima in corso.
+- Nell'errore della prova «invii senza risposta», caduta una volta con WebKit nella #37 e passata al rilancio, anche l'indirizzo e il testo della pagina. Provato con un guasto per un giro: il modulo cercato con un nome che non c'è (riga «D262» nel registro dei sabotaggi).
+
+**Non provato**
+
+- L'errore nuovo con WebKit: il guasto è stato provato con Chromium. La caduta vera della #37 non si è ripetuta.
+
+**Prossimo passo**: il collaudo, fatto da Simone e dalla Dr.ssa Rocca nella pagina; poi le correzioni di ciò che è «Da correggere».
 
 ## Risposte della fermata dopo la #36 (24/11/2026)
 
@@ -3996,3 +4012,4 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D261: un regime di fornitura fatto di soli spazi non si scrive                                                | PrescriptionEditor.tsx: regime scritto senza togliere gli spazi                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D261: il riquadro dice che la banca dati è l’anagrafica AIFA intera (prova nel browser)                       | DemoPanel.tsx: frase tolta                                                                                                | Rosso, poi verde (33 su 33)                                                                                                                                                                                                                                                                                      |
 | D261: nella dimostrazione l’alprazolam di classe C e l’ibuprofene da banco (prova nel browser)                | dati/aifa: l’estratto delle sole classi A e H al posto dell’anagrafica intera                                             | Rosso, poi verde (33 su 33)                                                                                                                                                                                                                                                                                      |
+| D262: l’errore della prova «invii senza risposta» dice anche l’indirizzo e il testo della pagina              | dimostrazione.e2e.ts: il modulo cercato con un nome che non c’è (con le quattro prove prima, Chromium)                    | Rosso, con l’indirizzo (/ricette#senza-risposta) e il testo della pagina nell’errore; il file torna com’era, con la stessa impronta                                                                                                                                                                              |

@@ -4,6 +4,8 @@ L'ultima verifica prima di usare il programma con pazienti veri (D247, D261). Ra
 
 **Come si segna l'esito.** Nella pagina del collaudo (https://claude.ai/artifact/X58AnakriJzqaApLjHa5kR), fatta da questo documento: per ogni voce «Va bene», «Da correggere» (con che cosa non va, nella nota) o «Non ancora» (con che cosa manca). Gli esiti si salvano subito, li vede chi apre la pagina e Claude li rilegge. Chi segna gli esiti ha bisogno della pagina condivisa da Simone come «Collaboratore»; in alternativa basta scrivere il codice della voce, per esempio «G4: da correggere, il promemoria esce su due pagine». Ogni «Da correggere» diventa una correzione, con la sua prova; ogni «Non ancora» resta qui con il motivo.
 
+**Quando.** Il collaudo si fa adesso (D262). Le voci con la riga «Quando» dipendono dal SAR o da AURA: si fanno, o si rifanno in parte, dopo l'integrazione con i servizi veri.
+
 **Dove si prova.** Nella dimostrazione (https://claude.ai/artifact/Md4KFYrVagjLdnNewSMzCQ): programma, database e simulatori girano nel browser, con pazienti inventati. Utenti: `medico` (medico titolare), `segreteria`, `sostituto`, `amministratore`, `collega` (nello stesso studio), `medico.aft` (in un altro studio dell'AFT); la password e il codice del secondo fattore sono nel riquadro «Dimostrazione». «Ricomincia da capo» riparte dai dati di partenza. Non scrivere dati di persone vere.
 
 ## Parte 1 · Una giornata di lavoro nella dimostrazione
@@ -21,6 +23,7 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 - **Chi**: Dr.ssa Rocca
 - **Dove**: pagina «Oggi»
 - **Che cosa guardare**: ricette da firmare e invii senza risposta; le notizie di AURA simulata (esenzione nuova, ASL diversa, decesso da confermare, revoca, nuovo assistito da registrare, cambio di medico da decidere); variazioni AIFA e carenze sui farmaci in terapia. Si capisce che cosa fare per ciascuna?
+- **Quando**: adesso, tranne le notizie di AURA: quelle si rifanno con AURA vera (D262)
 
 ### G3 · Pazienti e cartella
 
@@ -33,6 +36,7 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 - **Chi**: Dr.ssa Rocca
 - **Dove**: cartella › «Nuova ricetta»
 - **Che cosa guardare**: ripetere una terapia cronica; cercare un farmaco (amlodipina) e aggiungerlo con le confezioni; i controlli delle regole; il passo unico «Firma e invia» e quando si ferma; l'anteprima del promemoria prima della firma; il promemoria su A5 e su A4; la consegna per email al paziente o al delegato. I messaggi dei controlli sono comprensibili?
+- **Quando**: adesso, tranne l'invio al SAR: quello si rifà con il SAR vero (D262)
 
 ### G5 · Farmaci fuori dalle classi A e H
 
@@ -75,6 +79,7 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 - **Chi**: Dr.ssa Rocca
 - **Dove**: «Ricette › Invii senza risposta» e, nella cartella del paziente indicato nel riquadro, «Certificati»
 - **Che cosa guardare**: una ricetta e un certificato rimasti «in invio»: il medico segna l'esito chiesto all'ente, con il codice di autenticazione per la ricetta SSN (D240).
+- **Quando**: dopo l'integrazione con il SAR (D262)
 
 ### G12 · Medici dell'AFT
 
@@ -93,6 +98,7 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 - **Chi**: Dr.ssa Rocca
 - **Dove**: «Oggi», avviso del cambio di medico
 - **Che cosa guardare**: «Sposta» e «Non spostare» per i pazienti che hanno scelto la collega dello studio.
+- **Quando**: dopo l'integrazione con AURA (D262)
 
 ### G15 · Strumenti e amministrazione
 
@@ -217,12 +223,14 @@ Quando arrivano le risposte, ogni voce diventa lavoro da fare qui, con le sue pr
 - **Chi**: Simone, con la Regione e il CSI
 - **Dove**: `docs/ricetta.md`, «Da completare»
 - **Che cosa guardare**: specifiche e credenziali di collaudo, piano di test della Regione; registrazione del programma e censimento dei medici (D103). Con queste: stato di erogazione, controlli formali (R10), formato dell'NRE, ricetta rossa, frasi e validità sul promemoria.
+- **Quando**: dopo l'integrazione: quando arrivano specifiche e credenziali del SAR (D262)
 
 ### E2 · AURA vera
 
 - **Chi**: Simone, con il CSI
 - **Dove**: `docs/aura.md`
 - **Che cosa guardare**: servizio, campi, codici degli eventi e credenziali, chiesti con la PEC del 19/11/2026. Oggi AURA è un simulatore.
+- **Quando**: dopo l'integrazione: quando arriva AURA vera (D262)
 
 ### E3 · Certificati INPS veri
 
