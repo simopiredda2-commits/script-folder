@@ -2,7 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { ShortageNote, type DrugShortage } from '../src/components/Shortage';
-import { drugFacts, type Drug } from '../src/pages/PrescriptionEditor';
+import { drugFacts, ingredientOf, type Drug } from '../src/pages/PrescriptionEditor';
 
 const SHORTAGE: DrugShortage = {
   since: '2026-11-02',
@@ -138,5 +138,17 @@ describe('farmaci carenti e lista di trasparenza nell’interfaccia (D202)', () 
     render(<App />);
     await screen.findByRole('heading', { level: 2, name: 'Da fare' });
     expect(screen.queryByRole('heading', { name: 'Farmaci in terapia carenti' })).toBeNull();
+  });
+});
+
+describe('principio attivo nel risultato della ricerca (D256)', () => {
+  it('si mostra quando il nome non lo dice: marchi e associazioni', () => {
+    expect(ingredientOf({ name: 'ALAMUT', activeIngredient: 'RAMIPRIL' })).toBe('RAMIPRIL');
+    expect(ingredientOf({ name: 'DUOTENS', activeIngredient: 'RAMIPRIL/FELODIPINA' })).toBe(
+      'RAMIPRIL/FELODIPINA',
+    );
+    expect(ingredientOf({ name: 'AMLODIPINA DOC', activeIngredient: 'AMLODIPINA' })).toBeNull();
+    expect(ingredientOf({ name: 'Ramipril Teva', activeIngredient: 'RAMIPRIL' })).toBeNull();
+    expect(ingredientOf({ name: 'ALAMUT', activeIngredient: null })).toBeNull();
   });
 });

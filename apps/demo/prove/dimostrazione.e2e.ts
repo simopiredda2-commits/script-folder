@@ -630,6 +630,36 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .waitFor({ timeout: 30_000 });
   });
 
+  it('farmaci di classe A e H: la ricerca trova il ramipril; i farmaci prescritti hanno l’ultima ricetta già inviata (D256)', async () => {
+    type Prescribed = { farmaci?: { ultimaPrescrizione: { altroProgramma: boolean } | null }[] };
+    const id = await firstPatient(
+      (id) => `/api/pazienti/${id}/farmaci-prescritti`,
+      (b) =>
+        !!(b as Prescribed | null)?.farmaci?.some(
+          (d) => d.ultimaPrescrizione && !d.ultimaPrescrizione.altroProgramma,
+        ),
+    );
+    expect(id, 'nessun paziente con una ricetta già inviata').not.toBeNull();
+    await go(`/pazienti/${id}/ricetta`);
+    const restart = f.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
+    if (await restart.count()) await restart.click();
+    // L'ultima ricetta, con la data, nella riga del farmaco prescritto (D245, D249).
+    await f.locator('.farmaco-ultima-data').first().waitFor();
+    // Un farmaco di classe A che le 13 confezioni d'esempio non avevano.
+    await f.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('ramipril');
+    await f
+      .locator('.risultato')
+      .filter({ hasText: /RAMIPRIL/i })
+      .first()
+      .waitFor();
+    expect(
+      await f
+        .locator('.risultato')
+        .filter({ hasText: /RAMIPRIL/i })
+        .count(),
+    ).toBeGreaterThan(1);
+  });
+
   it('voci cliniche e Profilo sanitario: preparato, validato, firmato e pubblicato; PDF nel visore', async () => {
     const id = (await patients())[0]!.id;
     await go(`/pazienti/${id}/voci`);

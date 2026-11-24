@@ -47,6 +47,10 @@ File interi letti il 18/11/2026; per la lista di trasparenza e i farmaci carenti
 
 Licenza dei dati AIFA: CC BY 4.0 con l'obbligo di citare la fonte (https://www.aifa.gov.it/open-data). Il PDF della Regione non è nel repository: c'è solo la riga trascritta (principio attivo, ATC, nota, piano).
 
+### Farmaci di classe A e H nella dimostrazione (D256)
+
+In `apps/demo/dati/aifa/`, compressi con gzip: le liste intere di classe A e H del 30/6/2026 e le 13.053 righe dell'anagrafica del 20/11/2026 con un codice AIC in una delle due liste, senza cambiare un byte. I file d'origine sono quelli della tabella qui sopra (stesse impronte); le impronte dei contenuti sono in `apps/demo/dati/aifa/SHA256SUMS` e la prova delle provenienze le controlla. Script: `apps/demo/scripts/estrai-aifa.py`. Licenza: CC BY 4.0, con la fonte citata in `apps/demo/dati/aifa/LEGGIMI.md` e nella dimostrazione. Servono solo alla dimostrazione.
+
 ### Visite, esami e ricerca delle prestazioni (D152, D153)
 
 Nelle prove e nei dati della ricerca ci sono descrizioni del catalogo copiate parola per parola, con il codice e la pagina, e i sinonimi verificati su quelle descrizioni. I PDF non sono nel repository.

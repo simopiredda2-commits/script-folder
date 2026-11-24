@@ -1563,6 +1563,26 @@ Pull request #31 unita in `main` (commit 297121d) con le 14 verifiche su GitHub 
 - Le confezioni nell'ultima ricetta compaiono solo se c'è una ricetta: nella dimostrazione molte terapie non ne hanno («nessuna»). Ricette già inviate nei dati della dimostrazione sono nell'elenco «Che cosa resta da fare», con il database dei farmaci.
 - Il contatore delle confezioni (R11) conta le confezioni delle ricette inviate, quindi anche quelle scelte con «− N +». Però oggi non calcola mai la copertura: le unità per confezione non arrivano da nessuna banca dati che abbiamo (D59, D250). Domanda per la prossima fermata: da dove prenderle (la descrizione della confezione AIFA, per esempio «28 compresse»; un campo nella scheda della terapia; o una banca dati con licenza).
 
+## Dopo l'unione della #33 – farmaci di classe A e H e conferma esplicita (24/11/2026)
+
+Le risposte della fermata dopo la #33 (D256).
+
+**Fatto**
+
+- Fermato il passo unico, il medico procede con «Ho visto i controlli: firma e invia» (D256).
+- Nella dimostrazione i farmaci di classe A e H: le liste intere di AIFA e le 13.053 confezioni dell'anagrafica che vi compaiono, più le 13 d'esempio (D257). Gli estratti sono in `apps/demo/dati/aifa/`, con le impronte controllate dalla prova delle provenienze.
+- Ricette già inviate nella dimostrazione: una per ogni paziente del medico con terapie croniche, nei giorni scorsi e già archiviata. Nella ricetta, le righe dei farmaci prescritti mostrano data e confezioni dell'ultima ricetta.
+- Nei risultati della ricerca dei farmaci il principio attivo compare quando il nome non lo contiene: con la banca dati intera i marchi non si capivano senza.
+- La costruzione della dimostrazione si ferma se un file supera i 16 MB che l'artifact accetta: il database ora pesa 12,9 MB.
+
+**Come provarlo**
+
+- `apps/web/test/invio.test.tsx` (conferma esplicita), `apps/web/test/farmaci-carenti.test.tsx` (principio attivo), `packages/brand/test/provenienza.test.ts` (estratti AIFA), nella prova della dimostrazione «farmaci di classe A e H» (ramipril e ultima ricetta).
+
+**Non provato**
+
+- Safari e Firefox veri con il database più grande; tablet veri.
+
 ## Risposte della fermata dopo la #33 (24/11/2026)
 
 Simone ha risposto con il pulsante (D256).
@@ -1684,7 +1704,7 @@ Simone ha risposto con il pulsante il 23/11/2026 (D247).
 3. Ricetta del medico in un passo solo, con l'invio sempre con le sue credenziali (punto 4): fatta (D255).
 4. Unità per confezione per il contatore R11 (D250): fatto, dall'anagrafica AIFA (D252). Quando ci sarà la banca dati con licenza, servirà a trovare le differenze con il numero letto da AIFA.
 5. Conferma esplicita del medico quando il passo unico si ferma sui controlli (D256): fatta. Il pulsante del pannello diventa «Ho visto i controlli: firma e invia»; prova in `apps/web/test/invio.test.tsx`, sabotaggio nel registro.
-6. Database dei farmaci nella dimostrazione: i rimborsabili di classe A e H dalle liste AIFA (D256). Con il database, qualche ricetta già inviata nei dati della dimostrazione, così le righe dei farmaci prescritti mostrano data e confezioni dell'ultima ricetta (D249). **Da tenere a mente**: il resto dell'anagrafica AIFA (classe C, senza obbligo di prescrizione, non rimborsate) è da integrare.
+6. Database dei farmaci nella dimostrazione: i rimborsabili di classe A e H dalle liste AIFA (D256): fatto (D257). Con il database, qualche ricetta già inviata nei dati della dimostrazione, così le righe dei farmaci prescritti mostrano data e confezioni dell'ultima ricetta (D249). **Da tenere a mente**: il resto dell'anagrafica AIFA (classe C, senza obbligo di prescrizione, non rimborsate) è da integrare.
 7. Audit con Cowork sulla dimostrazione, a programma chiuso (D247).
 8. Collaudo finale: le verifiche di Simone e della Dr.ssa Rocca in «Che cosa resta aperto».
 
@@ -3754,3 +3774,9 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D255: le altre informazioni (R11, R21, R22) fermano il passo unico                                            | SendPanel.tsx: nessuna informazione ferma                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D255: a 1280 px i pulsanti in fondo alla ricetta stanno in una riga                                           | PrescriptionEditor.tsx: «Salva in bozza» allargato (prova nel browser)                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D256: fermato il passo unico, si procede solo con «Ho visto i controlli: firma e invia»                       | SendPanel.tsx: pulsante di sempre                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D257: nei risultati dei farmaci il principio attivo, se il nome non lo dice                                   | PrescriptionEditor.tsx: principio attivo mai mostrato                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D257: estratti AIFA della dimostrazione con l'impronta di SHA256SUMS                                          | SHA256SUMS: impronta della classe A cambiata                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D257: in apps/demo/dati/aifa solo gli archivi elencati                                                        | SHA256SUMS: la classe H con un altro nome                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D257: la costruzione si ferma se un file supera i 16 MB dell'artifact                                         | costruisci.ts: limite a 10 MB (database di 12,9 MB)                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D257: nella dimostrazione la ricerca trova i farmaci di classe A e H                                          | prepara-database.ts: estratti AIFA non usati (prova nel browser)                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D257: nella dimostrazione i farmaci prescritti hanno l'ultima ricetta inviata                                 | server.ts: niente ricette già inviate (prova nel browser)                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

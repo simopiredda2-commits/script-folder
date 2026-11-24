@@ -17,6 +17,7 @@ import { createAuraDemo } from './aura';
 import { COLLEAGUE_USERS, prepareColleagues } from './colleghi';
 import { singleSession, type SingleSession } from './database';
 import { prepareInterruptedSends } from './invii';
+import { prepareSentPrescriptions } from './ricette-inviate';
 import { getRequestHandler, IncomingMessage, ServerResponse } from './shims/http';
 import type {
   AftHints,
@@ -108,6 +109,9 @@ export async function start(
   // riceve il cambio di medico.
   progress('Preparo gli invii rimasti senza risposta…');
   const interrupted = await prepareInterruptedSends(db);
+  // Ricette già inviate e archiviate (D256): i farmaci prescritti con l'ultima ricetta.
+  progress('Preparo le ricette già inviate…');
+  await prepareSentPrescriptions(db);
 
   // AURA simulata con i pazienti dimostrativi (D223): collegati e con le loro variazioni prima che
   // il servizio la ascolti; il nuovo assistito arriva dopo, come una notifica.

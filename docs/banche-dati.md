@@ -197,6 +197,8 @@ Il prodotto della prescrizione di presidi arriva a 500 caratteri, nel servizio e
 
 Nella dimostrazione nel browser i due nomenclatori si vedono prima del controllo, perché Simone e la Dr.ssa Rocca possano guardarli dove servono (D236): la copia della dimostrazione dice, al posto di chi li ha controllati, che nessuno l'ha fatto, e il riquadro lo scrive.
 
+**Farmaci nella dimostrazione** (D257): le liste intere di AIFA di classe A e H del 30/6/2026 e le 13.053 confezioni dell'anagrafica del 20/11/2026 che vi compaiono, più le 13 confezioni d'esempio, entrano con `sync/` e l'importazione veri al posto dei file del sito d'esempio. Gli estratti e la loro provenienza sono in `apps/demo/dati/aifa/`. Classe C, farmaci senza obbligo di prescrizione e confezioni non rimborsate sono da integrare.
+
 ### Atti che modificano una tabella (D157)
 
 La Regione non ripubblica il catalogo intero. Pubblica le voci che finiscono e quelle che cominciano. Esempio, la D.D. 710/2026:
