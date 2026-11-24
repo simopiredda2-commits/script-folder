@@ -47,9 +47,9 @@ File interi letti il 18/11/2026; per la lista di trasparenza e i farmaci carenti
 
 Licenza dei dati AIFA: CC BY 4.0 con l'obbligo di citare la fonte (https://www.aifa.gov.it/open-data). Il PDF della Regione non è nel repository: c'è solo la riga trascritta (principio attivo, ATC, nota, piano).
 
-### Farmaci di classe A e H nella dimostrazione (D256)
+### Farmaci AIFA nella dimostrazione (D256, D261)
 
-In `apps/demo/dati/aifa/`, compressi con gzip: le liste intere di classe A e H del 30/6/2026 e le 13.053 righe dell'anagrafica del 20/11/2026 con un codice AIC in una delle due liste, senza cambiare un byte. I file d'origine sono quelli della tabella qui sopra (stesse impronte); le impronte dei contenuti sono in `apps/demo/dati/aifa/SHA256SUMS` e la prova delle provenienze le controlla. Script: `apps/demo/scripts/estrai-aifa.py`. Licenza: CC BY 4.0, con la fonte citata in `apps/demo/dati/aifa/LEGGIMI.md` e nella dimostrazione. Servono solo alla dimostrazione.
+In `apps/demo/dati/aifa/`, compressi con gzip: le liste intere di classe A e H del 30/6/2026 e l'anagrafica intera delle confezioni del 20/11/2026 (160.100 righe), senza cambiare un byte. Fino alla D257 dell'anagrafica c'erano solo le 13.053 righe con un codice AIC in una delle due liste; dalla D261 c'è tutta, con classe C, farmaci senza obbligo di prescrizione e confezioni non rimborsate. I file d'origine sono quelli della tabella qui sopra (stesse impronte: per l'anagrafica `7c6f00ec…`); le impronte dei contenuti sono in `apps/demo/dati/aifa/SHA256SUMS` e la prova delle provenienze le controlla. Script: `apps/demo/scripts/estrai-aifa.py`. Licenza: CC BY 4.0, con la fonte citata in `apps/demo/dati/aifa/LEGGIMI.md` e nella dimostrazione. Servono solo alla dimostrazione.
 
 ### Visite, esami e ricerca delle prestazioni (D152, D153)
 

@@ -574,6 +574,27 @@ describe('R8 · classe e regime di fornitura', () => {
       false,
     );
   });
+  it('fuori dagli elenchi di classe A e H in vigore: informa, senza bloccare (D59, D261)', () => {
+    const i = of(ctx({ facts: { listedClass: null } }), 'R8');
+    expect(i).toEqual([
+      expect.objectContaining({
+        severity: 'info',
+        lineId: 'l1',
+        message: expect.stringMatching(
+          /: non è negli elenchi AIFA dei farmaci di classe A e H in vigore; la banca dati non dice se è a carico del SSN\. Se non lo è, si prescrive su ricetta bianca$/,
+        ),
+      }),
+    ]);
+    expect(blocks(ctx({ facts: { listedClass: null } }), 'R8')).toBe(false);
+    // Classe A o H negli elenchi, o nessun elenco in vigore: niente da dire.
+    expect(of(ctx({ facts: { listedClass: 'A', reimbursableSsn: true } }), 'R8')).toEqual([]);
+    expect(of(ctx({ facts: { listedClass: 'H' } }), 'R8')).toEqual([]);
+    expect(of(ctx({ facts: {} }), 'R8')).toEqual([]);
+    // Sulla ricetta bianca la R8 non guarda la classe.
+    expect(
+      of(ctx({ prescription: { kind: 'white' }, facts: { listedClass: null } }), 'R8'),
+    ).toEqual([]);
+  });
 });
 
 describe('R9 · esenzione valida', () => {

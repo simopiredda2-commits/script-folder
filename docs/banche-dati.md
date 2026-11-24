@@ -197,7 +197,9 @@ Il prodotto della prescrizione di presidi arriva a 500 caratteri, nel servizio e
 
 Nella dimostrazione nel browser i due nomenclatori si vedono prima del controllo, perché Simone e la Dr.ssa Rocca possano guardarli dove servono (D236): la copia della dimostrazione dice, al posto di chi li ha controllati, che nessuno l'ha fatto, e il riquadro lo scrive.
 
-**Farmaci nella dimostrazione** (D257): le liste intere di AIFA di classe A e H del 30/6/2026 e le 13.053 confezioni dell'anagrafica del 20/11/2026 che vi compaiono, più le 13 confezioni d'esempio, entrano con `sync/` e l'importazione veri al posto dei file del sito d'esempio. Gli estratti e la loro provenienza sono in `apps/demo/dati/aifa/`. Classe C, farmaci senza obbligo di prescrizione e confezioni non rimborsate sono da integrare.
+**Farmaci nella dimostrazione** (D257, D261): le liste intere di AIFA di classe A e H del 30/6/2026 e l'anagrafica intera delle confezioni del 20/11/2026, più le 13 confezioni d'esempio, entrano con `sync/` e l'importazione veri al posto dei file del sito d'esempio. L'anagrafica ha 160.100 confezioni: 13.053 nelle due liste e 147.047 fuori, 68.474 con obbligo di prescrizione e 78.568 senza (di cui 74.301 omeopatici). La classe di quelle fuori non si deduce (D59): il programma dice che non sono negli elenchi. I file e la loro provenienza sono in `apps/demo/dati/aifa/`.
+
+**Regime di fornitura** (D261): la colonna FORNITURA dell'anagrafica si mostra accanto al farmaco, con le parole di AIFA («Medicinali soggetti a prescrizione medica», «Medicinali non soggetti a prescrizione medica, da banco.»…), nella ricetta, nella scheda della terapia e in «Farmaci e prestazioni». Per i farmaci fuori dalle liste A e H è ciò che dice se serve la ricetta. Sulla ricetta SSN la R8 informa che il farmaco non è negli elenchi di classe A e H (`docs/regole.md`).
 
 ### Atti che modificano una tabella (D157)
 

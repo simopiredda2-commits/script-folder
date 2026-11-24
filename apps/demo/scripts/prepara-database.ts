@@ -48,10 +48,11 @@ const UNCHECKED_TRANSCRIPTIONS = {
 const DEMO_UNCHECKED = 'nessuno: copia della dimostrazione, ancora da controllare (A8)';
 
 /**
- * Farmaci di classe A e H (D256): sul sito d'esempio le liste di AIFA intere al posto degli
+ * Farmaci (D256, D261): sul sito d'esempio le liste di AIFA di classe A e H intere al posto degli
  * estratti, e nell'anagrafica le righe d'esempio, che servono alle prove e alle simulazioni
- * (confezione sospesa, farmaco fuori dalle liste), più le confezioni delle due classi che
- * l'esempio non ha. `sync/` e l'importazione restano quelli veri.
+ * (confezione sospesa, farmaco fuori dalle liste), più tutte le altre confezioni dell'anagrafica
+ * AIFA intera: anche classe C, farmaci senza obbligo di prescrizione e confezioni non rimborsate.
+ * `sync/` e l'importazione restano quelli veri.
  */
 const DEMO_AIFA = join(import.meta.dirname, '..', 'dati', 'aifa');
 const CLASS_LISTS = [
@@ -88,7 +89,7 @@ function useDemoDrugs(site: ExampleSite) {
     Buffer.concat(all.flatMap((l) => [l, Buffer.from('\n')])),
   );
   console.log(
-    `Farmaci di classe A e H: ${added.length} confezioni oltre alle ${known.size} d'esempio`,
+    `Anagrafica AIFA intera: ${added.length} confezioni oltre alle ${known.size} d'esempio`,
   );
 }
 

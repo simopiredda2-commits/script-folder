@@ -340,6 +340,19 @@ const evaluators: Record<RuleId, Evaluator> = {
           },
         ];
       }
+      // Fuori dagli elenchi di classe A e H in vigore (per esempio classe C o senza obbligo di
+      // prescrizione): la classe non si deduce dall'assenza (D59), quindi si informa e non si blocca,
+      // come per il farmaco che la banca dati non ha (D42, D261).
+      if (facts.listedClass === null) {
+        return [
+          {
+            ruleId: 'R8',
+            severity: 'info',
+            lineId: line.id,
+            message: `${lineLabel(line)}: non è negli elenchi AIFA dei farmaci di classe A e H in vigore; la banca dati non dice se è a carico del SSN. Se non lo è, si prescrive su ricetta bianca`,
+          },
+        ];
+      }
       return [];
     });
   },

@@ -13,6 +13,12 @@ export interface DrugFacts {
   reimbursableSsn?: boolean;
   /** Prescrivibile dal medico di medicina generale (R8). */
   mmgPrescribable?: boolean;
+  /**
+   * La classe negli elenchi AIFA di classe A e H in vigore (R8, D261): `null` se gli elenchi in
+   * vigore non hanno la confezione; assente se nessun elenco è in vigore. `null` non vuol dire «non
+   * a carico del SSN» (D59): la R8 informa, non blocca.
+   */
+  listedClass?: string | null;
   /** Antibiotico iniettabile o soluzione per infusione (R3). */
   injectableAntibioticOrInfusion?: boolean;
   /** Unità posologiche per confezione (R4, R11). */

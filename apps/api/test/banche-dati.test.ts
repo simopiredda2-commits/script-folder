@@ -295,10 +295,16 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       equivalenceGroup: 'DOB',
       dpc: false,
       // Le unità per confezione dalla descrizione AIFA (D252): «- 28 COMPRESSE».
-      facts: { reimbursableSsn: true, unitsPerPack: 28, packUnit: 'compressa' },
+      facts: {
+        reimbursableSsn: true,
+        listedClass: 'A',
+        unitsPerPack: 28,
+        packUnit: 'compressa',
+      },
     });
     // Classe H: non dice da sola che cosa può prescrivere il medico di famiglia.
-    expect(d.get('025202096')).toMatchObject({ drugClass: 'H', price: '9.92', facts: {} });
+    expect(d.get('025202096')).toMatchObject({ drugClass: 'H', price: '9.92' });
+    expect(d.get('025202096')!.facts).toEqual({ listedClass: 'H' });
     // «-» al posto del prezzo: nessun prezzo, non zero.
     expect(d.get('034330047')).toMatchObject({ drugClass: 'H', price: null });
     // In DPC (elenco della Regione) con nota AIFA e piano terapeutico obbligatorio.
@@ -311,8 +317,9 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     });
     // «4 PENNE»: le penne non sono un'unità della posologia, il dato resta non noto (D252).
     expect(d.get('043783075')!.facts.unitsPerPack).toBeUndefined();
-    // Fuori dalle liste di classe A e H: nessun fatto, nemmeno «non a carico del SSN».
-    expect(d.get('012745093')).toMatchObject({ drugClass: null, facts: {} });
+    // Fuori dalle liste di classe A e H: si sa solo questo, non «non a carico del SSN» (D59, D261).
+    expect(d.get('012745093')).toMatchObject({ drugClass: null });
+    expect(d.get('012745093')!.facts).toEqual({ listedClass: null });
     expect(d.has('999999999')).toBe(false);
   });
 
@@ -1005,5 +1012,45 @@ describe('banche dati via HTTP e nelle regole', () => {
     expect(r22[0].needs).toBeUndefined();
     const sent = await post(`/api/ricette/${res.json().id}/firma-e-invia`);
     expect(sent.statusCode, sent.body).toBe(200);
+  });
+
+  it('R8 (D261): il farmaco fuori dagli elenchi di classe A e H informa sulla ricetta SSN, senza bloccare', async () => {
+    const lines = [
+      {
+        drugAic: '012745093',
+        drugName: 'TACHIPIRINA',
+        activeIngredient: 'PARACETAMOLO',
+        quantity: 1,
+      },
+      {
+        drugAic: '038092019',
+        drugName: 'AMLODIPINA DOC GENERICI',
+        activeIngredient: 'AMLODIPINA BESILATO',
+        quantity: 1,
+      },
+    ];
+    const res = await post(`/api/pazienti/${s.richPatient}/ricette`, { kind: 'pharma_ssn', lines });
+    expect(res.statusCode, res.body).toBe(201);
+    const check = (await post(`/api/ricette/${res.json().id}/controlla`)).json();
+    const r8 = check.problemi.filter((p: { ruleId: string }) => p.ruleId === 'R8');
+    // Solo la TACHIPIRINA, che le liste d'esempio non hanno: l'amlodipina è in classe A.
+    expect(r8).toEqual([
+      expect.objectContaining({
+        severity: 'info',
+        message:
+          'TACHIPIRINA: non è negli elenchi AIFA dei farmaci di classe A e H in vigore; la banca dati non dice se è a carico del SSN. Se non lo è, si prescrive su ricetta bianca',
+      }),
+    ]);
+    expect(r8[0].needs).toBeUndefined();
+    const sent = await post(`/api/ricette/${res.json().id}/firma-e-invia`);
+    expect(sent.statusCode, sent.body).toBe(200);
+    // Sulla ricetta bianca la R8 non dice nulla.
+    const white = await post(`/api/pazienti/${s.richPatient}/ricette`, {
+      kind: 'white',
+      lines: [lines[0]],
+    });
+    expect(white.statusCode, white.body).toBe(201);
+    const whiteCheck = (await post(`/api/ricette/${white.json().id}/controlla`)).json();
+    expect(whiteCheck.problemi.filter((p: { ruleId: string }) => p.ruleId === 'R8')).toEqual([]);
   });
 });

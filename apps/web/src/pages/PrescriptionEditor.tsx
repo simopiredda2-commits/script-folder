@@ -66,6 +66,11 @@ export interface Drug {
   shortage?: DrugShortage | null;
   /** Stato amministrativo della confezione nell'anagrafica AIFA in vigore (D205). */
   adminState?: string | null;
+  /**
+   * Regime di fornitura con le parole dell'anagrafica AIFA (colonna FORNITURA): dice anche se il
+   * farmaco è senza obbligo di prescrizione (D261).
+   */
+  supplyRegime?: string | null;
   /** Registri e piani terapeutici AIFA attivi per lo stesso ATC (D206). */
   registries?: DrugRegistry[];
 }
@@ -162,7 +167,6 @@ function AlreadyPrescribed({
   );
 }
 
-/** Descrizione breve di un farmaco della banca dati: confezione, ditta, classe, nota, DPC, piano. */
 /**
  * Il principio attivo, quando il nome non lo dice già: cercando «ramipril» i marchi (ALAMUT,
  * KRUPIL) e le associazioni non si capiscono senza (D256). Come nella ricerca delle banche dati.
@@ -173,11 +177,17 @@ export function ingredientOf(d: Pick<Drug, 'name' | 'activeIngredient'>): string
   return d.name?.toUpperCase().includes(ingredient.toUpperCase()) ? null : ingredient;
 }
 
+/**
+ * Descrizione breve di un farmaco della banca dati: confezione, ditta, classe, regime di
+ * fornitura, nota, DPC, piano, prezzi. Il regime con le parole dell'anagrafica AIFA: con classe C
+ * e farmaci senza obbligo di prescrizione nella banca dati è ciò che li distingue (D261).
+ */
 export function drugFacts(d: Drug): string[] {
   return [
     d.pack,
     d.holder && `ditta ${d.holder}`,
     d.drugClass && `classe ${d.drugClass}`,
+    d.supplyRegime?.trim(),
     d.aifaNote && `Nota ${d.aifaNote}`,
     d.dpc && 'in DPC',
     d.planRequired && 'piano terapeutico obbligatorio',

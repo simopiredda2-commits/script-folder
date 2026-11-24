@@ -154,6 +154,8 @@ describe('variazioni AIFA sui farmaci in terapia (A7, D205)', () => {
     });
     // Prima della versione del 01/11/2026 non c'è nulla da dire.
     expect([...(await ref.aifaChanges(therapies, '2026-10-15')).entries()]).toEqual([]);
+    // L'anagrafica senza elenchi di classe in vigore: la classe resta non nota, la R8 tace (D261).
+    expect((await ref.drugs([STABLE], DATE)).get(STABLE)!.facts).not.toHaveProperty('listedClass');
   });
 
   it('classe: dagli elenchi di classe, solo se la scheda ha la classe di una versione superata', async () => {
@@ -182,6 +184,15 @@ describe('variazioni AIFA sui farmaci in terapia (A7, D205)', () => {
       'in-h': [{ kind: 'classe', since: '2026-11-01', text: TEXT.classeH }],
       'fuori-a': [{ kind: 'classe', since: '2026-11-01', text: TEXT.fuoriA }],
     });
+    // Con gli elenchi in vigore: la classe degli elenchi alla data, o null se non c'è (D261).
+    const now = await ref.drugs([STABLE, RECLASSED, DECLASSED], DATE);
+    expect(now.get(STABLE)!.facts.listedClass).toBe('A');
+    expect(now.get(RECLASSED)!.facts.listedClass).toBe('H');
+    expect(now.get(DECLASSED)!.facts.listedClass).toBeNull();
+    // Il 15/10 vale la versione del 01/10, dove DECLASSED era ancora in classe A.
+    expect((await ref.drugs([DECLASSED], '2026-10-15')).get(DECLASSED)!.facts.listedClass).toBe(
+      'A',
+    );
   });
 
   it('nota e piano: dall’elenco DPC, per principio attivo o ATC', async () => {
