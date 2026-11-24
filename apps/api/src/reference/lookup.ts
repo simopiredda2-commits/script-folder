@@ -9,6 +9,7 @@ import {
   KINDS,
   loadServiceSearchData,
   type MappingSet,
+  packUnits,
   SERVICE_SEARCH_DATA,
   searchDiagnoses,
   scopeKey,
@@ -561,6 +562,13 @@ export class ReferenceData {
       // L'anagrafica in vigore dice «Sospesa»: la R22 informa (D210). «Autorizzata», nessuno stato
       // o nessuna riga non sono una sospensione, come nelle variazioni sui farmaci in terapia.
       if (d.some((x) => lower(x.adminState) === 'sospesa')) facts.suspended = true;
+      // Unità per confezione dalla descrizione dell'anagrafica AIFA (D252): «- 28 COMPRESSE».
+      // Solo compresse, capsule e bustine; il resto resta non noto.
+      const units = packUnits(pick(d.map((x) => x.pack)));
+      if (units) {
+        facts.unitsPerPack = units.count;
+        facts.packUnit = units.unit;
+      }
       out.set(aic, {
         aic,
         name: pick([...d.map((x) => x.name), ...t.map((x) => x.name), ...s.map((x) => x.name)]),

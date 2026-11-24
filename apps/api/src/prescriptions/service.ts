@@ -22,7 +22,7 @@ import type {
 import { systemFor } from '@mmg/integrations';
 import { basePackLimit } from '@mmg/rules';
 import { createHash } from 'node:crypto';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { secondsText, studioSendTimeoutMs } from '../admin/studio-service';
 import type { AccessAction } from '../audit/access-log';
@@ -1211,11 +1211,49 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
   }
 
   /**
+   * «Confermate» (D254): le ricette inviate o stampate su carta e non ancora archiviate, con il
+   * menu di stampa e invio del promemoria nella pagina Ricette.
+   */
+  async function confirmedQueue(actor: Actor) {
+    return queue(actor, ['sent', 'paper'], { signer: true, confirmed: true });
+  }
+
+  /**
+   * «Archivia ricette confermate» (D254): le confermate che chi lo chiede vede escono
+   * dall'elenco della pagina Ricette, per tutto lo studio; restano nello storico del paziente.
+   */
+  async function archiveConfirmed(actor: Actor) {
+    const ids = (await confirmedQueue(actor)).flatMap((g) =>
+      g.ricette.map((r) => (r as { id: string }).id),
+    );
+    if (ids.length === 0) return { archiviate: 0 };
+    const done = await withActor(db, actor.userId, (tx) =>
+      tx
+        .update(prescription)
+        .set({ archivedAt: now(), archivedBy: actor.userId, updatedAt: now() })
+        .where(
+          and(
+            inArray(prescription.id, ids),
+            // Due richieste insieme: la seconda non conta di nuovo ciò che la prima ha archiviato.
+            isNull(prescription.archivedAt),
+          ),
+        )
+        .returning({ id: prescription.id }),
+    );
+    return { archiviate: done.length };
+  }
+
+  /**
    * Le ricette di una coda, raggruppate per paziente. Chi firma le vede negli archivi dove firma;
    * chi legge la terapia dell'archivio senza firmare, la segreteria, le vede in sola lettura
    * (`firmabile` falso), senza quelle con una terapia riservata, come nella cartella (D242).
    */
-  async function queue(actor: Actor, status: PrescriptionStatus, opts: { signer?: boolean } = {}) {
+  async function queue(
+    actor: Actor,
+    status: PrescriptionStatus | PrescriptionStatus[],
+    opts: { signer?: boolean; confirmed?: boolean } = {},
+  ) {
+    const statuses = Array.isArray(status) ? status : [status];
     const signable = new Set(await visibleArchives(db, actor, 'prescription.sign_send'));
     const archives = [
       ...new Set([...signable, ...(await visibleArchives(db, actor, 'therapy.read'))]),
@@ -1237,6 +1275,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         tipoErrore: prescription.lastErrorKind,
         righe: sql<number>`(select count(*)::int from prescription_line l where l.prescription_id = ${prescription.id})`,
         firmataIl: prescription.signedAt,
+        stato: prescription.status,
+        nre: prescription.nre,
+        inviataIl: prescription.sentAt,
+        cartaceaIl: prescription.paperPrintedAt,
         firmataDa: sql<
           string | null
         >`(select u.display_name from app_user u where u.id = ${prescription.signedBy})`,
@@ -1244,7 +1286,13 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       .from(prescription)
       .innerJoin(patient, eq(patient.id, prescription.patientId))
       .innerJoin(appUser, eq(appUser.id, prescription.preparedBy))
-      .where(and(inArray(prescription.archiveId, archives), eq(prescription.status, status)))
+      .where(
+        and(
+          inArray(prescription.archiveId, archives),
+          inArray(prescription.status, statuses),
+          opts.confirmed ? isNull(prescription.archivedAt) : undefined,
+        ),
+      )
       .orderBy(patient.lastName, patient.firstName, prescription.preparedAt);
     // Le ricette con una terapia riservata non si vedono dove le riservate non si leggono.
     const unsure = found.filter((r) => !reservedAllowed.has(r.archiveId)).map((r) => r.id);
@@ -1288,6 +1336,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         errore: r.errore,
         tipoErrore: r.tipoErrore,
         firmabile: signable.has(r.archiveId),
+        ...(opts.confirmed
+          ? { stato: r.stato, nre: r.nre, inviataIl: r.inviataIl, cartaceaIl: r.cartaceaIl }
+          : {}),
         ...(opts.signer
           ? {
               firmataIl: r.firmataIl,
@@ -1354,6 +1405,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     toSignQueue,
     failedQueue,
     interruptedQueue,
+    confirmedQueue,
+    archiveConfirmed,
     listForPatient,
     dispensingStatus,
     load,

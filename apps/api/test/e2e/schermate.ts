@@ -169,6 +169,13 @@ try {
     join(OUT, '18-promemoria-pdf'),
   ]);
   console.log('  18-promemoria-pdf.png');
+  // La ricetta appena firmata è fra le confermate, con il menu di stampa e invio e «Archivia
+  // ricette confermate» (D254).
+  await page.getByRole('button', { name: /^Archivia ricette confermate/ }).waitFor();
+  await page
+    .getByRole('heading', { level: 2, name: 'Confermate' })
+    .evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await shot(page, '76-ricette-confermate');
 
   // Il paziente della ricetta appena inviata: cartella, scheda della terapia con lo storico.
   const sent = await db.execute<{ patient_id: string; therapy_id: string }>(sql`
@@ -203,7 +210,7 @@ try {
   const withPlan = page.locator('.risultato').filter({ hasText: 'TRULICITY' });
   await withPlan.waitFor();
   await withPlan.getByRole('button', { name: 'Aggiungi' }).click();
-  await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+  await page.getByRole('button', { name: 'Salva in bozza' }).click();
   await page.getByText(/Regole di prescrizione, versione/).waitFor();
   // I controlli in alto nella schermata, con un po' di spazio sopra.
   await page

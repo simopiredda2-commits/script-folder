@@ -337,6 +337,13 @@
       "when": 1795267589994,
       "tag": "0047_spostamenti_fra_archivi",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1795508203171,
+      "tag": "0048_ricette_archiviate",
+      "breakpoints": true
     }
   ]
 }

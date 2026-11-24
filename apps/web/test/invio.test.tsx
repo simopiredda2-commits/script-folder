@@ -53,7 +53,13 @@ function service(
 
 const checked = () => json(200, { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 });
 
-function panel(status = 'draft', lastErrorKind: string | null = null) {
+function panel(
+  status = 'draft',
+  lastErrorKind: string | null = null,
+  preview = false,
+  autoSign = false,
+  onChange?: (status: string, nre?: string) => void,
+) {
   render(
     <SessionProvider>
       <MemoryRouter>
@@ -62,6 +68,9 @@ function panel(status = 'draft', lastErrorKind: string | null = null) {
           status={status}
           lastErrorKind={lastErrorKind}
           lineNames={{}}
+          preview={preview}
+          autoSign={autoSign}
+          {...(onChange ? { onChange } : {})}
         />
       </MemoryRouter>
     </SessionProvider>,
@@ -195,5 +204,138 @@ describe('firma e invio a controllo finito (D230)', () => {
     panel('error', 'timeout');
     await screen.findByRole('button', { name: 'Firma e invia' });
     expect(screen.queryByRole('button', { name: 'Stampa la ricetta rossa' })).toBeNull();
+  });
+});
+
+describe('anteprima del promemoria prima della firma (D253)', () => {
+  it('per la ricetta SSN non inviata c’è il collegamento al PDF; per la bianca no', async () => {
+    service(['owner_doctor'], () => Promise.resolve(checked()));
+    panel('draft', null, true);
+    const link = await screen.findByRole('link', { name: 'Anteprima del promemoria (PDF)' });
+    expect(link.getAttribute('href')).toBe('/api/ricette/r1/promemoria/anteprima');
+    cleanup();
+    service(['owner_doctor'], () => Promise.resolve(checked()));
+    panel('draft', null, false);
+    await screen.findByRole('button', { name: 'Controlla di nuovo' });
+    expect(screen.queryByRole('link', { name: 'Anteprima del promemoria (PDF)' })).toBeNull();
+  });
+});
+
+describe('ricetta del medico in un passo (D255)', () => {
+  const signs = (calls: string[]) =>
+    calls.filter((c) => c === 'POST /api/ricette/r1/firma-e-invia');
+  const warned = () =>
+    json(200, {
+      versioneRegole: 'prova-1',
+      problemi: [
+        {
+          ruleId: 'R18',
+          severity: 'warn',
+          message: 'Codice non nel catalogo del programma',
+          remedy: null,
+          lineId: null,
+        },
+      ],
+      bloccanti: 0,
+    });
+
+  it('a controllo finito senza problemi firma e invia da sé, una volta sola', async () => {
+    const changes: string[] = [];
+    const calls = service(['owner_doctor'], () => Promise.resolve(checked()));
+    panel('draft', null, false, true, (status) => changes.push(status));
+    await screen.findByText('Ricetta inviata.', { exact: false });
+    expect(signs(calls)).toHaveLength(1);
+    expect(changes).toEqual(['sent']);
+  });
+
+  it('l’informazione R1 sulla validità, che c’è sempre, non ferma il passo unico', async () => {
+    const calls = service(['owner_doctor'], () =>
+      Promise.resolve(
+        json(200, {
+          versioneRegole: 'prova-1',
+          problemi: [
+            {
+              ruleId: 'R1',
+              severity: 'info',
+              message: 'La ricetta vale 30 giorni',
+              remedy: null,
+              lineId: null,
+            },
+          ],
+          bloccanti: 0,
+        }),
+      ),
+    );
+    panel('draft', null, false, true);
+    await screen.findByText('Ricetta inviata.', { exact: false });
+    expect(signs(calls)).toHaveLength(1);
+  });
+
+  it('un’altra informazione ferma il passo unico (R21, farmaco carente)', async () => {
+    const calls = service(['owner_doctor'], () =>
+      Promise.resolve(
+        json(200, {
+          versioneRegole: 'prova-1',
+          problemi: [
+            {
+              ruleId: 'R21',
+              severity: 'info',
+              message: 'Farmaco carente secondo l’elenco AIFA',
+              remedy: null,
+              lineId: 'l1',
+            },
+          ],
+          bloccanti: 0,
+        }),
+      ),
+    );
+    panel('draft', null, false, true);
+    await screen.findByText(/La ricetta non è ancora partita/);
+    expect(signs(calls)).toHaveLength(0);
+  });
+
+  it('con un problema dei controlli si ferma: niente invio, lo dice, si firma con il pulsante', async () => {
+    const calls = service(['owner_doctor'], () => Promise.resolve(warned()));
+    panel('draft', null, false, true);
+    await screen.findByText(/La ricetta non è ancora partita/);
+    screen.getByText(/Codice non nel catalogo del programma/);
+    expect(signs(calls)).toHaveLength(0);
+    await userEvent.type(
+      screen.getByLabelText('Motivo per procedere nonostante l’avviso R18'),
+      'Codice nuovo',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Firma e invia' }));
+    await screen.findByText('Ricetta inviata.', { exact: false });
+    expect(signs(calls)).toHaveLength(1);
+  });
+
+  it('con il controllo non riuscito non firma, nemmeno dopo «Controlla di nuovo»', async () => {
+    let fail = true;
+    const calls = service(['owner_doctor'], () =>
+      fail ? Promise.reject(new TypeError('Failed to fetch')) : Promise.resolve(checked()),
+    );
+    panel('draft', null, false, true);
+    await screen.findByText(/Controllo non riuscito/);
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Controlla di nuovo' }));
+    await waitFor(() => expect(checkStatus()).toBe(''));
+    expect(screen.queryByText(/Controllo non riuscito/)).toBeNull();
+    expect(signs(calls)).toHaveLength(0);
+  });
+
+  it('senza «in un passo» il medico firma solo con il pulsante', async () => {
+    const calls = service(['owner_doctor'], () => Promise.resolve(checked()));
+    panel('draft');
+    const sign = await screen.findByRole('button', { name: 'Firma e invia' });
+    await waitFor(() => expect(disabled(sign)).toBe(false));
+    expect(signs(calls)).toHaveLength(0);
+  });
+
+  it('la segreteria non firma mai, nemmeno «in un passo»', async () => {
+    const calls = service(['secretary'], () => Promise.resolve(checked()));
+    panel('draft', null, false, true);
+    const toSign = await screen.findByRole('button', { name: 'Manda alla firma del medico' });
+    await waitFor(() => expect(disabled(toSign)).toBe(false));
+    expect(signs(calls)).toHaveLength(0);
   });
 });

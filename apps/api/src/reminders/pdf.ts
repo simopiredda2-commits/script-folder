@@ -318,13 +318,21 @@ function heading(s: Sheet, d: PromemoriaDataV2, title: string) {
   s.line(M.box1, ROW.boxTop, M.box1, ROW.boxBottom);
   // Campo 1: la Regione, in alto a sinistra nel riquadro.
   s.fitted(d.regione, M.left + 1.5, ROW.boxTop + 4, M.box1 - 1.5, 2, 3.6);
-  // Campo 2: i due codici dell'NRE, centrati nel riquadro con 8 mm tra l'uno e l'altro.
-  const [first, second] = nreParts(d.nre);
-  const gap = 8;
-  const total = barcodeWidth(first) + gap + barcodeWidth(second);
-  const start = M.box1 + (M.right - M.box1 - total) / 2;
-  const top = ROW.boxTop + 1.4;
-  s.barcode(second, start + s.barcode(first, start, top) + gap, top);
+  if (d.bozza) {
+    // Anteprima prima della firma (D253): l'NRE non c'è ancora, e il foglio lo dice al suo posto.
+    s.text(d.nre, (M.box1 + M.right) / 2, (ROW.boxTop + ROW.boxBottom) / 2 + 2, {
+      size: 16,
+      align: 'center',
+    });
+  } else {
+    // Campo 2: i due codici dell'NRE, centrati nel riquadro con 8 mm tra l'uno e l'altro.
+    const [first, second] = nreParts(d.nre);
+    const gap = 8;
+    const total = barcodeWidth(first) + gap + barcodeWidth(second);
+    const start = M.box1 + (M.right - M.box1 - total) / 2;
+    const top = ROW.boxTop + 1.4;
+    s.barcode(second, start + s.barcode(first, start, top) + gap, top);
+  }
   // Campo 9: il codice fiscale a barre, a destra delle righe 3–8, con il margine di quiete.
   const cf = d.assistito.codiceFiscale;
   const cfLeft = M.right - 2.6 - barcodeWidth(cf);

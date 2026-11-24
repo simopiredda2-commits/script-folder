@@ -107,4 +107,11 @@ export function registerPrescriptionRoutes(
   app.get('/api/ricette/senza-risposta', async (req) => ({
     pazienti: await service.interruptedQueue(req.actor!),
   }));
+
+  // Confermate, cioè inviate o stampate, e la loro archiviazione dall'elenco (D254).
+  app.get('/api/ricette/confermate', async (req) => ({
+    pazienti: await service.confirmedQueue(req.actor!),
+  }));
+
+  app.post('/api/ricette/archivia-confermate', async (req) => service.archiveConfirmed(req.actor!));
 }

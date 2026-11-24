@@ -1869,3 +1869,47 @@ Non provato: un MacBook vero e Safari vero (le prove usano WebKit di Playwright 
 - **Il contatore delle confezioni (R11)** conta le confezioni delle ricette inviate, quindi anche quelle scelte qui. Oggi però non calcola mai la copertura: le unità per confezione non vengono da nessuna banca dati che abbiamo (D59). Come averle è una domanda per la prossima fermata.
 
 Non provato: lettori di schermo veri sul «− N +»; Safari vero.
+
+**D251 · Via anticipato alla #32 e fine della sessione del 23/11/2026.** Simone, prima che finissero le verifiche: «Ti autorizzo sin da ora a unire. A domani». La #32 è stata unita il 24/11/2026 (commit 1350cde), con le 14 verifiche su GitHub verdi sull'ultimo commit (6e4c3a8). Prima, con WebKit, una prova della #32 cadeva e ne trascinava altre tre: i clic su «−» e «+» facevano scorrere fino in fondo il riquadro della ricerca. In fondo il segno «c'è altro sotto» giustamente non c'è, e la prova lo cercava lì. La prova ora riporta il riquadro in cima prima di controllare; riprodotta e verificata in locale con WebKit. Si riprende dalla domanda sulle unità per confezione del contatore R11 (D250), poi dall'ordine concordato in `docs/avanzamento.md`.
+
+**D252 · Unità per confezione dall'anagrafica AIFA.** Domanda della fermata sul contatore R11 (D250); risposta di Simone del 24/11/2026: «AIFA. La banca dati con licenza verificherà eventuali discrepanze. Tienilo a mente».
+
+- **Da dove**: la colonna «DESCRIZIONE» dell'anagrafica AIFA delle confezioni, già importata come `pack`. Si legge il numero che apre l'ultima parte, dopo l'ultimo «- », solo se lo segue «compresse», «capsule» o «bustine» (al singolare o al plurale). Il trattino dentro il materiale del blister («PVC-PE-PVDC») non separa le parti.
+- **Che cosa non si legge**: penne, fiale, flaconcini, flaconi in millilitri, confezioni come «2 BLISTER DA 14 COMPRESSE». Restano non note: nessun numero ricostruito.
+- **Stessa unità della posologia**: il numero conta per R11 e R4 solo se la posologia della terapia è nella stessa unità («compressa» o «compresse»). Se la posologia è in gocce o in unità, o non ha l'unità, il contatore resta fermo e lo dice, come prima.
+- **Le regole non cambiano versione**: cambia il dato che arriva alle regole, non il loro comportamento. La nota «finché mancano, il contatore non si calcola» resta vera per le confezioni che non si leggono.
+- **Da tenere a mente**: con la banca dati con licenza si confronteranno le unità lette da AIFA con le sue, per trovare le differenze.
+
+Non provato: l'anagrafica AIFA intera (solo il file d'esempio).
+
+**D253 · Anteprima del promemoria prima della firma.** Punto 1 delle richieste della pausa: «il promemoria con "Bozza – non valida" al posto dell'NRE».
+
+- **Che cosa**: il promemoria del modello del 2024 (D217), costruito dalla ricetta com'è al momento, con «BOZZA – NON VALIDA» nel riquadro dell'NRE al posto dei due codici a barre e «—» al posto del codice di autenticazione. Il codice fiscale a barre e tutti gli altri campi restano: si vede il foglio vero.
+- **Quando**: per le ricette SSN in bozza, da firmare o non riuscite. Dopo l'invio c'è il promemoria vero; la ricetta bianca non ha anteprima, perché il suo promemoria lo produce il SAC.
+- **Il medico**: chi ha già firmato; altrimenti il medico che guarda; per la segreteria il medico scelto dal paziente, scelta in corso e non annullata. Senza, nessuna anteprima e il messaggio lo dice: il promemoria porta il codice fiscale del medico e non si inventa.
+- **Non è una consegna**: non entra in `reminder_delivery` e non si salva; si rifà a ogni richiesta. L'accesso alla cartella resta nel registro, con l'azione «anteprima_promemoria».
+- **Dove**: accanto a «Firma e invia», nella ricetta e nella coda «da firmare».
+
+Non provato: stampa su carta; Safari e Firefox veri.
+
+**D254 · Ricette confermate nella pagina Ricette, con «Archivia ricette confermate».** Punti 2 e 3 delle richieste della pausa. Le parole di Simone: «è sufficiente che nell'elenco "ricette" ci siano quelle da confermare, confermate (dal medico per ricetta fatta dal medico stesso o confermate quelle della segreteria), non confermate o non accolte».
+
+- **Le parti della pagina**: «Da firmare» (da confermare), «Confermate» (nuova), «Invii non riusciti» e «Invii senza risposta» (non accolte, o con l'esito ancora da sapere). Le ricette del medico e quelle preparate dalla segreteria stanno insieme: la conferma è sempre la firma del medico.
+- **Confermate**: le ricette inviate, con l'NRE, e quelle stampate sulla ricetta rossa, non ancora archiviate. Per le inviate c'è «Stampa e invio del promemoria», che apre lo stesso pannello della ricetta: promemoria completo o solo NRE, email al paziente o al delegato. La ricetta rossa no: il foglio stampato è già la ricetta.
+- **Chi le vede**: come le altre code (D242). Il medico le vede negli archivi dove firma, la segreteria negli archivi che l'hanno confermata. Senza le ricette con una terapia riservata dove le riservate non si leggono.
+- **Archivia per tutto lo studio, non per persona**: la pagina è l'elenco di lavoro dello studio. Un archivio per persona lascerebbe alla segreteria ricette già chiuse dal medico. Si archiviano solo le confermate che chi lo chiede vede: il titolare non tocca quelle del collega.
+- **Che cosa cambia**: solo l'elenco della pagina. Stato, promemoria e consegne restano; la ricetta resta nello storico del paziente, con il suo promemoria. Si scrivono chi ha archiviato e quando. Due richieste insieme non contano due volte la stessa ricetta.
+- **Niente «togli dall'archivio»**: ciò che serve dopo è nello storico del paziente.
+
+Non provato: Safari e Firefox veri; la stampa su carta dal menu della pagina.
+
+**D255 · Ricetta del medico in un passo.** Punto 4 delle richieste della pausa: «quando prescrive il medico, la conferma è la sua. Oggi sono due clic, «Prepara la ricetta» e poi «Firma e invia». L'invio con le credenziali del medico resta obbligatorio».
+
+- **Per il medico** il pulsante della ricetta è «Firma e invia»: salva la ricetta, la controlla con le regole di prescrizione e, se il controllo non ha nulla da dire, la invia con le credenziali del medico. È lo stesso invio di prima: stessi controlli nel servizio, stesso registro, stesse credenziali. Senza credenziali o senza codice di sessione l'invio non parte e il messaggio porta a «Credenziali dei servizi».
+- **Quando ci si ferma**: con un problema qualsiasi del controllo, anche solo informativo, l'invio non parte e il pannello lo dice: «La ricetta non è ancora partita». Fa eccezione l'informazione R1, «la ricetta vale 30 giorni»: c'è in ogni ricetta SSN e non chiede nulla al medico; se fermasse, il passo unico non ci sarebbe mai (lo ha mostrato la prova nel browser). Le altre informazioni (R11 sul contatore, R21 sulle carenze, R22 sulle confezioni sospese) fermano: possono far cambiare la ricetta prima dell'invio. Il medico vede i controlli, conferma le note o scrive i motivi, e firma con il pulsante del pannello. Chi firma vede sempre i controlli prima (D230). Ci si ferma anche se il controllo non riesce; «Controlla di nuovo» poi non firma da sé.
+- **«Salva in bozza»** resta accanto, per il medico che vuole l'anteprima del promemoria (D253) o firmare dopo: è il percorso di prima.
+- **Una volta sola**: il passo unico vale al momento del clic. Tornando su una bozza, il medico vede i controlli e firma con il pulsante.
+- **La segreteria** non cambia: «Prepara la ricetta», poi «Manda alla firma del medico».
+- **«Ricomincia» accanto al titolo «In ricetta»**: con tre pulsanti in fondo, a 1280 px «Ricomincia» andava a capo e toglieva spazio alla ricetta (lo ha mostrato la schermata). Svuota la lista, quindi sta con la lista; in fondo restano «Firma e invia» e «Salva in bozza», in una riga. La prova nel browser lo controlla a 1280 px.
+
+Non provato: Safari e Firefox veri; le credenziali vere del Sistema TS.

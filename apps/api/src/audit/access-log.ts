@@ -41,6 +41,8 @@ export type AccessAction =
   | 'modifica_terapia'
   | 'sospensione_terapia'
   | 'stampa_promemoria'
+  /** Anteprima del promemoria prima della firma (D253). */
+  | 'anteprima_promemoria'
   | 'invio_promemoria'
   | 'lettura_consegne_promemoria'
   | 'lettura_recapiti_promemoria'

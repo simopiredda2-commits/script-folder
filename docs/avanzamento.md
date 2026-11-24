@@ -1563,6 +1563,103 @@ Pull request #31 unita in `main` (commit 297121d) con le 14 verifiche su GitHub 
 - Le confezioni nell'ultima ricetta compaiono solo se c'è una ricetta: nella dimostrazione molte terapie non ne hanno («nessuna»). Ricette già inviate nei dati della dimostrazione sono nell'elenco «Che cosa resta da fare», con il database dei farmaci.
 - Il contatore delle confezioni (R11) conta le confezioni delle ricette inviate, quindi anche quelle scelte con «− N +». Però oggi non calcola mai la copertura: le unità per confezione non arrivano da nessuna banca dati che abbiamo (D59, D250). Domanda per la prossima fermata: da dove prenderle (la descrizione della confezione AIFA, per esempio «28 compresse»; un campo nella scheda della terapia; o una banca dati con licenza).
 
+## Domande della fermata dopo la #33
+
+1. **Via alla #33**: A. unisci con le prove su GitHub verdi (consigliata); B. prima provo la dimostrazione.
+2. **Ricetta del medico in un passo**: A. si ferma su ogni problema dei controlli tranne la R1 sulla validità (consigliata, come è fatto); B. si ferma solo su blocchi, motivi e note AIFA, e le informazioni si vedono dopo l'invio; C. sempre due clic.
+3. **Database dei farmaci nella dimostrazione** (punto 5 dell'elenco): A. i rimborsabili di classe A e H dalle liste AIFA, circa 13.000 confezioni (consigliata); B. tutta l'anagrafica AIFA, circa 160.000 righe e 82 MB, da dividere in più file, con la dimostrazione più lenta da aprire; C. l'estratto di oggi, con qualche ricetta già inviata.
+
+## Chiusura del blocco D252–D255 (24/11/2026)
+
+- Prove in locale: tutte le prove dell'interfaccia (unitarie) verdi; la prova nel browser con Chromium 56 su 56; la dimostrazione costruita, 31 prove su 31 con Chromium. WebKit e Firefox girano nella CI.
+- Dimostrazione ripubblicata nello stesso indirizzo, con le confermate e la ricetta in un passo.
+- Schermate rifatte, con la nuova 74 delle ricette confermate.
+
+## Ricetta del medico in un passo (24/11/2026)
+
+Punto 4 delle richieste della pausa (D255).
+
+**Fatto**
+
+- Per il medico, nella ricetta, il pulsante è «Firma e invia»: salva, controlla e, se il controllo non ha nulla da dire, invia con le credenziali del medico. Con un problema qualsiasi del controllo si ferma, lo dice, e il medico firma dal pannello dopo averlo visto; tranne l'informazione R1 sulla validità di 30 giorni, che c'è in ogni ricetta SSN.
+- «Salva in bozza» resta accanto per l'anteprima del promemoria o per firmare dopo. La segreteria fa come prima.
+- «Ricomincia» è passato accanto al titolo «In ricetta»: con tre pulsanti in fondo, a 1280 px andava a capo. La prova nel browser controlla che i pulsanti in fondo stiano in una riga.
+
+**Come provarlo**
+
+- `apps/web/test/invio.test.tsx`: invio da sé a controllo pulito, una volta sola; fermata con un avviso, poi firma con il pulsante; nessuna firma con il controllo non riuscito, nemmeno dopo «Controlla di nuovo»; nessuna firma senza il passo unico; la segreteria mai. Nella prova dell'interfaccia la ricetta specialistica parte con un clic; nella dimostrazione anche.
+
+**Da sapere**
+
+- Il primo giro della prova nel browser ha mostrato che l'informazione R1, «la ricetta vale 30 giorni», c'è in ogni ricetta SSN: fermandosi su ogni informazione il passo unico non ci sarebbe mai stato. La R1 non ferma; le altre informazioni sì (D255).
+
+**Non provato**
+
+- Safari e Firefox veri; le credenziali vere del Sistema TS.
+
+## Pagina Ricette: confermate e «Archivia ricette confermate» (24/11/2026)
+
+Punti 2 e 3 delle richieste della pausa (D254).
+
+**Fatto**
+
+- Nella pagina Ricette, fra «Da firmare» e «Invii non riusciti», la parte «Confermate»: le ricette inviate, con l'NRE, e quelle stampate sulla ricetta rossa. Per le inviate, «Stampa e invio del promemoria» apre il pannello della ricetta: promemoria completo o solo NRE, email.
+- «Archivia ricette confermate (N)» toglie dall'elenco le confermate che si vedono, per tutto lo studio. La ricetta non cambia stato e resta nello storico del paziente. Migrazione 0048: chi ha archiviato e quando.
+- La vedono il medico e la segreteria, come le altre code; l'amministratore senza accesso clinico no.
+
+**Come provarlo**
+
+- `apps/api/test/coda-segreteria.test.ts`: confermate con l'NRE, quelle da firmare escluse, archiviazione del titolare che lascia quelle del collega, stato invariato, ricetta nello storico, due richieste insieme. `apps/web/test/coda-segreteria.test.tsx`: la parte con il menu chiuso, «Archivia» e l'elenco che si svuota; nessuna richiesta per chi non le vede.
+
+**Non provato**
+
+- Safari e Firefox veri; la stampa su carta dal menu della pagina.
+
+## Anteprima del promemoria prima della firma (24/11/2026)
+
+Punto 1 delle richieste della pausa (D253).
+
+**Fatto**
+
+- Nella ricetta e nella coda «da firmare», accanto a «Firma e invia», «Anteprima del promemoria (PDF)» per le ricette SSN non ancora inviate. È il promemoria vero, dalla ricetta com'è ora, con «BOZZA – NON VALIDA» al posto dei codici a barre dell'NRE e «—» al posto del codice di autenticazione.
+- Il medico del promemoria è chi firmerà: il medico che guarda, o il medico scelto dal paziente se guarda la segreteria. Senza una scelta in corso la segreteria non ha l'anteprima, e il messaggio lo dice.
+- Non è una consegna e non si salva; l'accesso resta nel registro.
+
+**Come provarlo**
+
+- In `apps/api/test/promemoria.test.ts` l'anteprima: testo del PDF, nessun codice a barre dell'NRE, la segreteria con e senza scelta del medico, nessuna consegna, niente anteprima dopo l'invio né per la bianca. In `apps/web/test/invio.test.tsx` il collegamento; nella prova dell'interfaccia il PDF dal collegamento.
+
+**Non provato**
+
+- Stampa su carta dell'anteprima; Safari e Firefox veri.
+
+## Dopo l'unione della #32 – unità per confezione dall'anagrafica AIFA (24/11/2026)
+
+Risposta di Simone alla domanda sul contatore R11: «AIFA. La banca dati con licenza verificherà eventuali discrepanze. Tienilo a mente» (D252).
+
+**Fatto**
+
+- Le unità per confezione si leggono dalla descrizione dell'anagrafica AIFA delle confezioni: «5 MG COMPRESSE- 28 COMPRESSE IN BLISTER» dà 28 compresse. Si legge solo il numero che apre l'ultima parte, e solo per compresse, capsule e bustine; penne, fiale, flaconi e «2 BLISTER DA 14» restano non noti.
+- Il contatore R11 e il limite dei 180 giorni della R4 usano quel numero solo se la posologia della terapia è nella stessa unità (compresse con «compressa»); con le gocce o le unità di insulina no, e il contatore resta fermo come prima.
+
+**Come provarlo**
+
+- `packages/reference/test/confezioni.test.ts` (descrizioni del file d'esempio e casi che non si leggono); in `apps/api/test/banche-dati.test.ts` i fatti dell'amlodipina con 28 compresse e il dulaglutide senza; in `apps/api/test/regole-http.test.ts` l'unità della posologia.
+
+**Non provato**
+
+- Le descrizioni dell'anagrafica intera: provate solo quelle del file d'esempio. Il confronto con la banca dati con licenza si farà quando ci sarà.
+
+**Da tenere a mente**
+
+- Quando arriverà la banca dati con licenza, confrontare le unità per confezione lette da AIFA con le sue e segnalare le differenze (richiesta di Simone).
+
+## Unione della #32 (24/11/2026)
+
+Pull request #32 unita in `main` (commit 1350cde) con il via dato in anticipo da Simone («Ti autorizzo sin da ora a unire. A domani», D251) e le 14 verifiche su GitHub verdi. Con WebKit una prova cadeva: il riquadro della ricerca, fatto scorrere in fondo dai clic su «−» e «+», giustamente non aveva il segno «c'è altro sotto». La prova ora lo riporta in cima prima di controllare; riprodotto e verificato in locale con WebKit. Dimostrazione ripubblicata (versione 20).
+
+**Prossimo passo**: alla prossima fermata, la domanda sulle unità per confezione per il contatore R11 (D250); poi l'ordine di «Che cosa resta da fare, in ordine».
+
 ## Risposte della fermata dopo la #31 (23/11/2026)
 
 Simone ha risposto con il pulsante il 23/11/2026 (D247).
@@ -1574,10 +1671,10 @@ Simone ha risposto con il pulsante il 23/11/2026 (D247).
 
 **Che cosa resta da fare, in ordine**
 
-1. Anteprima del PDF prima della firma, con «Bozza – non valida» al posto dell'NRE (punto 1 delle richieste della pausa).
-2. Pagina Ricette con tutte le ricette in corso e il menu di stampa e invio; «Archivia ricette confermate» (punti 2 e 3).
-3. Ricetta del medico in un passo solo, con l'invio sempre con le sue credenziali (punto 4).
-4. Unità per confezione per il contatore R11 (D250): da dove prenderle, alla prossima fermata.
+1. Anteprima del PDF prima della firma, con «Bozza – non valida» al posto dell'NRE (punto 1 delle richieste della pausa): fatta (D253).
+2. Pagina Ricette con tutte le ricette in corso e il menu di stampa e invio; «Archivia ricette confermate» (punti 2 e 3): fatti (D254).
+3. Ricetta del medico in un passo solo, con l'invio sempre con le sue credenziali (punto 4): fatta (D255).
+4. Unità per confezione per il contatore R11 (D250): fatto, dall'anagrafica AIFA (D252). Quando ci sarà la banca dati con licenza, servirà a trovare le differenze con il numero letto da AIFA.
 5. Database dei farmaci nella dimostrazione (D243): che cosa vuol dire di preciso (i rimborsabili di classe A e H, o tutta l'anagrafica AIFA) si chiede a Simone allora. Con il database, qualche ricetta già inviata nei dati della dimostrazione, così le righe dei farmaci prescritti mostrano data e confezioni dell'ultima ricetta (D249).
 6. Audit con Cowork sulla dimostrazione, a programma chiuso (D247).
 7. Collaudo finale: le verifiche di Simone e della Dr.ssa Rocca in «Che cosa resta aperto».
@@ -3622,3 +3719,28 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D250: totale che conta le righe invece delle confezioni                                                       | PrescriptionEditor.tsx: totale uguale al numero di righe                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D250: «+» che non cambia le confezioni                                                                        | PrescribedDrugs.tsx: «+» rimanda lo stesso numero                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D250: «−» attivo con una confezione sola                                                                      | PrescribedDrugs.tsx: limite di una confezione tolto                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D252: descrizione AIFA mai letta                                                                              | pack-units.ts: nessuna unità letta                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D252: unità per confezione non passate alle regole                                                            | lookup.ts: numero non messo nei fatti del farmaco                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D252: unità per confezione anche con una posologia in un'altra unità                                          | rules-check.ts: controllo dell'unità tolto                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D253: anteprima con i codici a barre dell'NRE                                                                 | pdf.ts: riquadro dell'NRE come nel promemoria vero                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D253: anteprima anche di una ricetta inviata                                                                  | service.ts: controllo dello stato tolto                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D253: collegamento all'anteprima anche per la ricetta bianca                                                  | SendPanel.tsx: collegamento senza la condizione                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D254: fra le confermate non ci sono le archiviate                                                             | prescriptions/service.ts: archiviazione non guardata nella coda                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D254: fra le confermate solo inviate e stampate                                                               | prescriptions/service.ts: anche le ricette da firmare                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D254: «Archivia» tocca solo le ricette che chi lo chiede vede                                                 | prescriptions/service.ts: tutte le inviate dello studio                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D254: due richieste insieme non contano due volte la stessa ricetta                                           | prescriptions/service.ts: condizione sull'archiviazione tolta (rosso tre volte su tre)                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D254: le confermate hanno l'NRE                                                                               | prescriptions/service.ts: NRE tolto dalla coda                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D254: le confermate non si chiedono per chi non vede le code                                                  | SignQueuePage.tsx: coda chiesta per tutti                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D254: dopo «Archivia» l'elenco si ricarica                                                                    | SignQueuePage.tsx: niente ricarica                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D254: il menu di stampa e invio si apre a richiesta                                                           | SignQueuePage.tsx: menu aperto da subito                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: in un passo si invia solo a controllo senza problemi                                                    | SendPanel.tsx: invio anche con un problema dei controlli                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: con il controllo non riuscito non si firma, nemmeno dopo «Controlla di nuovo»                           | SendPanel.tsx: tentativo solo dopo un controllo riuscito                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: il passo unico firma una volta sola                                                                     | SendPanel.tsx: tentativo non segnato                                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: senza il passo unico si firma solo con il pulsante                                                      | SendPanel.tsx: passo unico non guardato                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: la segreteria non firma mai                                                                             | SendPanel.tsx: ruolo non guardato                                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: la fermata sui controlli si dice                                                                        | SendPanel.tsx: avviso «non ancora partita» tolto                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: il medico ha «Firma e invia» e «Salva in bozza», la segreteria «Prepara la ricetta»                     | PrescriptionEditor.tsx: pulsanti di prima anche al medico                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: «Firma e invia» dell'editor accende il passo unico                                                      | PrescriptionEditor.tsx: salvataggio senza il passo unico (rosso con la prova dell'editor)                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: l'informazione R1 sulla validità non ferma il passo unico                                               | SendPanel.tsx: anche la R1 ferma                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: le altre informazioni (R11, R21, R22) fermano il passo unico                                            | SendPanel.tsx: nessuna informazione ferma                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D255: a 1280 px i pulsanti in fondo alla ricetta stanno in una riga                                           | PrescriptionEditor.tsx: «Salva in bozza» allargato (prova nel browser)                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

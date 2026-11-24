@@ -20,6 +20,16 @@ export function registerReminderRoutes(
     return reply.send(Buffer.from(pdf.bytes));
   });
 
+  // Anteprima prima della firma (D253): «BOZZA – NON VALIDA» al posto dell'NRE.
+  app.get('/api/ricette/:id/promemoria/anteprima', scoped, async (req, reply) => {
+    const { id } = params.parse(req.params);
+    const pdf = await service.preview(req.actor!, id);
+    reply.header('content-type', 'application/pdf');
+    reply.header('content-disposition', `inline; filename="${pdf.name}"`);
+    reply.header('cache-control', 'no-store');
+    return reply.send(Buffer.from(pdf.bytes));
+  });
+
   app.post('/api/ricette/:id/promemoria/invio', scoped, async (req) => {
     const { id } = params.parse(req.params);
     return service.send(req.actor!, id, req.body);

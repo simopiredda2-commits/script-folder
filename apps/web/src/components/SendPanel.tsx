@@ -27,6 +27,13 @@ export interface SendPanelProps {
   lastErrorKind?: string | null;
   /** Nomi delle righe, per le conferme delle note AIFA. */
   lineNames: Record<string, string>;
+  /** Ricetta SSN: prima della firma si vede l'anteprima del promemoria (D253). */
+  preview?: boolean;
+  /**
+   * Ricetta del medico in un passo (D255): finito il controllo, se non ha nulla da dire, si firma e
+   * si invia da sé; altrimenti ci si ferma sui controlli e si firma da qui.
+   */
+  autoSign?: boolean;
   /** Nuovo stato della ricetta dopo un'azione, con l'NRE se è stata inviata. */
   onChange?: (status: string, nre?: string) => void;
 }
@@ -41,11 +48,20 @@ export interface SendPanelProps {
 const failure = (e: unknown, message: string) =>
   e instanceof ApiError ? e : new ApiError(0, message);
 
+/**
+ * L'informazione R1, «la ricetta vale 30 giorni», accompagna ogni ricetta SSN e non chiede nulla al
+ * medico: non ferma il passo unico (D255). Ogni altro problema, anche solo informativo, lo ferma.
+ */
+const routine = (p: RuleIssue) => p.ruleId === 'R1' && p.severity === 'info';
+const toLookAt = (c: CheckResult) => c.problemi.filter((p) => !routine(p));
+
 export function SendPanel({
   prescriptionId,
   status,
   lastErrorKind,
   lineNames,
+  preview,
+  autoSign,
   onChange,
 }: SendPanelProps) {
   const { isDoctor } = useSession();
@@ -90,6 +106,19 @@ export function SendPanel({
     if (checkable) void runCheck();
   }, [checkable, runCheck]);
 
+  // In un passo (D255): un tentativo solo, al primo controllo finito, riuscito o no. Si firma solo
+  // se è riuscito senza problemi; «Controlla di nuovo» poi non firma da sé.
+  // Chi firma vede sempre i controlli prima (D230): con un problema qualsiasi, anche solo
+  // informativo, ci si ferma e si firma con il pulsante; tranne la validità della R1 (routine).
+  const signNow = useRef<() => Promise<void>>(async () => {});
+  const autoTried = useRef(false);
+  useEffect(() => {
+    if (!autoSign || !isDoctor || autoTried.current || checking || (!check && !error)) return;
+    autoTried.current = true;
+    if (check && toLookAt(check).length === 0 && !error) void signNow.current();
+  }, [autoSign, isDoctor, checking, check, error]);
+  const stopped = !!autoSign && isDoctor && !!check && toLookAt(check).length > 0;
+
   // L'ente non ha risposto: all'invio appena fatto, o all'ultimo invio della ricetta (D239).
   const unreachable = outcome
     ? outcome.esito === 'unreachable'
@@ -129,6 +158,8 @@ export function SendPanel({
       setBusy(false);
     }
   }
+
+  signNow.current = sign;
 
   async function toSign() {
     setBusy(true);
@@ -183,6 +214,11 @@ export function SendPanel({
   return (
     <div className="pannello-invio">
       <h3>Controlli prima dell’invio</h3>
+      {stopped && !outcome && (
+        <Notice kind="avviso">
+          La ricetta non è ancora partita: i controlli qui sotto si vedono prima della firma.
+        </Notice>
+      )}
       {check && (
         <>
           <IssueList issues={check.problemi} />
@@ -194,7 +230,9 @@ export function SendPanel({
       <p role="status" className={check ? 'stato-controllo tenue' : 'stato-controllo'}>
         {checking
           ? `Controllo in corso: si ${isDoctor ? 'firma' : 'manda alla firma'} quando è finito.`
-          : ''}
+          : busy && isDoctor
+            ? 'Firma e invio in corso.'
+            : ''}
       </p>
       {isDoctor && aifa.length > 0 && (
         <fieldset className="conferme">
@@ -269,6 +307,17 @@ export function SendPanel({
         >
           <Icon name="ripeti" /> <span>Controlla di nuovo</span>
         </button>
+        {/* Il promemoria com'è prima della firma, con «BOZZA – NON VALIDA» al posto dell'NRE. */}
+        {preview && checkable && (
+          <a
+            className="pulsante"
+            href={`/api/ricette/${prescriptionId}/promemoria/anteprima`}
+            target="_blank"
+            rel="noopener"
+          >
+            <Icon name="stampa" /> <span>Anteprima del promemoria (PDF)</span>
+          </a>
+        )}
         {isDoctor ? (
           <button
             type="button"

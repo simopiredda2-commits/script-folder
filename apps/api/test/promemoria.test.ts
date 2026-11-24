@@ -8,6 +8,7 @@ import {
   delegation,
   doctorProfile,
   patient,
+  patientChoice,
   prescription,
   prescriptionDocument,
   refDrugTransparency,
@@ -537,6 +538,45 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     expect((await req('GET', `/api/ricette/${id}/promemoria`, 'segreteria')).statusCode).toBe(200);
     const draftId = await draft(pharma());
     expect((await req('GET', `/api/ricette/${draftId}/promemoria`)).statusCode).toBe(409);
+  });
+
+  it('anteprima prima della firma (D253): «BOZZA – NON VALIDA» al posto dell’NRE, nessuna consegna', async () => {
+    const draftId = await draft(pharma({ exemptionCode: 'P00' }));
+    const preview = (id: string, who = 'titolare') =>
+      req('GET', `/api/ricette/${id}/promemoria/anteprima`, who);
+    const res = await preview(draftId);
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.headers['content-type']).toBe('application/pdf');
+    const text = norm(await pdfText(res.rawPayload));
+    for (const expected of [
+      'RICETTA ELETTRONICA – PROMEMORIA PER L’ASSISTITO',
+      'BOZZA – NON VALIDA',
+      `COGNOME E NOME /INIZIALI DELL’ASSISTITO: ${pt.lastName} ${pt.firstName}`,
+      'ESENZIONE: P00',
+    ])
+      expect(text).toContain(expected);
+    // Nessun codice a barre dell'NRE: fra asterischi c'è solo il codice fiscale.
+    expect(text.match(/\*[A-Z0-9]+\*/g)).toEqual([`*${pt.fiscalCode}*`]);
+    // La segreteria la vede con il medico scelto dal paziente; senza una scelta in corso, no.
+    expect((await preview(draftId, 'segreteria')).statusCode).toBe(409);
+    await t.db.insert(patientChoice).values({
+      patientId: s.richPatient,
+      doctorUserId: s.users.titolare.id,
+      chosenOn: '2026-01-01',
+      source: 'manual',
+    });
+    expect((await preview(draftId, 'segreteria')).statusCode).toBe(200);
+    // Non è una consegna, e la ricetta resta com'era.
+    expect(
+      await t.db
+        .select()
+        .from(reminderDelivery)
+        .where(eq(reminderDelivery.prescriptionId, draftId)),
+    ).toEqual([]);
+    expect((await row(draftId)).status).toBe('draft');
+    // Inviata: niente anteprima, c'è il promemoria vero. Ricetta bianca: lo fa il SAC.
+    expect((await preview(await sent(pharma()))).statusCode).toBe(409);
+    expect((await preview(await draft({ ...pharma(), kind: 'white' }))).statusCode).toBe(409);
   });
 
   it('carta: A5 orizzontale per difetto; A4 se lo studio sceglie A4, anche per l’email (D222)', async () => {

@@ -79,6 +79,12 @@ export const prescription = pgTable(
     cancelReason: text(),
     paperPrintedAt: timestamp({ withTimezone: true }),
     paperPrintedBy: uuid().references(() => appUser.id),
+    /**
+     * «Archivia ricette confermate» (D254): la ricetta inviata o stampata esce dall'elenco della
+     * pagina Ricette e resta nello storico del paziente. Vale per tutto lo studio.
+     */
+    archivedAt: timestamp({ withTimezone: true }),
+    archivedBy: uuid().references(() => appUser.id),
     /** Versione delle regole di prescrizione con cui è stata controllata (tappa 4). */
     rulesVersion: text(),
     /**

@@ -231,7 +231,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
 
   /**
    * La ricetta in una schermata (D242): sul computer e sul tablet in orizzontale la pagina non
-   * scorre e «Prepara la ricetta» è in vista; scorrono, se serve, la ricerca e la ricetta.
+   * scorre e il pulsante principale («Firma e invia» per il medico, D255) è in vista; scorrono, se
+   * serve, la ricerca e la ricetta.
    */
   async function expectOneScreen(p: Page, where: string) {
     for (const v of [
@@ -240,21 +241,28 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     ]) {
       await p.setViewportSize(v);
       const m = await p.evaluate(() => {
-        const b = [...document.querySelectorAll('button')]
-          .find((x) => x.textContent?.includes('Prepara la ricetta'))
+        const b = document
+          .querySelector('.azioni-ricetta .pulsante-primario')
           ?.getBoundingClientRect();
+        // I pulsanti in fondo alla ricetta, in una riga sola (D255).
+        const rows = new Set(
+          [...document.querySelectorAll('.azioni-ricetta > button')].map((x) =>
+            Math.round(x.getBoundingClientRect().top),
+          ),
+        );
         return {
           height: document.scrollingElement!.scrollHeight,
           view: innerHeight,
           button: b ? b.top >= 0 && b.bottom <= innerHeight : false,
+          rows: rows.size,
         };
       });
       expect(m.height, `${where} a ${v.width}×${v.height}: la pagina scorre`).toBeLessThanOrEqual(
         m.view,
       );
-      expect(m.button, `${where} a ${v.width}×${v.height}: «Prepara la ricetta» fuori vista`).toBe(
-        true,
-      );
+      expect(m.button, `${where} a ${v.width}×${v.height}: «Firma e invia» fuori vista`).toBe(true);
+      if (v.width >= 1280)
+        expect(m.rows, `${where} a ${v.width}×${v.height}: i pulsanti vanno a capo`).toBe(1);
     }
     await p.setViewportSize({ width: 1280, height: 900 });
   }
@@ -861,10 +869,18 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       )
       .toBe(true);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    // «Salva in bozza»: i controlli e l'anteprima prima della firma (D253, D255).
+    await page.getByRole('button', { name: 'Salva in bozza' }).click();
     await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
     await page.getByText(/Regole di prescrizione, versione/).waitFor();
     await check(page, 'ricetta con i controlli');
+    // Prima della firma l'anteprima del promemoria, con «BOZZA – NON VALIDA» al posto dell'NRE (D253).
+    const previewHref = await page
+      .getByRole('link', { name: 'Anteprima del promemoria (PDF)' })
+      .getAttribute('href');
+    const previewPdf = await page.request.get(`${base}${previewHref}`);
+    expect(previewPdf.status()).toBe(200);
+    expect(previewPdf.headers()['content-type']).toBe('application/pdf');
     await signAndSend(page);
   });
 
@@ -958,7 +974,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByRole('button', { name: 'Aggiungi' })
       .click();
     await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
-    await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    // Ricetta del medico in un passo (D255): «Firma e invia» salva, controlla e invia.
     await signAndSend(page);
     await page.goto(`${base}/pazienti/${s.richPatient}`);
     await page.getByRole('link', { name: 'Visita di prova' }).click();
@@ -1187,7 +1203,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .getByText('quantità 1 · catalogo NUOVO.1 · nomenclatore (DM) 99.99.1')
       .waitFor();
     await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
-    await page.getByRole('button', { name: 'Prepara la ricetta' }).click();
+    await page.getByRole('button', { name: 'Salva in bozza' }).click();
     await page
       .getByLabel('Motivo per procedere nonostante l’avviso R18')
       .fill('Codice nuovo, il catalogo del programma non è ancora aggiornato');
