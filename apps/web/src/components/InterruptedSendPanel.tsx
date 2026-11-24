@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
+import { normalizePrescriptionNumber, nrbeProblem, nreProblem } from '../lib/prescription-numbers';
 import { ErrorMessage, Notice } from './common';
 import { Icon } from './Icon';
 
@@ -22,6 +23,11 @@ export interface InterruptedSendPanelProps {
   signedBy: string | null;
   /** Da quando l'esito si può segnare: prima l'invio potrebbe essere ancora in corso (D239). */
   settleFrom?: string | null;
+  /**
+   * Il codice fiscale mandato con la ricetta: per la bianca l'NRBE comincia con la sua lettera di
+   * controllo (D259).
+   */
+  fiscalCode?: string | null;
   /** Dopo l'esito: le code si ricaricano. */
   onChange?: (status: 'sent' | 'error', nre: string | null) => void;
 }
@@ -43,6 +49,7 @@ export function InterruptedSendPanel({
   signedAt,
   signedBy,
   settleFrom,
+  fiscalCode,
   onChange,
 }: InterruptedSendPanelProps) {
   const white = kind === 'white';
@@ -205,6 +212,14 @@ export function InterruptedSendPanel({
             aria-label="La ricetta è arrivata"
             onSubmit={(e) => {
               e.preventDefault();
+              // La forma del numero, prima della conferma (audit D259): NRE di 15 caratteri, NRBE
+              // di 12, come nelle specifiche del Sistema TS. Il servizio la controlla di nuovo.
+              const number = normalizePrescriptionNumber(nre);
+              const shape = white ? nrbeProblem(number, fiscalCode) : nreProblem(number);
+              if (shape) {
+                setError(new ApiError(400, shape));
+                return;
+              }
               // Un codice di soli spazi non è un codice: lo si dice qui, prima della conferma.
               if (ssn && !authCode.trim()) {
                 setError(
@@ -218,7 +233,7 @@ export function InterruptedSendPanel({
               setError(null);
               setPending({
                 esito: 'arrivata',
-                nre: nre.trim(),
+                nre: number,
                 ...(white
                   ? { pin: pin.trim() }
                   : authCode.trim()
@@ -240,8 +255,15 @@ export function InterruptedSendPanel({
                 // In maiuscolo, come lo vuole il codice a barre del promemoria (D239).
                 onChange={(e) => setNre(e.target.value.toUpperCase())}
                 required
+                aria-describedby={`${nreId}-aiuto`}
                 autoComplete="off"
+                spellCheck={false}
               />
+              <p className="aiuto" id={`${nreId}-aiuto`}>
+                {white
+                  ? '12 caratteri: una lettera, una lettera o una cifra, poi 10 cifre.'
+                  : '15 caratteri: 5 lettere o cifre, una cifra da 0 a 7, poi 9 cifre.'}
+              </p>
             </div>
             {white ? (
               <div className="campo">

@@ -3,6 +3,9 @@ import {
   cancellableState,
   DISPENSING_STATE_LABELS,
   INTERRUPTED_SEND_AFTER_MINUTES,
+  normalizePrescriptionNumber,
+  nrbeProblem,
+  nreProblem,
   transition,
   type PrescriptionEvent,
   type PrescriptionKind,
@@ -116,11 +119,13 @@ const signSchema = z
   .strict();
 
 /**
- * Esito di un invio rimasto senza risposta (D233), come lo dice l'ente al medico. Il formato
- * dell'NRE non è nelle specifiche che abbiamo (A1): lettere e cifre, in maiuscolo come le vuole il
- * codice a barre del promemoria (D239). Per la ricetta SSN serve anche il codice di autenticazione:
- * senza, la ricetta non è valida (specifiche del Sistema TS, D240). Per la ricetta bianca il
- * Sistema TS dà NRBE e PIN (D239).
+ * Esito di un invio rimasto senza risposta (D233), come lo dice l'ente al medico. Il numero si
+ * scrive senza spazi e in maiuscolo, come lo vuole il codice a barre del promemoria (D239); la sua
+ * forma (NRE di 15 caratteri, NRBE di 12) si controlla poi secondo il tipo di ricetta, con le
+ * specifiche del Sistema TS (`nreProblem`, `nrbeProblem`, audit D259). Per la ricetta SSN serve
+ * anche il codice di autenticazione: senza, la ricetta non è valida (specifiche del Sistema TS,
+ * D240). Per la ricetta bianca il Sistema TS dà NRBE e PIN (D239). Codice e PIN non hanno un
+ * formato nelle specifiche lette: lettere e cifre, da completare (D259).
  */
 const settleSchema = z.discriminatedUnion('esito', [
   z.object({ esito: z.literal('non_arrivata') }).strict(),
@@ -129,9 +134,12 @@ const settleSchema = z.discriminatedUnion('esito', [
       esito: z.literal('arrivata'),
       nre: z
         .string()
-        .trim()
-        .toUpperCase()
-        .regex(/^[A-Z0-9]{1,30}$/, 'Il numero di ricetta ha solo lettere e cifre, al più 30'),
+        .transform(normalizePrescriptionNumber)
+        .pipe(
+          z
+            .string()
+            .regex(/^[A-Z0-9]{1,30}$/, 'Il numero di ricetta ha solo lettere e cifre, al più 30'),
+        ),
       codiceAutenticazione: z
         .string()
         .trim()
@@ -915,6 +923,20 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const signedAt = p.signedAt!;
     const arrived = input.esito === 'arrivata' ? input : null;
     const white = p.kind === 'white';
+    // Il messaggio partito con quell'invio, fotografato alla firma (D239): è la richiesta che resta
+    // nel registro degli invii, e le sue righe e il paziente di allora vanno sul promemoria. Per
+    // una ricetta firmata prima della fotografia, come l'aveva firmato chi l'ha mandata.
+    const snapshot = p.sendingSnapshot as SendingSnapshot | null;
+    const message = snapshot?.message ?? (await buildMessage(p, p.signedBy!, studioDate(signedAt)));
+    // La forma del numero, prima di tutto (audit D259): NRE di 15 caratteri secondo le specifiche
+    // del Sistema TS del 5/12/2024; NRBE di 12, che per il paziente con il codice fiscale comincia
+    // con la lettera di controllo del codice fiscale mandato con la ricetta (DM 1/12/2022).
+    const shape = !arrived
+      ? null
+      : white
+        ? nrbeProblem(arrived.nre, message.patientFiscalCode)
+        : nreProblem(arrived.nre);
+    if (shape) throw new HttpError(400, shape);
     if (arrived && white && !arrived.pin)
       throw new HttpError(
         400,
@@ -929,11 +951,6 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         400,
         'Senza il codice di autenticazione la ricetta SSN non è valida: chiedi all’ente il numero (NRE) e il codice. Se l’ente non li dà, segna «Non è arrivata»',
       );
-    // Il messaggio partito con quell'invio, fotografato alla firma (D239): è la richiesta che resta
-    // nel registro degli invii, e le sue righe e il paziente di allora vanno sul promemoria. Per
-    // una ricetta firmata prima della fotografia, come l'aveva firmato chi l'ha mandata.
-    const snapshot = p.sendingSnapshot as SendingSnapshot | null;
-    const message = snapshot?.message ?? (await buildMessage(p, p.signedBy!, studioDate(signedAt)));
     let promemoria: Awaited<ReturnType<typeof buildPromemoriaData>> | null = null;
     // Il promemoria manca solo se i dati non si sono potuti fissare: il codice c'è sempre (D240).
     let notFixed = false;
@@ -1379,6 +1396,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         firmataDa: sql<
           string | null
         >`(select u.display_name from app_user u where u.id = ${prescription.signedBy})`,
+        // Il codice fiscale partito con l'invio (D239): con quello si controlla l'NRBE (D259).
+        codiceFiscaleInviato: sql<
+          string | null
+        >`${prescription.sendingSnapshot}->'message'->>'patientFiscalCode'`,
       })
       .from(prescription)
       .innerJoin(patient, eq(patient.id, prescription.patientId))
@@ -1446,6 +1467,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
                     r.firmataIl.getTime() + INTERRUPTED_SEND_AFTER_MINUTES * 60_000,
                   ).toISOString()
                 : null,
+              ...(statuses.includes('sending')
+                ? { codiceFiscaleInviato: r.codiceFiscaleInviato ?? r.codiceFiscale }
+                : {}),
             }
           : {}),
       });

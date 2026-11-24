@@ -55,7 +55,13 @@ class GatedGateway implements PrescriptionGateway {
 
 interface QueueGroup {
   paziente: { id: string };
-  ricette: { id: string; firmataIl: string; firmataDa: string; esitoDal: string | null }[];
+  ricette: {
+    id: string;
+    firmataIl: string;
+    firmataDa: string;
+    esitoDal: string | null;
+    codiceFiscaleInviato?: string | null;
+  }[];
 }
 
 /**
@@ -271,12 +277,28 @@ describe('ricetta rimasta «in invio» (D233)', () => {
     expect(await available(id)).toMatchObject({ promemoria: true });
   });
 
-  it('un NRE con spazi o segni non entra; una ricetta non «in invio» non ha esito da segnare', async () => {
+  it('un NRE con segni o di forma sbagliata non entra; una ricetta non «in invio» non ha esito da segnare', async () => {
     const id = await stuck();
     s.clock.advance(16 * 60_000);
     const bad = await settle('titolare', id, { esito: 'arrivata', nre: 'MAN 0001-X' });
     expect(bad.statusCode).toBe(400);
-    expect((await row(id)).status).toBe('sending');
+    // La forma dell'NRE secondo le specifiche del Sistema TS (audit D259): 15 caratteri, il sesto
+    // da 0 a 7, gli ultimi 9 cifre. Anche con il codice di autenticazione non entra.
+    for (const [nre, why] of [
+      ['ABC', /L’NRE ha sempre 15 caratteri: qui ce ne sono 3/],
+      ['MAN008000000001', /il sesto carattere è una cifra da 0 a 7/],
+      ['MAN00000000000A', /gli ultimi 9 sono cifre/],
+    ] as const) {
+      const res = await settle('titolare', id, {
+        esito: 'arrivata',
+        nre,
+        codiceAutenticazione: '1',
+      });
+      expect(res.statusCode, nre).toBe(400);
+      expect(res.json().errore, nre).toMatch(why);
+    }
+    expect(await row(id)).toMatchObject({ status: 'sending', nre: null, authCode: null });
+    expect(await manualRows(id)).toEqual([]);
     expect((await settle('titolare', id, { esito: 'non_arrivata' })).statusCode).toBe(200);
     const done = await settle('titolare', id, { esito: 'non_arrivata' });
     expect(done.statusCode).toBe(409);
@@ -301,17 +323,18 @@ describe('ricetta rimasta «in invio» (D233)', () => {
     expect(r.status).toBe(a.statusCode === 200 ? 'sent' : 'error');
   });
 
-  it('«è arrivata» con l’NRE scritto in minuscolo: si registra in maiuscolo e il promemoria si stampa (D239)', async () => {
+  it('«è arrivata» con l’NRE scritto in minuscolo e con gli spazi: si registra in maiuscolo e il promemoria si stampa (D239)', async () => {
     const id = await stuck();
     s.clock.advance(16 * 60_000);
     const res = await settle('titolare', id, {
       esito: 'arrivata',
-      nre: ' man00000000000a ',
+      // Con gli spazi, come l'esempio delle specifiche («123 A0 0 4567890 12»).
+      nre: ' man 00 0 0000000 11 ',
       codiceAutenticazione: 'MANAUT0002',
     });
     expect(res.statusCode, res.body).toBe(200);
-    expect(res.json().nre).toBe('MAN00000000000A');
-    expect((await row(id)).nre).toBe('MAN00000000000A');
+    expect(res.json().nre).toBe('MAN000000000011');
+    expect((await row(id)).nre).toBe('MAN000000000011');
     for (const url of [
       `/api/ricette/${id}/promemoria`,
       `/api/ricette/${id}/promemoria?formato=nre`,
@@ -349,6 +372,9 @@ describe('ricetta rimasta «in invio» (D233)', () => {
       .update(patient)
       .set({ lastName: 'Cognomecambiato', fiscalCode: `CGN${pt!.fiscalCode.slice(3)}` })
       .where(eq(patient.id, s.richPatient));
+    // La coda dà il codice fiscale partito con l'invio: con quello la pagina controlla l'NRBE
+    // (audit D259).
+    expect((await inQueue(id))?.codiceFiscaleInviato).toBe(pt!.fiscalCode);
     s.clock.advance(16 * 60_000);
     const res = await settle('titolare', id, {
       esito: 'arrivata',
@@ -381,12 +407,28 @@ describe('ricetta rimasta «in invio» (D233)', () => {
   it('ricetta bianca: «è arrivata» con NRBE e PIN, senza il promemoria del Sistema TS (D239)', async () => {
     const id = await stuck('white');
     s.clock.advance(16 * 60_000);
-    const missing = await settle('titolare', id, { esito: 'arrivata', nre: 'NRBE00000001' });
+    // L'NRBE del paziente con il codice fiscale comincia con la lettera di controllo del codice
+    // fiscale mandato con la ricetta, poi una cifra e 10 cifre (DM 1/12/2022, audit D259).
+    const [pt] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
+    const letter = pt!.fiscalCode[15]!;
+    const other = letter === 'A' ? 'B' : 'A';
+    const nrbe = `${letter}00000000001`;
+    for (const [nre, why] of [
+      ['NRBE00000001', /il primo carattere è una lettera, il secondo una lettera o una cifra/],
+      ['NRBE0001', /L’NRBE ha sempre 12 caratteri: qui ce ne sono 8/],
+      [`${other}00000000001`, new RegExp(`codice fiscale \\(${letter}\\) seguita da una cifra`)],
+    ] as const) {
+      const res = await settle('titolare', id, { esito: 'arrivata', nre, pin: '1234' });
+      expect(res.statusCode, nre).toBe(400);
+      expect(res.json().errore, nre).toMatch(why);
+    }
+    expect(await manualRows(id)).toEqual([]);
+    const missing = await settle('titolare', id, { esito: 'arrivata', nre: nrbe });
     expect(missing.statusCode).toBe(400);
     expect(missing.json().errore).toMatch(/servono il numero \(NRBE\) e il PIN/);
     const res = await settle('titolare', id, {
       esito: 'arrivata',
-      nre: 'NRBE00000001',
+      nre: nrbe,
       pin: '1234',
     });
     expect(res.statusCode, res.body).toBe(200);

@@ -30,6 +30,8 @@ interface QueueGroup {
     firmataDa?: string | null;
     /** Da quando l'esito si può segnare (D239). */
     esitoDal?: string | null;
+    /** Il codice fiscale mandato con l'invio, per la forma dell'NRBE (D259). */
+    codiceFiscaleInviato?: string | null;
     /** Solo fra le confermate (D254): inviata con l'NRE, o stampata su carta. */
     stato?: string;
     nre?: string | null;
@@ -275,6 +277,7 @@ function InterruptedItem({
           signedAt={r.firmataIl ?? r.preparataIl}
           signedBy={r.firmataDa ?? null}
           settleFrom={r.esitoDal ?? null}
+          fiscalCode={r.codiceFiscaleInviato ?? patient.codiceFiscale}
           onChange={(status) => {
             if (status === 'sent') setArrived(true);
             // «Non è arrivata»: la ricetta passa fra gli invii non riusciti, che si ricaricano.
