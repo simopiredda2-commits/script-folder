@@ -101,6 +101,6 @@ Come funziona:
 - Adattatori veri per SAR e Sistema TS, con l'autenticazione forte (Id-Sessione) del Sistema TS.
 - Casi in cui l'annullamento è ammesso.
 - Modulo di stampa della ricetta rossa.
-- Promemoria (D217): la frase regionale (campo 28) e la frase sui farmaci in DPC come le restituisce il SAC vero; un'eventuale validità minore di 180 giorni comunicata dal Piemonte; i tipi di ricetta diversi da «Assist. SSN»; il codice regionale davanti al nome del medico, da confermare al collaudo. Stampa vera e lettura dei codici in farmacia.
+- Promemoria (D217): la frase regionale (campo 28) e la frase sui farmaci in DPC come le restituisce il SAC vero; la validità della specialistica, che oggi viene dalla regola R1 (60 giorni per il primo accesso, 180 per gli altri, D.D. 710/2026; D260), come la riceve il Sistema TS dal Piemonte; i tipi di ricetta diversi da «Assist. SSN»; il codice regionale davanti al nome del medico, da confermare al collaudo. Stampa vera e lettura dei codici in farmacia.
 - Fornitore vero di email e SMS, con le garanzie sul trattamento dei dati.
 - Se il SAR comunica l'erogazione in farmacia; lo stato «sospesa» (6) delle specifiche del Sistema TS nella tavola degli stati di processo, oggi non tra gli stati del prodotto (D70).

@@ -348,6 +348,29 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     expect(text).toContain('QUESITO DIAGNOSTICO: Quesito di prova');
   });
 
+  it('ricetta specialistica di primo accesso: 60 giorni per prenotare, come la regola R1 (D260)', async () => {
+    const id = await sent({
+      kind: 'specialist_ssn',
+      accessType: 'first',
+      priority: 'B',
+      diagnosticQuestion: 'Quesito di prova',
+      lines: [
+        {
+          serviceCode: '89.7.1',
+          serviceNationalCode: '89.7',
+          serviceDescription: 'Visita di prova',
+          quantity: 1,
+        },
+      ],
+    });
+    const text = norm(
+      await pdfText((await req('GET', `/api/ricette/${id}/promemoria`)).rawPayload),
+    );
+    expect(text).toContain('89.7 (89.7.1) – Visita di prova PRIMO ACCESSO 1 ---');
+    // I giorni della D.D. 710/2026 (punto 4), dalla versione delle regole in vigore alla data.
+    expect(text).toContain('PRESCRIZIONE VALIDA 60 GIORNI AI FINI DELLA PRENOTAZIONE');
+  });
+
   it('farmaco della lista di trasparenza: gruppo di equivalenza, AIC, non sostituibile, DPC', async () => {
     const [dataset] = await t.db
       .insert(referenceDataset)

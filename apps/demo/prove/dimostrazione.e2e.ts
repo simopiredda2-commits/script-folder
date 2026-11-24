@@ -765,10 +765,22 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   });
 
   it('specialistica e seguito: visita dal catalogo inviata, poi l’esecuzione con il referto nel visore', async () => {
+    // Il catalogo regionale vero, D.D. 590/2026 con le modifiche della 710, da controllare (D260).
+    const hint = await fromPanel((panel) =>
+      panel.getByRole('region', { name: 'Specialistica' }).innerText(),
+    );
+    expect(hint).toMatch(/D\.D\. 590\/2026 con le modifiche della D\.D\. 710\/2026/);
+    expect(hint).toMatch(/prima\s+che una persona abbia controllato la trascrizione/);
     const id = (await patients())[1]!.id;
     await go(`/pazienti/${id}/specialistica`);
     const restart = f.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
     if (await restart.count()) await restart.click();
+    await f.getByLabel('Prestazione, branca o codice').fill('cardiologica controllo ecg');
+    await f
+      .locator('.risultato')
+      .filter({ hasText: 'VISITA CARDIOLOGICA DI CONTROLLO CON ECG' })
+      .first()
+      .waitFor();
     await f.getByLabel('Prestazione, branca o codice').fill('visita');
     await f.locator('.risultato').first().getByRole('button', { name: 'Aggiungi' }).click();
     await f.getByLabel('Quesito diagnostico').fill('Quesito dimostrativo');

@@ -110,6 +110,24 @@ export function value(rule: Rule, key: string): number | null {
 }
 
 /**
+ * Giorni di validità della ricetta specialistica secondo R1 alla data, per tipo di accesso
+ * (D.D. 710/2026 della Regione, punto 4; D260): li stampa il promemoria. Null se la versione in
+ * vigore non li ha: allora vale quello che dicono le specifiche di stampa.
+ */
+export function specialistValidityDays(
+  date: string,
+  accessType: 'first' | 'subsequent',
+  rulesets: Ruleset[] = loadRulesets(),
+): number | null {
+  const r1 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R1');
+  if (!r1 || r1.status !== 'active') return null;
+  return value(
+    r1,
+    accessType === 'first' ? 'specialistFirstAccessDays' : 'specialistOtherAccessDays',
+  );
+}
+
+/**
  * Confezioni per ricetta secondo R2 alla data: serve a raggruppare le ripetizioni senza
  * superare il limite. Null se la regola non ha il valore.
  */

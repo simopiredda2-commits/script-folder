@@ -256,8 +256,11 @@ async function reconcile(
 
 /**
  * Stato del paziente secondo la scelta del titolare dell'archivio in AURA (D198). Scelta cessata e
- * nessuna in corso: «revocato», da solo; di nuovo una scelta in corso: «in carico». I pazienti
- * deceduti o temporanei non si toccano, e senza scelte di AURA per il titolare nulla cambia.
+ * nessuna in corso: «revocato», da solo, anche se era temporaneo (D260); di nuovo una scelta in
+ * corso: «in carico», o «temporaneo» se la scelta ha una scadenza, come alla registrazione da AURA
+ * (D199). Una scelta temporanea solo scaduta, non cessata, non cambia lo stato: alla ricetta avvisa
+ * la R20. I deceduti non si toccano: nessuno dei due passaggi vale per loro. Senza scelte di AURA
+ * per il titolare nulla cambia.
  */
 async function alignStatus(
   tx: Tx,
@@ -270,7 +273,7 @@ async function alignStatus(
     .innerJoin(archive, eq(archive.id, patient.archiveId))
     .innerJoin(appUser, eq(appUser.id, archive.ownerUserId))
     .where(eq(patient.id, patientId));
-  if (!row || (row.status !== 'active' && row.status !== 'revoked')) return null;
+  if (!row) return null;
   const choices = await tx
     .select()
     .from(patientChoice)
@@ -288,9 +291,9 @@ async function alignStatus(
   const ended = choices
     .filter((c) => c.endedOn && c.endedOn <= by.today)
     .sort((a, b) => (a.endedOn! < b.endedOn! ? 1 : -1))[0];
-  const set = async (status: 'active' | 'revoked') =>
+  const set = async (status: 'active' | 'revoked' | 'temporary') =>
     tx.update(patient).set({ status, updatedAt: by.at }).where(eq(patient.id, patientId));
-  if (row.status === 'active' && !inForce && ended) {
+  if ((row.status === 'active' || row.status === 'temporary') && !inForce && ended) {
     await set('revoked');
     return {
       kind: 'stato',
@@ -300,12 +303,13 @@ async function alignStatus(
     };
   }
   if (row.status === 'revoked' && inForce) {
-    await set('active');
+    const back = inForce.expiresOn ? 'temporary' : 'active';
+    await set(back);
     return {
       kind: 'stato',
       change: 'cambiata',
       subject: 'Stato del paziente',
-      description: `Paziente di nuovo in carico: ${choiceText(row.ownerName, inForce)}`,
+      description: `${back === 'temporary' ? 'Paziente di nuovo temporaneo' : 'Paziente di nuovo in carico'}: ${choiceText(row.ownerName, inForce)}`,
     };
   }
   return null;
