@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { ErrorMessage, Notice } from '../components/common';
 import { Logo } from '../components/Logo';
+import { QrCode } from '../components/QrCode';
 import { Signature } from '../components/Signature';
 import { api, ApiError } from '../lib/api';
 import { useSession } from '../lib/session';
@@ -140,8 +141,14 @@ export function LoginPage() {
               <Notice kind="info">
                 <p>
                   Primo accesso: attiva il secondo fattore. Nell’app di autenticazione aggiungi un
-                  account con questo codice, poi scrivi qui il codice a 6 cifre che l’app mostra.
+                  account inquadrando il codice QR, o scrivendo il codice qui sotto; poi scrivi qui
+                  il codice a 6 cifre che l’app mostra.
                 </p>
+                {/* Il codice QR, oltre alla chiave da scrivere a mano (suggerimento S2, D259). */}
+                <QrCode
+                  text={step.otpauth}
+                  label="Codice QR da inquadrare con l’app di autenticazione"
+                />
                 <p className="segreto codice" aria-label="Codice da inserire nell'app">
                   {grouped(step.secret)}
                 </p>

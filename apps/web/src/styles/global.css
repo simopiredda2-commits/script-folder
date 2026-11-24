@@ -2820,3 +2820,11 @@ textarea[aria-invalid='true'] {
   align-items: center;
   min-height: var(--size-min-target);
 }
+
+/* Il codice QR del primo accesso: dimensione fissa, il margine bianco è nel disegno (S2, D259). */
+.codice-qr {
+  display: block;
+  width: 200px;
+  height: 200px;
+  margin: 0.5rem 0;
+}

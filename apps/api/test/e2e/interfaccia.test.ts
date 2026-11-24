@@ -780,20 +780,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByText('Banche dati dei farmaci in uso').waitFor();
     await check(page, 'nuova ricetta con risultati', true);
     // Su tablet in verticale la ricerca scorre nel suo riquadro, alto al massimo metà schermo:
-    // «In ricetta» sta nella prima schermata, non dopo tutti i risultati (audit D259).
+    // «In ricetta» viene subito dopo, non dopo tutti i risultati (audit D259).
     await page.setViewportSize({ width: 768, height: 1024 });
     await expect(
       page.evaluate(() => {
-        scrollTo(0, 0);
         const box = document.querySelector('section[aria-labelledby="titolo-cerca"]')!;
         const css = getComputedStyle(box);
+        const heading = document.getElementById('titolo-ricetta')!.getBoundingClientRect();
         return {
           box: [css.maxHeight, css.overflowY],
-          inView:
-            document.getElementById('titolo-ricetta')!.getBoundingClientRect().top < innerHeight,
+          right: heading.top - box.getBoundingClientRect().bottom < 48,
         };
       }),
-    ).resolves.toEqual({ box: ['512px', 'auto'], inView: true });
+    ).resolves.toEqual({ box: ['512px', 'auto'], right: true });
     await page.setViewportSize({ width: 1280, height: 900 });
     await page
       .locator('.risultato')
@@ -1041,42 +1040,53 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await menu.getByRole('link', { name: 'Nuova ricetta', exact: true }).click();
     const prescribedList = page.getByRole('list', { name: 'Farmaci prescritti' });
     await prescribedList.getByRole('listitem').first().waitFor();
-    // La ricetta con AMLODIPINA, senza una terapia in cartella, è stata annullata nella prova della
-    // scheda della terapia: con la sola ricetta annullata il farmaco non è fra i prescritti (audit
-    // D259). Con una ricetta inviata, sì: una del giorno prima, inserita qui.
+    // Un farmaco senza terapia con la sola ricetta annullata non è fra i prescritti (audit D259); con
+    // una ricetta inviata, sì. Le due ricette, del giorno prima, le inserisce la prova.
+    const yesterday = new Date(s.clock.now().getTime() - 86_400_000);
+    const amlodipinePrescription = async (status: 'cancelled' | 'sent', nre: string) =>
+      withActor(t.db, s.users.titolare.id, async (tx) => {
+        const [rx] = await tx
+          .insert(prescription)
+          .values({
+            patientId: s.richPatient,
+            archiveId: s.archives.titolare,
+            kind: 'pharma_ssn',
+            status,
+            nre,
+            preparedBy: s.users.titolare.id,
+            preparedAt: yesterday,
+            signedBy: s.users.titolare.id,
+            signedAt: yesterday,
+            sentAt: yesterday,
+            ...(status === 'cancelled'
+              ? {
+                  cancelledAt: yesterday,
+                  cancelledBy: s.users.titolare.id,
+                  cancelReason: 'Prescritta per errore',
+                }
+              : {}),
+          })
+          .returning({ id: prescription.id });
+        await tx.insert(prescriptionLine).values({
+          prescriptionId: rx!.id,
+          position: 1,
+          drugAic: '038548032',
+          drugName: 'AMLODIPINA TEVA ITALIA 5 MG COMPRESSE',
+          activeIngredient: 'AMLODIPINA BESILATO',
+          quantity: 1,
+          posologyText: '1 compressa al giorno',
+        });
+      });
+    await amlodipinePrescription('cancelled', '123A01900000002');
+    await page.reload();
+    await prescribedList.getByRole('listitem').first().waitFor();
     await expect(
       prescribedList
         .getByRole('listitem')
         .filter({ hasText: /AMLODIPINA/ })
         .count(),
     ).resolves.toBe(0);
-    await withActor(t.db, s.users.titolare.id, async (tx) => {
-      const sentAt = new Date(s.clock.now().getTime() - 86_400_000);
-      const [rx] = await tx
-        .insert(prescription)
-        .values({
-          patientId: s.richPatient,
-          archiveId: s.archives.titolare,
-          kind: 'pharma_ssn',
-          status: 'sent',
-          nre: '123A01900000001',
-          preparedBy: s.users.titolare.id,
-          preparedAt: sentAt,
-          signedBy: s.users.titolare.id,
-          signedAt: sentAt,
-          sentAt,
-        })
-        .returning({ id: prescription.id });
-      await tx.insert(prescriptionLine).values({
-        prescriptionId: rx!.id,
-        position: 1,
-        drugAic: '038548032',
-        drugName: 'AMLODIPINA TEVA ITALIA 5 MG COMPRESSE',
-        activeIngredient: 'AMLODIPINA BESILATO',
-        quantity: 1,
-        posologyText: '1 compressa al giorno',
-      });
-    });
+    await amlodipinePrescription('sent', '123A01900000001');
     await page.reload();
     await prescribedList
       .getByRole('listitem')
