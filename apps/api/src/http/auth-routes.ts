@@ -85,6 +85,17 @@ export function registerAuthRoutes(
     return { stato: 'ok' };
   });
 
+  // Blocco allo scadere dell'inattività nella pagina (audit D259): la sessione si blocca subito,
+  // senza aspettare la richiesta seguente.
+  app.post('/api/sessione/blocca', async (req) => {
+    const minutes = z
+      .object({ minuti: z.number().int().positive().max(1440).nullable() })
+      .strict()
+      .parse(req.body ?? {}).minuti;
+    await auth.lockNow(req.actor!, minutes);
+    return { stato: 'bloccata' };
+  });
+
   app.post('/api/uscita', { config: { public: true } }, async (req, reply) => {
     const token = req.cookies[SESSION_COOKIE];
     if (token) await auth.logout(token);

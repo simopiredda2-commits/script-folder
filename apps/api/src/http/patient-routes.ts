@@ -17,6 +17,7 @@ import {
   exemption,
   patient,
   problemDetail,
+  studio,
   therapeuticPlan,
   therapy,
 } from '../db/schema';
@@ -114,6 +115,14 @@ export function registerPatientRoutes(
       codiceFiscaleDaConfermare: !!me?.pending,
       // Blocchi del conto ancora da vedere: i propri e, per un titolare, dello studio (D188).
       blocchiDaVedere: await unseenLockCount(db, actor),
+      // I minuti di inattività dello studio: allo scadere la pagina si copre da sola (D259).
+      minutiInattivita:
+        (
+          await db
+            .select({ minutes: studio.idleLockMinutes })
+            .from(studio)
+            .where(eq(studio.id, actor.studioId))
+        )[0]?.minutes ?? null,
     };
   });
 
