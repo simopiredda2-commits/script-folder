@@ -141,3 +141,12 @@ export const REMINDER_CHANNEL: Record<string, string> = {
 export function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`;
 }
+
+/**
+ * Una frase chiusa dal punto, se non ha già un segno finale: per i messaggi del servizio seguiti da
+ * altro testo o da un collegamento (audit D259). Il punto va dopo le virgolette di chiusura.
+ */
+export function sentence(text: string): string {
+  const t = text.trimEnd();
+  return /[.!?…]$/.test(t) ? t : `${t}.`;
+}

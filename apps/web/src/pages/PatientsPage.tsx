@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
+import { PATIENT_STATUS } from '../components/PatientFacts';
 import { query } from '../lib/api';
 import { age, date, maskedFiscalCode } from '../lib/format';
 import { useApi } from '../lib/useApi';
@@ -74,7 +75,9 @@ export function PatientsPage() {
           <p role="status" className="tenue">
             {data.pazienti.length === 0
               ? 'Nessun paziente trovato.'
-              : `${data.pazienti.length} pazienti${data.pazienti.length === 100 ? ' (i primi 100: affina la ricerca)' : ''}`}
+              : data.pazienti.length === 1
+                ? '1 paziente'
+                : `${data.pazienti.length} pazienti${data.pazienti.length === 100 ? ' (i primi 100: affina la ricerca)' : ''}`}
           </p>
           <ul className="elenco-pazienti">
             {data.pazienti.map((p) => (
@@ -87,7 +90,10 @@ export function PatientsPage() {
                     {date(p.dataNascita)} · {age(p.dataNascita)} anni
                   </span>
                   <span className="codice">{maskedFiscalCode(p.codiceFiscale)}</span>
-                  {p.stato !== 'active' && <span className="etichetta">{p.stato}</span>}
+                  {/* Lo stato in parole, come nella fascia della cartella (audit D259). */}
+                  {p.stato !== 'active' && (
+                    <span className="etichetta">{PATIENT_STATUS[p.stato] ?? p.stato}</span>
+                  )}
                   <Icon name="apri" />
                 </Link>
               </li>

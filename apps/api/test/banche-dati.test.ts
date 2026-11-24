@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   exemption,
   REFERENCE_TABLES,
+  refDrug,
   refDrugShortage,
   refDrugTransparency,
   referenceDataset,
@@ -22,6 +23,7 @@ import {
 import { importReferenceData, type ImportLine } from '../src/reference/importer';
 import {
   compareEquivalents,
+  drugRank,
   ReferenceData,
   safeAifaUrl,
   shortageAt,
@@ -382,6 +384,29 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
     ]);
   });
 
+  it('ordine della ricerca (audit, D259): il solo principio attivo prima delle associazioni', () => {
+    const rows = [
+      { aic: '1', name: 'ASSOCIAZIONE A', activeIngredient: 'SITAGLIPTIN/METFORMINA' },
+      { aic: '2', name: 'MARCHIO B', activeIngredient: 'METFORMINA CLORIDRATO' },
+      { aic: '3', name: 'METFORMINA GENERICO', activeIngredient: 'METFORMINA CLORIDRATO' },
+      { aic: '4', name: 'METFORMINA E ALTRO', activeIngredient: 'METFORMINA, ALTRO' },
+      { aic: '5', name: 'CON METFORMINA', activeIngredient: 'PRINCIPIO DIVERSO' },
+    ];
+    const order = [...rows]
+      .sort(
+        (a, b) =>
+          drugRank(a, 'metformina') - drugRank(b, 'metformina') || a.aic.localeCompare(b.aic),
+      )
+      .map((r) => r.aic);
+    // Prima il solo principio attivo (generico e marchio), poi i nomi che cominciano così, poi il
+    // resto: l'associazione più lontana di tutte.
+    expect(order).toEqual(['2', '3', '4', '5', '1']);
+    expect(drugRank({ aic: '038038016', name: 'X', activeIngredient: null }, '0380')).toBe(0);
+    expect(drugRank({ aic: '1', atc: 'C10AA05', name: 'X', activeIngredient: null }, 'c10')).toBe(
+      0,
+    );
+  });
+
   it('equivalenti: prima il prezzo, poi il nome, poi l’AIC, qualunque sia l’ordine di partenza', () => {
     const list = [
       { aic: '000000003', name: 'B', price: '3.74' },
@@ -694,6 +719,28 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       '099999991',
     ]);
   });
+
+  // Dopo la D202: aggiunge anch'essa righe a una versione importata.
+  it('oltre il limite i primi sono i più pertinenti, non i primi dell’alfabeto (audit 5, D259)', async () => {
+    const [d] = await t.db
+      .select({ id: referenceDataset.id })
+      .from(referenceDataset)
+      .where(eq(referenceDataset.kind, 'farmaci'));
+    // 31 associazioni che vengono prima nell'alfabeto, e un generico con il solo principio attivo.
+    await t.db.insert(refDrug).values([
+      ...Array.from({ length: 31 }, (_, i) => ({
+        datasetId: d!.id,
+        aic: `0988${String(i).padStart(5, '0')}`,
+        name: `AAA ASSOCIAZIONE ${String(i).padStart(2, '0')}`,
+        activeIngredient: 'ALTROLINA/RICERCALINA',
+      })),
+      { datasetId: d!.id, aic: '098899999', name: 'ZZZ GENERICO', activeIngredient: 'RICERCALINA' },
+    ]);
+    const ref = new ReferenceData(t.db, repo);
+    const found = (await ref.searchDrugs('ricercalina', today)).map((x) => x.aic);
+    expect(found).toHaveLength(30);
+    expect(found[0]).toBe('098899999');
+  });
 });
 
 describe('banche dati via HTTP e nelle regole', () => {
@@ -736,6 +783,8 @@ describe('banche dati via HTTP e nelle regole', () => {
     const res = await get('/api/farmaci?q=amlodipina');
     expect(res.statusCode, res.body).toBe(200);
     expect(res.json().farmaci).toHaveLength(4);
+    // Meno di 30: nessun «altri risultati» da dire (audit, D259).
+    expect(res.json().altri).toBe(false);
     // Tutte le banche dati che i dati del farmaco usano, anche le liste di trasparenza e dei carenti.
     expect(
       res

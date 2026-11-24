@@ -168,12 +168,10 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
     ]) {
       expect(text, expected).toContain(expected);
     }
-    // La stampa è una consegna: registrata, e nel registro degli accessi.
-    const [d] = await t.db
-      .select()
-      .from(reminderDelivery)
-      .where(eq(reminderDelivery.prescriptionId, id));
-    expect(d).toMatchObject({ channel: 'stampa_promemoria', outcome: 'stampato' });
+    // Aprire il PDF non è una consegna (audit D259): resta nel registro degli accessi.
+    const delivered = () =>
+      t.db.select().from(reminderDelivery).where(eq(reminderDelivery.prescriptionId, id));
+    expect(await delivered()).toEqual([]);
     const logged = await t.db
       .select()
       .from(accessLog)
@@ -181,6 +179,56 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
         and(eq(accessLog.patientId, s.richPatient), eq(accessLog.action, 'stampa_promemoria')),
       );
     expect(logged.length).toBeGreaterThan(0);
+    // La consegna su carta la segna chi ha dato il foglio, anche la segreteria.
+    const paper = await req('POST', `/api/ricette/${id}/promemoria/consegna-carta`, 'segreteria', {
+      formato: 'nre',
+    });
+    expect(paper.statusCode, paper.body).toBe(200);
+    expect(await delivered()).toEqual([
+      expect.objectContaining({
+        channel: 'stampa_nre',
+        outcome: 'consegnato',
+        userId: s.users.segreteria.id,
+      }),
+    ]);
+    const rows = (await req('GET', `/api/ricette/${id}/promemoria/consegne`)).json().consegne;
+    expect(rows).toEqual([expect.objectContaining({ canale: 'stampa_nre', esito: 'consegnato' })]);
+    for (const bad of [{}, { formato: 'tutto' }, { formato: 'nre', altro: 1 }])
+      expect(
+        (await req('POST', `/api/ricette/${id}/promemoria/consegna-carta`, 'titolare', bad))
+          .statusCode,
+        JSON.stringify(bad),
+      ).toBe(400);
+  });
+
+  it('consegna su carta solo di ciò che per la ricetta si può dare (audit D259)', async () => {
+    // Non inviata: niente da consegnare.
+    const draftId = await draft(pharma());
+    const early = await req(
+      'POST',
+      `/api/ricette/${draftId}/promemoria/consegna-carta`,
+      'titolare',
+      {
+        formato: 'completo',
+      },
+    );
+    expect(early.statusCode).toBe(409);
+    // Ricetta bianca inviata senza il promemoria del SAC (come dopo un esito segnato a mano): il
+    // foglio con l'NRE non c'è mai, e senza il PDF del SAC nemmeno il promemoria.
+    const white = await draft({ ...pharma(), kind: 'white' });
+    await t.db
+      .update(prescription)
+      .set({ status: 'sent', nre: 'X01234567890', pinNrbe: '1234', sentAt: new Date() })
+      .where(eq(prescription.id, white));
+    for (const formato of ['nre', 'completo'] as const) {
+      const res = await req('POST', `/api/ricette/${white}/promemoria/consegna-carta`, 'titolare', {
+        formato,
+      });
+      expect(res.statusCode, formato).toBe(409);
+    }
+    expect(
+      await t.db.select().from(reminderDelivery).where(eq(reminderDelivery.prescriptionId, white)),
+    ).toEqual([]);
   });
 
   it('solo NRE: numero, codice fiscale e codice di autenticazione, senza i farmaci', async () => {

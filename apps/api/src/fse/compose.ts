@@ -105,8 +105,11 @@ export interface PssContent {
   /** Per difetto «nessuna informazione»: «nessuna nota» lo decide il medico. */
   assenze: PssAbsences;
   esclusi: { oscurate: number; riservate: number };
-  /** Voci che non possono entrare così come sono, con il motivo. */
-  nonInseribili: { etichetta: string; motivo: string }[];
+  /**
+   * Voci che non possono entrare così come sono, con il motivo e la sezione in cui andrebbero
+   * (la sezione dalle bozze dell'audit D259 in poi).
+   */
+  nonInseribili: { etichetta: string; motivo: string; sezione?: PssSectionKey }[];
 }
 
 export const DEFAULT_ABSENCES: PssAbsences = {
@@ -115,6 +118,55 @@ export const DEFAULT_ABSENCES: PssAbsences = {
   problemi: 'no-problem-info',
   anamnesiFamiliare: 'no-problem-info',
 };
+
+/** «Nessuna … nota» per ogni sezione obbligatoria, con le parole della pagina. */
+const KNOWN_ABSENCE = {
+  allergie: {
+    value: 'no-known-allergies',
+    title: 'Allergie e intolleranze',
+    label: 'Nessuna allergia nota',
+  },
+  terapie: {
+    value: 'no-known-medications',
+    title: 'Terapie farmacologiche',
+    label: 'Nessuna terapia nota',
+  },
+  problemi: {
+    value: 'no-known-problems',
+    title: 'Patologie croniche',
+    label: 'Nessun problema noto',
+  },
+  anamnesiFamiliare: {
+    value: 'no-known-problems',
+    title: 'Anamnesi familiare',
+    label: 'Nessuna patologia nota in famiglia',
+  },
+} as const satisfies Record<keyof PssAbsences, { value: string; title: string; label: string }>;
+
+/** Voci della cartella per una sezione: quelle proposte e quelle che non possono entrare. */
+export function recordedIn(c: PssContent, key: keyof PssAbsences): number {
+  return (
+    (c.sezioni[key] as PssItem<unknown>[]).length +
+    c.nonInseribili.filter((n) => n.sezione === key).length
+  );
+}
+
+/**
+ * «Nessuna … nota» dice che in cartella non c'è niente (audit D259): con voci in cartella,
+ * anche se nessuna entra, il Profilo direbbe il falso. Si scrive «Nessuna informazione», oppure si
+ * includono le voci. Che cosa non va, una riga per sezione; vuoto se le assenze sono vere.
+ */
+export function absenceProblems(c: PssContent): string[] {
+  return (Object.keys(KNOWN_ABSENCE) as (keyof PssAbsences)[]).flatMap((key) => {
+    const known = KNOWN_ABSENCE[key];
+    const included = (c.sezioni[key] as PssItem<unknown>[]).some((i) => i.incluso);
+    return c.assenze[key] === known.value && !included && recordedIn(c, key) > 0
+      ? [
+          `${known.title}: in cartella ci sono voci, quindi «${known.label}» non si può scrivere. Includi le voci che possono entrare, o scegli «Nessuna informazione»`,
+        ]
+      : [];
+  });
+}
 
 const CRITICALITY_FROM_DB = Object.fromEntries(
   Object.entries(ALLERGY_CRITICALITY_DB).map(([k, v]) => [
@@ -247,6 +299,7 @@ export async function composePss(
       notInsertable.push({
         etichetta: `Anamnesi familiare: ${d.text.slice(0, 80)}`,
         motivo: 'Indica il parente e il codice ICD-9-CM della patologia',
+        sezione: 'anamnesiFamiliare',
       });
       continue;
     }
@@ -297,6 +350,7 @@ export async function composePss(
       notInsertable.push({
         etichetta: `${d.factor}: ${d.value}`,
         motivo: 'Il Profilo ha i codici solo per fumo, alcol e attività fisica',
+        sezione: 'stiliDiVita',
       });
       continue;
     }
@@ -405,5 +459,9 @@ export function keepChoices(fresh: PssContent, previous: PssContent | null): Pss
     }
   }
   out.assenze = { ...previous.assenze };
+  // Una «nessuna … nota» scelta prima non vale più se ora in cartella ci sono voci (audit D259).
+  for (const key of Object.keys(KNOWN_ABSENCE) as (keyof PssAbsences)[])
+    if (out.assenze[key] === KNOWN_ABSENCE[key].value && recordedIn(out, key) > 0)
+      out.assenze = { ...out.assenze, [key]: DEFAULT_ABSENCES[key] };
   return out;
 }

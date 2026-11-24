@@ -248,7 +248,11 @@ export async function prescribedDrugs(
     const [key, g] = drugGroup(l);
     if (!groups.has(key)) groups.set(key, g);
   };
-  for (const { line } of rows) if (!assigned.has(line.id)) addGroup(line);
+  // Un farmaco senza terapia entra quando è stato prescritto davvero, qui o con un altro programma:
+  // una bozza mai partita, o annullata, non è una prescrizione (audit, D259). Con la terapia la voce
+  // c'è sempre, ed è la terapia.
+  for (const { line, p } of rows)
+    if (!assigned.has(line.id) && PRESCRIBED.has(p.status)) addGroup(line);
   for (const h of past) if (!assignedPast.has(h.id)) addGroup(historicalLine(h));
   const occasional = [...groups].map(([key, g]) => {
     const mine = rows.filter(({ line }) => matchesTarget(g.target, line));

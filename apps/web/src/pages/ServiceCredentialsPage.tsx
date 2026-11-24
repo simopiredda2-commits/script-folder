@@ -259,7 +259,7 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
           <legend>Accesso regionale con SPID o CIE</legend>
           <p>
             {regionalActive
-              ? `Attivo fino a ${dateTime(s.sessione.scadeIl)}.`
+              ? `Attivo fino al ${dateTime(s.sessione.scadeIl)}.`
               : 'Non attivo: per le ricette SSN si entra con SPID o CIE sulla pagina della Regione.'}
           </p>
           <p className="aiuto">
@@ -291,7 +291,7 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
           </legend>
           <p>
             {emailActive
-              ? `Attivo fino a ${dateTime(s.sessione.scadeIl)}.`
+              ? `Attivo fino al ${dateTime(s.sessione.scadeIl)}.`
               : s.accessoRegionale
                 ? 'Non attivo. Serve con le credenziali RUPAR, al posto dell’accesso con SPID o CIE.'
                 : 'Non attivo: serve per mandare le ricette.'}

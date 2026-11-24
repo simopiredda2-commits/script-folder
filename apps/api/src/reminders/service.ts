@@ -128,22 +128,48 @@ export function createReminderService(deps: ReminderDeps) {
     return { bytes, name: `${format === 'nre' ? 'nre' : 'promemoria'}-${p.nre}.pdf` };
   }
 
-  /** Stampa: il PDF, e la consegna registrata. */
+  /**
+   * Stampa: il PDF. Aprirlo non è una consegna (audit D259): il programma non sa se il foglio è
+   * stato stampato e dato al paziente. L'apertura resta nel registro degli accessi; la consegna
+   * su carta la segna chi la fa (`paperDelivered`).
+   */
   async function print(actor: Actor, id: string, query: unknown) {
     const { p } = await guarded(actor, id, 'stampa_promemoria');
     const { formato } = z
       .object({ formato: z.enum(['completo', 'nre']).default('completo') })
       .parse(query);
     requireSent(p);
-    const pdf = await pdfFor(actor, p, formato);
+    return pdfFor(actor, p, formato);
+  }
+
+  /**
+   * Consegna su carta segnata da chi ha stampato il foglio e l'ha dato al paziente o al delegato
+   * (audit D259): promemoria completo o solo NRE, quello che per questa ricetta si può dare.
+   */
+  async function paperDelivered(actor: Actor, id: string, body: unknown) {
+    const { p } = await guarded(actor, id, 'consegna_promemoria_carta');
+    const { formato } = z
+      .object({ formato: z.enum(['completo', 'nre']) })
+      .strict()
+      .parse(body ?? {});
+    requireSent(p);
+    const can = await availableFor(p);
+    if (!(formato === 'nre' ? can.soloNre : can.promemoria))
+      throw new HttpError(
+        409,
+        can.motivo ??
+          (formato === 'nre'
+            ? 'Per questa ricetta il foglio con il solo NRE non si dà'
+            : 'Per questa ricetta il promemoria su carta non si dà'),
+      );
     await db.insert(reminderDelivery).values({
       prescriptionId: p.id,
       userId: actor.userId,
       at: now(),
       channel: formato === 'nre' ? 'stampa_nre' : 'stampa_promemoria',
-      outcome: 'stampato',
+      outcome: 'consegnato',
     });
-    return pdf;
+    return { consegnato: true };
   }
 
   /**
@@ -395,5 +421,5 @@ export function createReminderService(deps: ReminderDeps) {
     };
   }
 
-  return { print, preview, send, deliveries, contacts };
+  return { print, paperDelivered, preview, send, deliveries, contacts };
 }

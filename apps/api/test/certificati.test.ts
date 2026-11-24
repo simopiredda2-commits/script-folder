@@ -294,12 +294,29 @@ describe('certificati di malattia INPS (tappa 8)', () => {
       'Agevolazioni',
     ])
       expect(text, absent).not.toContain(absent);
-    // Le stampe restano registrate.
-    const rows = await t.db
-      .select()
-      .from(certificateDelivery)
-      .where(eq(certificateDelivery.certificateId, cert.id));
-    expect(rows.map((r) => r.channel)).toEqual(['stampa_attestato']);
+    // Aprire il PDF non è una consegna (audit D259): la consegna su carta la segna chi la fa.
+    const rows = () =>
+      t.db.select().from(certificateDelivery).where(eq(certificateDelivery.certificateId, cert.id));
+    expect(await rows()).toEqual([]);
+    const paper = await req('POST', `/api/certificati/${cert.id}/consegna-carta`, 'titolare', {
+      documento: 'attestato',
+    });
+    expect(paper.statusCode, paper.body).toBe(200);
+    expect((await rows()).map((r) => [r.channel, r.outcome])).toEqual([
+      ['stampa_attestato', 'consegnato'],
+    ]);
+    for (const bad of [{}, { documento: 'ricetta' }])
+      expect(
+        (await req('POST', `/api/certificati/${cert.id}/consegna-carta`, 'titolare', bad))
+          .statusCode,
+        JSON.stringify(bad),
+      ).toBe(400);
+    // Una bozza non si consegna.
+    const draft = await create(good());
+    const early = await req('POST', `/api/certificati/${draft.id}/consegna-carta`, 'titolare', {
+      documento: 'copia',
+    });
+    expect(early.statusCode).toBe(409);
   });
 
   it('la copia resta quella dell’invio anche se poi cambia l’anagrafica', async () => {

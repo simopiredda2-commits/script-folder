@@ -99,6 +99,11 @@ export function registerPrescriptionRoutes(
     pazienti: await service.toSignQueue(req.actor!),
   }));
 
+  // Le bozze di chi guarda, non ancora mandate (audit, D259).
+  app.get('/api/ricette/in-bozza', async (req) => ({
+    pazienti: await service.draftQueue(req.actor!),
+  }));
+
   app.get('/api/ricette/non-inviate', async (req) => ({
     pazienti: await service.failedQueue(req.actor!),
   }));

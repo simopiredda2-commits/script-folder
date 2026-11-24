@@ -146,3 +146,58 @@ describe('certificato rimasto «in invio» (D233)', () => {
     );
   });
 });
+
+describe('copia e attestato: consegna su carta (audit D259)', () => {
+  it('aprire il PDF non registra niente: «Consegnato su carta» lo segna chi ha dato il foglio', async () => {
+    const posts: { path: string; body: unknown }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        const path = url.split('?')[0]!;
+        if (init?.method === 'POST') {
+          posts.push({ path, body: JSON.parse(init.body as string) as unknown });
+          return Promise.resolve(json(200, { consegnato: true }));
+        }
+        if (path === '/api/io') return Promise.resolve(json(200, me));
+        // I suggerimenti di stampa del certificato inviato leggono le preferenze (tappa 14).
+        if (path === '/api/stampa/preferenze')
+          return Promise.resolve(json(200, { postazione: null, preferenze: [] }));
+        if (path === '/api/pazienti/p1')
+          return Promise.resolve(
+            json(200, { paziente: { firstName: 'Paola', lastName: 'Inventata' } }),
+          );
+        if (path === '/api/pazienti/p1/certificati')
+          return Promise.resolve(
+            json(200, {
+              certificati: [
+                {
+                  ...certificate(false),
+                  stato: 'sent',
+                  etichettaStato: 'Inviato',
+                  protocollo: 'SIM000000001',
+                  ricevutoIl: '2026-11-20T09:05:00Z',
+                },
+              ],
+              residenza: null,
+              recapiti: { email: false, telefono: false, emailDatore: false },
+            }),
+          );
+        return Promise.resolve(json(200, {}));
+      }),
+    );
+    page();
+    const copy = await screen.findByRole('link', { name: /Copia per il lavoratore \(PDF\)/ });
+    expect(screen.queryByRole('button', { name: 'Consegnato su carta' })).toBeNull();
+    // In jsdom il collegamento non apre niente: conta il clic, come nel browser.
+    copy.addEventListener('click', (e) => e.preventDefault());
+    await userEvent.click(copy);
+    const group = within(await screen.findByRole('group', { name: 'Consegna su carta' }));
+    expect(group.getByText(/Aprire il PDF non è una consegna/)).toBeTruthy();
+    expect(posts).toEqual([]);
+    await userEvent.click(group.getByRole('button', { name: 'Consegnato su carta' }));
+    await screen.findByText('Consegna della copia su carta registrata.');
+    expect(posts).toEqual([
+      { path: '/api/certificati/c1/consegna-carta', body: { documento: 'copia' } },
+    ]);
+  });
+});

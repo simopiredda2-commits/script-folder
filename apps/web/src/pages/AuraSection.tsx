@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { ErrorMessage, Loading, Notice } from '../components/common';
+import { ConfirmQuestion, ErrorMessage, Loading, Notice, ResultNotice } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, type ApiError } from '../lib/api';
 import { date, dateTime, maskedFiscalCode, plural } from '../lib/format';
@@ -104,6 +104,8 @@ export function AuraSection({
     text: string;
     kind: 'fatto' | 'avviso' | 'errore' | 'info';
   } | null>(null);
+  // Il decesso, confermato o no, non si cambia dopo: prima la domanda (audit D259).
+  const [pendingDeath, setPendingDeath] = useState<{ d: Difference; usa: boolean } | null>(null);
 
   async function update() {
     setBusy(true);
@@ -262,7 +264,11 @@ export function AuraSection({
                                     ? undefined
                                     : `Usa il dato di AURA: ${d.etichetta}`
                                 }
-                                onClick={() => void choose(d, true)}
+                                onClick={() =>
+                                  d.campo === 'decesso'
+                                    ? setPendingDeath({ d, usa: true })
+                                    : void choose(d, true)
+                                }
                               >
                                 <Icon name="fatto" />{' '}
                                 <span>
@@ -280,7 +286,11 @@ export function AuraSection({
                                     ? undefined
                                     : `Tieni il dato della cartella: ${d.etichetta}`
                                 }
-                                onClick={() => void choose(d, false)}
+                                onClick={() =>
+                                  d.campo === 'decesso'
+                                    ? setPendingDeath({ d, usa: false })
+                                    : void choose(d, false)
+                                }
                               >
                                 <Icon name="annulla" />{' '}
                                 <span>
@@ -299,7 +309,38 @@ export function AuraSection({
               </div>
             </>
           )}
-          {done && <Notice kind={done.kind}>{done.text}</Notice>}
+          {pendingDeath && (
+            <ConfirmQuestion
+              label="Conferma della scelta sul decesso"
+              yes={pendingDeath.usa ? 'Sì, conferma il decesso' : 'Sì, non confermare'}
+              busy={busy}
+              onBack={() => setPendingDeath(null)}
+              onYes={() => {
+                const { d, usa } = pendingDeath;
+                setPendingDeath(null);
+                void choose(d, usa);
+              }}
+            >
+              {pendingDeath.usa ? (
+                <>
+                  Confermi il decesso del paziente
+                  {pendingDeath.d.inAura ? (
+                    <>
+                      {' '}
+                      il <strong>{date(pendingDeath.d.inAura)}</strong>
+                    </>
+                  ) : null}
+                  , come dice AURA? Le ricette per lui si bloccano, e la scelta non si cambia dopo.
+                </>
+              ) : (
+                <>
+                  Confermi di non registrare il decesso che dice AURA? Non si ripropone finché AURA
+                  non manda un’altra data.
+                </>
+              )}
+            </ConfirmQuestion>
+          )}
+          {done && <ResultNotice kind={done.kind}>{done.text}</ResultNotice>}
           <ErrorMessage error={error} />
           <h3 id="titolo-variazioni-aura">Ultime variazioni da AURA</h3>
           {s.variazioni.length === 0 ? (
@@ -350,6 +391,15 @@ interface StudioChanges {
 const toPanel = (p: Who) => `/pazienti/${p.id}/amministrazione#aura`;
 
 /**
+ * «nuova» o «cambiata» per esenzione, scelta e anagrafica, che aprono la descrizione; la voce tolta
+ * lo dice già («non c'è più in AURA»), e stato e archivio sono frasi intere.
+ */
+const changeWord = (v: AuraChange) =>
+  ['esenzione', 'scelta', 'anagrafica'].includes(v.tipo) && v.variazione !== 'tolta'
+    ? CHANGE_LABEL[v.variazione].toLowerCase()
+    : null;
+
+/**
  * Pagina Oggi: le anagrafiche di AURA da confermare (il decesso in evidenza) e le variazioni
  * arrivate negli ultimi giorni, dei pazienti che l'utente vede. Senza nulla da mostrare non c'è.
  */
@@ -361,6 +411,14 @@ export function AuraChangesToday() {
   if (list.length === 0 && pending.length === 0) return null;
   const deaths = pending.filter((p) => p.decesso);
   const registry = pending.filter((p) => p.campi.length > 0);
+  // Un cambio di medico, una riga (audit D259): la proposta di spostamento dice già la scelta nuova;
+  // le righe della scelta dello stesso aggiornamento restano nel pannello del paziente.
+  const moves = new Set(
+    list.filter((v) => v.tipo === 'archivio').map((v) => `${v.paziente.id}|${v.quando}`),
+  );
+  const shown = list.filter(
+    (v) => !(v.tipo === 'scelta' && moves.has(`${v.paziente.id}|${v.quando}`)),
+  );
   return (
     <section aria-labelledby="titolo-aura-oggi" className="riquadro">
       <h2 id="titolo-aura-oggi">
@@ -402,13 +460,18 @@ export function AuraChangesToday() {
             {plural(r.data?.giorni ?? 7, 'giorno', 'giorni')}.
           </p>
           <ul className="elenco-semplice">
-            {list.map((v) => (
+            {shown.map((v) => (
               <li key={`${v.quando}-${v.paziente.id}-${v.descrizione}`}>
                 <Link to={toPanel(v.paziente)}>
                   {v.paziente.nome} {v.paziente.cognome}
-                </Link>
-                : {CHANGE_LABEL[v.variazione].toLowerCase()} – {v.descrizione}
-                <span className="tenue"> ({dateTime(v.quando)})</span>
+                </Link>{' '}
+                – {v.descrizione}
+                {/* «nuova» o «cambiata» accanto a ciò che è cambiato, non al nome (audit D259). */}
+                <span className="tenue">
+                  {' '}
+                  ({changeWord(v) ? `${changeWord(v)}, ` : ''}
+                  {dateTime(v.quando)})
+                </span>
               </li>
             ))}
           </ul>
@@ -538,7 +601,8 @@ export function AuraNewPatientsToday() {
         </div>
       )}
       {done && (
-        <Notice kind="fatto">
+        // «Registra» sparisce con la riga: il fuoco va all'esito (audit D259, WCAG 2.4.3).
+        <ResultNotice>
           <p>
             {done.text}
             {done.patientId && (
@@ -548,11 +612,11 @@ export function AuraNewPatientsToday() {
               </>
             )}
           </p>
-        </Notice>
+        </ResultNotice>
       )}
       <ErrorMessage error={error} />
       {existing && (
-        <p>
+        <p className="collegamento-solo">
           <Link to={`/pazienti/${existing.id}`}>Apri la cartella del paziente già registrato</Link>
         </p>
       )}
@@ -590,6 +654,8 @@ export function AuraDoctorChangesToday() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
+  // «Sposta» e «Non spostare» non si annullano: prima la domanda (audit D259, WCAG 3.3.4).
+  const [pending, setPending] = useState<{ c: DoctorChange; move: boolean } | null>(null);
   // Una risposta inattesa non deve far cadere la pagina Oggi.
   const toDecide = Array.isArray(r.data?.daDecidere) ? r.data.daDecidere : [];
   const incoming = Array.isArray(r.data?.inArrivo) ? r.data.inArrivo : [];
@@ -659,7 +725,7 @@ export function AuraDoctorChangesToday() {
                             disabled={busy}
                             // Il nome comincia con il testo visibile, e dice chi e dove.
                             aria-label={`Sposta ${name} nell’archivio di ${c.medico}`}
-                            onClick={() => void act(c, true)}
+                            onClick={() => setPending({ c, move: true })}
                           >
                             <Icon name="archivio" /> <span>Sposta</span>
                           </button>
@@ -668,7 +734,7 @@ export function AuraDoctorChangesToday() {
                             className="pulsante pulsante-piatto"
                             disabled={busy}
                             aria-label={`Non spostare ${name}`}
-                            onClick={() => void act(c, false)}
+                            onClick={() => setPending({ c, move: false })}
                           >
                             <Icon name="annulla" /> <span>Non spostare</span>
                           </button>
@@ -695,7 +761,39 @@ export function AuraDoctorChangesToday() {
           </ul>
         </>
       )}
-      {done && <Notice kind="fatto">{done}</Notice>}
+      {pending && (
+        <ConfirmQuestion
+          label="Conferma dello spostamento"
+          yes={pending.move ? 'Sì, sposta' : 'Sì, non spostare'}
+          busy={busy}
+          onBack={() => setPending(null)}
+          onYes={() => {
+            const { c, move } = pending;
+            setPending(null);
+            void act(c, move);
+          }}
+        >
+          {pending.move ? (
+            <>
+              Confermi lo spostamento di{' '}
+              <strong>
+                {pending.c.paziente.nome} {pending.c.paziente.cognome}
+              </strong>{' '}
+              nell’archivio di {pending.c.medico}? La cartella passa intera, con lo storico, e non
+              torna indietro da qui.
+            </>
+          ) : (
+            <>
+              Confermi che{' '}
+              <strong>
+                {pending.c.paziente.nome} {pending.c.paziente.cognome}
+              </strong>{' '}
+              resta nel tuo archivio? Non si ripropone finché AURA non manda una scelta nuova.
+            </>
+          )}
+        </ConfirmQuestion>
+      )}
+      {done && <ResultNotice>{done}</ResultNotice>}
       <ErrorMessage error={error} />
     </section>
   );

@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { allergyDetail, clinicalEntry } from '../src/db/schema';
+import { eq } from 'drizzle-orm';
+import { accessLog, allergyDetail, appUser, clinicalEntry } from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -146,5 +147,59 @@ describe('ruoli e permessi attraverso il servizio', () => {
     for (const who of ['segreteria', 'sostituto', 'collega', 'amministratore']) {
       expect((await get(who, `/api/pazienti/${s.richPatient}/registro`)).statusCode, who).toBe(403);
     }
+  });
+
+  it('il registro dice chi, che cosa, con quale esito e perché; anche gli accessi negati (audit D259)', async () => {
+    // Un accesso negato della segreteria alla cartella: resta nel registro, con il motivo.
+    expect((await get('segreteria', `/api/pazienti/${s.richPatient}/registro`)).statusCode).toBe(
+      403,
+    );
+    const res = await get('titolare', `/api/pazienti/${s.richPatient}/registro`);
+    const body = res.json<{
+      registro: { nome: string | null; azione: string; esito: string; motivo: string | null }[];
+      altri: boolean;
+    }>();
+    expect(body.altri).toBe(false);
+    const name = async (id: string) =>
+      (await t.db.select().from(appUser).where(eq(appUser.id, id)))[0]!.displayName;
+    const denied = body.registro.find(
+      (r) => r.esito === 'negato' && r.azione === 'lettura_registro',
+    );
+    expect(denied).toMatchObject({ nome: await name(s.users.segreteria.id) });
+    expect(denied!.motivo).toBeTruthy();
+    expect(body.registro[0]).toMatchObject({
+      nome: await name(s.users.titolare.id),
+      azione: 'lettura_registro',
+      esito: 'consentito',
+    });
+  });
+
+  it('il registro dell’archivio: lo legge il titolare, con i pazienti; la lettura resta registrata (audit D259)', async () => {
+    const url = `/api/archivi/${s.archives.titolare}/registro`;
+    const res = await get('titolare', url);
+    expect(res.statusCode, res.body).toBe(200);
+    const rows = res.json<{ registro: { pazienteId: string; paziente: string }[] }>().registro;
+    expect(rows.length).toBeGreaterThan(0);
+    // Solo pazienti dell'archivio del titolare.
+    expect(rows.every((r) => s.patients.titolare.includes(r.pazienteId))).toBe(true);
+    expect(rows.some((r) => r.pazienteId === s.richPatient)).toBe(true);
+    for (const who of ['segreteria', 'sostituto', 'collega', 'amministratore'])
+      expect((await get(who, url)).statusCode, who).toBe(403);
+    // Il collega non legge il registro dell'archivio altrui, ma il suo sì.
+    expect((await get('collega', `/api/archivi/${s.archives.collega}/registro`)).statusCode).toBe(
+      200,
+    );
+    const logged = await t.db
+      .select()
+      .from(accessLog)
+      .where(eq(accessLog.action, 'lettura_registro_archivio'));
+    expect(logged.map((l) => l.outcome).sort()).toEqual([
+      'consentito',
+      'consentito',
+      'negato',
+      'negato',
+      'negato',
+      'negato',
+    ]);
   });
 });

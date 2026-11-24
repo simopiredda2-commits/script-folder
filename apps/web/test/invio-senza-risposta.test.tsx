@@ -182,6 +182,8 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     expect(s.getByText(/Confermi che la ricetta è arrivata con NRE/).textContent).toMatch(
       /MAN000000000001.*MANAUT0001/,
     );
+    // Il modulo non c'è più: la domanda prende il fuoco (WCAG 2.4.3, audit D259).
+    expect(document.activeElement).toBe(s.getByRole('group', { name: 'Conferma dell’esito' }));
     await userEvent.click(s.getByRole('button', { name: 'Sì, confermo' }));
     await s.findByText(/Ricetta segnata come arrivata/);
     expect(bodies).toEqual([
@@ -243,15 +245,63 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     expect((await s.findAllByText(/fermato mentre aspettava il Sistema TS/)).length).toBe(1);
     const form = await s.findByRole('form', { name: 'La ricetta è arrivata' });
     expect(within(form).queryByLabelText(/Codice di autenticazione/)).toBeNull();
-    await userEvent.type(within(form).getByLabelText(/NRBE/), 'nrbe0001');
+    // Come lo detta il Sistema TS, anche con uno spazio e in minuscolo: la X è la lettera di
+    // controllo del codice fiscale del paziente (D259).
+    await userEvent.type(within(form).getByLabelText(/NRBE/), 'x0 1234567890');
     await userEvent.type(within(form).getByLabelText('PIN della ricetta bianca'), '1234');
     await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
     expect(s.getByText(/Confermi che la ricetta è arrivata con NRBE/).textContent).toMatch(
-      /NRBE0001.*PIN 1234/,
+      /X01234567890.*PIN 1234/,
     );
     await userEvent.click(s.getByRole('button', { name: 'Sì, confermo' }));
     await s.findByText(/Ricetta segnata come arrivata/);
-    expect(bodies).toEqual([{ esito: 'arrivata', nre: 'NRBE0001', pin: '1234' }]);
+    expect(bodies).toEqual([{ esito: 'arrivata', nre: 'X01234567890', pin: '1234' }]);
+  });
+
+  it('un NRE di forma sbagliata si dice prima della conferma, e non parte niente (audit D259)', async () => {
+    const { bodies } = service((b) => ({ stato: 'sent', nre: b.nre, messaggio: null }));
+    page();
+    const s = await section();
+    const form = await s.findByRole('form', { name: 'La ricetta è arrivata' });
+    const number = within(form).getByLabelText(/Numero di ricetta/);
+    // La forma si legge accanto al campo, prima di scrivere.
+    expect(number.getAttribute('aria-describedby')).toBeTruthy();
+    expect(within(form).getByText(/^15 caratteri: 5 lettere o cifre/)).toBeTruthy();
+    await userEvent.type(number, 'ABC');
+    await userEvent.type(within(form).getByLabelText(/Codice di autenticazione/), '1');
+    await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
+    await s.findByText(/L’NRE ha sempre 15 caratteri: qui ce ne sono 3/);
+    expect(s.queryByText(/Confermi che la ricetta è arrivata/)).toBeNull();
+    // Il sesto carattere va da 0 a 7.
+    await userEvent.clear(number);
+    await userEvent.type(number, 'MAN008000000001');
+    await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
+    await s.findByText(/il sesto carattere è una cifra da 0 a 7/);
+    expect(s.queryByText(/Confermi che la ricetta è arrivata/)).toBeNull();
+    expect(bodies).toEqual([]);
+  });
+
+  it('ricetta bianca: l’NRBE comincia con la lettera di controllo del codice fiscale mandato con la ricetta (audit D259)', async () => {
+    // Il codice fiscale del paziente è stato corretto dopo l'invio: vale quello mandato.
+    const { bodies } = service((b) => ({ stato: 'sent', nre: b.nre, messaggio: null }), {
+      tipo: 'white',
+      codiceFiscaleInviato: 'XXXXXX00X00X000Y',
+    });
+    page();
+    const s = await section();
+    const form = await s.findByRole('form', { name: 'La ricetta è arrivata' });
+    const number = within(form).getByLabelText(/NRBE/);
+    await userEvent.type(number, 'X01234567890');
+    await userEvent.type(within(form).getByLabelText('PIN della ricetta bianca'), '1234');
+    await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
+    await s.findByText(/lettera di controllo del codice fiscale \(Y\) seguita da una cifra/);
+    expect(s.queryByText(/Confermi che la ricetta è arrivata/)).toBeNull();
+    await userEvent.clear(number);
+    await userEvent.type(number, 'Y01234567890');
+    await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
+    await userEvent.click(s.getByRole('button', { name: 'Sì, confermo' }));
+    await s.findByText(/Ricetta segnata come arrivata/);
+    expect(bodies).toEqual([{ esito: 'arrivata', nre: 'Y01234567890', pin: '1234' }]);
   });
 
   it('nei primi 15 minuti la ricetta si vede, con l’ora da cui si segna l’esito (D239)', async () => {

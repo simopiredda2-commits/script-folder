@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { query } from '../lib/api';
 import { date, PRESCRIPTION_STATUS, THERAPY_KIND } from '../lib/format';
@@ -245,13 +245,21 @@ export function PackStepper({
   name,
   quantity,
   disabled,
+  autoFocus,
   onChange,
 }: {
   name: string;
   quantity: number;
   disabled?: boolean;
+  /** Appena aggiunto il farmaco: il fuoco viene qui, al posto di «Aggiungi» (audit 14, D259). */
+  autoFocus?: boolean;
   onChange: (quantity: number) => void;
 }) {
+  const more = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (autoFocus) more.current?.focus();
+    // Solo alla comparsa: poi il fuoco lo decide chi usa la pagina.
+  }, []);
   return (
     <span className="confezioni-passo" role="group" aria-label={`Confezioni di ${name} in ricetta`}>
       <button
@@ -270,6 +278,7 @@ export function PackStepper({
       <button
         type="button"
         className="pulsante pulsante-piccolo"
+        ref={more}
         disabled={disabled || quantity >= MAX_PACKS}
         onClick={() => onChange(quantity + 1)}
         aria-label={`Una confezione in più di ${name}`}

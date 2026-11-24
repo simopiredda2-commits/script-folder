@@ -144,7 +144,7 @@ export function ServiceSection() {
           comando sul server o con il pulsante.
         </p>
       )}
-      <p>
+      <p className="collegamento-solo">
         <Link to="/strumenti?sezione=banche-dati">Versioni in uso e ultimi giri</Link>
       </p>
 

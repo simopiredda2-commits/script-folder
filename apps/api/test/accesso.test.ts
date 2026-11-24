@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { accessLog, appUser, archive, studio } from '../src/db/schema';
 import { base32Decode } from '../src/security/base32';
@@ -177,6 +177,57 @@ describe('soglie dello studio: blocco per inattività e tentativi falliti', () =
     s.clock.advance(5 * 60_000 + 1);
     expect((await io()).statusCode).toBe(423);
     expect((await unlock(code)).statusCode).toBe(401);
+    await s.app.close();
+  });
+
+  it('la pagina blocca la sessione allo scadere dell’inattività, senza aspettare la richiesta seguente (audit D259)', async () => {
+    const s = await createScenario(t.db);
+    const cookie = await login(s, 'titolare');
+    const io = () => s.app.inject({ method: 'GET', url: '/api/io', headers: { cookie } });
+    // La pagina sa dopo quanti minuti bloccarsi: l'impostazione dello studio (5 per difetto).
+    expect((await io()).json<{ minutiInattivita: number | null }>().minutiInattivita).toBe(5);
+    const lock = await s.app.inject({
+      method: 'POST',
+      url: '/api/sessione/blocca',
+      payload: { minuti: 5 },
+      headers: { cookie },
+    });
+    expect(lock.statusCode, lock.body).toBe(200);
+    // Bloccata subito, anche se i 5 minuti nel servizio non sono passati.
+    expect((await io()).statusCode).toBe(423);
+    const logged = await t.db
+      .select()
+      .from(accessLog)
+      .where(
+        and(eq(accessLog.userId, s.users.titolare.id), eq(accessLog.action, 'sessione_bloccata')),
+      );
+    expect(logged.at(-1)!.details).toMatchObject({ motivo: 'inattività nella pagina' });
+    // Si sblocca come sempre, con il codice.
+    s.clock.advance(30_000);
+    const code = totp(s.secrets.get(s.users.titolare.id)!, s.clock.now().getTime());
+    const unlocked = await s.app.inject({
+      method: 'POST',
+      url: '/api/accesso/sblocca',
+      payload: { codice: code },
+      headers: { cookie },
+    });
+    expect(unlocked.statusCode).toBe(200);
+    expect((await io()).statusCode).toBe(200);
+    // Senza sessione non si blocca niente; con un corpo sbagliato nemmeno.
+    expect(
+      (await s.app.inject({ method: 'POST', url: '/api/sessione/blocca', payload: { minuti: 5 } }))
+        .statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await s.app.inject({
+          method: 'POST',
+          url: '/api/sessione/blocca',
+          payload: { minuti: 'tanti' },
+          headers: { cookie },
+        })
+      ).statusCode,
+    ).toBe(400);
     await s.app.close();
   });
 

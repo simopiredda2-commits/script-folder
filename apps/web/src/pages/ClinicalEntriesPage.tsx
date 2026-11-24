@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
-import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { ErrorMessage, Loading, PageHeader, ResultNotice } from '../components/common';
 import { DiagnosisCodeInfo, DiagnosisSearch } from '../components/DiagnosisSearch';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
@@ -725,8 +725,9 @@ function NewEntryForm({
           </button>
         </div>
       </fieldset>
-      <ErrorMessage error={error} />
-      {done && <Notice kind="fatto">Voce registrata.</Notice>}
+      {/* Durante il salvataggio il modulo è spento: l'esito prende il fuoco (WCAG 2.4.3, D259). */}
+      <ErrorMessage error={error} focus />
+      {done && <ResultNotice>Voce registrata.</ResultNotice>}
     </form>
   );
 }

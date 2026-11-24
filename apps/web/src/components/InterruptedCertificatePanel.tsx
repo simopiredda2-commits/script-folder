@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
-import { ErrorMessage, Notice } from './common';
+import { ConfirmQuestion, ErrorMessage, Notice } from './common';
 import { Icon } from './Icon';
 
 type Pending = { esito: 'non_arrivato' } | { esito: 'arrivato'; protocollo: string };
@@ -60,43 +60,29 @@ export function InterruptedCertificatePanel({
         si è fermato mentre aspettava l’INPS. Chiedi all’INPS se il certificato è arrivato, poi
         segna qui l’esito.
       </Notice>
-      <ErrorMessage error={error} />
+      <ErrorMessage error={error} focus />
       {pending ? (
         // L'esito non si cambia dopo: si rilegge e si conferma (WCAG 3.3.4).
-        <div className="conferma-esito" role="group" aria-label="Conferma dell’esito">
-          <p>
-            {pending.esito === 'non_arrivato' ? (
-              <>
-                Confermi che il certificato <strong>non è arrivato</strong> all’INPS? Torna da
-                inviare: se in realtà fosse arrivato, rimandarlo farebbe un doppione.
-              </>
-            ) : (
-              <>
-                Confermi che il certificato è arrivato con il protocollo{' '}
-                <strong className="codice">{pending.protocollo}</strong>? Un protocollo sbagliato
-                non si corregge dopo.
-              </>
-            )}
-          </p>
-          <div className="azioni">
-            <button
-              type="button"
-              className="pulsante pulsante-primario"
-              disabled={busy}
-              onClick={() => void settle(pending)}
-            >
-              <Icon name="fatto" /> <span>Sì, confermo</span>
-            </button>
-            <button
-              type="button"
-              className="pulsante"
-              disabled={busy}
-              onClick={() => setPending(null)}
-            >
-              <Icon name="annulla" /> <span>Torna indietro</span>
-            </button>
-          </div>
-        </div>
+        <ConfirmQuestion
+          label="Conferma dell’esito"
+          yes="Sì, confermo"
+          busy={busy}
+          onYes={() => void settle(pending)}
+          onBack={() => setPending(null)}
+        >
+          {pending.esito === 'non_arrivato' ? (
+            <>
+              Confermi che il certificato <strong>non è arrivato</strong> all’INPS? Torna da
+              inviare: se in realtà fosse arrivato, rimandarlo farebbe un doppione.
+            </>
+          ) : (
+            <>
+              Confermi che il certificato è arrivato con il protocollo{' '}
+              <strong className="codice">{pending.protocollo}</strong>? Un protocollo sbagliato non
+              si corregge dopo.
+            </>
+          )}
+        </ConfirmQuestion>
       ) : (
         <>
           <div className="azioni">

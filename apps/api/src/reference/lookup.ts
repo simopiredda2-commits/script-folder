@@ -204,7 +204,27 @@ function toShortage(row: ShortageRow, date: string): DrugShortage {
   };
 }
 
-const SEARCH_LIMIT = 30;
+/** Quanti farmaci mostra al più una ricerca: oltre, si precisa la ricerca (audit, D259). */
+export const SEARCH_LIMIT = 30;
+
+/**
+ * Quanto un farmaco risponde alla ricerca (audit, D259): prima AIC e ATC; poi le confezioni con il
+ * solo principio attivo cercato (un generico, o un marchio come LIPITOR per l'atorvastatina); poi i
+ * nomi che cominciano con il testo; poi il resto, con le associazioni (A/B) in fondo. Così i primi
+ * trenta non sono le associazioni che vengono prima in ordine alfabetico.
+ */
+export function drugRank(
+  d: { aic: string; atc?: string | null; name: string | null; activeIngredient: string | null },
+  q: string,
+): number {
+  const text = q.trim().toLowerCase();
+  const ingredient = (d.activeIngredient ?? '').trim().toLowerCase();
+  const single = !/[/+,]/.test(ingredient);
+  if (d.aic.startsWith(text) || (d.atc ?? '').toLowerCase().startsWith(text)) return 0;
+  if (single && ingredient.startsWith(text)) return 1;
+  if ((d.name ?? '').toLowerCase().startsWith(text)) return 2;
+  return single ? 3 : 4;
+}
 
 /** Sinonimi e sigle dei materiali (D153), letti una volta. */
 const SERVICE_SEARCH = loadServiceSearchData(SERVICE_SEARCH_DATA);
@@ -952,13 +972,26 @@ export class ReferenceData {
         ilike(refDrug.name, like),
         ilike(refDrug.activeIngredient, like),
       )!;
+      // Lo stesso ordine di drugRank, prima del taglio: le confezioni che rispondono meglio entrano
+      // nei primi, non quelle che vengono prima nell'alfabeto (audit, D259).
+      const single = sql`(${refDrug.activeIngredient} !~ '[/+,]')`;
+      const rank = sql<number>`case
+        when ${refDrug.aic} ilike ${prefix} or ${refDrug.atc} ilike ${prefix} then 0
+        when ${single} and ${refDrug.activeIngredient} ilike ${prefix} then 1
+        when ${refDrug.name} ilike ${prefix} then 2
+        when ${single} then 3
+        else 4 end`;
+      // Senza DISTINCT: con l'ordine calcolato Postgres non lo accetta. Lo stesso AIC in due
+      // versioni dell'anagrafica si conta una volta, qui.
       for (const r of await this.db
-        .selectDistinct({ aic: refDrug.aic, name: refDrug.name })
+        .select({ aic: refDrug.aic })
         .from(refDrug)
         .where(and(inArray(refDrug.datasetId, drugIds), match))
-        .orderBy(refDrug.name, refDrug.aic)
-        .limit(limit))
+        .orderBy(rank, refDrug.name, refDrug.aic)
+        .limit(limit * drugIds.length)) {
+        if (aics.size >= limit) break;
         aics.add(r.aic);
+      }
     }
     if (classIds.length && aics.size < limit) {
       for (const r of await this.db
@@ -996,7 +1029,10 @@ export class ReferenceData {
     }
     const found = await this.drugs([...aics].slice(0, limit), date);
     return [...found.values()].sort(
-      (a, b) => lower(a.name).localeCompare(lower(b.name)) || a.aic.localeCompare(b.aic),
+      (a, b) =>
+        drugRank(a, text) - drugRank(b, text) ||
+        lower(a.name).localeCompare(lower(b.name)) ||
+        a.aic.localeCompare(b.aic),
     );
   }
 

@@ -1,6 +1,6 @@
 import { START_URL } from './start';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { secondFactorCode, type Ready } from './bridge';
+import { ACCESS_CHANGED, secondFactorCode, type Ready } from './bridge';
 import { autoReduce } from './panel-state';
 
 type Code = Awaited<ReturnType<typeof secondFactorCode>>['code'];
@@ -47,9 +47,11 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
       });
     tick();
     const timer = window.setInterval(tick, 1000);
+    window.addEventListener(ACCESS_CHANGED, tick);
     return () => {
       alive = false;
       window.clearInterval(timer);
+      window.removeEventListener(ACCESS_CHANGED, tick);
     };
   }, []);
 
@@ -66,7 +68,13 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
         aria-expanded="false"
       >
         Dimostrazione
-        {code && <span className="dimo-codice-breve">{group(code.code)}</span>}
+        {/* Di chi è il codice, non solo il numero (suggerimento S5, D259). */}
+        {code && (
+          <span>
+            codice per {code.username}:{' '}
+            <span className="dimo-codice-breve">{group(code.code)}</span>
+          </span>
+        )}
       </button>
     );
 
@@ -119,7 +127,10 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
         <p>
           Per le ricette entra come <code>medico</code>: <strong>Pazienti</strong>, apri un
           paziente, <strong>Nuova ricetta</strong>. Farmaci d’esempio: amlodipina, atorvastatina,
-          metformina. L’amministratore dello studio non apre le cartelle.
+          metformina. Per inviare una ricetta SSN serve prima l’accesso regionale: dal nome in alto,{' '}
+          <strong>Credenziali</strong>, <strong>Entra con SPID o CIE</strong>, poi{' '}
+          <strong>Entra con SPID (simulato)</strong>. L’amministratore dello studio non apre le
+          cartelle.
         </p>
       </section>
       <section aria-labelledby="dimo-aura">

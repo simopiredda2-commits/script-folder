@@ -176,7 +176,7 @@ export function ServicesSection({
           </div>
         );
       })}
-      <p>
+      <p className="collegamento-solo">
         <Link to={`/pazienti/${patientId}/visite-ed-esami`}>
           Tutte le visite e gli esami prescritti
         </Link>

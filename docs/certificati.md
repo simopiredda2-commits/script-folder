@@ -59,7 +59,7 @@ Restano dell'INPS le verifiche che richiedono i suoi archivi: codice fiscale del
   - rifiuto dell'INPS: si corregge e si rimanda;
   - INPS non raggiungibile o nessuna risposta in tempo: si riprova;
   - rifiuto per l'accesso: si sistemano le credenziali e si rimanda così com'è;
-- **in invio, senza risposta** (D233): se il servizio si ferma proprio mentre aspetta l'INPS, il certificato resta «in invio». Dopo 15 minuti la sua scheda lo dice e il medico segna l'esito chiesto all'INPS (`POST /api/certificati/:id/esito-invio`). «Non è arrivato»: torna da inviare, come quando l'INPS non risponde. «È arrivato»: con il protocollo dato dall'INPS (lettere e cifre); come data di ricezione vale l'ora in cui era partito l'invio, e copia e attestato si stampano come sempre. L'esito resta in `certificate_submission` con l'ambiente «manuale»; una risposta tardiva del servizio di prima resta lì e non cambia più il certificato;
+- **in invio, senza risposta** (D233): se il servizio si ferma proprio mentre aspetta l'INPS, il certificato resta «in invio». Dopo 15 minuti la sua scheda lo dice e il medico segna l'esito chiesto all'INPS (`POST /api/certificati/:id/esito-invio`). «Non è arrivato»: torna da inviare, come quando l'INPS non risponde. «È arrivato»: con il protocollo dato dall'INPS (lettere e cifre: nelle specifiche del Sistema TS, versione 3.2, `idCertificato` è una stringa senza formato, da completare con le specifiche di collaudo, D259); come data di ricezione vale l'ora in cui era partito l'invio, e copia e attestato si stampano come sempre. L'esito resta in `certificate_submission` con l'ambiente «manuale»; una risposta tardiva del servizio di prima resta lì e non cambia più il certificato;
 - **inviato → annullato**, solo entro il giorno successivo alla data di rilascio (3.4). L'INPS restituisce l'identificativo dell'annullamento;
 - **inviato → rettificato**, solo entro la fine della prognosi e solo per anticiparla (3.3). Nasce un certificato nuovo con un protocollo nuovo; la sua copia riporta «Rettifica del certificato protocollo …». Il vecchio non vale più e non si stampa;
 - **continuazione** di un certificato inviato: una bozza nuova di tipo C, dal giorno dopo la fine della prognosi, con gli stessi dati.
@@ -84,7 +84,7 @@ Ogni chiamata all'INPS, riuscita o no, resta in `certificate_submission` con ric
 | SMS al lavoratore         | Protocollo, data di rilascio, durata della prognosi, nome e cognome del lavoratore e del medico                 | Disciplinare, 4.2                                     |
 | Email al datore di lavoro | Protocollo con nome e cognome del lavoratore, come nell'attestato, se il lavoratore lo chiede; mai dati clinici | D88, D108; allegato B; l'attestato lo dà l'INPS (3.5) |
 
-Ogni stampa e consegna resta in `certificate_delivery`, che non si modifica. Email e SMS passano dal simulatore (regola 7).
+Ogni consegna resta in `certificate_delivery`, che non si modifica. Email e SMS passano dal simulatore (regola 7). Aprire il PDF di copia o attestato non è una consegna (audit D259): resta nel registro degli accessi (`stampa_certificato`), e la consegna su carta la segna chi ha dato il foglio al lavoratore, con «Consegnato su carta» (`POST /api/certificati/:id/consegna-carta`, esito «consegnato»). Le stampe registrate prima all'apertura del PDF restano con l'esito «stampato».
 
 ## Chi fa che cosa
 

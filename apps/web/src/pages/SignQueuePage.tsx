@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, useLocation } from 'react-router';
-import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
+import { ConfirmQuestion, ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { InterruptedSendPanel } from '../components/InterruptedSendPanel';
 import { ReminderPanel } from '../components/ReminderPanel';
@@ -30,11 +30,15 @@ interface QueueGroup {
     firmataDa?: string | null;
     /** Da quando l'esito si può segnare (D239). */
     esitoDal?: string | null;
+    /** Il codice fiscale mandato con l'invio, per la forma dell'NRBE (D259). */
+    codiceFiscaleInviato?: string | null;
     /** Solo fra le confermate (D254): inviata con l'NRE, o stampata su carta. */
     stato?: string;
     nre?: string | null;
     inviataIl?: string | null;
     cartaceaIl?: string | null;
+    /** Solo fra le confermate: le consegne del promemoria riuscite (suggerimento S7, D259). */
+    consegne?: number;
   }[];
 }
 
@@ -77,12 +81,26 @@ function QueueItem({
 }: {
   patientId: string;
   prescription: QueueGroup['ricette'][number];
-  status: 'to_sign' | 'error';
+  status: 'draft' | 'to_sign' | 'error';
   onChange: (status: string, nre?: string) => void;
 }) {
   const { list, lines } = useLines(patientId, prescription.id);
   const { isDoctor } = useSession();
-  const signable = isDoctor && prescription.firmabile !== false;
+  // La bozza è di chi l'ha preparata: il medico la firma, la segreteria la manda alla firma (D259).
+  const signable = status === 'draft' || (isDoctor && prescription.firmabile !== false);
+  const [error, setError] = useState<ApiError | null>(null);
+  async function dropDraft() {
+    setError(null);
+    try {
+      await api(`/api/ricette/${prescription.id}/annulla`, {
+        method: 'POST',
+        body: { motivo: 'Bozza annullata dalla pagina Ricette' },
+      });
+      onChange('cancelled');
+    } catch (e) {
+      setError(e instanceof ApiError ? e : new ApiError(0, 'Il servizio non ha risposto'));
+    }
+  }
   return (
     <li className="ricetta-in-coda">
       <p>
@@ -115,6 +133,14 @@ function QueueItem({
           onChange={onChange}
         />
       )}
+      {status === 'draft' && (
+        <div className="azioni">
+          <button type="button" className="pulsante" onClick={() => void dropDraft()}>
+            <Icon name="annulla" /> <span>Annulla la bozza</span>
+          </button>
+        </div>
+      )}
+      <ErrorMessage error={error} />
     </li>
   );
 }
@@ -127,7 +153,7 @@ function Queue({
   onChanged,
 }: {
   path: string;
-  status: 'to_sign' | 'error';
+  status: 'draft' | 'to_sign' | 'error';
   empty: string;
   /** Cambia quando un'altra coda della pagina ha spostato una ricetta: si ricarica (D239). */
   reloadKey?: number;
@@ -253,6 +279,7 @@ function InterruptedItem({
           signedAt={r.firmataIl ?? r.preparataIl}
           signedBy={r.firmataDa ?? null}
           settleFrom={r.esitoDal ?? null}
+          fiscalCode={r.codiceFiscaleInviato ?? patient.codiceFiscale}
           onChange={(status) => {
             if (status === 'sent') setArrived(true);
             // «Non è arrivata»: la ricetta passa fra gli invii non riusciti, che si ricaricano.
@@ -380,11 +407,17 @@ function ConfirmedQueue({ reloadKey }: { reloadKey: number }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [archived, setArchived] = useState<number | null>(null);
+  const [asking, setAsking] = useState(false);
   if (queue.loading && !queue.data) return <Loading what="ricette" />;
   if (!queue.data) return <ErrorMessage error={queue.error} />;
   const groups = queue.data.pazienti;
   const count = groups.reduce((n, g) => n + g.ricette.length, 0);
+  // Le ricette senza nessuna consegna del promemoria: prima di archiviarle si chiede (S7, D259).
+  const undelivered = groups.flatMap((g) =>
+    g.ricette.filter((r) => r.consegne === 0).map(() => `${g.paziente.nome} ${g.paziente.cognome}`),
+  );
   async function archive() {
+    setAsking(false);
     setBusy(true);
     setError(null);
     try {
@@ -417,8 +450,8 @@ function ConfirmedQueue({ reloadKey }: { reloadKey: number }) {
             <button
               type="button"
               className="pulsante"
-              onClick={() => void archive()}
-              disabled={busy}
+              onClick={() => (undelivered.length > 0 ? setAsking(true) : void archive())}
+              disabled={busy || asking}
             >
               <Icon name="archivio" />{' '}
               <span>
@@ -426,6 +459,21 @@ function ConfirmedQueue({ reloadKey }: { reloadKey: number }) {
               </span>
             </button>
           </div>
+          {asking && (
+            <ConfirmQuestion
+              label="Ricette senza consegna del promemoria"
+              yes="Sì, archivia"
+              busy={busy}
+              onYes={() => void archive()}
+              onBack={() => setAsking(false)}
+            >
+              {undelivered.length === 1
+                ? '1 ricetta non ha nessuna consegna del promemoria'
+                : `${undelivered.length} ricette non hanno nessuna consegna del promemoria`}
+              : {[...new Set(undelivered)].join(', ')}. Archiviate escono da questa pagina; il
+              promemoria resta nello storico delle prescrizioni del paziente. Le archivi lo stesso?
+            </ConfirmQuestion>
+          )}
           <ul className="coda-ricette">
             {groups.map((g) => (
               <li key={g.paziente.id} className="riquadro">
@@ -466,8 +514,16 @@ export function SignQueuePage() {
     if (!target) return;
     target.scrollIntoView?.({ block: 'start' });
     target.focus({ preventScroll: true });
-  }, [hash]);
-  const hidden = <p className="tenue">Le ricette in attesa le vedono il medico e la segreteria.</p>;
+    // Anche quando la sessione arriva dopo: prima di lei la pagina non ha le sezioni (D259).
+  }, [hash, sees]);
+  // Chi non ha un ruolo clinico (l'amministratore) legge una frase sola, non una per sezione (audit 17).
+  if (!sees)
+    return (
+      <>
+        <PageHeader title="Ricette" />
+        <p className="tenue">Le ricette le vedono il medico e la segreteria.</p>
+      </>
+    );
   return (
     <>
       <PageHeader title="Ricette" />
@@ -477,21 +533,33 @@ export function SignQueuePage() {
           attesa.
         </Notice>
       )}
+      <section aria-labelledby="in-bozza">
+        <h2 id="in-bozza" tabIndex={-1}>
+          In bozza
+        </h2>
+        <p className="tenue">
+          Le ricette che hai salvato e non hai ancora firmato o mandato alla firma.
+        </p>
+        <Queue
+          path="/api/ricette/in-bozza"
+          status="draft"
+          empty="Nessuna ricetta in bozza."
+          reloadKey={changes}
+          onChanged={changed}
+        />
+      </section>
       <section aria-labelledby="titolo-da-firmare">
         <h2 id="titolo-da-firmare">Da firmare</h2>
         <p className="tenue">
           Ogni ricetta passa i controlli delle regole di prescrizione prima dell’invio.
         </p>
-        {sees ? (
-          <Queue
-            path="/api/ricette/da-firmare"
-            status="to_sign"
-            empty="Nessuna ricetta da firmare."
-            onChanged={changed}
-          />
-        ) : (
-          hidden
-        )}
+        <Queue
+          path="/api/ricette/da-firmare"
+          status="to_sign"
+          empty="Nessuna ricetta da firmare."
+          reloadKey={changes}
+          onChanged={changed}
+        />
       </section>
       <section aria-labelledby="confermate">
         <h2 id="confermate" tabIndex={-1}>
@@ -501,38 +569,30 @@ export function SignQueuePage() {
           Inviate o stampate. Da qui il promemoria si stampa o si manda; «Archivia ricette
           confermate» le toglie dall’elenco, e restano nello storico del paziente.
         </p>
-        {sees ? <ConfirmedQueue reloadKey={changes} /> : hidden}
+        <ConfirmedQueue reloadKey={changes} />
       </section>
       <section aria-labelledby="non-inviate">
         <h2 id="non-inviate" tabIndex={-1}>
           Invii non riusciti
         </h2>
-        {sees ? (
-          <Queue
-            path="/api/ricette/non-inviate"
-            status="error"
-            empty="Nessun invio in sospeso."
-            reloadKey={changes}
-          />
-        ) : (
-          hidden
-        )}
+        <Queue
+          path="/api/ricette/non-inviate"
+          status="error"
+          empty="Nessun invio non riuscito."
+          reloadKey={changes}
+        />
       </section>
       <section aria-labelledby="senza-risposta">
         <h2 id="senza-risposta" tabIndex={-1}>
           Invii senza risposta
         </h2>
-        {sees ? (
-          <>
-            <p className="tenue">
-              Ricette rimaste «in invio». Se la risposta non arriva entro 15 minuti, il servizio si
-              è fermato mentre aspettava l’ente: si chiede all’ente se sono arrivate.
-            </p>
-            <InterruptedQueue onChanged={changed} />
-          </>
-        ) : (
-          hidden
-        )}
+        <>
+          <p className="tenue">
+            Ricette rimaste «in invio». Se la risposta non arriva entro 15 minuti, il servizio si è
+            fermato mentre aspettava l’ente: si chiede all’ente se sono arrivate.
+          </p>
+          <InterruptedQueue onChanged={changed} />
+        </>
       </section>
     </>
   );

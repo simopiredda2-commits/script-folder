@@ -143,6 +143,29 @@ legend {
   top: 0.5rem;
 }
 
+/*
+ * Un salto dentro un riquadro (suggerimento S6, D259): nascosto finché non prende il fuoco, poi in
+ * alto a sinistra del riquadro. Non esce mai dal riquadro, che scorra o no.
+ */
+.riquadro:has(> .salta-riquadro) {
+  position: relative;
+}
+
+.salta.salta-riquadro {
+  top: 0.5rem;
+  left: 0.5rem;
+}
+
+.salta.salta-riquadro:not(:focus) {
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+}
+
 .icona {
   flex: none;
 }
@@ -607,6 +630,16 @@ legend {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /*
+   * La ricerca e i suoi risultati scorrono nel loro riquadro, con l'ombra se sotto c'è altro: «In
+   * ricetta» e «Firma e invia» restano subito sotto, non dopo trenta risultati (audit D259).
+   */
+  .griglia-ricetta > .riquadro:first-child {
+    max-height: 50vh;
+    max-height: 50dvh;
+    overflow-y: auto;
+  }
+
   .app-main {
     padding: 1rem;
   }
@@ -829,6 +862,15 @@ legend {
   list-style: none;
   margin: 0 0 1rem;
   padding: 0;
+}
+
+/* Quanti risultati, o che sono solo i primi (audit, D259): una riga sopra l'elenco. */
+.stato-ricerca:empty {
+  display: none;
+}
+
+.stato-ricerca {
+  margin: 0.25rem 0 0;
 }
 
 .risultato {
@@ -2358,6 +2400,20 @@ textarea[aria-invalid='true'] {
   margin: 0.5rem 0;
 }
 
+/* Consegna su carta, segnata da chi ha dato il foglio (audit D259). */
+.consegna-carta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.consegna-carta p {
+  flex: 1 1 20rem;
+  margin: 0;
+}
+
 /* Distinta consegnata all'ASL fuori dal programma (D232). */
 .consegna-distinta {
   margin-top: 1rem;
@@ -2753,4 +2809,22 @@ textarea[aria-invalid='true'] {
 
 .segnaposto dd {
   margin: 0;
+}
+
+/*
+ * Un collegamento da solo nel suo paragrafo è un bersaglio da 44 px (audit D259): l'eccezione di
+ * WCAG vale per i collegamenti dentro una frase, che restano in riga.
+ */
+.collegamento-solo a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--size-min-target);
+}
+
+/* Il codice QR del primo accesso: dimensione fissa, il margine bianco è nel disegno (S2, D259). */
+.codice-qr {
+  display: block;
+  width: 200px;
+  height: 200px;
+  margin: 0.5rem 0;
 }

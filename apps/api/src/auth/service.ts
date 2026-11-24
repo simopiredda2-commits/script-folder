@@ -936,6 +936,28 @@ export function createAuthService(deps: AuthDeps) {
     return { ok: true, otherSessionsClosed: closed };
   }
 
+  /**
+   * Blocca subito la sessione (audit D259): la pagina lo chiede allo scadere dei minuti di
+   * inattività dello studio, così i dati non restano in vista su una postazione lasciata aperta.
+   * Si sblocca come sempre, con il codice a 6 cifre.
+   */
+  async function lockNow(actor: Actor, minutes: number | null): Promise<void> {
+    const [done] = await db
+      .update(session)
+      .set({ lockedAt: now() })
+      .where(and(eq(session.id, actor.sessionId), isNull(session.lockedAt)))
+      .returning({ id: session.id });
+    if (!done) return;
+    await logAccess(db, {
+      studioId: actor.studioId,
+      userId: actor.userId,
+      action: 'sessione_bloccata',
+      outcome: 'riuscito',
+      workstation: actor.workstation,
+      details: { minuti_di_inattivita: minutes, motivo: 'inattività nella pagina' },
+    });
+  }
+
   async function logout(sessionToken: string): Promise<void> {
     const row = await loadSession(sessionToken);
     if (!row || row.session.revokedAt) return;
@@ -954,6 +976,7 @@ export function createAuthService(deps: AuthDeps) {
     verifySecondFactor,
     authenticate,
     unlock,
+    lockNow,
     confirmCode,
     changePassword,
     logout,

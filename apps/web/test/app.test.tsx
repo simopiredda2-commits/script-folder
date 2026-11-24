@@ -32,6 +32,8 @@ const TODAY = {
   appuntamenti: [],
   code: {
     daFirmare: 3,
+    // Le bozze di chi guarda contano anche loro accanto a «Ricette» (audit, D259).
+    inBozza: 2,
     nonInviate: 0,
     richiesteAperte: 0,
     pianiInScadenza: [],
@@ -112,7 +114,34 @@ describe('interfaccia', () => {
       // Il simbolo è decorativo: il nome del collegamento è il testo.
       expect(link.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
     }
-    expect(await screen.findByLabelText('3 da firmare')).toBeTruthy();
+    expect(await screen.findByLabelText('5 da firmare o in bozza')).toBeTruthy();
+    // In Oggi le bozze hanno la loro voce, verso la sezione della pagina Ricette.
+    expect(
+      (await screen.findByRole('link', { name: /^Ricette in bozza/ })).getAttribute('href'),
+    ).toBe('/ricette#in-bozza');
     expect(screen.getByText('Dott.ssa Medico Inventato')).toBeTruthy();
+  });
+
+  it('solo amministratore: niente Pazienti e Ricette nel menu (suggerimento S11, D259)', async () => {
+    fakeService({
+      '/api/io': {
+        status: 200,
+        body: {
+          ...ME,
+          nome: 'Amministratore inventato',
+          ruoli: [{ codice: 'administrator', nome: 'Amministratore dello studio' }],
+        },
+      },
+      '/api/oggi': { status: 200, body: TODAY },
+    });
+    render(<App />);
+    const nav = await screen.findByRole('navigation', { name: 'Sezioni' });
+    await within(nav).findByRole('link', { name: /^Farmaci e prestazioni/ });
+    const labels = within(nav)
+      .getAllByRole('link')
+      .map((a) => a.textContent?.trim());
+    expect(labels).not.toContain('Pazienti');
+    expect(labels.some((l) => l?.startsWith('Ricette'))).toBe(false);
+    expect(labels).toContain('Oggi');
   });
 });

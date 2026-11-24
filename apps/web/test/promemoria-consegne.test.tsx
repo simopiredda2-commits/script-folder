@@ -27,11 +27,15 @@ const doctor = {
   archivio: null,
 };
 
-function service(available: object) {
+function service(available: object, posts: { path: string; body: unknown }[] = []) {
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string) => {
+    vi.fn((url: string, init?: RequestInit) => {
       const path = url.split('?')[0]!;
+      if (init?.method === 'POST') {
+        posts.push({ path, body: JSON.parse(init.body as string) as unknown });
+        return Promise.resolve(json(200, { consegnato: true }));
+      }
       if (path === '/api/io') return Promise.resolve(json(200, doctor));
       if (path === '/api/ricette/r1/promemoria/consegne')
         return Promise.resolve(json(200, { consegne: [], carta: null, disponibile: available }));
@@ -109,6 +113,30 @@ describe('promemoria: solo ciò che si può consegnare (D239)', () => {
     await screen.findByRole('link', { name: /Promemoria \(PDF\)/ });
     expect(screen.getByRole('link', { name: /Solo NRE/ })).toBeTruthy();
     expect(screen.getAllByRole('radio')).toHaveLength(2);
+  });
+});
+
+describe('consegna su carta (audit D259)', () => {
+  it('aprire il PDF non registra niente: la consegna la segna chi ha dato il foglio', async () => {
+    const posts: { path: string; body: unknown }[] = [];
+    service({ promemoria: true, soloNre: true, email: true, sms: true, motivo: null }, posts);
+    panel();
+    const link = await screen.findByRole('link', { name: /Solo NRE/ });
+    // Prima di aprire un PDF non c'è niente da segnare.
+    expect(screen.queryByRole('button', { name: 'Consegnato su carta' })).toBeNull();
+    // In jsdom il collegamento non apre niente: conta il clic, come nel browser.
+    link.addEventListener('click', (e) => e.preventDefault());
+    link.click();
+    const group = within(await screen.findByRole('group', { name: 'Consegna su carta' }));
+    expect(group.getByText(/Aprire il PDF non è una consegna/)).toBeTruthy();
+    expect(group.getByText(/il foglio con l’NRE/)).toBeTruthy();
+    expect(posts).toEqual([]);
+    group.getByRole('button', { name: 'Consegnato su carta' }).click();
+    await screen.findByText('Consegna del foglio con l’NRE registrata.');
+    expect(posts).toEqual([
+      { path: '/api/ricette/r1/promemoria/consegna-carta', body: { formato: 'nre' } },
+    ]);
+    expect(screen.queryByRole('group', { name: 'Consegna su carta' })).toBeNull();
   });
 });
 

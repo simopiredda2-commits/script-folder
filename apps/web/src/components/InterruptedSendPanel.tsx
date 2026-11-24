@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
-import { ErrorMessage, Notice } from './common';
+import { normalizePrescriptionNumber, nrbeProblem, nreProblem } from '../lib/prescription-numbers';
+import { ConfirmQuestion, ErrorMessage, Notice } from './common';
 import { Icon } from './Icon';
 
 interface SettleOutcome {
@@ -22,6 +23,11 @@ export interface InterruptedSendPanelProps {
   signedBy: string | null;
   /** Da quando l'esito si può segnare: prima l'invio potrebbe essere ancora in corso (D239). */
   settleFrom?: string | null;
+  /**
+   * Il codice fiscale mandato con la ricetta: per la bianca l'NRBE comincia con la sua lettera di
+   * controllo (D259).
+   */
+  fiscalCode?: string | null;
   /** Dopo l'esito: le code si ricaricano. */
   onChange?: (status: 'sent' | 'error', nre: string | null) => void;
 }
@@ -43,6 +49,7 @@ export function InterruptedSendPanel({
   signedAt,
   signedBy,
   settleFrom,
+  fiscalCode,
   onChange,
 }: InterruptedSendPanelProps) {
   const white = kind === 'white';
@@ -137,57 +144,43 @@ export function InterruptedSendPanel({
         fermato mentre aspettava {ente}. Chiedi all’ente se la ricetta è arrivata, poi segna qui
         l’esito.
       </Notice>
-      <ErrorMessage error={error} />
+      <ErrorMessage error={error} focus />
       {pending ? (
         // L'esito non si cambia dopo: si rilegge e si conferma (WCAG 3.3.4).
-        <div className="conferma-esito" role="group" aria-label="Conferma dell’esito">
-          <p>
-            {pending.esito === 'non_arrivata' ? (
-              <>
-                Confermi che la ricetta <strong>non è arrivata</strong>? Torna da inviare: se in
-                realtà fosse arrivata, rimandarla farebbe un doppione.
-              </>
-            ) : (
-              <>
-                Confermi che la ricetta è arrivata con {number}{' '}
-                <strong className="codice">{pending.nre}</strong>
-                {pending.pin ? (
-                  <>
-                    {' '}
-                    e PIN <strong className="codice">{pending.pin}</strong>
-                  </>
-                ) : pending.codiceAutenticazione ? (
-                  <>
-                    {' '}
-                    e codice di autenticazione{' '}
-                    <strong className="codice">{pending.codiceAutenticazione}</strong>
-                  </>
-                ) : (
-                  ', senza il codice di autenticazione'
-                )}
-                ? Un numero sbagliato non si corregge dopo.
-              </>
-            )}
-          </p>
-          <div className="azioni">
-            <button
-              type="button"
-              className="pulsante pulsante-primario"
-              disabled={busy}
-              onClick={() => void settle(pending)}
-            >
-              <Icon name="fatto" /> <span>Sì, confermo</span>
-            </button>
-            <button
-              type="button"
-              className="pulsante"
-              disabled={busy}
-              onClick={() => setPending(null)}
-            >
-              <Icon name="annulla" /> <span>Torna indietro</span>
-            </button>
-          </div>
-        </div>
+        <ConfirmQuestion
+          label="Conferma dell’esito"
+          yes="Sì, confermo"
+          busy={busy}
+          onYes={() => void settle(pending)}
+          onBack={() => setPending(null)}
+        >
+          {pending.esito === 'non_arrivata' ? (
+            <>
+              Confermi che la ricetta <strong>non è arrivata</strong>? Torna da inviare: se in
+              realtà fosse arrivata, rimandarla farebbe un doppione.
+            </>
+          ) : (
+            <>
+              Confermi che la ricetta è arrivata con {number}{' '}
+              <strong className="codice">{pending.nre}</strong>
+              {pending.pin ? (
+                <>
+                  {' '}
+                  e PIN <strong className="codice">{pending.pin}</strong>
+                </>
+              ) : pending.codiceAutenticazione ? (
+                <>
+                  {' '}
+                  e codice di autenticazione{' '}
+                  <strong className="codice">{pending.codiceAutenticazione}</strong>
+                </>
+              ) : (
+                ', senza il codice di autenticazione'
+              )}
+              ? Un numero sbagliato non si corregge dopo.
+            </>
+          )}
+        </ConfirmQuestion>
       ) : (
         <>
           <div className="azioni">
@@ -205,6 +198,14 @@ export function InterruptedSendPanel({
             aria-label="La ricetta è arrivata"
             onSubmit={(e) => {
               e.preventDefault();
+              // La forma del numero, prima della conferma (audit D259): NRE di 15 caratteri, NRBE
+              // di 12, come nelle specifiche del Sistema TS. Il servizio la controlla di nuovo.
+              const number = normalizePrescriptionNumber(nre);
+              const shape = white ? nrbeProblem(number, fiscalCode) : nreProblem(number);
+              if (shape) {
+                setError(new ApiError(400, shape));
+                return;
+              }
               // Un codice di soli spazi non è un codice: lo si dice qui, prima della conferma.
               if (ssn && !authCode.trim()) {
                 setError(
@@ -218,7 +219,7 @@ export function InterruptedSendPanel({
               setError(null);
               setPending({
                 esito: 'arrivata',
-                nre: nre.trim(),
+                nre: number,
                 ...(white
                   ? { pin: pin.trim() }
                   : authCode.trim()
@@ -240,8 +241,15 @@ export function InterruptedSendPanel({
                 // In maiuscolo, come lo vuole il codice a barre del promemoria (D239).
                 onChange={(e) => setNre(e.target.value.toUpperCase())}
                 required
+                aria-describedby={`${nreId}-aiuto`}
                 autoComplete="off"
+                spellCheck={false}
               />
+              <p className="aiuto" id={`${nreId}-aiuto`}>
+                {white
+                  ? '12 caratteri: una lettera, una lettera o una cifra, poi 10 cifre.'
+                  : '15 caratteri: 5 lettere o cifre, una cifra da 0 a 7, poi 9 cifre.'}
+              </p>
             </div>
             {white ? (
               <div className="campo">

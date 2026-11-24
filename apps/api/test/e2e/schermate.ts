@@ -908,6 +908,7 @@ try {
   // D199: confermato il decesso segnalato da AURA, la ricetta non si fa (R19).
   await page.goto(`${base}/pazienti/${other.id}/amministrazione#aura`);
   await auraSection.getByRole('button', { name: 'Conferma il decesso' }).click();
+  await auraSection.getByRole('button', { name: 'Sì, conferma il decesso' }).click();
   await auraSection
     .getByText(/decesso/i)
     .first()

@@ -183,7 +183,7 @@ export function RecoveryPage() {
             </button>
           </form>
         )}
-        <p>
+        <p className="collegamento-solo">
           <a href="/">Torna all’accesso</a>
         </p>
       </main>

@@ -7,6 +7,7 @@ import { DataSearchPage } from './pages/DataSearchPage';
 import { DoctorContactsPage } from './pages/DoctorContactsPage';
 import { ExamsPage } from './pages/ExamsPage';
 import { FollowUpPage } from './pages/FollowUpPage';
+import { AccessLogPage } from './pages/AccessLogPage';
 import { ArchivePage } from './pages/ArchivePage';
 import { ReportsPage } from './pages/ReportsPage';
 import { CertificatesPage } from './pages/CertificatesPage';
@@ -75,6 +76,7 @@ function Screens() {
             <Route path="prestazioni-aggiuntive" element={<PpipPage />} />
             <Route path="profilo-sanitario" element={<HealthProfilePage />} />
             <Route path="fascicolo-regionale" element={<FseAccessPage />} />
+            <Route path="registro" element={<AccessLogPage />} />
             <Route path="certificati-modelli" element={<TemplateCertificatesPage />} />
             <Route path="terapie/nuova" element={<TherapyForm />} />
             <Route path="terapie/:therapyId" element={<TherapyPage />} />

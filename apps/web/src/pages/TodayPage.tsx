@@ -23,6 +23,8 @@ interface Today {
   }[];
   code: {
     daFirmare: number | null;
+    /** Le bozze di chi guarda, non ancora mandate (audit, D259). */
+    inBozza?: number | null;
     nonInviate: number | null;
     /** Ricette rimaste «in invio» da più di 15 minuti (D233). */
     senzaRisposta: number | null;
@@ -101,6 +103,15 @@ export function TodayPage() {
                   <Icon name="firma" />
                   <span>Ricette da firmare</span>
                   <strong>{code.daFirmare}</strong>
+                </Link>
+              </li>
+            )}
+            {!!code.inBozza && (
+              <li>
+                <Link to="/ricette#in-bozza" className="coda">
+                  <Icon name="ricette" />
+                  <span>Ricette in bozza</span>
+                  <strong>{code.inBozza}</strong>
                 </Link>
               </li>
             )}
@@ -237,7 +248,7 @@ function CredentialAlerts() {
           {a.text}
         </Notice>
       ))}
-      <p>
+      <p className="collegamento-solo">
         <Link to={CREDENTIALS_PATH}>Apri «Credenziali dei servizi»</Link>
       </p>
     </section>

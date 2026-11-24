@@ -166,6 +166,18 @@ html.dimo-ridotto .app-footer {
   min-height: calc(var(--size-min-target) + 8px);
   padding-right: calc(var(--dimo-posto, 16rem) + 24px);
 }
+/*
+ * Dove la pagina scorre (tablet in verticale), il pulsante ridotto sta in fondo al documento, nel
+ * posto che il piede gli lascia, e non in fondo allo schermo: la pagina non gli passa sotto e non
+ * copre «Aggiungi» (audit D259). Dove la pagina sta in una schermata il fondo del documento è il
+ * fondo dello schermo, come prima.
+ */
+html.dimo-ridotto {
+  position: relative;
+}
+html.dimo-ridotto .dimo-apri {
+  position: absolute;
+}
 @media (max-width: 699.98px) {
   html.dimo-ridotto .app-footer {
     padding-right: max(12px, env(safe-area-inset-right, 0px));

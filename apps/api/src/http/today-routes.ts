@@ -103,6 +103,23 @@ export function registerTodayRoutes(
               )
           )[0]?.n ?? 0)
         : null;
+    // Le bozze di chi guarda, nelle cartelle che vede ancora (audit, D259).
+    const draftScope = [...new Set([...signArchives, ...draftArchives])];
+    const countMyDrafts = async () =>
+      draftScope.length
+        ? ((
+            await db
+              .select({ n: count() })
+              .from(prescription)
+              .where(
+                and(
+                  inArray(prescription.archiveId, draftScope),
+                  eq(prescription.status, 'draft'),
+                  eq(prescription.preparedBy, actor.userId),
+                ),
+              )
+          )[0]?.n ?? 0)
+        : null;
     // Ricette «in invio» da più di INTERRUPTED_SEND_AFTER_MINUTES: l'esito lo segna il medico (D233).
     const interruptedBefore = new Date(now().getTime() - INTERRUPTED_SEND_AFTER_MINUTES * 60_000);
     const countInterrupted = async (archives: string[]) =>
@@ -271,6 +288,7 @@ export function registerTodayRoutes(
         .map(({ archivio: _a, ...rest }) => rest),
       code: {
         daFirmare: await countStatus(signArchives, 'to_sign'),
+        inBozza: await countMyDrafts(),
         nonInviate: await countStatus(signArchives.length ? signArchives : draftArchives, 'error'),
         senzaRisposta: await countInterrupted(signArchives),
         richiesteAperte: openRequests,

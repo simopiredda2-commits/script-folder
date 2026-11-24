@@ -272,7 +272,11 @@ export const reminderDelivery = pgTable(
     recipient: text(),
     /** «simulator», «test» o «production» per email e SMS. */
     environment: text(),
-    /** «stampato», «consegnato», «rifiutato», «non_raggiungibile». */
+    /**
+     * «consegnato», «rifiutato», «non_raggiungibile»; «stampato» per le stampe registrate
+     * all'apertura del PDF fino all'audit D259: da allora la carta è «consegnato», segnato da chi
+     * l'ha data.
+     */
     outcome: text().notNull(),
     messageId: text(),
     errorMessage: text(),

@@ -16,3 +16,4 @@ export * from './studio-lists';
 export * from './patient-registry';
 export * from './import-destinations';
 export * from './archive-moves';
+export * from './prescription-numbers';

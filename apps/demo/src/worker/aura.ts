@@ -93,6 +93,7 @@ export function createAuraDemo(): AuraDemo {
           lastName: patient.lastName,
           firstName: patient.firstName,
           birthDate: patient.birthDate,
+          status: patient.status,
         })
         .from(patient)
         .where(
@@ -160,7 +161,9 @@ export function createAuraDemo(): AuraDemo {
       const byAge = rows.map((r) => r.id);
       const deceased = pick(byAge);
       if (deceased) gateway.setRegistry(auraIds.get(deceased)!, { deceasedOn: day(-1) });
-      const revoked = pick(byAge);
+      // La revoca automatica vale per i pazienti in carico (D198): un temporaneo con la scelta
+      // cessata resta temporaneo, e il riquadro annuncerebbe una revoca che non c'è (audit 28).
+      const revoked = pick(rows.filter((r) => r.status === 'active').map((r) => r.id));
       if (revoked)
         gateway.setChoice(auraIds.get(revoked)!, {
           doctorFiscalCode: await doctorFiscalCode(db),

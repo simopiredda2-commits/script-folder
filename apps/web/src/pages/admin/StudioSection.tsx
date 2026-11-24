@@ -411,9 +411,9 @@ function StudioForm({
             onChange={(e) => set('intestazione', e.target.value)}
           />
           <p className="aiuto" id="studio-intestazione-aiuto">
-            Una riga per riga, al massimo {l.headerLines} di {l.headerLineLength} caratteri; la
-            prima si stampa in neretto. Vale nei certificati dai modelli dei medici che non hanno
-            un’intestazione loro (Strumenti › Impaginazione).
+            Al massimo {l.headerLines} righe di {l.headerLineLength} caratteri; la prima si stampa
+            in neretto. Vale nei certificati dei medici che non hanno scritto un’intestazione loro
+            nell’impaginazione dei modelli.
           </p>
         </div>
       </fieldset>

@@ -19,7 +19,7 @@ import { Logo } from './Logo';
 import { Signature } from './Signature';
 
 interface TodayCounts {
-  code: { daFirmare: number | null };
+  code: { daFirmare: number | null; inBozza?: number | null };
 }
 
 const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
@@ -28,6 +28,9 @@ const NAV: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/ricette', label: 'Ricette', icon: 'ricette' },
   { to: '/banche-dati', label: 'Farmaci e prestazioni', icon: 'farmaci' },
 ];
+
+/** Le voci che servono solo a chi ha un ruolo clinico: medico, sostituto, segreteria. */
+const CLINICAL_ONLY = new Set(['/pazienti', '/ricette']);
 
 /**
  * Cartelle aperte insieme (D68): una scheda per paziente, che riporta all'ultima pagina vista.
@@ -235,11 +238,19 @@ export function Shell({ children }: { children: ReactNode }) {
   const location = useLocation();
   // Il numero accanto a «Ricette» si aggiorna a ogni cambio di pagina.
   const today = useApi<TodayCounts>(`/api/oggi?_=${encodeURIComponent(location.pathname)}`);
-  const toSign = today.data?.code.daFirmare ?? null;
+  // Da firmare, e le bozze di chi guarda: una ricetta salvata non si dimentica (audit, D259).
+  const counts = today.data?.code;
+  const toSign =
+    counts && (counts.daFirmare !== null || counts.inBozza != null)
+      ? (counts.daFirmare ?? 0) + (counts.inBozza ?? 0)
+      : null;
   const me = state.status === 'ready' ? state.me : null;
   const header = useRef<HTMLElement>(null);
+  // Chi è solo amministratore non apre cartelle né ricette: Pazienti e Ricette non sono nel suo
+  // menu, invece di portare a pagine vuote (suggerimento S11 dell'audit, D259).
+  const clinical = !me || me.ruoli.some((r) => r.codice !== 'administrator');
   const items = [
-    ...NAV,
+    ...NAV.filter((n) => clinical || !CLINICAL_ONLY.has(n.to)),
     ...(me?.archivio
       ? [{ to: '/archivio', label: 'Archivio', icon: 'archivio' as const, end: false }]
       : []),
@@ -273,7 +284,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <Icon name={n.icon} />
               <span>{n.label}</span>
               {n.to === '/ricette' && toSign !== null && toSign > 0 && (
-                <span className="contatore" aria-label={`${toSign} da firmare`}>
+                <span className="contatore" aria-label={`${toSign} da firmare o in bozza`}>
                   {toSign}
                 </span>
               )}

@@ -3,6 +3,9 @@ import {
   cancellableState,
   DISPENSING_STATE_LABELS,
   INTERRUPTED_SEND_AFTER_MINUTES,
+  normalizePrescriptionNumber,
+  nrbeProblem,
+  nreProblem,
   transition,
   type PrescriptionEvent,
   type PrescriptionKind,
@@ -116,11 +119,13 @@ const signSchema = z
   .strict();
 
 /**
- * Esito di un invio rimasto senza risposta (D233), come lo dice l'ente al medico. Il formato
- * dell'NRE non è nelle specifiche che abbiamo (A1): lettere e cifre, in maiuscolo come le vuole il
- * codice a barre del promemoria (D239). Per la ricetta SSN serve anche il codice di autenticazione:
- * senza, la ricetta non è valida (specifiche del Sistema TS, D240). Per la ricetta bianca il
- * Sistema TS dà NRBE e PIN (D239).
+ * Esito di un invio rimasto senza risposta (D233), come lo dice l'ente al medico. Il numero si
+ * scrive senza spazi e in maiuscolo, come lo vuole il codice a barre del promemoria (D239); la sua
+ * forma (NRE di 15 caratteri, NRBE di 12) si controlla poi secondo il tipo di ricetta, con le
+ * specifiche del Sistema TS (`nreProblem`, `nrbeProblem`, audit D259). Per la ricetta SSN serve
+ * anche il codice di autenticazione: senza, la ricetta non è valida (specifiche del Sistema TS,
+ * D240). Per la ricetta bianca il Sistema TS dà NRBE e PIN (D239). Codice e PIN non hanno un
+ * formato nelle specifiche lette: lettere e cifre, da completare (D259).
  */
 const settleSchema = z.discriminatedUnion('esito', [
   z.object({ esito: z.literal('non_arrivata') }).strict(),
@@ -129,9 +134,12 @@ const settleSchema = z.discriminatedUnion('esito', [
       esito: z.literal('arrivata'),
       nre: z
         .string()
-        .trim()
-        .toUpperCase()
-        .regex(/^[A-Z0-9]{1,30}$/, 'Il numero di ricetta ha solo lettere e cifre, al più 30'),
+        .transform(normalizePrescriptionNumber)
+        .pipe(
+          z
+            .string()
+            .regex(/^[A-Z0-9]{1,30}$/, 'Il numero di ricetta ha solo lettere e cifre, al più 30'),
+        ),
       codiceAutenticazione: z
         .string()
         .trim()
@@ -350,8 +358,23 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     );
   }
 
-  /** Il medico prepara una ricetta nuova (bozza). Il corpo si valida dopo la guardia. */
+  /**
+   * Una ricetta nuova (bozza). Il medico la prepara come vuole; la segreteria solo come ripetizione
+   * di terapie croniche (requisiti, «Ruoli»), anche dalla «Nuova ricetta» (audit, D259). Il corpo si
+   * valida dopo la guardia.
+   */
   async function createDraft(actor: Actor, patientId: string, body: unknown) {
+    const [row] = await db
+      .select({ archiveId: patient.archiveId })
+      .from(patient)
+      .where(and(eq(patient.id, patientId), eq(patient.studioId, actor.studioId)));
+    const doctor =
+      !row ||
+      can(actor, 'prescription.draft', {
+        ...(await loadArchiveContext(db, row.archiveId)),
+        now: now(),
+      }).allowed;
+    if (!doctor) return createRepeatDraft(actor, patientId, body);
     const { patient: p } = await guardPatient(
       db,
       actor,
@@ -361,6 +384,80 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     );
     assertNotDeceased(p);
     return insertDraft(actor, patientId, p.archiveId, draftSchema.parse(body), 'draft');
+  }
+
+  /**
+   * La bozza della segreteria dalla «Nuova ricetta» (D259): ogni riga è una terapia cronica in
+   * corso del paziente, non riservata, come in «Ripeti le terapie scelte». Della riga contano la
+   * terapia e le confezioni; farmaco, nota AIFA e posologia vengono dalla scheda della terapia,
+   * non da ciò che manda il browser. Le regole (R2–R4) controllano le confezioni prima della firma.
+   */
+  async function createRepeatDraft(actor: Actor, patientId: string, body: unknown) {
+    const { patient: p, context } = await guardPatient(
+      db,
+      actor,
+      patientId,
+      'prescription.draft_repeat',
+      'ricetta_ripetizione',
+      { therapyKind: 'chronic' },
+    );
+    assertNotDeceased(p);
+    const input = draftSchema.parse(body);
+    if (input.kind === 'specialist_ssn')
+      // Registrata come richiesta negata: la ricetta specialistica la prepara il medico.
+      await guardPatient(db, actor, patientId, 'prescription.draft', 'ricetta_bozza');
+    const ids = input.lines.map((l) => l.therapyId);
+    if (ids.some((id) => !id))
+      throw new HttpError(
+        403,
+        'La segreteria prepara solo le ripetizioni delle terapie croniche in corso: si aggiungono dai farmaci prescritti',
+      );
+    const rows = await db
+      .select()
+      .from(therapy)
+      .where(and(eq(therapy.patientId, patientId), inArray(therapy.id, ids as string[])));
+    const byId = new Map(rows.map((t) => [t.id, t]));
+    const lines = [];
+    for (const l of input.lines) {
+      const t = byId.get(l.therapyId!);
+      if (!t) throw new HttpError(404, 'Terapia non trovata');
+      const decision = can(actor, 'prescription.draft_repeat', {
+        ...context,
+        resource: { therapyKind: t.kind, reserved: t.reserved },
+        now: now(),
+      });
+      if (!decision.allowed)
+        await guardPatient(
+          db,
+          actor,
+          patientId,
+          'prescription.draft_repeat',
+          'ricetta_ripetizione',
+          {
+            therapyKind: t.kind,
+            reserved: t.reserved,
+          },
+        );
+      if (t.status !== 'active') throw new HttpError(409, `Terapia non attiva: ${t.drugName}`);
+      if ((input.kind === 'white') !== t.notReimbursable)
+        throw new HttpError(
+          400,
+          `${t.drugName}: la terapia va in ricetta ${t.notReimbursable ? 'bianca' : 'SSN'}`,
+        );
+      lines.push({
+        therapyId: t.id,
+        drugAic: t.drugAic,
+        drugName: t.drugName,
+        activeIngredient: t.activeIngredient,
+        quantity: l.quantity,
+        aifaNote: t.aifaNote,
+        byActiveIngredient: t.byActiveIngredient,
+        notSubstitutable: t.notSubstitutable,
+        notSubstitutableReason: t.notSubstitutableReason,
+        posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
+      });
+    }
+    return insertDraft(actor, patientId, p.archiveId, { ...input, lines }, 'draft');
   }
 
   /**
@@ -826,6 +923,20 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const signedAt = p.signedAt!;
     const arrived = input.esito === 'arrivata' ? input : null;
     const white = p.kind === 'white';
+    // Il messaggio partito con quell'invio, fotografato alla firma (D239): è la richiesta che resta
+    // nel registro degli invii, e le sue righe e il paziente di allora vanno sul promemoria. Per
+    // una ricetta firmata prima della fotografia, come l'aveva firmato chi l'ha mandata.
+    const snapshot = p.sendingSnapshot as SendingSnapshot | null;
+    const message = snapshot?.message ?? (await buildMessage(p, p.signedBy!, studioDate(signedAt)));
+    // La forma del numero, prima di tutto (audit D259): NRE di 15 caratteri secondo le specifiche
+    // del Sistema TS del 5/12/2024; NRBE di 12, che per il paziente con il codice fiscale comincia
+    // con la lettera di controllo del codice fiscale mandato con la ricetta (DM 1/12/2022).
+    const shape = !arrived
+      ? null
+      : white
+        ? nrbeProblem(arrived.nre, message.patientFiscalCode)
+        : nreProblem(arrived.nre);
+    if (shape) throw new HttpError(400, shape);
     if (arrived && white && !arrived.pin)
       throw new HttpError(
         400,
@@ -840,11 +951,6 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         400,
         'Senza il codice di autenticazione la ricetta SSN non è valida: chiedi all’ente il numero (NRE) e il codice. Se l’ente non li dà, segna «Non è arrivata»',
       );
-    // Il messaggio partito con quell'invio, fotografato alla firma (D239): è la richiesta che resta
-    // nel registro degli invii, e le sue righe e il paziente di allora vanno sul promemoria. Per
-    // una ricetta firmata prima della fotografia, come l'aveva firmato chi l'ha mandata.
-    const snapshot = p.sendingSnapshot as SendingSnapshot | null;
-    const message = snapshot?.message ?? (await buildMessage(p, p.signedBy!, studioDate(signedAt)));
     let promemoria: Awaited<ReturnType<typeof buildPromemoriaData>> | null = null;
     // Il promemoria manca solo se i dati non si sono potuti fissare: il codice c'è sempre (D240).
     let notFixed = false;
@@ -1195,6 +1301,14 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return queue(actor, 'to_sign');
   }
 
+  /**
+   * «In bozza» (audit, D259): le bozze che chi guarda ha preparato e non ha ancora mandato, così
+   * una ricetta salvata non si dimentica. Le bozze degli altri restano loro.
+   */
+  async function draftQueue(actor: Actor) {
+    return queue(actor, 'draft', { mine: true });
+  }
+
   /** «Invii non riusciti»: ricette in errore, con il motivo. */
   async function failedQueue(actor: Actor) {
     return queue(actor, 'error');
@@ -1251,7 +1365,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
   async function queue(
     actor: Actor,
     status: PrescriptionStatus | PrescriptionStatus[],
-    opts: { signer?: boolean; confirmed?: boolean } = {},
+    opts: { signer?: boolean; confirmed?: boolean; mine?: boolean } = {},
   ) {
     const statuses = Array.isArray(status) ? status : [status];
     const signable = new Set(await visibleArchives(db, actor, 'prescription.sign_send'));
@@ -1282,6 +1396,13 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         firmataDa: sql<
           string | null
         >`(select u.display_name from app_user u where u.id = ${prescription.signedBy})`,
+        // Le consegne del promemoria riuscite (anche le stampe di prima dell'audit): «Archivia
+        // ricette confermate» chiede prima di archiviare quelle senza (suggerimento S7, D259).
+        consegne: sql<number>`(select count(*)::int from reminder_delivery d where d.prescription_id = ${prescription.id} and d.outcome in ('consegnato', 'stampato'))`,
+        // Il codice fiscale partito con l'invio (D239): con quello si controlla l'NRBE (D259).
+        codiceFiscaleInviato: sql<
+          string | null
+        >`${prescription.sendingSnapshot}->'message'->>'patientFiscalCode'`,
       })
       .from(prescription)
       .innerJoin(patient, eq(patient.id, prescription.patientId))
@@ -1291,6 +1412,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           inArray(prescription.archiveId, archives),
           inArray(prescription.status, statuses),
           opts.confirmed ? isNull(prescription.archivedAt) : undefined,
+          opts.mine ? eq(prescription.preparedBy, actor.userId) : undefined,
         ),
       )
       .orderBy(patient.lastName, patient.firstName, prescription.preparedAt);
@@ -1337,7 +1459,13 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         tipoErrore: r.tipoErrore,
         firmabile: signable.has(r.archiveId),
         ...(opts.confirmed
-          ? { stato: r.stato, nre: r.nre, inviataIl: r.inviataIl, cartaceaIl: r.cartaceaIl }
+          ? {
+              stato: r.stato,
+              nre: r.nre,
+              inviataIl: r.inviataIl,
+              cartaceaIl: r.cartaceaIl,
+              consegne: r.consegne,
+            }
           : {}),
         ...(opts.signer
           ? {
@@ -1348,6 +1476,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
                     r.firmataIl.getTime() + INTERRUPTED_SEND_AFTER_MINUTES * 60_000,
                   ).toISOString()
                 : null,
+              ...(statuses.includes('sending')
+                ? { codiceFiscaleInviato: r.codiceFiscaleInviato ?? r.codiceFiscale }
+                : {}),
             }
           : {}),
       });
@@ -1403,6 +1534,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     cancel,
     printPaper,
     toSignQueue,
+    draftQueue,
     failedQueue,
     interruptedQueue,
     confirmedQueue,

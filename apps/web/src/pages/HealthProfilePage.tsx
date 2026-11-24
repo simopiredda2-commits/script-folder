@@ -26,7 +26,7 @@ interface Content {
   sezioni: Record<SectionKey, Item[]>;
   assenze: Record<'allergie' | 'terapie' | 'problemi' | 'anamnesiFamiliare', string>;
   esclusi: { oscurate: number; riservate: number };
-  nonInseribili: { etichetta: string; motivo: string }[];
+  nonInseribili: { etichetta: string; motivo: string; sezione?: SectionKey }[];
 }
 interface Problem {
   type: string;
@@ -174,7 +174,7 @@ export function HealthProfilePage() {
             ))}
           </ul>
           {o.mancano.some((m) => m.startsWith('Medico:')) && o.puoFirmare && (
-            <p>
+            <p className="collegamento-solo">
               <Link to="/profilo/recapiti">Apri «Recapiti di studio»</Link>
             </p>
           )}
@@ -240,6 +240,15 @@ export function HealthProfilePage() {
                 s.mandatory
                   ? (pickedAbsence[s.key] ??
                     open.contenuto!.assenze[s.key as keyof Content['assenze']])
+                  : undefined
+              }
+              recorded={
+                open.contenuto!.sezioni[s.key].length +
+                open.contenuto!.nonInseribili.filter((n) => n.sezione === s.key).length
+              }
+              completeHref={
+                s.key === 'terapie'
+                  ? (itemId) => `/pazienti/${id}/terapie/${itemId}/modifica`
                   : undefined
               }
               editable={open.stato === 'draft' && o!.puoFirmare && !busy}
@@ -398,7 +407,10 @@ export function HealthProfilePage() {
                   {v.pubblicatoIl && <> il {dateTime(v.pubblicatoIl)}</>}
                   {v.sostituitoIl && <>; sostituita il {dateTime(v.sostituitoIl)}</>}
                 </p>
-                <p className="tenue codice">{v.documento}</p>
+                {/* L'identificativo con il suo nome, non un codice da solo (suggerimento S9, D259). */}
+                <p className="tenue">
+                  Identificativo nel Fascicolo: <span className="codice">{v.documento}</span>
+                </p>
                 <a
                   className="pulsante pulsante-piatto"
                   href={`${base}/${v.id}/pdf`}
@@ -449,6 +461,8 @@ function Exclusions({ c }: { c: Content }) {
 function Section({
   section,
   items,
+  recorded,
+  completeHref,
   absence,
   editable,
   onToggle,
@@ -456,12 +470,19 @@ function Section({
 }: {
   section: { key: SectionKey; title: string; mandatory: boolean };
   items: Item[];
+  /** Voci della cartella per la sezione, anche quelle che non possono entrare (D259). */
+  recorded: number;
+  /** Dove si completano i dati che mancano a una voce: per le terapie, la loro scheda. */
+  completeHref?: (itemId: string) => string;
   absence?: string;
   editable: boolean;
   onToggle: (itemId: string, included: boolean) => void;
   onAbsence: (value: string) => void;
 }) {
   const anyIncluded = items.some((i) => i.incluso);
+  // «Nessuna … nota» solo con la sezione vuota in cartella: altrimenti il Profilo direbbe il
+  // falso (audit D259). Resta «Nessuna informazione», che il servizio scrive per difetto.
+  const noInfo = ABSENCES[section.key]?.find((a) => !a.value.startsWith('no-known'));
   return (
     <fieldset className="sezione-profilo">
       <legend>{section.title}</legend>
@@ -483,11 +504,23 @@ function Section({
             <p id={`manca-${i.id}`} className="manca-voce">
               <Icon name="avviso" />{' '}
               <span>Non può entrare: {i.manca.map(lowerFirst).join('; ')}.</span>
+              {completeHref && (
+                <>
+                  {' '}
+                  <Link to={completeHref(i.id)}>Completa la scheda di {i.etichetta}</Link>
+                </>
+              )}
             </p>
           )}
         </div>
       ))}
-      {section.mandatory && !anyIncluded && absence && (
+      {section.mandatory && !anyIncluded && absence && recorded > 0 && noInfo && (
+        <p className="tenue">
+          Nessuna voce inclusa: nel Profilo si scrive «{noInfo.label}». «Nessuna … nota» non si può
+          scrivere, perché in cartella ci sono voci: includile o completa i dati che mancano.
+        </p>
+      )}
+      {section.mandatory && !anyIncluded && absence && recorded === 0 && (
         <fieldset className="scelta-in-riga">
           <legend>Sezione obbligatoria senza voci: nel Profilo si scrive</legend>
           {ABSENCES[section.key]!.map((a) => (

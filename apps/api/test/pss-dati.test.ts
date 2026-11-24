@@ -1,4 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import {
+  absenceProblems,
+  DEFAULT_ABSENCES,
+  keepChoices,
+  type PssContent,
+} from '../src/fse/compose';
 import { studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -275,5 +281,65 @@ describe('dati della cartella per il Profilo Sanitario Sintetico', () => {
       regime: 'NOSSN',
     });
     expect((await at(admin, 'PUT', { ...body, regime: 'SSN' })).statusCode).toBe(200);
+  });
+});
+
+/** Le assenze dicono il vero (audit D259): «nessuna … nota» solo con la sezione vuota. */
+describe('assenze del Profilo', () => {
+  const content = (over: Partial<PssContent> = {}): PssContent => ({
+    composto: '2026-11-24T10:00:00Z',
+    paziente: { cf: '', nome: '', cognome: '', sesso: null, nascita: '', luogoNascita: null },
+    sezioni: {
+      allergie: [],
+      terapie: [],
+      problemi: [],
+      anamnesiFamiliare: [],
+      parametri: [],
+      stiliDiVita: [],
+      capacitaMotoria: [],
+    },
+    assenze: { ...DEFAULT_ABSENCES },
+    esclusi: { oscurate: 0, riservate: 0 },
+    nonInseribili: [],
+    ...over,
+  });
+  const therapy = { id: 't1', etichetta: 'Farmaco inventato', incluso: false, manca: [], dati: {} };
+
+  it('con la sezione vuota «nessuna nota» va bene; con una voce esclusa no; con una inclusa non conta', () => {
+    const known = { ...DEFAULT_ABSENCES, terapie: 'no-known-medications' as const };
+    expect(absenceProblems(content({ assenze: known }))).toEqual([]);
+    const withItem = content({
+      assenze: known,
+      sezioni: { ...content().sezioni, terapie: [therapy as never] },
+    });
+    expect(absenceProblems(withItem)).toEqual([
+      expect.stringMatching(/^Terapie farmacologiche: in cartella ci sono voci/),
+    ]);
+    const included = content({
+      assenze: known,
+      sezioni: { ...content().sezioni, terapie: [{ ...therapy, incluso: true } as never] },
+    });
+    expect(absenceProblems(included)).toEqual([]);
+    // Una voce che non può entrare conta, se è di quella sezione.
+    const notInsertable = content({
+      assenze: { ...DEFAULT_ABSENCES, anamnesiFamiliare: 'no-known-problems' },
+      nonInseribili: [{ etichetta: 'x', motivo: 'y', sezione: 'anamnesiFamiliare' }],
+    });
+    expect(absenceProblems(notInsertable)).toEqual([expect.stringMatching(/^Anamnesi familiare/)]);
+  });
+
+  it('ricomponendo, una «nessuna nota» che non vale più torna «nessuna informazione»', () => {
+    const before = content({
+      assenze: {
+        ...DEFAULT_ABSENCES,
+        terapie: 'no-known-medications',
+        allergie: 'no-known-allergies',
+      },
+    });
+    const fresh = content({ sezioni: { ...content().sezioni, terapie: [therapy as never] } });
+    const kept = keepChoices(fresh, before);
+    expect(kept.assenze.terapie).toBe('no-medication-info');
+    // Dove la sezione è ancora vuota la scelta resta.
+    expect(kept.assenze.allergie).toBe('no-known-allergies');
   });
 });

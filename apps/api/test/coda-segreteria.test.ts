@@ -148,8 +148,14 @@ describe('code delle ricette viste dalla segreteria (D242)', () => {
     const theirs = await send('collega', theirPatient, 'Farmaco del collega di prova');
     const waiting = await toSign('titolare', s.richPatient, { drugName: 'Farmaco in attesa' });
     const seen = await find('titolare', 'confermate', sent);
-    expect(seen).toMatchObject({ stato: 'sent' });
+    expect(seen).toMatchObject({ stato: 'sent', consegne: 0 });
     expect((seen as unknown as { nre: string }).nre).toMatch(/\S/);
+    // Una consegna su carta: la ricetta la conta, e «Archivia» non chiede più (suggerimento S7).
+    const paper = await req('titolare', 'POST', `/api/ricette/${sent}/promemoria/consegna-carta`, {
+      formato: 'completo',
+    });
+    expect(paper.statusCode, paper.body).toBe(200);
+    expect(await find('titolare', 'confermate', sent)).toMatchObject({ consegne: 1 });
     // La segreteria le vede anche lei; quelle da firmare non sono confermate.
     expect(await find('segreteria', 'confermate', sent)).toBeDefined();
     expect(await find('titolare', 'confermate', waiting)).toBeUndefined();
@@ -200,5 +206,32 @@ describe('code delle ricette viste dalla segreteria (D242)', () => {
     });
     expect(await find('segreteria', 'da-firmare', theirs)).toBeUndefined();
     expect(await find('collega', 'da-firmare', theirs)).toMatchObject({ firmabile: true });
+  });
+
+  it('in bozza (audit, D259): chi la prepara la ritrova, con il conto in Oggi; gli altri no', async () => {
+    const today = async (who: string) =>
+      (await req(who, 'GET', '/api/oggi')).json<{ code: { inBozza: number | null } }>().code
+        .inBozza;
+    const before = await today('titolare');
+    const res = await req('titolare', 'POST', `/api/pazienti/${s.richPatient}/ricette`, {
+      kind: 'pharma_ssn',
+      lines: [{ quantity: 1, activeIngredient: 'principio di prova', drugName: 'Bozza di prova' }],
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const id = res.json<{ id: string }>().id;
+    expect(await find('titolare', 'in-bozza', id)).toBeTruthy();
+    expect(await today('titolare')).toBe((before ?? 0) + 1);
+    // La bozza è del medico che l'ha preparata: né la segreteria né la collega la vedono qui.
+    expect(await find('segreteria', 'in-bozza', id)).toBeUndefined();
+    expect(await find('collega', 'in-bozza', id)).toBeUndefined();
+    // Mandata alla firma esce dalle bozze ed entra fra le ricette da firmare.
+    expect((await req('titolare', 'POST', `/api/ricette/${id}/da-firmare`, {})).statusCode).toBe(
+      200,
+    );
+    expect(await find('titolare', 'in-bozza', id)).toBeUndefined();
+    expect(await find('titolare', 'da-firmare', id)).toBeTruthy();
+    expect(await today('titolare')).toBe(before);
+    // L'amministratore senza ruolo clinico non ha bozze né conto.
+    expect(await today('amministratore')).toBeNull();
   });
 });

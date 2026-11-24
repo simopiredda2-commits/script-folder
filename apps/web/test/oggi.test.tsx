@@ -99,6 +99,11 @@ describe('pagina Oggi: avvisi dei servizi (D100–D102)', () => {
         'Codice di sessione RUPAR Piemonte non attivo: serve per mandare le ricette.',
       ),
     ).toBeTruthy();
-    expect(screen.getByText(/Mancano le credenziali Sistema TS/)).toBeTruthy();
+    // Sigle e nomi propri restano maiuscoli (audit D259).
+    expect(
+      screen.getByText(
+        'Mancano le credenziali Sistema TS (certificati di malattia INPS e ricetta bianca elettronica).',
+      ),
+    ).toBeTruthy();
   });
 });

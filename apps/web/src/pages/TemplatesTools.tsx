@@ -401,7 +401,7 @@ function LayoutForm({
             onChange={(e) => setHeader(e.target.value)}
           />
           <p className="aiuto" id="impaginazione-intestazione-aiuto">
-            Una riga per riga, al massimo sei; la prima si stampa in neretto.
+            Al massimo sei righe; la prima si stampa in neretto.
           </p>
         </div>
         <fieldset className="scelta-in-riga">

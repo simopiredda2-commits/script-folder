@@ -157,10 +157,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       };
       for (const el of document.querySelectorAll('a, button, input, select, textarea, summary')) {
         if (!visible(el) || el.closest('.salta')) continue;
-        // Eccezione WCAG: collegamenti dentro una frase.
+        // Eccezione WCAG: collegamenti dentro una frase. Un collegamento da solo nel suo
+        // paragrafo non è in una frase: è un bersaglio come gli altri (audit D259).
+        const words = (e: Element) => (e.textContent ?? '').replace(/\s+/g, ' ').trim();
+        const sentence = el.parentElement?.closest('p');
         if (
           el.tagName === 'A' &&
-          el.parentElement?.closest('p') &&
+          sentence &&
+          words(sentence) !== words(el) &&
           getComputedStyle(el).display === 'inline'
         )
           continue;
@@ -775,6 +779,28 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.locator('.risultato').filter({ hasText: 'TEVA ITALIA' }).waitFor();
     await page.getByText('Banche dati dei farmaci in uso').waitFor();
     await check(page, 'nuova ricetta con risultati', true);
+    // Su tablet in verticale la ricerca scorre nel suo riquadro, alto al massimo metà schermo:
+    // «In ricetta» viene subito dopo, non dopo tutti i risultati (audit D259).
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await expect(
+      page.evaluate(() => {
+        const box = document.querySelector('section[aria-labelledby="titolo-cerca"]')!;
+        const css = getComputedStyle(box);
+        const r = box.getBoundingClientRect();
+        const heading = document.getElementById('titolo-ricetta')!.getBoundingClientRect();
+        return {
+          box: [css.maxHeight, css.overflowY],
+          // Alta al massimo metà schermo, e subito dopo il riquadro di «In ricetta»: fra i due
+          // solo margine, spazio della griglia, bordo e spaziatura interna (53 px).
+          short: r.height <= innerHeight / 2 + 1,
+          next:
+            box.nextElementSibling ===
+            document.querySelector('section[aria-labelledby="titolo-ricetta"]'),
+          close: heading.top - r.bottom < 64,
+        };
+      }),
+    ).resolves.toEqual({ box: ['512px', 'auto'], short: true, next: true, close: true });
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page
       .locator('.risultato')
       .filter({ hasText: 'TEVA ITALIA' })
@@ -1019,9 +1045,59 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     // altri programmi, dal collegamento sotto l'elenco. Il menu resta su «Nuova ricetta».
     const menu = page.getByRole('navigation', { name: 'Sezioni della cartella' });
     await menu.getByRole('link', { name: 'Nuova ricetta', exact: true }).click();
-    await page
-      .getByRole('list', { name: 'Farmaci prescritti' })
+    const prescribedList = page.getByRole('list', { name: 'Farmaci prescritti' });
+    await prescribedList.getByRole('listitem').first().waitFor();
+    // Un farmaco senza terapia con la sola ricetta annullata non è fra i prescritti (audit D259); con
+    // una ricetta inviata, sì. Le due ricette, del giorno prima, le inserisce la prova.
+    const yesterday = new Date(s.clock.now().getTime() - 86_400_000);
+    const amlodipinePrescription = async (status: 'cancelled' | 'sent', nre: string) =>
+      withActor(t.db, s.users.titolare.id, async (tx) => {
+        const [rx] = await tx
+          .insert(prescription)
+          .values({
+            patientId: s.richPatient,
+            archiveId: s.archives.titolare,
+            kind: 'pharma_ssn',
+            status,
+            nre,
+            preparedBy: s.users.titolare.id,
+            preparedAt: yesterday,
+            signedBy: s.users.titolare.id,
+            signedAt: yesterday,
+            sentAt: yesterday,
+            ...(status === 'cancelled'
+              ? {
+                  cancelledAt: yesterday,
+                  cancelledBy: s.users.titolare.id,
+                  cancelReason: 'Prescritta per errore',
+                }
+              : {}),
+          })
+          .returning({ id: prescription.id });
+        await tx.insert(prescriptionLine).values({
+          prescriptionId: rx!.id,
+          position: 1,
+          drugAic: '038548032',
+          drugName: 'AMLODIPINA TEVA ITALIA 5 MG COMPRESSE',
+          activeIngredient: 'AMLODIPINA BESILATO',
+          quantity: 1,
+          posologyText: '1 compressa al giorno',
+        });
+      });
+    await amlodipinePrescription('cancelled', '123A01900000002');
+    await page.reload();
+    await prescribedList.getByRole('listitem').first().waitFor();
+    await expect(
+      prescribedList
+        .getByRole('listitem')
+        .filter({ hasText: /AMLODIPINA/ })
+        .count(),
+    ).resolves.toBe(0);
+    await amlodipinePrescription('sent', '123A01900000001');
+    await page.reload();
+    await prescribedList
       .getByRole('listitem')
+      .filter({ hasText: /AMLODIPINA/ })
       .first()
       .waitFor();
     // La riga aperta sta nel suo riquadro anche dove la colonna è più stretta: le ultime ricette,
@@ -1269,7 +1345,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await sec.getByText('Riepilogo clinico').waitFor();
       await sec.getByLabel('Seleziona Farmaco di prova 5 mg da ripetere').check();
       await sec.getByRole('button', { name: /Ripeti 1 terapia/ }).click();
-      await sec.getByText(/coda «da firmare» del medico/).waitFor();
+      // Una ricetta: «è nella coda», al singolare (audit D259).
+      await sec.getByText('Preparata 1 ricetta: è nella coda «da firmare» del medico.').waitFor();
       await check(sec, 'cartella vista dalla segreteria');
       // La segreteria non scrive le terapie e non ha un archivio suo.
       await expect(sec.getByRole('link', { name: 'Nuova terapia' }).count()).resolves.toBe(0);
@@ -1549,14 +1626,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await byEmail.getByRole('button', { name: 'Chiedi il codice' }).click();
     await byEmail.getByText(/Ambiente di prova/).waitFor();
     await byEmail.getByRole('button', { name: 'Attiva' }).click();
-    await byEmail.getByText(/^Attivo fino a/).waitFor();
+    await byEmail.getByText(/^Attivo fino al \d{2}\/\d{2}\/\d{4} alle \d{2}:\d{2}\.$/).waitFor();
     // Accesso regionale con SPID o CIE (D109): la pagina regionale simulata, poi il ritorno.
     await regional.getByRole('button', { name: 'Entra con SPID o CIE' }).click();
     await page.getByRole('heading', { level: 1, name: 'Accesso regionale simulato' }).waitFor();
     await check(page, 'pagina regionale simulata');
     await page.getByRole('button', { name: 'Entra con SPID (simulato)' }).click();
     await page.getByText('Accesso regionale attivo: puoi mandare le ricette SSN.').waitFor();
-    await regional.getByText(/^Attivo fino a/).waitFor();
+    await regional.getByText(/^Attivo fino al \d{2}\/\d{2}\/\d{4} alle \d{2}:\d{2}\.$/).waitFor();
     expect(new URL(page.url()).search).toBe('');
   });
 
@@ -1630,6 +1707,10 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     );
     await page.getByRole('button', { name: 'Registra', exact: true }).click();
     await page.getByText('Voce registrata.').waitFor();
+    // Durante il salvataggio il modulo è spento: il fuoco va all'esito, non alla pagina (D259).
+    await expect(
+      page.evaluate(() => document.activeElement?.textContent?.trim() ?? ''),
+    ).resolves.toBe('Voce registrata.');
     const item = page.locator('.voce').filter({ hasText: 'Problema della prova nel browser' });
     await item.waitFor();
     await check(page, 'voci cliniche', true);
@@ -1816,6 +1897,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('button', { name: 'Firma e pubblica' }).click();
     await page.getByText('Profilo firmato e pubblicato nel Fascicolo.').waitFor();
     await page.getByRole('heading', { name: 'Versioni nel Fascicolo' }).waitFor();
+    // L'identificativo del documento con il suo nome (suggerimento S9 dell'audit, D259).
+    await page
+      .getByText(/^Identificativo nel Fascicolo: \S+$/)
+      .first()
+      .waitFor();
     const signed = page.getByRole('link', { name: 'PDF firmato della versione 1' });
     const res = await page.request.get(`${base}${await signed.getAttribute('href')}`);
     expect(res.status()).toBe(200);
@@ -2820,6 +2906,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'decesso segnalato da AURA in Oggi');
     await today.getByRole('link', { name }).first().click();
     await section.getByRole('button', { name: 'Conferma il decesso' }).click();
+    // Il decesso non si cambia dopo: prima la domanda (audit D259).
+    await section.getByRole('button', { name: 'Sì, conferma il decesso' }).click();
     await section.getByText('Decesso confermato.').waitFor();
     const [after] = await t.db.select().from(patient).where(eq(patient.id, deadId));
     expect(after).toMatchObject({ status: 'deceased', deceasedOn: died });
@@ -2839,7 +2927,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     }
     await check(page, 'ricetta per un paziente deceduto', true);
 
-    // La ricetta preparata prima del decesso si ferma con R19, anche con «Firma e invia»: non parte.
+    // La ricetta preparata prima del decesso si ferma con R19: «Firma e invia» è spento e la pagina
+    // dice perché e dove si corregge (audit D259); la ricetta non parte.
     await page.goto(`${base}/ricette`);
     await page.getByRole('heading', { name: 'Da firmare' }).waitFor();
     const group = page
@@ -2853,11 +2942,19 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     const reason = group.getByLabel('Motivo per procedere nonostante l’avviso R19');
     await expect(reason.count()).resolves.toBe(0);
     await check(page, 'ricetta di un deceduto nella coda da firmare', true);
-    await group.getByRole('button', { name: 'Firma e invia' }).click();
     await group
       .getByRole('alert')
-      .getByText(/^R19: Il paziente risulta deceduto/)
+      .getByText(/^La ricetta non può partire: R19 blocca\./)
       .waitFor();
+    await group
+      .getByText('Se lo stato è sbagliato, correggilo nei «Dati amministrativi»', {
+        exact: false,
+      })
+      .first()
+      .waitFor();
+    await expect(group.getByRole('button', { name: 'Firma e invia' }).isDisabled()).resolves.toBe(
+      true,
+    );
     await expect(reason.count()).resolves.toBe(0);
     const [still] = await t.db.select().from(prescription).where(eq(prescription.id, rxId));
     expect(still!.status).toBe('to_sign');
@@ -2975,6 +3072,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await changes
       .getByRole('button', { name: `Sposta ${name} nell’archivio di Dott. Paolo Serra` })
       .click();
+    // Lo spostamento non si annulla: prima la domanda (audit D259).
+    await changes.getByRole('button', { name: 'Sì, sposta' }).click();
     await changes.getByText(`${name}: spostato nell’archivio di Dott. Paolo Serra.`).waitFor();
     await check(page, 'paziente spostato nell’archivio del collega');
     const [after] = await t.db.select().from(patient).where(eq(patient.id, movingId));

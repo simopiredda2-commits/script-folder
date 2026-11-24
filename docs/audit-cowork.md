@@ -11,7 +11,7 @@ Una cartella clinica in cloud per medici di medicina generale, partendo dal Piem
 - **Dimostrazione nel browser**: https://claude.ai/artifact/Md4KFYrVagjLdnNewSMzCQ (versione 23). È privata: va aperta dal conto di Simone. Programma, database e servizi simulati girano nella pagina; ricaricando si riparte da capo, con i dati del giorno.
 - **Accesso**: il riquadro «Dimostrazione» mostra gli utenti, la password (la stessa per tutti) e il codice del secondo fattore di chi accede. Utenti: `medico` (titolare), `segreteria`, `sostituto`, `amministratore`; in più una collega dello studio e un medico di un altro studio dell'AFT.
 - **Dati**: solo pazienti inventati. Farmaci: le liste di classe A e H di AIFA del 30/6/2026 e le confezioni dell'anagrafica che vi compaiono; classe C e farmaci senza obbligo di prescrizione non ci sono (da integrare, D257).
-- **Repository** (facoltativo): `simopiredda2-commits/script-folder`. Da leggere: `docs/requisiti.md` (che cosa deve fare), `docs/decisioni.md` (le scelte, D1–D257), `docs/avanzamento.md` («Che cosa resta aperto»), `docs/interfaccia.md` (schermate e accessibilità).
+- **Repository** (facoltativo): `simopiredda2-commits/script-folder`. Da leggere: `docs/requisiti.md` (che cosa deve fare), `docs/decisioni.md` (le scelte, D1–D258), `docs/avanzamento.md` («Che cosa resta aperto»), `docs/interfaccia.md` (schermate e accessibilità).
 
 ## Che cosa guardare
 

@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { ApiError } from '../lib/api';
 import { CREDENTIALS_PATH, isCredentialError } from '../lib/credentials';
-import { date, dateTime } from '../lib/format';
+import { date, dateTime, sentence } from '../lib/format';
 import { Icon } from './Icon';
 
 /** Stato di caricamento, annunciato a chi usa un lettore di schermo. */
@@ -26,14 +26,36 @@ function fieldMessages(error: ApiError): string[] {
   return [...new Set(messages)].slice(0, 5);
 }
 
-export function ErrorMessage({ error }: { error: ApiError | null }) {
+export function ErrorMessage({
+  error,
+  focus = false,
+}: {
+  error: ApiError | null;
+  /**
+   * L'errore di un'azione che toglie o spegne il pulsante premuto prende il fuoco, che altrimenti
+   * finirebbe sulla pagina (WCAG 2.4.3, audit D259).
+   */
+  focus?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focus && error) ref.current?.focus();
+  }, [focus, error]);
   if (!error) return null;
   const fields = fieldMessages(error);
   return (
-    <div className="messaggio messaggio-errore" role="alert">
+    <div
+      ref={ref}
+      tabIndex={focus ? -1 : undefined}
+      className="messaggio messaggio-errore"
+      role="alert"
+    >
       <Icon name="avviso" />
       <span>
-        {error.message}
+        {/* Seguito dal collegamento, il messaggio chiude la frase col punto (audit D259). */}
+        {isCredentialError(error.details) && fields.length === 0
+          ? sentence(error.message)
+          : error.message}
         {fields.length > 0 && `: ${fields.join('; ')}`}
         {isCredentialError(error.details) && (
           <>
@@ -58,6 +80,70 @@ export function Notice({
     <div className={`messaggio messaggio-${kind}`} role={kind === 'errore' ? 'alert' : 'status'}>
       <Icon name={icon} />
       <div>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Domanda di conferma prima di un esito che poi non si cambia (WCAG 3.3.4, audit D259): la
+ * domanda, «Sì» e «Torna indietro». Quando compare prende il fuoco, così la tastiera e il lettore
+ * di schermo la trovano subito (WCAG 2.4.3).
+ */
+export function ConfirmQuestion({
+  label,
+  yes,
+  busy = false,
+  onYes,
+  onBack,
+  children,
+}: {
+  /** Nome del gruppo, per il lettore di schermo. */
+  label: string;
+  /** Il testo del «Sì», che dice che cosa si fa: «Sì, sposta». */
+  yes: string;
+  busy?: boolean;
+  onYes: () => void;
+  onBack: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  return (
+    <div ref={ref} tabIndex={-1} className="conferma-esito" role="group" aria-label={label}>
+      <p>{children}</p>
+      <div className="azioni">
+        <button
+          type="button"
+          className="pulsante pulsante-primario"
+          disabled={busy}
+          onClick={onYes}
+        >
+          <Icon name="fatto" /> <span>{yes}</span>
+        </button>
+        <button type="button" className="pulsante" disabled={busy} onClick={onBack}>
+          <Icon name="annulla" /> <span>Torna indietro</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * L'esito di un'azione che toglie il pulsante premuto: prende il fuoco, che altrimenti finirebbe
+ * sulla pagina (WCAG 2.4.3, audit D259).
+ */
+export function ResultNotice({
+  kind = 'fatto',
+  children,
+}: {
+  kind?: 'info' | 'avviso' | 'errore' | 'fatto';
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => ref.current?.focus(), [children]);
+  return (
+    <div ref={ref} tabIndex={-1} className="esito-segnato">
+      <Notice kind={kind}>{children}</Notice>
     </div>
   );
 }

@@ -342,12 +342,68 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .getByRole('button', { name: 'Riduci il riquadro della dimostrazione' });
     if (await reduce.count()) await reduce.click();
     await f.locator('button.dimo-apri').waitFor();
+    // Il pulsante dice di chi è il codice (suggerimento S5 dell'audit, D259).
+    await f
+      .locator('button.dimo-apri')
+      .getByText(/^codice per medico: \d{3} \d{3}$/)
+      .waitFor();
     for (const v of [
       { width: 1280, height: 900 },
       { width: 1024, height: 768 },
       { width: 820, height: 1180 },
+      { width: 768, height: 1024 },
     ]) {
       await page.setViewportSize(v);
+      // Con la pagina in alto e a metà il pulsante non copre comandi del programma: dove la pagina
+      // scorre, non le sta sopra (audit D259, «Aggiungi» coperto a 768×1024).
+      for (const at of [0, 0.5]) {
+        const under = await f.evaluate(async (at) => {
+          const doc = document.scrollingElement!;
+          scrollTo(0, (doc.scrollHeight - innerHeight) * at);
+          await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+          const pill = document.querySelector('button.dimo-apri')!.getBoundingClientRect();
+          // Di ogni comando conta la parte che si vede, tagliata dai riquadri che scorrono e dallo
+          // schermo: un campo nascosto in fondo a un riquadro che scorre non è coperto (CI del
+          // 24/11/2026, la scelta del promemoria sotto «In ricetta» a 1024×768).
+          const seen = (e: Element) => {
+            const r = e.getBoundingClientRect();
+            let [left, top, right, bottom] = [r.left, r.top, r.right, r.bottom];
+            for (
+              let p = e.parentElement;
+              p && p !== document.documentElement;
+              p = p.parentElement
+            ) {
+              const s = getComputedStyle(p);
+              if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
+              const c = p.getBoundingClientRect();
+              left = Math.max(left, c.left);
+              top = Math.max(top, c.top);
+              right = Math.min(right, c.right);
+              bottom = Math.min(bottom, c.bottom);
+            }
+            return {
+              left: Math.max(left, 0),
+              top: Math.max(top, 0),
+              right: Math.min(right, innerWidth),
+              bottom: Math.min(bottom, innerHeight),
+            };
+          };
+          return [...document.querySelectorAll('#root a, #root button, #root input, #root select')]
+            .filter((e) => {
+              const r = seen(e);
+              return (
+                r.right > r.left &&
+                r.bottom > r.top &&
+                r.left < pill.right &&
+                r.right > pill.left &&
+                r.top < pill.bottom &&
+                r.bottom > pill.top
+              );
+            })
+            .map((e) => (e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 40));
+        }, at);
+        expect(under, `${where} a ${v.width}×${v.height}, pagina a ${at * 100}%`).toEqual([]);
+      }
       const measure = () =>
         f.evaluate(async () => {
           scrollTo(0, document.scrollingElement!.scrollHeight);
@@ -439,12 +495,25 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     const registry = text.match(/un’ASL diversa per (.+), da confermare/)![1]!;
     const deceased = text.match(/il decesso di (.+), da confermare/)![1]!;
     const exemption = text.match(/un’esenzione nuova per (.+);/)![1]!;
+    const revoked = text.match(/la revoca di (.+);/)![1]!;
     await login('medico');
+    // La revoca annunciata c'è davvero: il paziente era in carico e ora è revocato (audit 28).
+    expect(
+      await f.evaluate(async (wanted) => {
+        const list = (await (await fetch('/api/pazienti')).json()) as {
+          pazienti: { nome: string; cognome: string; stato: string }[];
+        };
+        return list.pazienti.find((p) => `${p.nome} ${p.cognome}` === wanted)?.stato ?? null;
+      }, revoked),
+    ).toBe('revoked');
 
     const changes = f.getByRole('region', { name: 'Variazioni da AURA' });
     await changes.getByText(`AURA segnala il decesso di ${deceased}`, { exact: false }).waitFor();
     await changes.getByRole('link', { name: exemption }).first().waitFor();
-    await changes.getByText(/nuova – Esenzione 013/).waitFor();
+    await changes
+      .getByText(/ – Esenzione 013 .*\(nuova, /)
+      .first()
+      .waitFor();
 
     const news = f.getByRole('region', { name: 'Nuovi assistiti in AURA' });
     await news.getByRole('button', { name: `Registra ${newPatient}` }).click();
@@ -952,6 +1021,8 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await changes
       .getByRole('button', { name: `Sposta ${moving} nell’archivio di ${colleague}` })
       .click();
+    // Lo spostamento non si annulla: prima la domanda (audit D259).
+    await changes.getByRole('button', { name: 'Sì, sposta' }).click();
     await changes.getByText(`${moving}: spostato nell’archivio di ${colleague}.`).waitFor();
     expect(await patientId(moving)).toBeNull();
     // La collega lo trova nel suo archivio.
@@ -983,6 +1054,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await login('medico');
     const changes = f.getByRole('region', { name: 'Cambi di medico nello studio' });
     await changes.getByRole('button', { name: `Non spostare ${kept}` }).click();
+    await changes.getByRole('button', { name: 'Sì, non spostare' }).click();
     await changes
       .getByText(
         `${kept}: resta nel tuo archivio. Non si ripropone finché AURA non manda una scelta nuova.`,

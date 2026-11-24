@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -150,6 +150,43 @@ describe('AURA nell’interfaccia (D197)', () => {
     expect(screen.getByRole('button', { name: 'Non confermare il decesso' })).toBeTruthy();
   });
 
+  it('il decesso, confermato o no, passa da una domanda: non si cambia dopo (audit D259)', async () => {
+    const fetchMock = stub({
+      'GET /api/pazienti/p1/aura': state({
+        differenze: [
+          { campo: 'decesso', etichetta: 'Decesso', nellaCartella: null, inAura: '2026-11-17' },
+        ],
+      }),
+      'POST /api/pazienti/p1/aura/differenze': { campi: ['decesso'], nonUsati: [], stato: state() },
+    });
+    render(<AuraSection patientId="p1" canWrite onUpdated={() => undefined} />);
+    const posts = () =>
+      fetchMock.mock.calls.filter(
+        ([u, init]) => u === '/api/pazienti/p1/aura/differenze' && init?.method === 'POST',
+      );
+    fireEvent.click(await screen.findByRole('button', { name: 'Conferma il decesso' }));
+    const ask = screen.getByRole('group', { name: 'Conferma della scelta sul decesso' });
+    expect(document.activeElement).toBe(ask);
+    expect(ask.textContent).toMatch(
+      /^Confermi il decesso del paziente il 17\/11\/2026, come dice AURA\?/,
+    );
+    expect(posts()).toHaveLength(0);
+    fireEvent.click(within(ask).getByRole('button', { name: 'Torna indietro' }));
+    expect(posts()).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Conferma il decesso' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, conferma il decesso' }));
+    expect(await screen.findByText('Decesso confermato.')).toBeTruthy();
+    expect(JSON.parse(posts()[0]![1]!.body as string)).toEqual({
+      scelte: [{ campo: 'decesso', inAura: '2026-11-17', usa: true }],
+    });
+    await waitFor(() => {
+      const focused = document.activeElement as HTMLElement;
+      expect(focused).not.toBe(document.body);
+      expect(focused.className).toBe('esito-segnato');
+      expect(focused.textContent).toMatch(/Decesso confermato/);
+    });
+  });
+
   it('anagrafica di AURA: chi non scrive nell’archivio vede le differenze ma non i pulsanti', async () => {
     stub({
       'GET /api/pazienti/p1/aura': state({
@@ -222,7 +259,9 @@ describe('AURA nell’interfaccia (D197)', () => {
     );
     const link = await screen.findByRole('link', { name: 'Paziente Inventato' });
     expect(link.getAttribute('href')).toBe('/pazienti/p1/amministrazione#aura');
-    expect(screen.getByText(/nuova – Esenzione 013/)).toBeTruthy();
+    // «nuova» accanto all'esenzione, non dopo il nome (audit D259).
+    expect(screen.getByText('– Esenzione 013 dal 01/01/2025, senza scadenza')).toBeTruthy();
+    expect(screen.getByText(/^\(nuova, 19\/11\/2026 alle \d{2}:\d{2}\)$/)).toBeTruthy();
     first.unmount();
     vi.unstubAllGlobals();
     stub({ 'GET /api/aura/variazioni?giorni=7': { variazioni: 'non un elenco' } });
@@ -233,6 +272,59 @@ describe('AURA nell’interfaccia (D197)', () => {
     );
     await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
     expect(second.container.textContent).toBe('');
+  });
+
+  it('pagina Oggi: un cambio di medico è una riga sola, la proposta di spostamento (audit D259)', async () => {
+    const who = { id: 'p1', cognome: 'Inventato', nome: 'Paziente' };
+    const at = '2026-11-19T08:00:00Z';
+    stub({
+      'GET /api/aura/variazioni?giorni=7': {
+        disponibile: true,
+        giorni: 7,
+        variazioni: [
+          {
+            quando: at,
+            tipo: 'scelta',
+            variazione: 'nuova',
+            descrizione: 'Scelta di Medica Nuova dal 18/11/2026',
+            paziente: who,
+          },
+          {
+            quando: at,
+            tipo: 'scelta',
+            variazione: 'tolta',
+            descrizione: 'Scelta di Medico Prima: non c’è più in AURA',
+            paziente: who,
+          },
+          {
+            quando: at,
+            tipo: 'archivio',
+            variazione: 'nuova',
+            descrizione:
+              'Scelta in AURA di Medica Nuova dal 18/11/2026: lo spostamento nel suo archivio lo decide Medico Prima',
+            paziente: who,
+          },
+          // Un'altra volta, senza spostamento: resta.
+          {
+            quando: '2026-11-17T08:00:00Z',
+            tipo: 'scelta',
+            variazione: 'cambiata',
+            descrizione: 'Scelta di Medico Prima dal 01/01/2020, fino al 31/12/2026',
+            paziente: who,
+          },
+        ],
+      },
+    });
+    render(
+      <MemoryRouter>
+        <AuraChangesToday />
+      </MemoryRouter>,
+    );
+    await screen.findByText(/– Scelta in AURA di Medica Nuova dal 18\/11\/2026/);
+    const rows = screen.getAllByRole('listitem').map((li) => li.textContent);
+    expect(rows).toHaveLength(2);
+    expect(rows.join('\n')).not.toMatch(/non c’è più in AURA|Scelta di Medica Nuova dal/);
+    expect(screen.getByText(/^\(cambiata, 17\/11\/2026 alle \d{2}:\d{2}\)$/)).toBeTruthy();
   });
 
   it('nuovi assistiti in Oggi (D199): chi, scelta e scadenza; «Registra» con un clic porta alla cartella', async () => {
@@ -360,9 +452,32 @@ describe('AURA nell’interfaccia (D197)', () => {
         name: 'Sposta PAZIENTE INVENTATO nell’archivio di Medico Collega',
       }),
     );
+    // Lo spostamento non si annulla: prima la domanda, con il fuoco (audit D259, WCAG 3.3.4).
+    const ask = screen.getByRole('group', { name: 'Conferma dello spostamento' });
+    expect(document.activeElement).toBe(ask);
+    expect(ask.textContent).toMatch(/Confermi lo spostamento di PAZIENTE INVENTATO/);
+    expect(fetchMock.mock.calls.some(([u]) => u === '/api/aura/cambi-medico/c1/sposta')).toBe(
+      false,
+    );
+    // «Torna indietro» non manda niente.
+    fireEvent.click(within(ask).getByRole('button', { name: 'Torna indietro' }));
+    expect(screen.queryByRole('group', { name: 'Conferma dello spostamento' })).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Sposta PAZIENTE INVENTATO nell’archivio di Medico Collega',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, sposta' }));
     expect(
       await screen.findByText('PAZIENTE INVENTATO: spostato nell’archivio di Medico Collega.'),
     ).toBeTruthy();
+    // Il pulsante premuto non c'è più: il fuoco va all'esito (WCAG 2.4.3).
+    await waitFor(() => {
+      const focused = document.activeElement as HTMLElement;
+      expect(focused).not.toBe(document.body);
+      expect(focused.className).toBe('esito-segnato');
+      expect(focused.textContent).toMatch(/spostato nell’archivio/);
+    });
     // Il cambio come si vede: medico scelto e data, perché il servizio controlli che sia quello.
     const sent = fetchMock.mock.calls.find(([u]) => u === '/api/aura/cambi-medico/c1/sposta');
     expect(sent?.[1]?.method).toBe('POST');
@@ -376,6 +491,7 @@ describe('AURA nell’interfaccia (D197)', () => {
       expect(fetchMock.mock.calls.filter(([u]) => u === '/api/aura/cambi-medico').length).toBe(2),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Non spostare PAZIENTE INVENTATO' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, non spostare' }));
     expect(
       await screen.findByText(
         'PAZIENTE INVENTATO: resta nel tuo archivio. Non si ripropone finché AURA non manda una scelta nuova.',
@@ -429,6 +545,7 @@ describe('AURA nell’interfaccia (D197)', () => {
         name: 'Sposta PAZIENTE ALTRO nell’archivio di Medico Collega',
       }),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, sposta' }));
     expect(await screen.findByText(message)).toBeTruthy();
     // Chi è stato scelto lo sa, ma la cartella non è nel suo archivio: niente collegamento.
     const incoming = screen.getByText(/PAZIENTE TERZO ti ha scelto in AURA dal 17\/11\/2026/);

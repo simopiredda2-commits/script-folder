@@ -2,7 +2,7 @@ import type { DatasetKind } from '@mmg/reference';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { studioDate } from '../prescriptions/rules-check';
-import type { ReferenceData } from '../reference/lookup';
+import { SEARCH_LIMIT, type ReferenceData } from '../reference/lookup';
 
 const dateQuery = z.object({
   /** Data a cui consultare le banche dati (A5); per difetto oggi nello studio. */
@@ -42,9 +42,12 @@ export function registerReferenceRoutes(
   app.get('/api/farmaci', async (req) => {
     const q = searchQuery.parse(req.query);
     const date = dateOf(q);
+    // Uno in più del limite: se c'è, la pagina lo dice e chiede di precisare (audit, D259).
+    const found = await reference.searchDrugs(q.q, date, SEARCH_LIMIT + 1);
     return {
       data: date,
-      farmaci: await reference.searchDrugs(q.q, date),
+      farmaci: found.slice(0, SEARCH_LIMIT),
+      altri: found.length > SEARCH_LIMIT,
       versioni: await reference.versions(date, DRUG_KINDS),
     };
   });

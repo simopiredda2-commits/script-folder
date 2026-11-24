@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import {
   DataVersions,
@@ -287,6 +287,26 @@ export function lineFromPrescribed(
   };
 }
 
+/** Quanti risultati, o che sono solo i primi e conviene precisare (audit, D259). */
+export function resultsText(
+  q: string,
+  data: { farmaci?: unknown[]; prestazioni?: unknown[]; altri?: boolean },
+): string {
+  const n = (data.farmaci ?? data.prestazioni ?? []).length;
+  if (n === 0) return `Nessun risultato per «${q}».`;
+  if (data.altri) return `Primi ${n} risultati: precisa la ricerca (dosaggio, forma o marchio).`;
+  return n === 1 ? '1 risultato.' : `${n} risultati.`;
+}
+
+/**
+ * Una riga che la segreteria può preparare (D259): una terapia cronica in corso, come in «Ripeti
+ * le terapie scelte». Il servizio lo controlla di nuovo.
+ */
+export function repeatable(line: Pick<Line, 'therapyId'>, therapies: readonly TherapyRow[]) {
+  const t = therapies.find((x) => x.id === line.therapyId);
+  return !!t && t.kind === 'chronic' && t.status === 'active' && !t.reserved;
+}
+
 /** Dove si ricorda la ricetta in corso di un paziente, nella scheda del browser (D68). */
 const draftKey = (patientId: string, mode: 'farmaci' | 'specialistica', field: string) =>
   `ricetta:${patientId}:${mode}:${field}`;
@@ -344,7 +364,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const [obscured, setObscured, resetObscured] = usePersistentState(k('oscurato'), false);
   const [text, setText] = useState('');
   const q = useDebounced(text);
-  const search = useApi<{ farmaci?: Drug[]; prestazioni?: Service[]; versioni: DatasetVersion[] }>(
+  const search = useApi<{
+    farmaci?: Drug[];
+    prestazioni?: Service[];
+    /** Più risultati di quelli mostrati: si precisa la ricerca (audit, D259). */
+    altri?: boolean;
+    versioni: DatasetVersion[];
+  }>(
     q.trim()
       ? `/api/${mode === 'farmaci' ? 'farmaci' : 'prestazioni'}${query({ q: q.trim() })}`
       : null,
@@ -362,13 +388,49 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   // Il medico firma e invia in un passo (D255). Non si ricorda: tornando alla bozza, il medico
   // vede i controlli e firma con il pulsante.
   const { isDoctor } = useSession();
+  // La segreteria prepara solo le ripetizioni delle terapie croniche in corso (requisiti, «Ruoli»;
+  // audit, D259): «Aggiungi» c'è solo su quelle; la ricerca resta per consultare.
+  const repeatOnly = !isDoctor;
   const [oneStep, setOneStep] = useState(false);
-  const startOver = () => {
+  const lineHeading = useRef<HTMLHeadingElement>(null);
+  // La bozza è nata qui, adesso, da un clic: il pannello dei controlli prende il fuoco (D259). Una
+  // bozza ricordata, ritrovata tornando alla pagina, no.
+  const [arrived, setArrived] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [justAdded, setJustAdded] = useState<Omit<Line, 'key'> | null>(null);
+  /**
+   * Una bozza lasciata non resta nel servizio (audit, D259): si annulla, con il motivo, e non
+   * finisce fra i farmaci prescritti. Una ricetta già partita o stampata non si tocca.
+   */
+  const dropDraft = async (reason: string) => {
+    if (!draft || !['draft', 'to_sign', 'error'].includes(draft.status)) return true;
+    try {
+      await api(`/api/ricette/${draft.id}/annulla`, { method: 'POST', body: { motivo: reason } });
+      return true;
+    } catch (e) {
+      // Già annullata o partita nel frattempo: non c'è niente da annullare.
+      if (e instanceof ApiError && e.status === 409) return true;
+      setError(e instanceof ApiError ? e : null);
+      return false;
+    }
+  };
+  const startOver = async () => {
+    if (!(await dropDraft('Lasciata con «Nuova ricetta da capo»'))) return;
     for (const reset of [resetKind, resetLines, resetExemption, resetChannel, resetAccess]) reset();
     for (const reset of [resetPriority, resetQuestion, resetDraft, resetObscured]) reset();
     setOneStep(false);
+    setError(null);
   };
-  const [error, setError] = useState<ApiError | null>(null);
+  /**
+   * Dopo l'arresto sui controlli si corregge la ricetta senza rifarla (audit, D259): la bozza si
+   * annulla e le righe tornano modificabili, con le confezioni, la posologia e le scelte di prima.
+   */
+  const editAgain = async () => {
+    if (!(await dropDraft('Modificata prima dell’invio'))) return;
+    resetDraft();
+    setOneStep(false);
+    setError(null);
+  };
   // Le righe in ricetta restano chiuse: si aprono col clic sulla riga (D242).
   const [openLines, setOpenLines] = useState<ReadonlySet<string>>(() => new Set());
   const toggleLine = (key: string) =>
@@ -395,10 +457,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
     versionKinds.includes(v.kind),
   );
 
-  const add = (l: Omit<Line, 'key'>) =>
+  const add = (l: Omit<Line, 'key'>) => {
     setLines((ls) =>
       mode === 'farmaci' && ls.some((x) => sameDrug(x, l)) ? ls : [...ls, { ...l, key: newKey() }],
     );
+    // «Aggiungi» lascia il posto a «− N +»: il fuoco va lì, non torna in cima (audit 14, D259).
+    setJustAdded(l);
+  };
   // Le posologie dello studio, come suggerimenti nella posologia delle righe dei farmaci.
   const posologyTexts = [...new Set((posologies.data?.voci ?? []).map((p) => p.etichetta))];
   const update = (key: string, patch: Partial<Line>) =>
@@ -451,6 +516,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
       }>(`/api/pazienti/${id}/ricette`);
       const created = list.ricette.find((x) => x.id === r.id);
       setOneStep(sign);
+      setArrived(true);
       setDraft({
         id: r.id,
         status: created?.status ?? 'draft',
@@ -474,6 +540,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         name={name}
         quantity={inPrescription.quantity}
         disabled={locked}
+        autoFocus={justAdded !== null && sameDrug(justAdded, line)}
         onChange={(quantity) => update(inPrescription.key, { quantity })}
       />
     ) : (
@@ -516,6 +583,19 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
       </>
     );
 
+  if (repeatOnly && mode === 'specialistica')
+    return (
+      <>
+        {header}
+        <Notice kind="info">
+          <p>
+            La ricetta specialistica la prepara il medico. La segreteria prepara le ripetizioni
+            delle terapie croniche, dalla <Link to={`/pazienti/${id}/ricetta`}>Nuova ricetta</Link>.
+          </p>
+        </Notice>
+      </>
+    );
+
   return (
     <>
       {header}
@@ -529,6 +609,18 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           <h2 id="titolo-cerca">
             {mode === 'farmaci' ? 'Banca dati farmaci' : 'Catalogo regionale'}
           </h2>
+          {/* Con la tastiera, un salto a «In ricetta» senza passare da ogni risultato: compare
+              quando prende il fuoco (suggerimento S6 dell'audit, D259). */}
+          <a
+            className="salta salta-riquadro"
+            href="#titolo-ricetta"
+            onClick={(e) => {
+              e.preventDefault();
+              lineHeading.current?.focus();
+            }}
+          >
+            Vai a «In ricetta»
+          </a>
           {mode === 'farmaci' && (
             <fieldset className="scelta scelta-in-riga" disabled={locked}>
               <legend>Tipo di ricetta</legend>
@@ -549,6 +641,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 </div>
               ))}
             </fieldset>
+          )}
+          {repeatOnly && mode === 'farmaci' && (
+            <p className="aiuto" id="solo-ripetizioni">
+              La segreteria prepara solo le ripetizioni delle terapie croniche in corso: si
+              aggiungono dai farmaci prescritti, qui sotto. La ricerca serve a consultare la banca
+              dati.
+            </p>
           )}
           <div role="search" className="ricerca">
             <label htmlFor="cerca-voce">
@@ -574,7 +673,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             compact
           />
           <ErrorMessage error={search.error} />
-          <ul className="risultati" aria-live="polite">
+          {/* Il numero, non tutto l'elenco, a chi usa un lettore di schermo (audit 15, D259). */}
+          <p role="status" className="tenue stato-ricerca">
+            {q && search.data ? resultsText(q, search.data) : ''}
+          </p>
+          <ul className="risultati">
             {search.data?.farmaci?.map((d) => {
               const line = {
                 drugAic: d.aic,
@@ -595,18 +698,20 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                     {d.shortage && <ShortageNote shortage={d.shortage} />}
                     <RegistryNote registries={d.registries ?? []} />
                   </div>
-                  {drugAction(
-                    line,
-                    line.drugName,
-                    <button
-                      type="button"
-                      className="pulsante"
-                      disabled={locked}
-                      onClick={() => add(line)}
-                    >
-                      <Icon name="aggiungi" /> <span>Aggiungi</span>
-                    </button>,
-                  )}
+                  {!repeatOnly &&
+                    drugAction(
+                      line,
+                      line.drugName,
+                      <button
+                        type="button"
+                        className="pulsante"
+                        disabled={locked}
+                        onClick={() => add(line)}
+                      >
+                        <Icon name="aggiungi" /> <span>Aggiungi</span>
+                        <span className="visivamente-nascosto"> {line.drugName}</span>
+                      </button>,
+                    )}
                 </li>
               );
             })}
@@ -627,14 +732,10 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   }
                 >
                   <Icon name="aggiungi" /> <span>Aggiungi</span>
+                  <span className="visivamente-nascosto"> {s.description}</span>
                 </button>
               </li>
             ))}
-            {q &&
-              search.data &&
-              (search.data.farmaci ?? search.data.prestazioni ?? []).length === 0 && (
-                <li className="tenue">Nessun risultato per «{q}».</li>
-              )}
           </ul>
           {mode === 'specialistica' && (
             <PackagePicker
@@ -661,6 +762,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 label="titolo-farmaci-prescritti"
                 action={(d) => {
                   const line = lineFromPrescribed(d, therapies.data?.terapie ?? []);
+                  if (repeatOnly && !repeatable(line, therapies.data?.terapie ?? [])) return null;
                   return drugAction(
                     line,
                     d.farmaco,
@@ -668,7 +770,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   );
                 }}
               />
-              <p className="aiuto">
+              <p className="collegamento-solo aiuto">
                 <Link to={`/pazienti/${id}/farmaci`}>
                   Tutti i farmaci prescritti, con le ricette fatte con altri programmi
                 </Link>
@@ -681,7 +783,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               <h3>Dalla terapia in corso</h3>
               <ul className="risultati">
                 {therapies
-                  .data!.terapie.filter((t) => t.status === 'active')
+                  .data!.terapie.filter(
+                    (t) => t.status === 'active' && (!repeatOnly || t.kind === 'chronic'),
+                  )
                   .map((t) => (
                     <li key={t.id} className="risultato">
                       <div>
@@ -715,9 +819,15 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           {/* «Ricomincia» svuota questa lista: sta accanto al titolo, così in fondo restano solo i
               pulsanti della firma e della bozza, in una riga anche a 1280 px (D255). */}
           <div className="riquadro-testa">
-            <h2 id="titolo-ricetta">In ricetta</h2>
+            <h2 id="titolo-ricetta" ref={lineHeading} tabIndex={-1}>
+              In ricetta
+            </h2>
             {!draft && lines.length > 0 && (
-              <button type="button" className="pulsante pulsante-piatto" onClick={startOver}>
+              <button
+                type="button"
+                className="pulsante pulsante-piatto"
+                onClick={() => void startOver()}
+              >
                 <Icon name="ripeti" /> <span>Ricomincia</span>
               </button>
             )}
@@ -731,7 +841,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           )}
           {lines.length === 0 && (
             <p className="tenue">
-              Aggiungi un {mode === 'farmaci' ? 'farmaco' : 'prestazione'} dalla ricerca.
+              {repeatOnly
+                ? 'Aggiungi una terapia cronica in corso dai farmaci prescritti.'
+                : mode === 'farmaci'
+                  ? 'Aggiungi un farmaco dalla ricerca.'
+                  : 'Aggiungi una prestazione dalla ricerca.'}
             </p>
           )}
           <ol className="righe-ricetta">
@@ -1093,13 +1207,15 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 lineNames={draft.lineIds}
                 preview={kind !== 'white'}
                 autoSign={oneStep}
+                focusOnArrival={arrived}
+                onEdit={() => void editAgain()}
                 onChange={(status, nre) => setDraft({ ...draft, status, ...(nre ? { nre } : {}) })}
               />
             </>
           )}
           {draft && (
             <div className="azioni">
-              <button type="button" className="pulsante" onClick={startOver}>
+              <button type="button" className="pulsante" onClick={() => void startOver()}>
                 <Icon name="ripeti" /> <span>Nuova ricetta da capo</span>
               </button>
             </div>
