@@ -786,13 +786,20 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       page.evaluate(() => {
         const box = document.querySelector('section[aria-labelledby="titolo-cerca"]')!;
         const css = getComputedStyle(box);
+        const r = box.getBoundingClientRect();
         const heading = document.getElementById('titolo-ricetta')!.getBoundingClientRect();
         return {
           box: [css.maxHeight, css.overflowY],
-          right: heading.top - box.getBoundingClientRect().bottom < 48,
+          // Alta al massimo metà schermo, e subito dopo il riquadro di «In ricetta»: fra i due
+          // solo margine, spazio della griglia, bordo e spaziatura interna (53 px).
+          short: r.height <= innerHeight / 2 + 1,
+          next:
+            box.nextElementSibling ===
+            document.querySelector('section[aria-labelledby="titolo-ricetta"]'),
+          close: heading.top - r.bottom < 64,
         };
       }),
-    ).resolves.toEqual({ box: ['512px', 'auto'], right: true });
+    ).resolves.toEqual({ box: ['512px', 'auto'], short: true, next: true, close: true });
     await page.setViewportSize({ width: 1280, height: 900 });
     await page
       .locator('.risultato')

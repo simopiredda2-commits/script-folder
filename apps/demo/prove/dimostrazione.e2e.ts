@@ -362,12 +362,38 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
           scrollTo(0, (doc.scrollHeight - innerHeight) * at);
           await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
           const pill = document.querySelector('button.dimo-apri')!.getBoundingClientRect();
+          // Di ogni comando conta la parte che si vede, tagliata dai riquadri che scorrono e dallo
+          // schermo: un campo nascosto in fondo a un riquadro che scorre non è coperto (CI del
+          // 24/11/2026, la scelta del promemoria sotto «In ricetta» a 1024×768).
+          const seen = (e: Element) => {
+            const r = e.getBoundingClientRect();
+            let [left, top, right, bottom] = [r.left, r.top, r.right, r.bottom];
+            for (
+              let p = e.parentElement;
+              p && p !== document.documentElement;
+              p = p.parentElement
+            ) {
+              const s = getComputedStyle(p);
+              if (s.overflowX === 'visible' && s.overflowY === 'visible') continue;
+              const c = p.getBoundingClientRect();
+              left = Math.max(left, c.left);
+              top = Math.max(top, c.top);
+              right = Math.min(right, c.right);
+              bottom = Math.min(bottom, c.bottom);
+            }
+            return {
+              left: Math.max(left, 0),
+              top: Math.max(top, 0),
+              right: Math.min(right, innerWidth),
+              bottom: Math.min(bottom, innerHeight),
+            };
+          };
           return [...document.querySelectorAll('#root a, #root button, #root input, #root select')]
             .filter((e) => {
-              const r = e.getBoundingClientRect();
+              const r = seen(e);
               return (
-                r.width > 0 &&
-                r.height > 0 &&
+                r.right > r.left &&
+                r.bottom > r.top &&
                 r.left < pill.right &&
                 r.right > pill.left &&
                 r.top < pill.bottom &&
