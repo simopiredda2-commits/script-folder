@@ -220,10 +220,35 @@ legend {
 
 .app-footer {
   justify-content: space-between;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
   border-top: 1px solid var(--color-divider);
   border-bottom: 0;
   font-size: 0.875rem;
   color: var(--color-text-muted);
+}
+
+/*
+ * Dove un riquadro scorre e sotto c'è altro, un'ombra in fondo lo dice (D249): su Mac le barre di
+ * scorrimento non si vedono finché non si scorre. L'attributo `data-sotto` lo mette
+ * `useMoreBelow`; l'ombra sta sopra i riquadri interni e non prende spazio.
+ */
+.ombre-scorrimento::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: block;
+  flex: none;
+  height: 1rem;
+  margin-top: -1rem;
+  background: linear-gradient(transparent, rgb(14 20 53 / 0.18));
+  pointer-events: none;
+  opacity: 0;
+}
+
+.ombre-scorrimento[data-sotto]::after {
+  opacity: 1;
 }
 
 .marchio-link {
@@ -406,7 +431,7 @@ legend {
   display: flex;
   gap: 0.375rem;
   margin: 0;
-  padding: 0.375rem 0;
+  padding: 0.25rem 0;
 }
 
 .scheda-aperta {
@@ -1345,15 +1370,18 @@ a.coda:hover {
   margin: 0 0 0.5rem;
 }
 
-/* Le ultime ricette di un farmaco, dentro la riga aperta. */
-.tabella-compatta {
-  margin-bottom: 0.25rem;
+/* Le ultime ricette di un farmaco, dentro la riga aperta: una riga per ricetta, che va a capo
+   fra un dato e l'altro e mai dentro un dato, così l'NRE resta intero e niente esce dal riquadro
+   (D249). */
+.ricette-in-riga {
+  margin: 0 0 0.25rem;
+  padding: 0;
+  list-style: none;
   font-size: 0.875rem;
 }
 
-.tabella-compatta th,
-.tabella-compatta td {
-  padding: 0.125rem 0.5rem 0.125rem 0;
+.ricette-in-riga li > span {
+  white-space: nowrap;
 }
 
 /*
@@ -1366,12 +1394,14 @@ a.coda:hover {
 }
 
 @container (max-width: 40rem) {
+  /* Due livelli (D249): nome e «Aggiungi» sulla stessa riga; sotto, in piccolo, le etichette e
+     l'ultima ricetta. Così nella colonna della ricetta entrano più farmaci. */
   .elenco-farmaci .farmaco-voce {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      'apri apri'
-      'tipo azione'
-      'ultima azione'
+      'apri azione'
+      'tipo tipo'
+      'ultima ultima'
       'dettagli dettagli';
   }
 
@@ -1380,7 +1410,45 @@ a.coda:hover {
     flex-wrap: wrap;
     gap: 0 0.375rem;
     padding-left: 1.75rem;
+    font-size: 0.8125rem;
   }
+}
+
+/* «Aggiungi» piccolo nelle righe dei farmaci (D249): testo e spazi ridotti, bersaglio di 44 px. */
+.pulsante.pulsante-piccolo {
+  gap: 0.25rem;
+  padding: 0 0.625rem;
+  font-size: 0.875rem;
+}
+
+/* «− N +» del farmaco già in ricetta (D250): al posto di «Aggiungi», bersagli di 44 px. */
+.confezioni-passo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.confezioni-passo .pulsante {
+  justify-content: center;
+  min-width: var(--size-min-target);
+  padding: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.confezioni-numero {
+  min-width: 3.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Il totale delle confezioni sotto «In ricetta» (D250). */
+.totale-confezioni {
+  margin: -0.25rem 0 0.5rem;
+  font-size: 0.875rem;
 }
 
 /* Collegamenti nelle tabelle delle prestazioni prescritte e della distinta delle PPIP: bersaglio
@@ -1720,7 +1788,7 @@ a.coda:hover {
   }
 
   html.schermo-unico .testata-ricetta h1 {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
   }
 
   html.schermo-unico .testata-dati,
@@ -1738,6 +1806,7 @@ a.coda:hover {
   html.schermo-unico .griglia-ricetta > .riquadro {
     min-height: 0;
     overflow-y: auto;
+    margin-bottom: 0;
     padding-top: 0.75rem;
     padding-bottom: 0;
   }
@@ -1753,10 +1822,15 @@ a.coda:hover {
     margin-bottom: 0.25rem;
   }
 
+  /* In una riga sola i due tipi bastano da soli: il nome del gruppo resta per i lettori di
+     schermo (D249). */
   html.schermo-unico .griglia-ricetta .scelta-in-riga legend {
-    float: left;
-    width: auto;
-    margin: 0;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* Il campo di ricerca resta in vista mentre scorrono i risultati. */
@@ -2072,11 +2146,12 @@ textarea[aria-invalid='true'] {
 }
 
 .cartella-contenuto .intestazione-pagina {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
+/* Il titolo della voce, più piccolo: dove si è lo dice già il menu evidenziato (D249). */
 .cartella-contenuto .intestazione-pagina h1 {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
 }
 
 /* Dentro la cartella il percorso ripeteva il nome: dove si è lo dice il menu evidenziato. */
@@ -2151,6 +2226,7 @@ textarea[aria-invalid='true'] {
 
   .menu-cartella ul {
     flex-direction: column;
+    gap: 0.125rem;
     overflow-x: visible;
   }
 
@@ -2179,8 +2255,8 @@ textarea[aria-invalid='true'] {
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
-    padding-top: 0.75rem;
-    padding-bottom: 0.75rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.25rem;
   }
 
   html.cartella-aperta .cartella {

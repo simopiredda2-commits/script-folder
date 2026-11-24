@@ -222,7 +222,7 @@ try {
     .first();
   await withLast.waitFor();
   await withLast.locator('.farmaco-apri').click();
-  await withLast.getByRole('table').waitFor();
+  await withLast.getByRole('list', { name: /^Ultime ricette di / }).waitFor();
   await shot(page, '75-farmaci-prescritti-nella-ricetta');
 
   await page.goto(`${base}/pazienti/${patientId}/specialistica`);

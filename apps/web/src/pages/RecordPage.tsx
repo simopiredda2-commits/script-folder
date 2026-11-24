@@ -63,6 +63,8 @@ export interface TherapyRow {
   shortage?: DrugShortage | null;
   /** Le altre variazioni AIFA, per le terapie non concluse (A7, D205). */
   aifaChanges?: AifaChange[];
+  /** «Confezioni per ricetta» della scheda: le confezioni con cui la terapia entra in ricetta (D250). */
+  packsPerPrescription?: number;
 }
 
 /** La scheda intera, come la restituisce il servizio. */

@@ -1,9 +1,10 @@
-import { Link, useParams } from 'react-router';
+import type { ReactNode } from 'react';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { ColourLegend } from '../components/DrugColours';
 import { Icon } from '../components/Icon';
 import { PastPrescriptionsSection } from '../components/PastPrescriptions';
-import { drugGroup, PrescribedDrugList } from '../components/PrescribedDrugs';
+import { AddDrugButton, drugGroup, PrescribedDrugList } from '../components/PrescribedDrugs';
 import {
   countsText,
   historyHref,
@@ -13,7 +14,12 @@ import {
   type PrescribedService,
 } from '../components/Prescribed';
 import { useApi } from '../lib/useApi';
-import { PatientBanner, type Patient, type Summary } from './RecordPage';
+import {
+  addToCurrentPrescription,
+  currentPrescriptionLocked,
+  lineFromPrescribed,
+} from './PrescriptionEditor';
+import { PatientBanner, type Patient, type Summary, type TherapyRow } from './RecordPage';
 
 /** Le ricette fatte con un altro programma che i due elenchi restituiscono (tappa 15). */
 interface WithPast {
@@ -39,12 +45,14 @@ function DrugGroup({
   drugs,
   patientId,
   empty,
+  action,
 }: {
   title: string;
   id: string;
   drugs: PrescribedDrug[];
   patientId: string;
   empty: string;
+  action?: (d: PrescribedDrug) => ReactNode;
 }) {
   return (
     <section className="riquadro" aria-labelledby={id}>
@@ -52,7 +60,7 @@ function DrugGroup({
       {drugs.length === 0 ? (
         <p className="tenue">{empty}</p>
       ) : (
-        <PrescribedDrugList drugs={drugs} patientId={patientId} label={id} />
+        <PrescribedDrugList drugs={drugs} patientId={patientId} label={id} action={action} />
       )}
     </section>
   );
@@ -69,6 +77,21 @@ export function PrescribedDrugsPage() {
   const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
   const drugs = useApi<{ farmaci: PrescribedDrug[] } & WithPast>(
     `/api/pazienti/${id}/farmaci-prescritti`,
+  );
+  // «Aggiungi» anche qui, su ogni farmaco (D249): la riga va nella ricetta in corso del paziente e
+  // si apre la ricetta. Le terapie servono per la posologia di quelle in corso.
+  const therapies = useApi<{ terapie: TherapyRow[] }>(`/api/pazienti/${id}/terapie`);
+  const navigate = useNavigate();
+  const locked = currentPrescriptionLocked(id!);
+  const addAction = (d: PrescribedDrug) => (
+    <AddDrugButton
+      name={d.farmaco}
+      disabled={locked || therapies.loading}
+      onClick={() => {
+        if (addToCurrentPrescription(id!, lineFromPrescribed(d, therapies.data?.terapie ?? [])))
+          void navigate(`/pazienti/${id}/ricetta`);
+      }}
+    />
   );
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
@@ -101,8 +124,14 @@ export function PrescribedDrugsPage() {
       )}
       {drugs.data && (
         <>
+          {locked && (
+            <Notice kind="info">
+              La ricetta in corso è già preparata: «Aggiungi» torna attivo con una ricetta nuova.
+            </Notice>
+          )}
           <DrugGroup
             id="titolo-farmaci-in-corso"
+            action={addAction}
             title="Terapie in corso"
             drugs={active}
             patientId={id!}
@@ -110,6 +139,7 @@ export function PrescribedDrugsPage() {
           />
           <DrugGroup
             id="titolo-farmaci-sospesi"
+            action={addAction}
             title="Terapie sospese o concluse"
             drugs={stopped}
             patientId={id!}
@@ -117,6 +147,7 @@ export function PrescribedDrugsPage() {
           />
           <DrugGroup
             id="titolo-farmaci-occasionali"
+            action={addAction}
             title="Prescritti senza terapia in cartella"
             drugs={occasional}
             patientId={id!}

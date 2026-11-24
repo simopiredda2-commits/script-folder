@@ -163,7 +163,7 @@
   bottom: max(6px, env(safe-area-inset-bottom, 0px));
 }
 html.dimo-ridotto .app-footer {
-  min-height: calc(var(--size-min-target) + 12px);
+  min-height: calc(var(--size-min-target) + 8px);
   padding-right: calc(var(--dimo-posto, 16rem) + 24px);
 }
 @media (max-width: 699.98px) {
