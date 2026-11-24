@@ -607,7 +607,9 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     const form = group.getByRole('form', { name: 'La ricetta è arrivata' });
     // Se il modulo non compare, l'errore dice che cosa mostra la sezione, che cosa risponde il
     // servizio e che ora è nella pagina (D234): con WebKit una volta non è comparso, senza dire
-    // perché (D239).
+    // perché (D239). Nella #37 la sezione non c'era proprio: ora l'errore dice anche dove è la
+    // pagina e che cosa mostra, per capire se il clic in Oggi non ha portato alla pagina Ricette
+    // (D262).
     await form.waitFor({ timeout: 30_000 }).catch(async (err: unknown) => {
       const shown = await section
         .innerText({ timeout: 2_000 })
@@ -619,8 +621,14 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
         })
         .catch((e: unknown) => String(e));
       const now = await f.evaluate(() => new Date().toISOString()).catch(() => '?');
+      const where = await f.evaluate(() => location.pathname + location.hash).catch(() => '?');
+      const page = await f
+        .locator('main')
+        .innerText({ timeout: 2_000 })
+        .then((text) => text.slice(0, 600))
+        .catch(() => '(pagina senza contenuto)');
       throw new Error(
-        `Il modulo «La ricetta è arrivata» non è comparso per ${name}. Ora nella pagina: ${now}.\nLa sezione mostra:\n${shown}\nIl servizio risponde:\n${answer}`,
+        `Il modulo «La ricetta è arrivata» non è comparso per ${name}. Ora nella pagina: ${now}, indirizzo ${where}.\nLa sezione mostra:\n${shown}\nLa pagina mostra:\n${page}\nIl servizio risponde:\n${answer}`,
         { cause: err },
       );
     });

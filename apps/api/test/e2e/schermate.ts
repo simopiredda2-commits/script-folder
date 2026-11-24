@@ -1001,7 +1001,7 @@ try {
   const amlodipine = (
     await db.execute<{ id: string }>(sql`
       select t.id from therapy t join patient p on p.id = t.patient_id
-      where t.active_ingredient = 'AMLODIPINA' and t.status = 'active' and t.drug_aic is null
+      where t.active_ingredient = 'AMLODIPINA' and t.status = 'active'
       order by p.last_name, p.first_name limit 1`)
   ).rows[0];
   if (!amlodipine) throw new Error('Serve una terapia dimostrativa con l’amlodipina');
