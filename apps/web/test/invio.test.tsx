@@ -59,6 +59,7 @@ function panel(
   preview = false,
   autoSign = false,
   onChange?: (status: string, nre?: string) => void,
+  onEdit?: () => void,
 ) {
   render(
     <SessionProvider>
@@ -71,6 +72,7 @@ function panel(
           preview={preview}
           autoSign={autoSign}
           {...(onChange ? { onChange } : {})}
+          {...(onEdit ? { onEdit } : {})}
         />
       </MemoryRouter>
     </SessionProvider>,
@@ -341,5 +343,72 @@ describe('ricetta del medico in un passo (D255)', () => {
     const toSign = await screen.findByRole('button', { name: 'Manda alla firma del medico' });
     await waitFor(() => expect(disabled(toSign)).toBe(false));
     expect(signs(calls)).toHaveLength(0);
+  });
+});
+
+describe('con un blocco non si firma: si corregge (audit, D259)', () => {
+  const signs = (calls: string[]) =>
+    calls.filter((c) => c === 'POST /api/ricette/r1/firma-e-invia');
+  const blocked = () =>
+    json(200, {
+      versioneRegole: 'prova-1',
+      problemi: [
+        {
+          ruleId: 'R2',
+          severity: 'block',
+          message: '3 confezioni: il limite è 2',
+          remedy: null,
+          lineId: null,
+        },
+      ],
+      bloccanti: 1,
+    });
+
+  it('«in un passo» si ferma, la firma è spenta, la pagina dice che cosa correggere', async () => {
+    const edits: string[] = [];
+    const calls = service(['owner_doctor'], () => Promise.resolve(blocked()));
+    panel('draft', null, false, true, undefined, () => edits.push('modifica'));
+    await screen.findByText(/La ricetta non può partire: R2 blocca/);
+    // Non invita a confermare: il pulsante non dice «Ho visto i controlli», ed è spento.
+    expect(screen.queryByText(/conferma con «Ho visto i controlli/)).toBeNull();
+    const sign = screen.getByRole('button', { name: 'Firma e invia' });
+    await waitFor(() => expect(checkStatus()).toBe(''));
+    expect(disabled(sign)).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Modifica la ricetta' }));
+    expect(edits).toEqual(['modifica']);
+    expect(signs(calls)).toHaveLength(0);
+  });
+
+  it('anche senza il passo unico, e senza «Modifica» dove non si modifica (la coda)', async () => {
+    service(['owner_doctor'], () => Promise.resolve(blocked()));
+    panel('to_sign');
+    await screen.findByText(/La ricetta non può partire: R2 blocca/);
+    expect(disabled(screen.getByRole('button', { name: 'Firma e invia' }))).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Modifica la ricetta' })).toBeNull();
+  });
+
+  it('la nota AIFA (R7) non spegne la firma: si conferma con la casella', async () => {
+    service(['owner_doctor'], () =>
+      Promise.resolve(
+        json(200, {
+          versioneRegole: 'prova-1',
+          problemi: [
+            {
+              ruleId: 'R7',
+              severity: 'block',
+              needs: 'aifa_confirmation',
+              message: 'Nota AIFA 13',
+              remedy: null,
+              lineId: 'l1',
+            },
+          ],
+          bloccanti: 1,
+        }),
+      ),
+    );
+    panel('draft');
+    const sign = await screen.findByRole('button', { name: 'Firma e invia' });
+    await waitFor(() => expect(disabled(sign)).toBe(false));
+    expect(screen.queryByText(/La ricetta non può partire/)).toBeNull();
   });
 });

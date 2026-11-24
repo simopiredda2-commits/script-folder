@@ -375,12 +375,40 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   // audit, D259): «Aggiungi» c'è solo su quelle; la ricerca resta per consultare.
   const repeatOnly = !isDoctor;
   const [oneStep, setOneStep] = useState(false);
-  const startOver = () => {
+  const [error, setError] = useState<ApiError | null>(null);
+  /**
+   * Una bozza lasciata non resta nel servizio (audit, D259): si annulla, con il motivo, e non
+   * finisce fra i farmaci prescritti. Una ricetta già partita o stampata non si tocca.
+   */
+  const dropDraft = async (reason: string) => {
+    if (!draft || !['draft', 'to_sign', 'error'].includes(draft.status)) return true;
+    try {
+      await api(`/api/ricette/${draft.id}/annulla`, { method: 'POST', body: { motivo: reason } });
+      return true;
+    } catch (e) {
+      // Già annullata o partita nel frattempo: non c'è niente da annullare.
+      if (e instanceof ApiError && e.status === 409) return true;
+      setError(e instanceof ApiError ? e : null);
+      return false;
+    }
+  };
+  const startOver = async () => {
+    if (!(await dropDraft('Lasciata con «Nuova ricetta da capo»'))) return;
     for (const reset of [resetKind, resetLines, resetExemption, resetChannel, resetAccess]) reset();
     for (const reset of [resetPriority, resetQuestion, resetDraft, resetObscured]) reset();
     setOneStep(false);
+    setError(null);
   };
-  const [error, setError] = useState<ApiError | null>(null);
+  /**
+   * Dopo l'arresto sui controlli si corregge la ricetta senza rifarla (audit, D259): la bozza si
+   * annulla e le righe tornano modificabili, con le confezioni, la posologia e le scelte di prima.
+   */
+  const editAgain = async () => {
+    if (!(await dropDraft('Modificata prima dell’invio'))) return;
+    resetDraft();
+    setOneStep(false);
+    setError(null);
+  };
   // Le righe in ricetta restano chiuse: si aprono col clic sulla riga (D242).
   const [openLines, setOpenLines] = useState<ReadonlySet<string>>(() => new Set());
   const toggleLine = (key: string) =>
@@ -753,7 +781,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           <div className="riquadro-testa">
             <h2 id="titolo-ricetta">In ricetta</h2>
             {!draft && lines.length > 0 && (
-              <button type="button" className="pulsante pulsante-piatto" onClick={startOver}>
+              <button
+                type="button"
+                className="pulsante pulsante-piatto"
+                onClick={() => void startOver()}
+              >
                 <Icon name="ripeti" /> <span>Ricomincia</span>
               </button>
             )}
@@ -1133,13 +1165,14 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 lineNames={draft.lineIds}
                 preview={kind !== 'white'}
                 autoSign={oneStep}
+                onEdit={() => void editAgain()}
                 onChange={(status, nre) => setDraft({ ...draft, status, ...(nre ? { nre } : {}) })}
               />
             </>
           )}
           {draft && (
             <div className="azioni">
-              <button type="button" className="pulsante" onClick={startOver}>
+              <button type="button" className="pulsante" onClick={() => void startOver()}>
                 <Icon name="ripeti" /> <span>Nuova ricetta da capo</span>
               </button>
             </div>

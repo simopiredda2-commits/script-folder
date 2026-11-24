@@ -465,4 +465,25 @@ describe('farmaci e prestazioni prescritti nella cartella (D152)', () => {
       { aic: '900000029' },
     ]);
   });
+
+  it('una bozza mai partita, o annullata, non mette un farmaco fra i prescritti (audit, D259)', async () => {
+    const solo = {
+      drugName: 'Solo in bozza 5 mg',
+      drugAic: '900000110',
+      activeIngredient: 'principio in bozza',
+      quantity: 1,
+    };
+    const kept = await draft({ kind: 'pharma_ssn', lines: [solo] });
+    expect((await drugs()).find((e) => e.aic === '900000110')).toBeUndefined();
+    // Annullata («Nuova ricetta da capo», «Modifica la ricetta»): nemmeno.
+    const cancelled = await req('POST', `/api/ricette/${kept}/annulla`, doctor, {
+      motivo: 'Lasciata con «Nuova ricetta da capo»',
+    });
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
+    expect((await drugs()).find((e) => e.aic === '900000110')).toBeUndefined();
+    // Inviata: c'è, e conta anche la bozza annullata, come il suo storico.
+    await send(await draft({ kind: 'pharma_ssn', lines: [solo] }));
+    const entry = (await drugs()).find((e) => e.aic === '900000110')!;
+    expect(entry).toMatchObject({ prescritte: 1, annullate: 1, terapia: null });
+  });
 });

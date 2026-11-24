@@ -36,6 +36,8 @@ export interface SendPanelProps {
   autoSign?: boolean;
   /** Nuovo stato della ricetta dopo un'azione, con l'NRE se è stata inviata. */
   onChange?: (status: string, nre?: string) => void;
+  /** Torna a modificare la ricetta, dove si può (l'editor): «Modifica la ricetta» (D259). */
+  onEdit?: () => void;
 }
 
 /**
@@ -55,6 +57,13 @@ const failure = (e: unknown, message: string) =>
 const routine = (p: RuleIssue) => p.ruleId === 'R1' && p.severity === 'info';
 const toLookAt = (c: CheckResult) => c.problemi.filter((p) => !routine(p));
 
+/**
+ * I blocchi che la firma non supera (audit, D259): una regola che blocca si corregge nella ricetta.
+ * La nota AIFA (R7) no: si conferma qui, con la casella.
+ */
+export const hardBlocks = (c: CheckResult | null) =>
+  (c?.problemi ?? []).filter((p) => p.severity === 'block' && p.needs !== 'aifa_confirmation');
+
 export function SendPanel({
   prescriptionId,
   status,
@@ -63,6 +72,7 @@ export function SendPanel({
   preview,
   autoSign,
   onChange,
+  onEdit,
 }: SendPanelProps) {
   const { isDoctor } = useSession();
   const [check, setCheck] = useState<CheckResult | null>(null);
@@ -118,6 +128,8 @@ export function SendPanel({
     if (check && toLookAt(check).length === 0 && !error) void signNow.current();
   }, [autoSign, isDoctor, checking, check, error]);
   const stopped = !!autoSign && isDoctor && !!check && toLookAt(check).length > 0;
+  // Con un blocco non si firma: si dice che cosa correggere, e dove (D259).
+  const blocked = [...new Set(hardBlocks(check).map((p) => p.ruleId))];
 
   // L'ente non ha risposto: all'invio appena fatto, o all'ultimo invio della ricetta (D239).
   const unreachable = outcome
@@ -214,10 +226,31 @@ export function SendPanel({
   return (
     <div className="pannello-invio">
       <h3>Controlli prima dell’invio</h3>
-      {stopped && !outcome && (
+      {blocked.length > 0 && !outcome && (
+        <Notice kind="errore">
+          <p>
+            La ricetta non può partire: {blocked.join(', ')}{' '}
+            {blocked.length === 1 ? 'blocca' : 'bloccano'}. Correggi la ricetta come dice il
+            controllo qui sotto, poi firma.
+          </p>
+          {onEdit && (
+            <button type="button" className="pulsante" onClick={onEdit}>
+              <Icon name="ricette" /> <span>Modifica la ricetta</span>
+            </button>
+          )}
+        </Notice>
+      )}
+      {stopped && blocked.length === 0 && !outcome && (
         <Notice kind="avviso">
-          La ricetta non è ancora partita. Guarda i controlli qui sotto e conferma con «Ho visto i
-          controlli: firma e invia».
+          <p>
+            La ricetta non è ancora partita. Guarda i controlli qui sotto e conferma con «Ho visto i
+            controlli: firma e invia».
+          </p>
+          {onEdit && (
+            <button type="button" className="pulsante" onClick={onEdit}>
+              <Icon name="ricette" /> <span>Modifica la ricetta</span>
+            </button>
+          )}
         </Notice>
       )}
       {check && (
@@ -324,11 +357,15 @@ export function SendPanel({
             type="button"
             className="pulsante pulsante-primario"
             onClick={() => void sign()}
-            disabled={busy || checking}
+            disabled={busy || checking || blocked.length > 0}
           >
             {/* Fermato il passo unico, il medico conferma di aver visto i controlli (D256). */}
             <Icon name="firma" />{' '}
-            <span>{stopped ? 'Ho visto i controlli: firma e invia' : 'Firma e invia'}</span>
+            <span>
+              {stopped && blocked.length === 0
+                ? 'Ho visto i controlli: firma e invia'
+                : 'Firma e invia'}
+            </span>
           </button>
         ) : (
           status === 'draft' && (

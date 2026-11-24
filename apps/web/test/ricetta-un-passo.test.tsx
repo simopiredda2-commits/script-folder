@@ -44,7 +44,22 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-function service() {
+/** Un controllo che blocca (R2), come nel resoconto dell'audit (D259). */
+const BLOCKED = {
+  versioneRegole: 'prova-1',
+  problemi: [
+    {
+      ruleId: 'R2',
+      severity: 'block',
+      message: '3 confezioni: il limite è 2',
+      remedy: null,
+      lineId: null,
+    },
+  ],
+  bloccanti: 1,
+};
+
+function service(opts: { blocked?: boolean; refused?: boolean } = {}) {
   const calls: string[] = [];
   vi.stubGlobal(
     'fetch',
@@ -52,6 +67,10 @@ function service() {
       const path = url.split('?')[0]!;
       const method = init?.method ?? 'GET';
       calls.push(`${method} ${path}`);
+      if (opts.refused && path === `/api/pazienti/${PATIENT_ID}/ricette` && method === 'POST')
+        return Promise.resolve(
+          new Response(JSON.stringify({ errore: 'Azione riservata al medico' }), { status: 403 }),
+        );
       const body =
         path === '/api/io'
           ? DOCTOR
@@ -62,7 +81,9 @@ function service() {
               : path === `/api/pazienti/${PATIENT_ID}/ricette`
                 ? { ricette: [{ id: 'r1', status: 'draft', righe: [] }] }
                 : path === '/api/ricette/r1/controlla'
-                  ? { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 }
+                  ? opts.blocked
+                    ? BLOCKED
+                    : { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 }
                   : path === '/api/ricette/r1/firma-e-invia'
                     ? { esito: 'accepted', nre: '0101A0000000009', messaggio: null }
                     : // Dopo l'invio compare il promemoria, che legge stampa, recapiti e consegne.
@@ -119,5 +140,42 @@ describe('ricetta del medico in un passo (D255)', () => {
     const sign = await screen.findByRole('button', { name: 'Firma e invia' });
     await waitFor(() => expect((sign as HTMLButtonElement).disabled).toBe(false));
     expect(signs(calls)).toHaveLength(0);
+  });
+});
+
+describe('dopo l’arresto si corregge la ricetta, senza rifarla (audit, D259)', () => {
+  it('«Modifica la ricetta» annulla la bozza e rimette in modifica le righe di prima', async () => {
+    const calls = service({ blocked: true });
+    editor();
+    fireEvent.click(await screen.findByRole('button', { name: 'Firma e invia' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Modifica la ricetta' }));
+    // Di nuovo in modifica: la ricerca accesa, la riga di prima ancora in ricetta.
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText<HTMLInputElement>('Farmaco, principio attivo, codice AIC o ATC')
+          .disabled,
+      ).toBe(false),
+    );
+    expect(screen.getAllByText(/Farmaco di prova 5 mg/).length).toBeGreaterThan(0);
+    expect(calls).toContain('POST /api/ricette/r1/annulla');
+    expect(signs(calls)).toHaveLength(0);
+  });
+
+  it('«Nuova ricetta da capo» non lascia la bozza nel servizio: la annulla', async () => {
+    const calls = service({ blocked: true });
+    editor();
+    fireEvent.click(await screen.findByRole('button', { name: 'Salva in bozza' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Nuova ricetta da capo' }));
+    await waitFor(() => expect(calls).toContain('POST /api/ricette/r1/annulla'));
+    await screen.findByText('Aggiungi un farmaco dalla ricerca.');
+  });
+
+  it('dopo «Ricomincia» l’errore del tentativo di prima non resta (audit 19)', async () => {
+    service({ refused: true });
+    editor();
+    fireEvent.click(await screen.findByRole('button', { name: 'Salva in bozza' }));
+    await screen.findByText('Azione riservata al medico');
+    fireEvent.click(screen.getByRole('button', { name: 'Ricomincia' }));
+    await waitFor(() => expect(screen.queryByText('Azione riservata al medico')).toBeNull());
   });
 });
