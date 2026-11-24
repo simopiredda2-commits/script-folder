@@ -30,6 +30,18 @@ export interface DemoTherapy {
    * di classe A del 30/6/2026. Non porta il nome di una ditta né un marchio.
    */
   drugName: string;
+  /**
+   * Una confezione del gruppo, come la riga «per principio attivo» del programma: la confezione
+   * scelta e il farmacista che può dare un equivalente (audit D259). Letta dalla lista di classe A
+   * del 30/6/2026 e dall'anagrafica delle confezioni del 20/11/2026 della dimostrazione
+   * (`apps/demo/dati/aifa/`): l'AIC più basso fra le confezioni autorizzate del gruppo che portano
+   * il nome del principio attivo, o, se nessuna lo porta, fra tutte le autorizzate del gruppo.
+   * Una prova lo rilegge dai file.
+   */
+  drugAic: string;
+  /** Codice ATC della confezione, dall'anagrafica delle confezioni del 20/11/2026. */
+  atc: string;
+  drugClass: 'A';
   activeIngredient: string;
   equivalenceGroup: string;
   dose: string;
@@ -58,6 +70,9 @@ const PROBLEMS = {
 const DRUGS = {
   amlodipine: {
     drugName: "AMLODIPINA 5MG 28 UNITA' USO ORALE",
+    drugAic: '037329012',
+    atc: 'C08CA01',
+    drugClass: 'A',
     activeIngredient: 'AMLODIPINA',
     equivalenceGroup: 'DOB',
     dose: '1',
@@ -69,6 +84,9 @@ const DRUGS = {
   },
   metformin: {
     drugName: "METFORMINA 500MG 30 UNITA' USO ORALE",
+    drugAic: '035195205',
+    atc: 'A10BA02',
+    drugClass: 'A',
     activeIngredient: 'METFORMINA',
     equivalenceGroup: 'A1A',
     dose: '1',
@@ -80,6 +98,9 @@ const DRUGS = {
   },
   atorvastatin: {
     drugName: "ATORVASTATINA 20MG 30 UNITA' USO ORALE",
+    drugAic: '040234217',
+    atc: 'C10AA05',
+    drugClass: 'A',
     activeIngredient: 'ATORVASTATINA',
     equivalenceGroup: 'FTB',
     dose: '1',
@@ -91,6 +112,9 @@ const DRUGS = {
   },
   insulinGlargine: {
     drugName: "INSULINA GLARGINE 100U/ML 3ML 5 UNITA' USO PARENTERALE",
+    drugAic: '035724069',
+    atc: 'A10AE04',
+    drugClass: 'A',
     activeIngredient: 'INSULINA GLARGINE',
     equivalenceGroup: 'N4B',
     dose: '14',
@@ -102,6 +126,9 @@ const DRUGS = {
   },
   insulinAspart: {
     drugName: "INSULINA ASPART 300U 3ML 5 UNITA' USO PARENTERALE",
+    drugAic: '048857027',
+    atc: 'A10AB05',
+    drugClass: 'A',
     activeIngredient: 'INSULINA ASPART',
     equivalenceGroup: 'N2A',
     dose: '4',
@@ -113,6 +140,9 @@ const DRUGS = {
   },
   levothyroxine: {
     drugName: "LEVOTIROXINA 50MCG 50 UNITA' USO ORALE",
+    drugAic: '046021111',
+    atc: 'H03AA01',
+    drugClass: 'A',
     activeIngredient: 'LEVOTIROXINA',
     equivalenceGroup: 'BKC',
     dose: '1',

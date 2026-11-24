@@ -1,4 +1,6 @@
 import { ageAt, generatePatients } from '@mmg/fixtures';
+import { readFileSync } from 'node:fs';
+import { gunzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { DEMO_PATIENTS, DEMO_REFERENCE_DATE, PROFILES, profilesFor } from '../src/db/demo';
 
@@ -25,6 +27,41 @@ describe('dati dimostrativi del seed', () => {
         expect(profile.problems[problem], profile.key).toBeDefined();
       }
     }
+  });
+
+  it('ogni terapia ha la confezione della regola, riletta dai file AIFA della dimostrazione (audit D259)', () => {
+    const dir = new URL('../../demo/dati/aifa/', import.meta.url);
+    // CSV con il punto e virgola; l'anagrafica ha i campi tra virgolette.
+    const fields = (line: string) =>
+      [...line.matchAll(/(?:^|;)(?:"((?:[^"]|"")*)"|([^;]*))/g)].map((m) =>
+        m[1] !== undefined ? m[1].replace(/""/g, '"') : m[2]!,
+      );
+    const rows = (name: string, encoding: 'latin1' | 'utf8') =>
+      gunzipSync(readFileSync(new URL(name, dir)))
+        .toString(encoding)
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .map(fields);
+    // Lista di classe A (cp1252: per queste righe è uguale a latin1) e anagrafica delle confezioni.
+    const [, ...classA] = rows('Classe-A_per_principio-attivo_30-6-2026.csv.gz', 'latin1');
+    const [head, ...packs] = rows('confezioni_fornitura.csv.gz', 'utf8');
+    const col = (n: string) => head!.indexOf(n);
+    const registry = new Map(packs.map((r) => [r[col('CODICE_AIC')]!, r]));
+    const authorized = (aic: string) =>
+      registry.get(aic)?.[col('STATO_AMMINISTRATIVO')] === 'Autorizzata';
+    for (const profile of Object.values(PROFILES))
+      for (const { therapy: t } of profile.therapies) {
+        // Colonne della lista: principio attivo, descrizione del gruppo, confezione, prezzo,
+        // titolare, AIC, codice del gruppo.
+        const group = classA.filter((r) => r[6] === t.equivalenceGroup);
+        expect(new Set(group.map((r) => r[1])), t.drugName).toEqual(new Set([t.drugName]));
+        const ok = group.filter((r) => authorized(r[5]!)).map((r) => [r[5]!, r[2]!] as const);
+        const named = ok.filter(([, name]) => name.startsWith(`${t.activeIngredient}*`));
+        const expected = (named.length ? named : ok).map(([aic]) => aic).sort()[0];
+        expect(t.drugAic, t.drugName).toBe(expected);
+        expect(registry.get(t.drugAic)![col('CODICE_ATC')], t.drugName).toBe(t.atc);
+        expect(t.drugClass).toBe('A');
+      }
   });
 
   it('solo codici ICD-9-CM verificati sulla fonte (D150)', () => {

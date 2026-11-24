@@ -24,6 +24,7 @@ import { guardPatient } from '../patients/access';
 import { studioDate } from '../prescriptions/rules-check';
 import type { ReferenceData } from '../reference/lookup';
 import {
+  absenceProblems,
   composePss,
   keepChoices,
   PSS_SECTION_KEYS,
@@ -418,6 +419,9 @@ export function createPssService(deps: PssDeps) {
         }
       }
       content.assenze = { ...content.assenze, ...b.assenze };
+      // «Nessuna … nota» solo se in cartella non c'è niente: il Profilo non dice il falso (D259).
+      const untrue = absenceProblems(content);
+      if (untrue.length) throw new HttpError(400, untrue.join('. '));
       await withActor(db, actor.userId, (tx) =>
         tx.update(pssDocument).set({ content }).where(eq(pssDocument.id, docId)),
       );
@@ -438,7 +442,10 @@ export function createPssService(deps: PssDeps) {
       if (r.status !== 'draft') throw new HttpError(409, 'Si valida solo la bozza');
       if (r.authorUserId !== actor.userId)
         throw new HttpError(403, 'Il Profilo lo valida e lo firma il medico che lo ha preparato');
-      const issues = await blockers(actor, patient);
+      const issues = [
+        ...(await blockers(actor, patient)),
+        ...absenceProblems(r.content as PssContent),
+      ];
       if (issues.length) throw new HttpError(422, issues.join('. '), { problemi: issues });
       const s = (await settingsOf(actor.studioId))!;
       const d = (await doctorOf(actor.userId))!;

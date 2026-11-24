@@ -612,6 +612,7 @@ export async function seedDemo(db: Database, options: DemoSeedOptions): Promise<
         prescriptionId: rx!.id,
         position: 1,
         therapyId: r.therapyId,
+        drugAic: r.drug.drugAic,
         drugName: r.drug.drugName,
         activeIngredient: r.drug.activeIngredient,
         byActiveIngredient: true,

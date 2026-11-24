@@ -178,9 +178,66 @@ describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
     expect(item(again, 'stiliDiVita', /Fumo/).incluso).toBe(false);
   });
 
+  it('«Nessuna terapia nota» non si scrive con terapie in cartella, anche se nessuna entra (audit D259)', async () => {
+    const draft = (await ok<{ inLavorazione: Pss }>('GET', base())).inLavorazione;
+    const none = Object.fromEntries(draft.contenuto.sezioni.terapie!.map((i) => [i.id, false]));
+    const untrue = await req('PATCH', `${base()}/${draft.id}`, {
+      scelte: { terapie: none },
+      assenze: { terapie: 'no-known-medications' },
+    });
+    expect(untrue.statusCode).toBe(400);
+    expect(untrue.json<{ errore: string }>().errore).toMatch(
+      /^Terapie farmacologiche: in cartella ci sono voci, quindi «Nessuna terapia nota» non si può scrivere/,
+    );
+    // Niente è cambiato: la terapia con il codice è ancora dentro.
+    const still = (await ok<{ inLavorazione: Pss }>('GET', base())).inLavorazione;
+    expect(item(still, 'terapie', /Farmaco con codice/).incluso).toBe(true);
+    // «Nessuna informazione» sì: è vero.
+    const honest = await ok<Pss>('PATCH', `${base()}/${draft.id}`, {
+      scelte: { terapie: none },
+      assenze: { terapie: 'no-medication-info' },
+    });
+    expect(honest.contenuto.assenze.terapie).toBe('no-medication-info');
+    // Anche l'anamnesi familiare senza codice conta come voce in cartella.
+    const family = Object.fromEntries(
+      draft.contenuto.sezioni.anamnesiFamiliare!.map((i) => [i.id, false]),
+    );
+    const noFamily = await req('PATCH', `${base()}/${draft.id}`, {
+      scelte: { anamnesiFamiliare: family },
+      assenze: { anamnesiFamiliare: 'no-known-problems' },
+    });
+    expect(noFamily.statusCode).toBe(400);
+    expect(noFamily.json<{ errore: string }>().errore).toMatch(/^Anamnesi familiare: /);
+    // Si rimette com'era, per le prove che seguono.
+    await ok('PATCH', `${base()}/${draft.id}`, {
+      scelte: {
+        terapie: { [item(still, 'terapie', /Farmaco con codice/).id]: true },
+        anamnesiFamiliare: Object.fromEntries(Object.keys(family).map((k) => [k, true])),
+      },
+    });
+  });
+
   it('valida dopo la conferma del medico; il PDF ha dentro il CDA, che rispetta lo schematron', async () => {
     const draft = (await ok<{ inLavorazione: Pss }>('GET', base())).inLavorazione;
     expect((await req('POST', `${base()}/${draft.id}/valida`, {})).statusCode).toBe(400);
+    // Una «Nessuna terapia nota» non vera, scritta nel database senza passare dalla scelta: la
+    // validazione la ferma lo stesso (audit D259).
+    const [row] = await t.db.select().from(pssDocument).where(eq(pssDocument.id, draft.id));
+    const good = row!.content as Pss['contenuto'];
+    const untrue = structuredClone(good);
+    for (const i of untrue.sezioni.terapie!) i.incluso = false;
+    untrue.assenze.terapie = 'no-known-medications';
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx.update(pssDocument).set({ content: untrue }).where(eq(pssDocument.id, draft.id)),
+    );
+    const stopped = await req('POST', `${base()}/${draft.id}/valida`, { confermo: true });
+    expect(stopped.statusCode).toBe(422);
+    expect(stopped.json<{ errore: string }>().errore).toMatch(
+      /Terapie farmacologiche: in cartella ci sono voci/,
+    );
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx.update(pssDocument).set({ content: good }).where(eq(pssDocument.id, draft.id)),
+    );
     const p = await ok<Pss>('POST', `${base()}/${draft.id}/valida`, { confermo: true });
     expect(p.stato).toBe('validated');
     const pdf = await req('GET', `${base()}/${draft.id}/pdf`);
