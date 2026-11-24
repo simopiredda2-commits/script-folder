@@ -2820,6 +2820,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'decesso segnalato da AURA in Oggi');
     await today.getByRole('link', { name }).first().click();
     await section.getByRole('button', { name: 'Conferma il decesso' }).click();
+    // Il decesso non si cambia dopo: prima la domanda (audit D259).
+    await section.getByRole('button', { name: 'Sì, conferma il decesso' }).click();
     await section.getByText('Decesso confermato.').waitFor();
     const [after] = await t.db.select().from(patient).where(eq(patient.id, deadId));
     expect(after).toMatchObject({ status: 'deceased', deceasedOn: died });
@@ -2975,6 +2977,8 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await changes
       .getByRole('button', { name: `Sposta ${name} nell’archivio di Dott. Paolo Serra` })
       .click();
+    // Lo spostamento non si annulla: prima la domanda (audit D259).
+    await changes.getByRole('button', { name: 'Sì, sposta' }).click();
     await changes.getByText(`${name}: spostato nell’archivio di Dott. Paolo Serra.`).waitFor();
     await check(page, 'paziente spostato nell’archivio del collega');
     const [after] = await t.db.select().from(patient).where(eq(patient.id, movingId));

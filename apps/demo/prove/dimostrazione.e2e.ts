@@ -952,6 +952,8 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await changes
       .getByRole('button', { name: `Sposta ${moving} nell’archivio di ${colleague}` })
       .click();
+    // Lo spostamento non si annulla: prima la domanda (audit D259).
+    await changes.getByRole('button', { name: 'Sì, sposta' }).click();
     await changes.getByText(`${moving}: spostato nell’archivio di ${colleague}.`).waitFor();
     expect(await patientId(moving)).toBeNull();
     // La collega lo trova nel suo archivio.
@@ -983,6 +985,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await login('medico');
     const changes = f.getByRole('region', { name: 'Cambi di medico nello studio' });
     await changes.getByRole('button', { name: `Non spostare ${kept}` }).click();
+    await changes.getByRole('button', { name: 'Sì, non spostare' }).click();
     await changes
       .getByText(
         `${kept}: resta nel tuo archivio. Non si ripropone finché AURA non manda una scelta nuova.`,

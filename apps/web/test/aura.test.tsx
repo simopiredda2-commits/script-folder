@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -148,6 +148,43 @@ describe('AURA nell’interfaccia (D197)', () => {
     expect(onUpdated).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('button', { name: 'Conferma il decesso' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Non confermare il decesso' })).toBeTruthy();
+  });
+
+  it('il decesso, confermato o no, passa da una domanda: non si cambia dopo (audit D259)', async () => {
+    const fetchMock = stub({
+      'GET /api/pazienti/p1/aura': state({
+        differenze: [
+          { campo: 'decesso', etichetta: 'Decesso', nellaCartella: null, inAura: '2026-11-17' },
+        ],
+      }),
+      'POST /api/pazienti/p1/aura/differenze': { campi: ['decesso'], nonUsati: [], stato: state() },
+    });
+    render(<AuraSection patientId="p1" canWrite onUpdated={() => undefined} />);
+    const posts = () =>
+      fetchMock.mock.calls.filter(
+        ([u, init]) => u === '/api/pazienti/p1/aura/differenze' && init?.method === 'POST',
+      );
+    fireEvent.click(await screen.findByRole('button', { name: 'Conferma il decesso' }));
+    const ask = screen.getByRole('group', { name: 'Conferma della scelta sul decesso' });
+    expect(document.activeElement).toBe(ask);
+    expect(ask.textContent).toMatch(
+      /^Confermi il decesso del paziente il 17\/11\/2026, come dice AURA\?/,
+    );
+    expect(posts()).toHaveLength(0);
+    fireEvent.click(within(ask).getByRole('button', { name: 'Torna indietro' }));
+    expect(posts()).toHaveLength(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Conferma il decesso' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, conferma il decesso' }));
+    expect(await screen.findByText('Decesso confermato.')).toBeTruthy();
+    expect(JSON.parse(posts()[0]![1]!.body as string)).toEqual({
+      scelte: [{ campo: 'decesso', inAura: '2026-11-17', usa: true }],
+    });
+    await waitFor(() => {
+      const focused = document.activeElement as HTMLElement;
+      expect(focused).not.toBe(document.body);
+      expect(focused.className).toBe('esito-segnato');
+      expect(focused.textContent).toMatch(/Decesso confermato/);
+    });
   });
 
   it('anagrafica di AURA: chi non scrive nell’archivio vede le differenze ma non i pulsanti', async () => {
@@ -360,9 +397,32 @@ describe('AURA nell’interfaccia (D197)', () => {
         name: 'Sposta PAZIENTE INVENTATO nell’archivio di Medico Collega',
       }),
     );
+    // Lo spostamento non si annulla: prima la domanda, con il fuoco (audit D259, WCAG 3.3.4).
+    const ask = screen.getByRole('group', { name: 'Conferma dello spostamento' });
+    expect(document.activeElement).toBe(ask);
+    expect(ask.textContent).toMatch(/Confermi lo spostamento di PAZIENTE INVENTATO/);
+    expect(fetchMock.mock.calls.some(([u]) => u === '/api/aura/cambi-medico/c1/sposta')).toBe(
+      false,
+    );
+    // «Torna indietro» non manda niente.
+    fireEvent.click(within(ask).getByRole('button', { name: 'Torna indietro' }));
+    expect(screen.queryByRole('group', { name: 'Conferma dello spostamento' })).toBeNull();
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Sposta PAZIENTE INVENTATO nell’archivio di Medico Collega',
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, sposta' }));
     expect(
       await screen.findByText('PAZIENTE INVENTATO: spostato nell’archivio di Medico Collega.'),
     ).toBeTruthy();
+    // Il pulsante premuto non c'è più: il fuoco va all'esito (WCAG 2.4.3).
+    await waitFor(() => {
+      const focused = document.activeElement as HTMLElement;
+      expect(focused).not.toBe(document.body);
+      expect(focused.className).toBe('esito-segnato');
+      expect(focused.textContent).toMatch(/spostato nell’archivio/);
+    });
     // Il cambio come si vede: medico scelto e data, perché il servizio controlli che sia quello.
     const sent = fetchMock.mock.calls.find(([u]) => u === '/api/aura/cambi-medico/c1/sposta');
     expect(sent?.[1]?.method).toBe('POST');
@@ -376,6 +436,7 @@ describe('AURA nell’interfaccia (D197)', () => {
       expect(fetchMock.mock.calls.filter(([u]) => u === '/api/aura/cambi-medico').length).toBe(2),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Non spostare PAZIENTE INVENTATO' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, non spostare' }));
     expect(
       await screen.findByText(
         'PAZIENTE INVENTATO: resta nel tuo archivio. Non si ripropone finché AURA non manda una scelta nuova.',
@@ -429,6 +490,7 @@ describe('AURA nell’interfaccia (D197)', () => {
         name: 'Sposta PAZIENTE ALTRO nell’archivio di Medico Collega',
       }),
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Sì, sposta' }));
     expect(await screen.findByText(message)).toBeTruthy();
     // Chi è stato scelto lo sa, ma la cartella non è nel suo archivio: niente collegamento.
     const incoming = screen.getByText(/PAZIENTE TERZO ti ha scelto in AURA dal 17\/11\/2026/);

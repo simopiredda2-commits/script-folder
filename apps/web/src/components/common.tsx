@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { ApiError } from '../lib/api';
 import { CREDENTIALS_PATH, isCredentialError } from '../lib/credentials';
@@ -58,6 +58,70 @@ export function Notice({
     <div className={`messaggio messaggio-${kind}`} role={kind === 'errore' ? 'alert' : 'status'}>
       <Icon name={icon} />
       <div>{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Domanda di conferma prima di un esito che poi non si cambia (WCAG 3.3.4, audit D259): la
+ * domanda, «Sì» e «Torna indietro». Quando compare prende il fuoco, così la tastiera e il lettore
+ * di schermo la trovano subito (WCAG 2.4.3).
+ */
+export function ConfirmQuestion({
+  label,
+  yes,
+  busy = false,
+  onYes,
+  onBack,
+  children,
+}: {
+  /** Nome del gruppo, per il lettore di schermo. */
+  label: string;
+  /** Il testo del «Sì», che dice che cosa si fa: «Sì, sposta». */
+  yes: string;
+  busy?: boolean;
+  onYes: () => void;
+  onBack: () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  return (
+    <div ref={ref} tabIndex={-1} className="conferma-esito" role="group" aria-label={label}>
+      <p>{children}</p>
+      <div className="azioni">
+        <button
+          type="button"
+          className="pulsante pulsante-primario"
+          disabled={busy}
+          onClick={onYes}
+        >
+          <Icon name="fatto" /> <span>{yes}</span>
+        </button>
+        <button type="button" className="pulsante" disabled={busy} onClick={onBack}>
+          <Icon name="annulla" /> <span>Torna indietro</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * L'esito di un'azione che toglie il pulsante premuto: prende il fuoco, che altrimenti finirebbe
+ * sulla pagina (WCAG 2.4.3, audit D259).
+ */
+export function ResultNotice({
+  kind = 'fatto',
+  children,
+}: {
+  kind?: 'info' | 'avviso' | 'errore' | 'fatto';
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => ref.current?.focus(), [children]);
+  return (
+    <div ref={ref} tabIndex={-1} className="esito-segnato">
+      <Notice kind={kind}>{children}</Notice>
     </div>
   );
 }
