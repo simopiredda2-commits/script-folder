@@ -77,6 +77,12 @@ describe('la segreteria prepara dalla «Nuova ricetta» (D259)', () => {
     // Poi la manda alla firma del medico, come la ripetizione.
     const sent = await post('segreteria', `/api/ricette/${id}/da-firmare`, {});
     expect(sent.statusCode, sent.body).toBe(200);
+    // La convalida resta sempre del medico (regola 5, Simone il 24/11/2026): la segreteria non
+    // firma né invia la ricetta che ha preparato.
+    const signed = await post('segreteria', `/api/ricette/${id}/firma-e-invia`, {});
+    expect(signed.statusCode).toBe(403);
+    const [after] = await t.db.select().from(prescription).where(eq(prescription.id, id));
+    expect(after).toMatchObject({ status: 'to_sign', signedBy: null });
     // Nel registro degli accessi è una ripetizione, consentita.
     const log = await t.db
       .select()
