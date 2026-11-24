@@ -831,6 +831,15 @@ legend {
   padding: 0;
 }
 
+/* Quanti risultati, o che sono solo i primi (audit, D259): una riga sopra l'elenco. */
+.stato-ricerca:empty {
+  display: none;
+}
+
+.stato-ricerca {
+  margin: 0.25rem 0 0;
+}
+
 .risultato {
   display: flex;
   justify-content: space-between;

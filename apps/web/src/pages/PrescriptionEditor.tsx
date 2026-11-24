@@ -287,6 +287,17 @@ export function lineFromPrescribed(
   };
 }
 
+/** Quanti risultati, o che sono solo i primi e conviene precisare (audit, D259). */
+export function resultsText(
+  q: string,
+  data: { farmaci?: unknown[]; prestazioni?: unknown[]; altri?: boolean },
+): string {
+  const n = (data.farmaci ?? data.prestazioni ?? []).length;
+  if (n === 0) return `Nessun risultato per «${q}».`;
+  if (data.altri) return `Primi ${n} risultati: precisa la ricerca (dosaggio, forma o marchio).`;
+  return n === 1 ? '1 risultato.' : `${n} risultati.`;
+}
+
 /**
  * Una riga che la segreteria può preparare (D259): una terapia cronica in corso, come in «Ripeti
  * le terapie scelte». Il servizio lo controlla di nuovo.
@@ -353,7 +364,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const [obscured, setObscured, resetObscured] = usePersistentState(k('oscurato'), false);
   const [text, setText] = useState('');
   const q = useDebounced(text);
-  const search = useApi<{ farmaci?: Drug[]; prestazioni?: Service[]; versioni: DatasetVersion[] }>(
+  const search = useApi<{
+    farmaci?: Drug[];
+    prestazioni?: Service[];
+    /** Più risultati di quelli mostrati: si precisa la ricerca (audit, D259). */
+    altri?: boolean;
+    versioni: DatasetVersion[];
+  }>(
     q.trim()
       ? `/api/${mode === 'farmaci' ? 'farmaci' : 'prestazioni'}${query({ q: q.trim() })}`
       : null,
@@ -376,6 +393,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const repeatOnly = !isDoctor;
   const [oneStep, setOneStep] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [justAdded, setJustAdded] = useState<Omit<Line, 'key'> | null>(null);
   /**
    * Una bozza lasciata non resta nel servizio (audit, D259): si annulla, con il motivo, e non
    * finisce fra i farmaci prescritti. Una ricetta già partita o stampata non si tocca.
@@ -435,10 +453,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
     versionKinds.includes(v.kind),
   );
 
-  const add = (l: Omit<Line, 'key'>) =>
+  const add = (l: Omit<Line, 'key'>) => {
     setLines((ls) =>
       mode === 'farmaci' && ls.some((x) => sameDrug(x, l)) ? ls : [...ls, { ...l, key: newKey() }],
     );
+    // «Aggiungi» lascia il posto a «− N +»: il fuoco va lì, non torna in cima (audit 14, D259).
+    setJustAdded(l);
+  };
   // Le posologie dello studio, come suggerimenti nella posologia delle righe dei farmaci.
   const posologyTexts = [...new Set((posologies.data?.voci ?? []).map((p) => p.etichetta))];
   const update = (key: string, patch: Partial<Line>) =>
@@ -514,6 +535,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         name={name}
         quantity={inPrescription.quantity}
         disabled={locked}
+        autoFocus={justAdded !== null && sameDrug(justAdded, line)}
         onChange={(quantity) => update(inPrescription.key, { quantity })}
       />
     ) : (
@@ -634,7 +656,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             compact
           />
           <ErrorMessage error={search.error} />
-          <ul className="risultati" aria-live="polite">
+          {/* Il numero, non tutto l'elenco, a chi usa un lettore di schermo (audit 15, D259). */}
+          <p role="status" className="tenue stato-ricerca">
+            {q && search.data ? resultsText(q, search.data) : ''}
+          </p>
+          <ul className="risultati">
             {search.data?.farmaci?.map((d) => {
               const line = {
                 drugAic: d.aic,
@@ -666,6 +692,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                         onClick={() => add(line)}
                       >
                         <Icon name="aggiungi" /> <span>Aggiungi</span>
+                        <span className="visivamente-nascosto"> {line.drugName}</span>
                       </button>,
                     )}
                 </li>
@@ -688,14 +715,10 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                   }
                 >
                   <Icon name="aggiungi" /> <span>Aggiungi</span>
+                  <span className="visivamente-nascosto"> {s.description}</span>
                 </button>
               </li>
             ))}
-            {q &&
-              search.data &&
-              (search.data.farmaci ?? search.data.prestazioni ?? []).length === 0 && (
-                <li className="tenue">Nessun risultato per «{q}».</li>
-              )}
           </ul>
           {mode === 'specialistica' && (
             <PackagePicker

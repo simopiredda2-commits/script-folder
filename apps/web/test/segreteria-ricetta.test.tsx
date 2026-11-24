@@ -1,10 +1,10 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PrescribedDrug } from '../src/components/Prescribed';
 import { OpenRecordsProvider } from '../src/lib/openRecords';
 import { SessionProvider } from '../src/lib/session';
-import { PrescriptionEditor, repeatable } from '../src/pages/PrescriptionEditor';
+import { PrescriptionEditor, repeatable, resultsText } from '../src/pages/PrescriptionEditor';
 import type { TherapyRow } from '../src/pages/RecordPage';
 
 /**
@@ -108,7 +108,7 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-function editor(who: object, mode: 'farmaci' | 'specialistica' = 'farmaci') {
+function editor(who: object, mode: 'farmaci' | 'specialistica' = 'farmaci', search: object = {}) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) => {
@@ -123,7 +123,7 @@ function editor(who: object, mode: 'farmaci' | 'specialistica' = 'farmaci') {
               : path === `/api/pazienti/${PATIENT_ID}/farmaci-prescritti`
                 ? { farmaci: [prescribed(CHRONIC), prescribed(AS_NEEDED)] }
                 : path === '/api/farmaci'
-                  ? { farmaci: [DRUG], versioni: [] }
+                  ? { farmaci: [DRUG], versioni: [], ...search }
                   : {};
       return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
     }),
@@ -188,5 +188,35 @@ describe('la segreteria nella «Nuova ricetta» (D259)', () => {
     expect(repeatable({ therapyId: 't1' }, [{ ...CHRONIC, status: 'suspended' }])).toBe(false);
     expect(repeatable({ therapyId: 't1' }, [{ ...CHRONIC, reserved: true }])).toBe(false);
     expect(repeatable({}, [CHRONIC])).toBe(false);
+  });
+});
+
+describe('la ricerca dei farmaci (audit 5, 14, 15, 31, D259)', () => {
+  it('dice quanti risultati, e quando sono solo i primi: l’elenco non è più letto tutto', async () => {
+    editor(DOCTOR, 'farmaci', { altri: true });
+    const result = await searchResult();
+    await screen.findByText('Primi 1 risultati: precisa la ricerca (dosaggio, forma o marchio).');
+    expect(result.closest('ul')!.getAttribute('aria-live')).toBeNull();
+  });
+
+  it('«Aggiungi» porta il nome del farmaco, e dopo il clic il fuoco va su «+»', async () => {
+    editor(DOCTOR);
+    const result = await searchResult();
+    const add = within(result).getByRole('button', {
+      name: /Aggiungi\s*FARMACO DELLA RICERCA 28 compresse/,
+    });
+    fireEvent.click(add);
+    await waitFor(() =>
+      expect(document.activeElement?.getAttribute('aria-label')).toBe(
+        'Una confezione in più di FARMACO DELLA RICERCA 28 compresse',
+      ),
+    );
+  });
+
+  it('resultsText', () => {
+    expect(resultsText('x', { farmaci: [] })).toBe('Nessun risultato per «x».');
+    expect(resultsText('x', { farmaci: [1] })).toBe('1 risultato.');
+    expect(resultsText('x', { farmaci: [1, 2] })).toBe('2 risultati.');
+    expect(resultsText('x', { farmaci: [1, 2], altri: true })).toMatch(/^Primi 2 risultati/);
   });
 });

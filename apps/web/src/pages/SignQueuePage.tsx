@@ -488,7 +488,8 @@ export function SignQueuePage() {
     if (!target) return;
     target.scrollIntoView?.({ block: 'start' });
     target.focus({ preventScroll: true });
-  }, [hash]);
+    // Anche quando la sessione arriva dopo: prima di lei la pagina non ha le sezioni (D259).
+  }, [hash, sees]);
   // Chi non ha un ruolo clinico (l'amministratore) legge una frase sola, non una per sezione (audit 17).
   if (!sees)
     return (
