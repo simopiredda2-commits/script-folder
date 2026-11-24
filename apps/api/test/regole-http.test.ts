@@ -9,7 +9,7 @@ import {
   prescriptionLine,
   therapy,
 } from '../src/db/schema';
-import { createRulesCheck, studioDate } from '../src/prescriptions/rules-check';
+import { buildRuleContext, createRulesCheck, studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -202,5 +202,37 @@ describe('regole di prescrizione prima dell’invio', () => {
     const r11 = issues.find((i) => i.ruleId === 'R11')!;
     expect(r11.severity).toBe('info');
     expect(r11.message).toMatch(/copre fino al/);
+  });
+
+  it('D252: le unità per confezione della descrizione AIFA contano solo con la posologia nella stessa unità', async () => {
+    const [ther] = await t.db.select().from(therapy).where(eq(therapy.patientId, s.richPatient));
+    const before = ther!.doseUnit;
+    const id = await draft({
+      kind: 'pharma_ssn',
+      lines: [
+        {
+          therapyId: ther!.id,
+          drugAic: ther!.drugAic,
+          drugName: 'Farmaco di prova 5 mg',
+          activeIngredient: 'principio di prova',
+          quantity: 1,
+        },
+      ],
+    });
+    // Come dalla banca dati: «- 28 COMPRESSE».
+    const drugFacts = () => ({ unitsPerPack: 28, packUnit: 'compressa' });
+    const unitsWith = async (doseUnit: string | null) => {
+      await t.db.update(therapy).set({ doseUnit }).where(eq(therapy.id, ther!.id));
+      const ctx = await buildRuleContext({ db: t.db, drugFacts }, id, {
+        reasons: {},
+        confirmedAifaNotes: [],
+      });
+      return ctx.drugFacts(ther!.drugAic)?.unitsPerPack;
+    };
+    expect(await unitsWith('compressa')).toBe(28);
+    expect(await unitsWith('compresse')).toBe(28);
+    expect(await unitsWith('goccia')).toBeUndefined();
+    expect(await unitsWith(null)).toBeUndefined();
+    await t.db.update(therapy).set({ doseUnit: before }).where(eq(therapy.id, ther!.id));
   });
 });

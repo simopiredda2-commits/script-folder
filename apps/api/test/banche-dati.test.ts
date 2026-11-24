@@ -292,7 +292,8 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       price: '3.74',
       equivalenceGroup: 'DOB',
       dpc: false,
-      facts: { reimbursableSsn: true },
+      // Le unità per confezione dalla descrizione AIFA (D252): «- 28 COMPRESSE».
+      facts: { reimbursableSsn: true, unitsPerPack: 28, packUnit: 'compressa' },
     });
     // Classe H: non dice da sola che cosa può prescrivere il medico di famiglia.
     expect(d.get('025202096')).toMatchObject({ drugClass: 'H', price: '9.92', facts: {} });
@@ -306,6 +307,8 @@ describe('banche dati pubbliche: dall’output di sync al database', () => {
       aifaNote: '100',
       facts: { reimbursableSsn: true, requiresPlan: true, aifaNote: '100' },
     });
+    // «4 PENNE»: le penne non sono un'unità della posologia, il dato resta non noto (D252).
+    expect(d.get('043783075')!.facts.unitsPerPack).toBeUndefined();
     // Fuori dalle liste di classe A e H: nessun fatto, nemmeno «non a carico del SSN».
     expect(d.get('012745093')).toMatchObject({ drugClass: null, facts: {} });
     expect(d.has('999999999')).toBe(false);

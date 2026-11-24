@@ -1871,3 +1871,13 @@ Non provato: un MacBook vero e Safari vero (le prove usano WebKit di Playwright 
 Non provato: lettori di schermo veri sul «− N +»; Safari vero.
 
 **D251 · Via anticipato alla #32 e fine della sessione del 23/11/2026.** Simone, prima che finissero le verifiche: «Ti autorizzo sin da ora a unire. A domani». La #32 è stata unita il 24/11/2026 (commit 1350cde), con le 14 verifiche su GitHub verdi sull'ultimo commit (6e4c3a8). Prima, con WebKit, una prova della #32 cadeva e ne trascinava altre tre: i clic su «−» e «+» facevano scorrere fino in fondo il riquadro della ricerca. In fondo il segno «c'è altro sotto» giustamente non c'è, e la prova lo cercava lì. La prova ora riporta il riquadro in cima prima di controllare; riprodotta e verificata in locale con WebKit. Si riprende dalla domanda sulle unità per confezione del contatore R11 (D250), poi dall'ordine concordato in `docs/avanzamento.md`.
+
+**D252 · Unità per confezione dall'anagrafica AIFA.** Domanda della fermata sul contatore R11 (D250); risposta di Simone del 24/11/2026: «AIFA. La banca dati con licenza verificherà eventuali discrepanze. Tienilo a mente».
+
+- **Da dove**: la colonna «DESCRIZIONE» dell'anagrafica AIFA delle confezioni, già importata come `pack`. Si legge il numero che apre l'ultima parte, dopo l'ultimo «- », solo se lo segue «compresse», «capsule» o «bustine» (al singolare o al plurale). Il trattino dentro il materiale del blister («PVC-PE-PVDC») non separa le parti.
+- **Che cosa non si legge**: penne, fiale, flaconcini, flaconi in millilitri, confezioni come «2 BLISTER DA 14 COMPRESSE». Restano non note: nessun numero ricostruito.
+- **Stessa unità della posologia**: il numero conta per R11 e R4 solo se la posologia della terapia è nella stessa unità («compressa» o «compresse»). Se la posologia è in gocce o in unità, o non ha l'unità, il contatore resta fermo e lo dice, come prima.
+- **Le regole non cambiano versione**: cambia il dato che arriva alle regole, non il loro comportamento. La nota «finché mancano, il contatore non si calcola» resta vera per le confezioni che non si leggono.
+- **Da tenere a mente**: con la banca dati con licenza si confronteranno le unità lette da AIFA con le sue, per trovare le differenze.
+
+Non provato: l'anagrafica AIFA intera (solo il file d'esempio).

@@ -17,6 +17,11 @@ export interface DrugFacts {
   injectableAntibioticOrInfusion?: boolean;
   /** Unità posologiche per confezione (R4, R11). */
   unitsPerPack?: number;
+  /**
+   * L'unità di `unitsPerPack` quando viene dalla descrizione AIFA della confezione (D252), per
+   * esempio «compressa»: conta solo con una posologia nella stessa unità.
+   */
+  packUnit?: string;
   /** Carenza secondo l'elenco AIFA dei farmaci carenti in vigore (R21); assente se non c'è. */
   shortage?: ShortageFacts;
   /**

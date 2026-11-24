@@ -1563,6 +1563,27 @@ Pull request #31 unita in `main` (commit 297121d) con le 14 verifiche su GitHub 
 - Le confezioni nell'ultima ricetta compaiono solo se c'è una ricetta: nella dimostrazione molte terapie non ne hanno («nessuna»). Ricette già inviate nei dati della dimostrazione sono nell'elenco «Che cosa resta da fare», con il database dei farmaci.
 - Il contatore delle confezioni (R11) conta le confezioni delle ricette inviate, quindi anche quelle scelte con «− N +». Però oggi non calcola mai la copertura: le unità per confezione non arrivano da nessuna banca dati che abbiamo (D59, D250). Domanda per la prossima fermata: da dove prenderle (la descrizione della confezione AIFA, per esempio «28 compresse»; un campo nella scheda della terapia; o una banca dati con licenza).
 
+## Dopo l'unione della #32 – unità per confezione dall'anagrafica AIFA (24/11/2026)
+
+Risposta di Simone alla domanda sul contatore R11: «AIFA. La banca dati con licenza verificherà eventuali discrepanze. Tienilo a mente» (D252).
+
+**Fatto**
+
+- Le unità per confezione si leggono dalla descrizione dell'anagrafica AIFA delle confezioni: «5 MG COMPRESSE- 28 COMPRESSE IN BLISTER» dà 28 compresse. Si legge solo il numero che apre l'ultima parte, e solo per compresse, capsule e bustine; penne, fiale, flaconi e «2 BLISTER DA 14» restano non noti.
+- Il contatore R11 e il limite dei 180 giorni della R4 usano quel numero solo se la posologia della terapia è nella stessa unità (compresse con «compressa»); con le gocce o le unità di insulina no, e il contatore resta fermo come prima.
+
+**Come provarlo**
+
+- `packages/reference/test/confezioni.test.ts` (descrizioni del file d'esempio e casi che non si leggono); in `apps/api/test/banche-dati.test.ts` i fatti dell'amlodipina con 28 compresse e il dulaglutide senza; in `apps/api/test/regole-http.test.ts` l'unità della posologia.
+
+**Non provato**
+
+- Le descrizioni dell'anagrafica intera: provate solo quelle del file d'esempio. Il confronto con la banca dati con licenza si farà quando ci sarà.
+
+**Da tenere a mente**
+
+- Quando arriverà la banca dati con licenza, confrontare le unità per confezione lette da AIFA con le sue e segnalare le differenze (richiesta di Simone).
+
 ## Unione della #32 (24/11/2026)
 
 Pull request #32 unita in `main` (commit 1350cde) con il via dato in anticipo da Simone («Ti autorizzo sin da ora a unire. A domani», D251) e le 14 verifiche su GitHub verdi. Con WebKit una prova cadeva: il riquadro della ricerca, fatto scorrere in fondo dai clic su «−» e «+», giustamente non aveva il segno «c'è altro sotto». La prova ora lo riporta in cima prima di controllare; riprodotto e verificato in locale con WebKit. Dimostrazione ripubblicata (versione 20).
@@ -1583,7 +1604,7 @@ Simone ha risposto con il pulsante il 23/11/2026 (D247).
 1. Anteprima del PDF prima della firma, con «Bozza – non valida» al posto dell'NRE (punto 1 delle richieste della pausa).
 2. Pagina Ricette con tutte le ricette in corso e il menu di stampa e invio; «Archivia ricette confermate» (punti 2 e 3).
 3. Ricetta del medico in un passo solo, con l'invio sempre con le sue credenziali (punto 4).
-4. Unità per confezione per il contatore R11 (D250): da dove prenderle, alla prossima fermata.
+4. Unità per confezione per il contatore R11 (D250): fatto, dall'anagrafica AIFA (D252). Quando ci sarà la banca dati con licenza, servirà a trovare le differenze con il numero letto da AIFA.
 5. Database dei farmaci nella dimostrazione (D243): che cosa vuol dire di preciso (i rimborsabili di classe A e H, o tutta l'anagrafica AIFA) si chiede a Simone allora. Con il database, qualche ricetta già inviata nei dati della dimostrazione, così le righe dei farmaci prescritti mostrano data e confezioni dell'ultima ricetta (D249).
 6. Audit con Cowork sulla dimostrazione, a programma chiuso (D247).
 7. Collaudo finale: le verifiche di Simone e della Dr.ssa Rocca in «Che cosa resta aperto».
@@ -3628,3 +3649,6 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D250: totale che conta le righe invece delle confezioni                                                       | PrescriptionEditor.tsx: totale uguale al numero di righe                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D250: «+» che non cambia le confezioni                                                                        | PrescribedDrugs.tsx: «+» rimanda lo stesso numero                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D250: «−» attivo con una confezione sola                                                                      | PrescribedDrugs.tsx: limite di una confezione tolto                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D252: descrizione AIFA mai letta                                                                              | pack-units.ts: nessuna unità letta                                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D252: unità per confezione non passate alle regole                                                            | lookup.ts: numero non messo nei fatti del farmaco                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D252: unità per confezione anche con una posologia in un'altra unità                                          | rules-check.ts: controllo dell'unità tolto                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |

@@ -1,3 +1,4 @@
+import { samePackUnit, type PackUnit } from '@mmg/reference';
 import { checkPrescription, type DrugFacts, type LineContext, type RuleContext } from '@mmg/rules';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client';
@@ -124,6 +125,24 @@ export async function buildRuleContext(
       exemptionExists ??= lookups.exemptionExists;
       exemptionServices ??= lookups.exemptionServices;
     }
+  }
+
+  // Le unità per confezione lette dalla descrizione AIFA contano solo se la posologia della
+  // terapia è nella stessa unità (D252): 28 compresse con «1 compressa» sì; con le gocce no.
+  const withUnits = drugFacts;
+  if (withUnits) {
+    drugFacts = (aic) => {
+      const facts = withUnits(aic);
+      if (!facts?.packUnit) return facts;
+      const units = lines
+        .filter((l) => l.drugAic === aic && l.therapyId)
+        .map((l) => therapies.find((x) => x.id === l.therapyId)?.doseUnit);
+      if (units.every((u) => samePackUnit(u, facts.packUnit as PackUnit))) return facts;
+      const rest: DrugFacts = { ...facts };
+      delete rest.unitsPerPack;
+      delete rest.packUnit;
+      return rest;
+    };
   }
 
   return {
