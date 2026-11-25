@@ -1749,6 +1749,12 @@ Risposte di Simone con il pulsante; il dettaglio è in D266.
 - Non provato: il SAR vero, la cifratura con il certificato della Regione, la stampa su un modulo vero.
 - L'annullamento della dematerializzata si chiede a nome di chi l'aveva firmata, con le sue credenziali.
 - Domande per il CSI: posizione dell'NRE sul modulo; presidi in DPCM; elenco dei ricettari del medico dal SAR; come risponde il SAR a un file DPCM mandato di nuovo dopo un invio senza risposta, se il primo era arrivato.
+- Schermate 77 (modulo) e 78 (ricette rosse in DPCM); aggiornate la 51 (codice ASL del medico), la 52 (testo della V06) e la 76 (sezione nuova e NRE dal lotto). Le altre rifatte cambiavano solo nelle date: tenute quelle di prima.
+- Rilettura finale prima della pull request, fatta dalla sessione (D268). Tre difetti veri, corretti con la prova e il sabotaggio:
+  - la stampa della ricetta rimasta «in invio» confrontava l'ora della firma in SQL: con i microsecondi salvati dal database non riconosceva lo stesso invio e diceva «La ricetta è cambiata nel frattempo». Ora blocca la riga e confronta in JavaScript, come «Non è arrivata». Trovato con le schermate, che scrivono l'ora con il database;
+  - l'esito che non si legge si rilegge dopo 5 minuti, come la lettura normale: prima l'attesa dipendeva dai tentativi dell'invio e arrivava a 60 minuti;
+  - nel file DPCM a capo e tabulazioni diventano uno spazio: prima sparivano e incollavano le parole del quesito diagnostico.
+- Interfaccia: lo stato con il simbolo sta sulla riga del testo che segue (anche in Banche dati e Importazione); «Invia adesso» staccato dall'elenco.
 
 **Ordine dopo la domanda di Simone sui tempi** (D268), nello stesso branch, senza agenti:
 
