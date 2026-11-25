@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router';
 import { ConfirmQuestion, ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { InterruptedSendPanel } from '../components/InterruptedSendPanel';
+import { RedPrintedNotice, type RedPrinted } from '../components/RedFormPrint';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError } from '../lib/api';
@@ -82,7 +83,7 @@ function QueueItem({
   patientId: string;
   prescription: QueueGroup['ricette'][number];
   status: 'draft' | 'to_sign' | 'error';
-  onChange: (status: string, nre?: string) => void;
+  onChange: (status: string, nre?: string, red?: RedPrinted) => void;
 }) {
   const { list, lines } = useLines(patientId, prescription.id);
   const { isDoctor } = useSession();
@@ -127,6 +128,7 @@ function QueueItem({
           status={status}
           lastErrorKind={prescription.tipoErrore}
           preview={prescription.tipo !== 'white'}
+          redForm={prescription.tipo === 'pharma_ssn' || prescription.tipo === 'specialist_ssn'}
           lineNames={Object.fromEntries(
             lines.map((l) => [l.id, l.drugName ?? l.serviceDescription ?? '']),
           )}
@@ -168,11 +170,18 @@ function Queue({
   const [sent, setSent] = useState<
     { who: string; nre: string; id: string; patientId: string; kind: string }[]
   >([]);
+  // Anche la ricetta rossa stampata esce dalla coda: il PDF da stampare resta qui sopra (D270).
+  const [printed, setPrinted] = useState<{ who: string; id: string; red: RedPrinted }[]>([]);
   if (queue.loading && !queue.data) return <Loading what="ricette" />;
   if (!queue.data) return <ErrorMessage error={queue.error} />;
   const groups = queue.data.pazienti;
-  const done = sent.length > 0 && (
+  const done = (sent.length > 0 || printed.length > 0) && (
     <ul className="elenco-semplice" aria-live="polite">
+      {printed.map((x) => (
+        <li key={x.id}>
+          <RedPrintedNotice red={x.red} who={x.who} />
+        </li>
+      ))}
       {sent.map((x) => (
         <li key={x.nre}>
           <Notice kind="fatto">
@@ -213,7 +222,12 @@ function Queue({
                   patientId={g.paziente.id}
                   prescription={r}
                   status={status}
-                  onChange={(newStatus, nre) => {
+                  onChange={(newStatus, nre, red) => {
+                    if (newStatus === 'paper' && red)
+                      setPrinted((xs) => [
+                        ...xs,
+                        { who: `${g.paziente.nome} ${g.paziente.cognome}`, id: r.id, red },
+                      ]);
                     if (newStatus === 'sent' && nre) {
                       setSent((xs) => [
                         ...xs,
@@ -280,9 +294,12 @@ function InterruptedItem({
           signedBy={r.firmataDa ?? null}
           settleFrom={r.esitoDal ?? null}
           fiscalCode={r.codiceFiscaleInviato ?? patient.codiceFiscale}
+          redForm={r.tipo === 'pharma_ssn' || r.tipo === 'specialist_ssn'}
           onChange={(status) => {
             if (status === 'sent') setArrived(true);
             // «Non è arrivata»: la ricetta passa fra gli invii non riusciti, che si ricaricano.
+            // Ricetta rossa: si ricaricano le confermate e le ricette rosse; questa coda no, così
+            // il PDF resta qui, come il promemoria dopo «È arrivata» (D270).
             else onChanged();
           }}
         />
@@ -500,6 +517,181 @@ function ConfirmedQueue({ reloadKey }: { reloadKey: number }) {
  * Coda «da firmare» del medico e invii non riusciti. La segreteria le vede in sola lettura (D242):
  * la pagina le promette, «Qui sotto le ricette in attesa»; firma ed esito restano del medico.
  */
+/** Una ricetta rossa del medico, come la dà `GET /api/ricette-rosse` (D270). */
+interface RedRow {
+  id: string;
+  ricetta: string;
+  paziente?: string;
+  nomePaziente: string;
+  poligrafico: string;
+  nre: string;
+  stampataIl: string;
+  inviareEntro: string;
+  stato: 'to_send' | 'accepted' | 'ok' | 'warnings' | 'discarded';
+  protocollo: string | null;
+  accoltaIl: string | null;
+  messaggi: { code: string; description: string }[];
+  errore: string | null;
+  annullamentoDematerializzata: {
+    nre: string | null;
+    stato: 'pending' | 'done' | 'failed';
+    errore: string | null;
+    annullataIl: string | null;
+  } | null;
+  pdf: string;
+  daSeguire: boolean;
+}
+
+/** Simbolo e parola dello stato, come in tutta la cartella: mai il solo colore. */
+function RedStatus({ r }: { r: RedRow }) {
+  const [kind, word, text]: ['info' | 'avviso' | 'errore' | 'fatto', string, string] =
+    r.stato === 'to_send'
+      ? [
+          r.daSeguire ? 'avviso' : 'info',
+          'Da mandare',
+          `al SAR entro il ${dateTime(r.inviareEntro)}. ${r.errore ?? 'Parte da sola.'}`,
+        ]
+      : r.stato === 'accepted'
+        ? [
+            r.daSeguire ? 'avviso' : 'info',
+            'Mandata',
+            `il ${dateTime(r.accoltaIl ?? r.stampataIl)}, protocollo ${r.protocollo ?? '—'}: si aspetta l’esito.${r.errore ? ` ${r.errore}` : ''}`,
+          ]
+        : r.stato === 'ok'
+          ? ['fatto', 'Accolta', `dal SAR, protocollo ${r.protocollo ?? '—'}.`]
+          : r.stato === 'warnings'
+            ? ['avviso', 'Accolta con avvisi', `protocollo ${r.protocollo ?? '—'}.`]
+            : [
+                'errore',
+                'Scartata',
+                'dal SAR: i messaggi qui sotto dicono perché. La correzione di una ricetta DPCM già mandata non è ancora nella cartella.',
+              ];
+  return (
+    <p>
+      <span className={`esito-aggiornamento esito-${kind}`}>
+        <Icon name={kind === 'errore' ? 'blocco' : kind} /> {word}
+      </span>{' '}
+      {text}
+    </p>
+  );
+}
+
+/** L'annullamento della ricetta dematerializzata che può essere arrivata (D270). */
+function DmCancelStatus({ a }: { a: NonNullable<RedRow['annullamentoDematerializzata']> }) {
+  const nre = a.nre ? (
+    <>
+      {' '}
+      <span className="codice">{a.nre}</span>
+    </>
+  ) : null;
+  if (a.stato === 'done')
+    return (
+      <p>
+        <span className="esito-aggiornamento esito-fatto">
+          <Icon name="fatto" /> Annullata
+        </span>{' '}
+        la ricetta dematerializzata{nre}
+        {a.annullataIl ? `, il ${dateTime(a.annullataIl)}` : ''}.
+      </p>
+    );
+  return (
+    <p>
+      <span className={`esito-aggiornamento esito-${a.stato === 'failed' ? 'errore' : 'info'}`}>
+        <Icon name={a.stato === 'failed' ? 'blocco' : 'info'} />{' '}
+        {a.stato === 'failed' ? 'Non annullata' : 'Da annullare'}
+      </span>{' '}
+      la ricetta dematerializzata{nre}. {a.errore ?? 'Si annulla da sola.'}
+    </p>
+  );
+}
+
+/**
+ * Le ricette rosse del medico (D270): in corso, e per 30 giorni quelle chiuse. Partono da sole per
+ * il SAR; «Invia adesso» fa subito un giro della coda.
+ */
+function RedQueue({ reloadKey }: { reloadKey: number }) {
+  const list = useApi<{ ricette: RedRow[] }>('/api/ricette-rosse');
+  const { reload } = list;
+  useEffect(() => {
+    if (reloadKey) reload();
+  }, [reloadKey, reload]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  if (list.loading && !list.data) return <Loading what="ricette rosse" />;
+  if (!list.data) return <ErrorMessage error={list.error} />;
+  const rows = list.data.ricette;
+  if (rows.length === 0) return <p className="tenue">Nessuna ricetta rossa.</p>;
+  const open = rows.some(
+    (r) =>
+      r.stato === 'to_send' ||
+      r.stato === 'accepted' ||
+      r.annullamentoDematerializzata?.stato === 'pending',
+  );
+  async function sendNow() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api('/api/ricette-rosse/invia', { method: 'POST', body: {} });
+      reload();
+    } catch (e) {
+      setError(e instanceof ApiError ? e : new ApiError(0, 'Il servizio non ha risposto'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      {open && (
+        <div className="azioni azioni-sopra-elenco">
+          <button type="button" className="pulsante" onClick={() => void sendNow()} disabled={busy}>
+            <Icon name="ripeti" /> <span>Invia adesso</span>
+          </button>
+        </div>
+      )}
+      <ErrorMessage error={error} />
+      <ul className="coda-ricette">
+        {rows.map((r) => (
+          <li key={r.id} className="riquadro ricetta-in-coda">
+            <p>
+              <strong>
+                {r.paziente ? (
+                  <Link to={`/pazienti/${r.paziente}`}>{r.nomePaziente}</Link>
+                ) : (
+                  r.nomePaziente
+                )}
+              </strong>
+              <span className="tenue">
+                {' '}
+                · stampata il {dateTime(r.stampataIl)} · modulo{' '}
+                <span className="codice">{r.poligrafico}</span> · NRE{' '}
+                <span className="codice">{r.nre}</span>
+              </span>
+            </p>
+            <RedStatus r={r} />
+            {r.messaggi.length > 0 && (
+              <ul className="elenco-semplice">
+                {r.messaggi.map((m) => (
+                  <li key={`${m.code}-${m.description}`}>
+                    <span className="codice">{m.code}</span> {m.description}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {r.annullamentoDematerializzata && (
+              <DmCancelStatus a={r.annullamentoDematerializzata} />
+            )}
+            <div className="azioni">
+              <a className="pulsante" href={r.pdf} target="_blank" rel="noopener">
+                <Icon name="stampa" /> <span>Stampa di nuovo sul modulo (PDF)</span>
+              </a>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export function SignQueuePage() {
   const { isDoctor, isSecretary } = useSession();
   const sees = isDoctor || isSecretary;
@@ -580,6 +772,7 @@ export function SignQueuePage() {
           status="error"
           empty="Nessun invio non riuscito."
           reloadKey={changes}
+          onChanged={changed}
         />
       </section>
       <section aria-labelledby="senza-risposta">
@@ -594,6 +787,19 @@ export function SignQueuePage() {
           <InterruptedQueue onChanged={changed} />
         </>
       </section>
+      {isDoctor && (
+        <section aria-labelledby="ricette-rosse">
+          <h2 id="ricette-rosse" tabIndex={-1}>
+            Ricette rosse in DPCM
+          </h2>
+          <p className="tenue">
+            Le ricette rosse stampate quando il SAR non ha dato esito partono da sole per il SAR
+            entro 24 ore. Qui l’esito e l’annullamento della ricetta dematerializzata; quelle chiuse
+            restano per 30 giorni.
+          </p>
+          <RedQueue reloadKey={changes} />
+        </section>
+      )}
     </>
   );
 }

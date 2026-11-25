@@ -1,0 +1,2 @@
+ALTER TABLE "dpcm_prescription" ADD COLUMN "dm_doctor_user_id" uuid;--> statement-breakpoint
+ALTER TABLE "dpcm_prescription" ADD CONSTRAINT "dpcm_prescription_dm_doctor_user_id_app_user_id_fk" FOREIGN KEY ("dm_doctor_user_id") REFERENCES "public"."app_user"("id") ON DELETE no action ON UPDATE no action;

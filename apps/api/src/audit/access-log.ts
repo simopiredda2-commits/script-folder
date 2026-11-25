@@ -28,6 +28,8 @@ export type AccessAction =
   | 'ricetta_esito_invio'
   | 'ricetta_annullamento'
   | 'ricetta_cartacea'
+  /** PDF della ricetta rossa sul modulo del Poligrafico (D270). */
+  | 'stampa_ricetta_rossa'
   | 'lettura_ricette'
   | 'ricetta_controllo'
   | 'lettura_registro'

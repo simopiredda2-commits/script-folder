@@ -1,5 +1,5 @@
 import cookie from '@fastify/cookie';
-import { PRODUCT_NAME } from '@mmg/brand';
+import { COMPANY_BRAND, PRODUCT_NAME } from '@mmg/brand';
 import { eq, sql } from 'drizzle-orm';
 import { prescription } from './db/schema';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -56,10 +56,15 @@ import { registerPatientAdminRoutes } from './http/patient-admin-routes';
 import { registerImportRoutes } from './import/routes';
 import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
+import { createDpcmService } from './prescriptions/dpcm';
+import { createNreLots } from './prescriptions/nre-lots';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
+import { studioSendTimeoutMs } from './admin/studio-service';
 import type { CredentialService } from '@mmg/domain';
 import {
   FseGatewayClient,
+  isDpcmServices,
+  isSarRegionalServices,
   SIMULATED_FSE_AUDIENCE,
   SimulatedDocumentSigner,
   SimulatedFseGateway,
@@ -75,6 +80,7 @@ import {
   type PrescriptionGateway,
   type ReminderSender,
   type RegionalAuthorizationGateway,
+  type SarRegionalServices,
   type SecondFactorGateway,
   type SickLeaveGateway,
   SimulatedAura,
@@ -111,7 +117,7 @@ declare module 'fastify' {
 export interface AppDeps {
   db: Database;
   config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'> &
-    Partial<Pick<Config, 'environment' | 'trustedProxies'>>;
+    Partial<Pick<Config, 'environment' | 'trustedProxies' | 'regionalSoftwareCode'>>;
   now?: () => Date;
   logger?: boolean;
   /**
@@ -119,16 +125,27 @@ export interface AppDeps {
    * chiamata a servizi reali (regola 7).
    */
   gateways?: Record<GatewaySystem, PrescriptionGateway>;
+  /**
+   * Lotti di NRE dal SAR (D269). Per difetto il SAR delle ricette, se sa darli (i simulatori sì):
+   * così il lotto e le ricette passano dallo stesso servizio.
+   */
+  sarServices?: SarRegionalServices;
+  /**
+   * Ricetta rossa in DPCM (D270): ogni quanto la coda prova invii, esiti e annullamenti (per
+   * difetto un minuto; null la ferma, le prove la fanno girare a mano) e l'attesa fra due file dello
+   * stesso medico (per difetto 2 secondi, 6.1.1).
+   */
+  dpcm?: { intervalMs?: number | null; minIntervalMs?: number };
   /** Secondo fattore (Id-Sessione) del Sistema TS e del SIRPED (D102). Per difetto i simulatori. */
   secondFactor?: Record<CredentialService, SecondFactorGateway>;
   /** Certificati di malattia all'INPS tramite il Sistema TS. Per difetto il simulatore. */
   sickLeaveGateway?: SickLeaveGateway;
   /**
-   * Accesso regionale con SPID o CIE (D109). Per difetto il simulatore, con un codice del
-   * gestionale di prova e il ritorno interno al programma: quelli veri li assegna e li registra la
-   * Regione (D103).
+   * Accesso regionale con SPID o CIE (D109). Per difetto il simulatore, con il ritorno interno al
+   * programma: quello vero lo registra la Regione (D103). Il `client_id` è il codice del gestionale
+   * della configurazione con il codice ASL di ogni medico (D266).
    */
-  regional?: { gateway: RegionalAuthorizationGateway; clientId: string; redirectUri: string };
+  regional?: { gateway: RegionalAuthorizationGateway; redirectUri: string };
   /** Controlli prima dell'invio delle ricette (regole di prescrizione). */
   preSendChecks?: PrescriptionDeps['preSendChecks'];
   /** Email e SMS del promemoria. Per difetto il simulatore (regola 7). */
@@ -190,10 +207,11 @@ export function buildApp({
   },
   regional = {
     gateway: new SimulatedRegionalAuthorization({ now }),
-    clientId: 'SIMULATORE_000',
     redirectUri: '/api/profilo/credenziali/rupar/accesso-regionale/ritorno',
   },
   gateways = defaultGateways(secondFactor, regional.gateway),
+  sarServices = isSarRegionalServices(gateways.sar) ? gateways.sar : undefined,
+  dpcm: dpcmOptions = {},
   sickLeaveGateway = new SimulatedSickLeaveGateway({ now }),
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
@@ -293,6 +311,7 @@ export function buildApp({
     now: now ?? (() => new Date()),
     secondFactor,
     regional,
+    regionalSoftwareCode: config.regionalSoftwareCode ?? 'SIMULATORE',
   });
   registerCredentialRoutes(app, credentials, {
     sessionCookie: SESSION_COOKIE,
@@ -417,6 +436,47 @@ export function buildApp({
   registerReferenceUpdateRoutes(app, db, referenceUpdates);
   // Alla chiusura si ferma l'orologio e il download in corso (il giro resta «interrotto»).
   app.addHook('onClose', async () => referenceUpdates.stop());
+  // Lotti di NRE (D269) e ricetta rossa in DPCM (D270), se il SAR li dà: i simulatori sì.
+  const nreLots = sarServices
+    ? createNreLots({
+        db,
+        sar: sarServices,
+        environment: gateways.sar.environment,
+        credentials,
+        timeoutMs: async (studioId) => sendTimeoutMs ?? studioSendTimeoutMs(db, studioId),
+      })
+    : undefined;
+  const dpcm =
+    nreLots && isDpcmServices(gateways.sar)
+      ? createDpcmService({
+          db,
+          sar: gateways.sar,
+          dm: gateways.sar,
+          environment: gateways.sar.environment,
+          credentials,
+          nreLots,
+          now: now ?? (() => new Date()),
+          producer: COMPANY_BRAND,
+          ...(dpcmOptions.minIntervalMs !== undefined
+            ? { minIntervalMs: dpcmOptions.minIntervalMs }
+            : {}),
+          equivalenceGroups: async (aics, date) =>
+            new Map(
+              [...(await reference.drugs(aics, date))].map(([aic, d]) => [aic, d.equivalenceGroup]),
+            ),
+          log: (message, err) => app.log.error({ err }, message),
+          auto: dpcmOptions.intervalMs !== null,
+        })
+      : undefined;
+  if (dpcm && dpcmOptions.intervalMs !== null) {
+    const every = dpcmOptions.intervalMs ?? 60_000;
+    app.addHook('onReady', (done) => {
+      dpcm.start(every);
+      done();
+    });
+  }
+  // Alla chiusura la coda si ferma; un giro in corso finisce prima.
+  if (dpcm) app.addHook('onClose', async () => dpcm.stop());
   registerPrescriptionRoutes(
     app,
     createPrescriptionService({
@@ -429,6 +489,8 @@ export function buildApp({
       sendTimeoutMs,
       ...(buildPromemoria ? { buildPromemoria } : {}),
       serviceCatalog: (date) => reference.serviceLookup(date),
+      ...(nreLots ? { nreLots } : {}),
+      ...(dpcm ? { dpcm } : {}),
     }),
     db,
     now ?? (() => new Date()),

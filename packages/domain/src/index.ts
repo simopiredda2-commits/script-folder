@@ -17,3 +17,6 @@ export * from './patient-registry';
 export * from './import-destinations';
 export * from './archive-moves';
 export * from './prescription-numbers';
+export * from './asl';
+export * from './nre-lots';
+export * from './poligrafico';

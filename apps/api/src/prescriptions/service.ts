@@ -53,6 +53,9 @@ import {
 } from '../reminders/promemoria';
 import type { createCredentialService } from '../credentials/service';
 import { studioDate } from './rules-check';
+import type { DpcmContent, DpcmService } from './dpcm';
+import { renderRedForm } from './red-form-pdf';
+import type { NreLots } from './nre-lots';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
 
 export interface LineInput {
@@ -186,10 +189,10 @@ export interface PrescriptionDeps {
    */
   preSendChecks?: (prescriptionId: string, actor: Actor, input: SignInput) => Promise<CheckOutcome>;
   /**
-   * Tempo massimo di attesa della risposta all'invio, in millisecondi. Regione Piemonte (SIRPE,
-   * «Cartelle cliniche MMG e PLS», 4.4.7): la cartella clinica ha un parametro per il tempo tra la
-   * richiesta di stampa e la stampa, «al momento definiti in 6-8 secondi»; senza codice di
-   * autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto vale l'impostazione
+   * Tempo massimo di attesa della risposta all'invio, in millisecondi. Regione Piemonte (SIRPED,
+   * «Cartelle cliniche MMG e PLS», V06 del 10/04/2026, 3.5.2 e 4.3.1): la cartella clinica ha un
+   * parametro per il tempo tra la richiesta di stampa e la stampa, «al momento definiti in 8
+   * secondi»; senza codice di autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto vale l'impostazione
    * dello studio, letta a ogni invio (`studio.sendTimeoutSeconds`, 8 secondi per difetto, D94); un
    * valore dato qui (lo usano le prove) vale sopra quello dello studio.
    */
@@ -203,6 +206,17 @@ export interface PrescriptionDeps {
   ) => Promise<((code: string) => { nationalCode: string | null } | null) | undefined>;
   /** Come si fissano i dati del promemoria all'invio: le prove ci mettono un guasto (D232). */
   buildPromemoria?: typeof buildPromemoriaData;
+  /**
+   * Lotti di NRE del medico (D269): con questi la cartella numera le ricette che vanno al SAR.
+   * Senza, l'NRE lo dà il servizio che riceve la ricetta, come i simulatori di prima.
+   */
+  nreLots?: NreLots;
+  /**
+   * Ricetta rossa in DPCM (D270): con questa, la ricetta SSN farmaceutica o specialistica senza
+   * esito si stampa sul modulo del Poligrafico e parte in DPCM, come vuole la Regione (V06, 4.3.1).
+   * Senza, il ripiego di prima.
+   */
+  dpcm?: DpcmService;
 }
 
 /** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
@@ -244,8 +258,16 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return row.p;
   }
 
+  /** Ricetta che senza esito passa alla ricetta rossa in DPCM, come vuole la Regione (D270). */
+  const regionFlow = (p: PrescriptionRow) =>
+    !!deps.dpcm && (p.kind === 'pharma_ssn' || p.kind === 'specialist_ssn');
+
   function check(p: PrescriptionRow, event: PrescriptionEvent): PrescriptionStatus {
-    const r = transition(p.status, event, { lastErrorKind: p.lastErrorKind });
+    const r = transition(p.status, event, {
+      lastErrorKind: p.lastErrorKind,
+      regionFlow: regionFlow(p),
+      interrupted: interrupted(p),
+    });
     if (!r.ok) throw new HttpError(409, r.reason);
     return r.to;
   }
@@ -586,11 +608,20 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
 
   async function doctorInfo(userId: string) {
     const [d] = await db
-      .select({ name: appUser.displayName, regionalCode: doctorProfile.regionalCode })
+      .select({
+        name: appUser.displayName,
+        regionalCode: doctorProfile.regionalCode,
+        fiscalCode: doctorProfile.fiscalCode,
+      })
       .from(appUser)
       .leftJoin(doctorProfile, eq(doctorProfile.userId, appUser.id))
       .where(eq(appUser.id, userId));
-    return { userId, name: d!.name, regionalCode: d!.regionalCode ?? null };
+    return {
+      userId,
+      name: d!.name,
+      regionalCode: d!.regionalCode ?? null,
+      fiscalCode: d!.fiscalCode ?? null,
+    };
   }
 
   /**
@@ -635,6 +666,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         validityMonths: l.validityMonths,
       })),
       compiledAt,
+      // L'NRE preso dal lotto del medico alla prima firma, se c'è (D269).
+      nre: p.assignedNre ?? null,
     };
   }
 
@@ -693,32 +726,54 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     // Credenziali e codice di sessione di chi firma: se mancano ci si ferma qui, senza invio.
     const use = useFor(p.kind);
     const auth = await deps.credentials.authFor(actor.userId, use);
+    const system = systemFor(p.kind);
+    // Le ricette per il SAR hanno l'NRE dal lotto del medico (D269): alla prima firma se ne prende
+    // uno; dopo un rifiuto si rimanda lo stesso (V06, 4.3.1, caso 3). Se i numeri sono pochi si
+    // chiede prima il lotto successivo; senza numeri e senza lotto la ricetta non parte.
+    const lots = system === 'sar' ? deps.nreLots : undefined;
+    const lotNotice =
+      lots && !p.assignedNre ? await lots.ensureNumbers(actor, p.id) : { warning: null };
 
     // Il messaggio e il paziente come partono: restano con la ricetta finché l'invio è in corso,
     // per l'esito segnato a mano se il servizio si ferma (D239).
-    const message = await buildMessage(p, actor.userId);
+    const built = await buildMessage(p, actor.userId);
     const [sendingPatient] = await db.select().from(patient).where(eq(patient.id, p.patientId));
-    const snapshot: SendingSnapshot = { message, paziente: promemoriaPatientOf(sendingPatient!) };
     // Passaggio atomico a «in invio»: se due richieste arrivano insieme, ne passa una sola. L'ora
-    // della firma segna questo invio: l'esito si scrive solo se è ancora lui (D233).
+    // della firma segna questo invio: l'esito si scrive solo se è ancora lui (D233). L'NRE del
+    // lotto si prende nella stessa transazione: se la ricetta è cambiata, il numero torna al lotto.
     const claimedAt = now();
-    const claimed = await withActor(db, actor.userId, (tx) =>
-      tx
+    const message = await withActor(db, actor.userId, async (tx) => {
+      let assigned = p.assignedNre ? { nre: p.assignedNre, lotId: p.nreLotId } : null;
+      if (lots && !assigned) {
+        assigned = await lots.take(tx, actor.userId);
+        if (!assigned)
+          throw new HttpError(
+            409,
+            'I numeri di ricetta (NRE) del medico sono finiti proprio adesso: riprova «Firma e invia», si chiede un lotto nuovo',
+          );
+      }
+      const sent: PrescriptionMessage = lots ? { ...built, nre: assigned!.nre } : built;
+      const snapshot: SendingSnapshot = {
+        message: sent,
+        paziente: promemoriaPatientOf(sendingPatient!),
+      };
+      const rows = await tx
         .update(prescription)
         .set({
           status: 'sending',
           signedBy: actor.userId,
           signedAt: claimedAt,
           sendingSnapshot: snapshot,
+          ...(lots ? { assignedNre: assigned!.nre, nreLotId: assigned!.lotId } : {}),
           updatedAt: now(),
         })
         .where(and(eq(prescription.id, p.id), eq(prescription.status, p.status)))
-        .returning({ id: prescription.id }),
-    );
-    if (claimed.length === 0)
-      throw new HttpError(409, 'La ricetta è cambiata nel frattempo: ricarica');
+        .returning({ id: prescription.id });
+      if (rows.length === 0)
+        throw new HttpError(409, 'La ricetta è cambiata nel frattempo: ricarica');
+      return sent;
+    });
 
-    const system = systemFor(p.kind);
     const gateway = deps.gateways[system];
     // Il tempo di attesa dello studio, com'è adesso: l'amministratore può averlo appena cambiato.
     const timeoutMs = deps.sendTimeoutMs ?? (await studioSendTimeoutMs(db, actor.studioId));
@@ -767,6 +822,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       );
       result = { ...result, message: authMessage(authProblem, result.message) };
     }
+    // Eccezione di sistema del SAR (V06, 4.3.1, caso 4): come il tempo scaduto (caso 5), non si sa
+    // se la ricetta c'è. Nel registro degli invii resta l'eccezione; la ricetta ha l'esito incerto
+    // e si rimanda con lo stesso NRE (D269).
     const errorKind: SendErrorKind | null =
       result.outcome === 'accepted'
         ? null
@@ -774,7 +832,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           ? 'auth'
           : result.outcome === 'rejected'
             ? 'rejected'
-            : result.outcome;
+            : result.outcome === 'fault'
+              ? 'timeout'
+              : result.outcome;
     // Dati del promemoria fissati ora, con il codice di autenticazione: ogni ristampa è identica.
     // Se non si riesce a fissarli, la ricetta è comunque partita: NRE e codice si scrivono lo
     // stesso, invece di lasciarla «in invio» senza numero; manca solo il promemoria (D232).
@@ -882,8 +942,15 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         'Nel frattempo l’esito di questo invio è stato segnato a mano: la risposta arrivata ora resta nel registro degli invii. Ricarica la pagina per vedere la ricetta',
       );
     return {
-      outcome: errorKind === 'auth' ? ('auth' as const) : result.outcome,
+      outcome:
+        errorKind === 'auth'
+          ? ('auth' as const)
+          : result.outcome === 'fault'
+            ? ('timeout' as const)
+            : result.outcome,
       nre: result.outcome === 'accepted' ? result.nre : null,
+      /** Il lotto successivo di NRE non è arrivato, ma restano numeri (D269). */
+      avviso: lotNotice.warning,
       messaggio:
         result.outcome === 'accepted'
           ? promemoriaMissing
@@ -937,6 +1004,14 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         ? nrbeProblem(arrived.nre, message.patientFiscalCode)
         : nreProblem(arrived.nre);
     if (shape) throw new HttpError(400, shape);
+    // L'NRE preso dal lotto del medico è partito con la ricetta (D269): l'ente non può averne dato
+    // un altro.
+    const lotNre = white ? null : (message.nre ?? p.assignedNre ?? null);
+    if (arrived && lotNre && arrived.nre !== lotNre)
+      throw new HttpError(
+        400,
+        `Il numero di questa ricetta è ${lotNre}, preso dal lotto del medico e partito con l’invio: l’ente non può averne dato un altro. Controlla il numero`,
+      );
     if (arrived && white && !arrived.pin)
       throw new HttpError(
         400,
@@ -980,8 +1055,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       .where(eq(prescriptionCheck.prescriptionId, p.id))
       .orderBy(sql`${prescriptionCheck.at} desc`)
       .limit(1);
-    const notArrived =
-      'Non arrivata all’ente, secondo l’ente: si può rimandare o stampare la ricetta rossa';
+    // Per la ricetta SSN al SAR non si rimanda: si stampa la ricetta rossa (V06, 4.3.1; D270).
+    const notArrived = regionFlow(p)
+      ? 'Non arrivata all’ente, secondo l’ente: si stampa la ricetta rossa, che parte poi in DPCM'
+      : 'Non arrivata all’ente, secondo l’ente: si può rimandare o stampare la ricetta rossa';
 
     await withActor(db, actor.userId, async (tx) => {
       const [row] = await tx
@@ -1280,10 +1357,18 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
    * Ripiego sulla ricetta rossa: quando SAR o Sistema TS non rispondono. Restituisce i dati da
    * stampare; il modulo di stampa conforme alle specifiche è da completare.
    */
-  async function printPaper(actor: Actor, id: string) {
+  async function printPaper(actor: Actor, id: string, body?: unknown) {
     const p = await load(id, actor.studioId);
     await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'ricetta_cartacea');
     const to = check(p, 'print_paper');
+    // Ricetta SSN al SAR: modulo del Poligrafico, NRE nuovo e invio in DPCM (D270).
+    if (deps.dpcm && regionFlow(p)) {
+      await ensurePromemoriaPossible(p, actor);
+      return deps.dpcm.print(actor, p, body, {
+        message: await buildMessage(p, actor.userId),
+        interrupted: interrupted(p),
+      });
+    }
     await setStatus(actor, p, to, {
       paperPrintedAt: now(),
       paperPrintedBy: actor.userId,
@@ -1294,6 +1379,30 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       stampa: await buildMessage(p, actor.userId),
       avviso: 'Modulo di stampa conforme: da completare',
     };
+  }
+
+  /**
+   * Il PDF della ricetta rossa stampata in DPCM (D270), come era alla stampa: si ristampa uguale.
+   * L'apertura resta nel registro degli accessi.
+   */
+  async function redFormPdf(actor: Actor, id: string) {
+    const p = await load(id, actor.studioId);
+    await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'stampa_ricetta_rossa');
+    const d = deps.dpcm ? await deps.dpcm.forPrescription(p.id) : null;
+    if (!d) throw new HttpError(404, 'Questa ricetta non è stata stampata sulla ricetta rossa');
+    return renderRedForm((d.content as DpcmContent).stampa);
+  }
+
+  /** Le ricette rosse del medico che le ha stampate, con invio, esito e annullamento (D270). */
+  async function redList(actor: Actor) {
+    return deps.dpcm ? deps.dpcm.list(actor) : [];
+  }
+
+  /** «Invia adesso»: un giro della coda sulle ricette rosse del medico. */
+  async function redRunNow(actor: Actor) {
+    if (!deps.dpcm) return [];
+    await deps.dpcm.runNow(actor);
+    return deps.dpcm.list(actor);
   }
 
   /** Coda «da firmare» del medico, raggruppata per paziente. */
@@ -1529,6 +1638,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     submitForSigning,
     backToDraft,
     signAndSend,
+    redFormPdf,
+    redList,
+    redRunNow,
     settleInterrupted,
     checkOnly,
     cancel,

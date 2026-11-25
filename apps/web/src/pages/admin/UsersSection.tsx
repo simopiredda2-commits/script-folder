@@ -14,6 +14,8 @@ interface Doctor {
   codiceFiscale: string | null;
   codiceRegionale: string | null;
   asl: string | null;
+  /** Codice ASL dell'elenco del Ministero (D267): entra nel client_id della Regione (D266). */
+  codiceAsl: string | null;
   nome: string | null;
   cognome: string | null;
   /** Correzione del codice fiscale che aspetta il medico (D181): fino ad allora vale l'altro. */
@@ -65,9 +67,16 @@ interface User {
   /** Sospeso da chi gestisce il servizio, sul server: da qui non si riattiva. */
   sospesoDalServizio: boolean;
 }
+/** Le ASL fra cui scegliere: quelle della regione dello studio, o tutte (D267). */
+interface HealthUnits {
+  regione: string | null;
+  elenco: { codice: string; nome: string; regione: string }[];
+  fonte: string;
+}
 interface Users {
   utenti: User[];
   ruoli: RoleOption[];
+  aziendeSanitarie: HealthUnits;
 }
 interface Result {
   utente: User;
@@ -160,6 +169,7 @@ interface FormValues {
   codiceFiscale: string;
   codiceRegionale: string;
   asl: string;
+  codiceAsl: string;
 }
 
 const EMPTY: FormValues = {
@@ -172,6 +182,7 @@ const EMPTY: FormValues = {
   codiceFiscale: '',
   codiceRegionale: '',
   asl: '',
+  codiceAsl: '',
 };
 
 const valuesOf = (u: User): FormValues => ({
@@ -184,6 +195,7 @@ const valuesOf = (u: User): FormValues => ({
   codiceFiscale: u.medico?.codiceFiscale ?? '',
   codiceRegionale: u.medico?.codiceRegionale ?? '',
   asl: u.medico?.asl ?? '',
+  codiceAsl: u.medico?.codiceAsl ?? '',
 });
 
 const doctorOf = (v: FormValues) => ({
@@ -192,6 +204,7 @@ const doctorOf = (v: FormValues) => ({
   cognome: v.medicoCognome,
   codiceRegionale: v.codiceRegionale,
   asl: v.asl,
+  codiceAsl: v.codiceAsl,
 });
 
 /** I messaggi sui campi non validi, quando il servizio li manda nei dettagli. */
@@ -394,6 +407,16 @@ export function UsersSection() {
                         )}
                         <li>Codice regionale: {u.medico.codiceRegionale ?? 'da completare'}</li>
                         {u.medico.asl && <li>{u.medico.asl}</li>}
+                        <li>
+                          Codice ASL per la Regione:{' '}
+                          {u.medico.codiceAsl ? (
+                            <span className="codice">
+                              {healthUnitLabel(data.aziendeSanitarie, u.medico.codiceAsl)}
+                            </span>
+                          ) : (
+                            'da completare'
+                          )}
+                        </li>
                       </ul>
                     ) : (
                       '—'
@@ -474,6 +497,7 @@ export function UsersSection() {
           title={`Modifica di ${editingUser.nome}`}
           initial={valuesOf(editingUser)}
           roles={data.ruoli}
+          healthUnits={data.aziendeSanitarie}
           ownRoles={editingUser.io}
           busy={busy}
           onSubmit={(v) => save(editingUser, v)}
@@ -485,6 +509,7 @@ export function UsersSection() {
         title="Nuovo utente"
         initial={EMPTY}
         roles={data.ruoli}
+        healthUnits={data.aziendeSanitarie}
         ownRoles={false}
         busy={busy}
         onSubmit={create}
@@ -622,11 +647,18 @@ export function TemporaryPassword({
 }
 
 /** Modulo di un utente: nuovo (con il nome utente) o in modifica (il nome utente non cambia). */
+/** «301 – ASL CITTA' DI TORINO»; un codice che non è nell'elenco resta com'è. */
+function healthUnitLabel(units: HealthUnits, code: string): string {
+  const a = units.elenco.find((x) => x.codice === code);
+  return a ? `${a.codice} – ${a.nome}${units.regione ? '' : ` (${a.regione})`}` : code;
+}
+
 function UserForm({
   mode,
   title,
   initial,
   roles,
+  healthUnits,
   ownRoles,
   busy,
   onSubmit,
@@ -636,6 +668,7 @@ function UserForm({
   title: string;
   initial: FormValues;
   roles: RoleOption[];
+  healthUnits: HealthUnits;
   ownRoles: boolean;
   busy: boolean;
   onSubmit: (v: FormValues) => Promise<boolean>;
@@ -775,10 +808,35 @@ function UserForm({
           <div className="campi-in-riga">
             {input('codiceRegionale', 'Codice regionale (se noto)', { code: true, maxLength: 40 })}
             {input('asl', 'Azienda sanitaria (se nota)')}
+            <div className="campo">
+              <label htmlFor={id('codiceAsl')}>Codice ASL per la Regione</label>
+              <select
+                id={id('codiceAsl')}
+                aria-describedby={id('codiceAsl-aiuto')}
+                value={v.codiceAsl}
+                onChange={(e) => set({ codiceAsl: e.target.value })}
+              >
+                <option value="">Da completare</option>
+                {v.codiceAsl && !healthUnits.elenco.some((a) => a.codice === v.codiceAsl) && (
+                  <option value={v.codiceAsl}>{v.codiceAsl} – non nell’elenco</option>
+                )}
+                {healthUnits.elenco.map((a) => (
+                  <option key={`${a.regione}-${a.codice}`} value={a.codice}>
+                    {healthUnitLabel(healthUnits, a.codice)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <p className="aiuto">
             Nome e cognome come nel codice fiscale. Il codice regionale serve per le ricette e per
             l’AFT: se non è ancora noto si aggiunge dopo.
+          </p>
+          <p className="aiuto" id={id('codiceAsl-aiuto')}>
+            Il codice ASL è quello dell’azienda in cui il medico lavora
+            {healthUnits.regione ? `, fra le ASL della regione ${healthUnits.regione}` : ''} (
+            {healthUnits.fonte}). Serve ai servizi della Regione Piemonte: senza, il medico non può
+            entrare con SPID o CIE né chiedere il codice di sessione RUPAR.
           </p>
         </fieldset>
       )}

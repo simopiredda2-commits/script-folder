@@ -73,7 +73,8 @@ export function registerPrescriptionRoutes(
 
   app.post('/api/ricette/:id/firma-e-invia', scoped, async (req) => {
     const r = await service.signAndSend(req.actor!, idParams.parse(req.params).id, req.body);
-    return { esito: r.outcome, nre: r.nre, messaggio: r.messaggio };
+    // `avviso`: il lotto successivo di NRE non è arrivato, ma restano numeri (D269).
+    return { esito: r.outcome, nre: r.nre, messaggio: r.messaggio, avviso: r.avviso };
   });
 
   // Esito di un invio rimasto senza risposta, chiesto all'ente dal medico (D233).
@@ -91,9 +92,27 @@ export function registerPrescriptionRoutes(
     return { esito: (await service.cancel(req.actor!, id, req.body)).outcome };
   });
 
+  // Ricetta rossa: per la SSN al SAR con il numero del modulo del Poligrafico e l'invio in DPCM
+  // (D270); per le altre il ripiego di prima.
   app.post('/api/ricette/:id/ricetta-rossa', scoped, async (req) => {
-    return service.printPaper(req.actor!, idParams.parse(req.params).id);
+    return service.printPaper(req.actor!, idParams.parse(req.params).id, req.body);
   });
+
+  app.get('/api/ricette/:id/ricetta-rossa.pdf', scoped, async (req, reply) => {
+    const pdf = await service.redFormPdf(req.actor!, idParams.parse(req.params).id);
+    return reply
+      .type('application/pdf')
+      .header('content-disposition', 'inline; filename="ricetta-rossa.pdf"')
+      .send(Buffer.from(pdf));
+  });
+
+  // Ricette rosse del medico: invio in DPCM, esito, annullamento della dematerializzata (D270).
+  app.get('/api/ricette-rosse', async (req) => ({ ricette: await service.redList(req.actor!) }));
+
+  // «Invia adesso»: un giro della coda sulle ricette rosse del medico, senza aspettare.
+  app.post('/api/ricette-rosse/invia', async (req) => ({
+    ricette: await service.redRunNow(req.actor!),
+  }));
 
   app.get('/api/ricette/da-firmare', async (req) => ({
     pazienti: await service.toSignQueue(req.actor!),

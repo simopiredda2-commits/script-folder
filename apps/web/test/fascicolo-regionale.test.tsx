@@ -238,6 +238,6 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     expect(documentTypeLabel('PROFILO SANITARIO SINTETICO / PATIENT SUMMARY')).toBe(
       'Profilo sanitario sintetico / patient summary',
     );
-    expect(documentTypeLabel('ESENZIONE DA REDDITO')).toBe('Esenzione da reddito');
+    expect(documentTypeLabel('ATTESTATO DI ESENZIONE')).toBe('Attestato di esenzione');
   });
 });

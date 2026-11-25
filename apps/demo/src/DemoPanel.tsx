@@ -176,6 +176,13 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
           <strong>Ricette › Invii senza risposta</strong>, il certificato nella cartella del
           paziente, in <strong>Certificati</strong>.
         </p>
+        <p>
+          Anche una ricetta di {ready.interrupted.redPatient} è rimasta «in invio»: per lei{' '}
+          <strong>Stampa la ricetta rossa</strong>, come vuole la Regione quando il SAR non dà
+          esito. Il numero del modulo è quello del codice a barre del ricettario; qui va bene{' '}
+          <code>010260000000101</code>. Il PDF si apre per la stampa sul modulo; la ricetta parte da
+          sola in DPCM e si segue in <strong>Ricette › Ricette rosse in DPCM</strong>.
+        </p>
       </section>
       <section aria-labelledby="dimo-presidi">
         <h3 id="dimo-presidi">Presidi</h3>

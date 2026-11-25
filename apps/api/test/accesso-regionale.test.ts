@@ -1,3 +1,4 @@
+import { NRE_LOT_SIZE, nreLotPrefix } from '@mmg/domain';
 import {
   SimulatedGateway,
   SimulatedRegionalAuthorization,
@@ -5,7 +6,13 @@ import {
 } from '@mmg/integrations';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { serviceCredential, serviceCredentialEvent, serviceSession } from '../src/db/schema';
+import {
+  doctorProfile,
+  nreLot,
+  serviceCredential,
+  serviceCredentialEvent,
+  serviceSession,
+} from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -18,10 +25,15 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
   const c: Record<string, string> = {};
   let regional: SimulatedRegionalAuthorization;
   let sar: SimulatedGateway;
+  /** Per le prove dei campi del token: cambia i campi prima dell'emissione (V08, 4.3.2). */
+  let tamperClaims: ((c: Record<string, unknown>) => Record<string, unknown>) | null = null;
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    regional = new SimulatedRegionalAuthorization({ now: () => s.clock.now() });
+    regional = new SimulatedRegionalAuthorization({
+      now: () => s.clock.now(),
+      claims: (claims) => tamperClaims?.(claims) ?? claims,
+    });
     sar = new SimulatedGateway('sar', { oauth: regional });
     s = await createScenario(
       t.db,
@@ -32,7 +44,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
           sistema_ts: new SimulatedSecondFactor('sistema_ts', { now: () => s.clock.now() }),
           rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now: () => s.clock.now() }),
         },
-        regional: { gateway: regional, clientId: 'SIMULATORE_000', redirectUri: RETURN },
+        regional: { gateway: regional, redirectUri: RETURN },
         preSendChecks: noRules,
       },
     );
@@ -107,6 +119,27 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     return req('POST', `/api/ricette/${d.json<{ id: string }>().id}/firma-e-invia`, 'titolare', {});
   };
 
+  /** Un lotto di NRE avuto prima, con utente, password e PIN RUPAR (V06, 3.1.1; D269). */
+  const giveLot = async () => {
+    const [p] = await t.db
+      .select({ fiscalCode: doctorProfile.fiscalCode })
+      .from(doctorProfile)
+      .where(eq(doctorProfile.userId, s.users.titolare.id));
+    const r = await sar.requestLot(
+      { regionCode: '010', lotType: '1', doctorFiscalCode: p!.fiscalCode! },
+      { username: 'utente-di-prova', password: 'parola-di-prova', pin: '1234' },
+    );
+    if (r.outcome !== 'assigned') throw new Error('atteso un lotto');
+    await t.db.insert(nreLot).values({
+      doctorUserId: s.users.titolare.id,
+      doctorFiscalCode: p!.fiscalCode!,
+      environment: 'simulator',
+      ...r.lot,
+      prefix: nreLotPrefix(r.lot),
+      size: NRE_LOT_SIZE,
+    });
+  };
+
   it('solo il medico avvia l’accesso regionale', async () => {
     expect(
       (await req('POST', '/api/profilo/credenziali/rupar/accesso-regionale', 'segreteria'))
@@ -125,7 +158,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     expect((await rupar()).accessoRegionale).toBe(true);
     const url = await start();
     expect(Object.fromEntries(url.searchParams)).toMatchObject({
-      client_id: 'SIMULATORE_000',
+      client_id: 'SIMULATORE_301',
       response_type: 'code',
       redirect_uri: RETURN,
       scope: 'prescrizione',
@@ -134,10 +167,30 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     expect(await back(await approve(url))).toEqual({ accesso: 'ok' });
     const st = await rupar();
     expect(st.sessione).toMatchObject({ attiva: true, modalita: 'spid_cie' });
-    expect(Date.parse(st.sessione.scadeIl!) - s.clock.now().getTime()).toBe(8 * 3_600_000);
+    // La scadenza è il campo exp del token, in secondi interi: 8 ore, meno i millisecondi.
+    const left = Date.parse(st.sessione.scadeIl!) - s.clock.now().getTime();
+    expect(left).toBeGreaterThan(8 * 3_600_000 - 1000);
+    expect(left).toBeLessThanOrEqual(8 * 3_600_000);
+    // Il lotto di NRE vuole utente, password e PIN RUPAR anche con il token (V06, 3.1.1; D269):
+    // senza credenziali e senza numeri la ricetta non parte, e il messaggio lo dice.
+    const refused = await sendPrescription();
+    expect(refused.statusCode, refused.body).toBe(422);
+    expect(refused.json().errore).toMatch(
+      /servono utente, password e PIN RUPAR del medico, anche con l’accesso con SPID o CIE/,
+    );
+    // Al SAR non è partita nessuna richiesta: il token non si manda per il lotto.
+    expect(sar.lotRequests).toHaveLength(0);
+    // Con un lotto avuto prima, la ricetta parte con il token.
+    await giveLot();
     const sent = await sendPrescription();
     expect(sent.json(), sent.body).toMatchObject({ esito: 'accepted' });
-    expect(sar.receivedAuth.at(-1)).toEqual({ username: '', sessionId: null, bearer: true });
+    // Con il token niente X-Gestionale: il gestionale è nel token, in aud (V08, 4.3.6).
+    expect(sar.receivedAuth.at(-1)).toEqual({
+      username: '',
+      sessionId: null,
+      bearer: true,
+      software: null,
+    });
     // Nel database il token è cifrato.
     const [row] = await t.db
       .select()
@@ -148,7 +201,8 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
           eq(serviceSession.service, 'rupar_piemonte'),
         ),
       );
-    expect(row!.tokenEnc.toString('latin1')).not.toContain('SIMJWT');
+    // L'intestazione del JWT del simulatore, in chiaro, non c'è.
+    expect(row!.tokenEnc.toString('latin1')).not.toContain('eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0');
   });
 
   it('state falso, o di un altro medico: niente accesso', async () => {
@@ -280,9 +334,79 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       expect(events, e).toContain(e);
   });
 
+  it('token per un altro gestionale (aud) o già scaduto (exp): niente accesso (V08, 4.3.2)', async () => {
+    await req('DELETE', '/api/profilo/credenziali/rupar/sessione');
+    const detail = async () =>
+      (
+        await t.db
+          .select()
+          .from(serviceCredentialEvent)
+          .where(
+            and(
+              eq(serviceCredentialEvent.userId, s.users.titolare.id),
+              eq(serviceCredentialEvent.event, 'accesso_regionale_rifiutato'),
+            ),
+          )
+      )
+        .map((e) => e.detail ?? '')
+        .join('\n');
+    try {
+      tamperClaims = (claims) => ({ ...claims, aud: 'ALTRO_GESTIONALE_301' });
+      expect(await back(await approve(await start()))).toMatchObject({
+        accesso: 'errore',
+        motivo: 'token-negato',
+      });
+      expect(await detail()).toContain('altro gestionale (ALTRO_GESTIONALE_301)');
+      tamperClaims = (claims) => ({
+        ...claims,
+        exp: Math.floor(s.clock.now().getTime() / 1000) - 1,
+      });
+      expect(await back(await approve(await start()))).toMatchObject({
+        accesso: 'errore',
+        motivo: 'token-negato',
+      });
+      expect(await detail()).toContain('token già scaduto');
+    } finally {
+      tamperClaims = null;
+    }
+    expect((await rupar()).sessione.attiva).toBe(false);
+  });
+
+  it('revoca di un token che per la Regione era già chiuso: si chiude anche qui, e si annota (V08, 4.3.5)', async () => {
+    expect(await back(await approve(await start()))).toEqual({ accesso: 'ok' });
+    const [row] = await t.db
+      .select()
+      .from(serviceSession)
+      .where(
+        and(
+          eq(serviceSession.userId, s.users.titolare.id),
+          eq(serviceSession.service, 'rupar_piemonte'),
+        ),
+      );
+    expect(row).toBeDefined();
+    // La Regione lo revoca da sé (per esempio un accesso nuovo da un altro gestionale): il nostro
+    // DELETE riceve 401.
+    s.clock.advance(8 * 3_600_000 + 1000);
+    c.titolare = await login(s, 'titolare');
+    expect((await req('DELETE', '/api/profilo/credenziali/rupar/sessione')).statusCode).toBe(200);
+    expect((await rupar()).sessione.attiva).toBe(false);
+    const details = (
+      await t.db
+        .select()
+        .from(serviceCredentialEvent)
+        .where(
+          and(
+            eq(serviceCredentialEvent.userId, s.users.titolare.id),
+            eq(serviceCredentialEvent.event, 'sessione_revocata'),
+          ),
+        )
+    ).map((e) => e.detail);
+    expect(details).toContain('SPID o CIE: per la Regione era già chiuso');
+  });
+
   it('la pagina regionale simulata rimanda solo al ritorno del programma, mai fuori (D193)', async () => {
     const common = {
-      client_id: 'SIMULATORE_000',
+      client_id: 'SIMULATORE_301',
       scope: 'prescrizione',
       state: 'qualunque',
       code_challenge: 'a'.repeat(43),
@@ -313,6 +437,57 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       });
       expect(out.statusCode, redirect).toBe(400);
       expect(out.headers.location, redirect).toBeUndefined();
+    }
+  });
+
+  const setAsl = (aslCode: string | null) =>
+    t.db
+      .update(doctorProfile)
+      .set({ aslCode })
+      .where(eq(doctorProfile.userId, s.users.titolare.id));
+  const lastRevocation = async () =>
+    (
+      await t.db
+        .select({ detail: serviceCredentialEvent.detail })
+        .from(serviceCredentialEvent)
+        .where(
+          and(
+            eq(serviceCredentialEvent.userId, s.users.titolare.id),
+            eq(serviceCredentialEvent.event, 'sessione_revocata'),
+          ),
+        )
+        .orderBy(sql`${serviceCredentialEvent.at} desc`)
+        .limit(1)
+    )[0]?.detail;
+
+  it('client_id: il codice del gestionale con il codice ASL del medico; senza codice ASL l’accesso non parte (D266)', async () => {
+    expect((await start()).searchParams.get('client_id')).toBe('SIMULATORE_301');
+    await setAsl(null);
+    try {
+      const res = await req('POST', '/api/profilo/credenziali/rupar/accesso-regionale');
+      expect(res.statusCode).toBe(422);
+      expect(res.json()).toMatchObject({
+        errore: expect.stringMatching(/^Manca il codice ASL del medico/),
+        dettagli: { codice: 'CODICE_ASL_MANCANTE', servizio: 'rupar' },
+      });
+    } finally {
+      await setAsl('301');
+    }
+  });
+
+  it('se l’ASL cambia fra l’avvio e il ritorno vale il client_id della richiesta; la revoca usa quello del token', async () => {
+    const url = await start();
+    expect(url.searchParams.get('client_id')).toBe('SIMULATORE_301');
+    await setAsl('203');
+    try {
+      expect(await back(await approve(url))).toEqual({ accesso: 'ok' });
+      expect((await rupar()).sessione.modalita).toBe('spid_cie');
+      // Con il client_id di adesso (SIMULATORE_203) la Regione direbbe che il token non è suo.
+      const del = await req('DELETE', '/api/profilo/credenziali/rupar/sessione');
+      expect(del.statusCode, del.body).toBe(200);
+      expect(await lastRevocation()).toBe('SPID o CIE');
+    } finally {
+      await setAsl('301');
     }
   });
 });

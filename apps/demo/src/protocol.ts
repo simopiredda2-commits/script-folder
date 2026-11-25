@@ -51,6 +51,8 @@ export interface AftHints {
 export interface InterruptedHints {
   patient: string;
   doctor: string;
+  /** La seconda ricetta «in invio», per la ricetta rossa (D270). */
+  redPatient: string;
 }
 
 export type ToWorker =

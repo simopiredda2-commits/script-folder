@@ -597,9 +597,10 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       const text = await p.getByRole('region', { name: 'Invii senza risposta' }).innerText();
       return /certificato di malattia di (.+), firmati da/.exec(text)![1]!;
     });
-    // In Oggi il conto, che porta alla coda nella pagina Ricette.
+    // In Oggi il conto, che porta alla coda nella pagina Ricette: due ricette, una per la ricetta
+    // rossa (D270).
     await go('/');
-    await f.getByRole('link', { name: /^Invii senza risposta\s*1$/ }).click();
+    await f.getByRole('link', { name: /^Invii senza risposta\s*2$/ }).click();
     const section = f.getByRole('region', { name: 'Invii senza risposta' });
     const group = section.locator('li.riquadro', {
       has: f.getByRole('link', { name, exact: true }),
@@ -657,6 +658,72 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await failed.getByRole('button', { name: 'Riprova l’invio' }).click();
     const sent = f.locator('.scheda-certificato').filter({ hasText: 'Inviato' }).first();
     await sent.getByText(/protocollo SIM\d+/).waitFor({ timeout: 30_000 });
+  });
+
+  it('ricetta rossa (D270): dalla ricetta rimasta «in invio» al PDF sul modulo, poi in DPCM fino a «Accolta»', async () => {
+    const name = await fromPanel(async (p) => {
+      const text = await p.getByRole('region', { name: 'Invii senza risposta' }).innerText();
+      return /Anche una ricetta di (.+) è rimasta/.exec(text)![1]!;
+    });
+    await go('/ricette#senza-risposta');
+    const section = f.getByRole('region', { name: 'Invii senza risposta' });
+    const group = section.locator('li.riquadro', {
+      has: f.getByRole('link', { name, exact: true }),
+    });
+    await group.getByRole('button', { name: 'Stampa la ricetta rossa' }).click();
+    await group.getByLabel(/Numero del modulo nella stampante/).fill('010260000000101');
+    await group.getByRole('button', { name: 'Prepara la ricetta rossa' }).click();
+    await group.getByText(/Ricetta rossa pronta sul modulo/).waitFor({ timeout: 30_000 });
+    await expectAccessible('ricetta rossa pronta');
+    await group.getByRole('link', { name: 'Stampa sul modulo (PDF)' }).click();
+    await viewer().locator('canvas').first().waitFor({ timeout: 30_000 });
+    await closeViewer();
+    // La ricetta rossa si segue nella sua sezione: parte da sola; «Invia adesso» non aspetta il
+    // giro della coda. Il SAR simulato risponde «in attesa» alla prima lettura dell'esito.
+    const red = f.getByRole('region', { name: 'Ricette rosse in DPCM' });
+    const item = red.locator('li.riquadro', { has: f.getByRole('link', { name, exact: true }) });
+    await item.waitFor({ timeout: 30_000 });
+    // Se non parte, l'errore dice che cosa mostra la sezione e che cosa risponde il servizio.
+    const explain = async (err: unknown) => {
+      const shown = await red.innerText({ timeout: 2_000 }).catch(() => '(sezione non trovata)');
+      const answer = await f
+        .evaluate(async () => {
+          const res = await fetch('/api/ricette-rosse');
+          return `${res.status} ${await res.text()}`;
+        })
+        .catch((e: unknown) => String(e));
+      throw new Error(
+        `La ricetta rossa di ${name} non è partita.\nLa sezione mostra:\n${shown}\nIl servizio risponde:\n${answer}`,
+        { cause: err },
+      );
+    };
+    // La parola dello stato, accanto al simbolo: la ricerca esatta ignora lo spazio fra i due.
+    const sentOrAccepted = item
+      .getByText('Mandata', { exact: true })
+      .or(item.getByText('Accolta', { exact: true }));
+    // Ogni «Invia adesso» legge l'esito una volta: la prima lettura dice «in attesa», la seconda
+    // «accolta». Dopo il clic si aspetta la risposta: il pulsante torna attivo, o sparisce quando
+    // non c'è più niente in corso.
+    const sendNow = red.getByRole('button', { name: 'Invia adesso' });
+    const accepted = item.getByText('Accolta', { exact: true });
+    for (let i = 0; i < 6; i += 1) {
+      await sentOrAccepted.first().waitFor({ timeout: 30_000 }).catch(explain);
+      if ((await accepted.count()) || !(await sendNow.count())) break;
+      await sendNow.click({ timeout: 10_000 });
+      await f.waitForFunction(
+        () => {
+          const b = [...document.querySelectorAll('button')].find((x) =>
+            x.textContent?.includes('Invia adesso'),
+          );
+          return !b || !b.disabled;
+        },
+        undefined,
+        { timeout: 30_000 },
+      );
+    }
+    await accepted.waitFor({ timeout: 30_000 }).catch(explain);
+    await item.getByText('010260000000101').waitFor();
+    await expectAccessible('ricette rosse in DPCM');
   });
 
   /** Una lettura dal servizio, come la fa l'interfaccia: con la sessione di chi è entrato. */

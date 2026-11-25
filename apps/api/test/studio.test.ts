@@ -358,7 +358,7 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
     expect(problems(await put({ invii: { secondiAttesa: 7.5 } }))).toEqual([
       'Tempo massimo di attesa degli invii: un numero intero da 1 a 60 secondi',
     ]);
-    // Ai limiti si salva; fuori dai 6–8 secondi della Regione resta un avviso.
+    // Ai limiti si salva; diverso dagli 8 secondi della Regione (V06, 3.5.2) resta un avviso.
     const edge = await put({
       sicurezza: {
         minutiInattivita: 30,
@@ -369,7 +369,9 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
       invii: { secondiAttesa: 60 },
     });
     expect(edge.statusCode, edge.body).toBe(200);
-    expect(edge.json<StudioView>().invii.avviso).toMatch(/da 6 a 8 secondi/);
+    expect(edge.json<StudioView>().invii.avviso).toBe(
+      'La Regione Piemonte indica 8 secondi (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.5.2)',
+    );
     const back = await put({
       sicurezza: {
         minutiInattivita: 5,
@@ -380,6 +382,11 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
       invii: { secondiAttesa: 8 },
     });
     expect(back.json<StudioView>().invii.avviso).toBeNull();
+    // La V05 diceva «6-8 secondi»; con la V06 anche 7 secondi hanno l'avviso (D265).
+    const seven = await put({ invii: { secondiAttesa: 7 } });
+    expect(seven.statusCode, seven.body).toBe(200);
+    expect(seven.json<StudioView>().invii.avviso).toMatch(/indica 8 secondi/);
+    expect((await put({ invii: { secondiAttesa: 8 } })).json<StudioView>().invii.avviso).toBeNull();
     // Il blocco per password sbagliate usa i valori nuovi: con 20, alla ventesima l'utente è
     // fermo. Ognuna da un indirizzo diverso, perché le attese per provenienza non la fermino prima.
     await put({

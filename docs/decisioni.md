@@ -82,13 +82,13 @@ Le scelte prese senza Simone, ognuna con il motivo e con che cosa toccare per ca
 
 **D35 · Stato tecnico «in invio».** Fra «da firmare» e «inviata» c'è uno stato di pochi istanti, preso con un aggiornamento atomico: due firme contemporanee non producono due invii. Una prova con una barriera lo verifica davvero.
 
-**D36 · Esito incerto distinto da sistema non raggiungibile.** Se il SAR non risponde in tempo non si sa se la ricetta è arrivata: niente ricetta rossa (rischio di doppione), si riprova l'invio. La ricetta rossa solo quando il sistema è certamente irraggiungibile. Da verificare sulle specifiche del SAR, come chiedono i requisiti.
+**D36 · Esito incerto distinto da sistema non raggiungibile.** Se il SAR non risponde in tempo non si sa se la ricetta è arrivata: niente ricetta rossa (rischio di doppione), si riprova l'invio. La ricetta rossa solo quando il sistema è certamente irraggiungibile. Da verificare sulle specifiche del SAR, come chiedono i requisiti. **Cambiata da D270** per la ricetta SSN farmaceutica e specialistica al SAR: senza esito, anche incerto, si stampa la ricetta rossa, che parte in DPCM; la dematerializzata che può essere arrivata si annulla da sé (V06, 4.3.1).
 
 **D37 · Ripetizione: una ricetta per terapia** (superata dalla D49). Semplice e sempre entro i limiti di confezioni per ricetta; la segreteria la mette nella coda «da firmare», il medico la trova in bozza. Raggruppare più farmaci in una ricetta si può aggiungere quando le regole delle confezioni (R2–R4) sono attive.
 
 **D38 · Numeri di ricetta del simulatore riconoscibili.** `SIMR…` (SAR) e `SIMB…` (bianca): il formato vero è nelle specifiche del Sistema TS, da riprendere con l'adattatore vero.
 
-**D39 · Un errore imprevisto dell'adattatore vale come esito incerto.** Se il codice dell'adattatore si guasta non si sa se la ricetta è partita: la scelta prudente.
+**D39 · Un errore imprevisto dell'adattatore vale come esito incerto.** Se il codice dell'adattatore si guasta non si sa se la ricetta è partita: la scelta prudente. **Cambiata da D270** per la ricetta SSN farmaceutica e specialistica al SAR: senza esito, anche incerto, si stampa la ricetta rossa, che parte in DPCM; la dematerializzata che può essere arrivata si annulla da sé (V06, 4.3.1).
 
 **D40 · Il corpo delle richieste si valida dopo la guardia.** Anche una richiesta sbagliata su un paziente finisce nel registro degli accessi.
 
@@ -1569,7 +1569,7 @@ Come si fa:
 
 Prove: 34 nuove e una cambiata. In tutto 54 sabotaggi, ognuno rosso con il guasto e verde dopo il ripristino.
 
-**D233 · Risposte della fermata dopo l'unione della #25: ricetta e certificato fermi «in invio».** Via alla #26, unita con le verifiche su GitHub verdi. Per la ricetta che resta «in invio» se il servizio si ferma mentre aspetta il SAR, Simone ha scelto «Come le PPIP, ora»; per il dopo, «Ricetta, poi pausa».
+**D233 · Risposte della fermata dopo l'unione della #25: ricetta e certificato fermi «in invio».** Via alla #26, unita con le verifiche su GitHub verdi. Per la ricetta che resta «in invio» se il servizio si ferma mentre aspetta il SAR, Simone ha scelto «Come le PPIP, ora»; per il dopo, «Ricetta, poi pausa». **Cambiata da D270** per la ricetta SSN farmaceutica e specialistica al SAR: senza esito, anche incerto, si stampa la ricetta rossa, che parte in DPCM; la dematerializzata che può essere arrivata si annulla da sé (V06, 4.3.1).
 
 Scelte prese qui, con il motivo:
 
@@ -1993,3 +1993,184 @@ Non provato: la validità sul promemoria con un collaudo del Sistema TS; la dimo
 - **Via**: pull request #37 unita con le 14 verifiche su GitHub verdi. Una prova della dimostrazione con WebKit, «invii senza risposta», era caduta in uno dei due giri: dopo il clic sul conto «Invii senza risposta» in Oggi la sezione della pagina Ricette non c'era, mentre il servizio rispondeva con i dati giusti. È la stessa prova già caduta così con WebKit (D234, D239); nell'altro giro, con lo stesso codice, era verde. Rilanciata una volta, come da regola, è passata. Nell'errore ora ci sono anche l'indirizzo e il testo della pagina, per capire la prossima volta se il clic non ha portato alla pagina Ricette.
 - **Collaudo adesso**: Simone e la Dr.ssa Rocca fanno ora le voci che non dipendono dal SAR e da AURA, segnando gli esiti nella pagina del collaudo. Le voci legate ai due servizi hanno nel documento e nella pagina la riga «Quando»: G11, G14, E1 ed E2 si fanno dopo l'integrazione, con i servizi veri; di G2 e G4 si guarda adesso tutto tranne le notizie di AURA e l'invio al SAR, che si rifanno dopo. La pagina ha un filtro per «Adesso» e «Dopo l'integrazione».
 - **Intanto**: le schermate di `docs/schermate/` rifatte tutte con il programma di oggi; 70 cambiano, 6 restano uguali. Oltre al regime di fornitura accanto al farmaco (D261) mostrano i cambiamenti dalla #35 in poi, che non avevano ancora: le bozze in Ricette e in Oggi, il blocco in cima ai controlli, i codici AIC delle terapie dimostrative (D259), la versione nuova delle regole. Il programma che fotografa cercava una terapia con l'amlodipina senza codice AIC, che dalla D259 non c'è più: ora prende la prima terapia in corso con l'amlodipina. Nel Profilo sanitario le terapie, che hanno il codice AIC, entrano spuntate: la descrizione della schermata in `docs/interfaccia.md` lo dice.
+
+**D263 · Unione della #38; gli esiti del collaudo si leggono quando Simone lo dice.** Risposte di Simone con il pulsante (24/11/2026).
+
+- **Via**: «Unisci (Consigliato)». Pull request #38 unita (63bb217) con le 14 verifiche su GitHub verdi e le 2084 prove verdi anche qui.
+- **Tempi del collaudo**: Simone ha chiesto se il collaudo si può fare nei prossimi giorni. Sì, anche un po' alla volta: la pagina del collaudo e la dimostrazione restano agli stessi indirizzi, ogni esito si salva appena segnato, e «Ricomincia da capo» nella dimostrazione non tocca gli esiti.
+- **Lettura degli esiti**: «Quando ve lo dico». Simone e la Dr.ssa Rocca scrivono qui quando hanno segnato un gruppo di voci; allora si leggono gli esiti dalla pagina e si correggono le voci «Da correggere», ognuna con la sua prova. Nessun controllo automatico. Il 24/11/2026, dopo l'unione, la pagina non aveva ancora esiti.
+
+**D264 · Catalogo regionale: la D.D. 444/2025 non serve, la D.G.R. 40-3255 conferma la trascrizione.** Simone ha chiesto il 25/11/2026: «Abbiamo già il catalogo delle prestazioni versione 444/2025?».
+
+- **La D.D. 444/A1400B/2025 del 29/7/2025 non serve.** È un aggiornamento precedente: la D.D. 590/2026 ripubblica il catalogo intero, per le ricette dal 21/09/2026, e sopra ci sono le modifiche della D.D. 710/2026 (D159). Lo conferma la D.G.R. 40-3255, che elenca gli atti del catalogo in ordine: D.D. 180/2024, 990/2024, 444/2025, 590/2026.
+- **Controllati i Bollettini dopo la D.D. 710**, il 25/11/2026: n. 44 (5/11), 45 (12/11) e 46 (19/11). L'unico atto nuovo sul catalogo è la D.G.R. 2/11/2026, n. 40-3255, nel supplemento ordinario n. 2 del n. 44. Il n. 47 esce il 26/11.
+- **La D.G.R. 40-3255 non cambia la trascrizione.** Riapprova gli elenchi della D.D. 710, con la brachiterapia «≤ 2 sedute» che la trascrizione ha già. Le esenzioni nuove del DPCM 7/8/2026 (068 sindrome fibromialgica molto severa, 069 idrosadenite suppurativa, 070 micobatteri non tubercolari) sono già nell'allegato 8 trascritto. Scelta: la trascrizione resta quella della D.D. 710; la delibera si aggiunge fra le fonti in `docs/catalogo-regionale.md`. L'unica differenza letta, la tariffa di 92.2C.5, si controlla sul PDF con il resto del catalogo (A8): il testo letto da qui ha altri errori di lettura.
+- **Non provato**: il PDF della delibera non si scarica da qui (regione.piemonte.it chiude la connessione a metà). Il testo è stato letto con uno strumento di lettura dei PDF.
+
+**D265 · Specifiche regionali del 25/11/2026: documenti registrati e allineamenti che non cambiano decisioni.** Richiesta di Simone del 25/11/2026, con il confronto `confronto-specifiche-regionali.md`: «sistema solo ciò che non cambia una decisione già presa». Fino alle sue risposte non si toccano l'esito incerto e la ricetta rossa, la DPCM e i lotti di NRE, AURA, la pubblicazione sul Fascicolo e il `client_id`.
+
+- **Documenti.** Tutti quelli del confronto, e quelli che segnava «da scaricare», sono scaricati da qui il 25/11/2026. Link, byte e SHA-256 sono in `docs/provenienze.md`; i documenti restano fuori dal repository (D92). Dove il confronto sbaglia vale il documento: le differenze sono in `docs/avanzamento.md`.
+- **SAR, «Cartelle cliniche MMG e PLS» V06 (10/04/2026).**
+  - Tempo d'attesa: «al momento definiti in 8 secondi» (3.5.2, p. 10), non più «6-8» della V05. Il valore per difetto resta 8 secondi (D94). L'avviso dello studio ora parte per ogni valore diverso da 8; il valore si salva lo stesso.
+  - I riferimenti passano da 4.4.3 e 4.4.7 a 4.3.3 (riga «codice regionale – nominativo» del promemoria) e 3.5.2.
+- **Accesso con SPID o CIE, REL-STC-01 V08 (23/09/2026).**
+  - Il simulatore emette un token con la forma e i campi del JWT della V08 (4.3.2): sub, aud, nbf, iat, exp, jti, iss, scope e userData con cfutente, idSessione, autenticazioneTs, livello e modalità di autenticazione, organizzazione e clientid. Il token non ha firma («alg»: «none»): l'adattatore vero, che controlla la firma con la chiave del servizio JWKS (4.3.3), lo rifiuterebbe.
+  - La scadenza si legge da `exp`, non da `expires_in`: la V08 descrive `expires_in` come «Unix time», ma nell'esempio vale 7199, una durata. L'Id-Sessione della prescrizione vale 8 ore (V08, 3).
+  - Il servizio rifiuta, come «token-negato», un token rilasciato per un altro gestionale (`aud` diverso dal `client_id`) o già scaduto.
+  - La revoca è la DELETE della V08 (4.3.5). La risposta 401 (token già scaduto, revocato o sconosciuto) chiude la sessione anche qui e si annota nel registro. La descrizione OpenAPI pubblicata con la V08 (`yaml.zip`) dice GET: è una domanda per il CSI.
+  - Le intestazioni delle chiamate al SAR sono scritte e provate in `sarAuthentication`, per l'adattatore vero:
+    - con il token (4.3.6): solo `X-OAuth2-Authorization: Bearer <jwt>`, niente `Authorization: Basic`, `<pinCode>` vuoto;
+    - con il codice per email (4.1.1, 4.2.5): Basic con utente e password RUPAR, `X-idSessione: Bearer <Id-Sessione>`, `X-Gestionale` con il valore della configurazione, e il PIN da cifrare.
+
+    Il token insieme a utente, password, PIN o Id-Sessione si rifiuta, anche nel SAR simulato. Come si sceglie `X-Gestionale` per ogni ASL resta la domanda del `client_id`.
+- **Modulo di accesso al Fascicolo, LCCE--SRS-01 V13 (aprile 2026).**
+  - L'applicazione è DMAWACCE, «Servizi FSE per Cartelle Cliniche» (tabella 5).
+  - Utente, password e PIN RUPAR sono obbligatori: AUTH_ER_516 senza credenziali, AUTH_ER_510 senza PIN. Questi due, come AUTH_ER_501, portano il medico a «Credenziali dei servizi».
+  - Gli errori sono quelli delle tabelle 1 e 6 della V13. WEB_002 non c'è più: l'IP della postazione va nella richiesta e la Regione lo traccia (2.2), ma la pagina non lo confronta. WEB_001 vale anche per il token scaduto. La V13 non dice quanto dura il token, quindi nel simulatore la durata è un'impostazione vuota per difetto, da completare con il CSI.
+  - I tipi di documento del filtro sono i 20 della tabella 3: «DOCUMENTO DEI CONSENSI» non c'è più, 57827-8 è «ATTESTATO DI ESENZIONE», si aggiungono le schede vaccinali, il piano di cura personalizzato, il bilancio di salute e il certificato di condizione o malattia.
+  - Gli indirizzi della pagina regionale (6.3) sono in `docs/fse.md`, per la configurazione dell'adattatore vero. Nel codice non ci sono (regola 7): erano entrati in una costante e la prova della regola 7 li ha fermati.
+- **Non provato**: nessun servizio vero. Le intestazioni, la firma del token e gli errori veri si provano in collaudo con il kit del CSI, che è fra le cose chieste con la mail del 25/11/2026.
+
+**D266 · Risposte della fermata sulle specifiche regionali.** Risposte di Simone con il pulsante (25/11/2026) alle cinque domande del paragrafo 5 del confronto e a quelle nate dalle verifiche (D265).
+
+1. **Ricetta senza esito: come la Regione.** «Come la Regione (Consigliato)». Dopo un errore di sistema o un'attesa scaduta, la ricetta dematerializzata si annulla e si rimanda come ricetta rossa (DPCM), con un NRE nuovo e il numero del Poligrafico (V06, 4.3.1). Cambiano D36, D39 e D233 e `docs/ricetta.md`. Si fa insieme ai lotti di NRE: per annullare serve l'NRE, e la cartella lo conosce perché lo assegna lei.
+2. **Ricetta rossa e lotti di NRE: si costruiscono**, con i simulatori. «Sì, costruirli (Consigliato)». Entrano:
+   - la richiesta del lotto al SAR (1000 NRE);
+   - gli NRE generati e conservati dalla cartella, riusati solo dopo un rifiuto;
+   - l'invio DPCM al SAR con il numero del Poligrafico e l'NRE;
+   - gli esiti con l'elenco sintetico e l'elenco analitico;
+   - la stampa sul modulo del Poligrafico.
+
+   Servono per il test DM-TRAS-01 e per i test DPCM del piano V03.
+
+3. **AURA: servizi per i medici, con il giro di notte.** «Sì, giro di notte (Consigliato)».
+   - Simulatore sui cinque WSDL dei medici.
+   - Ogni notte ListaAssistiti e ListaAssistitiEsenti, poi le ricerche solo per chi è cambiato.
+   - Le notifiche solo se il CSI le concede.
+   - Il significato dei campi va confermato con il CSI.
+4. **Fascicolo: pubblicazione con i servizi della Regione.** «Sì, servizi regionali (Consigliato)».
+   - Validazione sul Gateway, poi CREATE, UPDATE, REPLACE e cancellazione con i servizi regionali della V09, con un simulatore.
+   - «ERP» al posto di «OBS» (D133).
+   - Coda e tentativi come nelle politiche di invio (FSE-INT-SRS-01): niente invii fra le 00 e le 07, tre tentativi a cinque minuti, coda di dieci giorni.
+5. **client_id: codice del gestionale più codice ASL del medico.** «Codice + ASL (Consigliato)».
+   - Nella configurazione c'è un solo valore, il codice del gestionale che la Regione assegna.
+   - Il programma aggiunge «_» e il codice ASL del medico: tre cifre, nel profilo del medico, controllate sull'elenco ufficiale. Vale anche per `X-Gestionale` (V08, 4.3.1, p. 28).
+   - Senza codice ASL l'accesso con SPID o CIE non parte, e il programma dice che cosa manca.
+6. **PSS: allineato alla guida HL7 Italia v1.5 dove non contrasta con il Ministero.** «Sì, dove non contrasta (Consigliato)».
+   - Si correggono le voci su cui i due schematron vanno d'accordo: quello del Ministero (v4.0, il controllo del Gateway) e quello della guida (ART-DECOR).
+   - Ogni PSS deve passarli tutti e due.
+   - Dove si contraddicono resta il Ministero, finché il CSI non dice quale usa la Regione (domanda 7 per il CSI, `docs/avanzamento.md`).
+7. **R14 resta com'è.** Risposta di Simone: «Atteniamoci alle disposizioni di TS o della Regione, se quello che abbiamo fatto è accettato allora ok». Verificato sulle fonti:
+   - **Il Sistema TS accetta il tipo di accesso per ogni prestazione.** Tipo e classe di priorità «possono essere indicati dal medico, a sua discrezione oppure sulla base degli adempimenti normativi della propria Regione/PA di appartenenza, anche per le prestazioni che non fanno parte della lista» del PNGLA. Se sono indicati, valgono le stesse regole (Sistema TS, «Controlli secondo il PNGLA 2019-2021», 3/6/2019, p. 1–2). Le specifiche della prescrizione dicono lo stesso: il campo `tipoAccesso` è obbligatorio per le prestazioni del PNGLA ed «elemento facoltativo per tutte le altre» (versione del 08/07/2026, p. 28).
+   - **Con il primo accesso indicato, la classe di priorità è obbligatoria (1301).** È quello che fa R14.
+   - **La Regione Piemonte lega la validità della ricetta al tipo di accesso**: 60 giorni per il primo, 180 per gli altri (D.D. 710/2026, punto 4; D260).
+
+   La ricetta che R14 lascia passare è quindi accettata dal Sistema TS e serve alla regola regionale. R14 resta, con la fonte scritta qui.
+
+8. **Revisione indipendente alla fine.** Alla domanda sui revisori Simone ha risposto: «Se un lavoro senza revisori ci può garantire lo stesso risultato procediamo senza revisori». Non lo garantisce: nella revisione dalla #26 alla #28 (D239) i revisori hanno trovato 35 difetti veri su 38 segnalazioni, che prove e sabotaggi non avevano preso. Riproposta la domanda con questo dato, Simone ha scelto «Sì, quattro revisori (Consigliato)». Come si fa:
+   - quattro agenti, alla fine della costruzione e prima della pull request;
+   - uno per area: ricetta rossa e NRE; AURA; Fascicolo; interfaccia e dimostrazione;
+   - leggono solo il codice del branch e le specifiche scaricate, e non cambiano niente;
+   - le segnalazioni le verifico io, e correggo solo i difetti veri, con prove e sabotaggi.
+
+   La costruzione si fa senza agenti.
+
+**Ordine del lavoro** (scelta mia):
+
+1. il `client_id`, che è piccolo;
+2. i lotti di NRE, la ricetta rossa e l'esito incerto, che dipendono uno dall'altro;
+3. AURA;
+4. il Fascicolo e il PSS;
+5. interfaccia, dimostrazione e documenti;
+6. la revisione e la pull request.
+
+Tutto nello stesso branch, con una sola pull request alla fine.
+
+**D268 · Ordine del lavoro dopo la domanda sui tempi; niente agenti.** Simone ha chiesto i tempi (11–15 giornate di lavoro con i simulatori, senza l'integrazione vera con il CSI) e se il lavoro non fosse già chiuso. Spiegato che era chiuso sui documenti di prima, e che il lavoro nuovo viene dai documenti regionali del 25/11/2026 (D265, D266). Alla domanda sull'ordine ha risposto: «Seguiamo l'ordine più appropriato. Ma cerca di ottimizzare i tempi. Workflow e agenti solo dietro mia autorizzazione e se STRETTAMENTE NECESSARI AL COMPLETAMENTO, se si possono evitare preferirei. Se ci sono aspetti che devono essere lavorati dopo le risposte del CSI, di questo devi tenerne conto».
+
+- **Ordine** (scelta mia, con le risposte di D266):
+  1. **SAR, prima pull request**: `client_id` con il codice ASL, lotti di NRE, ricetta rossa in DPCM, esito incerto. Viene prima perché la certificazione regionale passa dal piano dei test V03, e perché le specifiche (V06, manuale DPCM, guida NRE) bastano senza il CSI. Circa 6–8 giornate.
+  2. **Fascicolo, seconda pull request**: pubblicazione con i servizi regionali della V09 e PSS allineato alla guida v1.5 dove non contrasta. La V09 descrive i servizi; quello che aspetta il CSI (kit, provisioning, schematron del servizio regionale) riguarda il collegamento vero, non la costruzione con il simulatore. Circa 3–4 giornate.
+  3. **AURA, dopo le risposte del CSI**: i servizi per i medici e il giro di notte. Mancano il documento tecnico per le cartelle di MMG e PLS, gli indirizzi, il modo di autenticarsi e le notifiche per una cartella in cloud. Costruito adesso sui soli WSDL, rischierebbe di andare rifatto. Resta il simulatore di oggi (D197–D200).
+- **Niente agenti né workflow.** La revisione con quattro agenti di D266 non si fa: non è strettamente necessaria al completamento. Prima di ogni pull request la revisione la faccio io: rileggo tutto il codice nuovo e controllo le prove e i sabotaggi. La regola di `CLAUDE.md` è aggiornata.
+- **Integrazione vera con il CSI**: non è nelle stime. Dipende dai requisiti del fornitore (partita IVA), dal kit di test e dalle prove del piano V03 nell'ambiente del CSI, e da una decisione di Simone sulla regola 7.
+
+**D267 · Codice ASL del medico e codice del gestionale per la Regione.** Come si costruisce la risposta 5 di D266 («Codice + ASL»).
+
+- **Elenco delle ASL.** Dal dataset «Aziende Sanitarie Locali - ASL» dei dati aperti del Ministero della Salute, file `ASL_2010-2026.csv` del 23/04/2026, licenza IODL 2.0. Indirizzo, byte e impronta sono in `docs/provenienze.md`. `packages/domain/scripts/elenco-asl.ts` ne genera `packages/domain/src/asl-elenco.ts`: le 106 aziende del 2026, con codice e nome di regione e azienda, senza indirizzi e recapiti. Per il Piemonte sono dodici: da 203 a 213 e la 301 dell'esempio della V08. Il codice è unico solo dentro la regione: si controlla sulla regione scritta nei dati dello studio («PIEMONTE»), e su tutte se la regione non si riconosce. La prova controlla che l'impronta scritta nell'elenco sia quella di `docs/provenienze.md`. Si aggiorna rilanciando lo script sul file nuovo: il dataset cambia una volta l'anno.
+- **Dati del medico.** Il codice ASL è un campo nuovo (`asl_code`), accanto al nome dell'ASL scritto dallo studio, che resta com'è: lo usano il certificato di malattia, l'AFT e le PPIP. Lo sceglie l'amministratore in «Utenti e ruoli», da un elenco con le ASL della regione dello studio. Una modifica che non porta il campo lo lascia com'è, perché chi non lo conosce ancora non lo cancelli per sbaglio; vuoto lo toglie. Se cambia, la sessione della RUPAR si chiude, come per il codice regionale. Entra nell'esportazione (`medico.codice_asl`).
+- **Codice del gestionale.** Sta nella configurazione, `APP_CODICE_GESTIONALE`, perché lo assegna la Regione al fornitore. La V08 non ne dà la forma: si accettano lettere, cifre, «-» e «_». Per difetto vale «SIMULATORE», buono solo con i simulatori; un valore non valido ferma l'avvio.
+- **Dove va.** `regionalSoftwareId` compone il valore. Va nel `client_id` dell'accesso con SPID o CIE, in `X-Gestionale` per il SAR con il codice per email e nell'informazione «APP» del secondo fattore della RUPAR. Tutti e due viaggiano dentro le credenziali della chiamata (`ServiceAuth.software`), non nei messaggi delle ricette. Con il token non va: il gestionale è nel token, in `aud` (V08, 4.3.6).
+- **Richiesta, ritorno e revoca.** La richiesta di accesso conserva il `client_id` con cui è partita: il ritorno usa quello, anche se nel frattempo l'ASL è cambiata. La revoca usa l'`aud` del token: è il `client_id` che lo ha chiesto, come vuole la V08 (4.3.5).
+- **Simulatori.** Rifiutano, come farebbe il servizio vero, un `client_id`, un `X-Gestionale` o un'«APP» senza le tre cifre dell'ASL. Il servizio regionale simulato rifiuta anche la verifica e la revoca con un `client_id` diverso da quello del token.
+- **Non provato**: i codici veri. Il codice del gestionale lo dà la Regione con l'autocertificazione; quali `client_id` registra (uno per ASL o la forma soltanto) si vede con il kit del CSI.
+
+**D269 · Lotti di NRE: la cartella numera da sé le ricette per il SAR.** Come si costruisce la risposta 2 di D266 («lotti di NRE con i simulatori»).
+
+- **Fonti.** SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026: 3.1.1 (credenziali), 3.2 (in Piemonte solo il lotto di tipo 1, 1000 NRE), 4.1 (richiesta del lotto, esempio «010 A0 4 000000», codici d'errore da 02 a 06), 4.3.1 (esiti dell'invio). Sistema TS, «Gestione del numero ricetta elettronica», versione 2 del 21/05/2012, §2 e §2.1 (forma dell'NRE).
+- **Il lotto.** Lo chiede il medico che firma, con il suo codice fiscale, il codice della regione dello studio (dall'elenco delle ASL, D267) e il tipo 1. Il SAR restituisce un lotto «estratto»: regione, raggruppamento, identificativo del lotto del SAR e un codice di 6 cifre. La cartella genera gli NRE con il progressivo, da 000 a 999. Il lotto si conserva con la ricevuta del SAR (`nre_lot`), per ambiente: i numeri di un simulatore non vanno al servizio vero. Un lotto che non dà 1000 NRE di 15 caratteri, o di un'altra regione, non si usa.
+- **Credenziali.** Solo utente, password e PIN RUPAR (V06, 3.1.1): niente secondo fattore e niente token. Chi entra con SPID o CIE deve avere salvate anche le credenziali RUPAR; se mancano, la firma si ferma con un messaggio che lo dice.
+- **Quando si chiede.** Alla firma di una ricetta per il SAR, quando al medico restano meno di 100 numeri. La soglia è una scelta mia: le fonti non ne danno una, e con un decimo del lotto le ricette partono anche quando il SAR non risponde.
+  - Se il SAR non dà il lotto e restano numeri, la ricetta parte con quelli e il medico vede l'avviso; si riprova alla firma dopo.
+  - Se non restano numeri, la ricetta non parte e resta com'era; il messaggio dice perché.
+  - Ogni richiesta resta nel registro degli invii, con la ricetta che l'ha fatta partire, e si vede nella sua cronologia.
+- **Il numero della ricetta.** Si prende nella stessa transazione che porta la ricetta «in invio». Due firme insieme non hanno mai lo stesso NRE, e se la ricetta è cambiata nel frattempo il numero torna al lotto. Si consuma prima il lotto più vecchio.
+  - La ricetta tiene il suo numero (`assigned_nre`): dopo un rifiuto con errori bloccanti si corregge e si rimanda con lo stesso (V06, 4.3.1, caso 3).
+  - Un indice unico del database vieta lo stesso NRE su due ricette, anche annullate o mai partite.
+  - Con «È arrivata» (D233) il numero dev'essere quello partito con l'invio.
+- **Esito incerto.** Il tempo scaduto e l'eccezione di sistema del SAR (V06, 4.3.1, casi 5 e 4) restano come oggi (D233): esito incerto e nuovo invio, con lo stesso NRE. Se la ricetta era arrivata, il SAR rifiuta il numero già usato. L'eccezione resta tale nel registro degli invii. Il percorso della Regione (ricetta rossa, annullamento, DPCM) arriva con la ricetta rossa (D266, risposta 1).
+- **Ricetta bianca**: invariata, il numero lo dà il Sistema TS.
+- **Simulatore.** Dà i lotti con il raggruppamento «ZZ», che li riconosce come simulati. I codici partono da un numero a caso, perché dopo un riavvio non ridia un lotto che il database ha già. Rifiuta con i codici della V06 e vuole utente, password e PIN. Controlla che l'NRE sia di un lotto del medico che firma e non già usato. I lotti «ZZ» dati prima di un riavvio li accetta, perché non li ricorda più.
+- **Esportazione**: i lotti da cui vengono i numeri delle ricette dell'archivio (`nre_lot`).
+- **Non provato**: il SAR vero. Restano domande per il CSI: se il lotto si possa chiedere prima che finisca, quanti lotti aperti possa avere un medico, con quale codice il SAR rifiuti un NRE già usato.
+
+**D270 · Ricetta rossa in DPCM e ricetta senza esito come la Regione.** Come si costruiscono le risposte 1 e 2 di D266. Cambiano D36, D39 e D233 per la ricetta SSN farmaceutica e specialistica che va al SAR.
+
+- **Fonti.**
+  - SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026: 3.1.1, 3.4, 3.5.1, 4.2.1–4.2.3, 4.3.1 e 4.3.2.
+  - Sistema TS, «Collegamento telematico in rete dei medici», versione 11 del 1/3/2016: 6.1, 6.4, 6.5 e capitolo 7.
+  - Sistema TS, «WSDL e schemi XSD» del 5/9/2011: RicettaMIR.xsd 2.1 e TipiDatiMIR.xsd 1.0.7.
+  - Manuale dei codici d'errore DPCM 26/3/2008, per l'avviso 2090.
+  - Disciplinare tecnico del DM 17/3/2008, comma 2: modulo, codice della ricetta, Allegati 2 e 11.
+- **Senza esito, la ricetta rossa.** Tempo scaduto, eccezione di sistema del SAR, SAR non raggiungibile e invio interrotto (D233): la ricetta dematerializzata non si rimanda (V06, 3.5.1 e 4.3.1, casi 4 e 5). Il medico stampa la ricetta rossa. Le credenziali rifiutate e i rifiuti restano come prima: si sistema e si rimanda.
+- **Il modulo.** Il medico legge le 15 cifre del modulo nella stampante: con il lettore di codici a barre o a mano.
+  - La cifra di controllo non si calcola: le fonti non danno il calcolo e il Sistema TS non la usa (7.1).
+  - Il codice dell'ente dev'essere quello della regione dello studio (010 per il Piemonte, Allegato 11).
+  - Un modulo non si usa due volte; lo vieta anche il database.
+  - Prima di prendere il numero si controlla che il file DPCM si possa fare: un modulo non si spreca per un dato che manca.
+- **L'NRE.** Uno nuovo, dal lotto del medico (V06, 4.3.1, caso 4; D269), stampato in chiaro e a barre (4.2.2).
+- **Il PDF.** Modulo di 250 × 152,4 mm, caselle in OCR-A, «STAMPA PC» biffata. L'NRE va in due codici 3-of-9 come il numero del Poligrafico (5 e 10 caratteri), con barre di 7,5 mm e modulo di 0,254 mm.
+  - Le posizioni sono misurate sul facsimile dell'Allegato 2, in scala per la parte della ricetta (2,78 punti per millimetro).
+  - La posizione dell'NRE è una scelta mia: la V06 dice solo «accanto alla denominazione dell'ente», e lì non c'è posto per 7,5 mm di barre. Va nella fascia libera sopra il codice fiscale; il testo in chiaro sta dentro il riquadro dell'ente.
+  - Da controllare con un modulo vero e da confermare con il CSI. Il PDF prevede uno spostamento per tarare la stampante, che si regolerà nelle impostazioni di stampa.
+- **Il file DPCM.** Una ricetta per file, nell'ordine degli elementi dello schema, solo caratteri «BasicLatin».
+  - TipoInvio «RPS», Bar1 e Bar2 dal modulo, Ricetta1 con l'NRE, Ricetta2 con il codice fiscale del medico.
+  - PinCode e codice fiscale dell'assistito cifrati con il certificato della Regione, che oggi non c'è: il simulatore usa un prefisso riconoscibile.
+  - Per la farmaceutica: AIC, gruppo di equivalenza dalle banche dati e nota AIFA. Per la specialistica: codice del nomenclatore, descrizione, diagnosi o quesito e priorità; in Prescrizione2 il catalogo e il tipo di accesso, 1 o 0 come nella ricetta dematerializzata (D79).
+  - Nome del file con «SCRIPT» dopo «_», come chiede il manuale (6.1.1).
+- **La coda.** Invio, esito e annullamento della dematerializzata si fanno da soli, ogni minuto, e con «Invia adesso».
+  - Invio con utente, password e PIN RUPAR (V06, 3.1.1), al più un file ogni 2 secondi per medico.
+  - Se il SAR non risponde si riprova dopo 1, 5, 15 e poi 60 minuti (scelta mia).
+  - L'esito si rilegge ogni 5 minuti finché il file è «in attesa» (scelta mia). Con avvisi o errori si leggono i messaggi dell'elenco analitico.
+  - Attesa della risposta di 30 secondi: l'invio DPCM non è sincrono (scelta mia).
+  - Ogni chiamata resta nel registro degli invii e nella cronologia della ricetta.
+- **Annullamento della dematerializzata.** Solo se può essere arrivata: tempo scaduto, eccezione o invio interrotto. Non con il SAR non raggiungibile, né con «Non è arrivata».
+  - Usa le credenziali della ricetta (secondo fattore o token): se mancano, si riprova e il motivo si vede.
+  - Si chiede a nome di chi aveva firmato la dematerializzata, con le sue credenziali, anche se la ricetta rossa la stampa un altro medico dell'archivio (per esempio la titolare dopo il sostituto). Scelta mia: la dematerializzata è di chi l'ha firmata.
+  - Se il SAR non la annulla (per esempio perché non c'è), lo si scrive; dal portale del SAR il medico controlla.
+- **Esportazione**: la tabella della ricetta rossa entra con le ricette (`dpcm_prescription`), che ha storico e divieto di cancellazione come gli altri dati dei pazienti.
+- **Nell'interfaccia** (scelte mie).
+  - «Stampa la ricetta rossa» prende il posto di «Firma e invia» e, nell'invio rimasto senza risposta, di «Non è arrivata»: la dematerializzata non si rimanda, e l'annullamento parte da sé se può essere arrivata. «È arrivata» resta, per quando l'ente ha già dato numero e codice.
+  - Dopo la stampa il PDF resta nella pagina anche quando la ricetta esce dalla coda, come il promemoria delle ricette inviate; nella pagina della ricetta resta ricordato con la bozza.
+  - «Non è arrivata» segnato prima, per una farmaceutica o una specialistica al SAR, dice di stampare la ricetta rossa.
+  - Due stampe nello stesso istante sullo stesso modulo: la seconda si ferma con il messaggio del modulo già usato.
+  - Nella pagina Ricette la sezione «Ricette rosse in DPCM», solo per il medico: quelle in corso e, per 30 giorni, quelle chiuse. In Oggi il conto di quelle da seguire: invio o lettura non riusciti, 24 ore passate senza invio, annullamento che non riesce; per 30 giorni le scartate e gli annullamenti rifiutati. I 30 giorni sono una scelta mia, perché un elenco senza fine non si legge.
+  - Per una ricetta DPCM scartata la pagina dice che la correzione non è ancora nella cartella: la variazione (RicettaV) è fra le cose non fatte.
+- **Ricetta bianca e presidi**: come prima. La ricetta DPCM ha solo farmaceutica e specialistica (TipoPrescrizione F o P); per i presidi è una domanda per il CSI.
+- **Non fatto**:
+  - la variazione e la cancellazione di una ricetta DPCM già mandata (RicettaV e RicettaC);
+  - i farmaci esclusi dalla ricetta dematerializzata (DM 2/11/2011, art. 3), che vanno sempre sulla ricetta rossa;
+  - il codice della motivazione di non sostituibilità in Prescrizione1 (oggi c'è solo il testo);
+  - l'archivio dei ricettari del medico (7.3 e 7.4).
+- **Non provato**: il SAR vero, la cifratura vera, la stampa su un modulo vero.
+- **Domanda per il CSI**: se l'invio DPCM resta senza risposta, la cartella lo rimanda; come risponde il SAR se il primo file era arrivato (stesso NRE e stesso modulo)? Oggi il rifiuto resta nella ricetta rossa, che Oggi conta fra quelle da seguire.

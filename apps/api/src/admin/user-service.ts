@@ -3,7 +3,11 @@ import {
   can,
   checkFiscalCode,
   CREDENTIAL_SERVICE_LABELS,
+  ASL_LIST,
+  ASL_SOURCE,
   CREDENTIAL_SERVICES,
+  findHealthUnit,
+  healthUnitsOfRegion,
   opensPatientData,
   PATIENT_DATA_ROLES,
   ROLE_LABELS,
@@ -198,7 +202,11 @@ const text = (max: number) =>
     .refine((v) => !hasControlCharacters(v), CONTROL_CHARACTERS_MESSAGE);
 const email = z.union([z.literal(''), z.email().max(200)]);
 
-/** Dati del medico: nome e cognome come nel codice fiscale; codice regionale e ASL se noti. */
+/**
+ * Dati del medico: nome e cognome come nel codice fiscale; codice regionale e ASL se noti. Il
+ * codice ASL (tre cifre dell'elenco del Ministero, D267) serve ai servizi della Regione Piemonte
+ * (`client_id`, `X-Gestionale`, D266); `asl` resta il nome, come lo scrive lo studio.
+ */
 export const doctorBody = z
   .object({
     codiceFiscale: z.string().trim().toUpperCase().max(16),
@@ -206,6 +214,11 @@ export const doctorBody = z
     cognome: text(100).min(1),
     codiceRegionale: text(40).optional(),
     asl: text(120).optional(),
+    codiceAsl: z
+      .string()
+      .trim()
+      .regex(/^(\d{3})?$/, 'Il codice ASL ha tre cifre, per esempio 301')
+      .optional(),
   })
   .strict();
 
@@ -221,7 +234,10 @@ export const createUserBody = z
   })
   .strict();
 
-/** Modifica: i campi assenti restano come sono; `medico`, se c'è, sostituisce i cinque dati. */
+/**
+ * Modifica: i campi assenti restano come sono; `medico`, se c'è, sostituisce i dati del medico,
+ * tranne il codice ASL, che resta com'è se manca (D267).
+ */
 export const updateUserBody = z
   .object({
     nome: text(120).min(1).optional(),
@@ -285,6 +301,7 @@ const profileColumns = {
   pendingFiscalCodeAt: doctorProfile.pendingFiscalCodeAt,
   regionalCode: doctorProfile.regionalCode,
   asl: doctorProfile.asl,
+  aslCode: doctorProfile.aslCode,
   firstName: doctorProfile.firstName,
   lastName: doctorProfile.lastName,
 };
@@ -322,6 +339,7 @@ interface ProfileRow {
   pendingFiscalCodeAt: Date | null;
   regionalCode: string | null;
   asl: string | null;
+  aslCode: string | null;
   firstName: string | null;
   lastName: string | null;
 }
@@ -336,6 +354,11 @@ interface DoctorValues {
   lastName: string;
   regionalCode: string | null;
   asl: string | null;
+  /**
+   * Codice ASL (D267): `undefined` quando la richiesta non lo porta, e allora resta com'è; per
+   * toglierlo si manda vuoto. Così chi non conosce ancora il campo non lo cancella per sbaglio.
+   */
+  aslCode: string | null | undefined;
 }
 
 /** Nomi dei dati del medico nel registro, come li scrive l'interfaccia. */
@@ -345,6 +368,7 @@ const DOCTOR_FIELDS = [
   ['lastName', 'medico.cognome'],
   ['regionalCode', 'medico.codiceRegionale'],
   ['asl', 'medico.asl'],
+  ['aslCode', 'medico.codiceAsl'],
 ] as const;
 
 function doctorValues(m: DoctorBody): DoctorValues {
@@ -360,6 +384,7 @@ function doctorValues(m: DoctorBody): DoctorValues {
     lastName: m.cognome,
     regionalCode: m.codiceRegionale || null,
     asl: m.asl || null,
+    aslCode: m.codiceAsl === undefined ? undefined : m.codiceAsl || null,
   };
 }
 
@@ -428,6 +453,7 @@ function view(u: UserRow, p: ProfileRow | null, a: ArchiveRow | null, c: ViewCon
           codiceFiscale: p.fiscalCode,
           codiceRegionale: p.regionalCode,
           asl: p.asl,
+          codiceAsl: p.aslCode,
           nome: p.firstName,
           cognome: p.lastName,
           /** La correzione del codice fiscale in attesa del medico: fino ad allora vale l'altro. */
@@ -809,6 +835,45 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
   }
 
   /** Il codice fiscale e il codice regionale di un medico sono suoi, nello studio. */
+  /**
+   * Le ASL fra cui scegliere il codice del medico: quelle della regione dello studio, o tutte se la
+   * regione non è scritta o non si riconosce (D267).
+   */
+  async function healthUnitsFor(q: Database | Tx, studioId: string) {
+    const [st] = await q
+      .select({ region: studio.regionName })
+      .from(studio)
+      .where(eq(studio.id, studioId));
+    const units = healthUnitsOfRegion(st?.region);
+    return {
+      regione: units ? units[0]!.regionName : null,
+      elenco: (units ?? ASL_LIST).map((a) => ({
+        codice: a.code,
+        nome: a.name,
+        regione: a.regionName,
+      })),
+      fonte: `Ministero della Salute, ASL ${ASL_SOURCE.year}`,
+    };
+  }
+
+  /**
+   * Il codice ASL del medico dev'essere nell'elenco del Ministero, per la regione dello studio se
+   * è scritta nei dati dello studio (D267): con un codice sbagliato la Regione non riconoscerebbe
+   * il programma (`client_id`, `X-Gestionale`, D266).
+   */
+  async function ensureHealthUnitKnown(q: Database | Tx, actor: Actor, d: DoctorValues) {
+    if (!d.aslCode) return;
+    const [st] = await q
+      .select({ region: studio.regionName })
+      .from(studio)
+      .where(eq(studio.id, actor.studioId));
+    if (!findHealthUnit(d.aslCode, st?.region))
+      throw new HttpError(
+        400,
+        `Codice ASL ${d.aslCode}: non è nell'elenco delle ASL del Ministero della Salute${st?.region ? ` per la regione ${st.region}` : ''}`,
+      );
+  }
+
   async function ensureDoctorCodesFree(
     q: Database | Tx,
     actor: Actor,
@@ -885,6 +950,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
         ),
       ),
       ruoli: roleList(ROLES),
+      aziendeSanitarie: await healthUnitsFor(db, actor.studioId),
     };
   }
 
@@ -903,13 +969,17 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
       throw new HttpError(400, 'Per un medico servono nome, cognome e codice fiscale');
     if (!isDoctor(roles) && body.medico)
       throw new HttpError(400, 'I dati del medico valgono solo per i ruoli di medico');
-    const doctor = body.medico ? doctorValues(body.medico) : null;
+    const given = body.medico ? doctorValues(body.medico) : null;
+    const doctor = given ? { ...given, aslCode: given.aslCode ?? null } : null;
     const [taken] = await db
       .select({ id: appUser.id })
       .from(appUser)
       .where(eq(appUser.username, body.nomeUtente));
     if (taken) throw new HttpError(409, USERNAME_TAKEN);
-    if (doctor) await ensureDoctorCodesFree(db, actor, doctor, null);
+    if (doctor) {
+      await ensureHealthUnitKnown(db, actor, doctor);
+      await ensureDoctorCodesFree(db, actor, doctor, null);
+    }
     const password = temporaryPassword();
     const passwordHash = await hashPassword(password);
     let created: { id: string; awaiting: boolean; noConfirmer: boolean };
@@ -1056,7 +1126,10 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
         const profile = await profileOf(tx, id);
         if (isDoctor(after) && !isDoctor(before) && !profile && !doctor)
           throw new HttpError(400, 'Per un medico servono nome, cognome e codice fiscale');
-        if (doctor) await ensureDoctorCodesFree(tx, actor, doctor, id);
+        if (doctor) {
+          await ensureHealthUnitKnown(tx, actor, doctor);
+          await ensureDoctorCodesFree(tx, actor, doctor, id);
+        }
 
         const campi: string[] = [];
         const patch: Partial<typeof appUser.$inferInsert> = {};
@@ -1094,6 +1167,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
               fiscalCode: willAwait
                 ? doctor.fiscalCode
                 : (profile?.fiscalCode ?? doctor.fiscalCode),
+              aslCode: doctor.aslCode === undefined ? (profile?.aslCode ?? null) : doctor.aslCode,
             }
           : null;
         const doctorChanges = written ? changedDoctorFields(profile ?? undefined, written) : [];
@@ -1175,24 +1249,26 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
 
         // Codici del medico corretti (scelta 4): le sessioni dei servizi legate a quei codici
         // si chiudono. Il codice fiscale vale per tutti e due i servizi (D102, D111), il codice
-        // regionale per il servizio regionale.
+        // regionale per il servizio regionale; anche il codice ASL, che è nel `client_id` con cui
+        // la sessione regionale si è aperta (D266).
         const cfChanged = !!profile && doctorChanges.includes('medico.codiceFiscale');
         const regionalChanged = !!profile && doctorChanges.includes('medico.codiceRegionale');
+        const aslChanged = !!profile && doctorChanges.includes('medico.codiceAsl');
         let servicesClosed: CredentialService[] = [];
-        if (cfChanged || regionalChanged) {
+        if (cfChanged || regionalChanged || aslChanged) {
+          const what = cfChanged
+            ? 'Codice fiscale'
+            : regionalChanged
+              ? 'Codice regionale'
+              : 'Codice ASL';
           servicesClosed = await closeServiceSessions(tx, {
             userId: id,
             services: cfChanged ? CREDENTIAL_SERVICES : ['rupar_piemonte'],
             at: t,
             workstation: actor.workstation,
-            detail: cfChanged
-              ? 'codice fiscale del medico corretto dall’amministratore'
-              : 'codice regionale del medico corretto dall’amministratore',
+            detail: `${what.toLowerCase()} del medico corretto dall’amministratore`,
           });
-          if (servicesClosed.length > 0)
-            out.push(
-              servicesNotice(cfChanged ? 'Codice fiscale' : 'Codice regionale', servicesClosed),
-            );
+          if (servicesClosed.length > 0) out.push(servicesNotice(what, servicesClosed));
         }
 
         // Il ruolo di segreteria tolto o ridato: le conferme dei titolari per i loro archivi non

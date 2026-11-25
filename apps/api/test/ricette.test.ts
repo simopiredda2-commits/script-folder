@@ -75,12 +75,18 @@ describe('ciclo della ricetta', () => {
     expect(sent.json()).toMatchObject({ esito: 'accepted' });
     const row = await status(id);
     expect(row.status).toBe('sent');
-    expect(row.nre).toMatch(/^SIMR\d{12}$/);
+    // L'NRE è del lotto del medico, dato dal simulatore del SAR con il raggruppamento «ZZ» (D269).
+    expect(row.nre).toMatch(/^010ZZ4\d{9}$/);
+    expect(row.assignedNre).toBe(row.nre);
     expect(row.signedBy).toBe(s.users.titolare.id);
   });
 
   it('ogni invio esterno conserva richiesta, risposta ed esito, e non si modifica', async () => {
-    const rows = await t.db.select().from(externalSubmission);
+    // Il primo è la richiesta del lotto di NRE (D269); poi l'invio della ricetta.
+    const rows = await t.db
+      .select()
+      .from(externalSubmission)
+      .where(eq(externalSubmission.operation, 'invio'));
     expect(rows.length).toBeGreaterThan(0);
     const r = rows[0]!;
     expect(r.system).toBe('sar');
@@ -234,9 +240,14 @@ describe('ciclo della ricetta', () => {
       'unreachable',
     );
     expect((await status(id)).lastErrorKind).toBe('unreachable');
-    const paper = await post('titolare', `/api/ricette/${id}/ricetta-rossa`);
+    // Ricetta rossa sul modulo del Poligrafico, con un NRE nuovo e l'invio in DPCM (D270).
+    const paper = await post('titolare', `/api/ricette/${id}/ricetta-rossa`, {
+      poligrafico: '010260004321001',
+    });
     expect(paper.statusCode, paper.body).toBe(200);
-    expect(paper.json().stampa.lines[0].drugName).toBe('Farmaco di prova 5 mg');
+    expect(paper.json()).toMatchObject({ stato: 'paper', poligrafico: '010260004321001' });
+    // Il SAR non è stato raggiunto: la ricetta dematerializzata non c'è, niente da annullare.
+    expect(paper.json().annullamentoDematerializzata).toBeNull();
     const row = await status(id);
     expect(row.status).toBe('paper');
     expect(row.paperPrintedBy).toBe(s.users.titolare.id);
@@ -244,18 +255,21 @@ describe('ciclo della ricetta', () => {
     expect((await post('titolare', `/api/ricette/${id}/firma-e-invia`)).statusCode).toBe(409);
   });
 
-  it('se l’esito è incerto: niente ricetta rossa, si riprova l’invio', async () => {
+  it('se l’esito è incerto: non si rimanda, si stampa la ricetta rossa (V06, 4.3.1; D270)', async () => {
     const id = await newDraft();
     sim.next.push('timeout');
     expect((await post('titolare', `/api/ricette/${id}/firma-e-invia`)).json().esito).toBe(
       'timeout',
     );
-    const paper = await post('titolare', `/api/ricette/${id}/ricetta-rossa`);
-    expect(paper.statusCode).toBe(409);
-    expect(paper.json().errore).toMatch(/incerto/);
-    expect((await post('titolare', `/api/ricette/${id}/firma-e-invia`)).json().esito).toBe(
-      'accepted',
-    );
+    const again = await post('titolare', `/api/ricette/${id}/firma-e-invia`);
+    expect(again.statusCode).toBe(409);
+    expect(again.json().errore).toMatch(/ricetta rossa/);
+    const paper = await post('titolare', `/api/ricette/${id}/ricetta-rossa`, {
+      poligrafico: '010260004321002',
+    });
+    expect(paper.statusCode, paper.body).toBe(200);
+    // La dematerializzata può essere arrivata: si annulla da sé (V06, 4.3.1, caso 5).
+    expect(paper.json().annullamentoDematerializzata).toBe('da_fare');
   });
 
   it('un errore imprevisto dell’adattatore vale come esito incerto', async () => {

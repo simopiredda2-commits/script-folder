@@ -25,6 +25,7 @@ import {
   SuspendedNote,
   type DrugShortage,
 } from '../components/Shortage';
+import { RedPrintedNotice, type RedPrinted } from '../components/RedFormPrint';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
@@ -394,6 +395,8 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
     status: string;
     lineIds: Record<string, string>;
     nre?: string;
+    /** La ricetta rossa stampata sul modulo del Poligrafico (D270). */
+    red?: RedPrinted;
   } | null>(k('bozza'), null);
   // Il medico firma e invia in un passo (D255). Non si ricorda: tornando alla bozza, il medico
   // vede i controlli e firma con il pulsante.
@@ -1201,9 +1204,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
               <ReminderPanel prescriptionId={draft.id} patientId={id!} kind={kind} />
             </>
           )}
-          {draft && draft.status === 'paper' && (
-            <Notice kind="fatto">Ricetta rossa pronta per la stampa.</Notice>
-          )}
+          {draft &&
+            draft.status === 'paper' &&
+            (draft.red ? (
+              <RedPrintedNotice red={draft.red} />
+            ) : (
+              <Notice kind="fatto">Ricetta rossa pronta per la stampa.</Notice>
+            ))}
           {draft && draft.status !== 'sent' && draft.status !== 'paper' && (
             <>
               {!oneStep && (
@@ -1216,10 +1223,14 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                 status={draft.status}
                 lineNames={draft.lineIds}
                 preview={kind !== 'white'}
+                redForm={kind === 'pharma_ssn' || kind === 'specialist_ssn'}
                 autoSign={oneStep}
                 focusOnArrival={arrived}
                 onEdit={() => void editAgain()}
-                onChange={(status, nre) => setDraft({ ...draft, status, ...(nre ? { nre } : {}) })}
+                onChange={(status, nre, red) =>
+                  // La ricetta rossa stampata: il PDF resta in vista al posto del pannello (D270).
+                  setDraft({ ...draft, status, ...(nre ? { nre } : {}), ...(red ? { red } : {}) })
+                }
               />
             </>
           )}

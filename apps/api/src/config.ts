@@ -1,4 +1,5 @@
 import { isIP } from 'node:net';
+import { REGIONAL_SOFTWARE_CODE } from '@mmg/integrations';
 import { parseTime } from './reference/scheduler';
 import { parseKey } from './security/secrets';
 
@@ -45,6 +46,23 @@ export interface Config {
    * quello della connessione. Con un proxy fidato vale l'indirizzo del cliente che il proxy scrive.
    */
   trustedProxies: string[];
+  /**
+   * Codice del gestionale assegnato dalla Regione Piemonte all'avvio dell'autocertificazione, da
+   * APP_CODICE_GESTIONALE (D266, D267). Il programma ci aggiunge «_» e il codice ASL del medico
+   * (`client_id`, `X-Gestionale`, REL-STC-01 V08). Per difetto «SIMULATORE»: vale solo con i
+   * simulatori.
+   */
+  regionalSoftwareCode?: string;
+}
+
+/** APP_CODICE_GESTIONALE: lettere, cifre, «-» e «_»; vuoto vale «SIMULATORE» (D267). */
+export function regionalSoftwareCodeOf(raw: string | undefined): string {
+  const code = raw?.trim() || 'SIMULATORE';
+  if (!REGIONAL_SOFTWARE_CODE.test(code))
+    throw new Error(
+      `APP_CODICE_GESTIONALE=${raw}: il codice del gestionale assegnato dalla Regione ha solo lettere, cifre, «-» e «_» (per esempio MIOAPPLICATIVO)`,
+    );
+  return code;
 }
 
 function environmentOf(raw: string | undefined): AppEnvironment {
@@ -140,5 +158,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     auraTime: auraTimeOf(env.AURA_AGGIORNAMENTO),
     environment: environmentOf(env.APP_AMBIENTE),
     trustedProxies: trustedProxiesOf(env.APP_PROXY_FIDATI),
+    regionalSoftwareCode: regionalSoftwareCodeOf(env.APP_CODICE_GESTIONALE),
   };
 }

@@ -28,6 +28,8 @@ interface Today {
     nonInviate: number | null;
     /** Ricette rimaste «in invio» da più di 15 minuti (D233). */
     senzaRisposta: number | null;
+    /** Ricette rosse del medico da seguire: scartate, ferme o con l'annullamento non riuscito (D270). */
+    ricetteRosse?: number | null;
     richiesteAperte: number | null;
     pianiInScadenza: {
       pazienteId: string;
@@ -130,6 +132,15 @@ export function TodayPage() {
                   <Icon name="avviso" />
                   <span>Invii senza risposta</span>
                   <strong>{code.senzaRisposta}</strong>
+                </Link>
+              </li>
+            )}
+            {!!code.ricetteRosse && (
+              <li>
+                <Link to="/ricette#ricette-rosse" className="coda coda-avviso">
+                  <Icon name="avviso" />
+                  <span>Ricette rosse da seguire</span>
+                  <strong>{code.ricetteRosse}</strong>
                 </Link>
               </li>
             )}

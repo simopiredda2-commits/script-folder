@@ -71,6 +71,10 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
   const chosen = rows.find((r) => !open.has(r.p.id) && !diabetics.has(r.p.id));
   if (!chosen) throw new Error('Nessun paziente dimostrativo per gli invii senza risposta');
   const { p, t } = chosen;
+  // Una seconda ricetta «in invio», di un altro paziente, per la ricetta rossa (D270): la prima
+  // resta per «È arrivata».
+  const second = rows.find((r) => r.p.id !== p.id && !open.has(r.p.id) && !diabetics.has(r.p.id));
+  if (!second) throw new Error('Nessun paziente dimostrativo per la ricetta rossa');
 
   const signedAt = new Date(Date.now() - STUCK_FOR_MINUTES * 60_000);
   // Preparati e controllati prima della firma, come nel servizio (D239): l'ordine delle ore è
@@ -79,6 +83,39 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
   const checkedAt = new Date(signedAt.getTime() - 60_000);
   const day = studioDate(signedAt);
   await withActor(db, doctor!.id, async (tx) => {
+    const [red] = await tx
+      .insert(prescription)
+      .values({
+        patientId: second.p.id,
+        archiveId: own!.id,
+        kind: 'pharma_ssn',
+        status: 'sending',
+        preparedBy: doctor!.id,
+        preparedAt,
+        signedBy: doctor!.id,
+        signedAt,
+      })
+      .returning({ id: prescription.id });
+    await tx.insert(prescriptionCheck).values({
+      prescriptionId: red!.id,
+      userId: doctor!.id,
+      at: checkedAt,
+      rulesVersion: rulesetAt(day).version,
+      outcome: 'superato',
+      issues: [],
+      reasons: {},
+      confirmedAifaNotes: [],
+    });
+    await tx.insert(prescriptionLine).values({
+      prescriptionId: red!.id,
+      position: 1,
+      therapyId: second.t.id,
+      drugAic: second.t.drugAic,
+      drugName: second.t.drugName,
+      activeIngredient: second.t.activeIngredient,
+      byActiveIngredient: second.t.byActiveIngredient,
+      quantity: 1,
+    });
     const [rx] = await tx
       .insert(prescription)
       .values({
@@ -138,5 +175,9 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
       createdAt: preparedAt,
     });
   });
-  return { patient: `${p.firstName} ${p.lastName}`, doctor: doctor!.displayName };
+  return {
+    patient: `${p.firstName} ${p.lastName}`,
+    doctor: doctor!.displayName,
+    redPatient: `${second.p.firstName} ${second.p.lastName}`,
+  };
 }

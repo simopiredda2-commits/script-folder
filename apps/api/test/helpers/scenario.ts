@@ -98,6 +98,7 @@ export async function createScenario(
     | 'aura'
     | 'ppipPortal'
     | 'fseAccess'
+    | 'dpcm'
   > & {
     /** Aggiornamento delle banche dati (D156), costruito con l'orologio della prova. */
     referenceUpdates?: (now: () => Date) => NonNullable<AppDeps['referenceUpdates']>;
@@ -171,6 +172,8 @@ export async function createScenario(
       userId: users.titolare.id,
       regionalCode: 'MMG-PROVA-1',
       asl: 'ASL di prova',
+      // Codice ASL dell'elenco del Ministero (D267): entra nel client_id e in X-Gestionale (D266).
+      aslCode: '301',
       fiscalCode: doctorCf('Marchi', 'Elena', 'F'),
       // Nome, cognome e recapiti per il Profilo Sanitario Sintetico (tappa 11); domini .invalid.
       firstName: 'Elena',
@@ -182,12 +185,16 @@ export async function createScenario(
       userId: users.collega.id,
       regionalCode: 'MMG-PROVA-2',
       asl: 'ASL di prova',
+      // Codice ASL dell'elenco del Ministero (D267): entra nel client_id e in X-Gestionale (D266).
+      aslCode: '301',
       fiscalCode: doctorCf('Serra', 'Paolo', 'M'),
     },
     {
       userId: users.sostituto.id,
       regionalCode: 'MMG-PROVA-3',
       asl: 'ASL di prova',
+      // Codice ASL dell'elenco del Ministero (D267): entra nel client_id e in X-Gestionale (D266).
+      aslCode: '301',
       fiscalCode: doctorCf('Fiore', 'Marco', 'M'),
       firstName: 'Marco',
       lastName: 'Fiore',
@@ -407,7 +414,7 @@ export async function createScenario(
   );
 
   // L'ora di partenza è già nell'orologio: al servizio vanno le altre opzioni.
-  const { referenceUpdates, clockAt, environment, ...deps } = appOptions;
+  const { referenceUpdates, clockAt, environment, dpcm, ...deps } = appOptions;
   void clockAt;
   const app = buildApp({
     db,
@@ -419,6 +426,8 @@ export async function createScenario(
     },
     now: clock.now,
     ...deps,
+    // La coda della ricetta rossa (D270) gira solo quando la prova la chiama, senza i 2 secondi.
+    dpcm: dpcm ?? { intervalMs: null, minIntervalMs: 0 },
     ...(referenceUpdates ? { referenceUpdates: referenceUpdates(clock.now) } : {}),
     secondFactor,
   });

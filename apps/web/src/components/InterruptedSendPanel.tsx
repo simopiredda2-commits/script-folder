@@ -4,6 +4,7 @@ import { dateTime } from '../lib/format';
 import { normalizePrescriptionNumber, nrbeProblem, nreProblem } from '../lib/prescription-numbers';
 import { ConfirmQuestion, ErrorMessage, Notice } from './common';
 import { Icon } from './Icon';
+import { RedFormPrint, RedPrintedNotice, type RedPrinted } from './RedFormPrint';
 
 interface SettleOutcome {
   stato: 'sent' | 'error';
@@ -28,8 +29,14 @@ export interface InterruptedSendPanelProps {
    * controllo (D259).
    */
   fiscalCode?: string | null;
-  /** Dopo l'esito: le code si ricaricano. */
-  onChange?: (status: 'sent' | 'error', nre: string | null) => void;
+  /**
+   * Ricetta SSN farmaceutica o specialistica al SAR: come vuole la Regione, senza esito si stampa
+   * la ricetta rossa, che parte poi in DPCM; la dematerializzata si annulla da sé (V06, 4.3.1;
+   * D270).
+   */
+  redForm?: boolean;
+  /** Dopo l'esito: le code si ricaricano. Con la ricetta rossa resta in vista il PDF (D270). */
+  onChange?: (status: 'sent' | 'error' | 'paper', nre: string | null) => void;
 }
 
 type Pending =
@@ -50,6 +57,7 @@ export function InterruptedSendPanel({
   signedBy,
   settleFrom,
   fiscalCode,
+  redForm,
   onChange,
 }: InterruptedSendPanelProps) {
   const white = kind === 'white';
@@ -63,6 +71,9 @@ export function InterruptedSendPanel({
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState<SettleOutcome | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
+  /** Ricetta rossa in DPCM: modulo aperto ed esito della stampa (D270). */
+  const [redOpen, setRedOpen] = useState(false);
+  const [red, setRed] = useState<RedPrinted | null>(null);
   const result = useRef<HTMLDivElement>(null);
   // Nei primi 15 minuti l'esito non si segna: il pannello lo dice e si apre da solo all'ora giusta.
   const from = settleFrom ? Date.parse(settleFrom) : null;
@@ -74,8 +85,8 @@ export function InterruptedSendPanel({
   }, [waiting, from]);
   // Dopo l'esito il fuoco va al risultato: il pulsante premuto non c'è più (WCAG 2.4.3).
   useEffect(() => {
-    if (done) result.current?.focus();
-  }, [done]);
+    if (done || red) result.current?.focus();
+  }, [done, red]);
 
   async function settle(body: Pending) {
     setBusy(true);
@@ -102,6 +113,12 @@ export function InterruptedSendPanel({
     }
   }
 
+  if (red)
+    return (
+      <div ref={result} tabIndex={-1} className="esito-segnato">
+        <RedPrintedNotice red={red} />
+      </div>
+    );
   if (done)
     return (
       <div ref={result} tabIndex={-1} className="esito-segnato">
@@ -138,14 +155,34 @@ export function InterruptedSendPanel({
   const number = white ? 'NRBE' : 'NRE';
   return (
     <div className="pannello-invio">
-      <Notice kind="avviso">
-        L’invio del {dateTime(signedAt)}
-        {signedBy ? `, firmato da ${signedBy},` : ''} è rimasto senza risposta: il servizio si è
-        fermato mentre aspettava {ente}. Chiedi all’ente se la ricetta è arrivata, poi segna qui
-        l’esito.
-      </Notice>
+      {redForm ? (
+        <Notice kind="avviso">
+          L’invio del {dateTime(signedAt)}
+          {signedBy ? `, firmato da ${signedBy},` : ''} è rimasto senza risposta: il servizio si è
+          fermato mentre aspettava {ente}. Come vuole la Regione, si stampa la ricetta rossa, che
+          parte poi in DPCM; la ricetta dematerializzata, se era arrivata, si annulla da sola (V06,
+          4.3.1). Se l’ente ti ha già dato numero e codice di autenticazione, segna invece che è
+          arrivata.
+        </Notice>
+      ) : (
+        <Notice kind="avviso">
+          L’invio del {dateTime(signedAt)}
+          {signedBy ? `, firmato da ${signedBy},` : ''} è rimasto senza risposta: il servizio si è
+          fermato mentre aspettava {ente}. Chiedi all’ente se la ricetta è arrivata, poi segna qui
+          l’esito.
+        </Notice>
+      )}
       <ErrorMessage error={error} focus />
-      {pending ? (
+      {redOpen ? (
+        <RedFormPrint
+          prescriptionId={prescriptionId}
+          onPrinted={(r) => {
+            setRed(r);
+            onChange?.('paper', null);
+          }}
+          onCancel={() => setRedOpen(false)}
+        />
+      ) : pending ? (
         // L'esito non si cambia dopo: si rilegge e si conferma (WCAG 3.3.4).
         <ConfirmQuestion
           label="Conferma dell’esito"
@@ -184,14 +221,26 @@ export function InterruptedSendPanel({
       ) : (
         <>
           <div className="azioni">
-            <button
-              type="button"
-              className="pulsante"
-              disabled={busy}
-              onClick={() => setPending({ esito: 'non_arrivata' })}
-            >
-              <Icon name="ripeti" /> <span>Non è arrivata: torna da inviare</span>
-            </button>
+            {redForm ? (
+              // Senza esito la dematerializzata non si rimanda: «Non è arrivata» non serve (D270).
+              <button
+                type="button"
+                className="pulsante pulsante-primario"
+                disabled={busy}
+                onClick={() => setRedOpen(true)}
+              >
+                <Icon name="stampa" /> <span>Stampa la ricetta rossa</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="pulsante"
+                disabled={busy}
+                onClick={() => setPending({ esito: 'non_arrivata' })}
+              >
+                <Icon name="ripeti" /> <span>Non è arrivata: torna da inviare</span>
+              </button>
+            )}
           </div>
           <form
             className="esito-arrivata"
@@ -211,7 +260,7 @@ export function InterruptedSendPanel({
                 setError(
                   new ApiError(
                     400,
-                    'Senza il codice di autenticazione la ricetta SSN non è valida: chiedi all’ente il numero e il codice. Se l’ente non li dà, segna «Non è arrivata».',
+                    `Senza il codice di autenticazione la ricetta SSN non è valida: chiedi all’ente il numero e il codice. Se l’ente non li dà, ${redForm ? 'stampa la ricetta rossa' : 'segna «Non è arrivata»'}.`,
                   ),
                 );
                 return;
@@ -285,13 +334,17 @@ export function InterruptedSendPanel({
                 />
                 <p className="aiuto" id={`${codeId}-aiuto`}>
                   {ssn
-                    ? 'Senza il codice la ricetta SSN non è valida e il promemoria non si stampa. Se l’ente non dà il codice, segna «Non è arrivata».'
+                    ? `Senza il codice la ricetta SSN non è valida e il promemoria non si stampa. Se l’ente non dà il codice, ${redForm ? 'stampa la ricetta rossa' : 'segna «Non è arrivata»'}.`
                     : 'Se l’ente lo dà, resta con la ricetta.'}
                 </p>
               </div>
             )}
             <div className="azioni">
-              <button type="submit" className="pulsante pulsante-primario" disabled={busy}>
+              <button
+                type="submit"
+                className={redForm ? 'pulsante' : 'pulsante pulsante-primario'}
+                disabled={busy}
+              >
                 <Icon name="fatto" /> <span>È arrivata: segna come inviata</span>
               </button>
             </div>

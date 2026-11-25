@@ -935,9 +935,14 @@ legend {
 /* Aggiornamento delle banche dati (D156): esito con simbolo e parola. */
 .esito-aggiornamento {
   display: inline-flex;
-  align-items: center;
+  /* La parola sulla stessa linea del testo che segue; il simbolo al centro. */
+  align-items: baseline;
   gap: 0.25rem;
   font-weight: 600;
+}
+
+.esito-aggiornamento > .icona {
+  align-self: center;
 }
 
 .esito-fatto {
@@ -1983,6 +1988,11 @@ a.coda:hover {
 .ricetta-in-coda {
   padding: 0.75rem 0;
   border-top: 1px solid var(--color-divider);
+}
+
+/* «Invia adesso» sopra l'elenco delle ricette rosse: staccato dal primo riquadro. */
+.azioni-sopra-elenco {
+  margin-bottom: 0.75rem;
 }
 
 /* Scheda della terapia ------------------------------------------------------------------- */

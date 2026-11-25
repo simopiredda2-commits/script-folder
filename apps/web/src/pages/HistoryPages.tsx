@@ -110,6 +110,8 @@ const OPERATION: Record<string, string> = {
   invio: 'Invio',
   stato: 'Verifica dello stato',
   annullamento: 'Annullamento',
+  esito: 'Esito segnato a mano',
+  lotto_nre: 'Richiesta del lotto di numeri di ricetta (NRE)',
 };
 const EXCHANGE_OUTCOME: Record<string, string> = {
   accepted: 'accettato',
@@ -117,6 +119,8 @@ const EXCHANGE_OUTCOME: Record<string, string> = {
   rejected: 'rifiutato',
   unreachable: 'ente non raggiungibile',
   timeout: 'nessuna risposta',
+  fault: 'eccezione di sistema, esito incerto',
+  assigned: 'lotto assegnato',
 };
 
 interface DispensingInfo {

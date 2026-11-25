@@ -24,8 +24,8 @@ import { ReferenceData } from '../reference/lookup';
  *   versione 28/02/2024, che sostituiscono il modello dell'allegato tecnico del DM. I numeri dei
  *   campi sono quelli delle specifiche.
  * - **Versione 1**: il modello del DM 2 novembre 2011 (allegato 2), con le aggiunte delle specifiche
- *   del Sistema TS sulla prescrizione (5/12/2024) e della Regione Piemonte (SIRPE, «Cartelle
- *   cliniche MMG e PLS», 4.4.3). Resta per ristampare i promemoria fissati prima.
+ *   del Sistema TS sulla prescrizione (5/12/2024) e della Regione Piemonte (SIRPED, «Cartelle
+ *   cliniche MMG e PLS», V06, 4.3.3). Resta per ristampare i promemoria fissati prima.
  */
 export type PromemoriaData = PromemoriaDataV1 | PromemoriaDataV2;
 
@@ -96,7 +96,7 @@ export interface PromemoriaDataV2 {
   medico: {
     /** Campo 25. */
     codiceFiscale: string;
-    /** Regione Piemonte (SIRPE, 4.4.3): davanti al nome, nel campo 27. */
+    /** Regione Piemonte (SIRPED, «Cartelle cliniche MMG e PLS», V06, 4.3.3): davanti al nome, nel campo 27. */
     codiceRegionale: string | null;
     /** Campo 27: come lo restituisce il SAC; se manca, il nome nel programma. */
     nominativo: string;

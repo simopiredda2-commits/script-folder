@@ -1,6 +1,8 @@
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -8,7 +10,9 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { patientRequest } from './agenda';
 import { patient, reminderChannel } from './patients';
@@ -57,6 +61,13 @@ export const prescription = pgTable(
     status: prescriptionStatus().notNull().default('draft'),
     /** Numero di ricetta elettronica (NRE; NRBE per la bianca), dato dal SAR o dal Sistema TS. */
     nre: text(),
+    /**
+     * NRE preso dal lotto del medico alla prima firma (D269): la ricetta lo tiene e, dopo un
+     * rifiuto con errori bloccanti, si rimanda con lo stesso numero (V06, 4.3.1, caso 3). Nessun
+     * NRE di un lotto va a due ricette.
+     */
+    assignedNre: text(),
+    nreLotId: uuid().references((): AnyPgColumn => nreLot.id),
     priority: priorityClass(),
     accessType: accessType(),
     diagnosticQuestion: text(),
@@ -116,7 +127,134 @@ export const prescription = pgTable(
     sendingSnapshot: jsonb(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index().on(t.archiveId, t.status), index().on(t.patientId)],
+  (t) => [
+    index().on(t.archiveId, t.status),
+    index().on(t.patientId),
+    uniqueIndex('prescription_assigned_nre_key')
+      .on(t.assignedNre)
+      .where(sql`${t.assignedNre} is not null`),
+  ],
+);
+
+/**
+ * Lotto di NRE del medico (D269): 1000 numeri che il SAR «estrae» da un lotto avuto dal SAC e lega
+ * al codice fiscale del medico (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.2 e 4.1). La
+ * cartella genera gli NRE agendo solo sul progressivo, da 000 a 999, e non dà mai due volte lo
+ * stesso: il prossimo progressivo cresce dentro la transazione che lo assegna. I lotti di un
+ * simulatore non vanno al servizio vero: si tengono per ambiente.
+ */
+export const nreLot = pgTable(
+  'nre_lot',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    doctorUserId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    /** Codice fiscale con cui il medico ha chiesto il lotto: il SAR lo lega a lui. */
+    doctorFiscalCode: text().notNull(),
+    /** «simulator», «test» o «production», come il registro degli invii. */
+    environment: text().notNull(),
+    /** CodRegione, CodRagLotto, IdentificativoLotto e CodLotto della ricevuta del SAR. */
+    regionCode: text().notNull(),
+    groupCode: text().notNull(),
+    lotType: text().notNull(),
+    lotCode: text().notNull(),
+    /** I primi 12 caratteri, comuni ai 1000 NRE. */
+    prefix: text().notNull(),
+    size: integer().notNull(),
+    /** Il prossimo progressivo da dare: quando arriva a `size`, il lotto è finito. */
+    nextProgressive: integer().notNull().default(0),
+    receivedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** La ricevuta del SAR così com'è. */
+    response: jsonb(),
+  },
+  (t) => [
+    uniqueIndex('nre_lot_prefix_key').on(t.environment, t.prefix),
+    index().on(t.doctorUserId, t.environment),
+    check(
+      'nre_lot_progressive_check',
+      sql`${t.nextProgressive} >= 0 and ${t.nextProgressive} <= ${t.size}`,
+    ),
+  ],
+);
+
+export const dpcmStatus = pgEnum('dpcm_status', [
+  /** Da mandare al SAR: la coda ci riprova finché non è accolta. */
+  'to_send',
+  /** Accolta, con il protocollo: si aspetta l'esito dei controlli. */
+  'accepted',
+  /** Esito letto: senza errori. */
+  'ok',
+  /** Esito letto: con avvisi, che non si correggono (per esempio 2090). */
+  'warnings',
+  /** Esito letto: errori scartanti, o file scartato del tutto (stati 4 e 5). */
+  'discarded',
+]);
+
+/**
+ * Ricetta rossa in modalità DPCM (D270): la ricetta stampata sul modulo del Poligrafico quando la
+ * ricetta dematerializzata non ha esito (SIRPED, «Cartelle cliniche MMG e PLS», V06, 4.3.1, casi
+ * 4 e 5), mandata poi al SAR con il numero del modulo e un NRE nuovo del lotto del medico (4.2.1),
+ * entro 24 ore dalla compilazione (3.4.2). Se la ricetta dematerializzata può essere arrivata, la
+ * cartella la annulla da sé (4.3.1 e 4.3.2).
+ */
+export const dpcmPrescription = pgTable(
+  'dpcm_prescription',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    prescriptionId: uuid()
+      .notNull()
+      .references(() => prescription.id),
+    /** Il medico che ha stampato e firmato il modulo: il SAR lega l'NRE al suo codice fiscale. */
+    doctorUserId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    /** «simulator», «test» o «production». */
+    environment: text().notNull(),
+    /** Il numero del Poligrafico letto dal modulo, 15 cifre (Bar1 e Bar2). */
+    poligrafico: text().notNull(),
+    /** L'NRE nuovo, dal lotto del medico (Ricetta1). */
+    nre: text().notNull(),
+    nreLotId: uuid().references(() => nreLot.id),
+    printedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** La ricetta come va al SAR, con i dati in chiaro: la cifratura si fa all'invio. */
+    content: jsonb().notNull(),
+    status: dpcmStatus().notNull().default('to_send'),
+    /** ProtocolloSAR della ricevuta di accoglienza (23 cifre). */
+    protocol: text(),
+    acceptedAt: timestamp({ withTimezone: true }),
+    /** Ultimo stato dell'elenco sintetico (da 1 a 5) e messaggi dell'elenco analitico. */
+    sendState: integer(),
+    messages: jsonb(),
+    checkedAt: timestamp({ withTimezone: true }),
+    attempts: integer().notNull().default(0),
+    lastAttemptAt: timestamp({ withTimezone: true }),
+    lastError: text(),
+    /** Quando la coda riprova (invio o lettura dell'esito). */
+    nextAttemptAt: timestamp({ withTimezone: true }),
+    /**
+     * Ricetta dematerializzata da annullare: il suo NRE, se può essere arrivata al SAR (tempo
+     * scaduto o eccezione di sistema). Null se non serve.
+     */
+    dmNre: text(),
+    /**
+     * Chi aveva firmato la ricetta dematerializzata: l'annullamento si chiede con le sue credenziali
+     * e a suo nome, anche se la ricetta rossa l'ha stampata un altro medico dell'archivio.
+     */
+    dmDoctorUserId: uuid().references(() => appUser.id),
+    /** «pending», «done» (annullata), «failed» (il SAR non l'ha annullata: lo dice il messaggio). */
+    dmCancelStatus: text(),
+    dmCancelAttempts: integer().notNull().default(0),
+    dmCancelNextAt: timestamp({ withTimezone: true }),
+    dmCancelError: text(),
+    dmCancelledAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('dpcm_prescription_prescription_key').on(t.prescriptionId),
+    uniqueIndex('dpcm_prescription_poligrafico_key').on(t.poligrafico),
+    uniqueIndex('dpcm_prescription_nre_key').on(t.nre),
+    index().on(t.doctorUserId, t.status),
+  ],
 );
 
 /** Riga di ricetta: un farmaco (o una prestazione) con la quantità. */

@@ -88,6 +88,14 @@ export type PrescriptionEvent =
 export interface TransitionContext {
   /** Tipo dell'ultimo errore d'invio, se la ricetta è in errore. */
   lastErrorKind?: SendErrorKind | null;
+  /**
+   * Ricetta SSN farmaceutica o specialistica al SAR del Piemonte: senza esito si passa alla
+   * ricetta rossa in DPCM, non si rimanda (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.5.1 e
+   * 4.3.1, casi 4 e 5; D270).
+   */
+  regionFlow?: boolean;
+  /** La ricetta è «in invio» da più di INTERRUPTED_SEND_AFTER_MINUTES: l'invio si è interrotto. */
+  interrupted?: boolean;
 }
 
 export type TransitionResult = { ok: true; to: PrescriptionStatus } | { ok: false; reason: string };
@@ -116,11 +124,18 @@ export function transition(
       return no('Una ricetta inviata, annullata o stampata non si modifica');
     case 'start_sending':
       if (from === 'draft' || from === 'to_sign') return ok('sending');
+      if (from === 'error' && ctx.lastErrorKind === 'auth') return ok('sending');
       if (
         from === 'error' &&
-        (ctx.lastErrorKind === 'unreachable' ||
-          ctx.lastErrorKind === 'timeout' ||
-          ctx.lastErrorKind === 'auth')
+        ctx.regionFlow &&
+        (ctx.lastErrorKind === 'unreachable' || ctx.lastErrorKind === 'timeout')
+      )
+        return no(
+          'Il SAR non ha dato esito: si stampa la ricetta rossa, che parte poi in DPCM (V06, 4.3.1)',
+        );
+      if (
+        from === 'error' &&
+        (ctx.lastErrorKind === 'unreachable' || ctx.lastErrorKind === 'timeout')
       ) {
         return ok('sending');
       }
@@ -139,6 +154,15 @@ export function transition(
       if (from === 'sending') return no('Invio in corso: aspetta la risposta');
       return no('Già annullata o stampata');
     case 'print_paper':
+      // Come la Regione (D270): senza esito, anche incerto, la ricetta rossa; la dematerializzata
+      // che può essere arrivata la annulla la cartella.
+      if (
+        ctx.regionFlow &&
+        from === 'error' &&
+        (ctx.lastErrorKind === 'unreachable' || ctx.lastErrorKind === 'timeout')
+      )
+        return ok('paper');
+      if (ctx.regionFlow && from === 'sending' && ctx.interrupted) return ok('paper');
       if (from === 'error' && ctx.lastErrorKind === 'unreachable') return ok('paper');
       if (from === 'error' && ctx.lastErrorKind === 'timeout') {
         return no(

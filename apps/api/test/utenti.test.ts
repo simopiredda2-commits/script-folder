@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { CLINICAL_UNLOCK_REFUSAL, createUserAdminService } from '../src/admin/user-service';
 import type { Actor } from '../src/auth/service';
-import { accessLog, appUser, archive, doctorProfile } from '../src/db/schema';
+import { accessLog, appUser, archive, doctorProfile, serviceSession } from '../src/db/schema';
 import { base32Decode } from '../src/security/base32';
 import { totp } from '../src/security/totp';
 import { createScenario, login, PASSWORD, type Scenario } from './helpers/scenario';
@@ -437,6 +437,7 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
     expect(u.body.utente.medico).toEqual({
       codiceFiscale: cf('Verdi', 'Luca', 'M'),
       codiceRegionale: 'MMG-PROVA-9',
+      codiceAsl: null,
       asl: 'ASL di prova',
       nome: 'Luca',
       cognome: 'Verdi',
@@ -517,6 +518,79 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
       ruoliDopo: ['substitute_doctor'],
       campi: ['nome', 'email', 'ruoli', 'medico.codiceRegionale'],
     });
+  });
+
+  it('codice ASL del medico: solo dall’elenco del Ministero per la regione dello studio; cambiarlo chiude la sessione RUPAR (D267)', async () => {
+    const list = await admin('GET', '/api/studio/utenti');
+    const units = list.json().aziendeSanitarie;
+    expect(units.regione).toBe('PIEMONTE');
+    expect(units.elenco.map((a: { codice: string }) => a.codice)).toEqual([
+      '203',
+      '204',
+      '205',
+      '206',
+      '207',
+      '208',
+      '209',
+      '210',
+      '211',
+      '212',
+      '213',
+      '301',
+    ]);
+    const collega = s.users.collega;
+    const sessions = () =>
+      t.db
+        .select({ service: serviceSession.service })
+        .from(serviceSession)
+        .where(eq(serviceSession.userId, collega.id));
+    expect((await sessions()).map((r) => r.service).sort()).toEqual([
+      'rupar_piemonte',
+      'sistema_ts',
+    ]);
+    // Lo stesso codice fiscale dello scenario: qui cambia solo il codice ASL.
+    const scenarioCf = buildFiscalCode({
+      surname: 'Serra',
+      name: 'Paolo',
+      birthDate: '1970-01-01',
+      sex: 'M',
+      placeCode: 'X001',
+    });
+    const medico = (codiceAsl?: string) => ({
+      medico: {
+        codiceFiscale: scenarioCf,
+        nome: 'Paolo',
+        cognome: 'Serra',
+        codiceRegionale: 'MMG-PROVA-2',
+        asl: 'ASL di prova',
+        ...(codiceAsl === undefined ? {} : { codiceAsl }),
+      },
+    });
+    const patch = (payload: object) => admin('PATCH', `/api/studio/utenti/${collega.id}`, payload);
+    // Prima nome e cognome, che lo scenario non ha, con l'ASL di adesso: le sessioni restano.
+    expect((await patch(medico('301'))).statusCode).toBe(200);
+    expect((await sessions()).length).toBe(2);
+    // 321 è un'ATS della Lombardia, non un'ASL del Piemonte; 30 non ha tre cifre.
+    const wrong = await patch(medico('321'));
+    expect(wrong.statusCode).toBe(400);
+    expect(wrong.json().errore).toBe(
+      "Codice ASL 321: non è nell'elenco delle ASL del Ministero della Salute per la regione PIEMONTE",
+    );
+    expect((await patch(medico('30'))).statusCode).toBe(400);
+    const ok = await patch(medico('203'));
+    expect(ok.statusCode, ok.body).toBe(200);
+    expect(ok.json().utente.medico.codiceAsl).toBe('203');
+    // La sessione RUPAR era del client_id con l'ASL di prima: si chiude; quella del Sistema TS no.
+    expect((await sessions()).map((r) => r.service)).toEqual(['sistema_ts']);
+    expect(ok.json().avvisi.join(' ')).toMatch(/Codice ASL/);
+    const last = (await adminLog()).filter((e) => e.utente === collega.username).at(-1);
+    expect(last).toMatchObject({ azione: 'modifica', campi: ['medico.codiceAsl'] });
+    // Senza il campo il codice resta com'è: chi non lo conosce non lo cancella per sbaglio.
+    expect((await patch(medico())).json().errore).toBe('Niente da cambiare');
+    // Vuoto lo toglie: torna «da completare».
+    const cleared = await patch(medico(''));
+    expect(cleared.json().utente.medico.codiceAsl).toBeNull();
+    expect((await patch(medico('301'))).statusCode).toBe(200);
   });
 
   it('nessuno cambia i propri ruoli; il proprio nome sì', async () => {

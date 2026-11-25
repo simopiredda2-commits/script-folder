@@ -454,7 +454,7 @@ function StudioForm({
           type: 'number',
           required: true,
           range: l.sendTimeoutSeconds,
-          help: `Quanto si aspetta la risposta di SAR, Sistema TS e INPS: oltre, l’esito dell’invio è incerto e va controllato prima di rifarlo. La Regione Piemonte indica da 6 a 8 secondi (SIRPE, «Cartelle cliniche MMG e PLS», 4.4.7). Da ${l.sendTimeoutSeconds.min} a ${l.sendTimeoutSeconds.max}.`,
+          help: `Quanto si aspetta la risposta di SAR, Sistema TS e INPS: oltre, l’esito dell’invio è incerto e va controllato prima di rifarlo. La Regione Piemonte indica 8 secondi (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.5.2). Da ${l.sendTimeoutSeconds.min} a ${l.sendTimeoutSeconds.max}.`,
         })}
         {data.invii.avviso && <Notice kind="avviso">{data.invii.avviso}.</Notice>}
       </fieldset>

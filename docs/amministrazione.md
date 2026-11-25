@@ -50,7 +50,7 @@ All'installazione, se davanti al servizio c'è un proxy inverso, il suo indirizz
 
 ## Utenti e ruoli (D164) e password (D165)
 
-- L'amministratore crea gli utenti con uno o più ruoli e, per i medici, nome, cognome, codice fiscale (controllato), codice regionale e ASL. La password temporanea si vede una volta e va consegnata di persona (per medici e segreteria la riceve il titolare che conferma, qui sotto); al primo accesso si cambia prima di ogni altra cosa.
+- L'amministratore crea gli utenti con uno o più ruoli e, per i medici, nome, cognome, codice fiscale (controllato), codice regionale, ASL e codice ASL. Il codice ASL si sceglie fra le ASL della regione dello studio, dall'elenco del Ministero della Salute (D267); serve ai servizi della Regione Piemonte (`docs/credenziali.md`). La password temporanea si vede una volta e va consegnata di persona (per medici e segreteria la riceve il titolare che conferma, qui sotto); al primo accesso si cambia prima di ogni altra cosa.
 - Il ruolo di titolare crea l'archivio del medico; togliere un ruolo non cancella nulla.
 - Sospendere, riattivare, sbloccare dopo troppi tentativi: dall'elenco, con conferma (per medici e segreteria con i limiti qui sotto). Nessuno agisce su sé stesso e nessuno cambia i propri ruoli; l'ultimo amministratore attivo non si toglie.
 - Password da 12 a 128 caratteri, diversa dalla precedente e dal nome utente; gli errori sulla password attuale contano come codici sbagliati (qui sotto, D188); il cambio chiude le altre sessioni.
@@ -79,7 +79,7 @@ Requisiti, «Utenti e ruoli»: l'amministratore non ha accesso clinico, a meno c
 - **Credenziali di medici e segreteria dal server, o da loro stessi con SPID o CIE:** password temporanea, azzeramento del secondo fattore, sblocco dopo i tentativi falliti, con `pnpm utente:ripristina` (`--secondo-fattore`, `--sblocca`, `--sospendi`, `--riattiva`); ogni azione va nel registro con «tramite: comando del server». In più medici e segreteria ripristinano da soli password, secondo fattore e blocco con SPID o CIE (qui sotto, D189). Per gli amministratori si fa da Strumenti. Chi è sospeso o rifiutato dal server si riattiva solo dal server.
 - **Titolari protetti:** l'amministratore non sospende e non toglie il ruolo a un titolare con pazienti, né all'ultimo titolare attivo e confermato, e non aggiunge segreteria o sostituto a un titolare con pazienti; un titolare con pazienti sospeso si riattiva solo dal server, e un titolare in attesa con pazienti non si rifiuta dal programma. Se nell'archivio del medico è in corso una scrittura (per esempio un'importazione), la sospensione risponde dopo al più 2 secondi «riprova tra qualche minuto».
 - **Pazienti nuovi solo negli archivi aperti:** nell'archivio di un titolare sospeso, non più titolare o in attesa di conferma non entrano pazienti, né a mano né con l'importazione; quegli archivi non si propongono nel nuovo paziente, e un titolare in attesa non si sceglie come medico di famiglia.
-- **Codici del medico corretti:** se l'amministratore corregge il codice regionale di un medico, la sessione del servizio regionale si chiude e la risposta lo dice. Il **codice fiscale** di un medico confermato invece resta quello di prima finché il medico non conferma la correzione dal programma (D181, D184): il medico vede l'avviso, la conferma o la rifiuta in «Recapiti di studio»; alla conferma il codice cambia e le sessioni dei servizi si chiudono. L'amministratore vede la correzione in attesa e la può ritirare. Per chi è ancora in attesa di conferma la correzione vale subito: chi conferma la vede nella richiesta.
+- **Codici del medico corretti:** se l'amministratore corregge il codice regionale o il codice ASL di un medico, la sessione del servizio regionale si chiude e la risposta lo dice. Il **codice fiscale** di un medico confermato invece resta quello di prima finché il medico non conferma la correzione dal programma (D181, D184): il medico vede l'avviso, la conferma o la rifiuta in «Recapiti di studio»; alla conferma il codice cambia e le sessioni dei servizi si chiudono. L'amministratore vede la correzione in attesa e la può ritirare. Per chi è ancora in attesa di conferma la correzione vale subito: chi conferma la vede nella richiesta.
 - **Accesso:** il passaggio fra password e codice guarda al più tanti codici quanti i codici sbagliati ammessi dallo studio, giusti o sbagliati, anche con molte richieste insieme, e non vale per un utente bloccato; un passaggio di attivazione aperto prima non vale dopo l'attivazione; il blocco dura al più 60 minuti; ogni tentativo fallito registra anche l'indirizzo della richiesta (con il proxy in `APP_PROXY_FIDATI`). Con il servizio sovraccarico la risposta è «servizio occupato, riprova» invece di un'attesa senza fine.
 
 ## Dati e impostazioni dello studio (D166)
@@ -89,7 +89,7 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 - **Intestazione dello studio:** vale nei certificati dai modelli quando il medico non ha la sua.
 - **Indirizzo completo:** è il luogo della visita in studio sulla copia INPS.
 - **Sicurezza:** 5 minuti di inattività, 50 password sbagliate o 5 codici sbagliati, 15 minuti di blocco (D29, D188); si cambiano qui, entro limiti di buon senso (le password da 20 a 100, i codici da 3 a 10, il blocco al più 60 minuti, perché non tenga fuori un medico per un giorno, D179). Le attese dopo le password sbagliate sono del servizio e si vedono nello stato del servizio.
-- **Tempo di attesa degli invii:** 8 secondi per difetto; la Regione indica 6–8 (D94). Si legge a ogni invio di ricette e certificati.
+- **Tempo di attesa degli invii:** 8 secondi per difetto, quelli che la Regione indica nelle specifiche del SAR V06 (3.5.2; la V05 diceva 6–8, D94, D265). Si legge a ogni invio di ricette e certificati.
 - **Soglie degli avvisi sugli accessi anomali** (Garante, linee guida sul dossier sanitario, par. 7, lett. c): vuote, quindi avvisi spenti, finché qualcuno non dà i valori (da completare).
 
 ## Segreteria per archivio (D181, D185)
@@ -173,7 +173,7 @@ Risposte di Simone alla fermata dopo la tappa 15 in D181: quelle sui poteri dell
 - **Password:** 12 caratteri, nessuna scadenza, nessuna regola di composizione: c'è una regola da seguire (Garante, AgID, consulente privacy)? La password temporanea deve scadere?
 - **Salvataggi:** i requisiti mettono i backup cifrati giornalieri nella versione 1; oggi il programma non li fa.
 - **Blocco per inattività:** su tutte le postazioni o solo su quelle condivise, come dicono i requisiti?
-- **Tempo di attesa:** libero da 1 a 60 secondi con un avviso, o fermo ai 6–8 della Regione?
+- **Tempo di attesa:** libero da 1 a 60 secondi con un avviso, o fermo agli 8 secondi della Regione (V06, 3.5.2)?
 - **Soglie degli avvisi:** chi le decide (la Dr.ssa Rocca con il consulente privacy)?
 
 ## Che cosa non è stato provato

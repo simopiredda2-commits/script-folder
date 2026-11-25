@@ -59,7 +59,7 @@ const BLOCKED = {
   bloccanti: 1,
 };
 
-function service(opts: { blocked?: boolean; refused?: boolean } = {}) {
+function service(opts: { blocked?: boolean; refused?: boolean; timeout?: boolean } = {}) {
   const calls: string[] = [];
   vi.stubGlobal(
     'fetch',
@@ -85,15 +85,30 @@ function service(opts: { blocked?: boolean; refused?: boolean } = {}) {
                     ? BLOCKED
                     : { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 }
                   : path === '/api/ricette/r1/firma-e-invia'
-                    ? { esito: 'accepted', nre: '0101A0000000009', messaggio: null }
-                    : // Dopo l'invio compare il promemoria, che legge stampa, recapiti e consegne.
-                      path === '/api/stampa/preferenze'
-                      ? { postazione: { scritta: '', riconosciuta: null }, preferenze: [] }
-                      : path === `/api/pazienti/${PATIENT_ID}/recapiti-promemoria`
-                        ? { paziente: { email: null, telefono: null }, deleghe: [] }
-                        : path === '/api/ricette/r1/promemoria/consegne'
-                          ? { consegne: [], carta: null }
-                          : {};
+                    ? opts.timeout
+                      ? {
+                          esito: 'timeout',
+                          nre: null,
+                          messaggio: 'Il SAR non ha risposto in tempo',
+                        }
+                      : { esito: 'accepted', nre: '0101A0000000009', messaggio: null }
+                    : path === '/api/ricette/r1/ricetta-rossa' && method === 'POST'
+                      ? {
+                          stato: 'paper',
+                          nre: '010ZZ4000000004',
+                          poligrafico: '010260001234010',
+                          pdf: '/api/ricette/r1/ricetta-rossa.pdf',
+                          annullamentoDematerializzata: 'da_fare',
+                          avviso: null,
+                        }
+                      : // Dopo l'invio compare il promemoria, che legge stampa, recapiti e consegne.
+                        path === '/api/stampa/preferenze'
+                        ? { postazione: { scritta: '', riconosciuta: null }, preferenze: [] }
+                        : path === `/api/pazienti/${PATIENT_ID}/recapiti-promemoria`
+                          ? { paziente: { email: null, telefono: null }, deleghe: [] }
+                          : path === '/api/ricette/r1/promemoria/consegne'
+                            ? { consegne: [], carta: null }
+                            : {};
       return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
     }),
   );
@@ -196,5 +211,26 @@ describe('dopo l’arresto si corregge la ricetta, senza rifarla (audit, D259)',
     await screen.findByText('Azione riservata al medico');
     fireEvent.click(screen.getByRole('button', { name: 'Ricomincia' }));
     await waitFor(() => expect(screen.queryByText('Azione riservata al medico')).toBeNull());
+  });
+  it('senza esito dal SAR la ricetta rossa: dopo la stampa il PDF resta nella pagina (D270)', async () => {
+    const calls = service({ timeout: true });
+    editor();
+    fireEvent.click(await screen.findByRole('button', { name: 'Firma e invia' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Stampa la ricetta rossa' }));
+    fireEvent.change(screen.getByLabelText(/Numero del modulo nella stampante/), {
+      target: { value: '010260001234010' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Prepara la ricetta rossa' }));
+    await screen.findByText(/Ricetta rossa pronta sul modulo/);
+    expect(screen.getByRole('link', { name: 'Stampa sul modulo (PDF)' }).getAttribute('href')).toBe(
+      '/api/ricette/r1/ricetta-rossa.pdf',
+    );
+    expect(calls).toContain('POST /api/ricette/r1/ricetta-rossa');
+    // La ricetta rossa resta ricordata con la bozza: tornando alla pagina il PDF c'è ancora.
+    await waitFor(() =>
+      expect(sessionStorage.getItem(`ricetta:${PATIENT_ID}:farmaci:bozza`)).toContain(
+        '010260001234010',
+      ),
+    );
   });
 });
