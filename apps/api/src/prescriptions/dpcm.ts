@@ -378,9 +378,18 @@ export function createDpcmService(deps: DpcmDeps) {
           ricetta: { ...content.ricetta, nre: taken.nre },
           stampa: { ...content.stampa, nre: taken.nre },
         };
+        // Stessa ricetta e, se era «in invio», stesso invio. Il confronto si fa qui e non in SQL:
+        // l'ora salvata può avere i microsecondi, che una data di JavaScript non porta.
+        const [row] = await tx
+          .select({ status: prescription.status, signedAt: prescription.signedAt })
+          .from(prescription)
+          .where(eq(prescription.id, p.id))
+          .for('update', { of: prescription });
         const sameSend =
-          p.status === 'sending' && p.signedAt ? eq(prescription.signedAt, p.signedAt) : undefined;
-        const updated = await tx
+          p.status !== 'sending' || row?.signedAt?.getTime() === p.signedAt?.getTime();
+        if (row?.status !== p.status || !sameSend)
+          throw new HttpError(409, 'La ricetta è cambiata nel frattempo: ricarica la pagina');
+        await tx
           .update(prescription)
           .set({
             status: 'paper',
@@ -391,10 +400,7 @@ export function createDpcmService(deps: DpcmDeps) {
             sendingSnapshot: null,
             updatedAt: at,
           })
-          .where(and(eq(prescription.id, p.id), eq(prescription.status, p.status), sameSend))
-          .returning({ id: prescription.id });
-        if (!updated.length)
-          throw new HttpError(409, 'La ricetta è cambiata nel frattempo: ricarica la pagina');
+          .where(eq(prescription.id, p.id));
         await tx.insert(dpcmPrescription).values({
           prescriptionId: p.id,
           doctorUserId: actor.userId,
@@ -586,13 +592,15 @@ export function createDpcmService(deps: DpcmDeps) {
 
   async function checkOne(row: DpcmRow) {
     const got = await authOrError(row.doctorUserId, 'ricetta_dpcm');
-    const attempts = row.attempts + 1;
+    // L'esito si rilegge ogni 5 minuti, anche dopo una lettura non riuscita: i tentativi
+    // dell'invio non contano qui.
+    const again = () => new Date(now().getTime() + minutes(DPCM_CHECK_MINUTES));
     if ('error' in got) {
       await db
         .update(dpcmPrescription)
         .set({
           lastError: `Esito della ricetta rossa non letto: ${got.error ?? ''}`,
-          nextAttemptAt: new Date(now().getTime() + retryAfter(attempts)),
+          nextAttemptAt: again(),
         })
         .where(eq(dpcmPrescription.id, row.id));
       return;
@@ -625,7 +633,7 @@ export function createDpcmService(deps: DpcmDeps) {
         .update(dpcmPrescription)
         .set({
           lastError: `Esito della ricetta rossa non ancora letto: ${summary.message}. Si riprova da sé.`,
-          nextAttemptAt: new Date(now().getTime() + retryAfter(attempts)),
+          nextAttemptAt: again(),
         })
         .where(eq(dpcmPrescription.id, row.id));
       return;
@@ -637,7 +645,7 @@ export function createDpcmService(deps: DpcmDeps) {
           sendState: 1,
           checkedAt: now(),
           lastError: null,
-          nextAttemptAt: new Date(now().getTime() + minutes(DPCM_CHECK_MINUTES)),
+          nextAttemptAt: again(),
         })
         .where(eq(dpcmPrescription.id, row.id));
       return;
@@ -672,7 +680,7 @@ export function createDpcmService(deps: DpcmDeps) {
           .set({
             sendState: summary.state,
             lastError: `Messaggi dell’esito non ancora letti: ${analytic.message}. Si riprova da sé.`,
-            nextAttemptAt: new Date(now().getTime() + retryAfter(attempts)),
+            nextAttemptAt: again(),
           })
           .where(eq(dpcmPrescription.id, row.id));
         return;

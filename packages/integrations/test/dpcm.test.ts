@@ -144,6 +144,10 @@ describe('file della ricetta DPCM (RicettaMIR.xsd 2.1; D270)', () => {
     expect(toBasicLatin('È più l’ultima «prova» – ok')).toBe('E piu l\'ultima "prova" - ok');
     // Il resto, che non ha un equivalente semplice, si toglie: niente «€», «°», «ß» o «µ».
     expect(toBasicLatin('Dose 5 µg, 37 °C, 2 €, Straße')).toBe('Dose 5 g, 37 C, 2 , Strae');
+    // A capo e tabulazioni separano le parole: diventano uno spazio, non spariscono.
+    expect(toBasicLatin('Controllo\ndella\r\nfunzione\trenale')).toBe(
+      'Controllo della funzione renale',
+    );
     const xml = dpcmInsertXml(specialistica(), { pinCode: '1', crypto: SIMULATED_DPCM_CRYPTO });
     expect(/^[\x20-\x7e]*$/.test(xml)).toBe(true);
     expect(xml).toContain('<DescrizioneDiagnosi>Controllo dopo la terapia: e piu stanca');

@@ -1,5 +1,5 @@
 import { SimulatedGateway, type SimulatorOptions } from '@mmg/integrations';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   dpcmPrescription,
@@ -320,6 +320,28 @@ describe('ricetta rossa in DPCM (D270)', () => {
     expect(d.attempts).toBe(2);
   });
 
+  it('l’esito che non si legge si rilegge dopo 5 minuti, anche dopo un invio riprovato', async () => {
+    const id = await uncertain();
+    options.decideDpcmReceipt = () => 'unreachable';
+    expect((await print(id)).statusCode).toBe(200);
+    await runQueue();
+    await runQueue();
+    delete options.decideDpcmReceipt;
+    await runQueue();
+    expect((await red(id))!).toMatchObject({ status: 'accepted', attempts: 3 });
+    const summary = sar.dpcmSummary.bind(sar);
+    sar.dpcmSummary = () =>
+      Promise.resolve({ outcome: 'unreachable', message: 'Servizio non raggiungibile (simulato)' });
+    try {
+      await runQueue();
+    } finally {
+      sar.dpcmSummary = summary;
+    }
+    const d = (await red(id))!;
+    expect(d.lastError).toMatch(/Esito della ricetta rossa non ancora letto/);
+    expect(d.nextAttemptAt!.getTime() - s.clock.now().getTime()).toBe(DPCM_CHECK_MINUTES * 60_000);
+  });
+
   it('il giorno dopo la compilazione il SAR dà l’avviso 2090, che non si corregge', async () => {
     const id = await uncertain();
     options.decideDpcmReceipt = () => 'unreachable';
@@ -469,6 +491,18 @@ describe('ricetta rossa in DPCM (D270)', () => {
     expect(res.json().annullamentoDematerializzata).toBe('da_fare');
     expect(res.json().nre).not.toBe('010ZZ4999990001');
     expect((await red(id))!).toMatchObject({ dmNre: '010ZZ4999990001', dmCancelStatus: 'pending' });
+    expect((await row(id)).status).toBe('paper');
+  });
+
+  it('l’ora della firma con i microsecondi non ferma la stampa: lo stesso invio si riconosce', async () => {
+    const id = await stuck('010ZZ4999990003');
+    // Postgres tiene i microsecondi, una data di JavaScript no: come un'ora scritta dal database.
+    await t.db.execute(
+      sql`update prescription set signed_at = signed_at + interval '250 microseconds' where id = ${id}`,
+    );
+    s.clock.advance(16 * 60_000);
+    const res = await print(id);
+    expect(res.statusCode, res.body).toBe(200);
     expect((await row(id)).status).toBe('paper');
   });
 

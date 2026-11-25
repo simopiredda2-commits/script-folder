@@ -215,7 +215,17 @@ try {
   await form.evaluate((el) => el.scrollIntoView({ block: 'center' }));
   await shot(page, '77-ricetta-rossa-modulo');
   await form.getByRole('button', { name: 'Prepara la ricetta rossa' }).click();
-  await interrupted.getByText(/Ricetta rossa pronta sul modulo/).waitFor();
+  await interrupted
+    .getByText(/Ricetta rossa pronta sul modulo/)
+    .waitFor()
+    .catch(async (err: unknown) => {
+      throw new Error(
+        `Ricetta rossa non pronta. La sezione mostra:\n${await interrupted.innerText()}`,
+        {
+          cause: err,
+        },
+      );
+    });
   const red = page.getByRole('region', { name: 'Ricette rosse in DPCM' });
   await red.getByRole('button', { name: 'Invia adesso' }).click();
   await red

@@ -642,7 +642,7 @@ function RedQueue({ reloadKey }: { reloadKey: number }) {
   return (
     <>
       {open && (
-        <div className="azioni">
+        <div className="azioni azioni-sopra-elenco">
           <button type="button" className="pulsante" onClick={() => void sendNow()} disabled={busy}>
             <Icon name="ripeti" /> <span>Invia adesso</span>
           </button>

@@ -102,11 +102,13 @@ export function decryptSimulated(value: string): string | null {
 /**
  * Solo caratteri «BasicLatin» (da U+0000 a U+007F): è il dominio di quasi tutti i tipi dello schema
  * (TipiDatiMIR.xsd, `\p{IsBasicLatin}`). Le lettere accentate perdono l'accento, gli apostrofi e le
- * virgolette tipografiche diventano quelli semplici; il resto si toglie.
+ * virgolette tipografiche diventano quelli semplici; a capo e tabulazioni diventano uno spazio, così
+ * le parole restano separate; il resto si toglie.
  */
 export function toBasicLatin(text: string): string {
   return text
     .normalize('NFD')
+    .replace(/\s+/g, ' ')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[‘’ʼ]/g, "'")
     .replace(/[“”«»]/g, '"')
