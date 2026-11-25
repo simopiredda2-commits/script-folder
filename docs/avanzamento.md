@@ -1755,6 +1755,7 @@ Risposte di Simone con il pulsante; il dettaglio è in D266.
   - l'esito che non si legge si rilegge dopo 5 minuti, come la lettura normale: prima l'attesa dipendeva dai tentativi dell'invio e arrivava a 60 minuti;
   - nel file DPCM a capo e tabulazioni diventano uno spazio: prima sparivano e incollavano le parole del quesito diagnostico.
 - Interfaccia: lo stato con il simbolo sta sulla riga del testo che segue (anche in Banche dati e Importazione); «Invia adesso» staccato dall'elenco.
+- Dimostrazione ripubblicata allo stesso indirizzo, versione 27 (https://claude.ai/artifact/Md4KFYrVagjLdnNewSMzCQ): 34 prove nel browser verdi con Chromium in locale; WebKit e Firefox nella CI.
 
 **Ordine dopo la domanda di Simone sui tempi** (D268), nello stesso branch, senza agenti:
 
