@@ -32,6 +32,8 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 
 _A. Aspetta la Regione Piemonte, CSI Piemonte o un altro ente_
 
+Le richieste come fornitore partono quando SCRIPT ha la partita IVA (Simone, 25/11/2026: «Una volta aperta la P. IVA potremo fare richiesta in qualità di fornitore»).
+
 Contatto per le applicazioni sanitarie della Regione gestite dal CSI (AURA, SAR, Fascicolo): servizio tecnico 011 3168050, sanita.regione@csi.it. Il numero e l'indirizzo sono nelle pagine pubbliche di RUPAR Piemonte (SVAS) e Salute Piemonte (PROTES, DMRP), lette il 20/11/2026. Il 011 2279966 è l'assistenza applicativa del portale Sistema Piemonte (nelle pagine lette, servizi dell'agricoltura): non serve per queste richieste.
 
 1. **SAR (SIRPED) e Sistema TS**: specifiche e credenziali di collaudo, piano di test della Regione; registrazione del programma (codice del gestionale, `client_id`, autocertificazione per i due fattori) e censimento dei medici nel configuratore regionale (D103). Con queste: stato di erogazione (D70), controlli formali (R10), formato dell'NRE, modulo di stampa della ricetta rossa. Per il promemoria, che segue già le specifiche di stampa del 28/02/2024 (D217): frase regionale e frase sui farmaci in DPC come le dà il SAC vero, un'eventuale validità minore di 180 giorni, i tipi di ricetta diversi da «Assist. SSN», il codice regionale nel campo 27.
@@ -1586,6 +1588,15 @@ Il resoconto di Cowork (32 difetti, nessuno che blocca, 15 importanti e 17 minor
 - Nella dimostrazione, il codice del pulsante riletto subito dopo un accesso o un'uscita: non ha una prova a sé, lo copre il giro di ogni secondo.
 
 **Prossimo passo**: le domande della fermata qui sotto; poi il collaudo finale.
+
+## Dopo la fermata della #38 (25/11/2026)
+
+- **Partita IVA**: Simone: «Una volta aperta la P. IVA potremo fare richiesta in qualità di fornitore». Annotato in «Che cosa resta aperto», parte A.
+- **Catalogo delle prestazioni** (domanda di Simone: «Abbiamo già il catalogo delle prestazioni versione 444/2025?»), D264:
+  - la D.D. 444/2025 non serve: il catalogo intero più recente è la D.D. 590/2026, con le modifiche della D.D. 710/2026, già trascritte;
+  - nei Bollettini 44–46 l'unico atto nuovo è la D.G.R. 40-3255 del 2/11/2026. Riapprova gli stessi elenchi della D.D. 710, con la brachiterapia «≤ 2 sedute» che la trascrizione ha già;
+  - da guardare sul PDF, con il resto del catalogo: la tariffa di 92.2C.5 (punto 6 di `docs/catalogo-regionale.md`).
+- **Non provato**: il PDF della delibera non si scarica da qui (regione.piemonte.it chiude la connessione a metà); il testo viene da uno strumento di lettura dei PDF.
 
 ## Risposte della fermata dopo la #38 (24/11/2026)
 

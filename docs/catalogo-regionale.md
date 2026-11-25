@@ -7,6 +7,9 @@
 - **D.D. 20 settembre 2026, n. 590/A1400B/2026** (BU Regione Piemonte n. 38 del 24/09/2026), allegato A: il catalogo intero. Vale per le ricette prescritte dal 21/09/2026 (punto 3 della determina). 194 pagine, 5116 righe, 26 branche.
 - **D.D. 30 ottobre 2026, n. 710/A1400B/2026** (BU n. 44 del 5/11/2026): allegato A, 27 voci prescrivibili fino al 29/10/2026; allegato C, 69 voci dal 30/10/2026; allegato B, 56 voci di radioterapia prescrivibili fino al 12/01/2027.
 - I PDF li ha mandati Simone il 18/11/2026; impronte in `docs/provenienze.md`. I PDF restano fuori dal repository.
+- **D.G.R. 2 novembre 2026, n. 40-3255** (BU n. 44 del 5/11/2026, supplemento ordinario n. 2), letta il 25/11/2026 (D264). Recepisce i decreti dei LEA del 2026 e riapprova come allegati A, B e C gli stessi elenchi della D.D. 710. Corregge i pacchetti di brachiterapia del trattamento breve, da «< 2 sedute» a «≤ 2 sedute»: la trascrizione ha già «<=2». L'allegato D fissa le regole dei pacchetti di radioterapia dal 2/11/2026, senza cambiare codici né tariffe. Codici e tariffe sono stati confrontati con la trascrizione: sono uguali, tranne la tariffa di 92.2C.5 (punto 6 di «Che cosa controllare»).
+  - Il testo della delibera è stato letto con uno strumento di lettura dei PDF: le tabelle hanno errori di lettura evidenti (per esempio «>20 sedute» diventa «20 sedute»), e le righe 92.2B.4 e 92.2B.5 si perdono al cambio di pagina. Il PDF (`dgr_03255_1050_02112026.pdf`) non si scarica da qui: la connessione con regione.piemonte.it si chiude a metà.
+  - La delibera elenca anche la storia del catalogo: D.D. 180/2024 del 13/3/2024, poi D.D. 990/2024, D.D. 444/2025 del 29/7/2025 e D.D. 590/2026. La D.D. 444/2025 non serve: la D.D. 590 ripubblica il catalogo intero (D159).
 - Il PDF dell'allegato A è stampato da un file Excel della Regione: in testa a ogni pagina c'è «Allegato A_Catalogo Ambulatoriale_092026_ALL.xlsx». Con quel file il confronto si fa da programma, riga per riga.
 
 ## I tre file
@@ -34,6 +37,7 @@ Colonne: codice del catalogo, codice del nomenclatore (DM), descrizione del cata
 3. Tutte le 69 righe «aggiunge» di `dd710-2026-dal-2026-10-30.csv`, con le pagine 21–23 del PDF della D.D. 710. Tre righe sembrano strane ma sono così nell'atto: 91.20.8 (la descrizione finisce con la virgola, la nota comincia con il punto), 90324 («LUTEOTROPINA (LH) e E FOLLITROPINA (FSH)»), 92.2A.1 («Radioterapia - Piano di cura cat. A», con le minuscole come tutte le voci nuove di radioterapia).
 4. Il numero delle righe «toglie»: 27 nell'allegato A, 56 nell'allegato B.
 5. Le 8 voci con un finale strano, nella tabella «Finali da guardare nel PDF»: sono uguali nella D.D. 990/2024, quindi il confronto non aiuta. Nel PDF si vede se il testo è proprio così o se la cella è tagliata in tutti e due gli atti.
+6. La tariffa di 92.2C.5 (Radioterapia - Trattamento lungo cat. C >20 sedute): nella trascrizione 11.261,50, come nel PDF della D.D. 710; nel testo della D.G.R. 40-3255 letto da qui 11.281,50. Quel testo ha altri errori di lettura, quindi la differenza può venire solo dalla lettura: si guarda la tariffa nell'allegato C della delibera.
 
 Controllato tutto, chi ha controllato scrive nome e cognome in `controllato_da` nelle tre schede (`.json`). Dal giro successivo il catalogo entra in uso, con il nome di chi l'ha controllato in ogni versione.
 
