@@ -22,6 +22,14 @@ export interface PrescriptionLineMessage {
   /** Codice del nomenclatore, «codice DM» (codProdPrest; D154). */
   serviceNationalCode?: string | null;
   serviceDescription?: string | null;
+  /** numeroNota: il numero della nota del nomenclatore (DPCM LEA, allegato 4D; D276). */
+  serviceNote?: string | null;
+  /** Tipo della nota: dice se la lettera va in condErogabilita o in approprPrescrittiva. */
+  serviceNoteKind?: string | null;
+  /** La lettera della condizione di erogabilità o dell'indicazione di appropriatezza. */
+  serviceNoteLetter?: string | null;
+  /** numsedute: le sedute del ciclo, solo per le prestazioni a ciclo (D276). */
+  sessions?: number | null;
   quantity: number;
   aifaNote?: string | null;
   /**

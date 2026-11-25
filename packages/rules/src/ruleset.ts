@@ -5,7 +5,9 @@ import { z } from 'zod';
 /**
  * Identificativi delle regole: R1–R17 dei requisiti; R18 chiesta da Simone (D154); R19 e R20 sullo
  * stato del paziente, per scelta di Simone (D199); R21 sui farmaci carenti, dall'elenco AIFA (D202);
- * R22 sulla confezione sospesa, dall'anagrafica AIFA delle confezioni, per scelta di Simone (D210).
+ * R22 sulla confezione sospesa, dall'anagrafica AIFA delle confezioni, per scelta di Simone (D210);
+ * R23 sugli stupefacenti (D272); R24 sulla nota del nomenclatore e R25 sulle prestazioni della stessa
+ * branca, dal DPCM LEA (D276).
  */
 export const RULE_IDS = [
   'R1',
@@ -31,6 +33,8 @@ export const RULE_IDS = [
   'R21',
   'R22',
   'R23',
+  'R24',
+  'R25',
 ] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 

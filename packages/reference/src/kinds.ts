@@ -129,6 +129,39 @@ export const KINDS = {
       branch: { type: 'text' },
       fee: { type: 'number' },
       notes: { type: 'text' },
+      /**
+       * «Prestazione Ciclo» del catalogo: prestazione a ciclo di sedute, la sola che porta il numero
+       * di sedute in ricetta (numsedute, specifiche del Sistema TS dell'08/07/2026, p. 42; D276).
+       */
+      cycle: { type: 'boolean' },
+      /** «Numero Sedute» del catalogo: le sedute al più del ciclo, come nel DPCM LEA (D276). */
+      sessions: { type: 'number' },
+    },
+  },
+  /**
+   * Note del nomenclatore della specialistica (D276): l'allegato 4D del DPCM LEA, con l'allegato 4
+   * che dice a quali prestazioni si applica ogni nota. Una nota per codice del nomenclatore:
+   * condizione di erogabilità o indicazione di appropriatezza prescrittiva.
+   */
+  note_prestazioni: {
+    label: 'Note del nomenclatore (condizioni di erogabilità)',
+    /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */
+    changeKey: ['nationalCode'],
+    fields: {
+      nationalCode: { type: 'text', required: true },
+      note: {
+        type: 'text',
+        required: true,
+        pattern: /^\d{1,3}[A-Z]?$/,
+        patternLabel: 'numero della nota (per esempio 7)',
+      },
+      noteKind: {
+        type: 'text',
+        required: true,
+        pattern: /^(?:condizione|appropriatezza)$/,
+        patternLabel: '«condizione» o «appropriatezza»',
+      },
+      noteText: { type: 'text', required: true },
     },
   },
   /** Catalogo delle esenzioni, da una trascrizione controllata. */

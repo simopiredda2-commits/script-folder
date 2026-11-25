@@ -180,10 +180,26 @@
         "description": "descrizione",
         "branch": "branca",
         "fee": "tariffa",
-        "notes": "note"
+        "notes": "note",
+        "cycle": "ciclo",
+        "sessions": "sedute"
       },
       "vecchiaDopoGiorni": null,
       "nota": "Formato della trascrizione definito in docs/banche-dati.md."
+    },
+    {
+      "id": "trascrizione-note-prestazioni",
+      "titolo": "DPCM LEA: note del nomenclatore della specialistica, allegati 4 e 4D (trascrizione)",
+      "tipo": "note_prestazioni",
+      "origine": "trascrizione",
+      "colonne": {
+        "nationalCode": "codice_nomenclatore",
+        "note": "numero_nota",
+        "noteKind": "tipo_nota",
+        "noteText": "testo_nota"
+      },
+      "vecchiaDopoGiorni": null,
+      "nota": "Formato della trascrizione definito in docs/banche-dati.md, «Note del nomenclatore» (D276). Nessuna soglia di vecchiaia: le note cambiano solo con un decreto."
     },
     {
       "id": "trascrizione-esenzioni",

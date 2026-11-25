@@ -224,6 +224,25 @@ export function prescription2(catalogCode: string | null | undefined, access: st
   return parts.length ? parts.join('') : null;
 }
 
+/**
+ * Prescrizione1 della specialistica (specifiche DPCM, versione 11.0 dell'1/3/2016):
+ * «#<numeroNota>-<condizione di erogabilità>-<appropriatezza prescrittiva>-<patologia>#», con «*»
+ * per un dato che manca, e tutti e quattro i campi sempre scritti. La lettera va nel campo del tipo
+ * della nota; il codice di patologia non si compila (D276). Senza nota, niente.
+ */
+export function specialistPrescription1(l: {
+  serviceNote?: string | null;
+  serviceNoteKind?: string | null;
+  serviceNoteLetter?: string | null;
+}): string | null {
+  const note = l.serviceNote?.trim();
+  if (!note) return null;
+  const letter = l.serviceNoteLetter?.trim() || '*';
+  const condition = l.serviceNoteKind === 'condizione' ? letter : '*';
+  const appropriateness = l.serviceNoteKind === 'appropriatezza' ? letter : '*';
+  return `#${note}-${condition}-${appropriateness}-*#`;
+}
+
 export type DpcmService = ReturnType<typeof createDpcmService>;
 
 export function createDpcmService(deps: DpcmDeps) {
@@ -297,6 +316,7 @@ export function createDpcmService(deps: DpcmDeps) {
               productCode: l.serviceNationalCode ?? null,
               description: l.serviceDescription ?? null,
               quantity: l.quantity,
+              prescription1: specialistPrescription1(l),
               prescription2: prescription2(l.serviceCode, message.accessType ?? null),
             };
       }),

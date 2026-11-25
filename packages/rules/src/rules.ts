@@ -5,7 +5,8 @@ import { codedItems, value, type Rule, type RuleId } from './ruleset';
 
 /**
  * Le regole di prescrizione R1–R17 dei requisiti, R18 (D154), lo stato del paziente R19–R20 (D199),
- * i farmaci carenti R21 (D202) e la confezione sospesa R22 (D210), come controlli formali (regola 3:
+ * i farmaci carenti R21 (D202), la confezione sospesa R22 (D210), gli stupefacenti R23 (D272), la nota
+ * del nomenclatore R24 e le prestazioni della stessa branca R25 (D276), come controlli formali (regola 3:
  * nessun suggerimento diagnostico o terapeutico). Nessun numero è scritto qui: i valori vengono dal file dei dati
  * (packages/rules/data/), e una regola di lint lo controlla.
  */
@@ -434,6 +435,35 @@ const evaluators: Record<RuleId, Evaluator> = {
           );
         }
       }
+      // Dalla versione che lo dice (D276): le sedute solo sulle prestazioni a ciclo e non oltre il
+      // massimo del catalogo, un ciclo per riga (specifiche del Sistema TS, prescrizione,
+      // 08/07/2026, pp. 42–43). Senza la voce nel catalogo in uso le controlla il SAR.
+      if (isService && line.serviceCode && value(rule, 'checkCycleSessions') === 1) {
+        const entry = ctx.serviceCatalog?.(line.serviceCode) ?? null;
+        const sessions = line.sessions ?? null;
+        if (entry?.cycle) {
+          if (line.quantity !== 1) {
+            block(
+              `${lineLabel(line)}: prestazione a ciclo: quantità 1, e una riga per ogni ciclo`,
+              line.id,
+            );
+          }
+          const max = entry.sessions ?? null;
+          if (sessions !== null && (!Number.isInteger(sessions) || sessions < 1)) {
+            block(`${lineLabel(line)}: numero di sedute non valido`, line.id);
+          } else if (sessions !== null && max !== null && sessions > max) {
+            block(
+              `${lineLabel(line)}: ${sessions} sedute, oltre le ${max} del ciclo nel catalogo`,
+              line.id,
+            );
+          }
+        } else if (entry && sessions !== null) {
+          block(
+            `${lineLabel(line)}: le sedute si indicano solo per le prestazioni a ciclo`,
+            line.id,
+          );
+        }
+      }
       if (!isService && !line.drugAic && !line.drugName) block('Riga senza farmaco', line.id);
     }
     return issues;
@@ -645,6 +675,69 @@ const evaluators: Record<RuleId, Evaluator> = {
         severity: severityOf(rule),
         lineId: l.id,
         message: `${lineLabel(l)}: non è tra le prestazioni dell'esenzione ${p.exemptionCode}. Spostala su una ricetta senza esenzione o usa un'altra esenzione valida`,
+      }));
+  },
+
+  // Prestazione con una condizione di erogabilità (DPCM LEA, allegato 4D): in ricetta il numero
+  // della nota, come vuole la legenda dell'allegato 4 (D276). L'indicazione di appropriatezza chiede
+  // solo il quesito diagnostico, che controlla R14. Una nota che non è quella del codice ferma.
+  R24: (rule, ctx) => {
+    const p = ctx.prescription;
+    const notes = ctx.serviceNotes;
+    if (p.kind !== 'specialist_ssn' || !notes) return [];
+    const issues: Issue[] = [];
+    for (const l of p.lines) {
+      const national =
+        l.serviceNationalCode?.trim() ||
+        (l.serviceCode ? ctx.serviceCatalog?.(l.serviceCode)?.nationalCode : null) ||
+        null;
+      if (!national) continue;
+      const note = notes(national);
+      const written = l.serviceNote?.trim() || null;
+      const push = (message: string, remedy: string) =>
+        issues.push({ ruleId: 'R24', severity: severityOf(rule), lineId: l.id, message, remedy });
+      if (note?.kind === 'condizione' && !written) {
+        push(
+          `${lineLabel(l)}: prestazione con condizione di erogabilità (nota ${note.note}): in ricetta va il numero della nota`,
+          `Indica la nota ${note.note} se ricorre la condizione; se non ricorre, la prestazione non è erogabile dal SSN`,
+        );
+      } else if (written && note && written !== note.note) {
+        push(
+          `${lineLabel(l)}: la nota ${written} non è quella della prestazione nel nomenclatore (nota ${note.note})`,
+          `Indica la nota ${note.note}, quella del codice ${national}`,
+        );
+      } else if (written && !note) {
+        push(
+          `${lineLabel(l)}: la prestazione ${national} non ha note nel nomenclatore: la nota ${written} non va in ricetta`,
+          'Togli la nota dalla riga',
+        );
+      }
+    }
+    return issues;
+  },
+
+  // Al più otto prestazioni della stessa branca sulla stessa ricetta (legge 8/1990, come la richiama
+  // la legenda dell'allegato 4 del DPCM LEA; D276): si contano le quantità. Una voce che nel catalogo
+  // sta in più branche può contare nell'una o nell'altra, e non si conta.
+  R25: (rule, ctx) => {
+    const max = value(rule, 'maxSameBranch');
+    const p = ctx.prescription;
+    const catalog = ctx.serviceCatalog;
+    if (max === null || p.kind !== 'specialist_ssn' || !catalog) return [];
+    const byBranch = new Map<string, number>();
+    for (const l of p.lines) {
+      const branches = l.serviceCode ? (catalog(l.serviceCode)?.branches ?? []) : [];
+      if (branches.length !== 1) continue;
+      const branch = branches[0]!;
+      byBranch.set(branch, (byBranch.get(branch) ?? 0) + l.quantity);
+    }
+    return [...byBranch]
+      .filter(([, n]) => n > max)
+      .map(([branch, n]) => ({
+        ruleId: 'R25' as const,
+        severity: severityOf(rule),
+        message: `${n} prestazioni della branca «${branch}» sulla stessa ricetta: al più ${max}`,
+        remedy: `Dividi le prestazioni su più ricette, al più ${max} della stessa branca su ognuna`,
       }));
   },
 

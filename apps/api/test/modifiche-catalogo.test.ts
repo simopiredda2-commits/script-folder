@@ -40,7 +40,8 @@ describe('atti che modificano il catalogo, nel database (D157)', () => {
     if (work) rmSync(work, { recursive: true, force: true });
   });
 
-  const HEADER = 'operazione;codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note';
+  const HEADER =
+    'operazione;codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note;ciclo;sedute';
   /** Le trascrizioni d'esempio, più gli atti «solo modifiche» della prova. */
   function transcriptions(name: string, acts: { file: string; date: string; csv: string[] }[]) {
     const dir = join(work, name);

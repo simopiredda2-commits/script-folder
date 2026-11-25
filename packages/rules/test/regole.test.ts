@@ -85,7 +85,7 @@ const blocks = (c: RuleContext, id: string) =>
 describe('dati delle regole', () => {
   const [ruleset] = loadRulesets();
 
-  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3, R22 dalla 2026-11-20.1', () => {
+  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3, R22 dalla 2026-11-20.1, R23 dalla 2026-11-25.1, R24 e R25 dalla 2026-11-25.2', () => {
     const all = loadRulesets();
     expect(all.map((r) => r.version)).toEqual([
       '2026-11-18.1',
@@ -97,9 +97,10 @@ describe('dati delle regole', () => {
       '2026-11-20.1',
       '2026-11-24.1',
       '2026-11-25.1',
+      '2026-11-25.2',
     ]);
     const upTo17 = RULE_IDS.filter(
-      (id) => !['R18', 'R19', 'R20', 'R21', 'R22', 'R23'].includes(id),
+      (id) => !['R18', 'R19', 'R20', 'R21', 'R22', 'R23', 'R24', 'R25'].includes(id),
     );
     for (const rs of all.slice(0, 2)) {
       expect(rs.rules.map((r) => r.id).sort()).toEqual([...upTo17].sort());
@@ -111,11 +112,12 @@ describe('dati delle regole', () => {
     expect(all[5]!.rules.map((r) => r.id).sort()).toEqual(
       [...upTo17, 'R18', 'R19', 'R20', 'R21'].sort(),
     );
-    const upTo22 = RULE_IDS.filter((id) => id !== 'R23');
+    const upTo22 = RULE_IDS.filter((id) => !['R23', 'R24', 'R25'].includes(id));
     for (const rs of all.slice(6, 8)) {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...upTo22].sort());
     }
-    for (const rs of all.slice(8)) {
+    expect(all[8]!.rules.map((r) => r.id).sort()).toEqual([...upTo22, 'R23'].sort());
+    for (const rs of all.slice(9)) {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...RULE_IDS].sort());
     }
   });
@@ -125,7 +127,12 @@ describe('dati delle regole', () => {
     const v8 = all.find((r) => r.version === '2026-11-24.1')!;
     const v9 = all.find((r) => r.version === '2026-11-25.1')!;
     expect(v9.effectiveFrom).toBe('2026-11-25');
-    expect(rulesetAt('2026-11-25').version).toBe('2026-11-25.1');
+    expect(
+      rulesetAt(
+        '2026-11-25',
+        all.filter((r) => r.version !== '2026-11-25.2'),
+      ).version,
+    ).toBe('2026-11-25.1');
     expect(v9.rules).toHaveLength(v8.rules.length + 1);
     for (const r of v9.rules) {
       if (r.id === 'R23') {
@@ -543,8 +550,8 @@ describe('R5, R6 · piano terapeutico', () => {
       sentLines: sent,
       prescription: { lines: [line({ quantity: 2 })] },
     });
-    // In vigore il 25/11/2026: la 2026-11-25.1, con R6 come nella 2026-11-19.1 (D181).
-    expect(run(c).rulesVersion).toBe('2026-11-25.1');
+    // In vigore il 25/11/2026: la 2026-11-25.2, con R6 come nella 2026-11-19.1 (D181).
+    expect(run(c).rulesVersion).toBe('2026-11-25.2');
     expect(blocks(c, 'R6')).toBe(true);
     expect(of(c, 'R6')[0]!.message).toBe(
       'Farmaco di prova 5 mg: il piano autorizza 4 confezioni, già prescritte 3, di cui 2 con un altro programma; residuo 1',
@@ -1410,5 +1417,158 @@ describe('R23 · stupefacenti sulla ricetta farmaceutica del SSN (D272)', () => 
     expect(run({ ...before, date: '2026-11-24' }).issues.some((i) => i.ruleId === 'R23')).toBe(
       false,
     );
+  });
+});
+
+describe('R10, R24 e R25 · sedute, nota del nomenclatore e branca (D276)', () => {
+  // Codici di prova, non del catalogo vero.
+  const catalog = new Map([
+    [
+      'CICLO.1',
+      { nationalCode: 'CICLO.1', branches: ['Branca di prova'], cycle: true, sessions: 10 },
+    ],
+    [
+      'CICLO.2',
+      {
+        nationalCode: 'CICLO.2',
+        branches: ['Branca di prova', 'Altra branca'],
+        cycle: true,
+        sessions: 4,
+      },
+    ],
+    ['PROVA.1', { nationalCode: 'PROVA.1', branches: ['Branca di prova'] }],
+    ['PROVA.C', { nationalCode: 'PROVA.C', branches: ['Branca di prova'] }],
+    ['PROVA.A', { nationalCode: 'PROVA.A', branches: ['Altra branca'] }],
+  ]);
+  const notes = new Map([
+    [
+      'PROVA.C',
+      {
+        note: '3',
+        kind: 'condizione' as const,
+        text: 'A) Condizione di prova; B) Altra condizione',
+      },
+    ],
+    ['PROVA.A', { note: '40', kind: 'appropriatezza' as const, text: 'Indicazione di prova' }],
+  ]);
+  const spec = (lines: Partial<LineContext>[], over: Partial<RuleContext> = {}) =>
+    ctx({
+      date: '2026-11-25',
+      prescription: {
+        kind: 'specialist_ssn',
+        accessType: 'subsequent',
+        diagnosticQuestion: 'Controllo',
+        lines: lines.map((l, i) =>
+          line({ id: `l${i + 1}`, drugAic: null, drugName: null, activeIngredient: null, ...l }),
+        ),
+      },
+      serviceCatalog: (code) => catalog.get(code) ?? null,
+      serviceNotes: (code) => notes.get(code) ?? null,
+      ...over,
+    });
+  const messages = (c: RuleContext, id: string) => of(c, id).map((i) => i.message);
+
+  it('la 2026-11-25.2 vale dal 25/11/2026: R10 con le sedute, R24 e R25; il resto come la 2026-11-25.1', () => {
+    const all = loadRulesets();
+    const v9 = all.find((r) => r.version === '2026-11-25.1')!;
+    const v10 = all.find((r) => r.version === '2026-11-25.2')!;
+    expect(rulesetAt('2026-11-25').version).toBe('2026-11-25.2');
+    expect(v10.rules).toHaveLength(v9.rules.length + 2);
+    for (const r of v10.rules) {
+      const before = v9.rules.find((x) => x.id === r.id);
+      if (r.id === 'R10') {
+        expect(r.values).toEqual({ ...before!.values, checkCycleSessions: 1 });
+        expect(r.sources.slice(0, -1)).toEqual(before!.sources);
+        expect(r.sources.at(-1)!.title).toMatch(/numsedute/);
+      } else if (r.id === 'R24') {
+        expect(r).toMatchObject({ behavior: 'block', status: 'active', values: {} });
+        expect(r.sources[0]!.title).toMatch(/numero della nota ed il quesito/);
+      } else if (r.id === 'R25') {
+        expect(r).toMatchObject({
+          behavior: 'block',
+          status: 'active',
+          values: { maxSameBranch: 8 },
+        });
+        expect(r.sources[0]!.title).toMatch(/otto prestazioni della medesima branca/);
+      } else {
+        expect(r, r.id).toEqual(before);
+      }
+    }
+  });
+
+  it('R10: sedute solo sulle prestazioni a ciclo e non oltre il massimo, un ciclo per riga', () => {
+    expect(of(spec([{ serviceCode: 'CICLO.1', sessions: 10 }]), 'R10')).toEqual([]);
+    // Le sedute sono facoltative.
+    expect(of(spec([{ serviceCode: 'CICLO.1' }]), 'R10')).toEqual([]);
+    expect(messages(spec([{ serviceCode: 'CICLO.1', sessions: 11 }]), 'R10')).toEqual([
+      'CICLO.1: 11 sedute, oltre le 10 del ciclo nel catalogo',
+    ]);
+    expect(messages(spec([{ serviceCode: 'CICLO.1', quantity: 2 }]), 'R10')).toEqual([
+      'CICLO.1: prestazione a ciclo: quantità 1, e una riga per ogni ciclo',
+    ]);
+    expect(messages(spec([{ serviceCode: 'PROVA.1', sessions: 3 }]), 'R10')).toEqual([
+      'PROVA.1: le sedute si indicano solo per le prestazioni a ciclo',
+    ]);
+    expect(blocks(spec([{ serviceCode: 'PROVA.1', sessions: 3 }]), 'R10')).toBe(true);
+    // Fuori dal catalogo in uso le sedute le controlla il SAR.
+    const manual = { serviceCode: 'NUOVO.1', serviceNationalCode: '99.99.9', sessions: 30 };
+    expect(of(spec([manual]), 'R10')).toEqual([]);
+    // La versione di prima non le guardava.
+    expect(
+      of(spec([{ serviceCode: 'PROVA.1', sessions: 3 }], { date: '2026-11-24' }), 'R10'),
+    ).toEqual([]);
+  });
+
+  it('R24: condizione di erogabilità senza il numero della nota: blocca, e dice come procedere', () => {
+    const c = spec([{ serviceCode: 'PROVA.C' }]);
+    expect(blocks(c, 'R24')).toBe(true);
+    expect(of(c, 'R24')).toEqual([
+      expect.objectContaining({
+        lineId: 'l1',
+        message:
+          'PROVA.C: prestazione con condizione di erogabilità (nota 3): in ricetta va il numero della nota',
+        remedy:
+          'Indica la nota 3 se ricorre la condizione; se non ricorre, la prestazione non è erogabile dal SSN',
+      }),
+    ]);
+    expect(
+      of(spec([{ serviceCode: 'PROVA.C', serviceNote: '3', serviceNoteLetter: 'B' }]), 'R24'),
+    ).toEqual([]);
+    // Senza l'elenco delle note in uso, R24 tace.
+    expect(of(spec([{ serviceCode: 'PROVA.C' }], { serviceNotes: undefined }), 'R24')).toEqual([]);
+  });
+
+  it('R24: con l’indicazione di appropriatezza la nota è facoltativa; una nota diversa o di troppo blocca', () => {
+    expect(of(spec([{ serviceCode: 'PROVA.A' }]), 'R24')).toEqual([]);
+    expect(of(spec([{ serviceCode: 'PROVA.A', serviceNote: '40' }]), 'R24')).toEqual([]);
+    expect(messages(spec([{ serviceCode: 'PROVA.A', serviceNote: '41' }]), 'R24')).toEqual([
+      'PROVA.A: la nota 41 non è quella della prestazione nel nomenclatore (nota 40)',
+    ]);
+    expect(messages(spec([{ serviceCode: 'PROVA.1', serviceNote: '3' }]), 'R24')).toEqual([
+      'PROVA.1: la prestazione PROVA.1 non ha note nel nomenclatore: la nota 3 non va in ricetta',
+    ]);
+  });
+
+  it('R25: al più otto prestazioni della stessa branca, contando le quantità', () => {
+    expect(of(spec([{ serviceCode: 'PROVA.1', quantity: 8 }]), 'R25')).toEqual([]);
+    const nine = spec([
+      { serviceCode: 'PROVA.1', quantity: 5 },
+      { serviceCode: 'PROVA.C', serviceNote: '3', quantity: 4 },
+    ]);
+    expect(blocks(nine, 'R25')).toBe(true);
+    expect(of(nine, 'R25')).toEqual([
+      expect.objectContaining({
+        message: '9 prestazioni della branca «Branca di prova» sulla stessa ricetta: al più 8',
+        remedy: 'Dividi le prestazioni su più ricette, al più 8 della stessa branca su ognuna',
+      }),
+    ]);
+    // Una voce in due branche può contare nell'altra: non si conta.
+    expect(
+      of(spec([{ serviceCode: 'PROVA.1', quantity: 8 }, { serviceCode: 'CICLO.2' }]), 'R25'),
+    ).toEqual([]);
+    // Prima della 2026-11-25.2 R25 non c'era.
+    expect(
+      of(spec([{ serviceCode: 'PROVA.1', quantity: 9 }], { date: '2026-11-24' }), 'R25'),
+    ).toEqual([]);
   });
 });

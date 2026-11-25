@@ -76,8 +76,25 @@ describe('catalogo regionale in vigore (D159)', () => {
         fee: 157.95,
         notes:
           'PRECISAZIONE: [catetere temporaneo, con pompa infusore, con tunnel sottocutaneo] fino ad un massimo di 10 rifornimenti. ESCLUSO: iniezione di farmaco citotossico nel canale vertebrale (03.8), anestesia effettuata per intervento.',
+        cycle: null,
+        sessions: null,
       },
     ]);
+  });
+
+  it('ciclo e numero di sedute (D276): 52 voci a ciclo, tutte con le sedute', () => {
+    const cycles = full.records.filter((r) => r.cycle === true);
+    expect(cycles).toHaveLength(52);
+    expect(cycles.every((r) => typeof r.sessions === 'number' && r.sessions > 0)).toBe(true);
+    // Le sedute solo sulle voci a ciclo, e «no» non si scrive: la colonna stampa solo «S».
+    expect(full.records.filter((r) => r.cycle !== true && r.sessions !== null)).toEqual([]);
+    expect(full.records.filter((r) => r.cycle === false)).toEqual([]);
+    // «Ciclo fino a 4 sedute» nel nomenclatore (allegato 4 del DPCM LEA), in due branche.
+    expect(find(full.records, '93.15').map((r) => [r.branch, r.cycle, r.sessions])).toEqual([
+      ['Medicina Fisica E Riabilitazione', true, 4],
+      ['Ortopedia', true, 4],
+    ]);
+    expect(find(full.records, '93.11.8')[0]).toMatchObject({ cycle: true, sessions: 10 });
   });
 
   it('che cosa è cambiato rispetto al PDF, nei casi del documento di controllo', () => {

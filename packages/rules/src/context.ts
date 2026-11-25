@@ -75,6 +75,12 @@ export interface LineContext {
   serviceCode: string | null;
   /** Codice del nomenclatore («codice DM», codProdPrest), se scritto sulla riga. */
   serviceNationalCode?: string | null;
+  /** Numero della nota del nomenclatore scritto sulla riga (numeroNota; R24, D276). */
+  serviceNote?: string | null;
+  /** Lettera della condizione o dell'indicazione della nota, se scelta (D276). */
+  serviceNoteLetter?: string | null;
+  /** Sedute del ciclo (numsedute; R10, D276). */
+  sessions?: number | null;
   quantity: number;
   aifaNote: string | null;
   notSubstitutable: boolean;
@@ -98,6 +104,24 @@ export interface PlanContext {
   grantedOn: string;
   expiresOn: string;
   packsAuthorized: number | null;
+}
+
+/** Una voce del catalogo regionale delle prestazioni in uso (R10, R18, R25; D154, D276). */
+export interface ServiceCatalogEntry {
+  nationalCode: string | null;
+  /** Le branche del codice nel catalogo: una voce può stare in più branche (R25). */
+  branches?: readonly string[];
+  /** Prestazione a ciclo di sedute (R10). */
+  cycle?: boolean;
+  /** Le sedute al più del ciclo (R10). */
+  sessions?: number | null;
+}
+
+/** La nota del nomenclatore di un codice (DPCM LEA, allegati 4 e 4D; R24, D276). */
+export interface ServiceNoteFacts {
+  note: string;
+  kind: 'condizione' | 'appropriatezza';
+  text: string;
 }
 
 /** Riga di una ricetta già inviata, per il contatore (R11) e i piani (R6). */
@@ -166,7 +190,12 @@ export interface RuleContext {
    * Catalogo regionale delle prestazioni in uso alla data (R10, R18): la voce del codice, o null se
    * il codice non c'è. Assente se nessun catalogo è importato.
    */
-  serviceCatalog?: (code: string) => { nationalCode: string | null } | null;
+  serviceCatalog?: (code: string) => ServiceCatalogEntry | null;
+  /**
+   * Note del nomenclatore in vigore alla data (R24): la nota del codice del nomenclatore, o null se
+   * non ne ha. Assente se l'elenco delle note non è in uso.
+   */
+  serviceNotes?: (nationalCode: string) => ServiceNoteFacts | null;
   /** Righe per cui il medico conferma che il paziente rientra nella nota AIFA (R7). */
   confirmedAifaNotes: ReadonlySet<string>;
   /** Motivi dati dal medico per procedere nonostante un avviso, per regola. */

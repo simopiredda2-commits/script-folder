@@ -147,12 +147,14 @@ describe('lettura del CSV «solo modifiche»', () => {
     'branca',
     'tariffa',
     'note',
+    'ciclo',
+    'sedute',
   ];
 
   it('toglie e aggiunge, con le righe del file', () => {
     const out = parseChanges(mapping, [
       HEADER,
-      ['toglie', '45.30.1', '', '', 'Gastroenterologia', '', ''],
+      ['toglie', '45.30.1', '', '', 'Gastroenterologia', '', '', '', ''],
       [
         'aggiunge',
         '45.30.1A',
@@ -160,6 +162,8 @@ describe('lettura del CSV «solo modifiche»', () => {
         'ASPORTAZIONE O DEMOLIZIONE DI LESIONE DEL DUODENO IN CORSO DI EGDS POLIPECTOMIA',
         'Gastroenterologia',
         '220,10',
+        '',
+        '',
         '',
       ],
     ]);
@@ -176,9 +180,9 @@ describe('lettura del CSV «solo modifiche»', () => {
   it('operazione sconosciuta, codice mancante, campo obbligatorio vuoto: problemi con la riga', () => {
     const out = parseChanges(mapping, [
       HEADER,
-      ['cambia', '45.30.1', '', '', '', '', ''],
-      ['toglie', '', '', '', 'Gastroenterologia', '', ''],
-      ['aggiunge', '45.30.1A', '45.30.1', '', 'Gastroenterologia', '', ''],
+      ['cambia', '45.30.1', '', '', '', '', '', '', ''],
+      ['toglie', '', '', '', 'Gastroenterologia', '', '', '', ''],
+      ['aggiunge', '45.30.1A', '45.30.1', '', 'Gastroenterologia', '', '', '', ''],
     ]);
     expect(out.problems.map((p) => [p.line, p.field])).toEqual([
       [2, 'operazione'],

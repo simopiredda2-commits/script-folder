@@ -379,14 +379,20 @@ export async function buildPromemoriaData(
       const nationalCode = sent?.[i]?.serviceNationalCode ?? l.serviceNationalCode;
       const codes = [nationalCode, l.serviceCode && `(${l.serviceCode})`].filter(Boolean).join(' ');
       const description = l.serviceDescription ?? '';
+      // 18A: tipologia di accesso e, per i cicli, «N.SEDUTE:» con le sedute partite con la ricetta
+      // (D276); ambulatorio, televisita e note del medico non sono nella ricetta.
+      const sessions = sent?.[i]?.sessions ?? l.sessions;
+      // 20: numero della nota, spazio, lettera della condizione o dell'indicazione (D276); il
+      // codice di patologia, nella riga sotto, non si compila. Senza nota «---».
+      const note = (sent?.[i]?.serviceNote ?? l.serviceNote)?.trim();
+      const letter = note ? (sent?.[i]?.serviceNoteLetter ?? l.serviceNoteLetter)?.trim() : null;
       return {
         // 17A: codice nomenclatore (codice catalogo) – descrizione del catalogo.
         prescrizione: [codes && description ? `${codes} – ${description}` : codes || description],
-        // 18A: tipologia di accesso; ambulatorio, televisita, note e sedute non sono nella ricetta.
-        dettagli: accessText,
+        dettagli:
+          [accessText, sessions ? `N.SEDUTE:${sessions}` : null].filter(Boolean).join('-') || null,
         quantita: l.quantity,
-        // 20: le note del DM 9/12/2015 non sono nella ricetta.
-        nota: NO_NOTE,
+        nota: note ? [note, letter].filter(Boolean).join(' ') : NO_NOTE,
       };
     }
     const group = l.drugAic ? (groups.get(l.drugAic) ?? null) : null;

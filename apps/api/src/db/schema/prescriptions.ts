@@ -278,6 +278,20 @@ export const prescriptionLine = pgTable(
      */
     serviceNationalCode: text(),
     serviceDescription: text(),
+    /**
+     * Numero della nota del nomenclatore (numeroNota): condizione di erogabilità o indicazione di
+     * appropriatezza prescrittiva dell'allegato 4D del DPCM LEA (D276).
+     */
+    serviceNote: text(),
+    /** Tipo della nota quando si è fatta la riga: «condizione» o «appropriatezza» (D276). */
+    serviceNoteKind: text(),
+    /**
+     * Lettera della condizione o dell'indicazione scelta dal medico fra quelle della nota
+     * (condErogabilita o approprPrescrittiva, secondo il tipo della nota; D276).
+     */
+    serviceNoteLetter: text(),
+    /** Sedute del ciclo (numsedute), solo per le prestazioni a ciclo (D276). */
+    sessions: integer(),
     /** Confezioni (farmaci) o quantità (prestazioni). */
     quantity: integer().notNull(),
     aifaNote: text(),

@@ -23,7 +23,7 @@ import type {
   StatusResult,
 } from '@mmg/integrations';
 import { systemFor } from '@mmg/integrations';
-import { basePackLimit, painTherapyCodes } from '@mmg/rules';
+import { basePackLimit, painTherapyCodes, type ServiceNoteFacts } from '@mmg/rules';
 import { createHash } from 'node:crypto';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -67,6 +67,12 @@ export interface LineInput {
   serviceCode?: string | null;
   serviceNationalCode?: string | null;
   serviceDescription?: string | null;
+  /** Numero della nota del nomenclatore: assente, lo dà l'elenco in uso; null, nessuna (D276). */
+  serviceNote?: string | null;
+  /** Lettera della condizione o dell'indicazione della nota (D276). */
+  serviceNoteLetter?: string | null;
+  /** Sedute del ciclo (numsedute, D276). */
+  sessions?: number | null;
   quantity: number;
   aifaNote?: string | null;
   byActiveIngredient?: boolean;
@@ -207,6 +213,13 @@ export interface PrescriptionDeps {
   serviceCatalog?: (
     date: string,
   ) => Promise<((code: string) => { nationalCode: string | null } | null) | undefined>;
+  /**
+   * Note del nomenclatore in vigore alla data (D276): danno il numero della nota alle righe che
+   * non lo dicono. Per difetto nessuna nota.
+   */
+  serviceNotes?: (
+    date: string,
+  ) => Promise<((nationalCode: string) => ServiceNoteFacts | null) | undefined>;
   /** Come si fissano i dati del promemoria all'invio: le prove ci mettono un guasto (D232). */
   buildPromemoria?: typeof buildPromemoriaData;
   /**
@@ -245,6 +258,30 @@ function nationalCodeOf(
   const written = l.serviceNationalCode?.trim();
   if (written) return written;
   return l.serviceCode ? (catalog?.(l.serviceCode)?.nationalCode ?? null) : null;
+}
+
+/**
+ * Nota del nomenclatore di una riga di specialistica (D276): quella data con la riga, o, se la riga
+ * non la dice, quella del codice nell'elenco in uso, con il tipo che aveva quando si è fatta la riga.
+ * La lettera resta solo con la nota.
+ */
+function noteOf(
+  l: LineInput,
+  nationalCode: string | null,
+  notes: ((nationalCode: string) => ServiceNoteFacts | null) | undefined,
+): {
+  serviceNote: string | null;
+  serviceNoteKind: string | null;
+  serviceNoteLetter: string | null;
+} {
+  const known = nationalCode ? (notes?.(nationalCode) ?? null) : null;
+  const note = l.serviceNote === undefined ? (known?.note ?? null) : l.serviceNote?.trim() || null;
+  if (!note) return { serviceNote: null, serviceNoteKind: null, serviceNoteLetter: null };
+  return {
+    serviceNote: note,
+    serviceNoteKind: known && known.note === note ? known.kind : null,
+    serviceNoteLetter: l.serviceNoteLetter?.trim().toUpperCase() || null,
+  };
 }
 
 export function createPrescriptionService(deps: PrescriptionDeps) {
@@ -311,6 +348,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     // Le righe di specialistica conservano anche il codice del nomenclatore (D154).
     const catalog =
       input.kind === 'specialist_ssn' ? await deps.serviceCatalog?.(studioDate(now())) : undefined;
+    const notes =
+      input.kind === 'specialist_ssn' ? await deps.serviceNotes?.(studioDate(now())) : undefined;
     return withActor(db, actor.userId, async (tx) => {
       // Il paziente resta fermo fino alla fine (D239): «Sposta» insieme a una ricetta nuova aspetta
       // e la trova aperta; oppure la ricetta trova lo spostamento già fatto e si ferma.
@@ -355,6 +394,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           serviceCode: l.serviceCode ?? null,
           serviceNationalCode: nationalCodeOf(l, catalog),
           serviceDescription: l.serviceDescription ?? null,
+          ...(input.kind === 'specialist_ssn'
+            ? { ...noteOf(l, nationalCodeOf(l, catalog), notes), sessions: l.sessions ?? null }
+            : {}),
           quantity: l.quantity,
           aifaNote: l.aifaNote ?? null,
           byActiveIngredient: l.byActiveIngredient ?? false,
@@ -687,6 +729,11 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         serviceCode: l.serviceCode,
         serviceNationalCode: nationalCodeOf(l, catalog),
         serviceDescription: l.serviceDescription,
+        // Nota del nomenclatore con la lettera, e sedute del ciclo (D276).
+        serviceNote: l.serviceNote,
+        serviceNoteKind: l.serviceNoteKind,
+        serviceNoteLetter: l.serviceNote ? l.serviceNoteLetter : null,
+        sessions: l.sessions,
         quantity: l.quantity,
         aifaNote: l.aifaNote,
         byActiveIngredient: l.byActiveIngredient,

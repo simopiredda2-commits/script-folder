@@ -1,5 +1,12 @@
 import { samePackUnit, type PackUnit } from '@mmg/reference';
-import { checkPrescription, type DrugFacts, type LineContext, type RuleContext } from '@mmg/rules';
+import {
+  checkPrescription,
+  type DrugFacts,
+  type LineContext,
+  type RuleContext,
+  type ServiceCatalogEntry,
+  type ServiceNoteFacts,
+} from '@mmg/rules';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import type { ReferenceData } from '../reference/lookup';
@@ -30,8 +37,10 @@ export interface RulesCheckDeps {
   exemptionExists?: (code: string) => boolean | undefined;
   /** Sostituisce l'elenco regionale esenzione → prestazioni (R17, prove). */
   exemptionServices?: (code: string) => ReadonlySet<string> | undefined;
-  /** Sostituisce il catalogo regionale delle prestazioni (R10, R18, prove). */
-  serviceCatalog?: (code: string) => { nationalCode: string | null } | null;
+  /** Sostituisce il catalogo regionale delle prestazioni (R10, R18, R25, prove). */
+  serviceCatalog?: (code: string) => ServiceCatalogEntry | null;
+  /** Sostituisce le note del nomenclatore (R24, prove). */
+  serviceNotes?: (nationalCode: string) => ServiceNoteFacts | null;
 }
 
 /** Data di oggi nello studio (Europe/Rome), AAAA-MM-GG. */
@@ -94,6 +103,9 @@ export async function buildRuleContext(
       activeIngredient: l.activeIngredient,
       serviceCode: l.serviceCode,
       serviceNationalCode: l.serviceNationalCode,
+      serviceNote: l.serviceNote,
+      serviceNoteLetter: l.serviceNoteLetter,
+      sessions: l.sessions,
       quantity: l.quantity,
       aifaNote: l.aifaNote,
       notSubstitutable: l.notSubstitutable,
@@ -116,10 +128,13 @@ export async function buildRuleContext(
 
   const date = studioDate((deps.now ?? (() => new Date()))());
   let drugFacts = deps.drugFacts;
-  let { exemptionExists, exemptionServices, serviceCatalog } = deps;
+  let { exemptionExists, exemptionServices, serviceCatalog, serviceNotes } = deps;
   if (deps.reference) {
     if (!serviceCatalog && p.kind === 'specialist_ssn') {
       serviceCatalog = await deps.reference.serviceLookup(date);
+    }
+    if (!serviceNotes && p.kind === 'specialist_ssn') {
+      serviceNotes = await deps.reference.serviceNotes(date);
     }
     if (!drugFacts) {
       const known = await deps.reference.drugs(
@@ -186,6 +201,7 @@ export async function buildRuleContext(
       .from(patientChoice)
       .where(and(eq(patientChoice.patientId, p.patientId), isNull(patientChoice.annulledAt))),
     ...(serviceCatalog ? { serviceCatalog } : {}),
+    ...(serviceNotes ? { serviceNotes } : {}),
     exemptions: await db
       .select({ code: exemption.code, validFrom: exemption.validFrom, validTo: exemption.validTo })
       .from(exemption)

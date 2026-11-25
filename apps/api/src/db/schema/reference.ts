@@ -221,8 +221,30 @@ export const refService = pgTable(
     branch: text(),
     fee: numeric({ precision: 12, scale: 2 }),
     notes: text(),
+    /** Prestazione a ciclo di sedute («Prestazione Ciclo» del catalogo; D276). */
+    cycle: boolean(),
+    /** Le sedute al più del ciclo («Numero Sedute» del catalogo; D276). */
+    sessions: integer(),
   },
   (t) => [index().on(t.datasetId, t.regionalCode)],
+);
+
+/**
+ * Note del nomenclatore della specialistica (DPCM LEA, allegati 4 e 4D; D276): per codice del
+ * nomenclatore, il numero della nota, il tipo (condizione di erogabilità o indicazione di
+ * appropriatezza prescrittiva) e il testo.
+ */
+export const refServiceNote = pgTable(
+  'ref_service_note',
+  {
+    id: rowId(),
+    datasetId: datasetId(),
+    nationalCode: text().notNull(),
+    note: text().notNull(),
+    noteKind: text().notNull(),
+    noteText: text().notNull(),
+  },
+  (t) => [index().on(t.datasetId, t.nationalCode)],
 );
 
 export const refExemption = pgTable(
@@ -319,6 +341,7 @@ export const REFERENCE_TABLES = {
   registri_aifa: refDrugRegistry,
   comuni: refMunicipality,
   prestazioni: refService,
+  note_prestazioni: refServiceNote,
   esenzioni: refExemption,
   esenzioni_prestazioni: refExemptionService,
   diagnosi: refDiagnosis,

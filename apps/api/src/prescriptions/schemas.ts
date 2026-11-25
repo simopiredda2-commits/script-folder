@@ -12,6 +12,25 @@ const lineSchema = z
     /** Codice del nomenclatore, «codice DM» (codProdPrest): dal catalogo o scritto a mano (D154). */
     serviceNationalCode: z.string().trim().max(40).nullable().optional(),
     serviceDescription: z.string().max(500).nullable().optional(),
+    /**
+     * Numero della nota del nomenclatore (numeroNota, D276). Assente: lo dà l'elenco delle note in
+     * uso; null: nessuna nota. Lo controlla R24.
+     */
+    serviceNote: z
+      .string()
+      .trim()
+      .regex(/^\d{1,3}[A-Z]?$/, 'Numero della nota non valido')
+      .nullable()
+      .optional(),
+    /** Lettera della condizione o dell'indicazione della nota (D276). */
+    serviceNoteLetter: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z]$/, 'Una lettera della nota')
+      .nullable()
+      .optional(),
+    /** Sedute del ciclo (numsedute, D276): le controlla R10. */
+    sessions: z.number().int().min(1).max(99).nullable().optional(),
     quantity: z.number().int().min(1).max(99),
     aifaNote: z.string().max(20).nullable().optional(),
     byActiveIngredient: z.boolean().optional(),
