@@ -11,18 +11,19 @@ Da verificare con la Dr.ssa Rocca alla seconda fermata. Fonte: «Prescrizioni e 
  Bozza ──────► Da firmare ──────► [In invio] ──► Inviata (NRE)
    ▲  ▲            │   medico firma     │
    │  └────────────┘                    ├──► Errore: rifiutata ── correggi ──► Bozza
-   │                                    ├──► Errore: SAR non raggiungibile ──► Ricetta rossa
-   │                                    ├──► Errore: esito incerto ── riprova l'invio
-   │                                    └──► (servizio fermo) esito segnato dal medico dopo 15 minuti
+   │                                    ├──► Errore: senza esito ──► Ricetta rossa in DPCM (D270)
+   │                                    └──► (servizio fermo) dopo 15 minuti: ricetta rossa, o esito segnato dal medico
    │
  Annullata ◄── da Bozza, Da firmare, Errore (solo locale) o Inviata (tramite SAR)
 ```
+
+«Senza esito» è il SAR non raggiungibile, il tempo scaduto, l'eccezione di sistema del SAR e l'invio interrotto: vale per la ricetta SSN farmaceutica e specialistica (D270, sotto). La ricetta bianca e i presidi restano come prima: con il sistema non raggiungibile si riprova o si stampa la ricetta rossa; con l'esito incerto si riprova l'invio.
 
 - **Bozza**: la prepara il medico, oppure la segreteria per le terapie croniche richieste dal paziente.
 - **Da firmare**: la coda del medico, raggruppata per paziente (`GET /api/ricette/da-firmare`). Le ripetizioni preparate dalla segreteria arrivano qui direttamente.
 - **In invio**: stato tecnico di pochi istanti. Il passaggio è atomico, così la stessa ricetta non parte due volte anche con due clic contemporanei.
 - **Invio rimasto senza risposta** (D233): se il servizio si ferma proprio mentre aspetta il SAR, la ricetta resta «in invio». È subito nella coda «Invii senza risposta» della pagina Ricette (`GET /api/ricette/senza-risposta`), con le sue righe e l'ora da cui si può segnare l'esito: prima di 15 minuti l'invio potrebbe essere ancora in corso, e la ricetta non va rifatta (D239). Dopo i 15 minuti Oggi ne dà il conto. Il medico chiede all'ente se la ricetta è arrivata e segna la risposta (`POST /api/ricette/:id/esito-invio`), dopo averla confermata, perché l'esito non si cambia dopo (D239):
-  - «Non è arrivata»: la ricetta torna in errore come quando il SAR non risponde e la coda «Invii non riusciti» si ricarica; si rimanda o si stampa la ricetta rossa;
+  - «Non è arrivata»: la ricetta torna in errore come quando il SAR non risponde e la coda «Invii non riusciti» si ricarica; si rimanda o si stampa la ricetta rossa. Per la farmaceutica e la specialistica al SAR, al suo posto c'è «Stampa la ricetta rossa» (D270): come vuole la Regione la dematerializzata non si rimanda, e quella che può essere arrivata si annulla da sola;
   - «È arrivata»: con l'NRE dato dall'ente, senza spazi e in maiuscolo come lo vuole il codice a barre, e, per la ricetta SSN (farmaceutica e specialistica), il codice di autenticazione. **Il codice è obbligatorio** (D240, scelta di Simone del 21/11/2026): come nell'invio, senza il codice la ricetta SSN non è valida, quindi non si segna come arrivata. Si chiede all'ente il codice; se l'ente non lo dà, si segna «Non è arrivata». Con il codice il promemoria si stampa come sempre. Per i presidi il codice resta facoltativo, come nell'invio. Per la ricetta bianca servono NRBE e PIN dati dal Sistema TS: il promemoria del Sistema TS non c'è, e al paziente si dettano NRBE e PIN o gli si mandano per SMS. Per i riepiloghi la ricetta è inviata il giorno in cui era partita.
   - **Forma del numero** (audit D259), controllata nella pagina prima della domanda di conferma e di nuovo dal servizio. NRE: 15 caratteri, i primi 5 lettere o cifre, il sesto una cifra da 0 a 7, gli ultimi 9 cifre (Sistema TS, «Web services per la trasmissione delle ricette dematerializzate – parte 1: prescrizione», 05/12/2024, paragrafi 5 e 5.1: «AAA BB C DDDDDDD EE per un totale di 15 caratteri»). NRBE: 12 caratteri, una lettera, una lettera o una cifra, poi 10 cifre; per il paziente con il codice fiscale la prima è la lettera di controllo del codice fiscale mandato con la ricetta e la seconda una cifra (Disciplinare tecnico del DM 1/12/2022, paragrafo 2.4). Il codice di autenticazione e il PIN non hanno un formato nelle specifiche lette: lettere e cifre (l'esempio delle specifiche ha 30 cifre, ma non è una regola).
 
@@ -35,8 +36,8 @@ Da verificare con la Dr.ssa Rocca alla seconda fermata. Fonte: «Prescrizioni e 
 - **Inviata**: il SAR (o il Sistema TS per la ricetta bianca) ha accettato e ha dato l'NRE (l'NRBE per la bianca).
 - **Errore**, con il motivo in chiaro e la coda «Invii non riusciti» (`GET /api/ricette/non-inviate`). Tre casi:
   - **rifiutata**: il sistema ha risposto di no. La ricetta si riporta in bozza, si corregge e si reinvia.
-  - **sistema non raggiungibile**: la ricetta certamente non è arrivata. Si può riprovare oppure stampare la **ricetta rossa**, come dicono i requisiti («se SAR o Sistema TS non rispondono ma il programma sì, si stampa la ricetta rossa; senza rete resta il ricettario a mano»).
-  - **esito incerto**: nessuna risposta in tempo, non si sa se la ricetta è arrivata. Niente ricetta rossa (si rischierebbe un doppione); si riprova l'invio. Come gestire questo caso va verificato sulle specifiche del SAR: i requisiti lo segnano «da verificare».
+  - **sistema non raggiungibile**: la ricetta certamente non è arrivata. Si può riprovare oppure stampare la **ricetta rossa**, come dicono i requisiti («se SAR o Sistema TS non rispondono ma il programma sì, si stampa la ricetta rossa; senza rete resta il ricettario a mano»). Per la farmaceutica e la specialistica al SAR non si riprova: ricetta rossa in DPCM (D270).
+  - **esito incerto**: nessuna risposta in tempo, non si sa se la ricetta è arrivata. Per la ricetta bianca e i presidi niente ricetta rossa (si rischierebbe un doppione); si riprova l'invio. Per la farmaceutica e la specialistica al SAR si fa come vuole la Regione (V06, 4.3.1): ricetta rossa in DPCM, e la dematerializzata si annulla da sola (D270).
 - **Annullata**: prima dell'invio l'annullamento è solo nostro; dopo l'invio passa dal SAR, nei casi ammessi dalle specifiche. Se il SAR non risponde, la ricetta resta inviata. Serve sempre il motivo.
 
 ## Annullamento e stato di erogazione (D70)
@@ -67,7 +68,7 @@ Una ricetta inviata si annulla solo se l'ente non l'ha ancora lavorata. Prima di
 ## Integrazioni
 
 - `packages/integrations`: un'interfaccia comune (`PrescriptionGateway`) per SAR (ricette SSN, poi inoltrate al SAC del Sistema TS) e Sistema TS (ricetta bianca).
-- In sviluppo e nelle prove c'è solo il **simulatore**, con cinque esiti: accettata, rifiutata, non raggiungibile, esito incerto ed eccezione di sistema del SAR (V06, 4.3.1, caso 4), che la ricetta tratta come l'esito incerto (D269). Una prova controlla che il pacchetto non contenga indirizzi di rete né richieste HTTP (regola 7).
+- In sviluppo e nelle prove c'è solo il **simulatore**, con cinque esiti: accettata, rifiutata, non raggiungibile, esito incerto ed eccezione di sistema del SAR (V06, 4.3.1, caso 4), che la ricetta tratta come l'esito incerto (D269); per la farmaceutica e la specialistica, ricetta rossa (D270). Lo stesso simulatore fa il SAR in DPCM. Una prova controlla che il pacchetto non contenga indirizzi di rete né richieste HTTP (regola 7).
 - Ogni chiamata, riuscita o no, resta in `external_submission` con richiesta, risposta, esito e durata: non si modifica e non si cancella.
 
 ## Promemoria e invio (tappa 7)
@@ -102,10 +103,25 @@ La cartella numera da sé le ricette per il SAR (farmaceutica, specialistica e p
 - **Richiesta del lotto**: codice della regione dello studio, tipo 1 (l'unico ammesso in Piemonte), codice fiscale del medico che firma. Solo utente, password e PIN RUPAR (3.1.1): anche chi entra con SPID o CIE deve averli in «Credenziali dei servizi».
 - **Lotto restituito**: regione, raggruppamento, identificativo del lotto del SAR e codice di 6 cifre. Dall'esempio della V06 «010 A0 4 000000» la cartella genera gli NRE da «010A04000000000» a «010A04000000999», cambiando solo il progressivo.
 - **Quando**: alla firma, se al medico restano meno di 100 numeri. Se il lotto non arriva e restano numeri, la ricetta parte con l'avviso. Se non ne restano, la ricetta non parte e il messaggio dice perché.
-- **Numero della ricetta**: preso nella transazione che la porta «in invio», mai uguale per due ricette (lo vieta anche un indice del database). La ricetta lo tiene: dopo un rifiuto si corregge e si rimanda con lo stesso numero (4.3.1, caso 3). Anche dopo un esito incerto o un'eccezione di sistema del SAR si rimanda con lo stesso: se era arrivata, il SAR rifiuta il numero già usato. «È arrivata» vuole il numero partito con l'invio.
+- **Numero della ricetta**: preso nella transazione che la porta «in invio», mai uguale per due ricette (lo vieta anche un indice del database). La ricetta lo tiene: dopo un rifiuto si corregge e si rimanda con lo stesso numero (4.3.1, caso 3). Per i presidi, anche dopo un esito incerto o un'eccezione di sistema del SAR si rimanda con lo stesso: se era arrivata, il SAR rifiuta il numero già usato. Per la farmaceutica e la specialistica senza esito non si rimanda: la ricetta rossa prende un NRE nuovo dal lotto (4.3.1, caso 4; D270). «È arrivata» vuole il numero partito con l'invio.
 - **Registro**: ogni richiesta del lotto resta in `external_submission` (operazione `lotto_nre`), con la ricetta che l'ha fatta partire. I lotti stanno in `nre_lot`, con la ricevuta del SAR, ed entrano nell'esportazione.
 - **Ricetta bianca**: il numero lo dà il Sistema TS, come prima.
 - **Simulatore**: lotti con il raggruppamento «ZZ», riconoscibili come simulati; codici d'errore 02–06 della V06 (4.1); rifiuta un NRE fuori dai lotti, di un altro medico o già usato.
+
+## Ricetta rossa in DPCM (D270)
+
+Quando la ricetta SSN farmaceutica o specialistica non ha esito dal SAR, la Regione vuole la ricetta rossa (SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026, 3.5.1 e 4.3.1, casi 4 e 5). La cartella la stampa sul modulo del Poligrafico e poi la manda al SAR «in modalità DPCM» entro 24 ore (3.4.2), con le regole del Sistema TS («Collegamento telematico in rete dei medici», versione 11 del 1/3/2016) e gli schemi RicettaMIR.xsd 2.1 e TipiDatiMIR.xsd 1.0.7 del 5/9/2011.
+
+- **Quando**: SAR non raggiungibile, tempo scaduto, eccezione di sistema del SAR, invio interrotto dopo 15 minuti (D233). La dematerializzata non si rimanda: il servizio rifiuta «Firma e invia» con «Il SAR non ha dato esito: si stampa la ricetta rossa…». Rifiuti e credenziali rifiutate restano come prima: si sistema e si rimanda. Lo fa solo il medico che può firmare.
+- **Dove**: nel pannello dell'invio della ricetta e della pagina Ricette, «Stampa la ricetta rossa» prende il posto di «Firma e invia»; nella coda «Invii senza risposta» prende il posto di «Non è arrivata» (resta «È arrivata», per quando l'ente ha già dato numero e codice). Dopo la stampa il PDF resta in vista, anche quando la ricetta esce dalla coda, come il promemoria delle ricette inviate.
+- **Il modulo**: il medico legge le 15 cifre del modulo nella stampante, con il lettore di codici a barre o a mano, e sceglie il tipo di visita (ambulatoriale o domiciliare). Il codice dell'ente dev'essere quello della regione dello studio (010 per il Piemonte; disciplinare tecnico del DM 17/3/2008, Allegato 11). La cifra di controllo non si calcola: le fonti non danno il calcolo e il Sistema TS non la usa (7.1). Un modulo non si usa due volte, e lo vieta anche il database. Prima di prendere l'NRE si controlla che il file DPCM si possa fare: un modulo non si spreca per un dato che manca.
+- **L'NRE**: uno nuovo, dal lotto del medico (4.3.1, caso 4; D269), stampato in chiaro e con due codici 3-of-9 come il numero del Poligrafico (4.2.2).
+- **Il PDF** (`GET /api/ricette/:id/ricetta-rossa.pdf`): modulo di 250 × 152,4 mm, caselle in OCR-A, «STAMPA PC» biffata, posizioni misurate sul facsimile dell'Allegato 2 del disciplinare. Va provato con un modulo vero e la stampante dello studio; la posizione dell'NRE è da confermare con il CSI.
+- **Il file DPCM**: una ricetta per file, TipoInvio «RPS», Bar1 e Bar2 dal modulo, Ricetta1 con l'NRE, Ricetta2 con il codice fiscale del medico; PinCode e codice fiscale dell'assistito cifrati (il simulatore usa un prefisso riconoscibile: il certificato della Regione non c'è). Nome del file con «SCRIPT» dopo «_» (6.1.1). Per la specialistica, in Prescrizione2 il catalogo e il tipo di accesso (`CODCATPRESCR=…$TIPOACC=…$`).
+- **La coda**: invio, esito e annullamento della dematerializzata si fanno da soli ogni minuto, e con «Invia adesso» (`POST /api/ricette-rosse/invia`). Utente, password e PIN RUPAR (3.1.1); al più un file ogni 2 secondi per medico; se il SAR non risponde si riprova dopo 1, 5, 15 e poi 60 minuti; l'esito si rilegge ogni 5 minuti finché il file è in attesa, con i messaggi dell'elenco analitico quando ci sono avvisi o errori. Stati: da mandare, mandata (in attesa dell'esito), accolta, accolta con avvisi, scartata. Elenco del medico in `GET /api/ricette-rosse`, con la scadenza delle 24 ore.
+- **Annullamento della dematerializzata**: solo se può essere arrivata (tempo scaduto, eccezione, invio interrotto), con le credenziali della ricetta. Se il SAR non la annulla, il motivo si vede; se non era arrivata, non serve altro.
+- **Registro ed esportazione**: ogni chiamata resta in `external_submission`; la ricetta rossa sta in `dpcm_prescription`, con storico e divieto di cancellazione, ed entra nell'esportazione. La stampa e il PDF finiscono nel registro degli accessi (`ricetta_cartacea`, `stampa_ricetta_rossa`).
+- **Ricetta bianca e presidi**: come prima. La ricetta DPCM ha solo farmaceutica e specialistica; per i presidi è una domanda per il CSI.
 
 ## Da completare (servono le specifiche e le credenziali di collaudo)
 
@@ -113,7 +129,7 @@ La cartella numera da sé le ricette per il SAR (farmaceutica, specialistica e p
 - Lotti di NRE con il SAR vero (D269): se il lotto si possa chiedere prima che finisca, quanti lotti aperti possa avere un medico, con quale codice il SAR rifiuti un NRE già usato. Domande per il CSI.
 - Adattatori veri per SAR e Sistema TS, con l'autenticazione forte (Id-Sessione) del Sistema TS.
 - Casi in cui l'annullamento è ammesso.
-- Modulo di stampa della ricetta rossa.
+- Ricetta rossa (D270): la prova su un modulo vero e la taratura della stampante; la posizione dell'NRE, da confermare con il CSI; la cifratura con il certificato della Regione; variazione e cancellazione di una ricetta DPCM già mandata (RicettaV e RicettaC); i farmaci esclusi dalla dematerializzata (DM 2/11/2011, art. 3); il codice della motivazione di non sostituibilità; l'archivio dei ricettari del medico (7.3 e 7.4); i presidi in DPCM.
 - Promemoria (D217): la frase regionale (campo 28) e la frase sui farmaci in DPC come le restituisce il SAC vero; la validità della specialistica, che oggi viene dalla regola R1 (60 giorni per il primo accesso, 180 per gli altri, D.D. 710/2026; D260), come la riceve il Sistema TS dal Piemonte; i tipi di ricetta diversi da «Assist. SSN»; il codice regionale davanti al nome del medico, da confermare al collaudo. Stampa vera e lettura dei codici in farmacia.
 - Fornitore vero di email e SMS, con le garanzie sul trattamento dei dati.
 - Se il SAR comunica l'erogazione in farmacia; lo stato «sospesa» (6) delle specifiche del Sistema TS nella tavola degli stati di processo, oggi non tra gli stati del prodotto (D70).

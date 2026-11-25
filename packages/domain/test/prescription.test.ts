@@ -89,6 +89,27 @@ describe('ciclo della ricetta', () => {
     if (!uncertain.ok) expect(uncertain.reason).toMatch(/incerto/);
   });
 
+  it('ricetta SSN al SAR senza esito: si stampa la ricetta rossa, non si rimanda (V06, 4.3.1; D270)', () => {
+    const region = { regionFlow: true } as const;
+    for (const lastErrorKind of ['unreachable', 'timeout'] as const) {
+      expect(transition('error', 'print_paper', { ...region, lastErrorKind }).ok).toBe(true);
+      const again = transition('error', 'start_sending', { ...region, lastErrorKind });
+      expect(again.ok, lastErrorKind).toBe(false);
+      if (!again.ok) expect(again.reason).toMatch(/ricetta rossa.*DPCM/);
+    }
+    // Rifiuto e credenziali: si corregge e si rimanda, come prima.
+    expect(transition('error', 'print_paper', { ...region, lastErrorKind: 'rejected' }).ok).toBe(
+      false,
+    );
+    expect(transition('error', 'start_sending', { ...region, lastErrorKind: 'auth' }).ok).toBe(
+      true,
+    );
+    // Invio interrotto: la ricetta rossa anche da «in invio», ma solo dopo l'attesa.
+    expect(transition('sending', 'print_paper', { ...region, interrupted: true }).ok).toBe(true);
+    expect(transition('sending', 'print_paper', { ...region, interrupted: false }).ok).toBe(false);
+    expect(transition('sending', 'print_paper', { interrupted: true }).ok).toBe(false);
+  });
+
   it('un invio in corso non si ripete né si annulla', () => {
     expect(transition('sending', 'start_sending').ok).toBe(false);
     expect(transition('sending', 'cancel').ok).toBe(false);

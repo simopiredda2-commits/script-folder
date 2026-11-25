@@ -1,5 +1,5 @@
 import cookie from '@fastify/cookie';
-import { PRODUCT_NAME } from '@mmg/brand';
+import { COMPANY_BRAND, PRODUCT_NAME } from '@mmg/brand';
 import { eq, sql } from 'drizzle-orm';
 import { prescription } from './db/schema';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -56,12 +56,14 @@ import { registerPatientAdminRoutes } from './http/patient-admin-routes';
 import { registerImportRoutes } from './import/routes';
 import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
+import { createDpcmService } from './prescriptions/dpcm';
 import { createNreLots } from './prescriptions/nre-lots';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import { studioSendTimeoutMs } from './admin/studio-service';
 import type { CredentialService } from '@mmg/domain';
 import {
   FseGatewayClient,
+  isDpcmServices,
   isSarRegionalServices,
   SIMULATED_FSE_AUDIENCE,
   SimulatedDocumentSigner,
@@ -128,6 +130,12 @@ export interface AppDeps {
    * così il lotto e le ricette passano dallo stesso servizio.
    */
   sarServices?: SarRegionalServices;
+  /**
+   * Ricetta rossa in DPCM (D270): ogni quanto la coda prova invii, esiti e annullamenti (per
+   * difetto un minuto; null la ferma, le prove la fanno girare a mano) e l'attesa fra due file dello
+   * stesso medico (per difetto 2 secondi, 6.1.1).
+   */
+  dpcm?: { intervalMs?: number | null; minIntervalMs?: number };
   /** Secondo fattore (Id-Sessione) del Sistema TS e del SIRPED (D102). Per difetto i simulatori. */
   secondFactor?: Record<CredentialService, SecondFactorGateway>;
   /** Certificati di malattia all'INPS tramite il Sistema TS. Per difetto il simulatore. */
@@ -203,6 +211,7 @@ export function buildApp({
   },
   gateways = defaultGateways(secondFactor, regional.gateway),
   sarServices = isSarRegionalServices(gateways.sar) ? gateways.sar : undefined,
+  dpcm: dpcmOptions = {},
   sickLeaveGateway = new SimulatedSickLeaveGateway({ now }),
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
@@ -427,6 +436,47 @@ export function buildApp({
   registerReferenceUpdateRoutes(app, db, referenceUpdates);
   // Alla chiusura si ferma l'orologio e il download in corso (il giro resta «interrotto»).
   app.addHook('onClose', async () => referenceUpdates.stop());
+  // Lotti di NRE (D269) e ricetta rossa in DPCM (D270), se il SAR li dà: i simulatori sì.
+  const nreLots = sarServices
+    ? createNreLots({
+        db,
+        sar: sarServices,
+        environment: gateways.sar.environment,
+        credentials,
+        timeoutMs: async (studioId) => sendTimeoutMs ?? studioSendTimeoutMs(db, studioId),
+      })
+    : undefined;
+  const dpcm =
+    nreLots && isDpcmServices(gateways.sar)
+      ? createDpcmService({
+          db,
+          sar: gateways.sar,
+          dm: gateways.sar,
+          environment: gateways.sar.environment,
+          credentials,
+          nreLots,
+          now: now ?? (() => new Date()),
+          producer: COMPANY_BRAND,
+          ...(dpcmOptions.minIntervalMs !== undefined
+            ? { minIntervalMs: dpcmOptions.minIntervalMs }
+            : {}),
+          equivalenceGroups: async (aics, date) =>
+            new Map(
+              [...(await reference.drugs(aics, date))].map(([aic, d]) => [aic, d.equivalenceGroup]),
+            ),
+          log: (message, err) => app.log.error({ err }, message),
+          auto: dpcmOptions.intervalMs !== null,
+        })
+      : undefined;
+  if (dpcm && dpcmOptions.intervalMs !== null) {
+    const every = dpcmOptions.intervalMs ?? 60_000;
+    app.addHook('onReady', (done) => {
+      dpcm.start(every);
+      done();
+    });
+  }
+  // Alla chiusura la coda si ferma; un giro in corso finisce prima.
+  if (dpcm) app.addHook('onClose', async () => dpcm.stop());
   registerPrescriptionRoutes(
     app,
     createPrescriptionService({
@@ -439,17 +489,8 @@ export function buildApp({
       sendTimeoutMs,
       ...(buildPromemoria ? { buildPromemoria } : {}),
       serviceCatalog: (date) => reference.serviceLookup(date),
-      ...(sarServices
-        ? {
-            nreLots: createNreLots({
-              db,
-              sar: sarServices,
-              environment: gateways.sar.environment,
-              credentials,
-              timeoutMs: async (studioId) => sendTimeoutMs ?? studioSendTimeoutMs(db, studioId),
-            }),
-          }
-        : {}),
+      ...(nreLots ? { nreLots } : {}),
+      ...(dpcm ? { dpcm } : {}),
     }),
     db,
     now ?? (() => new Date()),

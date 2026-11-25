@@ -53,6 +53,8 @@ import {
 } from '../reminders/promemoria';
 import type { createCredentialService } from '../credentials/service';
 import { studioDate } from './rules-check';
+import type { DpcmContent, DpcmService } from './dpcm';
+import { renderRedForm } from './red-form-pdf';
 import type { NreLots } from './nre-lots';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
 
@@ -209,6 +211,12 @@ export interface PrescriptionDeps {
    * Senza, l'NRE lo dà il servizio che riceve la ricetta, come i simulatori di prima.
    */
   nreLots?: NreLots;
+  /**
+   * Ricetta rossa in DPCM (D270): con questa, la ricetta SSN farmaceutica o specialistica senza
+   * esito si stampa sul modulo del Poligrafico e parte in DPCM, come vuole la Regione (V06, 4.3.1).
+   * Senza, il ripiego di prima.
+   */
+  dpcm?: DpcmService;
 }
 
 /** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
@@ -250,8 +258,16 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return row.p;
   }
 
+  /** Ricetta che senza esito passa alla ricetta rossa in DPCM, come vuole la Regione (D270). */
+  const regionFlow = (p: PrescriptionRow) =>
+    !!deps.dpcm && (p.kind === 'pharma_ssn' || p.kind === 'specialist_ssn');
+
   function check(p: PrescriptionRow, event: PrescriptionEvent): PrescriptionStatus {
-    const r = transition(p.status, event, { lastErrorKind: p.lastErrorKind });
+    const r = transition(p.status, event, {
+      lastErrorKind: p.lastErrorKind,
+      regionFlow: regionFlow(p),
+      interrupted: interrupted(p),
+    });
     if (!r.ok) throw new HttpError(409, r.reason);
     return r.to;
   }
@@ -1039,8 +1055,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       .where(eq(prescriptionCheck.prescriptionId, p.id))
       .orderBy(sql`${prescriptionCheck.at} desc`)
       .limit(1);
-    const notArrived =
-      'Non arrivata all’ente, secondo l’ente: si può rimandare o stampare la ricetta rossa';
+    // Per la ricetta SSN al SAR non si rimanda: si stampa la ricetta rossa (V06, 4.3.1; D270).
+    const notArrived = regionFlow(p)
+      ? 'Non arrivata all’ente, secondo l’ente: si stampa la ricetta rossa, che parte poi in DPCM'
+      : 'Non arrivata all’ente, secondo l’ente: si può rimandare o stampare la ricetta rossa';
 
     await withActor(db, actor.userId, async (tx) => {
       const [row] = await tx
@@ -1339,10 +1357,18 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
    * Ripiego sulla ricetta rossa: quando SAR o Sistema TS non rispondono. Restituisce i dati da
    * stampare; il modulo di stampa conforme alle specifiche è da completare.
    */
-  async function printPaper(actor: Actor, id: string) {
+  async function printPaper(actor: Actor, id: string, body?: unknown) {
     const p = await load(id, actor.studioId);
     await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'ricetta_cartacea');
     const to = check(p, 'print_paper');
+    // Ricetta SSN al SAR: modulo del Poligrafico, NRE nuovo e invio in DPCM (D270).
+    if (deps.dpcm && regionFlow(p)) {
+      await ensurePromemoriaPossible(p, actor);
+      return deps.dpcm.print(actor, p, body, {
+        message: await buildMessage(p, actor.userId),
+        interrupted: interrupted(p),
+      });
+    }
     await setStatus(actor, p, to, {
       paperPrintedAt: now(),
       paperPrintedBy: actor.userId,
@@ -1353,6 +1379,30 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       stampa: await buildMessage(p, actor.userId),
       avviso: 'Modulo di stampa conforme: da completare',
     };
+  }
+
+  /**
+   * Il PDF della ricetta rossa stampata in DPCM (D270), come era alla stampa: si ristampa uguale.
+   * L'apertura resta nel registro degli accessi.
+   */
+  async function redFormPdf(actor: Actor, id: string) {
+    const p = await load(id, actor.studioId);
+    await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'stampa_ricetta_rossa');
+    const d = deps.dpcm ? await deps.dpcm.forPrescription(p.id) : null;
+    if (!d) throw new HttpError(404, 'Questa ricetta non è stata stampata sulla ricetta rossa');
+    return renderRedForm((d.content as DpcmContent).stampa);
+  }
+
+  /** Le ricette rosse del medico che le ha stampate, con invio, esito e annullamento (D270). */
+  async function redList(actor: Actor) {
+    return deps.dpcm ? deps.dpcm.list(actor) : [];
+  }
+
+  /** «Invia adesso»: un giro della coda sulle ricette rosse del medico. */
+  async function redRunNow(actor: Actor) {
+    if (!deps.dpcm) return [];
+    await deps.dpcm.runNow(actor);
+    return deps.dpcm.list(actor);
   }
 
   /** Coda «da firmare» del medico, raggruppata per paziente. */
@@ -1588,6 +1638,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     submitForSigning,
     backToDraft,
     signAndSend,
+    redFormPdf,
+    redList,
+    redRunNow,
     settleInterrupted,
     checkOnly,
     cancel,

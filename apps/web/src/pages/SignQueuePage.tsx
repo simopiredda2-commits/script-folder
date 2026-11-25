@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router';
 import { ConfirmQuestion, ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { InterruptedSendPanel } from '../components/InterruptedSendPanel';
+import { RedPrintedNotice, type RedPrinted } from '../components/RedFormPrint';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError } from '../lib/api';
@@ -82,7 +83,7 @@ function QueueItem({
   patientId: string;
   prescription: QueueGroup['ricette'][number];
   status: 'draft' | 'to_sign' | 'error';
-  onChange: (status: string, nre?: string) => void;
+  onChange: (status: string, nre?: string, red?: RedPrinted) => void;
 }) {
   const { list, lines } = useLines(patientId, prescription.id);
   const { isDoctor } = useSession();
@@ -127,6 +128,7 @@ function QueueItem({
           status={status}
           lastErrorKind={prescription.tipoErrore}
           preview={prescription.tipo !== 'white'}
+          redForm={prescription.tipo === 'pharma_ssn' || prescription.tipo === 'specialist_ssn'}
           lineNames={Object.fromEntries(
             lines.map((l) => [l.id, l.drugName ?? l.serviceDescription ?? '']),
           )}
@@ -168,11 +170,18 @@ function Queue({
   const [sent, setSent] = useState<
     { who: string; nre: string; id: string; patientId: string; kind: string }[]
   >([]);
+  // Anche la ricetta rossa stampata esce dalla coda: il PDF da stampare resta qui sopra (D270).
+  const [printed, setPrinted] = useState<{ who: string; id: string; red: RedPrinted }[]>([]);
   if (queue.loading && !queue.data) return <Loading what="ricette" />;
   if (!queue.data) return <ErrorMessage error={queue.error} />;
   const groups = queue.data.pazienti;
-  const done = sent.length > 0 && (
+  const done = (sent.length > 0 || printed.length > 0) && (
     <ul className="elenco-semplice" aria-live="polite">
+      {printed.map((x) => (
+        <li key={x.id}>
+          <RedPrintedNotice red={x.red} who={x.who} />
+        </li>
+      ))}
       {sent.map((x) => (
         <li key={x.nre}>
           <Notice kind="fatto">
@@ -213,7 +222,12 @@ function Queue({
                   patientId={g.paziente.id}
                   prescription={r}
                   status={status}
-                  onChange={(newStatus, nre) => {
+                  onChange={(newStatus, nre, red) => {
+                    if (newStatus === 'paper' && red)
+                      setPrinted((xs) => [
+                        ...xs,
+                        { who: `${g.paziente.nome} ${g.paziente.cognome}`, id: r.id, red },
+                      ]);
                     if (newStatus === 'sent' && nre) {
                       setSent((xs) => [
                         ...xs,
@@ -280,8 +294,11 @@ function InterruptedItem({
           signedBy={r.firmataDa ?? null}
           settleFrom={r.esitoDal ?? null}
           fiscalCode={r.codiceFiscaleInviato ?? patient.codiceFiscale}
+          redForm={r.tipo === 'pharma_ssn' || r.tipo === 'specialist_ssn'}
           onChange={(status) => {
             if (status === 'sent') setArrived(true);
+            // Ricetta rossa: il PDF resta qui, come il promemoria dopo «È arrivata» (D270).
+            else if (status === 'paper') return;
             // «Non è arrivata»: la ricetta passa fra gli invii non riusciti, che si ricaricano.
             else onChanged();
           }}

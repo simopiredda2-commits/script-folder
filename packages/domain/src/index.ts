@@ -19,3 +19,4 @@ export * from './archive-moves';
 export * from './prescription-numbers';
 export * from './asl';
 export * from './nre-lots';
+export * from './poligrafico';

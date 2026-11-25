@@ -57,6 +57,8 @@ export const PRESCRIPTION_TABLES = [
   'prescription_check',
   'prescription_document',
   'reminder_delivery',
+  // Ricetta rossa in DPCM (D270): modulo, NRE, invio, esito e annullamento della dematerializzata.
+  'dpcm_prescription',
 ] as const;
 
 /** Tabelle collegate per certificato: invii all'INPS e consegne di copia e attestato. */

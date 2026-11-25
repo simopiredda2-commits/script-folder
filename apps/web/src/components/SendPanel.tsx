@@ -6,6 +6,7 @@ import { sentence } from '../lib/format';
 import { useSession } from '../lib/session';
 import { ErrorMessage, IssueList, Notice, ResultNotice, type RuleIssue } from './common';
 import { Icon } from './Icon';
+import { RedFormPrint, RedPrintedNotice, type RedPrinted } from './RedFormPrint';
 
 interface CheckResult {
   versioneRegole: string | null;
@@ -36,12 +37,20 @@ export interface SendPanelProps {
   /** Ricetta SSN: prima della firma si vede l'anteprima del promemoria (D253). */
   preview?: boolean;
   /**
+   * Ricetta SSN farmaceutica o specialistica al SAR: senza esito non si rimanda, si stampa la
+   * ricetta rossa sul modulo del Poligrafico, che parte poi in DPCM (V06, 4.3.1; D270).
+   */
+  redForm?: boolean;
+  /**
    * Ricetta del medico in un passo (D255): finito il controllo, se non ha nulla da dire, si firma e
    * si invia da sé; altrimenti ci si ferma sui controlli e si firma da qui.
    */
   autoSign?: boolean;
-  /** Nuovo stato della ricetta dopo un'azione, con l'NRE se è stata inviata. */
-  onChange?: (status: string, nre?: string) => void;
+  /**
+   * Nuovo stato della ricetta dopo un'azione, con l'NRE se è stata inviata e la ricetta rossa se è
+   * stata stampata: la pagina che la toglie dalla coda tiene in vista il PDF (D270).
+   */
+  onChange?: (status: string, nre?: string, red?: RedPrinted) => void;
   /** Torna a modificare la ricetta, dove si può (l'editor): «Modifica la ricetta» (D259). */
   onEdit?: () => void;
   /**
@@ -83,6 +92,7 @@ export function SendPanel({
   lastErrorKind,
   lineNames,
   preview,
+  redForm,
   autoSign,
   onChange,
   onEdit,
@@ -101,6 +111,9 @@ export function SendPanel({
   const [outcome, setOutcome] = useState<SendOutcome | null>(null);
   const [busy, setBusy] = useState(false);
   const [paper, setPaper] = useState<string | null>(null);
+  /** Ricetta rossa in DPCM: modulo aperto ed esito della stampa (D270). */
+  const [redOpen, setRedOpen] = useState(false);
+  const [red, setRed] = useState<RedPrinted | null>(null);
   // Il controllo parte da sé per le ricette che si possono ancora firmare (effetto qui sotto).
   const checkable = status === 'draft' || status === 'to_sign' || status === 'error';
   const [checking, setChecking] = useState(checkable);
@@ -156,6 +169,11 @@ export function SendPanel({
   const unreachable = outcome
     ? outcome.esito === 'unreachable'
     : status === 'error' && lastErrorKind === 'unreachable';
+  // Nessun esito, nemmeno incerto: per la ricetta SSN al SAR si passa alla ricetta rossa (D270).
+  const noOutcome = outcome
+    ? outcome.esito === 'unreachable' || outcome.esito === 'timeout'
+    : status === 'error' && (lastErrorKind === 'unreachable' || lastErrorKind === 'timeout');
+  const toRedForm = !!redForm && noOutcome;
   const aifa = (check?.problemi ?? []).filter((p) => p.needs === 'aifa_confirmation' && p.lineId);
   const warns = [
     ...new Set((check?.problemi ?? []).filter((p) => p.severity === 'warn').map((p) => p.ruleId)),
@@ -230,6 +248,7 @@ export function SendPanel({
     }
   }
 
+  if (red) return <RedPrintedNotice red={red} />;
   if (status === 'to_sign' && !isDoctor) {
     return <Notice kind="fatto">La ricetta è nella coda «da firmare» del medico.</Notice>;
   }
@@ -332,17 +351,34 @@ export function SendPanel({
           </div>
         ))}
       <ErrorMessage error={error} />
-      {unreachable && (
+      {unreachable && !toRedForm && (
         <Notice kind="avviso">
           Il servizio regionale non risponde. Si può riprovare l’invio, oppure stampare la ricetta
           rossa.
         </Notice>
       )}
-      {outcome?.esito === 'timeout' && (
+      {isDoctor && toRedForm && redOpen && (
+        <RedFormPrint
+          prescriptionId={prescriptionId}
+          onPrinted={(r) => {
+            setRed(r);
+            onChange?.('paper', undefined, r);
+          }}
+          onCancel={() => setRedOpen(false)}
+        />
+      )}
+      {toRedForm ? (
         <Notice kind="avviso">
-          Esito incerto: la ricetta potrebbe essere arrivata. Riprova l’invio; la ricetta rossa non
-          si stampa finché l’esito non è chiaro.
+          Il SAR non ha dato esito: come vuole la Regione, si stampa la ricetta rossa, che parte poi
+          in DPCM. Se la ricetta dematerializzata era arrivata, si annulla da sola (V06, 4.3.1).
         </Notice>
+      ) : (
+        outcome?.esito === 'timeout' && (
+          <Notice kind="avviso">
+            Esito incerto: la ricetta potrebbe essere arrivata. Riprova l’invio; la ricetta rossa
+            non si stampa finché l’esito non è chiaro.
+          </Notice>
+        )
       )}
       {outcome?.esito === 'rejected' && (
         <Notice kind="errore">Ricetta respinta dal servizio regionale.</Notice>
@@ -377,7 +413,17 @@ export function SendPanel({
             <Icon name="stampa" /> <span>Anteprima del promemoria (PDF)</span>
           </a>
         )}
-        {isDoctor ? (
+        {isDoctor && toRedForm ? (
+          !redOpen && (
+            <button
+              type="button"
+              className="pulsante pulsante-primario"
+              onClick={() => setRedOpen(true)}
+            >
+              <Icon name="stampa" /> <span>Stampa la ricetta rossa</span>
+            </button>
+          )
+        ) : isDoctor ? (
           <button
             type="button"
             className="pulsante pulsante-primario"
@@ -404,7 +450,7 @@ export function SendPanel({
             </button>
           )
         )}
-        {isDoctor && unreachable && !paper && (
+        {isDoctor && unreachable && !paper && !redForm && (
           <button type="button" className="pulsante" onClick={() => void printPaper()}>
             <Icon name="stampa" /> <span>Stampa la ricetta rossa</span>
           </button>

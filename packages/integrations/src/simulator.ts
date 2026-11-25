@@ -8,6 +8,19 @@ import type {
   SendResult,
   StatusResult,
 } from './prescription-gateway';
+import { DOMParser } from '@xmldom/xmldom';
+import { unzipSync, strFromU8 } from 'fflate';
+import {
+  decryptSimulated,
+  dpcmPackage,
+  SIMULATED_DPCM_CRYPTO,
+  type DpcmAnalyticResult,
+  type DpcmPrescription,
+  type DpcmReceipt,
+  type DpcmSendState,
+  type DpcmServices,
+  type DpcmSummaryResult,
+} from './dpcm';
 import type { SimulatedRegionalAuthorization } from './regional-authorization';
 import type { LotResult, SarRegionalServices } from './sar-services';
 import {
@@ -54,6 +67,29 @@ export interface SimulatorOptions {
   oauth?: SimulatedRegionalAuthorization;
   /** Esito di ogni richiesta del lotto di NRE. Per difetto: assegnato. */
   decideLot?: (input: { regionCode: string; doctorFiscalCode: string }) => SimulatedOutcome;
+  /** Ricetta DPCM: esito della ricevuta di accoglienza. Per difetto: accolta. */
+  decideDpcmReceipt?: (p: DpcmPrescription) => 'accepted' | 'rejected' | 'unreachable' | 'timeout';
+  /**
+   * Ricetta DPCM: stato finale dell'elenco sintetico e messaggi dell'elenco analitico. Per difetto
+   * 2 (senza errori), oppure 3 con l'avviso 2090 se arriva il giorno dopo la compilazione.
+   */
+  decideDpcm?: (p: DpcmPrescription) => {
+    state: Exclude<DpcmSendState, 1>;
+    errors?: { code: string; description: string }[];
+  };
+  /** Quante letture dell'elenco sintetico rispondono «in attesa di elaborazione» (1). Per difetto 1. */
+  dpcmPendingChecks?: number;
+  /** Orologio del simulatore, per il giorno di ricezione delle ricette DPCM. */
+  now?: () => Date;
+}
+
+/** Una ricetta DPCM ricevuta dal simulatore. */
+interface ReceivedDpcm {
+  prescription: DpcmPrescription;
+  xml: string;
+  acceptedAt: Date;
+  checks: number;
+  result: { state: Exclude<DpcmSendState, 1>; errors: { code: string; description: string }[] };
 }
 
 /**
@@ -68,7 +104,11 @@ export interface SimulatorOptions {
  *   lotto «ZZ» che non ricorda l'ha dato prima di un riavvio: lo accetta, senza sapere di chi è.
  * - Ricetta senza NRE: il simulatore ne dà uno di fantasia, riconoscibile dal prefisso «SIM».
  */
-export class SimulatedGateway implements PrescriptionGateway, SarRegionalServices {
+/** Il giorno a Roma, come la data di compilazione della ricetta: il SAR è in Piemonte. */
+const romeDate = (d: Date) =>
+  new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Rome' }).format(d);
+
+export class SimulatedGateway implements PrescriptionGateway, SarRegionalServices, DpcmServices {
   readonly environment = 'simulator' as const;
   private counter = 0;
   /** Codice dell'ultimo lotto dato: parte da un numero a caso (vedi sopra). */
@@ -78,6 +118,11 @@ export class SimulatedGateway implements PrescriptionGateway, SarRegionalService
   private readonly lots = new Map<string, string>();
   /** Richieste del lotto ricevute, per le prove. */
   readonly lotRequests: { regionCode: string; lotType: string; doctorFiscalCode: string }[] = [];
+  /** Ricette DPCM accolte, per protocollo. */
+  private readonly dpcm = new Map<string, ReceivedDpcm>();
+  private dpcmCounter = 0;
+  /** File DPCM ricevuti, per le prove: nome e XML letto dallo zip. */
+  readonly dpcmFiles: { fileName: string; xml: string }[] = [];
   /** Messaggi ricevuti, per le prove. */
   readonly received: PrescriptionMessage[] = [];
   /**
@@ -346,6 +391,182 @@ export class SimulatedGateway implements PrescriptionGateway, SarRegionalService
         CodLotto: lot.lotCode,
         CFMedico: input.doctorFiscalCode,
       },
+    });
+  }
+
+  /** Le credenziali per i servizi DPCM: utente, password e PIN RUPAR, niente token (V06, 3.1.1). */
+  private dpcmAuthProblem(auth: ServiceAuth): { code: string; message: string } | null {
+    if (this.system !== 'sar')
+      return { code: 'SIM-DPCM', message: 'Le ricette DPCM le riceve il SAR (simulato)' };
+    if (auth?.bearer)
+      return {
+        code: 'CREDENZIALI',
+        message: 'Per la ricetta DPCM servono utente, password e PIN RUPAR (V06, 3.1.1) (simulato)',
+      };
+    return authShapeProblem(auth);
+  }
+
+  /**
+   * «invioTelematicoSanita» (6.1.1): compone il file con la cifratura simulata, poi lo legge come il
+   * SAR: nome del file, zip, XML, NRE del lotto del medico. Ricevuta con un protocollo di 23 cifre
+   * che comincia con «99», riconoscibile come simulato.
+   */
+  sendDpcm(
+    input: { prescription: DpcmPrescription; fileName: string },
+    auth: ServiceAuth,
+  ): Promise<DpcmReceipt> {
+    const problem = this.dpcmAuthProblem(auth);
+    const reject = (code: string, message: string, authProblem?: 'credentials') =>
+      Promise.resolve<DpcmReceipt>({
+        outcome: 'rejected',
+        code,
+        message,
+        ...(authProblem ? { authProblem } : {}),
+        raw: { simulatore: this.system, codiceEsito: code },
+      });
+    if (problem) return reject(problem.code, problem.message, 'credentials');
+    const decided = this.options.decideDpcmReceipt?.(input.prescription) ?? 'accepted';
+    if (decided === 'unreachable')
+      return Promise.resolve({
+        outcome: decided,
+        message: `${this.label()} non raggiungibile (simulato)`,
+      });
+    if (decided === 'timeout')
+      return Promise.resolve({
+        outcome: decided,
+        message: `${this.label()}: nessuna risposta in tempo (simulato)`,
+      });
+    if (decided === 'rejected')
+      return reject(
+        '200',
+        "il file non è stato accolto perché c'è un errore nell'applicazione ed è necessario contattare l'assistenza (simulato)",
+      );
+    if (input.fileName.length < 6 || input.fileName.length > 60)
+      return reject(
+        '101',
+        "il campo 'nomeFileAllegato' deve essere di almeno 6 caratteri: il file non è stato accolto",
+      );
+    let xml: string;
+    try {
+      const { zip } = dpcmPackage(input.prescription, {
+        pinCode: auth?.pin ?? '',
+        crypto: SIMULATED_DPCM_CRYPTO,
+        xmlName: input.fileName.replace(/\.zip$/, '.xml'),
+      });
+      const files = Object.values(unzipSync(zip));
+      if (files.length !== 1)
+        return reject('103', 'il file non è stato accolto perché l’allegato è vuoto');
+      xml = strFromU8(files[0]!);
+    } catch (err) {
+      return reject('SIM-STRUTTURA', `File della ricetta non valido (simulato): ${String(err)}`);
+    }
+    const read = this.readDpcm(xml);
+    if (typeof read === 'string') return reject('SIM-STRUTTURA', read);
+    const nreProblem = this.nreProblem(read.nre, read.doctorFiscalCode);
+    if (nreProblem) return reject(nreProblem.code, nreProblem.message);
+    this.issued.set(read.nre, { cancelled: false });
+    this.dpcmFiles.push({ fileName: input.fileName, xml });
+    this.dpcmCounter += 1;
+    const protocol = `99${String(this.dpcmCounter).padStart(21, '0')}`;
+    const acceptedAt = this.options.now?.() ?? new Date();
+    // L'avviso 2090 del manuale dei codici (DPCM 26.3.2008): ricetta ricevuta dopo il giorno di
+    // compilazione; non si corregge.
+    const late = romeDate(acceptedAt) > input.prescription.compiledAt;
+    const result = this.options.decideDpcm?.(input.prescription) ?? {
+      state: late ? 3 : 2,
+      errors: late
+        ? [
+            {
+              code: '2090',
+              description: 'Avviso: Data compilazione precedente alla data di ricezione',
+            },
+          ]
+        : [],
+    };
+    this.dpcm.set(protocol, {
+      prescription: input.prescription,
+      xml,
+      acceptedAt,
+      checks: 0,
+      result: { state: result.state, errors: result.errors ?? [] },
+    });
+    return Promise.resolve({
+      outcome: 'accepted',
+      protocol,
+      acceptedAt: acceptedAt.toISOString(),
+      size: xml.length,
+      raw: { simulatore: this.system, protocolloSAC: protocol, codiceEsito: '000' },
+    });
+  }
+
+  /** I campi che il simulatore controlla, letti dal file come farebbe il SAR. */
+  private readDpcm(xml: string): { nre: string; doctorFiscalCode: string } | string {
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    const one = (name: string) => doc.getElementsByTagName(name)[0]?.textContent ?? '';
+    if (one('TipoInvio') !== 'RPS') return 'TipoInvio diverso da «RPS» (V06, 4.2.1) (simulato)';
+    if (!/^\d{5}$/.test(one('Bar1')) || !/^\d{10}$/.test(one('Bar2')))
+      return 'Bar1 e Bar2 senza il numero del Poligrafico (simulato)';
+    if (!decryptSimulated(one('CodiceAss')) || !decryptSimulated(one('PinCode')))
+      return 'Codice fiscale dell’assistito o PIN non cifrati (V06, 3.1.2) (simulato)';
+    return { nre: one('Ricetta1'), doctorFiscalCode: one('Ricetta2') };
+  }
+
+  /** «elencoSintetico» per protocollo (6.4): la prima lettura dice «in attesa», poi lo stato. */
+  dpcmSummary(input: { protocol: string }, auth: ServiceAuth): Promise<DpcmSummaryResult> {
+    const problem = this.dpcmAuthProblem(auth);
+    if (problem)
+      return Promise.resolve({
+        outcome: 'rejected',
+        ...problem,
+        authProblem: 'credentials',
+        raw: { simulatore: this.system },
+      });
+    const r = this.dpcm.get(input.protocol);
+    if (!r)
+      return Promise.resolve({
+        outcome: 'rejected',
+        code: 'SIM-PROTOCOLLO',
+        message: `Protocollo ${input.protocol} sconosciuto (simulato)`,
+        raw: { simulatore: this.system },
+      });
+    const pending = this.options.dpcmPendingChecks ?? 1;
+    const state: DpcmSendState = r.checks < pending ? 1 : r.result.state;
+    r.checks += 1;
+    return Promise.resolve({
+      outcome: 'ok',
+      state,
+      raw: { simulatore: this.system, protocolloSac: input.protocol, statoInvio: state },
+    });
+  }
+
+  /** «elencoAnalitico» per protocollo (6.5): il codice a barre della ricetta e i messaggi. */
+  dpcmAnalytic(input: { protocol: string }, auth: ServiceAuth): Promise<DpcmAnalyticResult> {
+    const problem = this.dpcmAuthProblem(auth);
+    if (problem)
+      return Promise.resolve({
+        outcome: 'rejected',
+        ...problem,
+        authProblem: 'credentials',
+        raw: { simulatore: this.system },
+      });
+    const r = this.dpcm.get(input.protocol);
+    if (!r)
+      return Promise.resolve({
+        outcome: 'rejected',
+        code: 'SIM-PROTOCOLLO',
+        message: `Protocollo ${input.protocol} sconosciuto (simulato)`,
+        raw: { simulatore: this.system },
+      });
+    const record = {
+      protocol: input.protocol,
+      acceptedAt: r.acceptedAt.toISOString(),
+      barcode: `${r.prescription.bar1}${r.prescription.bar2}`,
+      errors: r.result.errors,
+    };
+    return Promise.resolve({
+      outcome: 'ok',
+      records: [record],
+      raw: { simulatore: this.system, ...record },
     });
   }
 

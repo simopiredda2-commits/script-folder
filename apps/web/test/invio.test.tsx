@@ -429,3 +429,87 @@ describe('con un blocco non si firma: si corregge (audit, D259)', () => {
     expect(screen.queryByText(/La ricetta non può partire/)).toBeNull();
   });
 });
+
+describe('ricetta rossa in DPCM (D270)', () => {
+  /** Servizio finto per la ricetta rossa: dati inventati, nessuna chiamata vera. */
+  function redService() {
+    const calls: { path: string; body: unknown }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        const path = url.split('?')[0]!;
+        calls.push({
+          path: `${init?.method ?? 'GET'} ${path}`,
+          body: init?.body ? (JSON.parse(init.body as string) as unknown) : null,
+        });
+        if (path === '/api/io') return Promise.resolve(json(200, me(['owner_doctor'])));
+        if (path === '/api/ricette/r1/controlla') return Promise.resolve(checked());
+        if (path === '/api/ricette/r1/ricetta-rossa')
+          return Promise.resolve(
+            json(200, {
+              stato: 'paper',
+              nre: '010ZZ4000001042',
+              poligrafico: '010260001234001',
+              pdf: '/api/ricette/r1/ricetta-rossa.pdf',
+              annullamentoDematerializzata: 'da_fare',
+              avviso: null,
+            }),
+          );
+        return Promise.resolve(json(404, { errore: 'Non trovato' }));
+      }),
+    );
+    return calls;
+  }
+  function redPanel(lastErrorKind: string) {
+    render(
+      <SessionProvider>
+        <MemoryRouter>
+          <SendPanel
+            prescriptionId="r1"
+            status="error"
+            lastErrorKind={lastErrorKind}
+            lineNames={{}}
+            preview
+            redForm
+          />
+        </MemoryRouter>
+      </SessionProvider>,
+    );
+  }
+
+  it('senza esito il medico non rimanda: legge il numero del modulo e prepara la ricetta rossa', async () => {
+    const calls = redService();
+    redPanel('timeout');
+    await screen.findByText(/si stampa la ricetta rossa, che parte\s+poi in DPCM/);
+    expect(screen.queryByRole('button', { name: 'Firma e invia' })).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: 'Stampa la ricetta rossa' }));
+    const prepare = screen.getByRole('button', { name: 'Prepara la ricetta rossa' });
+    expect(disabled(prepare)).toBe(true);
+    await userEvent.type(screen.getByLabelText(/Numero del modulo/), '010260001234001');
+    await userEvent.selectOptions(screen.getByLabelText('Tipo di visita'), 'D');
+    await userEvent.click(prepare);
+    await screen.findByText(/Ricetta rossa pronta sul modulo/);
+    expect(screen.getByText(/si annulla da sola/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Stampa sul modulo/ }).getAttribute('href')).toBe(
+      '/api/ricette/r1/ricetta-rossa.pdf',
+    );
+    expect(calls.find((c) => c.path === 'POST /api/ricette/r1/ricetta-rossa')!.body).toEqual({
+      poligrafico: '010260001234001',
+      tipoVisita: 'D',
+    });
+  });
+
+  it('con il SAR non raggiungibile la stessa ricetta rossa', async () => {
+    redService();
+    redPanel('unreachable');
+    await screen.findByRole('button', { name: 'Stampa la ricetta rossa' });
+    expect(screen.queryByRole('button', { name: 'Firma e invia' })).toBeNull();
+  });
+
+  it('con le credenziali rifiutate si sistema l’accesso e si rimanda: niente ricetta rossa', async () => {
+    redService();
+    redPanel('auth');
+    await screen.findByRole('button', { name: /Firma e invia/ });
+    expect(screen.queryByRole('button', { name: 'Stampa la ricetta rossa' })).toBeNull();
+  });
+});

@@ -153,7 +153,7 @@ describe('lotti di NRE (D269)', () => {
     expect((await lotsOf(s.users.titolare.id))[0]!.nextProgressive).toBe(before);
   });
 
-  it('l’eccezione di sistema del SAR è un esito incerto: si rimanda con lo stesso NRE', async () => {
+  it('l’eccezione di sistema del SAR è un esito incerto: ricetta rossa con un NRE nuovo (V06, 4.3.1, caso 4)', async () => {
     const id = await draft();
     sends.push('fault');
     const res = await sign(id);
@@ -161,8 +161,15 @@ describe('lotti di NRE (D269)', () => {
     const first = await row(id);
     expect(first).toMatchObject({ status: 'error', lastErrorKind: 'timeout' });
     expect((await exchanges(id)).at(-1)).toMatchObject({ operation: 'invio', outcome: 'fault' });
-    expect((await sign(id)).json().esito).toBe('accepted');
-    expect((await row(id)).nre).toBe(first.assignedNre);
+    // Non si rimanda con lo stesso NRE: si stampa la ricetta rossa, con un numero nuovo (D270).
+    expect((await sign(id)).statusCode).toBe(409);
+    const red = await post('titolare', `/api/ricette/${id}/ricetta-rossa`, {
+      poligrafico: '010260009876001',
+    });
+    expect(red.statusCode, red.body).toBe(200);
+    expect(red.json().nre).toMatch(/^010ZZ4\d{9}$/);
+    expect(red.json().nre).not.toBe(first.assignedNre);
+    expect(red.json().annullamentoDematerializzata).toBe('da_fare');
   });
 
   it('la ricetta bianca non usa i lotti: il numero lo dà il Sistema TS', async () => {

@@ -155,7 +155,13 @@ describe('ricette in attesa viste dalla segreteria (D242)', () => {
     const interrupted = await section('Invii senza risposta');
     await interrupted.findByText(/firmata da Medico inventato: l’esito lo segna il medico/);
     // Nessun pulsante di firma, di controllo o di esito: sono del medico.
-    for (const name of [/Firma e invia/, /Controlla/, /arrivata/, /Manda alla firma/])
+    for (const name of [
+      /Firma e invia/,
+      /Controlla/,
+      /arrivata/,
+      /Manda alla firma/,
+      /ricetta rossa/,
+    ])
       expect(screen.queryByRole('button', { name }), String(name)).toBeNull();
   });
 
@@ -166,7 +172,9 @@ describe('ricette in attesa viste dalla segreteria (D242)', () => {
     await toSign.findByText('Farmaco di prova 5 mg × 1');
     expect(toSign.queryByText('In attesa della firma del medico.')).toBeNull();
     const interrupted = await section('Invii senza risposta');
-    await interrupted.findByRole('button', { name: /Non è arrivata/ });
+    // Ricetta SSN al SAR: senza esito si stampa la ricetta rossa, come vuole la Regione (D270).
+    await interrupted.findByRole('button', { name: 'Stampa la ricetta rossa' });
+    expect(interrupted.queryByRole('button', { name: /Non è arrivata/ })).toBeNull();
   });
 
   it('alla segreteria i pannelli non compaiono nemmeno se il servizio la dicesse firmabile', async () => {
@@ -178,6 +186,7 @@ describe('ricette in attesa viste dalla segreteria (D242)', () => {
     const interrupted = await section('Invii senza risposta');
     await interrupted.findByText(/l’esito lo segna il medico/);
     expect(screen.queryByRole('button', { name: /arrivata/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /ricetta rossa/ })).toBeNull();
   });
 
   it('chi non è medico né segreteria non chiede le code', async () => {

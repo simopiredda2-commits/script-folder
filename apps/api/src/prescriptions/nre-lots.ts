@@ -286,5 +286,5 @@ export function createNreLots(deps: NreLotDeps) {
       .orderBy(asc(nreLot.receivedAt), asc(nreLot.id));
   }
 
-  return { environment, freeNumbers, ensureNumbers, take, requestLot, lotsOf };
+  return { environment, freeNumbers, ensureNumbers, take, requestLot, lotsOf, regionCodeOf };
 }

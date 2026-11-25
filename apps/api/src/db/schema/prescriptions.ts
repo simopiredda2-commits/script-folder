@@ -178,6 +178,80 @@ export const nreLot = pgTable(
   ],
 );
 
+export const dpcmStatus = pgEnum('dpcm_status', [
+  /** Da mandare al SAR: la coda ci riprova finché non è accolta. */
+  'to_send',
+  /** Accolta, con il protocollo: si aspetta l'esito dei controlli. */
+  'accepted',
+  /** Esito letto: senza errori. */
+  'ok',
+  /** Esito letto: con avvisi, che non si correggono (per esempio 2090). */
+  'warnings',
+  /** Esito letto: errori scartanti, o file scartato del tutto (stati 4 e 5). */
+  'discarded',
+]);
+
+/**
+ * Ricetta rossa in modalità DPCM (D270): la ricetta stampata sul modulo del Poligrafico quando la
+ * ricetta dematerializzata non ha esito (SIRPED, «Cartelle cliniche MMG e PLS», V06, 4.3.1, casi
+ * 4 e 5), mandata poi al SAR con il numero del modulo e un NRE nuovo del lotto del medico (4.2.1),
+ * entro 24 ore dalla compilazione (3.4.2). Se la ricetta dematerializzata può essere arrivata, la
+ * cartella la annulla da sé (4.3.1 e 4.3.2).
+ */
+export const dpcmPrescription = pgTable(
+  'dpcm_prescription',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    prescriptionId: uuid()
+      .notNull()
+      .references(() => prescription.id),
+    /** Il medico che ha stampato e firmato il modulo: il SAR lega l'NRE al suo codice fiscale. */
+    doctorUserId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    /** «simulator», «test» o «production». */
+    environment: text().notNull(),
+    /** Il numero del Poligrafico letto dal modulo, 15 cifre (Bar1 e Bar2). */
+    poligrafico: text().notNull(),
+    /** L'NRE nuovo, dal lotto del medico (Ricetta1). */
+    nre: text().notNull(),
+    nreLotId: uuid().references(() => nreLot.id),
+    printedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** La ricetta come va al SAR, con i dati in chiaro: la cifratura si fa all'invio. */
+    content: jsonb().notNull(),
+    status: dpcmStatus().notNull().default('to_send'),
+    /** ProtocolloSAR della ricevuta di accoglienza (23 cifre). */
+    protocol: text(),
+    acceptedAt: timestamp({ withTimezone: true }),
+    /** Ultimo stato dell'elenco sintetico (da 1 a 5) e messaggi dell'elenco analitico. */
+    sendState: integer(),
+    messages: jsonb(),
+    checkedAt: timestamp({ withTimezone: true }),
+    attempts: integer().notNull().default(0),
+    lastAttemptAt: timestamp({ withTimezone: true }),
+    lastError: text(),
+    /** Quando la coda riprova (invio o lettura dell'esito). */
+    nextAttemptAt: timestamp({ withTimezone: true }),
+    /**
+     * Ricetta dematerializzata da annullare: il suo NRE, se può essere arrivata al SAR (tempo
+     * scaduto o eccezione di sistema). Null se non serve.
+     */
+    dmNre: text(),
+    /** «pending», «done» (annullata), «failed» (il SAR non l'ha annullata: lo dice il messaggio). */
+    dmCancelStatus: text(),
+    dmCancelAttempts: integer().notNull().default(0),
+    dmCancelNextAt: timestamp({ withTimezone: true }),
+    dmCancelError: text(),
+    dmCancelledAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex('dpcm_prescription_prescription_key').on(t.prescriptionId),
+    uniqueIndex('dpcm_prescription_poligrafico_key').on(t.poligrafico),
+    uniqueIndex('dpcm_prescription_nre_key').on(t.nre),
+    index().on(t.doctorUserId, t.status),
+  ],
+);
+
 /** Riga di ricetta: un farmaco (o una prestazione) con la quantità. */
 export const prescriptionLine = pgTable(
   'prescription_line',

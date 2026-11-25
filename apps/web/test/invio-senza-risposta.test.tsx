@@ -62,6 +62,7 @@ const ALL = { promemoria: true, soloNre: true, email: true, sms: true, motivo: n
 /** Il servizio finto: risponde all'esito come la prova chiede, e ne tiene il corpo e le chiamate. */
 function service(settled: (body: Record<string, unknown>) => object, extra: object = {}) {
   const bodies: Record<string, unknown>[] = [];
+  const red: Record<string, unknown>[] = [];
   const calls: string[] = [];
   vi.stubGlobal(
     'fetch',
@@ -91,6 +92,19 @@ function service(settled: (body: Record<string, unknown>) => object, extra: obje
             ],
           }),
         );
+      if (path === '/api/ricette/r1/ricetta-rossa') {
+        const body = JSON.parse(init?.body as string) as Record<string, unknown>;
+        red.push(body);
+        return Promise.resolve(
+          json(200, {
+            nre: '010ZZ4000000002',
+            poligrafico: body.poligrafico,
+            pdf: '/api/ricette/r1/ricetta-rossa.pdf',
+            annullamentoDematerializzata: 'da_fare',
+            avviso: null,
+          }),
+        );
+      }
       if (path === '/api/ricette/r1/esito-invio') {
         const body = JSON.parse(init?.body as string) as Record<string, unknown>;
         bodies.push(body);
@@ -105,7 +119,7 @@ function service(settled: (body: Record<string, unknown>) => object, extra: obje
       return Promise.resolve(json(404, { errore: 'Non trovato' }));
     }),
   );
-  return { bodies, calls };
+  return { bodies, calls, red };
 }
 
 function page() {
@@ -127,12 +141,16 @@ const section = async () =>
 
 describe('invii senza risposta nella pagina Ricette (D233)', () => {
   it('dice quando era partito l’invio, chi l’aveva firmato e che cosa c’era; «Non è arrivata» si conferma e ricarica gli invii non riusciti', async () => {
-    const { bodies, calls } = service(() => ({
-      stato: 'error',
-      nre: null,
-      messaggio:
-        'Non arrivata all’ente, secondo l’ente: si può rimandare o stampare la ricetta rossa',
-    }));
+    // I presidi restano come prima: la ricetta rossa in DPCM è solo farmaceutica e specialistica.
+    const { bodies, calls } = service(
+      () => ({
+        stato: 'error',
+        nre: null,
+        messaggio:
+          'Non arrivata all’ente, secondo l’ente: si può rimandare o stampare la ricetta rossa',
+      }),
+      { tipo: 'devices' },
+    );
     page();
     const s = await section();
     await s.findByRole('link', { name: 'Paola Inventata' });
@@ -160,7 +178,9 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
   });
 
   it('«Torna indietro» non segna niente', async () => {
-    const { bodies } = service(() => ({ stato: 'error', nre: null, messaggio: null }));
+    const { bodies } = service(() => ({ stato: 'error', nre: null, messaggio: null }), {
+      tipo: 'devices',
+    });
     page();
     const s = await section();
     await userEvent.click(
@@ -202,7 +222,7 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     );
     expect(code.required).toBe(true);
     expect(
-      within(form).getByText(/Se l’ente non dà il codice, segna «Non è arrivata»/),
+      within(form).getByText(/Se l’ente non dà il codice, stampa la ricetta rossa/),
     ).toBeTruthy();
     await userEvent.type(within(form).getByLabelText(/Numero di ricetta/), 'MAN000000000002');
     await userEvent.click(within(form).getByRole('button', { name: /È arrivata/ }));
@@ -213,8 +233,45 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     await s.findByText(/Senza il codice di autenticazione la ricetta SSN non è valida/);
     expect(s.queryByText(/Confermi che la ricetta è arrivata/)).toBeNull();
     expect(bodies).toEqual([]);
-    // Resta l'altra strada: «Non è arrivata».
-    expect(s.getByRole('button', { name: 'Non è arrivata: torna da inviare' })).toBeTruthy();
+    // Resta l'altra strada: la ricetta rossa (D270).
+    expect(s.getByRole('button', { name: 'Stampa la ricetta rossa' })).toBeTruthy();
+  });
+
+  it('ricetta SSN al SAR: «Stampa la ricetta rossa» con il numero del modulo; il PDF resta in vista (D270)', async () => {
+    const { bodies, calls, red } = service(() => ({ stato: 'error', nre: null, messaggio: null }));
+    page();
+    const s = await section();
+    await s.findByText(/Come vuole la Regione, si stampa la ricetta rossa/);
+    expect(s.queryByRole('button', { name: /Non è arrivata/ })).toBeNull();
+    await userEvent.click(s.getByRole('button', { name: 'Stampa la ricetta rossa' }));
+    const field = s.getByLabelText(/Numero del modulo nella stampante/);
+    // Senza il numero del modulo non si prepara niente.
+    const prepare = s.getByRole('button', { name: 'Prepara la ricetta rossa' });
+    expect((prepare as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.type(field, '010260001234000');
+    await userEvent.selectOptions(s.getByLabelText('Tipo di visita'), 'D');
+    const before = calls.filter((c) => c === '/api/ricette/senza-risposta').length;
+    await userEvent.click(prepare);
+    await s.findByText(/Ricetta rossa pronta sul modulo/);
+    expect(red).toEqual([{ poligrafico: '010260001234000', tipoVisita: 'D' }]);
+    expect(bodies).toEqual([]);
+    const pdf = s.getByRole('link', { name: 'Stampa sul modulo (PDF)' });
+    expect(pdf.getAttribute('href')).toBe('/api/ricette/r1/ricetta-rossa.pdf');
+    s.getByText(/si annulla da sola/);
+    // La coda non si ricarica: il PDF da stampare resta qui, e il fuoco va al risultato.
+    expect(calls.filter((c) => c === '/api/ricette/senza-risposta').length).toBe(before);
+    expect((document.activeElement as HTMLElement).className).toBe('esito-segnato');
+  });
+
+  it('ricetta SSN al SAR: «Annulla» chiude il modulo senza stampare (D270)', async () => {
+    const { red } = service(() => ({ stato: 'error', nre: null, messaggio: null }));
+    page();
+    const s = await section();
+    await userEvent.click(await s.findByRole('button', { name: 'Stampa la ricetta rossa' }));
+    await userEvent.click(s.getByRole('button', { name: 'Annulla' }));
+    expect(s.queryByLabelText(/Numero del modulo nella stampante/)).toBeNull();
+    s.getByRole('button', { name: 'Stampa la ricetta rossa' });
+    expect(red).toEqual([]);
   });
 
   it('presidi: il codice resta facoltativo, come nell’invio (D240)', async () => {
@@ -313,6 +370,104 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     await s.findByText(/l’esito si segna qui dalle/);
     expect(s.getByText(/Intanto la ricetta non va rifatta/)).toBeTruthy();
     expect(s.queryByRole('button', { name: 'Non è arrivata: torna da inviare' })).toBeNull();
+    expect(s.queryByRole('button', { name: 'Stampa la ricetta rossa' })).toBeNull();
+  });
+});
+
+describe('invii non riusciti: la ricetta rossa stampata esce dalla coda, il PDF resta (D270)', () => {
+  it('nella coda degli invii non riusciti il medico stampa la ricetta rossa; il PDF resta sopra la coda', async () => {
+    let printed = false;
+    const failed = () => ({
+      pazienti: printed
+        ? []
+        : [
+            {
+              paziente: {
+                id: 'p1',
+                nome: 'Paola',
+                cognome: 'Inventata',
+                codiceFiscale: 'XXXXXX00X00X000X',
+              },
+              ricette: [
+                {
+                  id: 'r1',
+                  tipo: 'pharma_ssn',
+                  preparataIl: '2026-11-20T09:00:00Z',
+                  preparataDa: 'Medico inventato',
+                  righe: 1,
+                  errore: 'Il SAR non ha risposto in tempo',
+                  tipoErrore: 'timeout',
+                },
+              ],
+            },
+          ],
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        const path = url.split('?')[0]!;
+        if (path === '/api/io') return Promise.resolve(json(200, me));
+        if (path === '/api/ricette/non-inviate') return Promise.resolve(json(200, failed()));
+        if (path === '/api/ricette/da-firmare' || path === '/api/ricette/senza-risposta')
+          return Promise.resolve(json(200, { pazienti: [] }));
+        if (path === '/api/pazienti/p1/ricette')
+          return Promise.resolve(
+            json(200, {
+              ricette: [
+                {
+                  id: 'r1',
+                  righe: [
+                    {
+                      id: 'l1',
+                      drugName: 'Farmaco di prova 5 mg',
+                      serviceDescription: null,
+                      quantity: 1,
+                    },
+                  ],
+                },
+              ],
+            }),
+          );
+        if (path === '/api/ricette/r1/controlla')
+          return Promise.resolve(
+            json(200, { versioneRegole: 'prova-1', problemi: [], bloccanti: 0 }),
+          );
+        if (path === '/api/ricette/r1/ricetta-rossa' && init?.method === 'POST') {
+          printed = true;
+          return Promise.resolve(
+            json(200, {
+              stato: 'paper',
+              nre: '010ZZ4000000003',
+              poligrafico: '010260001234009',
+              pdf: '/api/ricette/r1/ricetta-rossa.pdf',
+              annullamentoDematerializzata: 'da_fare',
+              avviso: null,
+            }),
+          );
+        }
+        return Promise.resolve(json(404, { errore: 'Non trovato' }));
+      }),
+    );
+    page();
+    const failedQueue = within(
+      (await screen.findByRole('heading', { level: 2, name: 'Invii non riusciti' })).closest(
+        'section',
+      )!,
+    );
+    await userEvent.click(
+      await failedQueue.findByRole('button', { name: 'Stampa la ricetta rossa' }),
+    );
+    await userEvent.type(
+      failedQueue.getByLabelText(/Numero del modulo nella stampante/),
+      '010260001234009',
+    );
+    await userEvent.click(failedQueue.getByRole('button', { name: 'Prepara la ricetta rossa' }));
+    // La coda si ricarica e la ricetta non c'è più; la ricetta rossa con il PDF resta in vista.
+    await failedQueue.findByText(/Ricetta rossa per Paola Inventata pronta sul modulo/);
+    await waitFor(() => expect(failedQueue.queryByText('Farmaco di prova 5 mg × 1')).toBeNull());
+    expect(
+      failedQueue.getByRole('link', { name: 'Stampa sul modulo (PDF)' }).getAttribute('href'),
+    ).toBe('/api/ricette/r1/ricetta-rossa.pdf');
   });
 });
 

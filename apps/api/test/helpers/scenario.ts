@@ -98,6 +98,7 @@ export async function createScenario(
     | 'aura'
     | 'ppipPortal'
     | 'fseAccess'
+    | 'dpcm'
   > & {
     /** Aggiornamento delle banche dati (D156), costruito con l'orologio della prova. */
     referenceUpdates?: (now: () => Date) => NonNullable<AppDeps['referenceUpdates']>;
@@ -413,7 +414,7 @@ export async function createScenario(
   );
 
   // L'ora di partenza è già nell'orologio: al servizio vanno le altre opzioni.
-  const { referenceUpdates, clockAt, environment, ...deps } = appOptions;
+  const { referenceUpdates, clockAt, environment, dpcm, ...deps } = appOptions;
   void clockAt;
   const app = buildApp({
     db,
@@ -425,6 +426,8 @@ export async function createScenario(
     },
     now: clock.now,
     ...deps,
+    // La coda della ricetta rossa (D270) gira solo quando la prova la chiama, senza i 2 secondi.
+    dpcm: dpcm ?? { intervalMs: null, minIntervalMs: 0 },
     ...(referenceUpdates ? { referenceUpdates: referenceUpdates(clock.now) } : {}),
     secondFactor,
   });

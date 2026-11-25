@@ -82,13 +82,13 @@ Le scelte prese senza Simone, ognuna con il motivo e con che cosa toccare per ca
 
 **D35 · Stato tecnico «in invio».** Fra «da firmare» e «inviata» c'è uno stato di pochi istanti, preso con un aggiornamento atomico: due firme contemporanee non producono due invii. Una prova con una barriera lo verifica davvero.
 
-**D36 · Esito incerto distinto da sistema non raggiungibile.** Se il SAR non risponde in tempo non si sa se la ricetta è arrivata: niente ricetta rossa (rischio di doppione), si riprova l'invio. La ricetta rossa solo quando il sistema è certamente irraggiungibile. Da verificare sulle specifiche del SAR, come chiedono i requisiti.
+**D36 · Esito incerto distinto da sistema non raggiungibile.** Se il SAR non risponde in tempo non si sa se la ricetta è arrivata: niente ricetta rossa (rischio di doppione), si riprova l'invio. La ricetta rossa solo quando il sistema è certamente irraggiungibile. Da verificare sulle specifiche del SAR, come chiedono i requisiti. **Cambiata da D270** per la ricetta SSN farmaceutica e specialistica al SAR: senza esito, anche incerto, si stampa la ricetta rossa, che parte in DPCM; la dematerializzata che può essere arrivata si annulla da sé (V06, 4.3.1).
 
 **D37 · Ripetizione: una ricetta per terapia** (superata dalla D49). Semplice e sempre entro i limiti di confezioni per ricetta; la segreteria la mette nella coda «da firmare», il medico la trova in bozza. Raggruppare più farmaci in una ricetta si può aggiungere quando le regole delle confezioni (R2–R4) sono attive.
 
 **D38 · Numeri di ricetta del simulatore riconoscibili.** `SIMR…` (SAR) e `SIMB…` (bianca): il formato vero è nelle specifiche del Sistema TS, da riprendere con l'adattatore vero.
 
-**D39 · Un errore imprevisto dell'adattatore vale come esito incerto.** Se il codice dell'adattatore si guasta non si sa se la ricetta è partita: la scelta prudente.
+**D39 · Un errore imprevisto dell'adattatore vale come esito incerto.** Se il codice dell'adattatore si guasta non si sa se la ricetta è partita: la scelta prudente. **Cambiata da D270** per la ricetta SSN farmaceutica e specialistica al SAR: senza esito, anche incerto, si stampa la ricetta rossa, che parte in DPCM; la dematerializzata che può essere arrivata si annulla da sé (V06, 4.3.1).
 
 **D40 · Il corpo delle richieste si valida dopo la guardia.** Anche una richiesta sbagliata su un paziente finisce nel registro degli accessi.
 
@@ -1569,7 +1569,7 @@ Come si fa:
 
 Prove: 34 nuove e una cambiata. In tutto 54 sabotaggi, ognuno rosso con il guasto e verde dopo il ripristino.
 
-**D233 · Risposte della fermata dopo l'unione della #25: ricetta e certificato fermi «in invio».** Via alla #26, unita con le verifiche su GitHub verdi. Per la ricetta che resta «in invio» se il servizio si ferma mentre aspetta il SAR, Simone ha scelto «Come le PPIP, ora»; per il dopo, «Ricetta, poi pausa».
+**D233 · Risposte della fermata dopo l'unione della #25: ricetta e certificato fermi «in invio».** Via alla #26, unita con le verifiche su GitHub verdi. Per la ricetta che resta «in invio» se il servizio si ferma mentre aspetta il SAR, Simone ha scelto «Come le PPIP, ora»; per il dopo, «Ricetta, poi pausa». **Cambiata da D270** per la ricetta SSN farmaceutica e specialistica al SAR: senza esito, anche incerto, si stampa la ricetta rossa, che parte in DPCM; la dematerializzata che può essere arrivata si annulla da sé (V06, 4.3.1).
 
 Scelte prese qui, con il motivo:
 
@@ -2123,3 +2123,50 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Simulatore.** Dà i lotti con il raggruppamento «ZZ», che li riconosce come simulati. I codici partono da un numero a caso, perché dopo un riavvio non ridia un lotto che il database ha già. Rifiuta con i codici della V06 e vuole utente, password e PIN. Controlla che l'NRE sia di un lotto del medico che firma e non già usato. I lotti «ZZ» dati prima di un riavvio li accetta, perché non li ricorda più.
 - **Esportazione**: i lotti da cui vengono i numeri delle ricette dell'archivio (`nre_lot`).
 - **Non provato**: il SAR vero. Restano domande per il CSI: se il lotto si possa chiedere prima che finisca, quanti lotti aperti possa avere un medico, con quale codice il SAR rifiuti un NRE già usato.
+
+**D270 · Ricetta rossa in DPCM e ricetta senza esito come la Regione.** Come si costruiscono le risposte 1 e 2 di D266. Cambiano D36, D39 e D233 per la ricetta SSN farmaceutica e specialistica che va al SAR.
+
+- **Fonti.**
+  - SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026: 3.1.1, 3.4, 3.5.1, 4.2.1–4.2.3, 4.3.1 e 4.3.2.
+  - Sistema TS, «Collegamento telematico in rete dei medici», versione 11 del 1/3/2016: 6.1, 6.4, 6.5 e capitolo 7.
+  - Sistema TS, «WSDL e schemi XSD» del 5/9/2011: RicettaMIR.xsd 2.1 e TipiDatiMIR.xsd 1.0.7.
+  - Manuale dei codici d'errore DPCM 26/3/2008, per l'avviso 2090.
+  - Disciplinare tecnico del DM 17/3/2008, comma 2: modulo, codice della ricetta, Allegati 2 e 11.
+- **Senza esito, la ricetta rossa.** Tempo scaduto, eccezione di sistema del SAR, SAR non raggiungibile e invio interrotto (D233): la ricetta dematerializzata non si rimanda (V06, 3.5.1 e 4.3.1, casi 4 e 5). Il medico stampa la ricetta rossa. Le credenziali rifiutate e i rifiuti restano come prima: si sistema e si rimanda.
+- **Il modulo.** Il medico legge le 15 cifre del modulo nella stampante: con il lettore di codici a barre o a mano.
+  - La cifra di controllo non si calcola: le fonti non danno il calcolo e il Sistema TS non la usa (7.1).
+  - Il codice dell'ente dev'essere quello della regione dello studio (010 per il Piemonte, Allegato 11).
+  - Un modulo non si usa due volte; lo vieta anche il database.
+  - Prima di prendere il numero si controlla che il file DPCM si possa fare: un modulo non si spreca per un dato che manca.
+- **L'NRE.** Uno nuovo, dal lotto del medico (V06, 4.3.1, caso 4; D269), stampato in chiaro e a barre (4.2.2).
+- **Il PDF.** Modulo di 250 × 152,4 mm, caselle in OCR-A, «STAMPA PC» biffata. L'NRE va in due codici 3-of-9 come il numero del Poligrafico (5 e 10 caratteri), con barre di 7,5 mm e modulo di 0,254 mm.
+  - Le posizioni sono misurate sul facsimile dell'Allegato 2, in scala per la parte della ricetta (2,78 punti per millimetro).
+  - La posizione dell'NRE è una scelta mia: la V06 dice solo «accanto alla denominazione dell'ente», e lì non c'è posto per 7,5 mm di barre. Va nella fascia libera sopra il codice fiscale; il testo in chiaro sta dentro il riquadro dell'ente.
+  - Da controllare con un modulo vero e da confermare con il CSI. Il PDF prevede uno spostamento per tarare la stampante, che si regolerà nelle impostazioni di stampa.
+- **Il file DPCM.** Una ricetta per file, nell'ordine degli elementi dello schema, solo caratteri «BasicLatin».
+  - TipoInvio «RPS», Bar1 e Bar2 dal modulo, Ricetta1 con l'NRE, Ricetta2 con il codice fiscale del medico.
+  - PinCode e codice fiscale dell'assistito cifrati con il certificato della Regione, che oggi non c'è: il simulatore usa un prefisso riconoscibile.
+  - Per la farmaceutica: AIC, gruppo di equivalenza dalle banche dati e nota AIFA. Per la specialistica: codice del nomenclatore, descrizione, diagnosi o quesito e priorità; in Prescrizione2 il catalogo e il tipo di accesso, 1 o 0 come nella ricetta dematerializzata (D79).
+  - Nome del file con «SCRIPT» dopo «_», come chiede il manuale (6.1.1).
+- **La coda.** Invio, esito e annullamento della dematerializzata si fanno da soli, ogni minuto, e con «Invia adesso».
+  - Invio con utente, password e PIN RUPAR (V06, 3.1.1), al più un file ogni 2 secondi per medico.
+  - Se il SAR non risponde si riprova dopo 1, 5, 15 e poi 60 minuti (scelta mia).
+  - L'esito si rilegge ogni 5 minuti finché il file è «in attesa» (scelta mia). Con avvisi o errori si leggono i messaggi dell'elenco analitico.
+  - Attesa della risposta di 30 secondi: l'invio DPCM non è sincrono (scelta mia).
+  - Ogni chiamata resta nel registro degli invii e nella cronologia della ricetta.
+- **Annullamento della dematerializzata.** Solo se può essere arrivata: tempo scaduto, eccezione o invio interrotto. Non con il SAR non raggiungibile, né con «Non è arrivata».
+  - Usa le credenziali della ricetta (secondo fattore o token): se mancano, si riprova e il motivo si vede.
+  - Se il SAR non la annulla (per esempio perché non c'è), lo si scrive; dal portale del SAR il medico controlla.
+- **Esportazione**: la tabella della ricetta rossa entra con le ricette (`dpcm_prescription`), che ha storico e divieto di cancellazione come gli altri dati dei pazienti.
+- **Nell'interfaccia** (scelte mie).
+  - «Stampa la ricetta rossa» prende il posto di «Firma e invia» e, nell'invio rimasto senza risposta, di «Non è arrivata»: la dematerializzata non si rimanda, e l'annullamento parte da sé se può essere arrivata. «È arrivata» resta, per quando l'ente ha già dato numero e codice.
+  - Dopo la stampa il PDF resta nella pagina anche quando la ricetta esce dalla coda, come il promemoria delle ricette inviate; nella pagina della ricetta resta ricordato con la bozza.
+  - «Non è arrivata» segnato prima, per una farmaceutica o una specialistica al SAR, dice di stampare la ricetta rossa.
+  - Due stampe nello stesso istante sullo stesso modulo: la seconda si ferma con il messaggio del modulo già usato.
+- **Ricetta bianca e presidi**: come prima. La ricetta DPCM ha solo farmaceutica e specialistica (TipoPrescrizione F o P); per i presidi è una domanda per il CSI.
+- **Non fatto**:
+  - la variazione e la cancellazione di una ricetta DPCM già mandata (RicettaV e RicettaC);
+  - i farmaci esclusi dalla ricetta dematerializzata (DM 2/11/2011, art. 3), che vanno sempre sulla ricetta rossa;
+  - il codice della motivazione di non sostituibilità in Prescrizione1 (oggi c'è solo il testo);
+  - l'archivio dei ricettari del medico (7.3 e 7.4).
+- **Non provato**: il SAR vero, la cifratura vera, la stampa su un modulo vero.
