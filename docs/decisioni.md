@@ -2104,3 +2104,22 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Richiesta, ritorno e revoca.** La richiesta di accesso conserva il `client_id` con cui è partita: il ritorno usa quello, anche se nel frattempo l'ASL è cambiata. La revoca usa l'`aud` del token: è il `client_id` che lo ha chiesto, come vuole la V08 (4.3.5).
 - **Simulatori.** Rifiutano, come farebbe il servizio vero, un `client_id`, un `X-Gestionale` o un'«APP» senza le tre cifre dell'ASL. Il servizio regionale simulato rifiuta anche la verifica e la revoca con un `client_id` diverso da quello del token.
 - **Non provato**: i codici veri. Il codice del gestionale lo dà la Regione con l'autocertificazione; quali `client_id` registra (uno per ASL o la forma soltanto) si vede con il kit del CSI.
+
+**D269 · Lotti di NRE: la cartella numera da sé le ricette per il SAR.** Come si costruisce la risposta 2 di D266 («lotti di NRE con i simulatori»).
+
+- **Fonti.** SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026: 3.1.1 (credenziali), 3.2 (in Piemonte solo il lotto di tipo 1, 1000 NRE), 4.1 (richiesta del lotto, esempio «010 A0 4 000000», codici d'errore da 02 a 06), 4.3.1 (esiti dell'invio). Sistema TS, «Gestione del numero ricetta elettronica», versione 2 del 21/05/2012, §2 e §2.1 (forma dell'NRE).
+- **Il lotto.** Lo chiede il medico che firma, con il suo codice fiscale, il codice della regione dello studio (dall'elenco delle ASL, D267) e il tipo 1. Il SAR restituisce un lotto «estratto»: regione, raggruppamento, identificativo del lotto del SAR e un codice di 6 cifre. La cartella genera gli NRE con il progressivo, da 000 a 999. Il lotto si conserva con la ricevuta del SAR (`nre_lot`), per ambiente: i numeri di un simulatore non vanno al servizio vero. Un lotto che non dà 1000 NRE di 15 caratteri, o di un'altra regione, non si usa.
+- **Credenziali.** Solo utente, password e PIN RUPAR (V06, 3.1.1): niente secondo fattore e niente token. Chi entra con SPID o CIE deve avere salvate anche le credenziali RUPAR; se mancano, la firma si ferma con un messaggio che lo dice.
+- **Quando si chiede.** Alla firma di una ricetta per il SAR, quando al medico restano meno di 100 numeri. La soglia è una scelta mia: le fonti non ne danno una, e con un decimo del lotto le ricette partono anche quando il SAR non risponde.
+  - Se il SAR non dà il lotto e restano numeri, la ricetta parte con quelli e il medico vede l'avviso; si riprova alla firma dopo.
+  - Se non restano numeri, la ricetta non parte e resta com'era; il messaggio dice perché.
+  - Ogni richiesta resta nel registro degli invii, con la ricetta che l'ha fatta partire, e si vede nella sua cronologia.
+- **Il numero della ricetta.** Si prende nella stessa transazione che porta la ricetta «in invio». Due firme insieme non hanno mai lo stesso NRE, e se la ricetta è cambiata nel frattempo il numero torna al lotto. Si consuma prima il lotto più vecchio.
+  - La ricetta tiene il suo numero (`assigned_nre`): dopo un rifiuto con errori bloccanti si corregge e si rimanda con lo stesso (V06, 4.3.1, caso 3).
+  - Un indice unico del database vieta lo stesso NRE su due ricette, anche annullate o mai partite.
+  - Con «È arrivata» (D233) il numero dev'essere quello partito con l'invio.
+- **Esito incerto.** Il tempo scaduto e l'eccezione di sistema del SAR (V06, 4.3.1, casi 5 e 4) restano come oggi (D233): esito incerto e nuovo invio, con lo stesso NRE. Se la ricetta era arrivata, il SAR rifiuta il numero già usato. L'eccezione resta tale nel registro degli invii. Il percorso della Regione (ricetta rossa, annullamento, DPCM) arriva con la ricetta rossa (D266, risposta 1).
+- **Ricetta bianca**: invariata, il numero lo dà il Sistema TS.
+- **Simulatore.** Dà i lotti con il raggruppamento «ZZ», che li riconosce come simulati. I codici partono da un numero a caso, perché dopo un riavvio non ridia un lotto che il database ha già. Rifiuta con i codici della V06 e vuole utente, password e PIN. Controlla che l'NRE sia di un lotto del medico che firma e non già usato. I lotti «ZZ» dati prima di un riavvio li accetta, perché non li ricorda più.
+- **Esportazione**: i lotti da cui vengono i numeri delle ricette dell'archivio (`nre_lot`).
+- **Non provato**: il SAR vero. Restano domande per il CSI: se il lotto si possa chiedere prima che finisca, quanti lotti aperti possa avere un medico, con quale codice il SAR rifiuti un NRE già usato.

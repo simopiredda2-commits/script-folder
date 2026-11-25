@@ -75,12 +75,18 @@ describe('ciclo della ricetta', () => {
     expect(sent.json()).toMatchObject({ esito: 'accepted' });
     const row = await status(id);
     expect(row.status).toBe('sent');
-    expect(row.nre).toMatch(/^SIMR\d{12}$/);
+    // L'NRE è del lotto del medico, dato dal simulatore del SAR con il raggruppamento «ZZ» (D269).
+    expect(row.nre).toMatch(/^010ZZ4\d{9}$/);
+    expect(row.assignedNre).toBe(row.nre);
     expect(row.signedBy).toBe(s.users.titolare.id);
   });
 
   it('ogni invio esterno conserva richiesta, risposta ed esito, e non si modifica', async () => {
-    const rows = await t.db.select().from(externalSubmission);
+    // Il primo è la richiesta del lotto di NRE (D269); poi l'invio della ricetta.
+    const rows = await t.db
+      .select()
+      .from(externalSubmission)
+      .where(eq(externalSubmission.operation, 'invio'));
     expect(rows.length).toBeGreaterThan(0);
     const r = rows[0]!;
     expect(r.system).toBe('sar');

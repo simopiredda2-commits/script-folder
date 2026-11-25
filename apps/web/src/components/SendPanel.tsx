@@ -15,8 +15,13 @@ interface CheckResult {
 
 type SendOutcome =
   /** Con il messaggio quando il promemoria non si è potuto fissare (D232). */
-  | { esito: 'accepted'; nre: string; messaggio: string | null }
-  | { esito: 'rejected' | 'unreachable' | 'timeout' | 'auth'; nre: null; messaggio: string };
+  (
+    | { esito: 'accepted'; nre: string; messaggio: string | null }
+    | { esito: 'rejected' | 'unreachable' | 'timeout' | 'auth'; nre: null; messaggio: string }
+  ) & {
+    /** Il lotto successivo di numeri di ricetta non è arrivato, ma ne restano (D269). */
+    avviso?: string | null;
+  };
 
 export interface SendPanelProps {
   prescriptionId: string;
@@ -235,6 +240,7 @@ export function SendPanel({
           Ricetta inviata. NRE <span className="codice">{outcome.nre}</span>
         </Notice>
         {outcome.messaggio && <Notice kind="avviso">{outcome.messaggio}</Notice>}
+        {outcome.avviso && <Notice kind="avviso">{outcome.avviso}</Notice>}
       </>
     );
   }
@@ -341,6 +347,7 @@ export function SendPanel({
       {outcome?.esito === 'rejected' && (
         <Notice kind="errore">Ricetta respinta dal servizio regionale.</Notice>
       )}
+      {outcome?.avviso && <Notice kind="avviso">{outcome.avviso}</Notice>}
       {outcome?.esito === 'auth' && (
         <Notice kind="errore">
           <p>

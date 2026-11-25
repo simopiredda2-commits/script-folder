@@ -73,7 +73,8 @@ export function registerPrescriptionRoutes(
 
   app.post('/api/ricette/:id/firma-e-invia', scoped, async (req) => {
     const r = await service.signAndSend(req.actor!, idParams.parse(req.params).id, req.body);
-    return { esito: r.outcome, nre: r.nre, messaggio: r.messaggio };
+    // `avviso`: il lotto successivo di NRE non è arrivato, ma restano numeri (D269).
+    return { esito: r.outcome, nre: r.nre, messaggio: r.messaggio, avviso: r.avviso };
   });
 
   // Esito di un invio rimasto senza risposta, chiesto all'ente dal medico (D233).

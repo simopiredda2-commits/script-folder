@@ -1,3 +1,4 @@
+import { NRE_LOT_SIZE, nreLotPrefix } from '@mmg/domain';
 import {
   SimulatedGateway,
   SimulatedRegionalAuthorization,
@@ -7,6 +8,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   doctorProfile,
+  nreLot,
   serviceCredential,
   serviceCredentialEvent,
   serviceSession,
@@ -117,6 +119,27 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     return req('POST', `/api/ricette/${d.json<{ id: string }>().id}/firma-e-invia`, 'titolare', {});
   };
 
+  /** Un lotto di NRE avuto prima, con utente, password e PIN RUPAR (V06, 3.1.1; D269). */
+  const giveLot = async () => {
+    const [p] = await t.db
+      .select({ fiscalCode: doctorProfile.fiscalCode })
+      .from(doctorProfile)
+      .where(eq(doctorProfile.userId, s.users.titolare.id));
+    const r = await sar.requestLot(
+      { regionCode: '010', lotType: '1', doctorFiscalCode: p!.fiscalCode! },
+      { username: 'utente-di-prova', password: 'parola-di-prova', pin: '1234' },
+    );
+    if (r.outcome !== 'assigned') throw new Error('atteso un lotto');
+    await t.db.insert(nreLot).values({
+      doctorUserId: s.users.titolare.id,
+      doctorFiscalCode: p!.fiscalCode!,
+      environment: 'simulator',
+      ...r.lot,
+      prefix: nreLotPrefix(r.lot),
+      size: NRE_LOT_SIZE,
+    });
+  };
+
   it('solo il medico avvia l’accesso regionale', async () => {
     expect(
       (await req('POST', '/api/profilo/credenziali/rupar/accesso-regionale', 'segreteria'))
@@ -148,6 +171,17 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     const left = Date.parse(st.sessione.scadeIl!) - s.clock.now().getTime();
     expect(left).toBeGreaterThan(8 * 3_600_000 - 1000);
     expect(left).toBeLessThanOrEqual(8 * 3_600_000);
+    // Il lotto di NRE vuole utente, password e PIN RUPAR anche con il token (V06, 3.1.1; D269):
+    // senza credenziali e senza numeri la ricetta non parte, e il messaggio lo dice.
+    const refused = await sendPrescription();
+    expect(refused.statusCode, refused.body).toBe(422);
+    expect(refused.json().errore).toMatch(
+      /servono utente, password e PIN RUPAR del medico, anche con l’accesso con SPID o CIE/,
+    );
+    // Al SAR non è partita nessuna richiesta: il token non si manda per il lotto.
+    expect(sar.lotRequests).toHaveLength(0);
+    // Con un lotto avuto prima, la ricetta parte con il token.
+    await giveLot();
     const sent = await sendPrescription();
     expect(sent.json(), sent.body).toMatchObject({ esito: 'accepted' });
     // Con il token niente X-Gestionale: il gestionale è nel token, in aud (V08, 4.3.6).

@@ -144,6 +144,17 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
     );
   }
 
+  // Lotti di NRE da cui vengono i numeri delle ricette dell'archivio (D269), con la ricevuta del SAR.
+  const lotIds = [
+    ...new Set(tables.prescription!.map((p) => p.nre_lot_id).filter(Boolean)),
+  ] as string[];
+  tables.nre_lot = lotIds.length
+    ? await rows(
+        db,
+        sql`select * from nre_lot where id = any(${pgArray(lotIds)}::uuid[]) order by received_at, id`,
+      )
+    : [];
+
   const certificateIds = tables.sick_leave_certificate!.map((c) => c.id as string);
   for (const t of CERTIFICATE_TABLES) {
     tables[t] = await rows(

@@ -56,10 +56,13 @@ import { registerPatientAdminRoutes } from './http/patient-admin-routes';
 import { registerImportRoutes } from './import/routes';
 import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
+import { createNreLots } from './prescriptions/nre-lots';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
+import { studioSendTimeoutMs } from './admin/studio-service';
 import type { CredentialService } from '@mmg/domain';
 import {
   FseGatewayClient,
+  isSarRegionalServices,
   SIMULATED_FSE_AUDIENCE,
   SimulatedDocumentSigner,
   SimulatedFseGateway,
@@ -75,6 +78,7 @@ import {
   type PrescriptionGateway,
   type ReminderSender,
   type RegionalAuthorizationGateway,
+  type SarRegionalServices,
   type SecondFactorGateway,
   type SickLeaveGateway,
   SimulatedAura,
@@ -119,6 +123,11 @@ export interface AppDeps {
    * chiamata a servizi reali (regola 7).
    */
   gateways?: Record<GatewaySystem, PrescriptionGateway>;
+  /**
+   * Lotti di NRE dal SAR (D269). Per difetto il SAR delle ricette, se sa darli (i simulatori sì):
+   * così il lotto e le ricette passano dallo stesso servizio.
+   */
+  sarServices?: SarRegionalServices;
   /** Secondo fattore (Id-Sessione) del Sistema TS e del SIRPED (D102). Per difetto i simulatori. */
   secondFactor?: Record<CredentialService, SecondFactorGateway>;
   /** Certificati di malattia all'INPS tramite il Sistema TS. Per difetto il simulatore. */
@@ -193,6 +202,7 @@ export function buildApp({
     redirectUri: '/api/profilo/credenziali/rupar/accesso-regionale/ritorno',
   },
   gateways = defaultGateways(secondFactor, regional.gateway),
+  sarServices = isSarRegionalServices(gateways.sar) ? gateways.sar : undefined,
   sickLeaveGateway = new SimulatedSickLeaveGateway({ now }),
   preSendChecks,
   reminderSender = new SimulatedReminderSender(),
@@ -429,6 +439,17 @@ export function buildApp({
       sendTimeoutMs,
       ...(buildPromemoria ? { buildPromemoria } : {}),
       serviceCatalog: (date) => reference.serviceLookup(date),
+      ...(sarServices
+        ? {
+            nreLots: createNreLots({
+              db,
+              sar: sarServices,
+              environment: gateways.sar.environment,
+              credentials,
+              timeoutMs: async (studioId) => sendTimeoutMs ?? studioSendTimeoutMs(db, studioId),
+            }),
+          }
+        : {}),
     }),
     db,
     now ?? (() => new Date()),

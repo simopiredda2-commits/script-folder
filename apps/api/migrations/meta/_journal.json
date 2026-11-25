@@ -351,6 +351,13 @@
       "when": 1795626696623,
       "tag": "0049_codice_asl_e_client_id",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1795629774868,
+      "tag": "0050_lotti_nre",
+      "breakpoints": true
     }
   ]
 }

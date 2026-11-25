@@ -40,7 +40,19 @@ export interface PrescriptionMessage {
   kind: 'pharma_ssn' | 'specialist_ssn' | 'white' | 'devices';
   patientFiscalCode: string;
   /** Il medico che firma: le ricette sono sempre a nome suo (anche se sostituto). */
-  doctor: { userId: string; name: string; regionalCode?: string | null };
+  doctor: {
+    userId: string;
+    name: string;
+    regionalCode?: string | null;
+    /** Codice fiscale del medico (cfMedico1): il SAR lega a lui il lotto di NRE (V06, 4.1). */
+    fiscalCode?: string | null;
+  };
+  /**
+   * NRE della ricetta al SAR, generato dalla cartella con il lotto del medico (SIRPED, «Cartelle
+   * cliniche MMG e PLS», V06, 3.2 e 4.1; D269). Dopo un rifiuto si rimanda lo stesso (4.3.1, caso
+   * 3). Non c'è per la ricetta bianca: l'NRBE lo dà il Sistema TS.
+   */
+  nre?: string | null;
   exemptionCode?: string | null;
   priority?: 'U' | 'B' | 'D' | 'P' | null;
   accessType?: 'first' | 'subsequent' | null;
@@ -97,7 +109,12 @@ export type SendResult =
   /** Il sistema non risponde: la ricetta certamente non è arrivata. */
   | { outcome: 'unreachable'; message: string }
   /** Nessuna risposta entro il tempo: non si sa se è arrivata. */
-  | { outcome: 'timeout'; message: string };
+  | { outcome: 'timeout'; message: string }
+  /**
+   * Il SAR ha risposto con un'eccezione di sistema (SOAP fault): «negativo con fault» (V06, 4.3.1,
+   * caso 4). Come per il tempo scaduto, la ricetta si annulla e si stampa la ricetta rossa.
+   */
+  | { outcome: 'fault'; message: string; raw: unknown };
 
 export type CancelResult =
   | { outcome: 'accepted'; raw: unknown }

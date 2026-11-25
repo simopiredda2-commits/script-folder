@@ -264,7 +264,10 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
           </p>
           <p className="aiuto">
             La Regione riconosce il medico e autorizza il programma fino alla scadenza che indica;
-            poi si rientra. Con questo accesso le credenziali RUPAR non servono per le ricette.
+            poi si rientra. Con questo accesso le credenziali RUPAR non servono per mandare le
+            ricette. Servono però per chiedere al SAR i numeri di ricetta (lotto di NRE) e per la
+            ricetta rossa: tienile salvate qui sopra (SIRPED, «Cartelle cliniche MMG e PLS», V06,
+            3.1.1).
           </p>
           <div className="azioni">
             <button

@@ -1,4 +1,4 @@
-import type { DispensingState } from '@mmg/domain';
+import { checkFiscalCode, nreLotPrefix, splitNre, type DispensingState } from '@mmg/domain';
 import type {
   CancelResult,
   GatewaySystem,
@@ -9,6 +9,7 @@ import type {
   StatusResult,
 } from './prescription-gateway';
 import type { SimulatedRegionalAuthorization } from './regional-authorization';
+import type { LotResult, SarRegionalServices } from './sar-services';
 import {
   authShapeProblem,
   REGIONAL_SOFTWARE_ID,
@@ -17,7 +18,7 @@ import {
 } from './service-auth';
 import { simulatedWhiteReminderPdf } from './simulated-documents';
 
-export type SimulatedOutcome = 'accepted' | 'rejected' | 'unreachable' | 'timeout';
+export type SimulatedOutcome = 'accepted' | 'rejected' | 'unreachable' | 'timeout' | 'fault';
 
 export interface SimulatorOptions {
   /** Esito di ogni invio. Per difetto: accettato. Nelle prove si sceglie caso per caso. */
@@ -51,17 +52,32 @@ export interface SimulatorOptions {
   sessions?: SimulatedSecondFactor;
   /** Accesso regionale con SPID o CIE: se c'è, il token deve essere valido per quel simulatore. */
   oauth?: SimulatedRegionalAuthorization;
+  /** Esito di ogni richiesta del lotto di NRE. Per difetto: assegnato. */
+  decideLot?: (input: { regionCode: string; doctorFiscalCode: string }) => SimulatedOutcome;
 }
 
 /**
- * Simulatore del SAR (e del Sistema TS per la ricetta bianca). Numeri di ricetta di
- * fantasia, riconoscibili dal prefisso «SIM»: il formato vero dell'NRE è nelle specifiche del
- * Sistema TS, da riprendere quando si scrive l'adattatore vero.
+ * Simulatore del SAR (e del Sistema TS per la ricetta bianca).
+ *
+ * - Lotti di NRE (V06, 4.1; D269): «estratti» come nell'esempio della V06, con l'identificativo 4
+ *   del lotto del SAR e un codice di 6 cifre. Il raggruppamento è «ZZ», per riconoscerli come
+ *   simulati. Il simulatore ricorda a quale medico ha dato ogni lotto; i codici partono da un
+ *   numero a caso, perché dopo un riavvio non ridia un lotto che il database ha già.
+ * - Ricetta con l'NRE della cartella: l'NRE dev'essere di un lotto del medico che firma e non
+ *   ancora usato da una ricetta accettata; dopo un rifiuto si può rimandare (4.3.1, caso 3). Un
+ *   lotto «ZZ» che non ricorda l'ha dato prima di un riavvio: lo accetta, senza sapere di chi è.
+ * - Ricetta senza NRE: il simulatore ne dà uno di fantasia, riconoscibile dal prefisso «SIM».
  */
-export class SimulatedGateway implements PrescriptionGateway {
+export class SimulatedGateway implements PrescriptionGateway, SarRegionalServices {
   readonly environment = 'simulator' as const;
   private counter = 0;
+  /** Codice dell'ultimo lotto dato: parte da un numero a caso (vedi sopra). */
+  private lotCounter = Math.floor(Math.random() * 1_000_000);
   private readonly issued = new Map<string, { cancelled: boolean }>();
+  /** Lotti dati: inizio comune dei 1000 NRE → codice fiscale del medico. */
+  private readonly lots = new Map<string, string>();
+  /** Richieste del lotto ricevute, per le prove. */
+  readonly lotRequests: { regionCode: string; lotType: string; doctorFiscalCode: string }[] = [];
   /** Messaggi ricevuti, per le prove. */
   readonly received: PrescriptionMessage[] = [];
   /**
@@ -156,11 +172,24 @@ export class SimulatedGateway implements PrescriptionGateway {
         raw: { simulatore: this.system, esito: 'codice non in catalogo' },
       };
     }
+    if (this.system === 'sar' && message.nre) {
+      const problem = this.nreProblem(message.nre, message.doctor.fiscalCode ?? null);
+      if (problem)
+        return {
+          outcome: 'rejected',
+          code: problem.code,
+          message: problem.message,
+          raw: { simulatore: this.system, esito: 'NRE', nre: message.nre },
+        };
+    }
     const outcome = this.options.decide?.(message) ?? 'accepted';
     switch (outcome) {
       case 'accepted': {
         this.counter += 1;
-        const nre = `SIM${this.system === 'sar' ? 'R' : 'B'}${String(this.counter).padStart(12, '0')}`;
+        const nre =
+          this.system === 'sar' && message.nre
+            ? message.nre
+            : `SIM${this.system === 'sar' ? 'R' : 'B'}${String(this.counter).padStart(12, '0')}`;
         this.issued.set(nre, { cancelled: false });
         if (this.system === 'sar') {
           // Codice di autenticazione di fantasia, riconoscibile come i numeri del simulatore.
@@ -215,7 +244,109 @@ export class SimulatedGateway implements PrescriptionGateway {
         return { outcome, message: `${this.label()} non raggiungibile (simulato)` };
       case 'timeout':
         return { outcome, message: `${this.label()}: nessuna risposta in tempo (simulato)` };
+      case 'fault':
+        return {
+          outcome,
+          message: `${this.label()}: eccezione di sistema (simulato)`,
+          raw: { simulatore: this.system, esito: 'fault' },
+        };
     }
+  }
+
+  /**
+   * L'NRE della cartella: dei lotti di questo medico e non ancora usato. Codici del simulatore:
+   * quelli veri del SAR si leggono in collaudo.
+   */
+  private nreProblem(
+    nre: string,
+    doctorFiscalCode: string | null,
+  ): { code: string; message: string } | null {
+    const parts = splitNre(nre);
+    const owner = parts ? this.lots.get(parts.prefix) : undefined;
+    // Un lotto simulato dato prima di un riavvio: il simulatore non lo ricorda più.
+    const beforeRestart = !owner && parts?.prefix.slice(3, 5) === 'ZZ';
+    if (!owner && !beforeRestart)
+      return { code: 'SIM-NRE-LOTTO', message: `NRE ${nre} fuori dai lotti assegnati (simulato)` };
+    if (owner && owner !== doctorFiscalCode)
+      return {
+        code: 'SIM-NRE-MEDICO',
+        message: `NRE ${nre} di un lotto assegnato a un altro medico (simulato)`,
+      };
+    if (this.issued.has(nre))
+      return {
+        code: 'SIM-NRE-USATO',
+        message: `NRE ${nre} già usato da un'altra ricetta (simulato)`,
+      };
+    return null;
+  }
+
+  /** «Richiesta Lotto» come la descrive la V06 (4.1), con i suoi codici d'errore 02–06. */
+  requestLot(
+    input: { regionCode: string; lotType: string; doctorFiscalCode: string },
+    auth: ServiceAuth,
+  ): Promise<LotResult> {
+    this.lotRequests.push({ ...input });
+    const reject = (code: string, message: string, authProblem?: 'credentials') =>
+      Promise.resolve<LotResult>({
+        outcome: 'rejected',
+        code,
+        message,
+        ...(authProblem ? { authProblem } : {}),
+        raw: { simulatore: this.system, esito: code },
+      });
+    if (this.system !== 'sar')
+      return reject('SIM-LOTTO', 'Il lotto di NRE lo dà il SAR (simulato)');
+    // Solo utente, password e PIN RUPAR (V06, 3.1.1): né il token né il secondo fattore.
+    if (auth?.bearer)
+      return reject(
+        'CREDENZIALI',
+        'Per il lotto di NRE servono utente, password e PIN RUPAR (V06, 3.1.1) (simulato)',
+        'credentials',
+      );
+    const shape = authShapeProblem(auth);
+    if (shape) return reject(shape.code, shape.message, 'credentials');
+    const decided = this.options.decideLot?.(input) ?? 'accepted';
+    if (decided === 'timeout')
+      return Promise.resolve({
+        outcome: 'timeout',
+        message: `${this.label()}: nessuna risposta in tempo (simulato)`,
+      });
+    if (decided === 'unreachable' || decided === 'fault')
+      return Promise.resolve({
+        outcome: 'unreachable',
+        message: `${this.label()} non raggiungibile (simulato)`,
+      });
+    if (decided === 'rejected') return reject('SIM-LOTTO', 'Simulatore: lotto rifiutato per prova');
+    if (!input.lotType.trim()) return reject('02', "Inserire l'identificativo lotto");
+    if (input.lotType !== '1') return reject('03', 'Inserire un identificativo lotto valido');
+    if (!input.regionCode.trim()) return reject('04', 'Inserire il codice regione');
+    if (input.regionCode !== '010') return reject('05', 'Inserire un codice regione valido');
+    if (!checkFiscalCode(input.doctorFiscalCode).valid)
+      return reject(
+        '06',
+        'Inserire il codice fiscale del medico valido e/o facente parte della regione',
+      );
+    // Lotto «estratto»: identificativo del lotto del SAR (4) e codice di 6 cifre (V06, 4.1).
+    this.lotCounter = (this.lotCounter + 1) % 1_000_000;
+    const lot = {
+      regionCode: '010',
+      groupCode: 'ZZ',
+      lotType: '4',
+      lotCode: String(this.lotCounter).padStart(6, '0'),
+    };
+    this.lots.set(nreLotPrefix(lot), input.doctorFiscalCode);
+    return Promise.resolve({
+      outcome: 'assigned',
+      lot,
+      raw: {
+        simulatore: this.system,
+        CodRegione: lot.regionCode,
+        CodRagLotto: lot.groupCode,
+        IdentificativoLotto: lot.lotType,
+        CodLotto: lot.lotCode,
+        CFMedico: input.doctorFiscalCode,
+      },
+    });
   }
 
   cancel(

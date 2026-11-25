@@ -53,6 +53,7 @@ import {
 } from '../reminders/promemoria';
 import type { createCredentialService } from '../credentials/service';
 import { studioDate } from './rules-check';
+import type { NreLots } from './nre-lots';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
 
 export interface LineInput {
@@ -203,6 +204,11 @@ export interface PrescriptionDeps {
   ) => Promise<((code: string) => { nationalCode: string | null } | null) | undefined>;
   /** Come si fissano i dati del promemoria all'invio: le prove ci mettono un guasto (D232). */
   buildPromemoria?: typeof buildPromemoriaData;
+  /**
+   * Lotti di NRE del medico (D269): con questi la cartella numera le ricette che vanno al SAR.
+   * Senza, l'NRE lo dà il servizio che riceve la ricetta, come i simulatori di prima.
+   */
+  nreLots?: NreLots;
 }
 
 /** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
@@ -586,11 +592,20 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
 
   async function doctorInfo(userId: string) {
     const [d] = await db
-      .select({ name: appUser.displayName, regionalCode: doctorProfile.regionalCode })
+      .select({
+        name: appUser.displayName,
+        regionalCode: doctorProfile.regionalCode,
+        fiscalCode: doctorProfile.fiscalCode,
+      })
       .from(appUser)
       .leftJoin(doctorProfile, eq(doctorProfile.userId, appUser.id))
       .where(eq(appUser.id, userId));
-    return { userId, name: d!.name, regionalCode: d!.regionalCode ?? null };
+    return {
+      userId,
+      name: d!.name,
+      regionalCode: d!.regionalCode ?? null,
+      fiscalCode: d!.fiscalCode ?? null,
+    };
   }
 
   /**
@@ -635,6 +650,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         validityMonths: l.validityMonths,
       })),
       compiledAt,
+      // L'NRE preso dal lotto del medico alla prima firma, se c'è (D269).
+      nre: p.assignedNre ?? null,
     };
   }
 
@@ -693,32 +710,54 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     // Credenziali e codice di sessione di chi firma: se mancano ci si ferma qui, senza invio.
     const use = useFor(p.kind);
     const auth = await deps.credentials.authFor(actor.userId, use);
+    const system = systemFor(p.kind);
+    // Le ricette per il SAR hanno l'NRE dal lotto del medico (D269): alla prima firma se ne prende
+    // uno; dopo un rifiuto si rimanda lo stesso (V06, 4.3.1, caso 3). Se i numeri sono pochi si
+    // chiede prima il lotto successivo; senza numeri e senza lotto la ricetta non parte.
+    const lots = system === 'sar' ? deps.nreLots : undefined;
+    const lotNotice =
+      lots && !p.assignedNre ? await lots.ensureNumbers(actor, p.id) : { warning: null };
 
     // Il messaggio e il paziente come partono: restano con la ricetta finché l'invio è in corso,
     // per l'esito segnato a mano se il servizio si ferma (D239).
-    const message = await buildMessage(p, actor.userId);
+    const built = await buildMessage(p, actor.userId);
     const [sendingPatient] = await db.select().from(patient).where(eq(patient.id, p.patientId));
-    const snapshot: SendingSnapshot = { message, paziente: promemoriaPatientOf(sendingPatient!) };
     // Passaggio atomico a «in invio»: se due richieste arrivano insieme, ne passa una sola. L'ora
-    // della firma segna questo invio: l'esito si scrive solo se è ancora lui (D233).
+    // della firma segna questo invio: l'esito si scrive solo se è ancora lui (D233). L'NRE del
+    // lotto si prende nella stessa transazione: se la ricetta è cambiata, il numero torna al lotto.
     const claimedAt = now();
-    const claimed = await withActor(db, actor.userId, (tx) =>
-      tx
+    const message = await withActor(db, actor.userId, async (tx) => {
+      let assigned = p.assignedNre ? { nre: p.assignedNre, lotId: p.nreLotId } : null;
+      if (lots && !assigned) {
+        assigned = await lots.take(tx, actor.userId);
+        if (!assigned)
+          throw new HttpError(
+            409,
+            'I numeri di ricetta (NRE) del medico sono finiti proprio adesso: riprova «Firma e invia», si chiede un lotto nuovo',
+          );
+      }
+      const sent: PrescriptionMessage = lots ? { ...built, nre: assigned!.nre } : built;
+      const snapshot: SendingSnapshot = {
+        message: sent,
+        paziente: promemoriaPatientOf(sendingPatient!),
+      };
+      const rows = await tx
         .update(prescription)
         .set({
           status: 'sending',
           signedBy: actor.userId,
           signedAt: claimedAt,
           sendingSnapshot: snapshot,
+          ...(lots ? { assignedNre: assigned!.nre, nreLotId: assigned!.lotId } : {}),
           updatedAt: now(),
         })
         .where(and(eq(prescription.id, p.id), eq(prescription.status, p.status)))
-        .returning({ id: prescription.id }),
-    );
-    if (claimed.length === 0)
-      throw new HttpError(409, 'La ricetta è cambiata nel frattempo: ricarica');
+        .returning({ id: prescription.id });
+      if (rows.length === 0)
+        throw new HttpError(409, 'La ricetta è cambiata nel frattempo: ricarica');
+      return sent;
+    });
 
-    const system = systemFor(p.kind);
     const gateway = deps.gateways[system];
     // Il tempo di attesa dello studio, com'è adesso: l'amministratore può averlo appena cambiato.
     const timeoutMs = deps.sendTimeoutMs ?? (await studioSendTimeoutMs(db, actor.studioId));
@@ -767,6 +806,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       );
       result = { ...result, message: authMessage(authProblem, result.message) };
     }
+    // Eccezione di sistema del SAR (V06, 4.3.1, caso 4): come il tempo scaduto (caso 5), non si sa
+    // se la ricetta c'è. Nel registro degli invii resta l'eccezione; la ricetta ha l'esito incerto
+    // e si rimanda con lo stesso NRE (D269).
     const errorKind: SendErrorKind | null =
       result.outcome === 'accepted'
         ? null
@@ -774,7 +816,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           ? 'auth'
           : result.outcome === 'rejected'
             ? 'rejected'
-            : result.outcome;
+            : result.outcome === 'fault'
+              ? 'timeout'
+              : result.outcome;
     // Dati del promemoria fissati ora, con il codice di autenticazione: ogni ristampa è identica.
     // Se non si riesce a fissarli, la ricetta è comunque partita: NRE e codice si scrivono lo
     // stesso, invece di lasciarla «in invio» senza numero; manca solo il promemoria (D232).
@@ -882,8 +926,15 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         'Nel frattempo l’esito di questo invio è stato segnato a mano: la risposta arrivata ora resta nel registro degli invii. Ricarica la pagina per vedere la ricetta',
       );
     return {
-      outcome: errorKind === 'auth' ? ('auth' as const) : result.outcome,
+      outcome:
+        errorKind === 'auth'
+          ? ('auth' as const)
+          : result.outcome === 'fault'
+            ? ('timeout' as const)
+            : result.outcome,
       nre: result.outcome === 'accepted' ? result.nre : null,
+      /** Il lotto successivo di NRE non è arrivato, ma restano numeri (D269). */
+      avviso: lotNotice.warning,
       messaggio:
         result.outcome === 'accepted'
           ? promemoriaMissing
@@ -937,6 +988,14 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         ? nrbeProblem(arrived.nre, message.patientFiscalCode)
         : nreProblem(arrived.nre);
     if (shape) throw new HttpError(400, shape);
+    // L'NRE preso dal lotto del medico è partito con la ricetta (D269): l'ente non può averne dato
+    // un altro.
+    const lotNre = white ? null : (message.nre ?? p.assignedNre ?? null);
+    if (arrived && lotNre && arrived.nre !== lotNre)
+      throw new HttpError(
+        400,
+        `Il numero di questa ricetta è ${lotNre}, preso dal lotto del medico e partito con l’invio: l’ente non può averne dato un altro. Controlla il numero`,
+      );
     if (arrived && white && !arrived.pin)
       throw new HttpError(
         400,

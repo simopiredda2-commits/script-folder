@@ -169,6 +169,23 @@ describe('firma e invio a controllo finito (D230)', () => {
     expect(warning.closest('[class*="avviso"]')).toBeTruthy();
   });
 
+  it('il lotto successivo di NRE non è arrivato ma restano numeri: la ricetta parte con l’avviso (D269)', async () => {
+    service(['owner_doctor'], () => Promise.resolve(checked()), {
+      esito: 'accepted',
+      nre: '010ZZ4000001007',
+      messaggio: null,
+      avviso:
+        'Restano 5 numeri di ricetta (NRE) del medico. Non si è potuto avere il lotto di numeri di ricetta (NRE): il SAR non è raggiungibile: si richiede alla prossima firma.',
+    });
+    panel();
+    const sign = await screen.findByRole('button', { name: 'Firma e invia' });
+    await waitFor(() => expect(disabled(sign)).toBe(false));
+    await userEvent.click(sign);
+    await screen.findByText(/Ricetta inviata\. NRE/);
+    const warning = await screen.findByText(/Restano 5 numeri di ricetta/);
+    expect(warning.closest('[class*="avviso"]')).toBeTruthy();
+  });
+
   it('un controllo riuscito toglie l’errore di quello di prima (D239)', async () => {
     let first = true;
     service(['owner_doctor'], () => {

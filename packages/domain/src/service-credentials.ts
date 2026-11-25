@@ -67,6 +67,8 @@ export const SERVICE_USES = [
   'ricetta_bianca',
   'certificato_inps',
   'fascicolo_regionale',
+  'lotto_nre',
+  'ricetta_dpcm',
 ] as const;
 export type ServiceUse = (typeof SERVICE_USES)[number];
 
@@ -75,6 +77,8 @@ export const SERVICE_FOR_USE: Record<ServiceUse, CredentialService> = {
   ricetta_bianca: 'sistema_ts',
   certificato_inps: 'sistema_ts',
   fascicolo_regionale: 'rupar_piemonte',
+  lotto_nre: 'rupar_piemonte',
+  ricetta_dpcm: 'rupar_piemonte',
 };
 
 /**
@@ -89,6 +93,10 @@ export const NEEDS_SECOND_FACTOR: Record<ServiceUse, boolean> = {
   ricetta_bianca: true,
   certificato_inps: false,
   fascicolo_regionale: false,
+  // Lotto di NRE e ricetta rossa (DPCM): «esclusivamente» utente, password e PIN RUPAR, senza
+  // autenticazione multifattore (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.1.1; D269).
+  lotto_nre: false,
+  ricetta_dpcm: false,
 };
 
 /** Le ultime tre lettere dell'utente, per riconoscere la credenziale senza mostrarla. */

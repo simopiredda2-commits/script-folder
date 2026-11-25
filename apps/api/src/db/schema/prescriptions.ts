@@ -1,6 +1,8 @@
+import { sql } from 'drizzle-orm';
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -8,7 +10,9 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { patientRequest } from './agenda';
 import { patient, reminderChannel } from './patients';
@@ -57,6 +61,13 @@ export const prescription = pgTable(
     status: prescriptionStatus().notNull().default('draft'),
     /** Numero di ricetta elettronica (NRE; NRBE per la bianca), dato dal SAR o dal Sistema TS. */
     nre: text(),
+    /**
+     * NRE preso dal lotto del medico alla prima firma (D269): la ricetta lo tiene e, dopo un
+     * rifiuto con errori bloccanti, si rimanda con lo stesso numero (V06, 4.3.1, caso 3). Nessun
+     * NRE di un lotto va a due ricette.
+     */
+    assignedNre: text(),
+    nreLotId: uuid().references((): AnyPgColumn => nreLot.id),
     priority: priorityClass(),
     accessType: accessType(),
     diagnosticQuestion: text(),
@@ -116,7 +127,55 @@ export const prescription = pgTable(
     sendingSnapshot: jsonb(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index().on(t.archiveId, t.status), index().on(t.patientId)],
+  (t) => [
+    index().on(t.archiveId, t.status),
+    index().on(t.patientId),
+    uniqueIndex('prescription_assigned_nre_key')
+      .on(t.assignedNre)
+      .where(sql`${t.assignedNre} is not null`),
+  ],
+);
+
+/**
+ * Lotto di NRE del medico (D269): 1000 numeri che il SAR «estrae» da un lotto avuto dal SAC e lega
+ * al codice fiscale del medico (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.2 e 4.1). La
+ * cartella genera gli NRE agendo solo sul progressivo, da 000 a 999, e non dà mai due volte lo
+ * stesso: il prossimo progressivo cresce dentro la transazione che lo assegna. I lotti di un
+ * simulatore non vanno al servizio vero: si tengono per ambiente.
+ */
+export const nreLot = pgTable(
+  'nre_lot',
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    doctorUserId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    /** Codice fiscale con cui il medico ha chiesto il lotto: il SAR lo lega a lui. */
+    doctorFiscalCode: text().notNull(),
+    /** «simulator», «test» o «production», come il registro degli invii. */
+    environment: text().notNull(),
+    /** CodRegione, CodRagLotto, IdentificativoLotto e CodLotto della ricevuta del SAR. */
+    regionCode: text().notNull(),
+    groupCode: text().notNull(),
+    lotType: text().notNull(),
+    lotCode: text().notNull(),
+    /** I primi 12 caratteri, comuni ai 1000 NRE. */
+    prefix: text().notNull(),
+    size: integer().notNull(),
+    /** Il prossimo progressivo da dare: quando arriva a `size`, il lotto è finito. */
+    nextProgressive: integer().notNull().default(0),
+    receivedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /** La ricevuta del SAR così com'è. */
+    response: jsonb(),
+  },
+  (t) => [
+    uniqueIndex('nre_lot_prefix_key').on(t.environment, t.prefix),
+    index().on(t.doctorUserId, t.environment),
+    check(
+      'nre_lot_progressive_check',
+      sql`${t.nextProgressive} >= 0 and ${t.nextProgressive} <= ${t.size}`,
+    ),
+  ],
 );
 
 /** Riga di ricetta: un farmaco (o una prestazione) con la quantità. */

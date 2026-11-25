@@ -67,7 +67,7 @@ Una ricetta inviata si annulla solo se l'ente non l'ha ancora lavorata. Prima di
 ## Integrazioni
 
 - `packages/integrations`: un'interfaccia comune (`PrescriptionGateway`) per SAR (ricette SSN, poi inoltrate al SAC del Sistema TS) e Sistema TS (ricetta bianca).
-- In sviluppo e nelle prove c'è solo il **simulatore**, con quattro esiti: accettata, rifiutata, non raggiungibile, esito incerto. Una prova controlla che il pacchetto non contenga indirizzi di rete né richieste HTTP (regola 7).
+- In sviluppo e nelle prove c'è solo il **simulatore**, con cinque esiti: accettata, rifiutata, non raggiungibile, esito incerto ed eccezione di sistema del SAR (V06, 4.3.1, caso 4), che la ricetta tratta come l'esito incerto (D269). Una prova controlla che il pacchetto non contenga indirizzi di rete né richieste HTTP (regola 7).
 - Ogni chiamata, riuscita o no, resta in `external_submission` con richiesta, risposta, esito e durata: non si modifica e non si cancella.
 
 ## Promemoria e invio (tappa 7)
@@ -95,9 +95,22 @@ Come funziona:
 - **Ricetta del medico in un passo** (D255): nell'interfaccia «Firma e invia» crea la ricetta, chiama `POST /api/ricette/:id/controlla` e, se il controllo non ha problemi, `POST /api/ricette/:id/firma-e-invia`. Il servizio non cambia: rifà i controlli all'invio e vuole le credenziali di chi firma. Con un problema qualsiasi l'interfaccia si ferma sui controlli, e il medico procede solo con la conferma esplicita «Ho visto i controlli: firma e invia» (D256).
 - **Tempo massimo di attesa** dell’invio al SAR: 8 secondi, come nella V06 delle specifiche regionali (3.5.2); oltre, esito incerto (D94, D265).
 
+## Numeri di ricetta dal lotto del medico (D269)
+
+La cartella numera da sé le ricette per il SAR (farmaceutica, specialistica e presidi): il SAR le dà lotti di 1000 NRE legati al codice fiscale del medico (SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026, 3.2 e 4.1).
+
+- **Richiesta del lotto**: codice della regione dello studio, tipo 1 (l'unico ammesso in Piemonte), codice fiscale del medico che firma. Solo utente, password e PIN RUPAR (3.1.1): anche chi entra con SPID o CIE deve averli in «Credenziali dei servizi».
+- **Lotto restituito**: regione, raggruppamento, identificativo del lotto del SAR e codice di 6 cifre. Dall'esempio della V06 «010 A0 4 000000» la cartella genera gli NRE da «010A04000000000» a «010A04000000999», cambiando solo il progressivo.
+- **Quando**: alla firma, se al medico restano meno di 100 numeri. Se il lotto non arriva e restano numeri, la ricetta parte con l'avviso. Se non ne restano, la ricetta non parte e il messaggio dice perché.
+- **Numero della ricetta**: preso nella transazione che la porta «in invio», mai uguale per due ricette (lo vieta anche un indice del database). La ricetta lo tiene: dopo un rifiuto si corregge e si rimanda con lo stesso numero (4.3.1, caso 3). Anche dopo un esito incerto o un'eccezione di sistema del SAR si rimanda con lo stesso: se era arrivata, il SAR rifiuta il numero già usato. «È arrivata» vuole il numero partito con l'invio.
+- **Registro**: ogni richiesta del lotto resta in `external_submission` (operazione `lotto_nre`), con la ricetta che l'ha fatta partire. I lotti stanno in `nre_lot`, con la ricevuta del SAR, ed entrano nell'esportazione.
+- **Ricetta bianca**: il numero lo dà il Sistema TS, come prima.
+- **Simulatore**: lotti con il raggruppamento «ZZ», riconoscibili come simulati; codici d'errore 02–06 della V06 (4.1); rifiuta un NRE fuori dai lotti, di un altro medico o già usato.
+
 ## Da completare (servono le specifiche e le credenziali di collaudo)
 
-- Numeri del simulatore: NRE e NRBE di fantasia che cominciano con `SIM`, non nella forma delle specifiche (che si controlla solo quando il medico scrive il numero a mano, D259). Formato del codice di autenticazione e del PIN-NRBE: da prendere dalle specifiche di collaudo.
+- Numeri del simulatore: gli NRE dei lotti simulati hanno la forma delle specifiche, con il raggruppamento «ZZ» (D269); NRBE e NRE dei simulatori senza lotti sono di fantasia e cominciano con `SIM`, non nella forma delle specifiche (che si controlla solo quando il medico scrive il numero a mano, D259). Formato del codice di autenticazione e del PIN-NRBE: da prendere dalle specifiche di collaudo.
+- Lotti di NRE con il SAR vero (D269): se il lotto si possa chiedere prima che finisca, quanti lotti aperti possa avere un medico, con quale codice il SAR rifiuti un NRE già usato. Domande per il CSI.
 - Adattatori veri per SAR e Sistema TS, con l'autenticazione forte (Id-Sessione) del Sistema TS.
 - Casi in cui l'annullamento è ammesso.
 - Modulo di stampa della ricetta rossa.

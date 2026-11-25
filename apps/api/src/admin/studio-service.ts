@@ -442,6 +442,8 @@ const OUTCOME_LABELS: Record<string, string> = {
   rejected: 'rifiutato',
   unreachable: 'non raggiungibile',
   timeout: 'esito incerto',
+  fault: 'eccezione di sistema, esito incerto',
+  assigned: 'lotto assegnato',
 };
 
 /**
