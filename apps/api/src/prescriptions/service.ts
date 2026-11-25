@@ -186,10 +186,10 @@ export interface PrescriptionDeps {
    */
   preSendChecks?: (prescriptionId: string, actor: Actor, input: SignInput) => Promise<CheckOutcome>;
   /**
-   * Tempo massimo di attesa della risposta all'invio, in millisecondi. Regione Piemonte (SIRPE,
-   * «Cartelle cliniche MMG e PLS», 4.4.7): la cartella clinica ha un parametro per il tempo tra la
-   * richiesta di stampa e la stampa, «al momento definiti in 6-8 secondi»; senza codice di
-   * autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto vale l'impostazione
+   * Tempo massimo di attesa della risposta all'invio, in millisecondi. Regione Piemonte (SIRPED,
+   * «Cartelle cliniche MMG e PLS», V06 del 10/04/2026, 3.5.2 e 4.3.1): la cartella clinica ha un
+   * parametro per il tempo tra la richiesta di stampa e la stampa, «al momento definiti in 8
+   * secondi»; senza codice di autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto vale l'impostazione
    * dello studio, letta a ogni invio (`studio.sendTimeoutSeconds`, 8 secondi per difetto, D94); un
    * valore dato qui (lo usano le prove) vale sopra quello dello studio.
    */

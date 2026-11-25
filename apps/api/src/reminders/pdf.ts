@@ -428,8 +428,8 @@ async function renderPromemoria2024(d: PromemoriaDataV2, paper: PaperSize): Prom
 }
 
 /**
- * Campo 27, con il codice regionale davanti al nome dove la Regione lo chiede (Piemonte, SIRPE,
- * «Cartelle cliniche MMG e PLS», 4.4.3: «codice regionale – nominativo del medico»).
+ * Campo 27, con il codice regionale davanti al nome dove la Regione lo chiede (Piemonte, SIRPED,
+ * «Cartelle cliniche MMG e PLS», V06, 4.3.3: «codice regionale – nominativo del medico»).
  */
 function doctorName(d: PromemoriaDataV2) {
   return [d.medico.codiceRegionale, d.medico.nominativo.toUpperCase()].filter(Boolean).join(' - ');

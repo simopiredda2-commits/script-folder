@@ -9,8 +9,9 @@
  *   chiesto via web service, arriva all'email certificata (autenticazione forte, web service,
  *   versione 1.1 del 12/1/2026, 5.2 e 5.4).
  * - SIRPED (Piemonte): Id-Sessione chiesto con le credenziali RUPAR (CreateAuth), mandato
- *   all'email certificata, verificabile (CheckToken) e revocabile (SIRPED, autenticazione forte,
- *   versione 4.0 del 2/3/2026, 4.2). Nell'ambiente di prova torna anche nella risposta.
+ *   all'email certificata, verificabile (CheckToken) e revocabile (REL-STC-01, autenticazione
+ *   forte, V08 del 23/09/2026, 4.2). Nell'ambiente di prova torna anche nella risposta. Vale 8 ore
+ *   per i servizi di prescrizione; un Id-Sessione nuovo revoca il precedente (V08, 3).
  *
  * Qui l'interfaccia e il simulatore (regola 7).
  */
@@ -26,7 +27,8 @@ export interface ServiceAuth {
   sessionId?: string | null;
   /**
    * Token dell'accesso regionale con SPID o CIE (OAuth2, D109): per il SAR sostituisce utente,
-   * password e PIN (SIRPED, autenticazione forte, 4).
+   * password e PIN. Va nell'intestazione `X-OAuth2-Authorization: Bearer <jwt>`, senza
+   * l'autenticazione Basic e con `<pinCode></pinCode>` vuoto (REL-STC-01 V08, 4.3.6).
    */
   bearer?: string | null;
 }
@@ -40,7 +42,7 @@ export type AuthProblem = 'credentials' | 'session';
 export type SessionRequestResult =
   | {
       outcome: 'sent';
-      /** Solo nell'ambiente di prova: il codice torna anche nella risposta (SIRPED, 4.2.1). */
+      /** Solo nell'ambiente di prova: il codice torna anche nella risposta (REL-STC-01 V08, 4.2.1). */
       testCode: string | null;
       raw: unknown;
     }
@@ -81,11 +83,79 @@ export interface SecondFactorGateway {
 export function authShapeProblem(
   auth: ServiceAuth | undefined,
 ): { code: string; message: string } | null {
-  if (auth?.bearer) return null;
+  // Con il token non va nessun altro dato di autenticazione (REL-STC-01 V08, 4.3.6).
+  if (auth?.bearer)
+    return auth.username || auth.password || auth.pin || auth.sessionId
+      ? {
+          code: 'CREDENZIALI',
+          message:
+            'Con il token SPID o CIE non si mandano utente, password, PIN né Id-Sessione (REL-STC-01 V08, 4.3.6)',
+        }
+      : null;
   if (!auth?.username?.trim() || !auth.password)
     return { code: 'CREDENZIALI', message: 'Credenziali invalide (from client)' };
   if (!auth.pin) return { code: 'EA01', message: 'Inserire il PinCode' };
   return null;
+}
+
+/**
+ * Autenticazione di una chiamata SOAP ai servizi della ricetta del SIRPED, come la vuole la V08
+ * di REL-STC-01. Serve all'adattatore vero del SAR; qui la provano le prove.
+ *
+ * - Con il token SPID o CIE (4.3.6): solo `X-OAuth2-Authorization: Bearer <jwt>`; niente
+ *   `Authorization: Basic`, `<pinCode>` vuoto, nessun altro dato di autenticazione.
+ * - Con l'Id-Sessione dell'email certificata (4.1.1, 4.2.5): `Authorization: Basic` con utente e
+ *   password RUPAR, `X-idSessione: Bearer <Id-Sessione>`, `X-Gestionale` con il codice del
+ *   gestionale seguito da «_» e dal codice dell'ASL (per esempio MIOAPPLICATIVO_301); il PIN va
+ *   nella richiesta, cifrato con il certificato della Regione (SAR V06, 3.1.2): lo cifra
+ *   l'adattatore.
+ *
+ * `gestionale` è il valore della configurazione così com'è: come si sceglie per ogni ASL è una
+ * domanda aperta (client_id, D103).
+ */
+export function sarAuthentication(
+  auth: ServiceAuth,
+  gestionale: string | null,
+):
+  | {
+      outcome: 'ok';
+      headers: Record<string, string>;
+      /** Contenuto di `<pinCode>`: vuoto con il token, altrimenti il PIN da cifrare. */
+      pinCode: { kind: 'vuoto' } | { kind: 'da-cifrare'; pin: string };
+    }
+  | { outcome: 'problem'; code: string; message: string } {
+  const shape = authShapeProblem(auth);
+  if (shape) return { outcome: 'problem', ...shape };
+  if (auth.bearer)
+    return {
+      outcome: 'ok',
+      headers: { 'X-OAuth2-Authorization': `Bearer ${auth.bearer}` },
+      pinCode: { kind: 'vuoto' },
+    };
+  if (!auth.sessionId)
+    return {
+      outcome: 'problem',
+      code: 'ID_SESSIONE',
+      message: 'Manca l’Id-Sessione (secondo fattore)',
+    };
+  if (!gestionale?.trim())
+    return {
+      outcome: 'problem',
+      code: 'GESTIONALE',
+      message: 'Manca il codice del gestionale per X-Gestionale (REL-STC-01 V08, 4.2.5)',
+    };
+  const basic = btoa(
+    String.fromCharCode(...new TextEncoder().encode(`${auth.username}:${auth.password}`)),
+  );
+  return {
+    outcome: 'ok',
+    headers: {
+      Authorization: `Basic ${basic}`,
+      'X-idSessione': `Bearer ${auth.sessionId}`,
+      'X-Gestionale': gestionale.trim(),
+    },
+    pinCode: { kind: 'da-cifrare', pin: auth.pin! },
+  };
 }
 
 export interface SimulatedSecondFactorOptions {

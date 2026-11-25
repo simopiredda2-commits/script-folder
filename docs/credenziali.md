@@ -17,11 +17,11 @@ Per mandare ricette e certificati, il medico usa le proprie credenziali presso i
 Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id-Sessione»): ricetta bianca dal DM 8/6/2023, ricetta SSN dal DM 27/2/2025.
 
 - **Sistema TS**: il codice va in ogni chiamata nell'intestazione `Authorization2F: Bearer` e per la ricetta SSN vale «per almeno 8 ore». Si chiede dal portale con SPID, CIE o CNS, oppure con un servizio che lo manda all'email certificata. La tessera TS-CNS non lo richiede. Fonti: autenticazione forte per la ricetta SSN, versione 1.1 del 3/6/2025, 3 e 5; autenticazione forte per i web service, versione 1.1 del 12/1/2026, 5.
-- **Piemonte (SIRPED)**: due modalità (autenticazione forte, versione 4.0 del 2/3/2026, 3 e 4):
+- **Piemonte (SIRPED)**: due modalità (REL-STC-01, autenticazione forte, V08 del 23/09/2026, 3 e 4):
   1. il programma chiede il codice con le credenziali RUPAR, il codice arriva all'email che il medico ha certificato sul Punto Unico di Accesso, il medico lo inserisce nel programma;
   2. il programma apre l'accesso regionale con SPID, CIE, TS-CNS o CNS (OAuth2 con PKCE) e riceve il codice da solo; per il SAR non servono più utente, password e PIN.
 
-  Una richiesta nuova annulla il codice precedente. Ci sono servizi per verificarlo e revocarlo.
+  Il codice vale 8 ore per i servizi di prescrizione (16 per la presa in carico e l'erogazione, V08, 3). Una richiesta nuova annulla il codice precedente. Ci sono servizi per verificarlo e revocarlo.
 
 - **Certificati INPS**: nelle fonti lette il secondo fattore non c'è. È da verificare in collaudo.
 
@@ -29,7 +29,7 @@ Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id
 
 È l'accesso della Regione per le ricette, solo per il medico prescrittore. Il ripristino delle credenziali del programma con SPID o CIE è un'altra cosa (D189, `docs/amministrazione.md`).
 
-È la modalità scelta alla terza fermata per le ricette SSN in Piemonte. Fonte: SIRPED, autenticazione forte, versione 4.0 del 2/3/2026, 3.2 e 4.3.
+È la modalità scelta alla terza fermata per le ricette SSN in Piemonte. Fonte: REL-STC-01, autenticazione forte, V08 del 23/09/2026, 3.2 e 4.3 (D265).
 
 1. Il medico preme «Entra con SPID o CIE». Il programma crea uno `state` casuale (ne conserva l'impronta) e un `code_verifier` PKCE (cifrato), poi apre la pagina di autorizzazione regionale (`/oauth2/authorize` con `client_id`, `redirect_uri`, scope `prescrizione`, `state`, `code_challenge` S256).
 2. Il medico entra con SPID o CIE e autorizza. La Regione rimanda il browser al programma con `code` e `state`, oppure con un errore.
@@ -37,10 +37,11 @@ Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id
    - lo `state` è di una richiesta di **questo** medico, non usata e non più vecchia di 10 minuti;
    - scambia il codice con il `code_verifier` (`/oauth2/token`);
    - chi è entrato con SPID o CIE (`sub` del token) è il medico collegato; altrimenti revoca il token;
-   - la Regione ha concesso il profilo di prescrizione.
-4. Il token si conserva cifrato, con la scadenza indicata dalla Regione. Non si rinnova: alla scadenza si rientra.
-5. Le ricette SSN, i loro annullamenti e lo stato di erogazione usano il token come `Authorization: Bearer`. Utente, password e PIN RUPAR non servono.
-6. «Esci dall’accesso regionale» revoca il token (`/sessionid/revoke`).
+   - la Regione ha concesso il profilo di prescrizione;
+   - il token è stato rilasciato per il programma (`aud` uguale al `client_id`) e non è già scaduto.
+4. Il token si conserva cifrato. La scadenza è il campo `exp` del token, non `expires_in`: la V08 descrive `expires_in` come «Unix time», ma nell'esempio vale 7199, una durata (4.3.2, D265). Non si rinnova: alla scadenza si rientra.
+5. Le ricette SSN, i loro annullamenti e lo stato di erogazione usano il token nell'intestazione `X-OAuth2-Authorization: Bearer`, senza l'autenticazione Basic, con `<pinCode>` vuoto e nessun altro dato di autenticazione (V08, 4.3.6). Utente, password e PIN RUPAR non servono.
+6. «Esci dall’accesso regionale» revoca il token (`DELETE /sessionid/revoke`, V08, 4.3.5). Se per la Regione il token era già scaduto, revocato o sconosciuto (risposta 401), si chiude solo qui e si annota.
 
 Errori come annullamento, identità diversa, richiesta scaduta o accesso al programma scaduto nel frattempo tornano come messaggio chiaro nella pagina delle credenziali, mai come errore tecnico. Nell'indirizzo del ritorno c'è solo un codice, e il testo lo scrive il programma: un testo nell'indirizzo lo potrebbe scrivere chiunque (D193). Il codice per email resta come alternativa.
 
@@ -57,7 +58,7 @@ In prova la pagina regionale è simulata dal programma stesso:
   - Dopo il salvataggio vede solo «Impostate», le ultime tre lettere dell'utente e le date: le credenziali non si rileggono, né qui né altrove.
   - Per cambiare solo la password basta scrivere quella.
   - Può cancellarle.
-- **Codice di sessione**: «Chiedi il codice», poi il codice ricevuto per email e «Attiva». La pagina dice fino a quando vale; «Revoca il codice» lo annulla. Nel simulatore il codice compare anche a video, come nell'ambiente di prova della Regione (SIRPED, 4.2.1); in produzione mai.
+- **Codice di sessione**: «Chiedi il codice», poi il codice ricevuto per email e «Attiva». La pagina dice fino a quando vale; «Revoca il codice» lo annulla. Nel simulatore il codice compare anche a video, come nell'ambiente di prova della Regione (REL-STC-01 V08, 4.2.1); in produzione mai.
 - **Pagina «Oggi»**: avvisa se mancano credenziali, se la password è in scadenza o scaduta, se il codice di sessione non è attivo.
 - **Prima di ogni invio** (ricetta, annullamento, stato di erogazione) il programma prende le credenziali e il codice di chi firma. Se mancano o il codice è scaduto, l'invio si ferma prima di contattare il servizio, con un messaggio che porta alla pagina giusta. La ricetta non cambia stato.
 - **Rifiuto del servizio per l'accesso** (credenziali sbagliate, password scaduta, codice revocato):
@@ -99,12 +100,14 @@ In prova la pagina regionale è simulata dal programma stesso:
 - **Adattatori veri**, che arrivano con le credenziali di collaudo:
   - cifratura del PIN con il certificato della Regione o del Sistema TS;
   - codici d'errore veri per credenziali e sessione (oggi l'esito è segnalato dal simulatore);
-  - intestazione `Authorization2F`.
-- **Durata del codice SIRPED** («tempo predefinito»): valore da completare. Nel simulatore vale 8 ore, come quella del Sistema TS.
+  - intestazione `Authorization2F`;
+  - per il SAR le intestazioni sono già scritte e provate in `sarAuthentication` (`packages/integrations/src/service-auth.ts`): con il token, `X-OAuth2-Authorization`; con il codice per email, `Authorization: Basic`, `X-idSessione` e `X-Gestionale` (V08, 4.2.5 e 4.3.6).
+- **Durata del codice SIRPED**: 8 ore per i servizi di prescrizione (V08, 3), come nel simulatore.
 - **Accesso con SPID o CIE, con il servizio vero**:
   - codice del gestionale (`client_id`) e indirizzo di ritorno da registrare presso la Regione (D103);
-  - verifica della firma del token con la chiave pubblica (JWKS);
-  - durata vera del token. La specifica descrive `expires_in` in modo ambiguo («durata… in formato Unix time»), con un esempio di 7199 secondi: da chiarire in collaudo. Nel simulatore il token vale 8 ore.
+  - verifica della firma del token con la chiave pubblica (JWKS, `/.well-known/jwks.json`, kid «rel-oauth2-key»): il simulatore emette token con i campi della V08 ma senza firma;
+  - `expires_in`: la V08 lo descrive come «Unix time» e nell'esempio vale 7199; il programma usa `exp` del token, ma il significato va chiesto al CSI;
+  - revoca: la V08 dice `DELETE`, la descrizione OpenAPI pubblicata con la V08 (`yaml.zip`) dice `GET`: da chiarire con il CSI. Il simulatore segue la V08.
 - **Registrazione del programma presso la Regione** (codice del gestionale, autocertificazione) e censimento dei medici nel configuratore regionale: pratiche da avviare (D103).
 - **Secondo codice del Sistema TS**: il Sistema TS ammette un secondo codice «in attesa» accanto a quello attivo; non è simulato.
 - **Scadenza della password del Sistema TS**: da verificare.

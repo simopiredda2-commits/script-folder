@@ -18,10 +18,15 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
   const c: Record<string, string> = {};
   let regional: SimulatedRegionalAuthorization;
   let sar: SimulatedGateway;
+  /** Per le prove dei campi del token: cambia i campi prima dell'emissione (V08, 4.3.2). */
+  let tamperClaims: ((c: Record<string, unknown>) => Record<string, unknown>) | null = null;
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    regional = new SimulatedRegionalAuthorization({ now: () => s.clock.now() });
+    regional = new SimulatedRegionalAuthorization({
+      now: () => s.clock.now(),
+      claims: (claims) => tamperClaims?.(claims) ?? claims,
+    });
     sar = new SimulatedGateway('sar', { oauth: regional });
     s = await createScenario(
       t.db,
@@ -134,7 +139,10 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     expect(await back(await approve(url))).toEqual({ accesso: 'ok' });
     const st = await rupar();
     expect(st.sessione).toMatchObject({ attiva: true, modalita: 'spid_cie' });
-    expect(Date.parse(st.sessione.scadeIl!) - s.clock.now().getTime()).toBe(8 * 3_600_000);
+    // La scadenza è il campo exp del token, in secondi interi: 8 ore, meno i millisecondi.
+    const left = Date.parse(st.sessione.scadeIl!) - s.clock.now().getTime();
+    expect(left).toBeGreaterThan(8 * 3_600_000 - 1000);
+    expect(left).toBeLessThanOrEqual(8 * 3_600_000);
     const sent = await sendPrescription();
     expect(sent.json(), sent.body).toMatchObject({ esito: 'accepted' });
     expect(sar.receivedAuth.at(-1)).toEqual({ username: '', sessionId: null, bearer: true });
@@ -148,7 +156,8 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
           eq(serviceSession.service, 'rupar_piemonte'),
         ),
       );
-    expect(row!.tokenEnc.toString('latin1')).not.toContain('SIMJWT');
+    // L'intestazione del JWT del simulatore, in chiaro, non c'è.
+    expect(row!.tokenEnc.toString('latin1')).not.toContain('eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0');
   });
 
   it('state falso, o di un altro medico: niente accesso', async () => {
@@ -278,6 +287,76 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       'sessione_revocata',
     ])
       expect(events, e).toContain(e);
+  });
+
+  it('token per un altro gestionale (aud) o già scaduto (exp): niente accesso (V08, 4.3.2)', async () => {
+    await req('DELETE', '/api/profilo/credenziali/rupar/sessione');
+    const detail = async () =>
+      (
+        await t.db
+          .select()
+          .from(serviceCredentialEvent)
+          .where(
+            and(
+              eq(serviceCredentialEvent.userId, s.users.titolare.id),
+              eq(serviceCredentialEvent.event, 'accesso_regionale_rifiutato'),
+            ),
+          )
+      )
+        .map((e) => e.detail ?? '')
+        .join('\n');
+    try {
+      tamperClaims = (claims) => ({ ...claims, aud: 'ALTRO_GESTIONALE_301' });
+      expect(await back(await approve(await start()))).toMatchObject({
+        accesso: 'errore',
+        motivo: 'token-negato',
+      });
+      expect(await detail()).toContain('altro gestionale (ALTRO_GESTIONALE_301)');
+      tamperClaims = (claims) => ({
+        ...claims,
+        exp: Math.floor(s.clock.now().getTime() / 1000) - 1,
+      });
+      expect(await back(await approve(await start()))).toMatchObject({
+        accesso: 'errore',
+        motivo: 'token-negato',
+      });
+      expect(await detail()).toContain('token già scaduto');
+    } finally {
+      tamperClaims = null;
+    }
+    expect((await rupar()).sessione.attiva).toBe(false);
+  });
+
+  it('revoca di un token che per la Regione era già chiuso: si chiude anche qui, e si annota (V08, 4.3.5)', async () => {
+    expect(await back(await approve(await start()))).toEqual({ accesso: 'ok' });
+    const [row] = await t.db
+      .select()
+      .from(serviceSession)
+      .where(
+        and(
+          eq(serviceSession.userId, s.users.titolare.id),
+          eq(serviceSession.service, 'rupar_piemonte'),
+        ),
+      );
+    expect(row).toBeDefined();
+    // La Regione lo revoca da sé (per esempio un accesso nuovo da un altro gestionale): il nostro
+    // DELETE riceve 401.
+    s.clock.advance(8 * 3_600_000 + 1000);
+    c.titolare = await login(s, 'titolare');
+    expect((await req('DELETE', '/api/profilo/credenziali/rupar/sessione')).statusCode).toBe(200);
+    expect((await rupar()).sessione.attiva).toBe(false);
+    const details = (
+      await t.db
+        .select()
+        .from(serviceCredentialEvent)
+        .where(
+          and(
+            eq(serviceCredentialEvent.userId, s.users.titolare.id),
+            eq(serviceCredentialEvent.event, 'sessione_revocata'),
+          ),
+        )
+    ).map((e) => e.detail);
+    expect(details).toContain('SPID o CIE: per la Regione era già chiuso');
   });
 
   it('la pagina regionale simulata rimanda solo al ritorno del programma, mai fuori (D193)', async () => {

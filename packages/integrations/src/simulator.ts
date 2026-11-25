@@ -70,6 +70,15 @@ export class SimulatedGateway implements PrescriptionGateway {
   /** Rifiuto per credenziali o secondo fattore, come farebbe il servizio vero. */
   private authRefusal(auth: ServiceAuth) {
     if (auth?.bearer) {
+      // Token insieme a utente, password, PIN o Id-Sessione: il SAR non lo accetta (V08, 4.3.6).
+      const mixed = authShapeProblem(auth);
+      if (mixed)
+        return {
+          outcome: 'rejected' as const,
+          ...mixed,
+          authProblem: 'credentials' as const,
+          raw: { simulatore: this.system, esito: 'credenziali insieme al token' },
+        };
       if (this.options.oauth && !this.options.oauth.isValid(auth.bearer))
         return {
           outcome: 'rejected' as const,

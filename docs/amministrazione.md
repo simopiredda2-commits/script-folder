@@ -89,7 +89,7 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 - **Intestazione dello studio:** vale nei certificati dai modelli quando il medico non ha la sua.
 - **Indirizzo completo:** è il luogo della visita in studio sulla copia INPS.
 - **Sicurezza:** 5 minuti di inattività, 50 password sbagliate o 5 codici sbagliati, 15 minuti di blocco (D29, D188); si cambiano qui, entro limiti di buon senso (le password da 20 a 100, i codici da 3 a 10, il blocco al più 60 minuti, perché non tenga fuori un medico per un giorno, D179). Le attese dopo le password sbagliate sono del servizio e si vedono nello stato del servizio.
-- **Tempo di attesa degli invii:** 8 secondi per difetto; la Regione indica 6–8 (D94). Si legge a ogni invio di ricette e certificati.
+- **Tempo di attesa degli invii:** 8 secondi per difetto, quelli che la Regione indica nelle specifiche del SAR V06 (3.5.2; la V05 diceva 6–8, D94, D265). Si legge a ogni invio di ricette e certificati.
 - **Soglie degli avvisi sugli accessi anomali** (Garante, linee guida sul dossier sanitario, par. 7, lett. c): vuote, quindi avvisi spenti, finché qualcuno non dà i valori (da completare).
 
 ## Segreteria per archivio (D181, D185)
@@ -173,7 +173,7 @@ Risposte di Simone alla fermata dopo la tappa 15 in D181: quelle sui poteri dell
 - **Password:** 12 caratteri, nessuna scadenza, nessuna regola di composizione: c'è una regola da seguire (Garante, AgID, consulente privacy)? La password temporanea deve scadere?
 - **Salvataggi:** i requisiti mettono i backup cifrati giornalieri nella versione 1; oggi il programma non li fa.
 - **Blocco per inattività:** su tutte le postazioni o solo su quelle condivise, come dicono i requisiti?
-- **Tempo di attesa:** libero da 1 a 60 secondi con un avviso, o fermo ai 6–8 della Regione?
+- **Tempo di attesa:** libero da 1 a 60 secondi con un avviso, o fermo agli 8 secondi della Regione (V06, 3.5.2)?
 - **Soglie degli avvisi:** chi le decide (la Dr.ssa Rocca con il consulente privacy)?
 
 ## Che cosa non è stato provato

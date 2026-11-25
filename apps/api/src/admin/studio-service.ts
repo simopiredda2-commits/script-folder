@@ -60,10 +60,14 @@ export const STUDIO_LIMITS = {
 } as const;
 
 /**
- * Tempo di attesa indicato dalla Regione Piemonte (SIRPE, «Cartelle cliniche MMG e PLS», 4.4.7):
- * «al momento definiti in 6-8 secondi» (D94). Fuori da qui il valore si salva, con un avviso.
+ * Tempo di attesa indicato dalla Regione Piemonte (SIRPED, «Cartelle cliniche MMG e PLS», V06 del
+ * 10/04/2026, 3.5.2): «al momento definiti in 8 secondi», contati dalla richiesta di stampa del
+ * promemoria (D94, D265; la V05 diceva «6-8 secondi»). Fuori da qui il valore si salva, con un avviso.
  */
-export const REGIONAL_SEND_TIMEOUT_SECONDS = { min: 6, max: 8 } as const;
+export const REGIONAL_SEND_TIMEOUT_SECONDS: { readonly min: number; readonly max: number } = {
+  min: 8,
+  max: 8,
+};
 
 /** Fonte degli avvisi sugli accessi anomali (numero, tipologia, orari degli accessi). */
 export const ALERT_SOURCE =
@@ -421,8 +425,9 @@ function alertGaps(v: StudioValues): string[] {
 
 function timeoutNotice(seconds: number): string | null {
   const { min, max } = REGIONAL_SEND_TIMEOUT_SECONDS;
+  const range = min === max ? `${min} secondi` : `da ${min} a ${max} secondi`;
   return seconds < min || seconds > max
-    ? `La Regione Piemonte indica da ${min} a ${max} secondi (SIRPE, «Cartelle cliniche MMG e PLS», 4.4.7)`
+    ? `La Regione Piemonte indica ${range} (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.5.2)`
     : null;
 }
 

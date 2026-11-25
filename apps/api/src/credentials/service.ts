@@ -525,6 +525,8 @@ export function createCredentialService(deps: CredentialDeps) {
         accessToken: token,
       });
       if (r.outcome === 'unreachable') detail = `revoca solo locale: ${r.message}`;
+      // 401 della revoca (V08, 4.3.5): per la Regione il token era già scaduto, revocato o ignoto.
+      if (r.outcome === 'invalid') detail = 'SPID o CIE: per la Regione era già chiuso';
       await db.delete(serviceSession).where(w.session);
       await event(actor, service, 'sessione_revocata', detail ?? 'SPID o CIE');
       return status(actor);
@@ -641,7 +643,13 @@ export function createCredentialService(deps: CredentialDeps) {
     }
     if (!r.scope.includes(PRESCRIBER_SCOPE))
       return fail('senza-profilo', 'profilo di prescrizione non concesso dalla Regione');
-    const validUntil = new Date(now().getTime() + r.expiresIn * 1000);
+    // Il token vale per il gestionale che l'ha chiesto (aud) e fino al suo exp (REL-STC-01 V08,
+    // 4.3.2): expires_in non si usa, perché la V08 non è chiara su che cosa contenga (D265).
+    if (r.clientId !== regional.clientId)
+      return fail('token-negato', `token rilasciato per un altro gestionale (${r.clientId})`);
+    const validUntil = new Date(r.validUntil);
+    if (!(validUntil.getTime() > now().getTime()))
+      return fail('token-negato', `token già scaduto (${r.validUntil})`);
     await storeSession(db, deps.encryptionKey, {
       userId: actor.userId,
       service: 'rupar_piemonte',
