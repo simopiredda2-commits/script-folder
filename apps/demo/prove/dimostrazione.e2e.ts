@@ -701,12 +701,27 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     const sentOrAccepted = item
       .getByText('Mandata', { exact: true })
       .or(item.getByText('Accolta', { exact: true }));
-    for (let i = 0; i < 4; i += 1) {
-      if (await item.getByText('Accolta', { exact: true }).count()) break;
-      await red.getByRole('button', { name: 'Invia adesso' }).click();
+    // Ogni «Invia adesso» legge l'esito una volta: la prima lettura dice «in attesa», la seconda
+    // «accolta». Dopo il clic si aspetta la risposta: il pulsante torna attivo, o sparisce quando
+    // non c'è più niente in corso.
+    const sendNow = red.getByRole('button', { name: 'Invia adesso' });
+    const accepted = item.getByText('Accolta', { exact: true });
+    for (let i = 0; i < 6; i += 1) {
       await sentOrAccepted.first().waitFor({ timeout: 30_000 }).catch(explain);
+      if ((await accepted.count()) || !(await sendNow.count())) break;
+      await sendNow.click({ timeout: 10_000 });
+      await f.waitForFunction(
+        () => {
+          const b = [...document.querySelectorAll('button')].find((x) =>
+            x.textContent?.includes('Invia adesso'),
+          );
+          return !b || !b.disabled;
+        },
+        undefined,
+        { timeout: 30_000 },
+      );
     }
-    await item.getByText('Accolta', { exact: true }).waitFor({ timeout: 30_000 });
+    await accepted.waitFor({ timeout: 30_000 }).catch(explain);
     await item.getByText('010260000000101').waitFor();
     await expectAccessible('ricette rosse in DPCM');
   });
