@@ -1651,6 +1651,14 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 
 **Domande nuove per il CSI**, in un elenco a parte: non sono nella mail del 25/11/2026, e Simone le manda con il prossimo messaggio (sua richiesta del 25/11/2026). Le domande nuove si aggiungono qui. Ultimo aggiornamento: sera del 25/11/2026.
 
+Nessuna blocca il lavoro di adesso (risposta a Simone, sera del 25/11/2026):
+
+- la 1 e gli ultimi tre punti della 7 servono per costruire parti già rimandate al CSI: AURA (D268) e le tre parti della ricetta rossa (D271);
+- la 2, la 3, la 4, la 5, la 6, i primi due punti della 7 e la 9 servono solo per il collaudo, perché il programma va avanti con i simulatori e le scelte di `docs/decisioni.md`;
+- la 8 e la 10 migliorano controlli che ci sono già.
+
+Consiglio dato a Simone: mandarle dopo la risposta alla mail del 25/11/2026, togliendo quelle a cui il CSI avrà già risposto, e cominciare dalla 1 e dalla 7.
+
 _AURA_
 
 1. **Il documento sui servizi per i medici.** Oggi nomi e significato dei campi vengono solo dai cinque WSDL (confronto, §3.1).
