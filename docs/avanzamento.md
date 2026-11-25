@@ -1589,6 +1589,28 @@ Il resoconto di Cowork (32 difetti, nessuno che blocca, 15 importanti e 17 minor
 
 **Prossimo passo**: le domande della fermata qui sotto; poi il collaudo finale.
 
+## Specifiche regionali e nazionali (25/11/2026, D265)
+
+Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche regionali scaricate (SAR V06 e piano dei test V03, accesso con SPID o CIE V08, servizi AURA per i medici, FSE V09, modulo di accesso al Fascicolo LCCE V13), indicare i documenti nazionali per la ricetta rossa (DPCM) e per i lotti di NRE, sistemare ciò che non cambia una decisione presa e poi fermarsi con le cinque domande del confronto (`confronto-specifiche-regionali.md`, preparato da Simone in un'altra conversazione con Claude).
+
+**Documenti** (fatto). Tutti scaricati da qui il 25/11/2026 dagli indirizzi del confronto; link, byte e SHA-256 sono in `docs/provenienze.md`, sezione «Specifiche regionali e nazionali del 25/11/2026». I documenti restano fuori dal repository (D92).
+
+- Quelli con le impronte nel confronto (25 della Regione e del CSI, 7 del Sistema TS) sono uguali, byte per byte. Due di `www.servizi.piemonte.it` (report del piano dei test FSE V02 e LCCE V13) li ha mandati Simone, perché da qui il sito chiudeva la connessione: uguali anche quelli.
+- I 18 «da scaricare» del confronto sono scaricati, con le impronte. Il foglio delle scadenze regionali delle ricette è un xlsx, anche se il sito lo chiama xls.
+- AURA: la nota AVL-17 (99.398 byte) e i cinque WSDL dei servizi per i medici, riscaricati e uguali. L'elenco ufficiale di oggi dei documenti AURA è nella scheda del portale degli operatori, che dal 3/12/2025 sostituisce le pagine di Sistema Piemonte. Il collegamento della nota AVL-17 (RUPAR Piemonte, 2013) non vale più. Dalla scheda sono scaricati anche il manuale di cooperazione AURA--ORG-01-V08, le note di versione da 1 a 24 e i tracciati dei file mensili per i medici.
+
+**In sospeso con il CSI** (mail di Simone del 25/11/2026 a supporto.sar@csi.it, con integrazione.auracartelle@csi.it e supporto.fse@csi.it in copia; paragrafo 6 del confronto). Non si aspettano: si va avanti con i simulatori.
+
+- Requisiti del fornitore: per ora la Regione ha risposto solo che la procedura è riservata ai fornitori (prot. CSI 23148 del 25/11/2026).
+- SAR e accesso con SPID o CIE: kit di test, abilitazione dell'IP del server di test, codice del gestionale, registrazione della `redirect_uri`.
+- AURA: indirizzi e modo di autenticarsi per i servizi dei medici, ambiente di test, notifiche per una cartella in cloud.
+- FSE: kit di test, registrazione sul portale di provisioning, eventuale piano dei test per FSE 2.0.
+- Dati: catalogo regionale in formato strutturato (il file Excel da cui è stampato l'allegato A della D.D. 590/2026) e associazioni aggiornate tra esenzioni e prestazioni (D196).
+
+**Da aggiungere alle domande per il CSI** (non sono nella mail del 25/11/2026):
+
+1. Il documento tecnico sui servizi AURA per le cartelle di MMG e PLS, a cui rimanda il manuale di cooperazione AURA--ORG-01-V08 (§1, p. 2: «si rimanda ad apposito documento pubblicato nel portale di Sistema Piemonte»). Nella scheda AURA di oggi non c'è. Non ci sono nemmeno i due documenti citati dalla nota AVL-17 del 2013: «Modalità di utilizzo servizi per i medici (versione 2.0)» e «Allegato tecnico di utilizzo dei servizi per i medici (versione 4.0)». Richiesta di Simone del 25/11/2026.
+
 ## Dopo la fermata della #38 (25/11/2026)
 
 - **Partita IVA**: Simone: «Una volta aperta la P. IVA potremo fare richiesta in qualità di fornitore». Annotato in «Che cosa resta aperto», parte A.
