@@ -1619,6 +1619,7 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 6. **Fascicolo dalla cartella (LCCE V13):**
    - quanto dura il token;
    - se `ipClient` è obbligatorio (lo schema dice 0..1, la tabella degli errori ha AUTH_ER_512);
+   - il parametro del token nella pagina regionale: `tokenCCEMed` in 6.3 (p. 21), `tokenLCCE` nei facsimili delle dichiarazioni di certificazione (p. 34–35);
    - per una cartella in cloud, token di `getAuthentication` o accesso diretto dentro Shibboleth (6.4)?
 7. **Profilo Sanitario Sintetico:** il servizio regionale valida con lo schematron del Ministero (quello del Gateway, v4.0) o anche con quello della guida HL7 Italia v1.5?
 
@@ -1705,7 +1706,7 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 
 - Tempo d'attesa e riferimenti della V06.
 - Accesso con SPID o CIE come nella V08.
-- Modulo di accesso al Fascicolo come nella V13.
+- Modulo di accesso al Fascicolo come nella V13. Gli indirizzi delle pagine regionali erano finiti nel codice: la prova della regola 7 li ha fermati, e ora sono solo in `docs/fse.md`.
 
 **Non provato**: nessun servizio vero. Lo schematron della guida v1.5 è provato solo sull'esempio delle prove.
 

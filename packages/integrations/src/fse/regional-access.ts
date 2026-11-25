@@ -31,13 +31,11 @@ export const FSE_ACCESS_APPLICATION = 'DMAWACCE';
 export const FSE_ACCESS_ROLE = 'MMG';
 
 /**
- * Pagina del Fascicolo da aprire con il token, per le applicazioni senza Shibboleth (V13, 6.3):
- * da Internet o dalla RUPAR, con il token nel parametro `tokenCCEMed`. Solo per l'adattatore vero:
- * il programma, oggi, non apre queste pagine (regola 7).
+ * Pagina del Fascicolo da aprire con il token, per le applicazioni senza Shibboleth (V13, 6.3): il
+ * token va nel parametro `tokenCCEMed`. Gli indirizzi della pagina, da Internet e dalla RUPAR, sono
+ * in docs/fse.md: vanno nella configurazione dell'adattatore vero, non nel codice (regola 7).
  */
 export const FSE_ACCESS_PAGES = {
-  internet: 'https://medtok.fsepiemonte.it/dmawa/lcce',
-  rupar: 'https://medtokrup.fsepiemonte.it/dmawa/lcce',
   tokenParameter: 'tokenCCEMed',
 } as const;
 

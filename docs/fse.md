@@ -116,6 +116,7 @@ Il Profilo si compone dalla cartella. Il medico lo controlla, lo valida, lo firm
 Dalla cartella il medico apre il Fascicolo del paziente nella pagina regionale dei medici, senza riscrivere le credenziali: il modulo di accesso semplificato del CSI, LCCE V13 (fonti, sopra). Il programma chiede l'accesso con utente, password e PIN RUPAR del medico, per l'applicazione DMAWACCE, e apre la pagina regionale in una scheda nuova, con un token che vale una volta. L'IP della postazione va nella richiesta e la Regione lo traccia: dalla V13 non è più un controllo della pagina (WEB_002 non c'è più). Il consenso del paziente alla consultazione lo controlla la Regione.
 
 - Errori come nella V13: AUTH_ER_510 (PIN mancante) e AUTH_ER_516 (credenziali mancanti) portano, come AUTH_ER_501, a «Credenziali dei servizi»; gli altri arrivano al medico con il loro codice. AUTH_ER_518 e FSE_ER_507 compaiono solo negli esempi della V13: se arrivano, passano con il testo del servizio.
+- Pagine regionali da aprire con il token, senza Shibboleth (V13, 6.3, p. 21): `https://medtok.fsepiemonte.it/dmawa/lcce` da Internet e `https://medtokrup.fsepiemonte.it/dmawa/lcce` dalla RUPAR, con il token nel parametro `tokenCCEMed`. Vanno nella configurazione dell'adattatore vero: nel codice non ci sono (regola 7).
 
 - Pagina «Fascicolo regionale» della cartella, per i medici, con il filtro dei documenti delle specifiche.
 - Servizio: `GET /api/fascicolo-regionale` (filtri e stato del collegamento), `POST /api/pazienti/:id/fascicolo-regionale` (l'indirizzo con il token); ogni richiesta nel registro degli accessi.
@@ -123,6 +124,7 @@ Dalla cartella il medico apre il Fascicolo del paziente nella pagina regionale d
   - con l'autenticazione forte di oggi, se per una cartella in cloud vale il token di `getAuthentication` o l'accesso diretto dentro Shibboleth (V13, 6.4);
   - quanto dura il token (la V13 dice solo che scaduto dà WEB_001; nel simulatore la durata è un'impostazione, vuota per difetto);
   - se `ipClient` è obbligatorio: lo schema lo dà facoltativo (0..1), la tabella degli errori ha AUTH_ER_512 se manca;
+  - il nome del parametro del token: `tokenCCEMed` in 6.3 (p. 21), `tokenLCCE` nei facsimili delle dichiarazioni di certificazione (p. 34–35); con Shibboleth, `token` in 6.3 e `tokenLCCE` nel facsimile;
   - l'accesso per il programma (richiesta scritta, certificato X.509 del fornitore).
 
 ## Ancora da leggere
