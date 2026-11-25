@@ -24,9 +24,13 @@ export function renderRulesTable(): string {
       const sources = r.sources
         .map((s) => (s.url ? `[${cellText(s.title)}](${s.url})` : cellText(s.title)))
         .join('; ');
+      // Gli elenchi lunghi (codici AIC) si contano; quelli corti si scrivono (D272).
+      const lists = Object.entries(r.lists ?? {}).map(([k, v]) =>
+        v.length > 5 ? `${k}: ${v.length} voci` : `${k}: ${v.join(', ')}`,
+      );
       const values =
-        Object.entries(r.values)
-          .map(([k, v]) => `${k} = ${v ?? 'da completare'}`)
+        [...Object.entries(r.values).map(([k, v]) => `${k} = ${v ?? 'da completare'}`), ...lists]
+          .map(cellText)
           .join('; ') || '—';
       const todo = r.toComplete.map(cellText).join('; ') || '—';
       out.push(

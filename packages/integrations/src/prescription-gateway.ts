@@ -27,6 +27,12 @@ export interface PrescriptionLineMessage {
   notSubstitutable?: boolean;
   notSubstitutableReason?: string | null;
   /**
+   * Note della riga (motivazNote): per la terapia del dolore con gli stupefacenti posologia e
+   * telefono del medico, come vuole la «Nota STUP» delle specifiche del Sistema TS (D272). Vanno
+   * anche sul promemoria.
+   */
+  notes?: string | null;
+  /**
    * Ricetta bianca ripetibile: quante volte e per quanti mesi, solo se diverso dalla regola del
    * farmaco (Disciplinare tecnico della ricetta bianca, 1/12/2022: numRipetibilita, validitaFarm).
    */

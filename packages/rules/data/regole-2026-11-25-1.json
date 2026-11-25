@@ -1,0 +1,609 @@
+{
+  "version": "2026-11-25.1",
+  "effectiveFrom": "2026-11-25",
+  "valuesSource": "docs/requisiti.md, sezione «Regole di prescrizione», revisione 45 del 18/11/2026; R11 solo informativo per scelta di Simone alla seconda fermata (18/11/2026); R10 con il codice del nomenclatore e R18 su richiesta di Simone (18/11/2026, D154), dalle specifiche del Sistema TS; R6 e R11 contano anche le ricette fatte con altri programmi, importate, per scelta di Simone alla fermata dopo la tappa 15 (19/11/2026, D181); R19 e R20, stato del paziente alla ricetta, per scelta di Simone del 19/11/2026 (D199); R21, farmaco nell'elenco AIFA dei farmaci carenti, solo informativa: carenze dei farmaci chieste da Simone il 19/11/2026 (D202), «Avviso di carenza sui farmaci in terapia» nella sezione «Banche dati» dei requisiti; R22, confezione «Sospesa» nell'anagrafica AIFA delle confezioni, solo informativa: scelta di Simone alla fermata del 20/11/2026 (D210); R1 per la ricetta specialistica: 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto, dalla D.D. 710/2026 della Regione Piemonte (punto 4), per scelta di Simone alla fermata dopo la #35 (24/11/2026, D260). R23, stupefacenti sulla ricetta farmaceutica del SSN, dalle specifiche del Sistema TS (prescrizione, 5/12/2024, «Nota STUP») e dalla circolare MEF e Ministero della Salute del 14/05/2020 con i suoi elenchi di codici AIC, per scelta di Simone alla fermata dopo la #39 (25/11/2026, D271, D272).",
+  "validated": false,
+  "validationNote": "Prima dell'uso con pazienti reali la Dr.ssa Rocca valida ogni regola e un consulente verifica i riferimenti normativi (requisiti, «Come garantiamo il rigore»).",
+  "rules": [
+    {
+      "id": "R1",
+      "text": "La ricetta SSN vale 30 giorni; la specialistica 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto",
+      "behavior": "inform",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Tabella AIFA di classificazione dei medicinali",
+          "url": "https://www.aifa.gov.it/documents/20142/0/tabella_classificazione_medicinali.pdf"
+        },
+        {
+          "title": "Regione Piemonte, D.D. 30 ottobre 2026, n. 710/A1400B/2026 (BU n. 44 del 5/11/2026), punto 4, ai sensi della DGR 14 aprile 2022, n. 4-4878"
+        },
+        {
+          "title": "Scelta di Simone del 24/11/2026 (D260): per la ricetta specialistica i termini della Regione al posto dei 30 giorni"
+        }
+      ],
+      "values": {
+        "validityDays": 30,
+        "specialistFirstAccessDays": 60,
+        "specialistOtherAccessDays": 180
+      },
+      "toComplete": []
+    },
+    {
+      "id": "R2",
+      "text": "Di regola al massimo 2 confezioni per ricetta",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Tabella AIFA di classificazione dei medicinali",
+          "url": "https://www.aifa.gov.it/documents/20142/0/tabella_classificazione_medicinali.pdf"
+        }
+      ],
+      "values": {
+        "maxPacks": 2
+      },
+      "toComplete": []
+    },
+    {
+      "id": "R3",
+      "text": "Fino a 6 confezioni per antibiotici iniettabili e soluzioni per infusione",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Tabella AIFA di classificazione dei medicinali",
+          "url": "https://www.aifa.gov.it/documents/20142/0/tabella_classificazione_medicinali.pdf"
+        }
+      ],
+      "values": {
+        "maxPacks": 6
+      },
+      "toComplete": [
+        "Forma farmaceutica dalla banca dati farmaci: finché manca, il limite resta quello di R2"
+      ]
+    },
+    {
+      "id": "R4",
+      "text": "Fino a 6 confezioni per patologie croniche in trattamento da almeno 6 mesi, per non più di 180 giorni di terapia",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Tabella AIFA di classificazione dei medicinali",
+          "url": "https://www.aifa.gov.it/documents/20142/0/tabella_classificazione_medicinali.pdf"
+        }
+      ],
+      "values": {
+        "maxPacks": 6,
+        "minTreatmentMonths": 6,
+        "maxTherapyDays": 180
+      },
+      "toComplete": [
+        "Condizioni esatte da verificare sul testo di legge e sulle regole del Piemonte (requisiti)",
+        "Unità per confezione dalla banca dati farmaci: finché manca, i giorni di terapia non si calcolano e il limite resta quello di R2"
+      ]
+    },
+    {
+      "id": "R5",
+      "text": "Farmaco con piano terapeutico obbligatorio",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Determina AIFA del farmaco"
+        },
+        {
+          "title": "Note AIFA",
+          "url": "https://www.aifa.gov.it/it/note-aifa"
+        },
+        {
+          "title": "Regione Piemonte, farmaci PHT in DPC (piani ancora cartacei, es. Nota 85)",
+          "url": "https://www.regione.piemonte.it/web/node/964"
+        }
+      ],
+      "values": {
+        "expiryWarningDays": 30
+      },
+      "toComplete": [
+        "Obbligo di piano per farmaco dalla banca dati farmaci: finché manca, la regola si applica solo ai farmaci con un piano registrato in cartella"
+      ]
+    },
+    {
+      "id": "R6",
+      "text": "Quantità entro quanto indicato nel piano terapeutico, contando anche le ricette fatte con altri programmi",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Piano terapeutico dello specialista"
+        },
+        {
+          "title": "Scelta di Simone alla fermata dopo la tappa 15 (19/11/2026, D181): contano anche le ricette fatte con altri programmi, e il messaggio lo dice"
+        }
+      ],
+      "values": {
+        "countOtherPrograms": 1
+      },
+      "toComplete": [
+        "Posologia e durata del piano: oggi si controllano solo le confezioni autorizzate",
+        "Una ricetta fatta con un altro programma senza il numero di confezioni non si conta: lo si dice"
+      ]
+    },
+    {
+      "id": "R7",
+      "text": "Nota AIFA: il numero della nota in ricetta dichiara che ricorrono le condizioni di rimborsabilità",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Note AIFA",
+          "url": "https://www.aifa.gov.it/it/note-aifa"
+        }
+      ],
+      "values": {},
+      "toComplete": [
+        "Nota collegata al farmaco dalla banca dati farmaci: finché manca, vale la nota scritta nella riga della ricetta"
+      ]
+    },
+    {
+      "id": "R8",
+      "text": "Classe e regime di fornitura",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Classificazione AIFA, dalla banca dati"
+        }
+      ],
+      "values": {},
+      "toComplete": [
+        "Classe e regime di fornitura dalla banca dati farmaci: finché mancano, la regola segnala che non è verificabile"
+      ]
+    },
+    {
+      "id": "R9",
+      "text": "Esenzione valida",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Anagrafe regionale AURA e catalogo esenzioni"
+        }
+      ],
+      "values": {},
+      "toComplete": [
+        "Catalogo delle esenzioni (tappa 5): finché manca, si controlla solo l'esenzione registrata in cartella e la sua validità"
+      ]
+    },
+    {
+      "id": "R10",
+      "text": "Controlli formali del Sistema TS, ripetuti in locale prima dell'invio: codice fiscale, righe e quantità; per la specialistica il codice del catalogo regionale e quello del nomenclatore, coerenti tra loro",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Sistema TS, Specifiche tecniche ricetta dematerializzata, prescrizione (5/12/2024), pp. 28 e 40–42: codProdPrest e codCatalogoPrescr obbligatori per la specialistica; il Sistema TS controlla la coppia sul catalogo della Regione",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/81804/20241205_Specifiche%20tecniche%20ricetta%20dematerializzata%20-%20prescrizione/7cfbbd34-e929-d051-d5b2-629232f3d79e"
+        },
+        {
+          "title": "Documento dei controlli del Sistema TS sulla prescrizione"
+        }
+      ],
+      "values": {
+        "requireNationalServiceCode": 1
+      },
+      "toComplete": [
+        "Elenco completo dei controlli dal documento ufficiale del Sistema TS: oggi ci sono codice fiscale, righe, quantità e codici della specialistica"
+      ]
+    },
+    {
+      "id": "R11",
+      "text": "Contatore delle confezioni: informa se la nuova ricetta arriva prima della copertura delle precedenti, anche fatte con altri programmi",
+      "behavior": "inform",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Buona pratica, da validare con la Dr.ssa Rocca e con il consulente regolatorio (MDR)"
+        },
+        {
+          "title": "Scelta di Simone alla fermata dopo la tappa 15 (19/11/2026, D181): contano anche le ricette fatte con altri programmi, e il messaggio lo dice"
+        }
+      ],
+      "values": {
+        "coverageThreshold": 0.8,
+        "countOtherPrograms": 1
+      },
+      "toComplete": [
+        "Soglia dell'80%: proposta dei requisiti, da confermare con la Dr.ssa Rocca",
+        "Unità per confezione dalla banca dati farmaci: finché mancano, il contatore non si calcola",
+        "Le ricette fatte con altri programmi si riconoscono dal farmaco (AIC o principio attivo), perché non sono collegate alla terapia"
+      ]
+    },
+    {
+      "id": "R12",
+      "text": "Dose rispetto all'RCP, interazioni, linee guida cliniche",
+      "behavior": "out_of_scope",
+      "status": "out_of_scope",
+      "sources": [
+        {
+          "title": "Dati clinici con licenza e percorso di dispositivo medico (requisiti, Vincoli legali)"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R13",
+      "text": "In ricetta il principio attivo; il marchio vincola il farmacista solo con la clausola di non sostituibilità e una sintetica motivazione",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "DL 95/2012, art. 15, comma 11-bis"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R14",
+      "text": "Ricetta specialistica: tipo di accesso sempre; classe di priorità per il primo accesso; quesito diagnostico",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "PNGLA e indicazioni regionali"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R15",
+      "text": "Promemoria cartaceo oppure, su richiesta del paziente, canale alternativo con recapito e scelta registrata",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "DM MEF 25/03/2020 e norme successive"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R16",
+      "text": "Ricetta o NRE a una persona diversa dal paziente solo se è un delegato registrato",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Privacy (GDPR) e deleghe in cartella; da validare con il consulente privacy"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R17",
+      "text": "Esenzione per patologia su ricetta specialistica: ogni prestazione deve essere tra quelle associate a quell'esenzione",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "DPCM LEA, allegato 8-bis, e atti regionali"
+        },
+        {
+          "title": "Regione Piemonte, D.D. 1167/2022 (controllo bloccante del SAR dal 28/06/2022)",
+          "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/2022/28/attach/dda1410001167_10100.pdf"
+        }
+      ],
+      "values": {},
+      "toComplete": [
+        "Elenco regionale esenzioni–prestazioni (tappa 5): finché manca, la regola segnala che non è verificabile"
+      ]
+    },
+    {
+      "id": "R18",
+      "text": "Prestazione con un codice che non è nel catalogo regionale in uso (per esempio scritto a mano perché il catalogo del programma non è ancora aggiornato): si avvisa e serve un motivo; il controllo finale è del SAR, sul catalogo che la Regione ha trasmesso al Sistema TS",
+      "behavior": "warn",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Sistema TS, Specifiche tecniche ricetta dematerializzata, prescrizione (5/12/2024), pp. 28 e 40–42: codProdPrest e codCatalogoPrescr obbligatori per la specialistica; il Sistema TS controlla la coppia sul catalogo della Regione",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/81804/20241205_Specifiche%20tecniche%20ricetta%20dematerializzata%20-%20prescrizione/7cfbbd34-e929-d051-d5b2-629232f3d79e"
+        },
+        {
+          "title": "Richiesta di Simone del 18/11/2026: il codice scritto a mano quando l'aggiornamento non c'è ancora (D154)"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R19",
+      "text": "Paziente deceduto nella cartella: la ricetta non si fa",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Scelta di Simone del 19/11/2026 (D199): controllo formale sullo stato del paziente nella cartella"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R20",
+      "text": "Paziente revocato, o temporaneo senza una scelta del medico in corso (scaduta, cessata o mancante): avviso, con un motivo per procedere",
+      "behavior": "warn",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Scelta di Simone del 19/11/2026 (D199): controllo formale sullo stato del paziente e sulla sua scelta del medico"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R21",
+      "text": "Farmaco nell'elenco AIFA dei farmaci carenti: informazione con la data di inizio, il motivo, la fine presunta e l'equivalente come li dice l'elenco",
+      "behavior": "inform",
+      "status": "active",
+      "sources": [
+        {
+          "title": "AIFA, elenco dei medicinali carenti (pagina «Liste dei farmaci»)",
+          "url": "https://www.aifa.gov.it/liste-dei-farmaci"
+        },
+        {
+          "title": "Scelta di Simone del 19/11/2026 (D202): le carenze dei farmaci nella ricetta e nella terapia"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R22",
+      "text": "Confezione «Sospesa» nell'anagrafica AIFA delle confezioni in vigore alla data della ricetta: informazione con le parole dell'anagrafica",
+      "behavior": "inform",
+      "status": "active",
+      "sources": [
+        {
+          "title": "AIFA, anagrafica delle confezioni (file «confezioni_fornitura.csv», colonna «STATO_AMMINISTRATIVO») dalla pagina «Liste dei farmaci»",
+          "url": "https://www.aifa.gov.it/liste-dei-farmaci"
+        },
+        {
+          "title": "Scelta di Simone del 20/11/2026 (D210): la regola che informa sulla confezione sospesa alla ricetta, senza fermare e senza chiedere un motivo"
+        }
+      ],
+      "values": {},
+      "toComplete": []
+    },
+    {
+      "id": "R23",
+      "text": "Stupefacenti sulla ricetta farmaceutica del SSN: sezione A della tabella dei medicinali sul ricettario ministeriale a ricalco; allegato III-bis solo per la terapia del dolore, con il codice TDL, la posologia e il telefono del medico",
+      "behavior": "block",
+      "status": "active",
+      "sources": [
+        {
+          "title": "Sistema TS, «Web services per la trasmissione delle ricette dematerializzate – parte 1: prescrizione», 5/12/2024, «Nota STUP» (pagine 44 e 45)",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/81804/20241205_Specifiche%20tecniche%20ricetta%20dematerializzata%20-%20prescrizione/7cfbbd34-e929-d051-d5b2-629232f3d79e"
+        },
+        {
+          "title": "Circolare MEF e Ministero della Salute, prot. 5351 del 14/05/2020, «Prescrizioni di medicinali contenenti sostanze stupefacenti o psicotrope con ricetta dematerializzata»",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/33285/Prot_DGSISS_5351_2020_circolare+14_05_2020+ricetta+dematerializzata+stup....pdf/9b931a1e-3c64-6fc3-1fc1-9724c4e9cd02"
+        },
+        {
+          "title": "Elenchi «TAB MED SEZ A» (19 codici AIC) e «ALLEGATO III-BIS» (165 codici AIC) allegati alla circolare, dalla circolare FOFI n. 12255 del 18/05/2020",
+          "url": "https://ordinefarmacistigr.it/files/archivio/circolarifofi/2020/12255.pdf"
+        },
+        {
+          "title": "AIFA, anagrafica delle confezioni (file «confezioni_fornitura.csv», colonna «FORNITURA»): «Ricetta Ministeriale a Ricalco» per la sezione A",
+          "url": "https://www.aifa.gov.it/liste-dei-farmaci"
+        },
+        {
+          "title": "Scelta di Simone alla fermata dopo la #39 (25/11/2026, D271): le parti nazionali della ricetta rossa adesso; R23 come la costruisce D272"
+        }
+      ],
+      "values": {},
+      "lists": {
+        "painTherapyExemptions": ["TDL", "TDL01"],
+        "padOnlyIngredients": ["METADONE"],
+        "sectionAAics": [
+          "041889155",
+          "041889104",
+          "041889041",
+          "041438108",
+          "041438084",
+          "041438060",
+          "041438045",
+          "041438021",
+          "035040017",
+          "029610235",
+          "029610223",
+          "029610110",
+          "029610108",
+          "029610096",
+          "029610072",
+          "029610045",
+          "029610033",
+          "029610021",
+          "029610019"
+        ],
+        "annexIIIbisAics": [
+          "044388155",
+          "044388080",
+          "044388015",
+          "044164402",
+          "044164224",
+          "044164135",
+          "044164046",
+          "043927058",
+          "043927033",
+          "043927021",
+          "043927019",
+          "043588159",
+          "043588084",
+          "043588019",
+          "043518051",
+          "043518048",
+          "043518036",
+          "043518024",
+          "043518012",
+          "043426232",
+          "043426093",
+          "043426028",
+          "042415481",
+          "042415467",
+          "042415404",
+          "042415380",
+          "042415327",
+          "042415303",
+          "042415240",
+          "042415226",
+          "042415164",
+          "042415149",
+          "042415087",
+          "042415063",
+          "042415036",
+          "042415024",
+          "042060602",
+          "042060463",
+          "042060323",
+          "042060184",
+          "042060044",
+          "041263272",
+          "041263157",
+          "041263031",
+          "040328041",
+          "040328039",
+          "040328027",
+          "040328015",
+          "039784588",
+          "039784347",
+          "039784261",
+          "039784020",
+          "039542081",
+          "039542079",
+          "039542055",
+          "039542042",
+          "039542028",
+          "039542016",
+          "039359043",
+          "039359031",
+          "039359029",
+          "039359017",
+          "039014269",
+          "039014206",
+          "039014143",
+          "039014081",
+          "039014028",
+          "038736132",
+          "038736118",
+          "038736094",
+          "038736070",
+          "038736056",
+          "038736031",
+          "038660092",
+          "038660078",
+          "038660054",
+          "038660041",
+          "038660039",
+          "038660015",
+          "038407223",
+          "038407159",
+          "038407084",
+          "038407019",
+          "037609132",
+          "037609094",
+          "037609056",
+          "037609017",
+          "037563222",
+          "037563133",
+          "037563095",
+          "037563057",
+          "037563018",
+          "037405228",
+          "037405178",
+          "037405127",
+          "037405077",
+          "037405026",
+          "037396518",
+          "037396393",
+          "037396278",
+          "037396153",
+          "037396037",
+          "036730240",
+          "036730188",
+          "036730075",
+          "036730012",
+          "035568070",
+          "035568043",
+          "035568017",
+          "035399233",
+          "035399219",
+          "035399195",
+          "035399171",
+          "035399157",
+          "035399132",
+          "035399118",
+          "035399094",
+          "035399070",
+          "035399056",
+          "035399031",
+          "035399017",
+          "034435267",
+          "034435192",
+          "034435139",
+          "034435077",
+          "034435014",
+          "033484041",
+          "033484039",
+          "033484027",
+          "033484015",
+          "031507104",
+          "031507041",
+          "031507039",
+          "031507015",
+          "030798045",
+          "030798033",
+          "030798021",
+          "030798019",
+          "030677025",
+          "030677013",
+          "029611124",
+          "029611050",
+          "029611047",
+          "029611035",
+          "029611023",
+          "029212091",
+          "029212089",
+          "029212077",
+          "029212065",
+          "029212053",
+          "025624040",
+          "025624038",
+          "025624026",
+          "025624014",
+          "025215043",
+          "025215029",
+          "025215017",
+          "040423840",
+          "040422901",
+          "040422786",
+          "040422661",
+          "040422545",
+          "040422420",
+          "042318030",
+          "043927045"
+        ]
+      },
+      "toComplete": [
+        "Allegato III-bis del DPR 309/1990 vigente, con l'elenco delle sostanze: chiesto a Simone (Normattiva e Ministero non si scaricano da qui), per riconoscere anche le confezioni a ricalco nuove",
+        "Elenchi aggiornati dopo il 14/05/2020 e altre decodifiche regionali del codice TDL: li tiene il Sistema TS, domanda per il CSI"
+      ]
+    }
+  ]
+}

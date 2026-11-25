@@ -95,8 +95,11 @@ describe('dati delle regole', () => {
       '2026-11-19.3',
       '2026-11-20.1',
       '2026-11-24.1',
+      '2026-11-25.1',
     ]);
-    const upTo17 = RULE_IDS.filter((id) => !['R18', 'R19', 'R20', 'R21', 'R22'].includes(id));
+    const upTo17 = RULE_IDS.filter(
+      (id) => !['R18', 'R19', 'R20', 'R21', 'R22', 'R23'].includes(id),
+    );
     for (const rs of all.slice(0, 2)) {
       expect(rs.rules.map((r) => r.id).sort()).toEqual([...upTo17].sort());
     }
@@ -107,8 +110,40 @@ describe('dati delle regole', () => {
     expect(all[5]!.rules.map((r) => r.id).sort()).toEqual(
       [...upTo17, 'R18', 'R19', 'R20', 'R21'].sort(),
     );
-    for (const rs of all.slice(6)) {
+    const upTo22 = RULE_IDS.filter((id) => id !== 'R23');
+    for (const rs of all.slice(6, 8)) {
+      expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...upTo22].sort());
+    }
+    for (const rs of all.slice(8)) {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...RULE_IDS].sort());
+    }
+  });
+
+  it('dalla 2026-11-25.1 R23 sugli stupefacenti con gli elenchi del Ministero (D272); il resto come la 2026-11-24.1', () => {
+    const all = loadRulesets();
+    const v8 = all.find((r) => r.version === '2026-11-24.1')!;
+    const v9 = all.find((r) => r.version === '2026-11-25.1')!;
+    expect(v9.effectiveFrom).toBe('2026-11-25');
+    expect(rulesetAt('2026-11-25').version).toBe('2026-11-25.1');
+    expect(v9.rules).toHaveLength(v8.rules.length + 1);
+    for (const r of v9.rules) {
+      if (r.id === 'R23') {
+        expect(r.behavior).toBe('block');
+        expect(r.status).toBe('active');
+        expect(r.lists!.painTherapyExemptions).toEqual(['TDL', 'TDL01']);
+        expect(r.lists!.padOnlyIngredients).toEqual(['METADONE']);
+        expect(r.lists!.sectionAAics).toHaveLength(19);
+        expect(r.lists!.annexIIIbisAics).toHaveLength(165);
+        // Codici AIC di 9 cifre, senza doppioni, mai in tutti e due gli elenchi.
+        const all9 = [...r.lists!.sectionAAics!, ...r.lists!.annexIIIbisAics!];
+        expect(all9.every((x) => /^\d{9}$/.test(x))).toBe(true);
+        expect(new Set(all9).size).toBe(all9.length);
+        expect(r.sources[0]!.title).toMatch(/Nota STUP/);
+        expect(r.sources[1]!.title).toMatch(/5351 del 14\/05\/2020/);
+        expect(r.sources.at(-1)!.title).toMatch(/D271/);
+      } else {
+        expect(r, r.id).toEqual(v8.rules.find((x) => x.id === r.id));
+      }
     }
   });
 
@@ -491,8 +526,8 @@ describe('R5, R6 · piano terapeutico', () => {
       sentLines: sent,
       prescription: { lines: [line({ quantity: 2 })] },
     });
-    // In vigore il 25/11/2026: la 2026-11-24.1, con R6 come nella 2026-11-19.1 (D181).
-    expect(run(c).rulesVersion).toBe('2026-11-24.1');
+    // In vigore il 25/11/2026: la 2026-11-25.1, con R6 come nella 2026-11-19.1 (D181).
+    expect(run(c).rulesVersion).toBe('2026-11-25.1');
     expect(blocks(c, 'R6')).toBe(true);
     expect(of(c, 'R6')[0]!.message).toBe(
       'Farmaco di prova 5 mg: il piano autorizza 4 confezioni, già prescritte 3, di cui 2 con un altro programma; residuo 1',
@@ -1178,5 +1213,127 @@ describe('R22 · confezione sospesa secondo l’anagrafica AIFA (D210)', () => {
         (i) => i.ruleId === 'R22',
       ),
     ).toBe(false);
+  });
+});
+
+describe('R23 · stupefacenti sulla ricetta farmaceutica del SSN (D272)', () => {
+  // Codici degli elenchi della circolare del 14/05/2020: RITALIN (sezione A, fuori dalla ricetta
+  // dematerializzata) e TEMGESIC (allegato III-bis, solo per la terapia del dolore).
+  const SECTION_A = '035040017';
+  const ANNEX = '025215043';
+  const day = '2026-11-25';
+  const narcotic = (over: Partial<LineContext> = {}, exemptionCode: string | null = 'TDL01') =>
+    ctx({
+      date: day,
+      doctorPhone: '011 0000000',
+      prescription: {
+        exemptionCode,
+        lines: [
+          line({ drugAic: ANNEX, drugName: 'TEMGESIC', posologyText: '1 cpr ogni 8 ore', ...over }),
+        ],
+      },
+    });
+
+  it('allegato III-bis con il codice TDL01, la posologia e il telefono: nessun blocco', () => {
+    expect(of(narcotic(), 'R23')).toEqual([]);
+    expect(of(narcotic({}, 'tdl'), 'R23')).toEqual([]);
+  });
+
+  it('allegato III-bis senza il codice della terapia del dolore: blocca e dice dove va', () => {
+    const [i, ...more] = of(narcotic({}, '048'), 'R23');
+    expect(more).toEqual([]);
+    expect(i).toMatchObject({ ruleId: 'R23', severity: 'block', lineId: 'l1' });
+    expect(i!.message).toBe(
+      "TEMGESIC: farmaco dell'allegato III-bis: con la ricetta del SSN solo per la terapia del dolore, con il codice TDL o TDL01 nell'esenzione; altrimenti si prescrive sul ricettario ministeriale a ricalco (DM 10/3/2006)",
+    );
+    expect(blocks(narcotic({}, null), 'R23')).toBe(true);
+  });
+
+  it('allegato III-bis con il TDL ma senza posologia o senza telefono: blocca e dice che cosa manca', () => {
+    expect(of(narcotic({ posologyText: '  ' }), 'R23').map((i) => i.message)).toEqual([
+      'TEMGESIC: per la terapia del dolore la ricetta riporta posologia e modalità di somministrazione (nota STUP): scrivile nella riga',
+    ]);
+    const noPhone = { ...narcotic(), doctorPhone: null };
+    expect(of(noPhone, 'R23').map((i) => i.message)).toEqual([
+      'TEMGESIC: per la terapia del dolore la ricetta riporta il telefono del medico (nota STUP): scrivilo nei dati del medico o dello studio',
+    ]);
+    // Senza il telefono nel contesto (non noto) la regola non lo chiede.
+    const unknown: RuleContext = { ...narcotic() };
+    delete unknown.doctorPhone;
+    expect(of(unknown, 'R23')).toEqual([]);
+  });
+
+  it("sezione A dell'elenco del Ministero: sempre sul ricettario a ricalco, anche con il TDL", () => {
+    const c = narcotic({ drugAic: SECTION_A, drugName: 'RITALIN' });
+    expect(of(c, 'R23').map((i) => [i.severity, i.message])).toEqual([
+      [
+        'block',
+        "RITALIN: nell'elenco degli stupefacenti della sezione A esclusi dalla ricetta dematerializzata: si prescrive sul ricettario ministeriale a ricalco (DM 10/3/2006), non con la ricetta del SSN",
+      ],
+    ]);
+  });
+
+  it('metadone: sul ricettario a ricalco anche con il TDL, dal principio attivo', () => {
+    const c = ctx({
+      date: day,
+      doctorPhone: '011 0000000',
+      facts: { ministerialPad: true },
+      prescription: {
+        exemptionCode: 'TDL01',
+        lines: [
+          line({
+            drugName: 'METADONE DI PROVA',
+            activeIngredient: 'Metadone cloridrato',
+            posologyText: '10 ml',
+          }),
+        ],
+      },
+    });
+    expect(of(c, 'R23').map((i) => i.message)).toEqual([
+      'METADONE DI PROVA: a base di metadone: si prescrive sul ricettario ministeriale a ricalco (DM 10/3/2006), non con la ricetta del SSN',
+    ]);
+  });
+
+  it("confezione a ricalco secondo l'anagrafica AIFA, fuori dagli elenchi: senza TDL blocca, con il TDL informa", () => {
+    const pad = (exemptionCode: string | null) =>
+      ctx({
+        date: day,
+        doctorPhone: '011 0000000',
+        facts: { ministerialPad: true },
+        prescription: { exemptionCode, lines: [line({ posologyText: '1 cpr la sera' })] },
+      });
+    const [b] = of(pad(null), 'R23');
+    expect(b!.severity).toBe('block');
+    expect(b!.message).toMatch(
+      /^Farmaco di prova 5 mg: stupefacente della sezione A \(ricetta ministeriale a ricalco secondo l'anagrafica AIFA\)/,
+    );
+    const issues = of(pad('TDL'), 'R23');
+    expect(issues.map((i) => i.severity)).toEqual(['info']);
+    expect(issues[0]!.message).toMatch(/non è negli elenchi del Ministero del 2020/);
+    expect(blocks(pad('TDL'), 'R23')).toBe(false);
+  });
+
+  it("il codice TDL01 non è un'esenzione del paziente: la R9 non lo controlla dalla 2026-11-25.1", () => {
+    const c = narcotic();
+    expect(of(c, 'R9')).toEqual([]);
+    expect(of({ ...c, exemptionExists: () => false }, 'R9')).toEqual([]);
+    // Con le versioni di prima la R9 lo trattava come un'esenzione qualunque.
+    expect(of({ ...c, date: '2026-11-24' }, 'R9')).toHaveLength(1);
+    // Sulla ricetta specialistica il TDL01 resta un codice di esenzione da controllare.
+    expect(
+      of({ ...c, prescription: { ...c.prescription, kind: 'specialist_ssn' } }, 'R9'),
+    ).toHaveLength(1);
+  });
+
+  it('solo la ricetta farmaceutica del SSN; gli altri farmaci e le versioni di prima non hanno la R23', () => {
+    const white = narcotic({}, null);
+    expect(of({ ...white, prescription: { ...white.prescription, kind: 'white' } }, 'R23')).toEqual(
+      [],
+    );
+    expect(of(narcotic({ drugAic: '012345678' }, null), 'R23')).toEqual([]);
+    const before = narcotic({}, null);
+    expect(run({ ...before, date: '2026-11-24' }).issues.some((i) => i.ruleId === 'R23')).toBe(
+      false,
+    );
   });
 });

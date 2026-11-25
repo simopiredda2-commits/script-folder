@@ -23,7 +23,7 @@ import type {
   StatusResult,
 } from '@mmg/integrations';
 import { systemFor } from '@mmg/integrations';
-import { basePackLimit } from '@mmg/rules';
+import { basePackLimit, painTherapyCodes } from '@mmg/rules';
 import { createHash } from 'node:crypto';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -52,7 +52,7 @@ import {
   type PromemoriaPatient,
 } from '../reminders/promemoria';
 import type { createCredentialService } from '../credentials/service';
-import { studioDate } from './rules-check';
+import { contactPhone, studioDate, stupNote } from './rules-check';
 import type { DpcmContent, DpcmService } from './dpcm';
 import { renderRedForm } from './red-form-pdf';
 import type { NreLots } from './nre-lots';
@@ -641,6 +641,13 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       .from(prescriptionLine)
       .where(eq(prescriptionLine.prescriptionId, p.id))
       .orderBy(asc(prescriptionLine.position));
+    // Terapia del dolore (codice TDL nell'esenzione): posologia e telefono del medico nelle note
+    // di ogni riga, come vuole la «Nota STUP» per gli stupefacenti (D272).
+    const exemption = p.exemptionCode?.trim().toUpperCase() ?? '';
+    const pain =
+      p.kind === 'pharma_ssn' &&
+      painTherapyCodes(compiledAt).some((c) => c.toUpperCase() === exemption);
+    const phone = pain ? await contactPhone(db, doctorUserId, p.patientId) : null;
     return {
       localId: p.id,
       kind: p.kind,
@@ -662,6 +669,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         aifaNote: l.aifaNote,
         notSubstitutable: l.notSubstitutable,
         notSubstitutableReason: l.notSubstitutableReason,
+        ...(pain ? { notes: stupNote(l.posologyText, phone) } : {}),
         repeatCount: l.repeatCount,
         validityMonths: l.validityMonths,
       })),

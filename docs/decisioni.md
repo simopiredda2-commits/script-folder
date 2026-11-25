@@ -2182,3 +2182,30 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - i farmaci esclusi dalla ricetta dematerializzata (DM 2/11/2011, art. 3), che vanno sempre sulla ricetta rossa;
   - il codice della motivazione di non sostituibilità.
 - Variazione e cancellazione di una ricetta DPCM già mandata, archivio dei ricettari del medico e presidi in DPCM si fanno con le risposte del CSI, insieme ad AURA.
+
+**D272 · Stupefacenti sulla ricetta del SSN: la regola R23.** Come si costruisce la prima parte nazionale di D271. Correzione di quello che avevo scritto in D270 e alla fermata: i farmaci esclusi dalla ricetta dematerializzata non vanno sulla ricetta rossa del SSN, ma sul ricettario ministeriale a ricalco del DM 10/3/2006.
+
+- **Fonti.**
+  - DM 2/11/2011, art. 3: esclude le prescrizioni dei farmaci del DM 10/3/2006 (ricettario a ricalco).
+  - Circolare MEF e Ministero della Salute, prot. 5351 del 14/05/2020. Con la ricetta dematerializzata vanno le sezioni B, C, D ed E della tabella dei medicinali e l'allegato III-bis per la terapia del dolore. La sezione A resta sul ricettario a ricalco, metadone compreso. Due elenchi di codici AIC: «TAB MED SEZ A», da bloccare, e «ALLEGATO III-BIS», solo con il codice TDL. Il controllo lo devono fare anche le cartelle cliniche.
+  - Specifiche del Sistema TS, prescrizione, 5/12/2024, «Nota STUP»: il codice è «TDL/TDL01 o altre decodifiche regionali». Nelle note della ricetta (motivazNote) vanno posologia e modalità di somministrazione; per la sezione A anche telefono e recapito del medico. Le note si stampano sul promemoria.
+  - Gli elenchi della circolare vengono dalla circolare FOFI n. 12255 del 18/05/2020, che li riporta: 19 codici della sezione A (metadone e metilfenidato) e 165 dell'allegato III-bis. Sono estratti dal testo del PDF; le provenienze sono in `docs/provenienze.md`.
+- **La regola** (R23, versione delle regole 2026-11-25.1), solo sulla ricetta farmaceutica del SSN, dematerializzata o rossa. Blocca:
+  - un farmaco dell'elenco della sezione A, anche con il TDL;
+  - un farmaco a base di metadone;
+  - una confezione a ricalco secondo l'anagrafica AIFA, senza il codice della terapia del dolore;
+  - un farmaco dell'allegato III-bis senza il codice della terapia del dolore;
+  - con il codice, la riga senza posologia o il medico senza telefono.
+- **Scelte mie.**
+  - L'anagrafica AIFA serve per le confezioni uscite dopo il 2020: 213 delle 251 confezioni «Ricetta Ministeriale a Ricalco» di oggi non sono negli elenchi del 2020. Con il TDL e una confezione a ricalco fuori dagli elenchi la regola informa e non blocca: vale solo se il farmaco è dell'allegato III-bis, e lo controlla il Sistema TS. Lo dice il messaggio.
+  - Il telefono è quello del medico che firma; se manca, quello dello studio. Il programma scrive da sé le note di ogni riga della ricetta con il codice TDL: «Posologia: …; tel. del medico …». Le manda al SAR (motivazNote) e le stampa sul promemoria.
+  - Il codice TDL non è un'esenzione del paziente: dalla stessa versione la R9 non lo controlla sulla ricetta farmaceutica.
+  - Elenchi e codici stanno nei dati delle regole, in un campo nuovo `lists`, versionato come i valori.
+- **Non fatto**:
+  - le note dei farmaci dell'allegato III-bis fuori dalla sezione A (solo la posologia), perché senza l'elenco delle sostanze non si riconoscono;
+  - le note sulla ricetta rossa stampata, dove il medico le scrive a mano come sulla ricetta cartacea.
+- **Da completare**:
+  - l'allegato III-bis del DPR 309/1990 vigente: Normattiva e il sito del Ministero non si scaricano da qui, è chiesto a Simone;
+  - gli elenchi aggiornati dopo il 2020 e le decodifiche regionali del TDL: li tiene il Sistema TS, domanda per il CSI;
+  - le esclusioni regionali (piani terapeutici AIFA, distribuzione diretta e per conto, ossigeno), che la Regione manda al Sistema TS (specifiche del 15/11/2023): domanda per il CSI, perché la cartella non le ha.
+- **Non provato**: il Sistema TS e il SAR veri; la stampa delle note su un promemoria vero.

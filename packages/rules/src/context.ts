@@ -35,6 +35,12 @@ export interface DrugFacts {
    * se l'anagrafica non lo dice: la confezione «Autorizzata» o non trovata non è «sospesa».
    */
   suspended?: boolean;
+  /**
+   * Regime di fornitura AIFA «prescrizione medica speciale con Ricetta Ministeriale a Ricalco»:
+   * stupefacente della sezione A della tabella dei medicinali (R23, D272). Assente se l'anagrafica
+   * non lo dice.
+   */
+  ministerialPad?: boolean;
 }
 
 /** Una carenza come la dice l'elenco AIFA dei farmaci carenti (D202). */
@@ -73,6 +79,8 @@ export interface LineContext {
   aifaNote: string | null;
   notSubstitutable: boolean;
   notSubstitutableReason: string | null;
+  /** Posologia scritta nella riga: per gli stupefacenti va nella ricetta (R23, nota STUP). */
+  posologyText?: string | null;
   therapy: TherapyContext | null;
 }
 
@@ -156,4 +164,9 @@ export interface RuleContext {
   confirmedAifaNotes: ReadonlySet<string>;
   /** Motivi dati dal medico per procedere nonostante un avviso, per regola. */
   reasons: Readonly<Record<string, string>>;
+  /**
+   * Telefono del medico per le note della ricetta degli stupefacenti (R23, nota STUP): quello del
+   * medico o, se manca, dello studio. Assente se non si sa: la R23 non lo chiede.
+   */
+  doctorPhone?: string | null;
 }

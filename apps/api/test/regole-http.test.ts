@@ -1,11 +1,13 @@
 import { SimulatedGateway } from '@mmg/integrations';
 import { rulesetAt } from '@mmg/rules';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  externalSubmission,
   historicalPrescription,
   prescription,
   prescriptionCheck,
+  prescriptionDocument,
   prescriptionLine,
   therapy,
 } from '../src/db/schema';
@@ -111,6 +113,70 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(preview.json().problemi.some((p: { ruleId: string }) => p.ruleId === 'R14')).toBe(true);
     expect(sar.received.length).toBe(before);
     expect((await post(`/api/ricette/${id}/firma-e-invia`)).statusCode).toBe(422);
+  });
+
+  describe('R23 · stupefacenti sulla ricetta del SSN (D272)', () => {
+    // Codici AIC degli elenchi della circolare MEF e Salute del 14/05/2020: RITALIN (sezione A,
+    // fuori dalla ricetta dematerializzata) e TEMGESIC (allegato III-bis, terapia del dolore).
+    const ritalin = {
+      drugAic: '035040017',
+      drugName: 'RITALIN',
+      activeIngredient: 'METILFENIDATO',
+    };
+    const temgesic = {
+      drugAic: '025215043',
+      drugName: 'TEMGESIC',
+      activeIngredient: 'BUPRENORFINA CLORIDRATO',
+    };
+
+    it('sezione A dell’elenco del Ministero: «Firma e invia» si ferma e dice dove va', async () => {
+      const id = await draft({ ...pharma(ritalin), exemptionCode: 'TDL01' });
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(
+        /R23: RITALIN: nell'elenco degli stupefacenti della sezione A .*ricettario ministeriale a ricalco/,
+      );
+    });
+
+    it('allegato III-bis senza il codice della terapia del dolore: si ferma', async () => {
+      const id = await draft(pharma({ ...temgesic, posologyText: '1 compressa ogni 8 ore' }));
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(/R23: TEMGESIC: farmaco dell'allegato III-bis/);
+    });
+
+    it('terapia del dolore con TDL01: parte con posologia e telefono del medico nelle note, anche sul promemoria', async () => {
+      const id = await draft({
+        ...pharma({ ...temgesic, posologyText: '1 compressa ogni 8 ore' }),
+        exemptionCode: 'TDL01',
+      });
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode, res.body).toBe(200);
+      // L'invio, non la richiesta del lotto di NRE che la prima firma può fare (D269).
+      const [sent] = await t.db
+        .select()
+        .from(externalSubmission)
+        .where(
+          and(eq(externalSubmission.prescriptionId, id), eq(externalSubmission.operation, 'invio')),
+        );
+      const notes = 'Posologia: 1 compressa ogni 8 ore; tel. del medico 000 0000001';
+      expect((sent!.request as { lines: { notes?: string }[] }).lines[0]!.notes).toBe(notes);
+      const [doc] = await t.db
+        .select()
+        .from(prescriptionDocument)
+        .where(eq(prescriptionDocument.prescriptionId, id));
+      const data = JSON.parse(doc!.content) as { righe: { dettagli: string | null }[] };
+      expect(data.righe[0]!.dettagli).toBe(notes);
+    });
+
+    it('terapia del dolore senza posologia: si ferma e dice che cosa scrivere', async () => {
+      const id = await draft({ ...pharma(temgesic), exemptionCode: 'TDL01' });
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(
+        /R23: TEMGESIC: .*posologia e modalità di somministrazione/,
+      );
+    });
   });
 
   it('R9: un’esenzione non registrata per il paziente blocca', async () => {

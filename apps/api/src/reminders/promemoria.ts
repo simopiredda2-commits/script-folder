@@ -393,11 +393,15 @@ export async function buildPromemoriaData(
     const prescrizione = l.byActiveIngredient
       ? [group ?? l.activeIngredient ?? l.drugName ?? l.drugAic ?? '']
       : [group, product ?? ''].filter((x): x is string => x !== null);
+    // Le note partite con la ricetta (motivazNote): per la terapia del dolore posologia e
+    // telefono del medico, che vanno stampati sul promemoria («Nota STUP», D272).
+    const notes = sent?.[i]?.notes?.trim() || null;
+    const notSubstitutable = l.notSubstitutable
+      ? [NOT_SUBSTITUTABLE_TEXT, l.notSubstitutableReason?.trim()].filter(Boolean).join(' - ')
+      : null;
     return {
       prescrizione,
-      dettagli: l.notSubstitutable
-        ? [NOT_SUBSTITUTABLE_TEXT, l.notSubstitutableReason?.trim()].filter(Boolean).join(' - ')
-        : null,
+      dettagli: [notSubstitutable, notes].filter(Boolean).join(' · ') || null,
       quantita: l.quantity,
       nota: l.aifaNote?.trim() || NO_NOTE,
     };

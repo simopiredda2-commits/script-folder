@@ -30,6 +30,7 @@ export const RULE_IDS = [
   'R20',
   'R21',
   'R22',
+  'R23',
 ] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 
@@ -50,6 +51,8 @@ const ruleSchema = z
     sources: z.array(sourceSchema).min(1),
     /** Valori della regola: numeri presi dai requisiti, mai scritti nel codice. */
     values: z.record(z.string(), z.number().nullable()),
+    /** Elenchi della regola, presi dalle fonti: codici AIC, codici di esenzione, sostanze (D272). */
+    lists: z.record(z.string(), z.array(z.string().trim().min(1))).optional(),
     /** Che cosa manca perché la regola sia completa. */
     toComplete: z.array(z.string()),
   })
@@ -134,4 +137,14 @@ export function specialistValidityDays(
 export function basePackLimit(date: string, rulesets: Ruleset[] = loadRulesets()): number | null {
   const r2 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R2');
   return r2 && r2.status === 'active' ? value(r2, 'maxPacks') : null;
+}
+
+/**
+ * Codici di esenzione della terapia del dolore secondo R23 alla data (D272): con questi la
+ * ricetta degli stupefacenti dell'allegato III-bis porta posologia e telefono del medico nelle
+ * note. Vuoto se la versione in vigore non ha la regola.
+ */
+export function painTherapyCodes(date: string, rulesets: Ruleset[] = loadRulesets()): string[] {
+  const r23 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R23');
+  return r23 && r23.status === 'active' ? (r23.lists?.painTherapyExemptions ?? []) : [];
 }

@@ -263,6 +263,13 @@ function likeText(q: string): string {
 
 const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
 
+/**
+ * Il regime di fornitura AIFA dice «Ricetta Ministeriale a Ricalco»: stupefacente della sezione A
+ * della tabella dei medicinali (R23, D272).
+ */
+export const ministerialPad = (supplyRegime: string | null | undefined) =>
+  /ricetta ministeriale a ricalco/.test(lower(supplyRegime));
+
 /** Ordine degli equivalenti: prima il prezzo; a parità, nome e AIC, lo stesso a ogni ricerca. */
 /**
  * La carenza che vale alla data, fra quelle dell'elenco per lo stesso AIC (tre AIC compaiono due
@@ -585,6 +592,9 @@ export class ReferenceData {
       // L'anagrafica in vigore dice «Sospesa»: la R22 informa (D210). «Autorizzata», nessuno stato
       // o nessuna riga non sono una sospensione, come nelle variazioni sui farmaci in terapia.
       if (d.some((x) => lower(x.adminState) === 'sospesa')) facts.suspended = true;
+      // Regime «prescrizione medica speciale con Ricetta Ministeriale a Ricalco»: stupefacente
+      // della sezione A della tabella dei medicinali (R23, D272).
+      if (d.some((x) => ministerialPad(x.supplyRegime))) facts.ministerialPad = true;
       // Unità per confezione dalla descrizione dell'anagrafica AIFA (D252): «- 28 COMPRESSE».
       // Solo compresse, capsule e bustine; il resto resta non noto.
       const units = packUnits(pick(d.map((x) => x.pack)));

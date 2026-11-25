@@ -4,13 +4,16 @@ import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import type { ReferenceData } from '../reference/lookup';
 import {
+  archive,
   delegation,
+  doctorProfile,
   exemption,
   historicalPrescription,
   patient,
   patientChoice,
   prescription,
   prescriptionLine,
+  studio,
   therapeuticPlan,
   therapy,
 } from '../db/schema';
@@ -48,6 +51,8 @@ export async function buildRuleContext(
   deps: RulesCheckDeps,
   prescriptionId: string,
   input: SignInput,
+  /** Chi controlla: il suo telefono, o quello dello studio, va nelle note degli stupefacenti (R23). */
+  actorUserId?: string,
 ): Promise<RuleContext> {
   const { db } = deps;
   const [p] = await db.select().from(prescription).where(eq(prescription.id, prescriptionId));
@@ -93,6 +98,7 @@ export async function buildRuleContext(
       aifaNote: l.aifaNote,
       notSubstitutable: l.notSubstitutable,
       notSubstitutableReason: l.notSubstitutableReason,
+      posologyText: l.posologyText,
       therapy: t
         ? {
             id: t.id,
@@ -228,17 +234,55 @@ export async function buildRuleContext(
     exemptionServices,
     confirmedAifaNotes: new Set(input.confirmedAifaNotes),
     reasons: input.reasons,
+    ...(actorUserId ? { doctorPhone: await contactPhone(db, actorUserId, p.patientId) } : {}),
   };
+}
+
+/**
+ * Le note della riga per la terapia del dolore (R23, «Nota STUP», D272): posologia e telefono del
+ * medico. Null se non c'è niente da scrivere.
+ */
+export function stupNote(posology: string | null, phone: string | null): string | null {
+  const parts = [
+    posology?.trim() ? `Posologia: ${posology.trim()}` : null,
+    phone?.trim() ? `tel. del medico ${phone.trim()}` : null,
+  ].filter((x): x is string => x !== null);
+  return parts.length ? parts.join('; ') : null;
+}
+
+/**
+ * Il telefono per le note della ricetta degli stupefacenti (R23, nota STUP): quello del medico,
+ * altrimenti quello dello studio dell'archivio del paziente.
+ */
+export async function contactPhone(
+  db: Database,
+  userId: string,
+  patientId: string,
+): Promise<string | null> {
+  const [doctor] = await db
+    .select({ phone: doctorProfile.phone })
+    .from(doctorProfile)
+    .where(eq(doctorProfile.userId, userId));
+  if (doctor?.phone?.trim()) return doctor.phone.trim();
+  const [place] = await db
+    .select({ phone: studio.phone })
+    .from(patient)
+    .innerJoin(archive, eq(archive.id, patient.archiveId))
+    .innerJoin(studio, eq(studio.id, archive.studioId))
+    .where(eq(patient.id, patientId));
+  return place?.phone?.trim() || null;
 }
 
 /** Controlli prima dell'invio con le regole di prescrizione in vigore alla data. */
 export function createRulesCheck(deps: RulesCheckDeps) {
   return async (
     prescriptionId: string,
-    _actor: unknown,
+    actor: { userId: string } | undefined,
     input: SignInput,
   ): Promise<CheckOutcome> => {
-    const result = checkPrescription(await buildRuleContext(deps, prescriptionId, input));
+    const result = checkPrescription(
+      await buildRuleContext(deps, prescriptionId, input, actor?.userId),
+    );
     return {
       rulesVersion: result.rulesVersion,
       issues: result.issues,

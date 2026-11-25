@@ -357,9 +357,20 @@ const evaluators: Record<RuleId, Evaluator> = {
     });
   },
 
-  R9: (rule, ctx) => {
+  R9: (rule, ctx, all) => {
     const code = ctx.prescription.exemptionCode;
     if (!code || ctx.prescription.kind === 'white') return [];
+    // Il codice della terapia del dolore non è un'esenzione del paziente: lo controlla la R23
+    // (specifiche del Sistema TS, «Nota STUP»; D272).
+    const r23 = all.R23 as Rule | undefined;
+    if (
+      r23?.status === 'active' &&
+      isSsnPharma(ctx) &&
+      listOf(r23, 'painTherapyExemptions').some(
+        (c) => c.toUpperCase() === code.trim().toUpperCase(),
+      )
+    )
+      return [];
     if (ctx.exemptionExists?.(code) === false) {
       return [
         {
@@ -711,7 +722,82 @@ const evaluators: Record<RuleId, Evaluator> = {
           ]
         : [],
     ),
+
+  // Stupefacenti sulla ricetta farmaceutica del SSN (D272). Fonti: specifiche del Sistema TS,
+  // prescrizione, 5/12/2024, «Nota STUP»; circolare MEF e Ministero della Salute del 14/05/2020,
+  // con i suoi elenchi di codici AIC. Sul ricettario ministeriale a ricalco (DM 10/3/2006), non
+  // con la ricetta del SSN: l'elenco «TAB MED SEZ A», il metadone e ogni confezione a ricalco
+  // nell'anagrafica AIFA che non sia prescritta per la terapia del dolore. L'elenco «ALLEGATO
+  // III-BIS» va con la ricetta del SSN solo con il codice TDL nell'esenzione, con la posologia e
+  // con il telefono del medico nelle note.
+  R23: (rule, ctx) => {
+    if (!isSsnPharma(ctx)) return [];
+    const sectionA = new Set(listOf(rule, 'sectionAAics'));
+    const annex = new Set(listOf(rule, 'annexIIIbisAics'));
+    const tdl = listOf(rule, 'painTherapyExemptions');
+    const padOnly = listOf(rule, 'padOnlyIngredients');
+    const exemption = (ctx.prescription.exemptionCode ?? '').trim().toUpperCase();
+    const painTherapy = tdl.some((c) => c.toUpperCase() === exemption);
+    const codes = tdl.join(' o ');
+    const pad =
+      'si prescrive sul ricettario ministeriale a ricalco (DM 10/3/2006), non con la ricetta del SSN';
+    return ctx.prescription.lines.flatMap((line): Issue[] => {
+      const aic = line.drugAic ?? '';
+      const inAnnex = annex.has(aic);
+      const padRegime = ctx.drugFacts(line.drugAic)?.ministerialPad === true;
+      if (!inAnnex && !sectionA.has(aic) && !padRegime) return [];
+      const issue = (message: string, severity = severityOf(rule)): Issue => ({
+        ruleId: 'R23',
+        severity,
+        lineId: line.id,
+        message: `${lineLabel(line)}: ${message}`,
+      });
+      const ingredient = (line.activeIngredient ?? '').toUpperCase();
+      const padIngredient = padOnly.find((x) => ingredient.includes(x.toUpperCase()));
+      if (padIngredient) return [issue(`a base di ${padIngredient.toLowerCase()}: ${pad}`)];
+      if (sectionA.has(aic) && !inAnnex)
+        return [
+          issue(
+            `nell'elenco degli stupefacenti della sezione A esclusi dalla ricetta dematerializzata: ${pad}`,
+          ),
+        ];
+      const out: Issue[] = [];
+      if (!painTherapy)
+        return [
+          issue(
+            inAnnex
+              ? `farmaco dell'allegato III-bis: con la ricetta del SSN solo per la terapia del dolore, con il codice ${codes} nell'esenzione; altrimenti ${pad.replace(', non con la ricetta del SSN', '')}`
+              : `stupefacente della sezione A (ricetta ministeriale a ricalco secondo l'anagrafica AIFA): ${pad}; con la ricetta del SSN vanno solo i farmaci dell'allegato III-bis per la terapia del dolore, con il codice ${codes} nell'esenzione`,
+          ),
+        ];
+      if (!inAnnex)
+        // Confezione a ricalco che gli elenchi del 2020 non hanno: con il codice TDL la ricetta vale
+        // solo se il farmaco è dell'allegato III-bis. Lo controlla il Sistema TS (circolare, punto 2).
+        out.push(
+          issue(
+            "confezione a ricalco che non è negli elenchi del Ministero del 2020: con il codice della terapia del dolore la ricetta del SSN vale solo se il farmaco è dell'allegato III-bis; lo controlla il Sistema TS",
+            'info',
+          ),
+        );
+      if (!line.posologyText?.trim())
+        out.push(
+          issue(
+            'per la terapia del dolore la ricetta riporta posologia e modalità di somministrazione (nota STUP): scrivile nella riga',
+          ),
+        );
+      if (ctx.doctorPhone !== undefined && !ctx.doctorPhone?.trim())
+        out.push(
+          issue(
+            'per la terapia del dolore la ricetta riporta il telefono del medico (nota STUP): scrivilo nei dati del medico o dello studio',
+          ),
+        );
+      return out;
+    });
+  },
 };
+
+/** Un elenco della regola, dai dati (D272): vuoto se la versione non lo ha. */
+const listOf = (rule: Rule, key: string): string[] => rule.lists?.[key] ?? [];
 
 /**
  * La carenza in parole, alla data: «carente dal …» se è cominciata, «carenza prevista dal …» se
