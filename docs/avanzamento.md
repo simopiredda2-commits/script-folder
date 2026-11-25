@@ -1624,6 +1624,15 @@ Poi il Fascicolo con il PSS secondo la guida v1.5 (seconda pull request, D268). 
    - B. Casella solo per il medico; la segreteria resta come oggi.
    - C. Come oggi: si segna nella scheda della terapia.
 
+2. **Note di erogabilità, sedute e tariffa nella ricetta specialistica.** Trovato il 25/11/2026 rispondendo a Simone sui file dei LEA. È nei requisiti («Prescrizione specialistica»: «Sedute per i cicli (es. riabilitazione), tariffa a titolo informativo, condizioni di erogabilità e note del catalogo quando presenti») e non è fatto, né era nell'elenco di che cosa resta aperto.
+   - Le specifiche del Sistema TS dell'8/7/2026 (pp. 28–29) danno a ogni prestazione della ricetta campi facoltativi: `numeroNota`, `condErogabilita`, `approprPrescrittiva`, `patologia` e `numsedute`, quest'ultimo solo per i cicli del DPCM 12/1/2017. La ricetta rossa porta gli stessi dati in `Prescrizione1`, come `#nota-condizione-appropriatezza-patologia#`, con `*` per un dato che manca (specifiche del DPCM 26/3/2008, versione 11.0 dell'1/3/2016).
+   - I dati: le note dell'allegato 4D, con l'allegato 4A per la densitometria; il nomenclatore (allegato 4) dice a quali prestazioni si applica ogni nota. Vanno presi nella versione aggiornata dai decreti del 2026, che cambiano il 4 e il 4D. L'allegato 9 elenca, con il codice ICD-9-CM, le malattie che danno diritto alle cure termali a carico del SSN. I PDF ci sono tutti (`docs/provenienze.md`); le trascrizioni vanno controllate prima dell'uso, come le altre.
+   - Oggi il programma non ha né le note né le sedute e non mostra la tariffa; il promemoria lascia vuoti i campi 18A e 20 (D217).
+
+   Opzioni:
+   - A. Subito, nella pull request delle parti nazionali, prima del Fascicolo: sono campi dello stesso messaggio della ricetta (consigliata).
+   - B. Dopo il Fascicolo.
+
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 
 Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche regionali scaricate (SAR V06 e piano dei test V03, accesso con SPID o CIE V08, servizi AURA per i medici, FSE V09, modulo di accesso al Fascicolo LCCE V13), indicare i documenti nazionali per la ricetta rossa (DPCM) e per i lotti di NRE, sistemare ciò che non cambia una decisione presa e poi fermarsi con le cinque domande del confronto (`confronto-specifiche-regionali.md`, preparato da Simone in un'altra conversazione con Claude).
@@ -1640,6 +1649,8 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
   - note di versione più recenti della AVL-17: dalla 18 alla 24 (2014–2020), nello zip della scheda, con le impronte in `docs/provenienze.md`. Nessuna cambia i servizi per i medici; per il programma contano solo i certificati SHA-256 (AVL-22) e la virgola e il punto nei nomi (AVL-24), accettati, con una prova e un sabotaggio (`docs/aura.md`);
   - versioni più recenti dei 32 documenti: nessuna trovata. Niente da portare alla fermata;
   - oltre a quelli scaricati nel pomeriggio (manuale di cooperazione, note di versione, due tracciati per i medici), gli altri documenti della scheda non sono scaricati: non rispondono a una domanda di adesso.
+  - i file ICD-9-CM e LEA mandati da Simone dal 18 al 21/11/2026, confrontati con il registro per impronta, sulla sua domanda: sono tutti lavorati o messi da parte con il motivo. Al registro mancavano byte e impronte delle cinque parti dell'allegato 4, degli allegati 4D, 10 e 11, degli allegati messi da parte il 18/11/2026, dei file del primo invio ICD-9-CM e del CSV delle procedure: ora ci sono (`docs/provenienze.md`). Gli allegati 4A e 9, segnati come utili il 18/11/2026, non erano mai stati lavorati: vedi la domanda 2 della prossima fermata;
+  - i quattro file SIRPED mandati da Simone: yaml.zip e il modulo xlsx sono uguali a quelli registrati; il file html è la cornice vuota della pagina SIRPED del portale; la scheda (27 documenti) non ha versioni più recenti degli otto documenti SIRPED che usiamo; il piano dei test SIRPED-TES-01 V01 del 04/06/2026, uguale a quello del portale, riguarda la presa in carico e l'erogazione, cioè le strutture che erogano, e al programma non serve.
 
 **In sospeso con il CSI** (mail di Simone del 25/11/2026 a supporto.sar@csi.it, con integrazione.auracartelle@csi.it e supporto.fse@csi.it in copia; paragrafo 6 del confronto). Non si aspettano: si va avanti con i simulatori.
 
