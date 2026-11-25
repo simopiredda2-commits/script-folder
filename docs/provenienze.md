@@ -170,6 +170,14 @@ Moduli dell'anamnestico per la patente mandati da Simone il 18/11/2026, usati so
 | `ANAMNESTICO_web.pdf` (solo immagini)          | 3      | 226.831 | `d559c4ef5031c99cd929768499c845a199634ddfd7d2977d289248790c056cf3` |
 | `anamnestico-MMG.pdf`                          | 1      | 14.646  | `d3a6cdd70003b63d15a9beaa3678f4e488890fd8ae0eb70f828379a785e72e61` |
 
+### Aziende sanitarie locali (D267)
+
+L'elenco delle ASL in `packages/domain/src/asl-elenco.ts` viene dal dataset «Aziende Sanitarie Locali - ASL» dei dati aperti del Ministero della Salute (`https://www.dati.salute.gov.it/it/dataset/aziende-sanitarie-locali-asl/`), con «Data ultimo aggiornamento» 23/04/2026. Il file si scarica da qui; nel repository c'è solo l'elenco generato da `packages/domain/scripts/elenco-asl.ts`: le righe del 2026, con codice e nome di regione e azienda, senza indirizzi e recapiti. Serve a controllare il codice ASL del medico, che entra nel `client_id` e in `X-Gestionale` della Regione (D266, D267). Condizioni: Italian Open Data License 2.0, con il Ministero della Salute come fonte. La prova `packages/domain/test/asl.test.ts` controlla che l'impronta scritta nell'elenco sia quella qui sotto.
+
+| Documento                                                                        | Indirizzo                                                                      | Byte    | SHA-256                                                            |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------- | ------------------------------------------------------------------ |
+| Elenco delle ASL dal 2010 al 2026 (`ASL_2010-2026.csv`), scaricato il 25/11/2026 | `https://www.dati.salute.gov.it/sites/default/files/2026-04/ASL_2010-2026.csv` | 183.899 | `f76eeea9a390462827e553ba1e5eef6d45346b241f178526b44ec32cc36f08ab` |
+
 ### Condivisione nell'AFT (D161)
 
 Le regole della condivisione vengono da atti ufficiali, letti il 19/11/2026 sui testi pubblicati: D.Lgs. 502/1992, art. 8, e D.L. 158/2012, art. 1 (Normattiva); ACN della medicina generale 2022-2024, G.U. n. 24 del 30/1/2026, s.o. n. 5; Garante, linee guida sul dossier sanitario, provv. n. 331 del 4/6/2015, G.U. n. 164 del 17/7/2015; Regione Piemonte, D.G.R. 27/5/2024, n. 31-8647, B.U. n. 22 del 30/5/2024. Nel repository ci sono solo brevi citazioni, in `docs/aft.md` e nei commenti del codice, con la fonte accanto: sono testi di atti ufficiali (art. 5 della legge 633/1941). I PDF restano fuori dal repository.

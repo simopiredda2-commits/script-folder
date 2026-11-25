@@ -310,6 +310,7 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
       nome: a.owner.displayName,
       codice_regionale: a.profile?.regionalCode ?? null,
       asl: a.profile?.asl ?? null,
+      codice_asl: a.profile?.aslCode ?? null,
     },
     tabelle: tables,
     colonne,

@@ -111,7 +111,7 @@ declare module 'fastify' {
 export interface AppDeps {
   db: Database;
   config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'> &
-    Partial<Pick<Config, 'environment' | 'trustedProxies'>>;
+    Partial<Pick<Config, 'environment' | 'trustedProxies' | 'regionalSoftwareCode'>>;
   now?: () => Date;
   logger?: boolean;
   /**
@@ -124,11 +124,11 @@ export interface AppDeps {
   /** Certificati di malattia all'INPS tramite il Sistema TS. Per difetto il simulatore. */
   sickLeaveGateway?: SickLeaveGateway;
   /**
-   * Accesso regionale con SPID o CIE (D109). Per difetto il simulatore, con un codice del
-   * gestionale di prova e il ritorno interno al programma: quelli veri li assegna e li registra la
-   * Regione (D103).
+   * Accesso regionale con SPID o CIE (D109). Per difetto il simulatore, con il ritorno interno al
+   * programma: quello vero lo registra la Regione (D103). Il `client_id` è il codice del gestionale
+   * della configurazione con il codice ASL di ogni medico (D266).
    */
-  regional?: { gateway: RegionalAuthorizationGateway; clientId: string; redirectUri: string };
+  regional?: { gateway: RegionalAuthorizationGateway; redirectUri: string };
   /** Controlli prima dell'invio delle ricette (regole di prescrizione). */
   preSendChecks?: PrescriptionDeps['preSendChecks'];
   /** Email e SMS del promemoria. Per difetto il simulatore (regola 7). */
@@ -190,7 +190,6 @@ export function buildApp({
   },
   regional = {
     gateway: new SimulatedRegionalAuthorization({ now }),
-    clientId: 'SIMULATORE_000',
     redirectUri: '/api/profilo/credenziali/rupar/accesso-regionale/ritorno',
   },
   gateways = defaultGateways(secondFactor, regional.gateway),
@@ -293,6 +292,7 @@ export function buildApp({
     now: now ?? (() => new Date()),
     secondFactor,
     regional,
+    regionalSoftwareCode: config.regionalSoftwareCode ?? 'SIMULATORE',
   });
   registerCredentialRoutes(app, credentials, {
     sessionCookie: SESSION_COOKIE,

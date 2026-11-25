@@ -9,7 +9,12 @@ import type {
   StatusResult,
 } from './prescription-gateway';
 import type { SimulatedRegionalAuthorization } from './regional-authorization';
-import { authShapeProblem, type ServiceAuth, type SimulatedSecondFactor } from './service-auth';
+import {
+  authShapeProblem,
+  REGIONAL_SOFTWARE_ID,
+  type ServiceAuth,
+  type SimulatedSecondFactor,
+} from './service-auth';
 import { simulatedWhiteReminderPdf } from './simulated-documents';
 
 export type SimulatedOutcome = 'accepted' | 'rejected' | 'unreachable' | 'timeout';
@@ -59,8 +64,16 @@ export class SimulatedGateway implements PrescriptionGateway {
   private readonly issued = new Map<string, { cancelled: boolean }>();
   /** Messaggi ricevuti, per le prove. */
   readonly received: PrescriptionMessage[] = [];
-  /** Con quali credenziali: utente, Id-Sessione e se c'era un token; mai password, PIN o token. */
-  readonly receivedAuth: { username: string; sessionId: string | null; bearer: boolean }[] = [];
+  /**
+   * Con quali credenziali: utente, Id-Sessione, X-Gestionale e se c'era un token; mai password,
+   * PIN o token.
+   */
+  readonly receivedAuth: {
+    username: string;
+    sessionId: string | null;
+    bearer: boolean;
+    software: string | null;
+  }[] = [];
 
   constructor(
     readonly system: GatewaySystem,
@@ -105,6 +118,15 @@ export class SimulatedGateway implements PrescriptionGateway {
         authProblem: 'session' as const,
         raw: { simulatore: this.system, esito: 'secondo fattore' },
       };
+    // Con l'Id-Sessione per email il SAR vuole X-Gestionale: codice del gestionale, «_» e codice
+    // ASL del medico (REL-STC-01 V08, 4.2.5). Il Sistema TS no.
+    if (this.system === 'sar' && !REGIONAL_SOFTWARE_ID.test(auth.software ?? ''))
+      return {
+        outcome: 'rejected' as const,
+        code: 'GESTIONALE',
+        message: 'X-Gestionale mancante o non valido (simulato)',
+        raw: { simulatore: this.system, esito: 'X-Gestionale' },
+      };
     return null;
   }
 
@@ -114,6 +136,7 @@ export class SimulatedGateway implements PrescriptionGateway {
       username: auth?.username ?? '',
       sessionId: auth?.sessionId ?? null,
       bearer: !!auth?.bearer,
+      software: auth?.software ?? null,
     });
     if (this.options.delayMs) await new Promise((ok) => setTimeout(ok, this.options.delayMs));
     const refused = this.authRefusal(auth);

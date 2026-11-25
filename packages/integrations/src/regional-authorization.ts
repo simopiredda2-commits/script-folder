@@ -21,6 +21,7 @@
  */
 
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { REGIONAL_SOFTWARE_ID } from './service-auth';
 
 /** Scope del SIRPED per il medico prescrittore. */
 export const PRESCRIBER_SCOPE = 'prescrizione';
@@ -237,7 +238,13 @@ export class SimulatedRegionalAuthorization implements RegionalAuthorizationGate
   private readonly codes = new Map<string, PendingCode>();
   private readonly tokens = new Map<
     string,
-    { fiscalCode: string; sessionId: string; validUntil: number; revoked: boolean }
+    {
+      fiscalCode: string;
+      sessionId: string;
+      clientId: string;
+      validUntil: number;
+      revoked: boolean;
+    }
   >();
 
   constructor(private readonly options: SimulatedRegionalAuthorizationOptions = {}) {}
@@ -293,6 +300,10 @@ export class SimulatedRegionalAuthorization implements RegionalAuthorizationGate
     if (!pending || pending.used || pending.expiresAt <= this.now())
       return reject('invalid_grant', 'Codice di autorizzazione non valido, già usato o scaduto');
     pending.used = true;
+    // Il client_id è il codice del gestionale con il codice ASL del medico (V08, 4.3.1): il
+    // servizio vero conosce solo quelli registrati; il simulatore ne controlla la forma.
+    if (!REGIONAL_SOFTWARE_ID.test(input.clientId))
+      return reject('invalid_client', 'Parametro client_id non riconosciuto o non presente');
     if (pending.clientId !== input.clientId)
       return reject('invalid_client', 'Parametro client_id non riconosciuto');
     if (pending.redirectUri !== input.redirectUri)
@@ -331,6 +342,7 @@ export class SimulatedRegionalAuthorization implements RegionalAuthorizationGate
     this.tokens.set(accessToken, {
       fiscalCode: pending.fiscalCode,
       sessionId,
+      clientId: input.clientId,
       validUntil: exp,
       revoked: false,
     });
@@ -347,9 +359,14 @@ export class SimulatedRegionalAuthorization implements RegionalAuthorizationGate
     );
   }
 
-  verify(input: { accessToken: string; fiscalCode: string }): Promise<TokenCheck> {
+  /** Il client_id dev'essere quello che ha chiesto il token (4.3.4). */
+  verify(input: {
+    clientId: string;
+    accessToken: string;
+    fiscalCode: string;
+  }): Promise<TokenCheck> {
     const t = this.tokens.get(input.accessToken);
-    if (!t || t.fiscalCode !== input.fiscalCode)
+    if (!t || t.fiscalCode !== input.fiscalCode || t.clientId !== input.clientId)
       return Promise.resolve({ outcome: 'invalid', state: 'sconosciuto' });
     if (t.revoked) return Promise.resolve({ outcome: 'invalid', state: 'revocato' });
     if (t.validUntil <= this.now())
@@ -357,10 +374,13 @@ export class SimulatedRegionalAuthorization implements RegionalAuthorizationGate
     return Promise.resolve({ outcome: 'valid', validUntil: new Date(t.validUntil).toISOString() });
   }
 
-  /** Come la DELETE della V08 (4.3.5): 401, «invalid», se il token è già scaduto, revocato o ignoto. */
-  revoke(input: { accessToken: string }): Promise<RevokeResult> {
+  /**
+   * Come la DELETE della V08 (4.3.5): 401, «invalid», se il token è già scaduto, revocato o ignoto,
+   * o se lo revoca un client_id diverso da quello che l'ha chiesto.
+   */
+  revoke(input: { clientId: string; accessToken: string }): Promise<RevokeResult> {
     const t = this.tokens.get(input.accessToken);
-    if (!t || t.revoked || t.validUntil <= this.now())
+    if (!t || t.revoked || t.validUntil <= this.now() || t.clientId !== input.clientId)
       return Promise.resolve({ outcome: 'invalid' });
     t.revoked = true;
     return Promise.resolve({ outcome: 'revoked' });

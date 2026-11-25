@@ -840,6 +840,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
       db: t.db,
       encryptionKey: s.encryptionKey,
       now: s.clock.now,
+      regionalSoftwareCode: 'SIMULATORE',
       secondFactor: s.secondFactor,
     });
     const doctor = s.users.sostituto;

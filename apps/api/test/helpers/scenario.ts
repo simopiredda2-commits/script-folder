@@ -171,6 +171,8 @@ export async function createScenario(
       userId: users.titolare.id,
       regionalCode: 'MMG-PROVA-1',
       asl: 'ASL di prova',
+      // Codice ASL dell'elenco del Ministero (D267): entra nel client_id e in X-Gestionale (D266).
+      aslCode: '301',
       fiscalCode: doctorCf('Marchi', 'Elena', 'F'),
       // Nome, cognome e recapiti per il Profilo Sanitario Sintetico (tappa 11); domini .invalid.
       firstName: 'Elena',
@@ -182,12 +184,16 @@ export async function createScenario(
       userId: users.collega.id,
       regionalCode: 'MMG-PROVA-2',
       asl: 'ASL di prova',
+      // Codice ASL dell'elenco del Ministero (D267): entra nel client_id e in X-Gestionale (D266).
+      aslCode: '301',
       fiscalCode: doctorCf('Serra', 'Paolo', 'M'),
     },
     {
       userId: users.sostituto.id,
       regionalCode: 'MMG-PROVA-3',
       asl: 'ASL di prova',
+      // Codice ASL dell'elenco del Ministero (D267): entra nel client_id e in X-Gestionale (D266).
+      aslCode: '301',
       fiscalCode: doctorCf('Fiore', 'Marco', 'M'),
       firstName: 'Marco',
       lastName: 'Fiore',

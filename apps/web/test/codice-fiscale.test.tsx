@@ -143,7 +143,18 @@ describe('codice fiscale corretto dall’amministratore (tappa 16, D181)', () =>
       sospesoDalServizio: false,
     };
     const calls = fakeService({
-      '/api/studio/utenti': () => ({ status: 200, body: { ruoli: [], utenti: [doctor] } }),
+      '/api/studio/utenti': () => ({
+        status: 200,
+        body: {
+          ruoli: [],
+          utenti: [doctor],
+          aziendeSanitarie: {
+            regione: null,
+            elenco: [],
+            fonte: 'Ministero della Salute, ASL 2026',
+          },
+        },
+      }),
       '/api/studio/utenti/d1/codice-fiscale/ritira': () => ({
         status: 200,
         body: {

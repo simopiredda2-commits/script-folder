@@ -31,17 +31,27 @@ Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id
 
 È la modalità scelta alla terza fermata per le ricette SSN in Piemonte. Fonte: REL-STC-01, autenticazione forte, V08 del 23/09/2026, 3.2 e 4.3 (D265).
 
-1. Il medico preme «Entra con SPID o CIE». Il programma crea uno `state` casuale (ne conserva l'impronta) e un `code_verifier` PKCE (cifrato), poi apre la pagina di autorizzazione regionale (`/oauth2/authorize` con `client_id`, `redirect_uri`, scope `prescrizione`, `state`, `code_challenge` S256).
+1. Il medico preme «Entra con SPID o CIE». Il programma crea uno `state` casuale (ne conserva l'impronta) e un `code_verifier` PKCE (cifrato), poi apre la pagina di autorizzazione regionale (`/oauth2/authorize` con `client_id`, `redirect_uri`, scope `prescrizione`, `state`, `code_challenge` S256). Il `client_id` è il codice del gestionale con il codice ASL del medico (qui sotto); senza codice ASL l'accesso non parte. La richiesta conserva il `client_id` con cui è partita.
 2. Il medico entra con SPID o CIE e autorizza. La Regione rimanda il browser al programma con `code` e `state`, oppure con un errore.
 3. Il programma fa questi controlli:
    - lo `state` è di una richiesta di **questo** medico, non usata e non più vecchia di 10 minuti;
    - scambia il codice con il `code_verifier` (`/oauth2/token`);
    - chi è entrato con SPID o CIE (`sub` del token) è il medico collegato; altrimenti revoca il token;
    - la Regione ha concesso il profilo di prescrizione;
-   - il token è stato rilasciato per il programma (`aud` uguale al `client_id`) e non è già scaduto.
+   - il token è stato rilasciato per il programma (`aud` uguale al `client_id` della richiesta, anche se nel frattempo l'ASL del medico è cambiata) e non è già scaduto.
 4. Il token si conserva cifrato. La scadenza è il campo `exp` del token, non `expires_in`: la V08 descrive `expires_in` come «Unix time», ma nell'esempio vale 7199, una durata (4.3.2, D265). Non si rinnova: alla scadenza si rientra.
 5. Le ricette SSN, i loro annullamenti e lo stato di erogazione usano il token nell'intestazione `X-OAuth2-Authorization: Bearer`, senza l'autenticazione Basic, con `<pinCode>` vuoto e nessun altro dato di autenticazione (V08, 4.3.6). Utente, password e PIN RUPAR non servono.
-6. «Esci dall’accesso regionale» revoca il token (`DELETE /sessionid/revoke`, V08, 4.3.5). Se per la Regione il token era già scaduto, revocato o sconosciuto (risposta 401), si chiude solo qui e si annota.
+6. «Esci dall’accesso regionale» revoca il token (`DELETE /sessionid/revoke`, V08, 4.3.5), con il `client_id` che lo ha chiesto: è nel token, in `aud`. Se per la Regione il token era già scaduto, revocato o sconosciuto (risposta 401), si chiude solo qui e si annota.
+
+### Codice del gestionale e codice ASL (D266, D267)
+
+Per i servizi della Regione Piemonte il programma si presenta con il codice che la Regione gli assegna all'avvio dell'autocertificazione, seguito da «_» e dal codice dell'ASL in cui lavora il medico. L'esempio della V08 è `MIOAPPLICATIVO_301`. Lo stesso valore va in tre punti:
+
+- il `client_id` dell'accesso con SPID o CIE (V08, 4.3.1, p. 28; 4.3.2, 4.3.4 e 4.3.5);
+- l'intestazione `X-Gestionale` delle chiamate al SAR con il codice per email (4.2.5, p. 25);
+- l'informazione aggiuntiva «APP» delle richieste del codice per email: richiesta, verifica e revoca (4.2.1–4.2.3).
+
+Il codice del gestionale sta nella configurazione (`APP_CODICE_GESTIONALE`, per difetto «SIMULATORE»). Il codice ASL lo sceglie l'amministratore nei dati del medico, fra le ASL della regione dello studio dell'elenco del Ministero della Salute (`docs/amministrazione.md`). Senza codice ASL il programma non chiama i servizi della Regione che lo vogliono e lo dice: «Manca il codice ASL del medico…». Il Sistema TS non lo usa. Se l'amministratore cambia il codice ASL, la sessione della RUPAR si chiude, perché era del codice di prima. I simulatori rifiutano un `client_id`, un `X-Gestionale` o un'«APP» senza le tre cifre dell'ASL.
 
 Errori come annullamento, identità diversa, richiesta scaduta o accesso al programma scaduto nel frattempo tornano come messaggio chiaro nella pagina delle credenziali, mai come errore tecnico. Nell'indirizzo del ritorno c'è solo un codice, e il testo lo scrive il programma: un testo nell'indirizzo lo potrebbe scrivere chiunque (D193). Il codice per email resta come alternativa.
 
@@ -104,7 +114,7 @@ In prova la pagina regionale è simulata dal programma stesso:
   - per il SAR le intestazioni sono già scritte e provate in `sarAuthentication` (`packages/integrations/src/service-auth.ts`): con il token, `X-OAuth2-Authorization`; con il codice per email, `Authorization: Basic`, `X-idSessione` e `X-Gestionale` (V08, 4.2.5 e 4.3.6).
 - **Durata del codice SIRPED**: 8 ore per i servizi di prescrizione (V08, 3), come nel simulatore.
 - **Accesso con SPID o CIE, con il servizio vero**:
-  - codice del gestionale (`client_id`) e indirizzo di ritorno da registrare presso la Regione (D103);
+  - codice del gestionale da mettere in `APP_CODICE_GESTIONALE` e indirizzo di ritorno da registrare presso la Regione (D103); il `client_id` lo compone il programma con il codice ASL del medico (D267);
   - verifica della firma del token con la chiave pubblica (JWKS, `/.well-known/jwks.json`, kid «rel-oauth2-key»): il simulatore emette token con i campi della V08 ma senza firma;
   - `expires_in`: la V08 lo descrive come «Unix time» e nell'esempio vale 7199; il programma usa `exp` del token, ma il significato va chiesto al CSI;
   - revoca: la V08 dice `DELETE`, la descrizione OpenAPI pubblicata con la V08 (`yaml.zip`) dice `GET`: da chiarire con il CSI. Il simulatore segue la V08.

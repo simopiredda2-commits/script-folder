@@ -16,6 +16,8 @@ import {
   newPkceVerifier,
   pkceChallenge,
   PRESCRIBER_SCOPE,
+  readRegionalToken,
+  regionalSoftwareId,
   type AuthProblem,
   type RegionalAuthorizationGateway,
   type SecondFactorGateway,
@@ -75,14 +77,18 @@ export interface CredentialDeps {
   secondFactor: Record<CredentialService, SecondFactorGateway>;
   /**
    * Accesso regionale con SPID o CIE per le ricette in Piemonte (D109): servizio OAuth2 del
-   * SIRPED, codice del gestionale (client_id, da completare con la Regione, D103) e indirizzo di
-   * ritorno registrato presso la Regione.
+   * SIRPED e indirizzo di ritorno registrato presso la Regione.
    */
   regional?: {
     gateway: RegionalAuthorizationGateway;
-    clientId: string;
     redirectUri: string;
   };
+  /**
+   * Codice del gestionale assegnato dalla Regione (configurazione, D267). Con il codice ASL del
+   * medico fa il `client_id`, `X-Gestionale` e l'informazione aggiuntiva «APP» (REL-STC-01 V08;
+   * D266).
+   */
+  regionalSoftwareCode: string;
 }
 
 /** Minuti entro cui il medico deve tornare dalla pagina regionale (la Regione: «qualche minuto»). */
@@ -454,13 +460,40 @@ export function createCredentialService(deps: CredentialDeps) {
     return secret;
   }
 
+  /**
+   * Come il programma si presenta alla Regione Piemonte per questo medico: il codice del gestionale
+   * della configurazione, «_» e il codice ASL dei dati del medico (REL-STC-01 V08; D266). Senza
+   * codice ASL nessun servizio della Regione che lo vuole si chiama: il messaggio dice chi lo
+   * inserisce e dove.
+   */
+  async function regionalSoftwareIdOf(userId: string): Promise<string> {
+    const [p] = await db
+      .select({ aslCode: doctorProfile.aslCode })
+      .from(doctorProfile)
+      .where(eq(doctorProfile.userId, userId));
+    const r = regionalSoftwareId(deps.regionalSoftwareCode, p?.aslCode);
+    if (!r.ok)
+      throw new HttpError(422, r.message, {
+        codice: r.code === 'ASL' ? 'CODICE_ASL_MANCANTE' : 'CODICE_GESTIONALE_NON_VALIDO',
+        servizio: slugOf('rupar_piemonte'),
+      });
+    return r.value;
+  }
+
+  /** L'informazione aggiuntiva «APP» per il secondo fattore: solo la RUPAR Piemonte la vuole. */
+  const softwareFor = (userId: string, service: CredentialService) =>
+    service === 'rupar_piemonte' ? regionalSoftwareIdOf(userId) : Promise.resolve(null);
+  const withSoftware = (secret: Secret, software: string | null): ServiceAuth =>
+    software ? { ...secret, software } : secret;
+
   /** Chiede l'Id-Sessione: il servizio lo manda all'email certificata del medico. */
   async function requestSession(actor: Actor, service: CredentialService) {
     requireDoctor(actor);
     const secret = await requireSecret(actor.userId, service);
     const fiscalCode = await fiscalCodeOf(actor.userId);
+    const software = await softwareFor(actor.userId, service);
     const gateway = deps.secondFactor[service];
-    const r = await gateway.requestCode({ auth: secret, fiscalCode });
+    const r = await gateway.requestCode({ auth: withSoftware(secret, software), fiscalCode });
     if (r.outcome === 'unreachable') {
       await event(actor, service, 'codice_non_richiesto', r.message);
       throw new HttpError(502, `${label(service)}: ${r.message}. Riprova tra poco.`);
@@ -487,8 +520,9 @@ export function createCredentialService(deps: CredentialDeps) {
     const { codice } = codeBody.parse(body ?? {});
     const secret = await requireSecret(actor.userId, service);
     const fiscalCode = await fiscalCodeOf(actor.userId);
+    const software = await softwareFor(actor.userId, service);
     const r = await deps.secondFactor[service].check({
-      auth: secret,
+      auth: withSoftware(secret, software),
       fiscalCode,
       sessionId: codice,
     });
@@ -519,11 +553,16 @@ export function createCredentialService(deps: CredentialDeps) {
     const token = decryptSecret(key, s.tokenEnc, aad('sessione', actor.userId, service)).toString();
     let detail: string | null = null;
     if (s.mode === 'spid_cie' && deps.regional) {
-      const r = await deps.regional.gateway.revoke({
-        clientId: deps.regional.clientId,
-        fiscalCode: s.subject ?? '',
-        accessToken: token,
-      });
+      // Il client_id della revoca è quello che ha chiesto il token (V08, 4.3.5): sta nel token
+      // stesso, in `aud`, anche se nel frattempo l'ASL del medico è cambiata.
+      const clientId = readRegionalToken(token)?.aud ?? null;
+      const r = clientId
+        ? await deps.regional.gateway.revoke({
+            clientId,
+            fiscalCode: s.subject ?? '',
+            accessToken: token,
+          })
+        : ({ outcome: 'unreachable', message: 'token senza client_id' } as const);
       if (r.outcome === 'unreachable') detail = `revoca solo locale: ${r.message}`;
       // 401 della revoca (V08, 4.3.5): per la Regione il token era già scaduto, revocato o ignoto.
       if (r.outcome === 'invalid') detail = 'SPID o CIE: per la Regione era già chiuso';
@@ -533,8 +572,10 @@ export function createCredentialService(deps: CredentialDeps) {
     }
     const secret = await loadSecret(actor.userId, service);
     if (secret) {
+      // Senza codice ASL la revoca resta locale: la sessione si chiude comunque qui.
+      const software = await softwareFor(actor.userId, service).catch(() => null);
       const r = await deps.secondFactor[service].revoke({
-        auth: secret,
+        auth: withSoftware(secret, software),
         fiscalCode: await fiscalCodeOf(actor.userId),
         sessionId: token,
       });
@@ -556,6 +597,7 @@ export function createCredentialService(deps: CredentialDeps) {
     requireDoctor(actor);
     if (!deps.regional) throw new HttpError(404, 'Accesso regionale non disponibile');
     const fiscalCode = await fiscalCodeOf(actor.userId);
+    const clientId = await regionalSoftwareIdOf(actor.userId);
     const state = randomBytes(32).toString('base64url');
     const verifier = newPkceVerifier();
     await db.insert(regionalAuthorizationRequest).values({
@@ -563,12 +605,13 @@ export function createCredentialService(deps: CredentialDeps) {
       stateHash: stateHash(state),
       verifierEnc: encryptSecret(key, Buffer.from(verifier), pkceAad(actor.userId)),
       redirectUri: deps.regional.redirectUri,
+      clientId,
       expiresAt: new Date(now().getTime() + REGIONAL_REQUEST_MINUTES * 60_000),
     });
-    await event(actor, 'rupar_piemonte', 'accesso_regionale_avviato');
+    await event(actor, 'rupar_piemonte', 'accesso_regionale_avviato', clientId);
     return {
       indirizzo: deps.regional.gateway.authorizeUrl({
-        clientId: deps.regional.clientId,
+        clientId,
         redirectUri: deps.regional.redirectUri,
         scope: [PRESCRIBER_SCOPE],
         state,
@@ -623,11 +666,14 @@ export function createCredentialService(deps: CredentialDeps) {
         `${q.error}: ${q.error_description ?? ''}`,
       );
     if (!q.code) return fail('senza-codice', 'ritorno senza codice di autorizzazione');
+    // Lo stesso client_id della richiesta (D266): una richiesta di prima della migrazione non ce l'ha.
+    const clientId = request.clientId;
+    if (!clientId) return fail('non-riconosciuta', 'richiesta senza client_id');
     const verifier = decryptSecret(key, request.verifierEnc, pkceAad(actor.userId)).toString();
     const r = await regional.gateway.exchange({
       code: q.code,
       redirectUri: request.redirectUri,
-      clientId: regional.clientId,
+      clientId,
       codeVerifier: verifier,
     });
     if (r.outcome === 'unreachable') return fail('non-raggiungibile', r.message);
@@ -635,7 +681,7 @@ export function createCredentialService(deps: CredentialDeps) {
     const doctor = await fiscalCodeOf(actor.userId);
     if (r.fiscalCode.toUpperCase() !== doctor.toUpperCase()) {
       await regional.gateway.revoke({
-        clientId: regional.clientId,
+        clientId,
         fiscalCode: r.fiscalCode,
         accessToken: r.accessToken,
       });
@@ -645,7 +691,7 @@ export function createCredentialService(deps: CredentialDeps) {
       return fail('senza-profilo', 'profilo di prescrizione non concesso dalla Regione');
     // Il token vale per il gestionale che l'ha chiesto (aud) e fino al suo exp (REL-STC-01 V08,
     // 4.3.2): expires_in non si usa, perché la V08 non è chiara su che cosa contenga (D265).
-    if (r.clientId !== regional.clientId)
+    if (r.clientId !== clientId)
       return fail('token-negato', `token rilasciato per un altro gestionale (${r.clientId})`);
     const validUntil = new Date(r.validUntil);
     if (!(validUntil.getTime() > now().getTime()))
@@ -729,7 +775,9 @@ export function createCredentialService(deps: CredentialDeps) {
         { codice: 'SESSIONE_SCADUTA', servizio: slugOf(service) },
       );
     const sessionId = decryptSecret(key, s.tokenEnc, aad('sessione', userId, service)).toString();
-    return { ...secret, sessionId };
+    // Con l'Id-Sessione per email il SAR vuole anche X-Gestionale (REL-STC-01 V08, 4.2.5).
+    const software = service === 'rupar_piemonte' ? await regionalSoftwareIdOf(userId) : null;
+    return { ...secret, sessionId, ...(software ? { software } : {}) };
   }
 
   /** Il servizio ha rifiutato l'accesso durante un invio: si annota; se è la sessione, si toglie. */

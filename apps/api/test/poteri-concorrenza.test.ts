@@ -1366,6 +1366,7 @@ describe('sessione dei servizi durante la correzione del codice fiscale (seconda
       db: t.db,
       encryptionKey: s.encryptionKey,
       now: s.clock.now,
+      regionalSoftwareCode: 'SIMULATORE',
       secondFactor: s.secondFactor,
     });
     await expect(credentials.authFor(s.users.titolare.id, 'ricetta_bianca')).rejects.toMatchObject({

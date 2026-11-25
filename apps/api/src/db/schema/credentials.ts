@@ -74,6 +74,11 @@ export const regionalAuthorizationRequest = pgTable(
     stateHash: text().notNull(),
     verifierEnc: bytea().notNull(),
     redirectUri: text().notNull(),
+    /**
+     * Il `client_id` con cui la richiesta è partita: codice del gestionale e codice ASL del medico
+     * (D266). Lo scambio del codice deve usare lo stesso, anche se nel frattempo cambia l'ASL.
+     */
+    clientId: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     usedAt: timestamp({ withTimezone: true }),

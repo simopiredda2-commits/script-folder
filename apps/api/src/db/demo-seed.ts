@@ -200,6 +200,7 @@ export async function seedDemo(db: Database, options: DemoSeedOptions): Promise<
     userId: doctorId,
     regionalCode: 'DEMO-0001',
     asl: 'ASL dimostrativa',
+    aslCode: '301',
     // Recapiti inventati, su domini riservati agli esempi (.invalid).
     firstName: 'Elena',
     lastName: 'Marchi',
@@ -220,6 +221,7 @@ export async function seedDemo(db: Database, options: DemoSeedOptions): Promise<
     userId: users.get('sostituto')!,
     regionalCode: 'DEMO-0002',
     asl: 'ASL dimostrativa',
+    aslCode: '301',
     firstName: 'Marco',
     lastName: 'Fiore',
     phone: '000 0000002',

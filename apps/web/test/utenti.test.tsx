@@ -125,7 +125,17 @@ const row = (over: Record<string, unknown>) => ({
 });
 
 const ADMIN_ROLE = [{ codice: 'administrator', nome: 'Amministratore dello studio' }];
+/** Le ASL della regione dello studio, come le dà il servizio (D267): due bastano alla prova. */
+const HEALTH_UNITS = {
+  regione: 'PIEMONTE',
+  elenco: [
+    { codice: '203', nome: 'TO3', regione: 'PIEMONTE' },
+    { codice: '301', nome: "ASL CITTA' DI TORINO", regione: 'PIEMONTE' },
+  ],
+  fonte: 'Ministero della Salute, ASL 2026',
+};
 const USERS = {
+  aziendeSanitarie: HEALTH_UNITS,
   ruoli: [
     { codice: 'owner_doctor', nome: 'Medico titolare' },
     { codice: 'secretary', nome: 'Segreteria' },
@@ -280,6 +290,7 @@ describe('utenti dello studio (tappa 14)', () => {
       '/api/studio/utenti': () => ({
         status: 200,
         body: {
+          aziendeSanitarie: HEALTH_UNITS,
           ruoli: USERS.ruoli,
           utenti: [
             row({
@@ -384,6 +395,7 @@ describe('utenti dello studio (tappa 14)', () => {
       '/api/studio/utenti': () => ({
         status: 200,
         body: {
+          aziendeSanitarie: HEALTH_UNITS,
           ruoli: USERS.ruoli,
           utenti: [
             row({
@@ -456,5 +468,38 @@ describe('utenti dello studio (tappa 14)', () => {
     render(<UsersSection />);
     await user.click(await screen.findByRole('button', { name: 'Sospendi per Lucia Bassi' }));
     expect(calls.filter((c) => c.method === 'POST')).toHaveLength(0);
+  });
+
+  it('medico nuovo: il codice ASL si sceglie fra le ASL della regione dello studio e va al servizio (D267)', async () => {
+    const created = { ...USERS.utenti[4], id: 'w3', nomeUtente: 'elena.marchi', nome: 'Elena' };
+    const calls = fakeService({
+      '/api/studio/utenti': (method) =>
+        method === 'GET'
+          ? { status: 200, body: USERS }
+          : { status: 201, body: { utente: created, avvisi: [] } },
+    });
+    const user = userEvent.setup();
+    render(<UsersSection />);
+    const form = await screen.findByRole('form', { name: 'Nuovo utente' });
+    await user.type(within(form).getByLabelText('Nome utente'), 'elena.marchi');
+    await user.type(within(form).getByLabelText('Nome mostrato'), 'Dott.ssa Elena Marchi');
+    await user.click(within(form).getByLabelText('Medico titolare'));
+    await user.type(within(form).getByLabelText('Nome'), 'Elena');
+    await user.type(within(form).getByLabelText('Cognome'), 'Marchi');
+    await user.type(within(form).getByLabelText('Codice fiscale'), 'MRCLNE70A41X001X');
+    const asl = within(form).getByLabelText('Codice ASL per la Regione');
+    expect(
+      within(asl)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual(['Da completare', '203 – TO3', "301 – ASL CITTA' DI TORINO"]);
+    expect(asl.getAttribute('aria-describedby')).toBeTruthy();
+    expect(within(form).getByText(/fra le ASL della regione PIEMONTE/)).toBeTruthy();
+    await user.selectOptions(asl, '301');
+    await user.click(within(form).getByRole('button', { name: 'Crea l’utente' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST')).toBe(true));
+    expect(calls.find((c) => c.method === 'POST')?.body).toMatchObject({
+      medico: { codiceAsl: '301', codiceFiscale: 'MRCLNE70A41X001X' },
+    });
   });
 });

@@ -10,8 +10,16 @@ import {
   type ServiceAuth,
 } from '../src';
 
-/** Credenziali inventate: i simulatori ne controllano solo la forma. */
-const auth: ServiceAuth = { username: 'utente-di-prova', password: 'parola-di-prova', pin: '1234' };
+/**
+ * Credenziali inventate: i simulatori ne controllano solo la forma. Con l'Id-Sessione per email il
+ * SAR vuole anche X-Gestionale, la RUPAR l'informazione «APP» (REL-STC-01 V08; D266).
+ */
+const auth: ServiceAuth = {
+  username: 'utente-di-prova',
+  password: 'parola-di-prova',
+  pin: '1234',
+  software: 'MIOAPPLICATIVO_301',
+};
 
 const message = (localId = 'r1'): PrescriptionMessage => ({
   localId,
@@ -147,6 +155,7 @@ describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
       username: 'utente-di-prova',
       sessionId: null,
       bearer: false,
+      software: 'MIOAPPLICATIVO_301',
     });
     expect(JSON.stringify(sar.receivedAuth)).not.toMatch(/parola-di-prova|1234/);
   });

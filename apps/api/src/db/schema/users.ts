@@ -123,6 +123,12 @@ export const doctorProfile = pgTable('doctor_profile', {
   pendingFiscalCodeBy: uuid().references(() => appUser.id),
   pendingFiscalCodeAt: timestamp({ withTimezone: true }),
   asl: text(),
+  /**
+   * Codice dell'ASL presso cui opera il medico, tre cifre dell'elenco del Ministero (D267): entra
+   * nel codice con cui il programma si presenta alla Regione Piemonte (`client_id`, `X-Gestionale`,
+   * REL-STC-01 V08, 4.3.1 e 4.2.5; D266). `asl` resta il nome, come lo scrive lo studio.
+   */
+  aslCode: text(),
   headerText: text(),
   stampText: text(),
   /** Nome e cognome separati, come li vuole il Profilo Sanitario Sintetico (tappa 11). */

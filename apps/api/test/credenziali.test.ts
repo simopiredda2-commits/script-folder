@@ -3,6 +3,7 @@ import { and, count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   changeHistory,
+  doctorProfile,
   prescription,
   serviceCredential,
   serviceCredentialEvent,
@@ -217,11 +218,50 @@ describe('credenziali dei servizi e secondo fattore (D100–D102)', () => {
     const id = await draft();
     const sent = await send(id);
     expect(sent.json()).toMatchObject({ esito: 'accepted' });
+    // Con l'Id-Sessione per email anche X-Gestionale: codice del gestionale e ASL (V08, 4.2.5).
     expect(sar.receivedAuth.at(-1)).toEqual({
       username: 'RUPAR-PROVA-ABC',
       sessionId: codiceDiProva,
       bearer: false,
+      software: 'SIMULATORE_301',
     });
+    // Richiesta e verifica del codice hanno portato l'informazione «APP» (V08, 4.2.1–4.2.2).
+    expect(rupar2f.receivedSoftware.slice(-2)).toEqual(['SIMULATORE_301', 'SIMULATORE_301']);
+  });
+
+  it('senza codice ASL del medico la RUPAR non si chiama: né il codice di sessione né le ricette (D266)', async () => {
+    const before = rupar2f.receivedSoftware.length;
+    await t.db
+      .update(doctorProfile)
+      .set({ aslCode: null })
+      .where(eq(doctorProfile.userId, s.users.sostituto.id));
+    try {
+      const res = await req(
+        'POST',
+        '/api/profilo/credenziali/rupar/sessione/richiesta',
+        'sostituto',
+      );
+      expect(res.statusCode).toBe(422);
+      expect(res.json()).toMatchObject({
+        errore: expect.stringMatching(
+          /^Manca il codice ASL del medico: lo scrive l’amministratore/,
+        ),
+        dettagli: { codice: 'CODICE_ASL_MANCANTE', servizio: 'rupar' },
+      });
+      expect(rupar2f.receivedSoftware.length).toBe(before);
+      // Il Sistema TS non usa il codice ASL: il suo codice di sessione si chiede lo stesso.
+      const ts = await req(
+        'POST',
+        '/api/profilo/credenziali/sistema-ts/sessione/richiesta',
+        'sostituto',
+      );
+      expect(ts.statusCode, ts.body).toBe(200);
+    } finally {
+      await t.db
+        .update(doctorProfile)
+        .set({ aslCode: '301' })
+        .where(eq(doctorProfile.userId, s.users.sostituto.id));
+    }
   });
 
   it('sessione scaduta: l’invio si ferma prima, con l’errore che porta alla pagina giusta', async () => {
@@ -246,7 +286,7 @@ describe('credenziali dei servizi e secondo fattore (D100–D102)', () => {
     const id = await draft();
     // Un'altra richiesta (per esempio da un altro programma) invalida la sessione presso il servizio.
     await rupar2f.requestCode({
-      auth: { username: 'RUPAR-PROVA-ABC', password: 'x', pin: '1' },
+      auth: { username: 'RUPAR-PROVA-ABC', password: 'x', pin: '1', software: 'ALTRO_301' },
       fiscalCode: await fiscalCode(),
     });
     const res = await send(id);

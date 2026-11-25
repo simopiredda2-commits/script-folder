@@ -3,9 +3,11 @@ import {
   newPkceVerifier,
   pkceChallenge,
   readRegionalToken,
+  regionalSoftwareId,
   sarAuthentication,
   SimulatedGateway,
   SimulatedRegionalAuthorization,
+  SimulatedSecondFactor,
   tokenResultFrom,
   type PrescriptionMessage,
 } from '../src';
@@ -32,7 +34,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     const sim = new SimulatedRegionalAuthorization();
     const url = new URL(
       sim.authorizeUrl({
-        clientId: 'GESTIONALE_000',
+        clientId: 'MIOAPPLICATIVO_301',
         redirectUri: '/ritorno',
         scope: ['prescrizione'],
         state: 'stato-di-prova',
@@ -41,7 +43,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       'http://programma.invalid',
     );
     expect(Object.fromEntries(url.searchParams)).toEqual({
-      client_id: 'GESTIONALE_000',
+      client_id: 'MIOAPPLICATIVO_301',
       response_type: 'code',
       redirect_uri: '/ritorno',
       scope: 'prescrizione',
@@ -56,7 +58,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     const sim = new SimulatedRegionalAuthorization({ now: () => new Date(t) });
     const verifier = newPkceVerifier();
     const base = {
-      clientId: 'GESTIONALE_000',
+      clientId: 'MIOAPPLICATIVO_301',
       redirectUri: '/ritorno',
       scope: ['prescrizione'],
       codeChallenge: pkceChallenge(verifier),
@@ -66,7 +68,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       sim.exchange({
         code,
         redirectUri: '/ritorno',
-        clientId: 'GESTIONALE_000',
+        clientId: 'MIOAPPLICATIVO_301',
         codeVerifier: verifier,
         ...over,
       });
@@ -90,38 +92,60 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     expect(ok).toMatchObject({
       validUntil: '2026-11-18T16:05:00.000Z',
       fiscalCode: 'MRCLNE70A41X001X',
-      clientId: 'GESTIONALE_000',
+      clientId: 'MIOAPPLICATIVO_301',
       scope: ['prescrizione'],
     });
     expect((await exchange(code)).outcome).toBe('rejected');
     expect(sim.isValid(ok.accessToken)).toBe(true);
-    expect(await sim.verify({ accessToken: ok.accessToken, fiscalCode: 'ALTRO' })).toMatchObject({
+    expect(
+      await sim.verify({
+        clientId: 'MIOAPPLICATIVO_301',
+        accessToken: ok.accessToken,
+        fiscalCode: 'ALTRO',
+      }),
+    ).toMatchObject({
       outcome: 'invalid',
     });
 
     t += 8 * 3_600_000;
     expect(
-      await sim.verify({ accessToken: ok.accessToken, fiscalCode: 'MRCLNE70A41X001X' }),
+      await sim.verify({
+        clientId: 'MIOAPPLICATIVO_301',
+        accessToken: ok.accessToken,
+        fiscalCode: 'MRCLNE70A41X001X',
+      }),
     ).toEqual({
       outcome: 'invalid',
       state: 'scaduto',
     });
 
     // Revocare un token scaduto: 401, «invalid» (V08, 4.3.5).
-    expect(await sim.revoke({ accessToken: ok.accessToken })).toEqual({ outcome: 'invalid' });
+    expect(
+      await sim.revoke({ clientId: 'MIOAPPLICATIVO_301', accessToken: ok.accessToken }),
+    ).toEqual({ outcome: 'invalid' });
 
     const again = await exchange(sim.approve(base));
     if (again.outcome !== 'ok') throw new Error('scambio non riuscito');
-    expect(await sim.revoke({ accessToken: again.accessToken })).toEqual({ outcome: 'revoked' });
     expect(
-      await sim.verify({ accessToken: again.accessToken, fiscalCode: 'MRCLNE70A41X001X' }),
+      await sim.revoke({ clientId: 'MIOAPPLICATIVO_301', accessToken: again.accessToken }),
+    ).toEqual({ outcome: 'revoked' });
+    expect(
+      await sim.verify({
+        clientId: 'MIOAPPLICATIVO_301',
+        accessToken: again.accessToken,
+        fiscalCode: 'MRCLNE70A41X001X',
+      }),
     ).toEqual({
       outcome: 'invalid',
       state: 'revocato',
     });
     // Già revocato, o mai visto: 401 anche questi.
-    expect(await sim.revoke({ accessToken: again.accessToken })).toEqual({ outcome: 'invalid' });
-    expect(await sim.revoke({ accessToken: 'sconosciuto' })).toEqual({ outcome: 'invalid' });
+    expect(
+      await sim.revoke({ clientId: 'MIOAPPLICATIVO_301', accessToken: again.accessToken }),
+    ).toEqual({ outcome: 'invalid' });
+    expect(
+      await sim.revoke({ clientId: 'MIOAPPLICATIVO_301', accessToken: 'sconosciuto' }),
+    ).toEqual({ outcome: 'invalid' });
   });
 
   it('il token ha i campi della V08 (4.3.2); la scadenza si legge da exp, non da expires_in', async () => {
@@ -201,17 +225,20 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
   });
 
   it('chiamate al SAR come nella V08: con il token solo X-OAuth2-Authorization, niente Basic, PIN vuoto', () => {
-    const withToken = sarAuthentication({ bearer: 'jwt-di-prova', sessionId: null }, 'G_301');
+    const withToken = sarAuthentication({ bearer: 'jwt-di-prova', sessionId: null });
     expect(withToken).toEqual({
       outcome: 'ok',
       headers: { 'X-OAuth2-Authorization': 'Bearer jwt-di-prova' },
       pinCode: { kind: 'vuoto' },
     });
     // Con l'Id-Sessione dell'email certificata: Basic, X-idSessione, X-Gestionale; PIN da cifrare.
-    const withMail = sarAuthentication(
-      { username: 'utente', password: 'parola', pin: '12345678', sessionId: 'id-sessione' },
-      'MIOAPPLICATIVO_301',
-    );
+    const withMail = sarAuthentication({
+      username: 'utente',
+      password: 'parola',
+      pin: '12345678',
+      sessionId: 'id-sessione',
+      software: 'MIOAPPLICATIVO_301',
+    });
     expect(withMail).toEqual({
       outcome: 'ok',
       headers: {
@@ -221,12 +248,20 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       },
       pinCode: { kind: 'da-cifrare', pin: '12345678' },
     });
-    expect(
-      sarAuthentication({ username: 'u', password: 'p', pin: '1', sessionId: null }, 'G_301'),
-    ).toMatchObject({ outcome: 'problem', code: 'ID_SESSIONE' });
-    expect(
-      sarAuthentication({ username: 'u', password: 'p', pin: '1', sessionId: 's' }, null),
-    ).toMatchObject({ outcome: 'problem', code: 'GESTIONALE' });
+    const mail = { username: 'u', password: 'p', pin: '1' };
+    expect(sarAuthentication({ ...mail, sessionId: null, software: 'G_301' })).toMatchObject({
+      outcome: 'problem',
+      code: 'ID_SESSIONE',
+    });
+    // X-Gestionale: il codice del gestionale con il codice ASL del medico, sempre (4.2.5).
+    for (const software of [undefined, null, '', 'MIOAPPLICATIVO', 'MIOAPPLICATIVO_30', '_301'])
+      expect(
+        sarAuthentication({ ...mail, sessionId: 's', software }),
+        String(software),
+      ).toMatchObject({
+        outcome: 'problem',
+        code: 'GESTIONALE',
+      });
     // Token e credenziali insieme: no (4.3.6).
     for (const mixed of [
       { bearer: 'jwt', username: 'u' },
@@ -234,7 +269,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       { bearer: 'jwt', pin: '1' },
       { bearer: 'jwt', sessionId: 's' },
     ])
-      expect(sarAuthentication(mixed, 'G_301')).toMatchObject({
+      expect(sarAuthentication(mixed)).toMatchObject({
         outcome: 'problem',
         code: 'CREDENZIALI',
       });
@@ -245,7 +280,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     const sar = new SimulatedGateway('sar', { oauth });
     const verifier = newPkceVerifier();
     const code = oauth.approve({
-      clientId: 'G',
+      clientId: 'MIOAPPLICATIVO_301',
       redirectUri: '/r',
       scope: ['prescrizione'],
       codeChallenge: pkceChallenge(verifier),
@@ -254,12 +289,17 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
     const token = await oauth.exchange({
       code,
       redirectUri: '/r',
-      clientId: 'G',
+      clientId: 'MIOAPPLICATIVO_301',
       codeVerifier: verifier,
     });
     if (token.outcome !== 'ok') throw new Error('scambio non riuscito');
     expect((await sar.send(message, { bearer: token.accessToken })).outcome).toBe('accepted');
-    expect(sar.receivedAuth.at(-1)).toEqual({ username: '', sessionId: null, bearer: true });
+    expect(sar.receivedAuth.at(-1)).toEqual({
+      username: '',
+      sessionId: null,
+      bearer: true,
+      software: null,
+    });
     // Il token non si manda insieme a utente, password e PIN (V08, 4.3.6).
     expect(
       await sar.send(message, {
@@ -269,11 +309,119 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
         pin: '1',
       }),
     ).toMatchObject({ outcome: 'rejected', code: 'CREDENZIALI', authProblem: 'credentials' });
-    await oauth.revoke({ accessToken: token.accessToken });
+    await oauth.revoke({ clientId: 'MIOAPPLICATIVO_301', accessToken: token.accessToken });
     expect(await sar.send(message, { bearer: token.accessToken })).toMatchObject({
       outcome: 'rejected',
       code: 'TOKEN',
       authProblem: 'session',
     });
+  });
+});
+
+describe('codice del gestionale con il codice ASL del medico (REL-STC-01 V08; D266)', () => {
+  it('client_id, X-Gestionale e «APP»: il codice del gestionale, «_» e le tre cifre dell’ASL', () => {
+    expect(regionalSoftwareId('MIOAPPLICATIVO', '301')).toEqual({
+      ok: true,
+      value: 'MIOAPPLICATIVO_301',
+    });
+    expect(regionalSoftwareId(' MIO-APP_2 ', ' 203 ')).toEqual({
+      ok: true,
+      value: 'MIO-APP_2_203',
+    });
+    expect(regionalSoftwareId('MIOAPPLICATIVO', null)).toMatchObject({
+      ok: false,
+      code: 'ASL',
+      message: expect.stringMatching(/^Manca il codice ASL del medico/),
+    });
+    expect(regionalSoftwareId('MIOAPPLICATIVO', '30')).toMatchObject({ ok: false, code: 'ASL' });
+    expect(regionalSoftwareId('MIOAPPLICATIVO', 'TO3')).toMatchObject({ ok: false, code: 'ASL' });
+    expect(regionalSoftwareId('', '301')).toMatchObject({ ok: false, code: 'GESTIONALE' });
+    expect(regionalSoftwareId('MIO APP', '301')).toMatchObject({ ok: false, code: 'GESTIONALE' });
+  });
+
+  it('il servizio regionale simulato rifiuta un client_id senza ASL e chi non ha chiesto il token', async () => {
+    const sim = new SimulatedRegionalAuthorization();
+    const verifier = newPkceVerifier();
+    const approve = (clientId: string) =>
+      sim.approve({
+        clientId,
+        redirectUri: '/r',
+        scope: ['prescrizione'],
+        codeChallenge: pkceChallenge(verifier),
+        fiscalCode: 'MRCLNE70A41X001X',
+      });
+    const exchange = (clientId: string) =>
+      sim.exchange({
+        code: approve(clientId),
+        redirectUri: '/r',
+        clientId,
+        codeVerifier: verifier,
+      });
+    expect(await exchange('MIOAPPLICATIVO')).toMatchObject({
+      outcome: 'rejected',
+      error: 'invalid_client',
+    });
+    const ok = await exchange('MIOAPPLICATIVO_301');
+    if (ok.outcome !== 'ok') throw new Error('scambio non riuscito');
+    expect(readRegionalToken(ok.accessToken)?.organization).toBe('301');
+    // Verifica e revoca con un altro client_id: per il servizio il token non è suo (4.3.4, 4.3.5).
+    const other = { clientId: 'MIOAPPLICATIVO_203', accessToken: ok.accessToken };
+    expect(await sim.verify({ ...other, fiscalCode: 'MRCLNE70A41X001X' })).toMatchObject({
+      outcome: 'invalid',
+    });
+    expect(await sim.revoke(other)).toEqual({ outcome: 'invalid' });
+    expect(sim.isValid(ok.accessToken)).toBe(true);
+  });
+
+  it('SAR simulato: con l’Id-Sessione per email vuole X-Gestionale; il Sistema TS no', async () => {
+    const auth = { username: 'utente', password: 'parola', pin: '1', sessionId: 's' };
+    const sar = new SimulatedGateway('sar');
+    expect(await sar.send(message, auth)).toMatchObject({
+      outcome: 'rejected',
+      code: 'GESTIONALE',
+    });
+    expect(await sar.send(message, { ...auth, software: 'MIOAPPLICATIVO' })).toMatchObject({
+      outcome: 'rejected',
+      code: 'GESTIONALE',
+    });
+    expect((await sar.send(message, { ...auth, software: 'MIOAPPLICATIVO_301' })).outcome).toBe(
+      'accepted',
+    );
+    expect(sar.receivedAuth.at(-1)?.software).toBe('MIOAPPLICATIVO_301');
+    const ts = new SimulatedGateway('sistema_ts');
+    expect((await ts.send({ ...message, kind: 'white' }, auth)).outcome).toBe('accepted');
+  });
+
+  it('secondo fattore della RUPAR: «APP» in richiesta e verifica; il Sistema TS non la usa', async () => {
+    const auth = { username: 'utente', password: 'parola', pin: '1' };
+    const withApp = { ...auth, software: 'MIOAPPLICATIVO_301' };
+    const fiscalCode = 'MRCLNE70A41X001X';
+    const rupar = new SimulatedSecondFactor('rupar_piemonte');
+    expect(await rupar.requestCode({ auth, fiscalCode })).toMatchObject({
+      outcome: 'rejected',
+      code: 'APP',
+    });
+    const sent = await rupar.requestCode({ auth: withApp, fiscalCode });
+    if (sent.outcome !== 'sent' || !sent.testCode) throw new Error('codice non inviato');
+    expect(await rupar.check({ auth, fiscalCode, sessionId: sent.testCode })).toMatchObject({
+      outcome: 'invalid',
+    });
+    expect(
+      await rupar.check({ auth: withApp, fiscalCode, sessionId: sent.testCode }),
+    ).toMatchObject({ outcome: 'valid' });
+    expect(rupar.receivedSoftware).toEqual([
+      null,
+      'MIOAPPLICATIVO_301',
+      null,
+      'MIOAPPLICATIVO_301',
+    ]);
+    // Credenziali sbagliate: il servizio simulato lo dice prima di «APP».
+    expect(await rupar.requestCode({ auth: { ...auth, username: '' }, fiscalCode })).toMatchObject({
+      outcome: 'rejected',
+      authProblem: 'credentials',
+    });
+    const ts = new SimulatedSecondFactor('sistema_ts');
+    expect((await ts.requestCode({ auth, fiscalCode })).outcome).toBe('sent');
+    expect(ts.receivedSoftware).toEqual([]);
   });
 });

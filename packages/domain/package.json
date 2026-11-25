@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
-    "docs:permessi": "tsx scripts/matrice-permessi.ts"
+    "docs:permessi": "tsx scripts/matrice-permessi.ts",
+    "asl:elenco": "tsx scripts/elenco-asl.ts"
   },
   "dependencies": {
     "zod": "^4.6.7"
