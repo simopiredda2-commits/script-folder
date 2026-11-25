@@ -169,6 +169,16 @@ describe('regole di prescrizione prima dell’invio', () => {
       expect(data.righe[0]!.dettagli).toBe(notes);
     });
 
+    it('la cartella dà alla ricetta i codici della terapia del dolore della regola in vigore', async () => {
+      const res = await s.app.inject({
+        method: 'GET',
+        url: `/api/pazienti/${s.richPatient}`,
+        headers: { cookie },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().codiciTerapiaDolore).toEqual(['TDL', 'TDL01']);
+    });
+
     it('terapia del dolore senza posologia: si ferma e dice che cosa scrivere', async () => {
       const id = await draft({ ...pharma(temgesic), exemptionCode: 'TDL01' });
       const res = await post(`/api/ricette/${id}/firma-e-invia`);

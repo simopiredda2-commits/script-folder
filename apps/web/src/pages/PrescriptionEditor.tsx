@@ -342,7 +342,12 @@ export function addToCurrentPrescription(patientId: string, line: Omit<Line, 'ke
 
 export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica' }) {
   const { id } = useParams<{ id: string }>();
-  const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
+  const record = useApi<{
+    paziente: Patient;
+    riepilogo: Summary | null;
+    /** Codici della terapia del dolore (R23, D272): solo per la ricetta farmaceutica del SSN. */
+    codiciTerapiaDolore?: string[];
+  }>(`/api/pazienti/${id}`);
   const therapies = useApi<{ terapie: TherapyRow[] }>(
     mode === 'farmaci' ? `/api/pazienti/${id}/terapie` : null,
   );
@@ -1097,6 +1102,16 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                     {e.codice}
                   </option>
                 ))}
+                {/* Stupefacenti per la terapia del dolore: il codice va nel campo dell'esenzione
+                    (specifiche del Sistema TS, «Nota STUP»; D272). */}
+                {kind === 'pharma_ssn' &&
+                  (record.data.codiciTerapiaDolore ?? [])
+                    .filter((c) => !exemptions.some((e) => e.codice === c))
+                    .map((c) => (
+                      <option key={c} value={c}>
+                        {c} · terapia del dolore
+                      </option>
+                    ))}
               </select>
             </div>
             {/*

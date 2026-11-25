@@ -2201,6 +2201,7 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - Il telefono è quello del medico che firma; se manca, quello dello studio. Il programma scrive da sé le note di ogni riga della ricetta con il codice TDL: «Posologia: …; tel. del medico …». Le manda al SAR (motivazNote) e le stampa sul promemoria.
   - Il codice TDL non è un'esenzione del paziente: dalla stessa versione la R9 non lo controlla sulla ricetta farmaceutica.
   - Elenchi e codici stanno nei dati delle regole, in un campo nuovo `lists`, versionato come i valori.
+  - Nella ricetta farmaceutica SSN la scelta dell'esenzione offre i codici della terapia del dolore della regola in vigore, accanto alle esenzioni del paziente.
 - **Non fatto**:
   - le note dei farmaci dell'allegato III-bis fuori dalla sezione A (solo la posologia), perché senza l'elenco delle sostanze non si riconoscono;
   - le note sulla ricetta rossa stampata, dove il medico le scrive a mano come sulla ricetta cartacea.
