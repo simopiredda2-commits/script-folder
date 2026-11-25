@@ -219,7 +219,8 @@ try {
   const red = page.getByRole('region', { name: 'Ricette rosse in DPCM' });
   await red.getByRole('button', { name: 'Invia adesso' }).click();
   await red
-    .getByText(/^(Mandata|Accolta)$/)
+    .getByText('Mandata', { exact: true })
+    .or(red.getByText('Accolta', { exact: true }))
     .first()
     .waitFor();
   await page

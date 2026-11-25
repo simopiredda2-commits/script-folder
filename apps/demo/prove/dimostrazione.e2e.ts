@@ -697,14 +697,14 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
         { cause: err },
       );
     };
+    // La parola dello stato, accanto al simbolo: la ricerca esatta ignora lo spazio fra i due.
+    const sentOrAccepted = item
+      .getByText('Mandata', { exact: true })
+      .or(item.getByText('Accolta', { exact: true }));
     for (let i = 0; i < 4; i += 1) {
       if (await item.getByText('Accolta', { exact: true }).count()) break;
       await red.getByRole('button', { name: 'Invia adesso' }).click();
-      await item
-        .getByText(/^(Mandata|Accolta)$/)
-        .first()
-        .waitFor({ timeout: 30_000 })
-        .catch(explain);
+      await sentOrAccepted.first().waitFor({ timeout: 30_000 }).catch(explain);
     }
     await item.getByText('Accolta', { exact: true }).waitFor({ timeout: 30_000 });
     await item.getByText('010260000000101').waitFor();
