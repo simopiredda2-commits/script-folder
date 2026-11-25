@@ -1712,6 +1712,21 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 
 **Prossimo passo**: la fermata con le domande del paragrafo 5 del confronto, più quelle nate dalle verifiche (6 e 7).
 
+## Risposte della fermata sulle specifiche regionali (25/11/2026, D266)
+
+Risposte di Simone con il pulsante; il dettaglio è in D266.
+
+1. **Ricetta senza esito**: come la Regione, con annullamento e ricetta rossa (cambiano D36, D39, D233).
+2. **Ricetta rossa e lotti di NRE**: si costruiscono, con i simulatori.
+3. **AURA**: servizi per i medici, con il giro di notte; notifiche solo se il CSI le concede.
+4. **Fascicolo**: pubblicazione con i servizi della Regione, «ERP», coda e tentativi delle politiche di invio.
+5. **client_id**: codice del gestionale più «_» e codice ASL del medico, anche in `X-Gestionale`.
+6. **PSS**: allineato alla guida HL7 Italia v1.5 dove non contrasta con lo schematron del Ministero; ogni PSS deve passarli tutti e due.
+7. **R14**: «Atteniamoci alle disposizioni di TS o della Regione, se quello che abbiamo fatto è accettato allora ok». Il Sistema TS accetta il tipo di accesso anche per le prestazioni fuori dal PNGLA, con le stesse regole. La Regione lega la validità al tipo di accesso. R14 resta.
+8. **Revisione**: quattro revisori in sola lettura alla fine, prima della pull request. La costruzione si fa senza agenti.
+
+**In corso**, nello stesso branch, in quest'ordine: `client_id`; lotti di NRE, ricetta rossa ed esito incerto; AURA; Fascicolo e PSS; interfaccia, dimostrazione e documenti; revisione; pull request.
+
 ## Dopo la fermata della #38 (25/11/2026)
 
 - **Partita IVA**: Simone: «Una volta aperta la P. IVA potremo fare richiesta in qualità di fornitore». Annotato in «Che cosa resta aperto», parte A.

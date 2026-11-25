@@ -2028,5 +2028,60 @@ Non provato: la validità sul promemoria con un collaudo del Sistema TS; la dimo
   - Utente, password e PIN RUPAR sono obbligatori: AUTH_ER_516 senza credenziali, AUTH_ER_510 senza PIN. Questi due, come AUTH_ER_501, portano il medico a «Credenziali dei servizi».
   - Gli errori sono quelli delle tabelle 1 e 6 della V13. WEB_002 non c'è più: l'IP della postazione va nella richiesta e la Regione lo traccia (2.2), ma la pagina non lo confronta. WEB_001 vale anche per il token scaduto. La V13 non dice quanto dura il token, quindi nel simulatore la durata è un'impostazione vuota per difetto, da completare con il CSI.
   - I tipi di documento del filtro sono i 20 della tabella 3: «DOCUMENTO DEI CONSENSI» non c'è più, 57827-8 è «ATTESTATO DI ESENZIONE», si aggiungono le schede vaccinali, il piano di cura personalizzato, il bilancio di salute e il certificato di condizione o malattia.
-  - Gli indirizzi della pagina regionale (6.3) sono una costante per l'adattatore vero: il programma, oggi, non li apre.
+  - Gli indirizzi della pagina regionale (6.3) sono in `docs/fse.md`, per la configurazione dell'adattatore vero. Nel codice non ci sono (regola 7): erano entrati in una costante e la prova della regola 7 li ha fermati.
 - **Non provato**: nessun servizio vero. Le intestazioni, la firma del token e gli errori veri si provano in collaudo con il kit del CSI, che è fra le cose chieste con la mail del 25/11/2026.
+
+**D266 · Risposte della fermata sulle specifiche regionali.** Risposte di Simone con il pulsante (25/11/2026) alle cinque domande del paragrafo 5 del confronto e a quelle nate dalle verifiche (D265).
+
+1. **Ricetta senza esito: come la Regione.** «Come la Regione (Consigliato)». Dopo un errore di sistema o un'attesa scaduta, la ricetta dematerializzata si annulla e si rimanda come ricetta rossa (DPCM), con un NRE nuovo e il numero del Poligrafico (V06, 4.3.1). Cambiano D36, D39 e D233 e `docs/ricetta.md`. Si fa insieme ai lotti di NRE: per annullare serve l'NRE, e la cartella lo conosce perché lo assegna lei.
+2. **Ricetta rossa e lotti di NRE: si costruiscono**, con i simulatori. «Sì, costruirli (Consigliato)». Entrano:
+   - la richiesta del lotto al SAR (1000 NRE);
+   - gli NRE generati e conservati dalla cartella, riusati solo dopo un rifiuto;
+   - l'invio DPCM al SAR con il numero del Poligrafico e l'NRE;
+   - gli esiti con l'elenco sintetico e l'elenco analitico;
+   - la stampa sul modulo del Poligrafico.
+
+   Servono per il test DM-TRAS-01 e per i test DPCM del piano V03.
+
+3. **AURA: servizi per i medici, con il giro di notte.** «Sì, giro di notte (Consigliato)».
+   - Simulatore sui cinque WSDL dei medici.
+   - Ogni notte ListaAssistiti e ListaAssistitiEsenti, poi le ricerche solo per chi è cambiato.
+   - Le notifiche solo se il CSI le concede.
+   - Il significato dei campi va confermato con il CSI.
+4. **Fascicolo: pubblicazione con i servizi della Regione.** «Sì, servizi regionali (Consigliato)».
+   - Validazione sul Gateway, poi CREATE, UPDATE, REPLACE e cancellazione con i servizi regionali della V09, con un simulatore.
+   - «ERP» al posto di «OBS» (D133).
+   - Coda e tentativi come nelle politiche di invio (FSE-INT-SRS-01): niente invii fra le 00 e le 07, tre tentativi a cinque minuti, coda di dieci giorni.
+5. **client_id: codice del gestionale più codice ASL del medico.** «Codice + ASL (Consigliato)».
+   - Nella configurazione c'è un solo valore, il codice del gestionale che la Regione assegna.
+   - Il programma aggiunge «_» e il codice ASL del medico: tre cifre, nel profilo del medico, controllate sull'elenco ufficiale. Vale anche per `X-Gestionale` (V08, 4.3.1, p. 28).
+   - Senza codice ASL l'accesso con SPID o CIE non parte, e il programma dice che cosa manca.
+6. **PSS: allineato alla guida HL7 Italia v1.5 dove non contrasta con il Ministero.** «Sì, dove non contrasta (Consigliato)».
+   - Si correggono le voci su cui i due schematron vanno d'accordo: quello del Ministero (v4.0, il controllo del Gateway) e quello della guida (ART-DECOR).
+   - Ogni PSS deve passarli tutti e due.
+   - Dove si contraddicono resta il Ministero, finché il CSI non dice quale usa la Regione (domanda 7 per il CSI, `docs/avanzamento.md`).
+7. **R14 resta com'è.** Risposta di Simone: «Atteniamoci alle disposizioni di TS o della Regione, se quello che abbiamo fatto è accettato allora ok». Verificato sulle fonti:
+   - **Il Sistema TS accetta il tipo di accesso per ogni prestazione.** Tipo e classe di priorità «possono essere indicati dal medico, a sua discrezione oppure sulla base degli adempimenti normativi della propria Regione/PA di appartenenza, anche per le prestazioni che non fanno parte della lista» del PNGLA. Se sono indicati, valgono le stesse regole (Sistema TS, «Controlli secondo il PNGLA 2019-2021», 3/6/2019, p. 1–2). Le specifiche della prescrizione dicono lo stesso: il campo `tipoAccesso` è obbligatorio per le prestazioni del PNGLA ed «elemento facoltativo per tutte le altre» (versione del 08/07/2026, p. 28).
+   - **Con il primo accesso indicato, la classe di priorità è obbligatoria (1301).** È quello che fa R14.
+   - **La Regione Piemonte lega la validità della ricetta al tipo di accesso**: 60 giorni per il primo, 180 per gli altri (D.D. 710/2026, punto 4; D260).
+
+   La ricetta che R14 lascia passare è quindi accettata dal Sistema TS e serve alla regola regionale. R14 resta, con la fonte scritta qui.
+
+8. **Revisione indipendente alla fine.** Alla domanda sui revisori Simone ha risposto: «Se un lavoro senza revisori ci può garantire lo stesso risultato procediamo senza revisori». Non lo garantisce: nella revisione dalla #26 alla #28 (D239) i revisori hanno trovato 35 difetti veri su 38 segnalazioni, che prove e sabotaggi non avevano preso. Riproposta la domanda con questo dato, Simone ha scelto «Sì, quattro revisori (Consigliato)». Come si fa:
+   - quattro agenti, alla fine della costruzione e prima della pull request;
+   - uno per area: ricetta rossa e NRE; AURA; Fascicolo; interfaccia e dimostrazione;
+   - leggono solo il codice del branch e le specifiche scaricate, e non cambiano niente;
+   - le segnalazioni le verifico io, e correggo solo i difetti veri, con prove e sabotaggi.
+
+   La costruzione si fa senza agenti.
+
+**Ordine del lavoro** (scelta mia):
+
+1. il `client_id`, che è piccolo;
+2. i lotti di NRE, la ricetta rossa e l'esito incerto, che dipendono uno dall'altro;
+3. AURA;
+4. il Fascicolo e il PSS;
+5. interfaccia, dimostrazione e documenti;
+6. la revisione e la pull request.
+
+Tutto nello stesso branch, con una sola pull request alla fine.
