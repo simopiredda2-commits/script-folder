@@ -1610,6 +1610,106 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 **Da aggiungere alle domande per il CSI** (non sono nella mail del 25/11/2026):
 
 1. Il documento tecnico sui servizi AURA per le cartelle di MMG e PLS, a cui rimanda il manuale di cooperazione AURA--ORG-01-V08 (§1, p. 2: «si rimanda ad apposito documento pubblicato nel portale di Sistema Piemonte»). Nella scheda AURA di oggi non c'è. Non ci sono nemmeno i due documenti citati dalla nota AVL-17 del 2013: «Modalità di utilizzo servizi per i medici (versione 2.0)» e «Allegato tecnico di utilizzo dei servizi per i medici (versione 4.0)». Richiesta di Simone del 25/11/2026.
+2. **SAR: le ricette DM senza NRE.** Le specifiche nazionali della prescrizione dicono che l'NRE è facoltativo: se manca lo assegna il SAC, anche quando l'invio passa da un SAR (08/07/2026, §4.2.1). La V06 dice che in Piemonte la cartella numera da sé le ricette, DM e DPCM, con il lotto che le dà il SAR (3.2, p. 7–8). Il SAR accetta anche ricette DM senza NRE?
+3. **SAR: pre-autorizzazione del sostituto.** È un servizio nazionale facoltativo, che attiva la Regione; se è attivo, il SAC blocca le ricette del sostituto non autorizzato (Sistema TS, specifiche del 05/08/2015, §3). La V06 non ne parla: in Piemonte è attivo?
+4. **RUPAR: scadenza della password.** Il programma la mette a tre mesi, dal piano dei test V02; il piano V03 non ne parla più. Vale ancora?
+5. **Accesso con SPID o CIE:**
+   - la revoca è `DELETE` nella V08 (4.3.5) e `GET` nella descrizione OpenAPI pubblicata con la V08 (`yaml.zip`): quale vale?
+   - che cosa contiene `expires_in`?
+6. **Fascicolo dalla cartella (LCCE V13):**
+   - quanto dura il token;
+   - se `ipClient` è obbligatorio (lo schema dice 0..1, la tabella degli errori ha AUTH_ER_512);
+   - per una cartella in cloud, token di `getAuthentication` o accesso diretto dentro Shibboleth (6.4)?
+7. **Profilo Sanitario Sintetico:** il servizio regionale valida con lo schematron del Ministero (quello del Gateway, v4.0) o anche con quello della guida HL7 Italia v1.5?
+
+**Controllo del confronto sui documenti** (punto 2). Paragrafi e pagine del confronto tornano con i documenti. Dove il confronto sbaglia o non dice, vale il documento:
+
+- **Promemoria**: la versione nuova delle specifiche di stampa è del 05/12/2024 (copertina «Versione 5 12 2024», piè di pagina 05/12/2024). Il 6/12/2024 è la data del file PDF.
+- **LCCE V13, errori**: AUTH_ER_518 compare solo nell'esempio di p. 16 e FSE_ER_507 solo in quello di p. 12. La tabella 1 (p. 17) ha AUTH_ER_510–517 e AUTH_ER_628.
+- **LCCE V13, tipi di documento**: la tabella 3 (p. 19) cambia e il confronto non lo dice. I tipi sono 20: via «DOCUMENTO DEI CONSENSI» (59284-0), 57827-8 diventa «ATTESTATO DI ESENZIONE», in più le due schede vaccinali, il piano di cura personalizzato, il bilancio di salute e il certificato di condizione o malattia.
+- **LCCE V13, IP**: WEB_001 vale anche per il token scaduto. L'IP della postazione non è più un controllo: lo tracciano PUA e Fascicolo (2.2, p. 9). `ipClient` è facoltativo nello schema (0..1), ma AUTH_ER_512 dice che va valorizzato.
+- **V08**:
+  - nella tabella del servizio JWKS (4.3.3) il modulo della chiave si chiama «v», nell'esempio «n», come nello standard;
+  - l'esempio di PKCE (4.3.1) toglie i caratteri «=+/» invece di usare il base64url: il programma segue la RFC 7636;
+  - l'elenco dei servizi di 4.3.6 non ha «visualizza prescritto», che la V06 espone (4.3.4).
+- **V08, X-Gestionale**: anche la modalità per email vuole `X-Gestionale` con il codice del gestionale e quello dell'ASL (4.2.5, p. 25), oltre a `X-idSessione`.
+- **AURA, documenti**: il confronto dice che nessun documento descrive i servizi per i medici. La nota AVL-17 (2013) ne cita due, il cui indirizzo non vale più, e il manuale AURA--ORG-01-V08 rimanda a un «apposito documento» (§1, p. 2). Nell'elenco ufficiale di oggi non c'è nessuno dei tre: sono fra le domande per il CSI.
+- **AURA, file mensili**: il confronto non dice che AURA manda ai medici due file ogni mese, l'elenco degli assistiti e le variazioni, se il medico sottoscrive il modulo. Il tracciato è nella scheda AURA, `Tracciati_file_medici.xls`. Tornano utili per la domanda 3.
+- **V06 e NRE**: sul «da verificare» di chi assegna l'NRE, la V06 risponde già. In Piemonte la cartella numera da sé anche le ricette DM con gli NRE del lotto (3.2, p. 7–8), e dopo un rifiuto rimanda la ricetta con lo stesso NRE (4.3.1, p. 15).
+
+**Verifiche** (punto 4 e paragrafo 9):
+
+- **Esito 2, con avvisi** (V06, 4.3.1, p. 15): il programma lo tratta come accettato e mostra i messaggi della ricevuta. Per correggere, il medico annulla la ricetta e ne fa una nuova; oggi l'NRE nuovo lo assegna il SAC simulato. Con i lotti (domanda 2) lo darebbe il lotto.
+- **Esito 3, lo stesso NRE dopo un rifiuto**: oggi la ricetta rifiutata non ha un NRE, perché il numero arriva solo con l'accettazione. Con la numerazione piemontese il numero si assegna prima dell'invio e dopo il rifiuto si riusa: fa parte della domanda 2.
+- **Chi assegna l'NRE in DM**: per le specifiche nazionali il SAC, se manca (08/07/2026, §4.2.1); per la V06 la cartella con il lotto (sopra). Per il CSI c'è la domanda 2.
+- **VisualizzaPrescritto e stato di erogazione** (D70): la risposta ha `statoProcesso` (08/07/2026, §4.2.3), con i valori della tavola del §7. Si mappano sui cinque stati del programma:
+  - 3 «da erogare»: non erogata;
+  - 4 «annullata dal prescrittore»: annullata;
+  - 5 «in corso di erogazione», 6 «sospesa» e 9 «annullamento della ricetta erogata»: presa in carico;
+  - 7 «singola prescrizione erogata»: erogata in parte;
+  - 8 «erogata»: erogata.
+
+  Il 5 con codEsito 5221 vuol dire «erogata non a carico del SSN». La V06 espone VisualizzaPrescritto (4.3.4, p. 16). La mappa si scrive con l'adattatore vero.
+
+- **Promemoria, versione del 05/12/2024** contro quella del 28/02/2024 che il programma segue (D217): cambiano solo la tabella delle revisioni e le traduzioni in tedesco per Bolzano; le regole in italiano del §2 sono identiche. Per il Piemonte non cambia niente. Nota: nella nuova tabella tedesca la colonna italiana dice «Entro 24 ore» e «Entro 120 giorni», diversamente dal §2 («72 ore», «Programmabile»): vale il §2.
+- **Specifiche della prescrizione, versione del 08/07/2026** contro quella del 05/12/2024 che il programma segue: cambia solo il paragrafo sul piano terapeutico AIFA.
+  - Dal 9/7/2026 non si mette più in ricetta il protocollo dei piani terapeutici delle note 97 e 99 (Determinazioni AIFA 821/2026 e 822/2026).
+  - Se il piano è interrotto, il protocollo non vale.
+  - Gli avvisi sulle note AIFA sono solo informativi.
+
+  Il programma non manda il protocollo del piano (`testata1`, «PT=…;»): non cambia niente.
+
+- **Schematron del PSS**: quello del programma (Ministero, v4.0, il controllo del Gateway) dice nel titolo «Profilo Sanitario Sintetico 1.5»: segue la guida v1.5. In ART-DECOR c'è un altro schematron, generato dalla guida di HL7 Italia (transazione del 28/02/2024). Il PSS del programma, generato dall'esempio delle prove con un paziente inventato, lì dà 25 errori e un avviso, mentre passa lo schematron del Ministero. Sono la domanda 6:
+  - la versione del modello del documento è «1.4», copiata dall'esempio ufficiale; la guida vuole «1.5»;
+  - gli identificativi delle osservazioni sono fatti come «…-osservazione», che non è un identificativo valido;
+  - mancano la data di inizio dei problemi e l'osservazione richiesta dentro il problema;
+  - lo stato clinico usa il codice del dizionario nazionale e non LOINC;
+  - ci sono differenze su agente e criticità delle allergie e sui modelli delle terapie.
+
+  Provato con Saxon-HE 12.5, scaricato dal registro Maven, e lo schematron compilato del pacchetto della guida.
+
+- **PNGLA contro R14**: il SAC blocca senza tipo di accesso (1302) solo le prestazioni dell'elenco del PNGLA (§3.1, 69 voci nella transcodifica v3 del 22/01/2025). Con il primo accesso blocca anche senza classe di priorità (1301). R14 chiede invece il tipo di accesso per ogni prestazione: è più severa. È la domanda 7.
+- **Scadenze regionali delle ricette** (Sistema TS, 28/09/2026): per il Piemonte il primo accesso vale 60 giorni con qualunque priorità, gli altri accessi 180 (DGR 3-8294/2024). Il programma fa così dalla D260. Il confronto lo accostava a R1, che però riguarda la farmaceutica (30 giorni, tabella AIFA).
+- **Pre-autorizzazione del sostituto** (specifiche del 05/08/2015): il servizio lo attiva la Regione. In ogni caso, quando prescrive il sostituto, la ricetta porta il titolare in `cfMedico1` e il sostituto in `cfMedico2`; codici di regione, ASL, struttura e specializzazione sono del titolare, le credenziali del sostituto; annulla solo il sostituto (08/07/2026, «Regole da seguire per la prescrizione da parte di sostituti»). Oggi il messaggio della ricetta porta solo chi firma (D21): il titolare va aggiunto quando si scrive l'adattatore del SAR, perché il programma lo conosce dall'archivio.
+- **Piano dei test FSE V04** (06/09/2022) e report V02: casi di invio, aggiornamento, sostituzione e annullamento del PSS e del bilancio di salute. Del FSE 2.0 e del Gateway non parlano: il confronto ha ragione.
+- **Linee guida DCE V18** (ottobre 2026): sono per i repository delle aziende sanitarie (referti, consensi, visibilità, ritiro online). Per la cartella tornano utili solo PDF/A con il CDA dentro e firma PAdES, già nel programma.
+- **Politiche di invio FSE-INT-SRS-01 V02**: sono scritte per le aziende sanitarie, ma valgono per chi pubblica con i servizi regionali (domanda 4):
+  - fermo ogni notte dalle 00:00 alle 07:00;
+  - invii in ordine;
+  - con timeout, FSE_ER_000 o nessun esito, nuovo tentativo dopo almeno 5 minuti, al più 3 volte;
+  - poi una coda con un tentativo al giorno per 10 giorni, nella fascia 07:00–00:00;
+  - con gli altri errori si corregge prima di rimandare.
+- **AURA, campi**: i WSDL hanno i campi del confronto. Gli eventi delle notifiche sono 24 (elenco V05). L'elenco dei messaggi ha 495 righe. Le notifiche arrivano circa ogni 180 secondi, con al più 25 profili, da 10.102.109.194–196, a un servizio acceso h24 7x7 (SER-01 V17).
+
+**Documenti nazionali per la domanda 2.** Che cosa chiedono la DPCM e i lotti di NRE:
+
+- **Ricetta rossa (DPCM 26/3/2008)**, «Collegamento telematico in rete dei medici», manuale v11 (1/3/2016):
+  - invio di un file zip con una o più ricette al servizio `InvioTelematicoSanita` (6.1), al più 1 MB per il medico, almeno 2 secondi fra due invii;
+  - la ricevuta ha un protocollo SAC di 23 cifre, con i codici 000, 101–103 e 200;
+  - nella testata, `TipoInvio` RPS (ricettari SSN) o REL (con NRE) e il PIN cifrato;
+  - in ogni ricetta, `Bar1` e `Bar2` (il codice a barre del Poligrafico), il codice fiscale cifrato dell'assistito, la diagnosi, l'esenzione, il tipo di visita, il codice fiscale del medico in chiaro (`Ricetta2`) e le righe con codice e quantità (6.1.2);
+  - l'esito si legge con l'elenco sintetico (stati 1–5) e con l'elenco analitico per protocollo (6.4–6.5);
+  - i ricettari assegnati al medico si leggono con un servizio, e la cartella propone il numero della ricetta successiva (7.3–7.4).
+
+  In Piemonte la DPCM passa dal SAR, con l'NRE in `Ricetta1`, il catalogo in `Prescrizione2` e il protocollo del SAR (V06, 4.2). Le anomalie sono nel manuale dei codici di anomalia (avvisi e scarti, per esempio 1010: ricettario non associato al medico).
+
+- **Lotti di NRE** (guida «Gestione del numero di ricetta elettronica», v2 del 21/05/2012, e specifiche del 08/07/2026, §5):
+  - l'NRE ha 15 caratteri: regione (3), raggruppamento (2), tipo di lotto (1) e numero del lotto più progressivo (9);
+  - un medico può avere al più 1000 numeri (lotti di tipo 0 o 1).
+
+  In Piemonte il SAR dà alla cartella lotti di tipo 1 «estratti» da un lotto più grande, con l'identificativo del lotto del SAR (per esempio 4), e la cartella genera i 1000 NRE agendo solo sul progressivo (V06, 4.1, p. 10–11).
+
+**Non si toccano fino alle risposte** (richiesta di Simone): esito incerto e ricetta rossa, DPCM e lotti di NRE, AURA, pubblicazione sul Fascicolo, `client_id`.
+
+**Fatto** (punto 3, D265; tutte le prove e i sabotaggi sono qui sotto):
+
+- Tempo d'attesa e riferimenti della V06.
+- Accesso con SPID o CIE come nella V08.
+- Modulo di accesso al Fascicolo come nella V13.
+
+**Non provato**: nessun servizio vero. Lo schematron della guida v1.5 è provato solo sull'esempio delle prove.
+
+**Prossimo passo**: la fermata con le domande del paragrafo 5 del confronto, più quelle nate dalle verifiche (6 e 7).
 
 ## Dopo la fermata della #38 (25/11/2026)
 
@@ -4057,3 +4157,15 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D261: il riquadro dice che la banca dati è l’anagrafica AIFA intera (prova nel browser)                       | DemoPanel.tsx: frase tolta                                                                                                | Rosso, poi verde (33 su 33)                                                                                                                                                                                                                                                                                      |
 | D261: nella dimostrazione l’alprazolam di classe C e l’ibuprofene da banco (prova nel browser)                | dati/aifa: l’estratto delle sole classi A e H al posto dell’anagrafica intera                                             | Rosso, poi verde (33 su 33)                                                                                                                                                                                                                                                                                      |
 | D262: l’errore della prova «invii senza risposta» dice anche l’indirizzo e il testo della pagina              | dimostrazione.e2e.ts: il modulo cercato con un nome che non c’è (con le quattro prove prima, Chromium)                    | Rosso, con l’indirizzo (/ricette#senza-risposta) e il testo della pagina nell’errore; il file torna com’era, con la stessa impronta                                                                                                                                                                              |
+| D265: l'avviso del tempo d'attesa parte per ogni valore diverso dagli 8 secondi della V06                     | studio-service.ts: intervallo 6–8 della V05 (due volte, con il formato nuovo)                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: token per un altro gestionale (`aud`) rifiutato                                                         | credentials/service.ts: controllo di `aud` tolto                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: token già scaduto rifiutato                                                                             | credentials/service.ts: controllo della scadenza tolto                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: revoca di un token scaduto, revocato o sconosciuto: 401                                                 | regional-authorization.ts: revoca sempre riuscita                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: token insieme a utente, password, PIN o Id-Sessione rifiutato                                           | service-auth.ts: controllo del miscuglio tolto                                                                            | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: scadenza da `exp`, non da `expires_in`                                                                  | regional-authorization.ts: scadenza calcolata da `expires_in`                                                             | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: con il token solo `X-OAuth2-Authorization`                                                              | service-auth.ts: token in `Authorization`                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: applicazione DMAWACCE                                                                                   | regional-access.ts: DMAWA                                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: PIN obbligatorio (AUTH_ER_510)                                                                          | regional-access.ts: controllo del PIN tolto                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: AUTH_ER_510 e AUTH_ER_516 portano a «Credenziali dei servizi»                                           | fse-access-routes.ts: solo AUTH_ER_501                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: token scaduto dà WEB_001                                                                                | regional-access.ts: scadenza non guardata                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: tipi di documento della V13                                                                             | regional-access.ts: rimesso il documento dei consensi della V03                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
