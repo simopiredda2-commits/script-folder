@@ -2174,3 +2174,11 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - l'archivio dei ricettari del medico (7.3 e 7.4).
 - **Non provato**: il SAR vero, la cifratura vera, la stampa su un modulo vero.
 - **Domanda per il CSI**: se l'invio DPCM resta senza risposta, la cartella lo rimanda; come risponde il SAR se il primo file era arrivato (stesso NRE e stesso modulo)? Oggi il rifiuto resta nella ricetta rossa, che Oggi conta fra quelle da seguire.
+
+**D271 · Unione della #39; le due parti nazionali della ricetta rossa adesso, le altre con il CSI.** Risposte di Simone con il pulsante (25/11/2026).
+
+- «Unisci (consigliato)»: pull request #39 unita in `main` (3794299), con le 14 verifiche su GitHub verdi. Il branch riparte da `main`.
+- «Le due nazionali ora (consigliato)». Prima del Fascicolo si fanno le due parti che vengono dalle norme nazionali e non dipendono dal CSI:
+  - i farmaci esclusi dalla ricetta dematerializzata (DM 2/11/2011, art. 3), che vanno sempre sulla ricetta rossa;
+  - il codice della motivazione di non sostituibilità.
+- Variazione e cancellazione di una ricetta DPCM già mandata, archivio dei ricettari del medico e presidi in DPCM si fanno con le risposte del CSI, insieme ad AURA.
