@@ -289,6 +289,28 @@ describe('«Aggiungi» su ogni farmaco prescritto (D246, D249)', () => {
     });
   });
 
+  it('la terapia porta in ricetta «come va in ricetta»: per principio attivo, o non sostituibile con il codice (D273)', () => {
+    expect(lineFromPrescribed(CHRONIC, [{ ...THERAPY, byActiveIngredient: true }])).toMatchObject({
+      therapyId: 't1',
+      byActiveIngredient: true,
+    });
+    expect(
+      lineFromPrescribed(CHRONIC, [
+        {
+          ...THERAPY,
+          notSubstitutable: true,
+          notSubstitutableCode: '2',
+          notSubstitutableReason: 'Difficoltà di deglutizione',
+        },
+      ]),
+    ).toMatchObject({
+      therapyId: 't1',
+      notSubstitutable: true,
+      notSubstitutableCode: '2',
+      notSubstitutableReason: 'Difficoltà di deglutizione',
+    });
+  });
+
   it('una terapia sospesa o conclusa entra come farmaco, senza posologia né terapia collegata', () => {
     const drugOnly = {
       drugAic: '900000017',

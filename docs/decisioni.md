@@ -2210,3 +2210,58 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - gli elenchi aggiornati dopo il 2020 e le decodifiche regionali del TDL: li tiene il Sistema TS, domanda per il CSI;
   - le esclusioni regionali (piani terapeutici AIFA, distribuzione diretta e per conto, ossigeno), che la Regione manda al Sistema TS (specifiche del 15/11/2023): domanda per il CSI, perché la cartella non le ha.
 - **Non provato**: il Sistema TS e il SAR veri; la stampa delle note su un promemoria vero.
+
+**D273 · Codice della motivazione di non sostituibilità e tipologia S o H nel messaggio della ricetta.** La seconda parte nazionale di D271.
+
+- **Fonti.**
+  - Sistema TS, linee guida per la prescrizione del principio attivo (art. 15, comma 11-bis, DL 95/2012), versione 2.1 del 25/10/2013:
+    - i casi A1, A2, B, C e D e i campi da compilare (3.1.4);
+    - i codici 1, 2 e 3 della sintetica motivazione e il 4 della non applicabilità dell'art. 15, comma 11-bis, che il medico sceglie insieme alla clausola per proseguire una terapia in corso;
+    - il farmacista tratta il codice 4 come la non sostituibilità (paragrafo 4).
+  - Specifiche della prescrizione dell'8/7/2026:
+    - `nonSost` vale per il prodotto indicato con il codice AIC;
+    - `codMotivazione` «deve essere compilato se nonSost vale 1» (p. 27);
+    - `indicazionePrescr` (p. 25).
+  - Manuale dei codici di anomalia della ricetta in DPCM: l'avviso 5412 per un codice della motivazione non valido (p. 34).
+  - «Collegamento telematico in rete dei medici», versione 11.0:
+    - nella farmaceutica Prescrizione1 porta il codice;
+    - CodProdPrest può mancare per il solo principio attivo;
+    - DescrProdPrest porta il codice del gruppo di equivalenza.
+- **La regola R13**, dalla versione delle regole 2026-11-25.1. Con la clausola di non sostituibilità serve uno dei codici da 1 a 4, per un farmaco indicato con il codice AIC e non per principio attivo. Codici e descrizioni stanno nei dati della regola (`lists.substitutionReasons`), versionati come i valori. Le versioni di prima restano con la motivazione scritta, per le ricette che si ricontrollano alla loro data.
+- **Scheda della terapia e riga della ricetta.**
+  - Con «Non sostituibile» si sceglie il codice; il testo diventa una precisazione facoltativa.
+  - «Per principio attivo» e «Non sostituibile» si escludono, e «Non sostituibile» vuole l'AIC.
+  - La terapia che entra in ricetta porta con sé principio attivo, clausola e codice. Prima le due opzioni si perdevano: era un difetto, corretto.
+- **Messaggio al SAR.**
+  - `codMotivazione` sulla riga.
+  - Il caso A1 per principio attivo.
+  - `indicazionePrescr` S o H, solo se tutte le righe vengono da terapie con la stessa tipologia, come il campo 14 del promemoria (D217).
+- **Ricetta rossa.**
+  - Prescrizione1 con il codice.
+  - Per principio attivo solo il gruppo di equivalenza (A1).
+  - IndicazionePrescr S o H.
+- **Promemoria**: «NON SOSTITUIBILE - motivazione N - precisazione».
+- **Simulatore**: rifiuta la non sostituibilità senza codice (SIM-MOTIVAZIONE), come il SAC.
+- **Scelte mie.**
+  - Il codice 4 si sceglie sotto la clausola, come dicono le linee guida.
+  - Per principio attivo senza il gruppo di equivalenza nella lista di trasparenza in vigore, la ricetta rossa porta l'AIC, come per l'unico farmaco autorizzato (caso D). Senza nessuno dei due la riga non direbbe quale farmaco. Succede con un farmaco senza equivalenti o se la lista non è importata.
+- **Non fatto.**
+  - Sul modulo stampato della ricetta rossa le caselle S e H non si biffano: le fonti lette non danno le posizioni.
+  - Per principio attivo la riga stampata mostra il nome del farmaco, non il gruppo.
+  - La scheda della terapia accetta qualunque codice di due caratteri: il controllo sui codici della regola lo fa R13 alla ricetta.
+- **Non provato**: il Sistema TS e il SAR veri.
+
+**D274 · La ricerca della ricetta copre i risultati anche in Safari.** Segnalazione di Simone del 25/11/2026, con la schermata della ricetta specialistica nella dimostrazione: scorrendo i risultati, le righe si vedevano sopra il campo di ricerca.
+
+- **Causa.** Nella pagina della ricetta in una schermata (D242) il riquadro che scorre aveva uno spazio interno in alto. WebKit ferma il campo sotto quello spazio e lascia vedere, nella fascia sopra, le righe che scorrono; Chromium no.
+- **Correzione.**
+  - Il riquadro non ha più spazio interno in alto: lo dà il suo primo elemento.
+  - Il campo di ricerca ha lo sfondo del riquadro, un po' di spazio sopra e sotto e un bordo sottile in basso, che fa vedere dove le righe gli passano sotto.
+- **Prova.** In cima al riquadro, scorso fino in fondo, c'è il campo e non una riga dei risultati (`apps/api/test/e2e/interfaccia.test.ts`). Con WebKit diventa rossa con il foglio di stile di prima.
+- **Non provato**: Safari vero su Mac e iPad.
+
+**D275 · Risposte di Simone della sera del 25/11/2026.**
+
+- **Note di erogabilità, sedute e tariffa** (domanda 2 della prossima fermata). Risposta: «se manca qualcosa, provvedi e integra». Si fanno adesso, nella pull request delle parti nazionali, prima del Fascicolo (opzione A).
+- **Via dato in anticipo.** Simone: «ti autorizzo sin da ora a unire, visto che dopo non sarò operativo». La pull request di questo blocco si unisce con le prove su GitHub verdi. Lo stesso vale per quella del Fascicolo, che viene dopo nell'ordine concordato (D268), come gli ho scritto. Le domande della fermata restano in `docs/avanzamento.md` per quando torna.
+- Simone può spegnere il suo computer: il lavoro va avanti nella sessione in cloud, con commit e push dopo ogni passo.

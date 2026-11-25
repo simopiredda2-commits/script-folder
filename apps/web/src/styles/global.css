@@ -1854,8 +1854,15 @@ a.coda:hover {
     min-height: 0;
     overflow-y: auto;
     margin-bottom: 0;
-    padding-top: 0.75rem;
+    /* Nessuno spazio in alto nel riquadro che scorre: lo dà il suo primo elemento. Così il campo di
+       ricerca fermo in alto copre tutto ciò che scorre, anche in Safari, che sopra un elemento
+       fermo lascia libera la fascia dello spazio interno (segnalazione di Simone, D274). */
+    padding-top: 0;
     padding-bottom: 0;
+  }
+
+  html.schermo-unico .griglia-ricetta > .riquadro > :first-child {
+    padding-top: 0.75rem;
   }
 
   html.schermo-unico .griglia-ricetta h2 {
@@ -1880,14 +1887,17 @@ a.coda:hover {
     white-space: nowrap;
   }
 
-  /* Il campo di ricerca resta in vista mentre scorrono i risultati. */
+  /* Il campo di ricerca resta in vista mentre scorrono i risultati, che gli passano sotto: il bordo
+     dice dove (D274). */
   html.schermo-unico .griglia-ricetta .ricerca {
     position: sticky;
     top: 0;
     z-index: 1;
-    margin-bottom: 0;
-    padding-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
     background: inherit;
+    border-bottom: 1px solid var(--color-divider);
   }
 
   /* «Dati della ricetta» resta per i lettori di schermo; a vista bastano le etichette dei campi. */

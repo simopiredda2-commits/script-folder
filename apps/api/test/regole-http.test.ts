@@ -189,6 +189,102 @@ describe('regole di prescrizione prima dell’invio', () => {
     });
   });
 
+  describe('R13 · codice della motivazione di non sostituibilità (D273)', () => {
+    const named = {
+      drugAic: '038092019',
+      drugName: 'AMLODIPINA DOC GENERICI 5 MG',
+      activeIngredient: 'AMLODIPINA BESILATO',
+    };
+    /** Il messaggio dell'invio, non la richiesta del lotto di NRE che la firma può fare (D269). */
+    const sentMessage = async (id: string) => {
+      const [sent] = await t.db
+        .select()
+        .from(externalSubmission)
+        .where(
+          and(eq(externalSubmission.prescriptionId, id), eq(externalSubmission.operation, 'invio')),
+        );
+      return sent!.request as {
+        prescriptionIndication?: string | null;
+        lines: Record<string, unknown>[];
+      };
+    };
+
+    it('non sostituibile con la sola motivazione scritta: «Firma e invia» si ferma e dice i codici', async () => {
+      const id = await draft(
+        pharma({ ...named, notSubstitutable: true, notSubstitutableReason: 'Testo libero' }),
+      );
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(
+        /R13: AMLODIPINA DOC GENERICI 5 MG: la clausola di non sostituibilità richiede il codice della motivazione \(1, 2, 3, 4\)/,
+      );
+    });
+
+    it('con il codice parte: il messaggio al SAR porta il codice e il nome con l’AIC', async () => {
+      const id = await draft(
+        pharma({ ...named, notSubstitutable: true, notSubstitutableCode: '3' }),
+      );
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await sentMessage(id)).lines[0]).toMatchObject({
+        drugAic: '038092019',
+        notSubstitutable: true,
+        notSubstitutableCode: '3',
+        byActiveIngredient: false,
+      });
+    });
+
+    it('per principio attivo la clausola non vale: si ferma', async () => {
+      const id = await draft(
+        pharma({
+          ...named,
+          byActiveIngredient: true,
+          notSubstitutable: true,
+          notSubstitutableCode: '1',
+        }),
+      );
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(/R13: .*non per una prescrizione per principio attivo/);
+    });
+
+    it('la cartella dà alla scheda e alla ricetta i codici della regola in vigore', async () => {
+      const res = await s.app.inject({
+        method: 'GET',
+        url: `/api/pazienti/${s.richPatient}`,
+        headers: { cookie },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const reasons = res.json().motivazioniNonSostituibilita as { codice: string }[];
+      expect(reasons.map((r) => r.codice)).toEqual(['1', '2', '3', '4']);
+    });
+
+    it('la terapia suggerita dallo specialista dà la tipologia S al messaggio (indicazionePrescr)', async () => {
+      const created = await post(`/api/pazienti/${s.richPatient}/terapie`, {
+        ...named,
+        drugName: 'AMLODIPINA DOC GENERICI 5 MG COMPRESSE',
+        kind: 'chronic',
+        startOn: '2026-11-01',
+        packsPerPrescription: 1,
+        suggestedS: true,
+        suggestedByName: 'Dott. Specialista di prova',
+      });
+      expect(created.statusCode, created.body).toBe(201);
+      const therapyId = created.json<{ id: string }>().id;
+      const id = await draft({
+        kind: 'pharma_ssn',
+        lines: [{ ...named, therapyId, quantity: 1 }],
+      });
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await sentMessage(id)).prescriptionIndication).toBe('S');
+      // Senza una terapia S o H la tipologia non c'è.
+      const plain = await draft(pharma(named));
+      expect((await post(`/api/ricette/${plain}/firma-e-invia`)).statusCode).toBe(200);
+      expect((await sentMessage(plain)).prescriptionIndication ?? null).toBeNull();
+    });
+  });
+
   it('R9: un’esenzione non registrata per il paziente blocca', async () => {
     const id = await draft({ ...pharma(), exemptionCode: 'ZZZ' });
     const res = await post(`/api/ricette/${id}/firma-e-invia`);

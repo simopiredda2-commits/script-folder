@@ -124,13 +124,28 @@ Quando la ricetta SSN farmaceutica o specialistica non ha esito dal SAR, la Regi
 - **Registro ed esportazione**: ogni chiamata resta in `external_submission`; la ricetta rossa sta in `dpcm_prescription`, con storico e divieto di cancellazione, ed entra nell'esportazione. La stampa e il PDF finiscono nel registro degli accessi (`ricetta_cartacea`, `stampa_ricetta_rossa`).
 - **Ricetta bianca e presidi**: come prima. La ricetta DPCM ha solo farmaceutica e specialistica; per i presidi è una domanda per il CSI.
 
+## Parti nazionali della ricetta farmaceutica (D272, D273)
+
+- **Stupefacenti (R23, D272)**: la sezione A della tabella dei medicinali va sul ricettario ministeriale a ricalco e la ricetta si ferma; l'allegato III-bis va solo con il codice della terapia del dolore (TDL o TDL01), con posologia e telefono del medico nelle note, che vanno al SAR e sul promemoria.
+- **Non sostituibilità (R13, D273)**: con la clausola serve il codice della motivazione delle linee guida del Sistema TS per il principio attivo (versione 2.1 del 25/10/2013). I codici sono:
+  - 1, 2 e 3 per la sintetica motivazione;
+  - 4 per la non applicabilità dell'art. 15, comma 11-bis, del DL 95/2012, cioè la prosecuzione di una terapia in corso.
+
+  Vale per un farmaco indicato con il codice AIC, non per principio attivo. Il codice si sceglie nella scheda della terapia e nella riga della ricetta, e il testo resta come precisazione facoltativa.
+  - Va al SAR in `codMotivazione`, con `nonSost`.
+  - Nella ricetta rossa va in Prescrizione1.
+  - Sul promemoria si stampa «NON SOSTITUIBILE - motivazione N».
+
+- **Principio attivo**: nella ricetta rossa una riga per principio attivo porta solo il gruppo di equivalenza (caso A1). Senza il gruppo nella lista di trasparenza in vigore va l'AIC, come per l'unico farmaco autorizzato (caso D).
+- **Tipologia S o H** (`indicazionePrescr`, IndicazionePrescr nella ricetta rossa): c'è solo se tutte le righe vengono da terapie con la stessa tipologia, come il campo 14 del promemoria (D217).
+
 ## Da completare (servono le specifiche e le credenziali di collaudo)
 
 - Numeri del simulatore: gli NRE dei lotti simulati hanno la forma delle specifiche, con il raggruppamento «ZZ» (D269); NRBE e NRE dei simulatori senza lotti sono di fantasia e cominciano con `SIM`, non nella forma delle specifiche (che si controlla solo quando il medico scrive il numero a mano, D259). Formato del codice di autenticazione e del PIN-NRBE: da prendere dalle specifiche di collaudo.
 - Lotti di NRE con il SAR vero (D269): se il lotto si possa chiedere prima che finisca, quanti lotti aperti possa avere un medico, con quale codice il SAR rifiuti un NRE già usato. Domande per il CSI.
 - Adattatori veri per SAR e Sistema TS, con l'autenticazione forte (Id-Sessione) del Sistema TS.
 - Casi in cui l'annullamento è ammesso.
-- Ricetta rossa (D270): la prova su un modulo vero e la taratura della stampante; la posizione dell'NRE, da confermare con il CSI; la cifratura con il certificato della Regione; variazione e cancellazione di una ricetta DPCM già mandata (RicettaV e RicettaC); i farmaci esclusi dalla dematerializzata (DM 2/11/2011, art. 3); il codice della motivazione di non sostituibilità; l'archivio dei ricettari del medico (7.3 e 7.4); i presidi in DPCM.
+- Ricetta rossa (D270): la prova su un modulo vero e la taratura della stampante; la posizione dell'NRE, da confermare con il CSI; la cifratura con il certificato della Regione; variazione e cancellazione di una ricetta DPCM già mandata (RicettaV e RicettaC); l'archivio dei ricettari del medico (7.3 e 7.4); i presidi in DPCM; le caselle S e H e il principio attivo con il gruppo di equivalenza sul modulo stampato (D273).
 - Promemoria (D217): la frase regionale (campo 28) e la frase sui farmaci in DPC come le restituisce il SAC vero; la validità della specialistica, che oggi viene dalla regola R1 (60 giorni per il primo accesso, 180 per gli altri, D.D. 710/2026; D260), come la riceve il Sistema TS dal Piemonte; i tipi di ricetta diversi da «Assist. SSN»; il codice regionale davanti al nome del medico, da confermare al collaudo. Stampa vera e lettura dei codici in farmacia.
 - Fornitore vero di email e SMS, con le garanzie sul trattamento dei dati.
 - Se il SAR comunica l'erogazione in farmacia; lo stato «sospesa» (6) delle specifiche del Sistema TS nella tavola degli stati di processo, oggi non tra gli stati del prodotto (D70).

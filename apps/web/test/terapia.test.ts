@@ -135,6 +135,26 @@ describe('scheda della terapia: controlli formali e corpo per il servizio', () =
     expect(validateDraft({ ...d, unitsPerDay: '0,5' })).toEqual({});
   });
 
+  it('con i codici della motivazione (D273): il codice serve, e solo per un farmaco con l’AIC', () => {
+    const codes = ['1', '2', '3', '4'];
+    const today = '2026-11-25';
+    const d = { ...draftFromTherapy(saved), notSubstitutable: true };
+    expect(validateDraft(d, today, codes)).toEqual({
+      notSubstitutableCode: 'Non sostituibile: scegli il codice della motivazione (R13).',
+    });
+    expect(validateDraft({ ...d, notSubstitutableCode: '9' }, today, codes)).toHaveProperty(
+      'notSubstitutableCode',
+    );
+    // Con il codice la precisazione scritta è facoltativa.
+    expect(validateDraft({ ...d, notSubstitutableCode: '2' }, today, codes)).toEqual({});
+    for (const other of [{ byActiveIngredient: true }, { drugAic: null }])
+      expect(
+        validateDraft({ ...d, ...other, notSubstitutableCode: '2' }, today, codes),
+      ).toHaveProperty('notSubstitutable', expect.stringMatching(/codice AIC/));
+    // Senza i codici (versioni delle regole di prima) vale la motivazione scritta.
+    expect(validateDraft(d, today)).toHaveProperty('notSubstitutableReason');
+  });
+
   it('terapia conclusa: la data di fine c’è e non è nel futuro (tappa 15)', () => {
     const today = '2026-11-18';
     const d = { ...draftFromTherapy(saved), concluded: true };

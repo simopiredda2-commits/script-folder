@@ -9,6 +9,9 @@ const BEHAVIOR: Record<Rule['behavior'], string> = {
 
 const cellText = (s: string) => s.replace(/\|/g, '\\|');
 
+/** Un elenco non codificato fino a tante voci si scrive per intero; oltre, se ne dà il numero. */
+const SHORT_LIST = 5;
+
 /** Tabella delle regole per docs/regole.md, generata dai dati: dice ciò che il codice usa. */
 export function renderRulesTable(): string {
   const rulesets = loadRulesets();
@@ -30,7 +33,7 @@ export function renderRulesTable(): string {
       const lists = Object.entries(r.lists ?? {}).map(([k, v]) =>
         v.length > 0 && v.every((x) => x.includes('='))
           ? `${k}: ${v.map((x) => x.replace('=', ' = ')).join(' · ')}`
-          : v.length > 5
+          : v.length > SHORT_LIST
             ? `${k}: ${v.length} voci`
             : `${k}: ${v.join(', ')}`,
       );

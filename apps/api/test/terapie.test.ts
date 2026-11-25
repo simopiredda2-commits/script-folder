@@ -73,7 +73,7 @@ describe('scheda della terapia: nuova, modifica, sospensione, ripresa', () => {
     const [row] = await t.db
       .select({ code: therapy.notSubstitutableCode })
       .from(therapy)
-      .where(eq(therapy.id, (coded.json() as { id: string }).id));
+      .where(eq(therapy.id, coded.json<{ id: string }>().id));
     expect(row!.code).toBe('2');
     const written = await req('POST', url(), doctor, {
       ...base,

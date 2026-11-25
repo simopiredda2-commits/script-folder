@@ -779,6 +779,25 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.locator('.risultato').filter({ hasText: 'TEVA ITALIA' }).waitFor();
     await page.getByText('Banche dati dei farmaci in uso').waitFor();
     await check(page, 'nuova ricetta con risultati', true);
+    // Il campo di ricerca fermo in alto copre i risultati che gli scorrono sotto, anche con WebKit
+    // (D274): in cima al riquadro che scorre c'è il campo, non una riga dei risultati.
+    await page.setViewportSize({ width: 1280, height: 640 });
+    await expect(
+      page.locator('.griglia-ricetta [role="search"]').evaluate((search) => {
+        const box = search.closest('.riquadro')!;
+        box.scrollTop = box.scrollHeight;
+        const top = box.getBoundingClientRect().top + box.clientTop;
+        const hit = document.elementFromPoint(
+          box.getBoundingClientRect().left + box.clientWidth / 2,
+          top + 2,
+        );
+        return {
+          scrolls: box.scrollTop > 0,
+          gap: Math.round(search.getBoundingClientRect().top - top),
+          covered: hit !== null && search.contains(hit),
+        };
+      }),
+    ).resolves.toEqual({ scrolls: true, gap: 0, covered: true });
     // Su tablet in verticale la ricerca scorre nel suo riquadro, alto al massimo metà schermo:
     // «In ricetta» viene subito dopo, non dopo tutti i risultati (audit D259).
     await page.setViewportSize({ width: 768, height: 1024 });
@@ -1464,11 +1483,18 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       page.getByLabel('Unità al giorno, per il contatore (R11)').inputValue(),
     ).resolves.toBe('2');
     await page.getByLabel('Istruzioni per il paziente').fill('Dopo cena.');
-    // Non sostituibile senza motivazione: R13, vicino al campo.
+    // Non sostituibile senza il codice della motivazione: R13, vicino al campo. I codici sono
+    // quelli delle linee guida del Sistema TS, dai dati della regola in vigore (D273).
     await page.getByLabel(/Non sostituibile/).check();
+    await expect(
+      page
+        .getByLabel('Motivazione (linee guida del Sistema TS)')
+        .locator('option')
+        .evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value)),
+    ).resolves.toEqual(['', '1', '2', '3', '4']);
     await page.getByRole('button', { name: 'Salva la scheda' }).click();
     await page
-      .getByText('Non sostituibile: serve una sintetica motivazione (R13).')
+      .getByText('Non sostituibile: scegli il codice della motivazione (R13).')
       .first()
       .waitFor();
     await check(page, 'nuova terapia con gli errori', true);

@@ -53,6 +53,23 @@ describe('simulatore del SAR e del Sistema TS', () => {
     },
   );
 
+  it('non sostituibile senza il codice della motivazione: rifiutata, come dal SAC (D273)', async () => {
+    const sar = new SimulatedGateway('sar');
+    const line = {
+      drugName: 'Farmaco di prova',
+      drugAic: '099998011',
+      quantity: 1,
+      notSubstitutable: true,
+    };
+    await expect(sar.send({ ...message('a'), lines: [line] }, auth)).resolves.toMatchObject({
+      outcome: 'rejected',
+      code: 'SIM-MOTIVAZIONE',
+    });
+    await expect(
+      sar.send({ ...message('b'), lines: [{ ...line, notSubstitutableCode: '1' }] }, auth),
+    ).resolves.toMatchObject({ outcome: 'accepted' });
+  });
+
   it('annulla solo ricette che ha emesso, una volta', async () => {
     const sar = new SimulatedGateway('sar');
     const r = await sar.send(message(), auth);

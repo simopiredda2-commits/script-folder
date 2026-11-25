@@ -279,13 +279,16 @@ export function createDpcmService(deps: DpcmDeps) {
       doctorFiscalCode: message.doctor.fiscalCode ?? '',
       // Casi delle linee guida del Sistema TS per il principio attivo (3.1.4): per principio
       // attivo solo il gruppo di equivalenza (A1); con il nome anche l'AIC (A2); con la clausola
-      // di non sostituibilità il codice della motivazione in Prescrizione1 (B, C; D273).
+      // di non sostituibilità il codice della motivazione in Prescrizione1 (B, C; D273). Senza
+      // il gruppo nella lista di trasparenza in vigore il caso A1 non si può scrivere: va l'AIC,
+      // come per l'unico farmaco autorizzato (D), perché la riga dica quale farmaco.
       indication: pharma ? (message.prescriptionIndication ?? null) : null,
-      lines: message.lines.map((l) =>
-        pharma
+      lines: message.lines.map((l) => {
+        const group = (l.drugAic && groups.get(l.drugAic)) || null;
+        return pharma
           ? {
-              productCode: l.byActiveIngredient ? null : (l.drugAic ?? null),
-              description: (l.drugAic && groups.get(l.drugAic)) || null,
+              productCode: l.byActiveIngredient && group ? null : (l.drugAic ?? null),
+              description: group,
               aifaNote: l.aifaNote ?? null,
               quantity: l.quantity,
               prescription1: l.notSubstitutable ? (l.notSubstitutableCode ?? null) : null,
@@ -295,8 +298,8 @@ export function createDpcmService(deps: DpcmDeps) {
               description: l.serviceDescription ?? null,
               quantity: l.quantity,
               prescription2: prescription2(l.serviceCode, message.accessType ?? null),
-            },
-      ),
+            };
+      }),
     };
     const address = [pt!.residenceStreet, pt!.residenceNumber].filter(Boolean).join(' ');
     const town = [pt!.residencePostalCode, pt!.residenceTown].filter(Boolean).join(' ');
