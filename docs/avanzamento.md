@@ -1760,6 +1760,8 @@ Risposte di Simone con il pulsante; il dettaglio è in D266.
 
 Le stime contano le giornate di lavoro con la sessione attiva, non i giorni di calendario. L'integrazione vera con il CSI non c'è: kit, ambiente di test, certificazione e adattatori veri, a occhio 1–3 giornate per servizio dopo il kit (D268).
 
+**Stime riviste il 25/11/2026**, alla domanda di Simone («ma allora non sono giorni e giorni di lavoro...»). Il blocco 1 è stato fatto in circa una giornata, non 6–8: le specifiche erano già lette e confrontate, coda, simulatori e credenziali riprendono pezzi che c'erano, prove e sabotaggi girano da soli. Blocco 2 (Fascicolo e PSS v1.5): 1–2 giornate. Blocco 3 (AURA): meno di una giornata, dopo le risposte del CSI. I tempi lunghi restano quelli degli enti: risposte del CSI, kit, ambiente di prova, certificazione.
+
 ## Dopo la fermata della #38 (25/11/2026)
 
 - **Partita IVA**: Simone: «Una volta aperta la P. IVA potremo fare richiesta in qualità di fornitore». Annotato in «Che cosa resta aperto», parte A.
