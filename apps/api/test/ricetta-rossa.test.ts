@@ -48,7 +48,8 @@ describe('ricetta rossa in DPCM (D270)', () => {
         dpcm: { intervalMs: null, minIntervalMs: 300 },
       },
     );
-    for (const who of ['titolare', 'segreteria'] as const) c[who] = await login(s, who);
+    for (const who of ['titolare', 'segreteria', 'sostituto'] as const)
+      c[who] = await login(s, who);
   });
   afterAll(async () => {
     await s?.app.close();
@@ -179,6 +180,33 @@ describe('ricetta rossa in DPCM (D270)', () => {
       ['dpcm_esito', 'ok'],
       ['dpcm_esito', 'ok'],
     ]);
+  });
+
+  it('la dematerializzata firmata dal sostituto si annulla a nome suo, con le sue credenziali', async () => {
+    const id = await draft();
+    options.delayMs = 300;
+    const sent = await req('sostituto', 'POST', `/api/ricette/${id}/firma-e-invia`, {});
+    expect(sent.json(), sent.body).toMatchObject({ esito: 'timeout' });
+    delete options.delayMs;
+    await new Promise((r) => setTimeout(r, 350));
+    // La ricetta rossa la stampa la titolare.
+    expect((await print(id)).statusCode).toBe(200);
+    expect((await red(id))!).toMatchObject({
+      doctorUserId: s.users.titolare.id,
+      dmDoctorUserId: s.users.sostituto.id,
+    });
+    await runQueue();
+    expect((await red(id))!.dmCancelStatus).toBe('done');
+    const [cancel] = await t.db
+      .select()
+      .from(externalSubmission)
+      .where(
+        and(
+          eq(externalSubmission.prescriptionId, id),
+          eq(externalSubmission.operation, 'annullamento'),
+        ),
+      );
+    expect(cancel!.userId).toBe(s.users.sostituto.id);
   });
 
   it('con il SAR non raggiungibile la ricetta rossa non annulla niente: la ricetta non era arrivata', async () => {
@@ -341,6 +369,49 @@ describe('ricetta rossa in DPCM (D270)', () => {
     }
   });
 
+  it('l’elenco del medico: paziente, PDF e quelle da seguire, che Oggi conta (D270)', async () => {
+    const toFollow = async (who = 'titolare') =>
+      (await req(who, 'GET', '/api/oggi')).json<{ code: { ricetteRosse: number | null } }>().code
+        .ricetteRosse;
+    // SAR non raggiungibile: niente da annullare, così conta solo la ricetta scartata.
+    const id = await draft();
+    sends.push('unreachable');
+    await req('titolare', 'POST', `/api/ricette/${id}/firma-e-invia`, {});
+    const out = (await print(id)).json<{ nre: string; annullamentoDematerializzata: unknown }>();
+    expect(out.annullamentoDematerializzata).toBeNull();
+    const listed = async () =>
+      (await req('titolare', 'GET', '/api/ricette-rosse'))
+        .json<{
+          ricette: { ricetta: string; nomePaziente: string; pdf: string; daSeguire: boolean }[];
+        }>()
+        .ricette.find((r) => r.ricetta === id)!;
+    const mine = await listed();
+    expect(mine).toMatchObject({
+      pdf: `/api/ricette/${id}/ricetta-rossa.pdf`,
+      stato: 'to_send',
+      daSeguire: false,
+    });
+    expect(mine.nomePaziente).toMatch(/\S+ \S+/);
+    // Appena stampata non chiede niente: parte da sola. Scartata dal SAR sì, e Oggi la conta.
+    const before = (await toFollow())!;
+    options.dpcmPendingChecks = 0;
+    options.decideDpcm = (p) =>
+      p.nre === out.nre
+        ? { state: 4, errors: [{ code: 'SIM-ERR', description: 'Errore scartante (simulato)' }] }
+        : undefined;
+    try {
+      await runQueue();
+      await runQueue();
+    } finally {
+      delete options.dpcmPendingChecks;
+    }
+    expect(await listed()).toMatchObject({ stato: 'discarded', daSeguire: true });
+    expect(await toFollow()).toBe(before + 1);
+    // La segreteria non ha ricette rosse: l'elenco è vuoto e Oggi non le conta.
+    expect((await req('segreteria', 'GET', '/api/ricette-rosse')).json().ricette).toEqual([]);
+    expect(await toFollow('segreteria')).toBeNull();
+  });
+
   it('senza credenziali RUPAR la ricetta rossa resta da mandare, con il motivo', async () => {
     const id = await uncertain();
     expect((await print(id)).statusCode).toBe(200);
@@ -442,5 +513,41 @@ describe('ricetta rossa in DPCM (D270)', () => {
     const res = await req('titolare', 'POST', `/api/ricette/${id}/ricetta-rossa`, {});
     expect(res.statusCode).toBe(409);
     expect(await red(id)).toBeUndefined();
+  });
+
+  it('nell’elenco del medico: quelle in corso sempre, quelle chiuse per 30 giorni', async () => {
+    const open = await uncertain();
+    const closed = await uncertain();
+    expect((await print(open)).statusCode).toBe(200);
+    expect((await print(closed)).statusCode).toBe(200);
+    const old = new Date(s.clock.now().getTime() - 31 * 86_400_000);
+    await t.db
+      .update(dpcmPrescription)
+      .set({ printedAt: old })
+      .where(inArray(dpcmPrescription.prescriptionId, [open, closed]));
+    await t.db
+      .update(dpcmPrescription)
+      .set({ status: 'ok', dmCancelStatus: 'done' })
+      .where(eq(dpcmPrescription.prescriptionId, closed));
+    const ids = (await req('titolare', 'GET', '/api/ricette-rosse'))
+      .json<{ ricette: { ricetta: string }[] }>()
+      .ricette.map((r) => r.ricetta);
+    expect(ids).toContain(open);
+    expect(ids).not.toContain(closed);
+  });
+
+  // Ultima: fa passare un giorno sull'orologio dello scenario.
+  it('passate le 24 ore senza invio, la ricetta rossa è da seguire anche senza errori', async () => {
+    const id = await uncertain();
+    expect((await print(id)).statusCode).toBe(200);
+    const follows = async () =>
+      (await req('titolare', 'GET', '/api/ricette-rosse'))
+        .json<{ ricette: { ricetta: string; daSeguire: boolean }[] }>()
+        .ricette.find((r) => r.ricetta === id)!.daSeguire;
+    expect(await follows()).toBe(false);
+    s.clock.advance(25 * 3_600_000);
+    // Dopo un giorno la sessione è scaduta: si rientra.
+    c.titolare = await login(s, 'titolare');
+    expect(await follows()).toBe(true);
   });
 });

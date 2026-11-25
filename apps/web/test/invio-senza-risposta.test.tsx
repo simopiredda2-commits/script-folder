@@ -251,6 +251,7 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     await userEvent.type(field, '010260001234000');
     await userEvent.selectOptions(s.getByLabelText('Tipo di visita'), 'D');
     const before = calls.filter((c) => c === '/api/ricette/senza-risposta').length;
+    const redBefore = calls.filter((c) => c === '/api/ricette-rosse').length;
     await userEvent.click(prepare);
     await s.findByText(/Ricetta rossa pronta sul modulo/);
     expect(red).toEqual([{ poligrafico: '010260001234000', tipoVisita: 'D' }]);
@@ -258,8 +259,12 @@ describe('invii senza risposta nella pagina Ricette (D233)', () => {
     const pdf = s.getByRole('link', { name: 'Stampa sul modulo (PDF)' });
     expect(pdf.getAttribute('href')).toBe('/api/ricette/r1/ricetta-rossa.pdf');
     s.getByText(/si annulla da sola/);
-    // La coda non si ricarica: il PDF da stampare resta qui, e il fuoco va al risultato.
+    // Questa coda non si ricarica: il PDF da stampare resta qui, e il fuoco va al risultato.
+    // Si ricaricano le altre, dove la ricetta rossa compare.
     expect(calls.filter((c) => c === '/api/ricette/senza-risposta').length).toBe(before);
+    await waitFor(() =>
+      expect(calls.filter((c) => c === '/api/ricette-rosse').length).toBeGreaterThan(redBefore),
+    );
     expect((document.activeElement as HTMLElement).className).toBe('esito-segnato');
   });
 

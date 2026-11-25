@@ -12,6 +12,7 @@ import {
   therapy,
 } from '../db/schema';
 import { visibleArchives } from '../patients/access';
+import { countRedToFollow } from '../prescriptions/dpcm';
 import { studioDate } from '../prescriptions/rules-check';
 import type { AifaChange, DrugShortage, ReferenceData } from '../reference/lookup';
 
@@ -291,6 +292,8 @@ export function registerTodayRoutes(
         inBozza: await countMyDrafts(),
         nonInviate: await countStatus(signArchives.length ? signArchives : draftArchives, 'error'),
         senzaRisposta: await countInterrupted(signArchives),
+        // Le ricette rosse del medico che chiedono un'occhiata (D270): le sue, se firma.
+        ricetteRosse: signArchives.length ? await countRedToFollow(db, actor.userId, now()) : null,
         richiesteAperte: openRequests,
         pianiInScadenza: plans,
         giorniAvvisoPiani: warnDays,

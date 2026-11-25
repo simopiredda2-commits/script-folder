@@ -365,6 +365,13 @@
       "when": 1795631801748,
       "tag": "0051_ricetta_rossa_dpcm",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1795635434147,
+      "tag": "0052_annullamento_a_nome_di_chi_ha_firmato",
+      "breakpoints": true
     }
   ]
 }

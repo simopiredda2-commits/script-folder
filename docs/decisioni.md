@@ -2156,6 +2156,7 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - Ogni chiamata resta nel registro degli invii e nella cronologia della ricetta.
 - **Annullamento della dematerializzata.** Solo se può essere arrivata: tempo scaduto, eccezione o invio interrotto. Non con il SAR non raggiungibile, né con «Non è arrivata».
   - Usa le credenziali della ricetta (secondo fattore o token): se mancano, si riprova e il motivo si vede.
+  - Si chiede a nome di chi aveva firmato la dematerializzata, con le sue credenziali, anche se la ricetta rossa la stampa un altro medico dell'archivio (per esempio la titolare dopo il sostituto). Scelta mia: la dematerializzata è di chi l'ha firmata.
   - Se il SAR non la annulla (per esempio perché non c'è), lo si scrive; dal portale del SAR il medico controlla.
 - **Esportazione**: la tabella della ricetta rossa entra con le ricette (`dpcm_prescription`), che ha storico e divieto di cancellazione come gli altri dati dei pazienti.
 - **Nell'interfaccia** (scelte mie).
@@ -2163,6 +2164,8 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - Dopo la stampa il PDF resta nella pagina anche quando la ricetta esce dalla coda, come il promemoria delle ricette inviate; nella pagina della ricetta resta ricordato con la bozza.
   - «Non è arrivata» segnato prima, per una farmaceutica o una specialistica al SAR, dice di stampare la ricetta rossa.
   - Due stampe nello stesso istante sullo stesso modulo: la seconda si ferma con il messaggio del modulo già usato.
+  - Nella pagina Ricette la sezione «Ricette rosse in DPCM», solo per il medico: quelle in corso e, per 30 giorni, quelle chiuse. In Oggi il conto di quelle da seguire: invio o lettura non riusciti, 24 ore passate senza invio, annullamento che non riesce; per 30 giorni le scartate e gli annullamenti rifiutati. I 30 giorni sono una scelta mia, perché un elenco senza fine non si legge.
+  - Per una ricetta DPCM scartata la pagina dice che la correzione non è ancora nella cartella: la variazione (RicettaV) è fra le cose non fatte.
 - **Ricetta bianca e presidi**: come prima. La ricetta DPCM ha solo farmaceutica e specialistica (TipoPrescrizione F o P); per i presidi è una domanda per il CSI.
 - **Non fatto**:
   - la variazione e la cancellazione di una ricetta DPCM già mandata (RicettaV e RicettaC);
@@ -2170,3 +2173,4 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - il codice della motivazione di non sostituibilità in Prescrizione1 (oggi c'è solo il testo);
   - l'archivio dei ricettari del medico (7.3 e 7.4).
 - **Non provato**: il SAR vero, la cifratura vera, la stampa su un modulo vero.
+- **Domanda per il CSI**: se l'invio DPCM resta senza risposta, la cartella lo rimanda; come risponde il SAR se il primo file era arrivato (stesso NRE e stesso modulo)? Oggi il rifiuto resta nella ricetta rossa, che Oggi conta fra quelle da seguire.

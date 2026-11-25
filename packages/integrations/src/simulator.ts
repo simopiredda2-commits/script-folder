@@ -73,10 +73,13 @@ export interface SimulatorOptions {
    * Ricetta DPCM: stato finale dell'elenco sintetico e messaggi dell'elenco analitico. Per difetto
    * 2 (senza errori), oppure 3 con l'avviso 2090 se arriva il giorno dopo la compilazione.
    */
-  decideDpcm?: (p: DpcmPrescription) => {
-    state: Exclude<DpcmSendState, 1>;
-    errors?: { code: string; description: string }[];
-  };
+  decideDpcm?: (p: DpcmPrescription) =>
+    | {
+        state: Exclude<DpcmSendState, 1>;
+        errors?: { code: string; description: string }[];
+      }
+    // Nessuna scelta: l'esito di sempre (2, o 3 con l'avviso 2090).
+    | undefined;
   /** Quante letture dell'elenco sintetico rispondono «in attesa di elaborazione» (1). Per difetto 1. */
   dpcmPendingChecks?: number;
   /** Orologio del simulatore, per il giorno di ricezione delle ricette DPCM. */

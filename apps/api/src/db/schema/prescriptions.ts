@@ -237,6 +237,11 @@ export const dpcmPrescription = pgTable(
      * scaduto o eccezione di sistema). Null se non serve.
      */
     dmNre: text(),
+    /**
+     * Chi aveva firmato la ricetta dematerializzata: l'annullamento si chiede con le sue credenziali
+     * e a suo nome, anche se la ricetta rossa l'ha stampata un altro medico dell'archivio.
+     */
+    dmDoctorUserId: uuid().references(() => appUser.id),
     /** «pending», «done» (annullata), «failed» (il SAR non l'ha annullata: lo dice il messaggio). */
     dmCancelStatus: text(),
     dmCancelAttempts: integer().notNull().default(0),

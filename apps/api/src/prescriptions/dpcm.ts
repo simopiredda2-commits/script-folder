@@ -28,12 +28,33 @@ import {
   type PrescriptionGateway,
   type PrescriptionMessage,
 } from '@mmg/integrations';
-import { and, asc, eq, isNull, lte, or, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from '../auth/service';
 import type { createCredentialService } from '../credentials/service';
 import type { Database } from '../db/client';
-import { appUser, dpcmPrescription, externalSubmission, patient, prescription } from '../db/schema';
+import {
+  appUser,
+  doctorProfile,
+  dpcmPrescription,
+  externalSubmission,
+  patient,
+  prescription,
+} from '../db/schema';
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { unrefTimer } from '../timers';
@@ -62,6 +83,49 @@ export const DPCM_MIN_INTERVAL_MS = 2000;
 export const DPCM_TIMEOUT_MS = 30_000;
 /** Il prescritto DPCM va mandato entro 24 ore dalla compilazione (V06, 3.4.2). */
 export const DPCM_DEADLINE_HOURS = 24;
+
+/** Per quanti giorni le ricette rosse chiuse restano nell'elenco del medico (scelta mia, D270). */
+export const DPCM_LIST_DAYS = 30;
+
+/** Le ricette rosse ancora in corso: da mandare, in attesa dell'esito o con l'annullamento da fare. */
+const openRed = () =>
+  or(
+    inArray(dpcmPrescription.status, ['to_send', 'accepted']),
+    eq(dpcmPrescription.dmCancelStatus, 'pending'),
+  );
+
+/**
+ * Le ricette rosse che chiedono un'occhiata al medico (D270): un invio o una lettura non riusciti,
+ * le 24 ore passate senza invio, un annullamento che non riesce; e, per 30 giorni, le scartate e
+ * gli annullamenti rifiutati. Si contano in Oggi.
+ */
+export function redToFollow(at: Date): SQL {
+  const since = new Date(at.getTime() - DPCM_LIST_DAYS * 86_400_000);
+  const late = new Date(at.getTime() - DPCM_DEADLINE_HOURS * 3_600_000);
+  return or(
+    and(
+      inArray(dpcmPrescription.status, ['to_send', 'accepted']),
+      or(
+        isNotNull(dpcmPrescription.lastError),
+        and(eq(dpcmPrescription.status, 'to_send'), lt(dpcmPrescription.printedAt, late)),
+      ),
+    ),
+    and(eq(dpcmPrescription.dmCancelStatus, 'pending'), isNotNull(dpcmPrescription.dmCancelError)),
+    and(
+      gte(dpcmPrescription.printedAt, since),
+      or(eq(dpcmPrescription.status, 'discarded'), eq(dpcmPrescription.dmCancelStatus, 'failed')),
+    ),
+  )!;
+}
+
+/** Quante ricette rosse del medico chiedono un'occhiata (D270), per Oggi. */
+export async function countRedToFollow(db: Database, doctorUserId: string, at: Date) {
+  const [row] = await db
+    .select({ n: count() })
+    .from(dpcmPrescription)
+    .where(and(eq(dpcmPrescription.doctorUserId, doctorUserId), redToFollow(at)));
+  return row?.n ?? 0;
+}
 
 export const printRedSchema = z
   .object({
@@ -341,6 +405,8 @@ export function createDpcmService(deps: DpcmDeps) {
           printedAt: at,
           content: stored,
           dmNre,
+          // L'annullamento a nome di chi aveva firmato la dematerializzata, con le sue credenziali.
+          dmDoctorUserId: dmNre ? (p.signedBy ?? actor.userId) : null,
           dmCancelStatus: dmNre ? 'pending' : null,
         });
         return taken;
@@ -388,14 +454,15 @@ export function createDpcmService(deps: DpcmDeps) {
     result: { outcome: string; code?: string | null; message?: string | null; raw?: unknown },
     started: number,
     environment = deps.environment,
+    userId = row.doctorUserId,
   ) {
-    await withActor(db, row.doctorUserId, (tx) =>
+    await withActor(db, userId, (tx) =>
       tx.insert(externalSubmission).values({
         system: 'sar',
         environment,
         operation,
         prescriptionId: row.prescriptionId,
-        userId: row.doctorUserId,
+        userId,
         request: request,
         response: result.raw ?? null,
         outcome: result.outcome,
@@ -406,12 +473,23 @@ export function createDpcmService(deps: DpcmDeps) {
     );
   }
 
+  /** Nome, codice regionale e codice fiscale di un medico, come nel messaggio della ricetta. */
   async function doctorOf(userId: string) {
     const [d] = await db
-      .select({ name: appUser.displayName })
+      .select({
+        name: appUser.displayName,
+        regionalCode: doctorProfile.regionalCode,
+        fiscalCode: doctorProfile.fiscalCode,
+      })
       .from(appUser)
+      .leftJoin(doctorProfile, eq(doctorProfile.userId, appUser.id))
       .where(eq(appUser.id, userId));
-    return d?.name ?? '';
+    return {
+      userId,
+      name: d?.name ?? '',
+      regionalCode: d?.regionalCode ?? null,
+      fiscalCode: d?.fiscalCode ?? null,
+    };
   }
 
   /** Le credenziali per i servizi DPCM: se mancano, si annota e si riprova più tardi. */
@@ -615,7 +693,9 @@ export function createDpcmService(deps: DpcmDeps) {
   }
 
   async function cancelDm(row: DpcmRow) {
-    const got = await authOrError(row.doctorUserId, 'ricetta_ssn');
+    // La dematerializzata la annulla chi l'aveva firmata, a suo nome (4.3.2).
+    const signer = row.dmDoctorUserId ?? row.doctorUserId;
+    const got = await authOrError(signer, 'ricetta_ssn');
     const attempts = row.dmCancelAttempts + 1;
     if ('error' in got) {
       await db
@@ -628,13 +708,7 @@ export function createDpcmService(deps: DpcmDeps) {
         .where(eq(dpcmPrescription.id, row.id));
       return;
     }
-    const content = row.content as DpcmContent;
-    const doctor = {
-      userId: row.doctorUserId,
-      name: await doctorOf(row.doctorUserId),
-      regionalCode: content.stampa.doctorRegionalCode,
-      fiscalCode: content.stampa.doctorFiscalCode,
-    };
+    const doctor = await doctorOf(signer);
     const reason = 'Ricetta senza esito, rifatta come ricetta rossa (V06, 4.3.1)';
     const started = Date.now();
     let result: Awaited<ReturnType<PrescriptionGateway['cancel']>>;
@@ -657,6 +731,8 @@ export function createDpcmService(deps: DpcmDeps) {
         raw: 'raw' in result ? result.raw : null,
       },
       started,
+      deps.environment,
+      signer,
     );
     if (result.outcome === 'accepted') {
       await db
@@ -673,7 +749,7 @@ export function createDpcmService(deps: DpcmDeps) {
     }
     if (result.outcome === 'rejected' && result.authProblem) {
       await deps.credentials.authRefused(
-        { userId: row.doctorUserId },
+        { userId: signer },
         'ricetta_ssn',
         result.authProblem,
         `${result.code}: ${result.message}`,
@@ -769,13 +845,39 @@ export function createDpcmService(deps: DpcmDeps) {
 
   /** Le ricette rosse del medico, per la sua pagina e per Oggi. */
   async function list(actor: Actor) {
+    // Quelle in corso sempre; quelle chiuse per 30 giorni, dalla più recente.
+    const since = new Date(now().getTime() - DPCM_LIST_DAYS * 86_400_000);
     const rows = await db
-      .select({ d: dpcmPrescription, patientId: prescription.patientId })
+      .select({
+        d: dpcmPrescription,
+        patientId: prescription.patientId,
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+      })
       .from(dpcmPrescription)
       .innerJoin(prescription, eq(prescription.id, dpcmPrescription.prescriptionId))
-      .where(eq(dpcmPrescription.doctorUserId, actor.userId))
-      .orderBy(asc(dpcmPrescription.printedAt));
-    return rows.map(({ d, patientId }) => view(d, patientId));
+      .innerJoin(patient, eq(patient.id, prescription.patientId))
+      .where(
+        and(
+          eq(dpcmPrescription.doctorUserId, actor.userId),
+          or(openRed(), gte(dpcmPrescription.printedAt, since)),
+        ),
+      )
+      .orderBy(desc(dpcmPrescription.printedAt), desc(dpcmPrescription.id));
+    const follow = new Set(
+      (
+        await db
+          .select({ id: dpcmPrescription.id })
+          .from(dpcmPrescription)
+          .where(and(eq(dpcmPrescription.doctorUserId, actor.userId), redToFollow(now())))
+      ).map((r) => r.id),
+    );
+    return rows.map(({ d, patientId, firstName, lastName }) => ({
+      ...view(d, patientId),
+      nomePaziente: `${firstName} ${lastName}`,
+      pdf: `/api/ricette/${d.prescriptionId}/ricetta-rossa.pdf`,
+      daSeguire: follow.has(d.id),
+    }));
   }
 
   function view(d: DpcmRow, patientId?: string) {
