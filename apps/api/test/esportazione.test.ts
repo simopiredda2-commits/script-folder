@@ -12,6 +12,7 @@ import {
   type ExportDocument,
 } from '../src/export/export';
 import { studioDate } from '../src/prescriptions/rules-check';
+import { middayOf } from './helpers/dates';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -22,7 +23,8 @@ describe('esportazione completa dei dati del medico', () => {
   let raw: string;
   beforeAll(async () => {
     t = await createTestDatabase();
-    s = await createScenario(t.db);
+    // Orologio del servizio a mezzogiorno: «oggi» non cambia se il giro passa dalla mezzanotte (D203).
+    s = await createScenario(t.db, {}, { clockAt: middayOf(new Date()) });
     const cookie = await login(s, 'titolare');
     await s.app.inject({
       method: 'GET',
@@ -31,7 +33,7 @@ describe('esportazione completa dei dati del medico', () => {
     });
     // Un'autorizzazione sull'archivio del collega: non deve uscire nell'esportazione del titolare.
     const colleague = await login(s, 'collega');
-    const today = studioDate(new Date());
+    const today = studioDate(s.clock.now());
     const grant = await s.app.inject({
       method: 'POST',
       url: `/api/archivi/${s.archives.collega}/autorizzazioni`,
