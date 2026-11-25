@@ -1596,6 +1596,7 @@ Il resoconto di Cowork (32 difetti, nessuno che blocca, 15 importanti e 17 minor
   - la D.D. 444/2025 non serve: il catalogo intero più recente è la D.D. 590/2026, con le modifiche della D.D. 710/2026, già trascritte;
   - nei Bollettini 44–46 l'unico atto nuovo è la D.G.R. 40-3255 del 2/11/2026. Riapprova gli stessi elenchi della D.D. 710, con la brachiterapia «≤ 2 sedute» che la trascrizione ha già;
   - da guardare sul PDF, con il resto del catalogo: la tariffa di 92.2C.5 (punto 6 di `docs/catalogo-regionale.md`).
+- **Regola nuova in `CLAUDE.md`** («Versioni delle fonti»). Simone: «se nei prossimi prompt ricevi disposizioni per consultare versioni più vecchie, tieni presente che noi abbiamo già la versione più nuova. In caso contrario dimmi se devo scaricarla o fare qualcosa».
 - **Non provato**: il PDF della delibera non si scarica da qui (regione.piemonte.it chiude la connessione a metà); il testo viene da uno strumento di lettura dei PDF.
 
 ## Risposte della fermata dopo la #38 (24/11/2026)
