@@ -13,6 +13,7 @@ import {
   therapy,
 } from '../db/schema';
 import { HttpError } from '../http/errors';
+import { prescriptionTypology } from '../prescriptions/typology';
 import { ReferenceData } from '../reference/lookup';
 
 /**
@@ -313,6 +314,11 @@ export async function buildPromemoriaData(
   patientAt?: PromemoriaPatient | null,
   /** Il medico del promemoria se la ricetta non è ancora firmata: l'anteprima (D253). */
   doctorId?: string,
+  /**
+   * La tipologia S o H partita con la ricetta (indicazionePrescr, D273); assente per le ricette
+   * partite prima, e allora si legge dalle terapie.
+   */
+  sentIndication?: 'S' | 'H' | null,
 ): Promise<PromemoriaDataV2> {
   const [row] = await db
     .select({ p: prescription, pt: patient, st: studio })
@@ -349,17 +355,14 @@ export async function buildPromemoriaData(
   const therapyIds = lines.map((l) => l.therapyId).filter((x): x is string => !!x);
   const therapies = therapyIds.length
     ? await db
-        .select({ id: therapy.id, s: therapy.suggestedS, h: therapy.hospitalH })
+        .select({ id: therapy.id, suggestedS: therapy.suggestedS, hospitalH: therapy.hospitalH })
         .from(therapy)
         .where(and(inArray(therapy.id, therapyIds), eq(therapy.patientId, pt.id)))
     : [];
-  // Campo 14, uno per ricetta: la tipologia c'è se tutte le prescrizioni la hanno uguale.
-  const typologies = lines.map((l) => {
-    const t = therapies.find((x) => x.id === l.therapyId);
-    return t?.s ? 'S' : t?.h ? 'H' : null;
-  });
+  // Campo 14, uno per ricetta: la tipologia c'è se tutte le prescrizioni la hanno uguale. Se la
+  // ricetta è partita con indicazionePrescr, vale quella partita (D273).
   const tipologia =
-    typologies.length && typologies.every((x) => x && x === typologies[0]) ? typologies[0]! : null;
+    sentIndication !== undefined ? sentIndication : prescriptionTypology(lines, therapies);
 
   const specialist = p.kind === 'specialist_ssn';
   const groups = specialist
@@ -396,8 +399,16 @@ export async function buildPromemoriaData(
     // Le note partite con la ricetta (motivazNote): per la terapia del dolore posologia e
     // telefono del medico, che vanno stampati sul promemoria («Nota STUP», D272).
     const notes = sent?.[i]?.notes?.trim() || null;
+    // «NON SOSTITUIBILE» e la motivazione «scritta o codificata» (specifiche di stampa, campo 18):
+    // il codice delle linee guida e, se c'è, la precisazione del medico (D273).
     const notSubstitutable = l.notSubstitutable
-      ? [NOT_SUBSTITUTABLE_TEXT, l.notSubstitutableReason?.trim()].filter(Boolean).join(' - ')
+      ? [
+          NOT_SUBSTITUTABLE_TEXT,
+          l.notSubstitutableCode?.trim() ? `motivazione ${l.notSubstitutableCode.trim()}` : null,
+          l.notSubstitutableReason?.trim(),
+        ]
+          .filter(Boolean)
+          .join(' - ')
       : null;
     return {
       prescrizione,

@@ -25,8 +25,14 @@ export function renderRulesTable(): string {
         .map((s) => (s.url ? `[${cellText(s.title)}](${s.url})` : cellText(s.title)))
         .join('; ');
       // Gli elenchi lunghi (codici AIC) si contano; quelli corti si scrivono (D272).
+      // Gli elenchi codificati («codice=descrizione», come i codici della motivazione di R13) si
+      // leggono voce per voce; gli altri, se lunghi, con il solo numero delle voci.
       const lists = Object.entries(r.lists ?? {}).map(([k, v]) =>
-        v.length > 5 ? `${k}: ${v.length} voci` : `${k}: ${v.join(', ')}`,
+        v.length > 0 && v.every((x) => x.includes('='))
+          ? `${k}: ${v.map((x) => x.replace('=', ' = ')).join(' · ')}`
+          : v.length > 5
+            ? `${k}: ${v.length} voci`
+            : `${k}: ${v.join(', ')}`,
       );
       const values =
         [...Object.entries(r.values).map(([k, v]) => `${k} = ${v ?? 'da completare'}`), ...lists]

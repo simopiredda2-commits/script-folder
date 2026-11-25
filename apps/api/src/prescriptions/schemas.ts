@@ -17,6 +17,8 @@ const lineSchema = z
     byActiveIngredient: z.boolean().optional(),
     notSubstitutable: z.boolean().optional(),
     notSubstitutableReason: z.string().max(500).nullable().optional(),
+    /** Codice della motivazione di non sostituibilità (codMotivazione): lo controlla R13 (D273). */
+    notSubstitutableCode: z.string().trim().max(2).nullable().optional(),
     posologyText: z.string().max(500).nullable().optional(),
     /** Ricetta bianca ripetibile, solo se diverso dalla regola del farmaco (D93). */
     repeatCount: z.number().int().min(0).max(99).nullable().optional(),

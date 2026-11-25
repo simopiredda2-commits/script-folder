@@ -91,6 +91,8 @@ export const therapy = pgTable('therapy', {
   byActiveIngredient: boolean().notNull().default(false),
   notSubstitutable: boolean().notNull().default(false),
   notSubstitutableReason: text(),
+  /** Codice della motivazione di non sostituibilità, da 1 a 4 (linee guida del Sistema TS; D273). */
+  notSubstitutableCode: text(),
   multiPrescription: boolean().notNull().default(false),
   suggestedS: boolean().notNull().default(false),
   hospitalH: boolean().notNull().default(false),

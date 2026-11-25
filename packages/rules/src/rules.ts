@@ -1,7 +1,7 @@
 import { checkFiscalCode } from '@mmg/domain';
 import type { LineContext, RuleContext, SentLineContext, ShortageFacts } from './context';
 import { addDays, addMonths, daysBetween, italian } from './dates';
-import { value, type Rule, type RuleId } from './ruleset';
+import { codedItems, value, type Rule, type RuleId } from './ruleset';
 
 /**
  * Le regole di prescrizione R1–R17 dei requisiti, R18 (D154), lo stato del paziente R19–R20 (D199),
@@ -502,23 +502,36 @@ const evaluators: Record<RuleId, Evaluator> = {
 
   R13: (rule, ctx) => {
     if (ctx.prescription.kind !== 'pharma_ssn') return [];
+    // Dalla versione che ha i codici delle linee guida del Sistema TS, la motivazione è il codice
+    // (codMotivazione, Prescrizione1 nella ricetta rossa); il testo resta facoltativo (D273).
+    const reasons = codedItems(rule.lists?.substitutionReasons).map((r) => r.code);
     return ctx.prescription.lines.flatMap((line): Issue[] => {
       const issues: Issue[] = [];
-      if (line.notSubstitutable && !line.notSubstitutableReason?.trim()) {
-        issues.push({
-          ruleId: 'R13',
-          severity: severityOf(rule),
-          lineId: line.id,
-          message: `${lineLabel(line)}: la clausola di non sostituibilità richiede una sintetica motivazione`,
-        });
+      const issue = (message: string) =>
+        issues.push({ ruleId: 'R13', severity: severityOf(rule), lineId: line.id, message });
+      const code = line.notSubstitutableCode?.trim() ?? '';
+      if (line.notSubstitutable && reasons.length > 0) {
+        if (!code) {
+          issue(
+            `${lineLabel(line)}: la clausola di non sostituibilità richiede il codice della motivazione (${reasons.join(', ')}), dalle linee guida del Sistema TS`,
+          );
+        } else if (!reasons.includes(code)) {
+          issue(
+            `${lineLabel(line)}: il codice della motivazione «${code}» non è fra quelli delle linee guida del Sistema TS (${reasons.join(', ')})`,
+          );
+        }
+        if (line.byActiveIngredient || !line.drugAic?.trim()) {
+          issue(
+            `${lineLabel(line)}: la non sostituibilità vale per un farmaco indicato con il nome e il codice AIC, non per una prescrizione per principio attivo`,
+          );
+        }
+      } else if (line.notSubstitutable && !line.notSubstitutableReason?.trim()) {
+        issue(
+          `${lineLabel(line)}: la clausola di non sostituibilità richiede una sintetica motivazione`,
+        );
       }
       if (!line.activeIngredient?.trim()) {
-        issues.push({
-          ruleId: 'R13',
-          severity: severityOf(rule),
-          lineId: line.id,
-          message: `${lineLabel(line)}: in ricetta va indicato il principio attivo`,
-        });
+        issue(`${lineLabel(line)}: in ricetta va indicato il principio attivo`);
       }
       return issues;
     });

@@ -24,7 +24,19 @@ export interface PrescriptionLineMessage {
   serviceDescription?: string | null;
   quantity: number;
   aifaNote?: string | null;
+  /**
+   * «Per principio attivo» (caso A1 delle linee guida del Sistema TS): in ricetta il gruppo di
+   * equivalenza, senza l'AIC in codProdPrest. L'AIC resta qui solo per trovare il gruppo (D273).
+   */
+  byActiveIngredient?: boolean;
+  /** nonSost: il farmaco indicato con l'AIC non si sostituisce. */
   notSubstitutable?: boolean;
+  /**
+   * codMotivazione: il codice della motivazione di non sostituibilità, da 1 a 4 (linee guida del
+   * Sistema TS per la prescrizione del principio attivo, 3.1.3); va compilato se nonSost vale 1.
+   */
+  notSubstitutableCode?: string | null;
+  /** Precisazione scritta dal medico, facoltativa accanto al codice: va con le note (motivazNote). */
   notSubstitutableReason?: string | null;
   /**
    * Note della riga (motivazNote): per la terapia del dolore con gli stupefacenti posologia e
@@ -44,6 +56,11 @@ export interface PrescriptionMessage {
   /** Identificativo della ricetta nel nostro database, per collegare la risposta. */
   localId: string;
   kind: 'pharma_ssn' | 'specialist_ssn' | 'white' | 'devices';
+  /**
+   * indicazionePrescr (IndicazionePrescr nella ricetta rossa): S suggerita, H ricovero, dalle
+   * schede delle terapie, solo se tutte le righe hanno la stessa; è il campo 14 del promemoria.
+   */
+  prescriptionIndication?: 'S' | 'H' | null;
   patientFiscalCode: string;
   /** Il medico che firma: le ricette sono sempre a nome suo (anche se sostituto). */
   doctor: {

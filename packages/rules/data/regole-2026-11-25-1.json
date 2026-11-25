@@ -1,7 +1,7 @@
 {
   "version": "2026-11-25.1",
   "effectiveFrom": "2026-11-25",
-  "valuesSource": "docs/requisiti.md, sezione «Regole di prescrizione», revisione 45 del 18/11/2026; R11 solo informativo per scelta di Simone alla seconda fermata (18/11/2026); R10 con il codice del nomenclatore e R18 su richiesta di Simone (18/11/2026, D154), dalle specifiche del Sistema TS; R6 e R11 contano anche le ricette fatte con altri programmi, importate, per scelta di Simone alla fermata dopo la tappa 15 (19/11/2026, D181); R19 e R20, stato del paziente alla ricetta, per scelta di Simone del 19/11/2026 (D199); R21, farmaco nell'elenco AIFA dei farmaci carenti, solo informativa: carenze dei farmaci chieste da Simone il 19/11/2026 (D202), «Avviso di carenza sui farmaci in terapia» nella sezione «Banche dati» dei requisiti; R22, confezione «Sospesa» nell'anagrafica AIFA delle confezioni, solo informativa: scelta di Simone alla fermata del 20/11/2026 (D210); R1 per la ricetta specialistica: 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto, dalla D.D. 710/2026 della Regione Piemonte (punto 4), per scelta di Simone alla fermata dopo la #35 (24/11/2026, D260). R23, stupefacenti sulla ricetta farmaceutica del SSN, dalle specifiche del Sistema TS (prescrizione, 5/12/2024, «Nota STUP») e dalla circolare MEF e Ministero della Salute del 14/05/2020 con i suoi elenchi di codici AIC, per scelta di Simone alla fermata dopo la #39 (25/11/2026, D271, D272).",
+  "valuesSource": "docs/requisiti.md, sezione «Regole di prescrizione», revisione 45 del 18/11/2026; R11 solo informativo per scelta di Simone alla seconda fermata (18/11/2026); R10 con il codice del nomenclatore e R18 su richiesta di Simone (18/11/2026, D154), dalle specifiche del Sistema TS; R6 e R11 contano anche le ricette fatte con altri programmi, importate, per scelta di Simone alla fermata dopo la tappa 15 (19/11/2026, D181); R19 e R20, stato del paziente alla ricetta, per scelta di Simone del 19/11/2026 (D199); R21, farmaco nell'elenco AIFA dei farmaci carenti, solo informativa: carenze dei farmaci chieste da Simone il 19/11/2026 (D202), «Avviso di carenza sui farmaci in terapia» nella sezione «Banche dati» dei requisiti; R22, confezione «Sospesa» nell'anagrafica AIFA delle confezioni, solo informativa: scelta di Simone alla fermata del 20/11/2026 (D210); R1 per la ricetta specialistica: 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto, dalla D.D. 710/2026 della Regione Piemonte (punto 4), per scelta di Simone alla fermata dopo la #35 (24/11/2026, D260). R23, stupefacenti sulla ricetta farmaceutica del SSN, dalle specifiche del Sistema TS (prescrizione, 08/07/2026, «Nota STUP», uguale a quella del 5/12/2024) e dalla circolare MEF e Ministero della Salute del 14/05/2020 con i suoi elenchi di codici AIC, per scelta di Simone alla fermata dopo la #39 (25/11/2026, D271, D272). R13 con il codice della motivazione di non sostituibilità, dalle linee guida del Sistema TS per la prescrizione del principio attivo (versione 2.1 del 25/10/2013) e dalle specifiche della prescrizione dell'08/07/2026 (codMotivazione), per la stessa scelta (D271, D273).",
   "validated": false,
   "validationNote": "Prima dell'uso con pazienti reali la Dr.ssa Rocca valida ogni regola e un consulente verifica i riferimenti normativi (requisiti, «Come garantiamo il rigore»).",
   "rules": [
@@ -235,16 +235,39 @@
     },
     {
       "id": "R13",
-      "text": "In ricetta il principio attivo; il marchio vincola il farmacista solo con la clausola di non sostituibilità e una sintetica motivazione",
+      "text": "In ricetta il principio attivo; il marchio vincola il farmacista solo con la clausola di non sostituibilità e il codice della sintetica motivazione (linee guida del Sistema TS), per un farmaco indicato con l'AIC",
       "behavior": "block",
       "status": "active",
       "sources": [
         {
           "title": "DL 95/2012, art. 15, comma 11-bis"
+        },
+        {
+          "title": "Sistema TS, «Ricetta farmaceutica – aggiornamento alla luce dell'art. 15, comma 11-bis del DL 95/2012 e successive modificazioni, riguardante la prescrizione per principio attivo», versione 2.1 del 25/10/2013 (linee guida per la prescrizione del principio attivo), paragrafi 2.2, 2.3 e 3.1.3: i codici da 1 a 4",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/33285/Ricetta%20elettronica%20-%20Prescrittore%20-%20%20Linee%20guida%20per%20la%20prescrizione%20del%20principio%20attivo.pdf/6497df7f-bfd4-6046-24ff-1611daa8405e"
+        },
+        {
+          "title": "Sistema TS, «Web services per la trasmissione delle ricette dematerializzate – parte 1: prescrizione», 08/07/2026: nonSost e codMotivazione, «deve essere compilato se nonSost vale 1» (pagina 27)",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/81804/20260708_Specifiche%20tecniche%20ricetta%20dematerializzata%20-%20prescrizione/6ed04c7b-471c-a133-0de1-2525abb195b5"
+        },
+        {
+          "title": "Sistema TS, «Descrizione delle anomalie e soluzioni DPCM 26/3/2008», versione 2: avviso 5412, codice della motivazione non corretto (pagina 34)",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/33565/Invio%20Telematico%20-%20Prescrittori%20-Manuale%20esplicativo%20codici%20di%20anomalia%20delle%20ricette.pdf/983c4005-537c-3a4d-d9d2-fc3fb36fa118"
+        },
+        {
+          "title": "Scelta di Simone alla fermata dopo la #39 (25/11/2026, D271): le parti nazionali della ricetta rossa adesso; il codice della motivazione come lo costruisce D273"
         }
       ],
       "values": {},
-      "toComplete": []
+      "toComplete": [],
+      "lists": {
+        "substitutionReasons": [
+          "1=Ipersensibilità, intolleranza, interazione o controindicazione ad eccipienti",
+          "2=Obiettive difficoltà di assunzione",
+          "3=Terapia complessa / Problematiche assistenziali",
+          "4=Non si applica l'art. 15, comma 11-bis, in quanto non si tratta di una prima prescrizione per una patologia cronica o di un nuovo episodio di patologia non cronica"
+        ]
+      }
     },
     {
       "id": "R14",
@@ -388,8 +411,8 @@
       "status": "active",
       "sources": [
         {
-          "title": "Sistema TS, «Web services per la trasmissione delle ricette dematerializzate – parte 1: prescrizione», 5/12/2024, «Nota STUP» (pagine 44 e 45)",
-          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/81804/20241205_Specifiche%20tecniche%20ricetta%20dematerializzata%20-%20prescrizione/7cfbbd34-e929-d051-d5b2-629232f3d79e"
+          "title": "Sistema TS, «Web services per la trasmissione delle ricette dematerializzate – parte 1: prescrizione», 08/07/2026, «Nota STUP» (pagine 44 e 45), uguale a quella della versione del 5/12/2024",
+          "url": "https://sistemats1.sanita.finanze.it/portale/documents/20182/81804/20260708_Specifiche%20tecniche%20ricetta%20dematerializzata%20-%20prescrizione/6ed04c7b-471c-a133-0de1-2525abb195b5"
         },
         {
           "title": "Circolare MEF e Ministero della Salute, prot. 5351 del 14/05/2020, «Prescrizioni di medicinali contenenti sostanze stupefacenti o psicotrope con ricetta dematerializzata»",

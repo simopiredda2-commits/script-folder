@@ -6,6 +6,7 @@ import {
   RULE_IDS,
   rulesetAt,
   specialistValidityDays,
+  substitutionReasons,
   type DrugFacts,
   type LineContext,
   type RuleContext,
@@ -119,7 +120,7 @@ describe('dati delle regole', () => {
     }
   });
 
-  it('dalla 2026-11-25.1 R23 sugli stupefacenti con gli elenchi del Ministero (D272); il resto come la 2026-11-24.1', () => {
+  it('dalla 2026-11-25.1 R23 sugli stupefacenti con gli elenchi del Ministero (D272) e R13 con i codici della motivazione (D273); il resto come la 2026-11-24.1', () => {
     const all = loadRulesets();
     const v8 = all.find((r) => r.version === '2026-11-24.1')!;
     const v9 = all.find((r) => r.version === '2026-11-25.1')!;
@@ -141,6 +142,22 @@ describe('dati delle regole', () => {
         expect(r.sources[0]!.title).toMatch(/Nota STUP/);
         expect(r.sources[1]!.title).toMatch(/5351 del 14\/05\/2020/);
         expect(r.sources.at(-1)!.title).toMatch(/D271/);
+      } else if (r.id === 'R13') {
+        const before = v8.rules.find((x) => x.id === 'R13')!;
+        expect({ ...r, text: before.text, sources: before.sources, lists: undefined }).toEqual({
+          ...before,
+          lists: undefined,
+        });
+        expect(r.lists!.substitutionReasons!.map((x) => x.split('=')[0])).toEqual([
+          '1',
+          '2',
+          '3',
+          '4',
+        ]);
+        expect(r.sources.map((x) => x.title).join(' ')).toMatch(
+          /principio attivo.*codMotivazione/s,
+        );
+        expect(r.sources.at(-1)!.title).toMatch(/D273/);
       } else {
         expect(r, r.id).toEqual(v8.rules.find((x) => x.id === r.id));
       }
@@ -880,6 +897,64 @@ describe('R13 · principio attivo e non sostituibilità', () => {
     expect(
       blocks(ctx({ prescription: { lines: [line({ activeIngredient: null })] } }), 'R13'),
     ).toBe(true);
+  });
+
+  describe('dalla 2026-11-25.1: il codice della motivazione delle linee guida del Sistema TS', () => {
+    const at = (extra: Partial<LineContext>) =>
+      ctx({
+        date: '2026-11-25',
+        prescription: { lines: [line({ notSubstitutable: true, ...extra })] },
+      });
+    const messages = (c: RuleContext) => of(c, 'R13').map((i) => i.message);
+
+    it('i quattro codici, con la loro descrizione, solo dalla versione nuova', () => {
+      expect(substitutionReasons('2026-11-25').map((r) => r.code)).toEqual(['1', '2', '3', '4']);
+      expect(substitutionReasons('2026-11-25')[1]!.label).toBe(
+        'Obiettive difficoltà di assunzione',
+      );
+      expect(substitutionReasons('2026-11-24')).toEqual([]);
+    });
+    it('con il codice e l’AIC passa, anche senza il testo', () => {
+      for (const code of ['1', '2', '3', '4'])
+        expect(blocks(at({ notSubstitutableCode: code }), 'R13')).toBe(false);
+    });
+    it('senza codice blocca, anche con il testo', () => {
+      const c = at({ notSubstitutableReason: 'Intolleranza a un eccipiente' });
+      expect(blocks(c, 'R13')).toBe(true);
+      expect(messages(c).join(' ')).toMatch(/codice della motivazione \(1, 2, 3, 4\)/);
+    });
+    it('con un codice che non è nelle linee guida blocca', () => {
+      const c = at({ notSubstitutableCode: '7' });
+      expect(blocks(c, 'R13')).toBe(true);
+      expect(messages(c).join(' ')).toMatch(/«7» non è fra quelli/);
+    });
+    it('per principio attivo, o senza AIC, la non sostituibilità non vale: blocca', () => {
+      const pa = at({ notSubstitutableCode: '1', byActiveIngredient: true });
+      expect(messages(pa).join(' ')).toMatch(/non per una prescrizione per principio attivo/);
+      expect(blocks(at({ notSubstitutableCode: '1', drugAic: null }), 'R13')).toBe(true);
+    });
+    it('senza la clausola il codice non serve', () => {
+      expect(
+        blocks(
+          ctx({
+            date: '2026-11-25',
+            prescription: { lines: [line({ byActiveIngredient: true })] },
+          }),
+          'R13',
+        ),
+      ).toBe(false);
+    });
+    it('prima della versione nuova vale ancora la motivazione scritta', () => {
+      const old = (extra: Partial<LineContext>) =>
+        ctx({
+          date: '2026-11-24',
+          prescription: { lines: [line({ notSubstitutable: true, ...extra })] },
+        });
+      expect(blocks(old({ notSubstitutableReason: 'Intolleranza a un eccipiente' }), 'R13')).toBe(
+        false,
+      );
+      expect(blocks(old({ notSubstitutableCode: '1' }), 'R13')).toBe(true);
+    });
   });
 });
 

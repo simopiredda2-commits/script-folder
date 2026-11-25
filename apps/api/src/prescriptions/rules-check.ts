@@ -98,6 +98,8 @@ export async function buildRuleContext(
       aifaNote: l.aifaNote,
       notSubstitutable: l.notSubstitutable,
       notSubstitutableReason: l.notSubstitutableReason,
+      notSubstitutableCode: l.notSubstitutableCode,
+      byActiveIngredient: l.byActiveIngredient,
       posologyText: l.posologyText,
       therapy: t
         ? {

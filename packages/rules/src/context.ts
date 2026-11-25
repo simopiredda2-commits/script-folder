@@ -79,6 +79,13 @@ export interface LineContext {
   aifaNote: string | null;
   notSubstitutable: boolean;
   notSubstitutableReason: string | null;
+  /**
+   * Codice della motivazione di non sostituibilità (codMotivazione, e Prescrizione1 nella ricetta
+   * rossa): uno di quelli delle linee guida del Sistema TS, nei dati di R13 (D273).
+   */
+  notSubstitutableCode?: string | null;
+  /** «Per principio attivo»: in ricetta va il gruppo di equivalenza, non l'AIC (caso A1). */
+  byActiveIngredient?: boolean;
   /** Posologia scritta nella riga: per gli stupefacenti va nella ricetta (R23, nota STUP). */
   posologyText?: string | null;
   therapy: TherapyContext | null;

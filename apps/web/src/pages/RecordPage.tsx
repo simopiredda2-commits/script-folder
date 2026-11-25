@@ -45,6 +45,12 @@ export interface Summary {
   parametri: { data: string; parametro: string; valore: string; unita: string }[];
 }
 
+/** Un codice della motivazione di non sostituibilità della regola R13, come lo dà la cartella (D273). */
+export interface SubstitutionReason {
+  codice: string;
+  descrizione: string;
+}
+
 export interface TherapyRow {
   id: string;
   drugName: string;
@@ -65,6 +71,11 @@ export interface TherapyRow {
   aifaChanges?: AifaChange[];
   /** «Confezioni per ricetta» della scheda: le confezioni con cui la terapia entra in ricetta (D250). */
   packsPerPrescription?: number;
+  /** «Come va in ricetta»: entrano in ricetta con la terapia (D273). */
+  byActiveIngredient?: boolean;
+  notSubstitutable?: boolean;
+  notSubstitutableReason?: string | null;
+  notSubstitutableCode?: string | null;
 }
 
 /** La scheda intera, come la restituisce il servizio. */
@@ -88,6 +99,7 @@ export interface TherapyFull extends TherapyRow {
   byActiveIngredient: boolean;
   notSubstitutable: boolean;
   notSubstitutableReason: string | null;
+  notSubstitutableCode: string | null;
   multiPrescription: boolean;
   suggestedS: boolean;
   hospitalH: boolean;

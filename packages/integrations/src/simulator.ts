@@ -212,6 +212,20 @@ export class SimulatedGateway implements PrescriptionGateway, SarRegionalService
               !this.options.regionalCatalog!(l.serviceNationalCode ?? null, l.serviceCode ?? null),
           )
         : undefined;
+    // Come il SAC: codMotivazione «deve essere compilato se nonSost vale 1» (specifiche della
+    // prescrizione, 08/07/2026). Di solito lo ferma prima la regola R13 (D273).
+    const noReason =
+      message.kind === 'pharma_ssn'
+        ? message.lines.find((l) => l.notSubstitutable && !l.notSubstitutableCode?.trim())
+        : undefined;
+    if (noReason) {
+      return {
+        outcome: 'rejected',
+        code: 'SIM-MOTIVAZIONE',
+        message: `${noReason.drugName ?? noReason.drugAic ?? 'Farmaco'}: non sostituibile senza il codice della motivazione (simulato)`,
+        raw: { simulatore: this.system, esito: 'codMotivazione mancante' },
+      };
+    }
     if (unknown) {
       return {
         outcome: 'rejected',

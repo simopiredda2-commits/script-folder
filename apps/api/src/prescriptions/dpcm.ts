@@ -136,6 +136,15 @@ export const printRedSchema = z
   })
   .strict();
 
+/** «NON SOSTITUIBILE» sul modulo, con il codice della motivazione se c'è (D273). */
+export const notSubstitutableText = (l: {
+  notSubstitutable?: boolean;
+  notSubstitutableCode?: string | null;
+}) =>
+  l.notSubstitutable
+    ? ` - NON SOSTITUIBILE${l.notSubstitutableCode ? ` (motivazione ${l.notSubstitutableCode})` : ''}`
+    : '';
+
 /** Che cosa si stampa sul modulo: i dati della ricetta come erano alla stampa. */
 export interface RedFormData {
   poligrafico: string;
@@ -268,13 +277,18 @@ export function createDpcmService(deps: DpcmDeps) {
       priority: pharma ? null : (message.priority ?? null),
       nre: '',
       doctorFiscalCode: message.doctor.fiscalCode ?? '',
+      // Casi delle linee guida del Sistema TS per il principio attivo (3.1.4): per principio
+      // attivo solo il gruppo di equivalenza (A1); con il nome anche l'AIC (A2); con la clausola
+      // di non sostituibilità il codice della motivazione in Prescrizione1 (B, C; D273).
+      indication: pharma ? (message.prescriptionIndication ?? null) : null,
       lines: message.lines.map((l) =>
         pharma
           ? {
-              productCode: l.drugAic ?? null,
+              productCode: l.byActiveIngredient ? null : (l.drugAic ?? null),
               description: (l.drugAic && groups.get(l.drugAic)) || null,
               aifaNote: l.aifaNote ?? null,
               quantity: l.quantity,
+              prescription1: l.notSubstitutable ? (l.notSubstitutableCode ?? null) : null,
             }
           : {
               productCode: l.serviceNationalCode ?? null,
@@ -300,7 +314,7 @@ export function createDpcmService(deps: DpcmDeps) {
       asl,
       lines: message.lines.map((l) => ({
         text: pharma
-          ? `${l.drugName ?? l.activeIngredient ?? ''}${l.notSubstitutable ? ' - NON SOSTITUIBILE' : ''}`
+          ? `${l.drugName ?? l.activeIngredient ?? ''}${notSubstitutableText(l)}`
           : `${l.serviceNationalCode ?? l.serviceCode ?? ''} ${l.serviceDescription ?? ''}`.trim(),
         quantity: l.quantity,
       })),

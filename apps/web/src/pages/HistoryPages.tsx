@@ -65,6 +65,8 @@ interface HistoryEntry {
     perPrincipioAttivo: boolean;
     nonSostituibile: boolean;
     motivoNonSostituibile: string | null;
+    /** Codice della motivazione di non sostituibilità, da 1 a 4 (D273). */
+    codiceMotivazione?: string | null;
   };
   controlli: {
     il: string;
@@ -307,7 +309,17 @@ function HistoryTable({
                 {l.posologia && <div>{l.posologia}</div>}
                 {l.notaAifa && <div>Nota AIFA {l.notaAifa}</div>}
                 {l.perPrincipioAttivo && <div>Per principio attivo</div>}
-                {l.nonSostituibile && <div>Non sostituibile: {l.motivoNonSostituibile}</div>}
+                {l.nonSostituibile && (
+                  <div>
+                    {[
+                      'Non sostituibile',
+                      l.codiceMotivazione && `motivazione ${l.codiceMotivazione}`,
+                      l.motivoNonSostituibile,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </div>
+                )}
                 {r.esenzione && <div>Esenzione {r.esenzione}</div>}
                 {r.accesso && <div>{ACCESS_TYPE[r.accesso]}</div>}
                 {r.priorita && <div>Priorità {PRIORITY[r.priorita]}</div>}

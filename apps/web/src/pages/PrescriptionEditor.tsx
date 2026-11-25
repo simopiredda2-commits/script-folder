@@ -43,7 +43,14 @@ import {
 } from '../lib/studio-lists';
 import { useApi } from '../lib/useApi';
 import { useSession } from '../lib/session';
-import { PatientBanner, posology, type Patient, type Summary, type TherapyRow } from './RecordPage';
+import {
+  PatientBanner,
+  posology,
+  type Patient,
+  type SubstitutionReason,
+  type Summary,
+  type TherapyRow,
+} from './RecordPage';
 
 export interface Drug {
   aic: string;
@@ -95,6 +102,8 @@ interface Line {
   byActiveIngredient?: boolean;
   notSubstitutable?: boolean;
   notSubstitutableReason?: string;
+  /** Codice della motivazione di non sostituibilità, da 1 a 4 (R13, D273). */
+  notSubstitutableCode?: string;
   /** Ricetta bianca ripetibile, solo se diverso dalla regola del farmaco (D93). */
   repeatCount?: string;
   validityMonths?: string;
@@ -211,6 +220,7 @@ export function lineSummary(
     posologyText?: string;
     byActiveIngredient?: boolean;
     notSubstitutable?: boolean;
+    notSubstitutableCode?: string;
     repeatCount?: string;
     validityMonths?: string;
     serviceCode?: string | null;
@@ -231,7 +241,10 @@ export function lineSummary(
     `${l.quantity} ${l.quantity === 1 ? 'confezione' : 'confezioni'}`,
     l.posologyText?.trim() || 'posologia non indicata',
     l.byActiveIngredient && 'per principio attivo',
-    l.notSubstitutable && 'non sostituibile',
+    l.notSubstitutable &&
+      (l.notSubstitutableCode
+        ? `non sostituibile, motivazione ${l.notSubstitutableCode}`
+        : 'non sostituibile'),
     white && l.repeatCount && `ripetibile ${l.repeatCount} volte`,
     white && l.validityMonths && `validità ${l.validityMonths} mesi`,
   ]
@@ -252,6 +265,16 @@ function therapyLine(t: TherapyRow): Omit<Line, 'key'> {
     aifaNote: t.aifaNote,
     quantity: t.packsPerPrescription ?? 1,
     posologyText: posology(t),
+    // «Come va in ricetta» della scheda: per principio attivo e non sostituibile, con la
+    // motivazione, entrano con la terapia, come nelle ripetizioni (D273).
+    ...(t.byActiveIngredient ? { byActiveIngredient: true } : {}),
+    ...(t.notSubstitutable
+      ? {
+          notSubstitutable: true,
+          notSubstitutableReason: t.notSubstitutableReason ?? '',
+          notSubstitutableCode: t.notSubstitutableCode ?? '',
+        }
+      : {}),
   };
 }
 
@@ -347,6 +370,8 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
     riepilogo: Summary | null;
     /** Codici della terapia del dolore (R23, D272): solo per la ricetta farmaceutica del SSN. */
     codiciTerapiaDolore?: string[];
+    /** Codici della motivazione di non sostituibilità di R13 in vigore oggi (D273). */
+    motivazioniNonSostituibilita?: SubstitutionReason[];
   }>(`/api/pazienti/${id}`);
   const therapies = useApi<{ terapie: TherapyRow[] }>(
     mode === 'farmaci' ? `/api/pazienti/${id}/terapie` : null,
@@ -468,6 +493,8 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
+  // Codici della motivazione di non sostituibilità di R13 in vigore oggi (D273); vuoto prima.
+  const reasons = record.data.motivazioniNonSostituibilita ?? [];
   const exemptions = record.data.riepilogo?.esenzioni ?? [];
   const versionKinds =
     mode === 'farmaci' ? ['farmaci', 'farmaci_classe', 'farmaci_dpc'] : ['prestazioni'];
@@ -503,6 +530,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             key: _k,
             posologyText,
             notSubstitutableReason,
+            notSubstitutableCode,
             repeatCount,
             validityMonths,
             ...l
@@ -510,6 +538,7 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             ...l,
             posologyText: posologyText || null,
             notSubstitutableReason: notSubstitutableReason || null,
+            notSubstitutableCode: l.notSubstitutable ? notSubstitutableCode || null : null,
             ...(kind === 'white'
               ? {
                   repeatCount: repeatCount ? Number(repeatCount) : null,
@@ -949,6 +978,10 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                             type="checkbox"
                             id={`pa-${l.key}`}
                             checked={!!l.byActiveIngredient}
+                            // Per principio attivo e non sostituibile non vanno insieme (R13, D273).
+                            disabled={
+                              reasons.length > 0 && !!l.notSubstitutable && !l.byActiveIngredient
+                            }
                             onChange={(e) =>
                               update(l.key, { byActiveIngredient: e.target.checked })
                             }
@@ -963,19 +996,49 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                             type="checkbox"
                             id={`ns-${l.key}`}
                             checked={!!l.notSubstitutable}
+                            disabled={
+                              reasons.length > 0 &&
+                              !l.notSubstitutable &&
+                              (!!l.byActiveIngredient || !l.drugAic)
+                            }
                             onChange={(e) => update(l.key, { notSubstitutable: e.target.checked })}
                           />
                           <label htmlFor={`ns-${l.key}`}>
                             Non sostituibile{' '}
                             <span className="tenue">
-                              · vincola il farmacista; serve una motivazione (R13)
+                              {reasons.length > 0
+                                ? '· vincola il farmacista al farmaco con l’AIC; serve il codice della motivazione (R13)'
+                                : '· vincola il farmacista; serve una motivazione (R13)'}
                             </span>
                           </label>
                         </div>
+                        {l.notSubstitutable && reasons.length > 0 && (
+                          <div className="campo">
+                            <label htmlFor={`nsc-${l.key}`}>
+                              Motivazione (linee guida del Sistema TS)
+                            </label>
+                            <select
+                              id={`nsc-${l.key}`}
+                              value={l.notSubstitutableCode ?? ''}
+                              onChange={(e) =>
+                                update(l.key, { notSubstitutableCode: e.target.value })
+                              }
+                            >
+                              <option value="">Scegli la motivazione</option>
+                              {reasons.map((r) => (
+                                <option key={r.codice} value={r.codice}>
+                                  {r.codice} · {r.descrizione}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         {l.notSubstitutable && (
                           <div className="campo">
                             <label htmlFor={`nsm-${l.key}`}>
-                              Motivazione della non sostituibilità
+                              {reasons.length > 0
+                                ? 'Precisazione, facoltativa'
+                                : 'Motivazione della non sostituibilità'}
                             </label>
                             <input
                               id={`nsm-${l.key}`}

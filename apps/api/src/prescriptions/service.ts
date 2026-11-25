@@ -57,6 +57,7 @@ import type { DpcmContent, DpcmService } from './dpcm';
 import { renderRedForm } from './red-form-pdf';
 import type { NreLots } from './nre-lots';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
+import { prescriptionTypology } from './typology';
 
 export interface LineInput {
   therapyId?: string | null;
@@ -71,6 +72,8 @@ export interface LineInput {
   byActiveIngredient?: boolean;
   notSubstitutable?: boolean;
   notSubstitutableReason?: string | null;
+  /** Codice della motivazione di non sostituibilità (codMotivazione, D273). */
+  notSubstitutableCode?: string | null;
   posologyText?: string | null;
   repeatCount?: number | null;
   validityMonths?: number | null;
@@ -357,6 +360,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           byActiveIngredient: l.byActiveIngredient ?? false,
           notSubstitutable: l.notSubstitutable ?? false,
           notSubstitutableReason: l.notSubstitutableReason ?? null,
+          // Il codice vale solo con la clausola: senza, non resta sulla riga (D273).
+          notSubstitutableCode: l.notSubstitutable ? l.notSubstitutableCode?.trim() || null : null,
           posologyText: l.posologyText ?? null,
           repeatCount: l.repeatCount ?? null,
           validityMonths: l.validityMonths ?? null,
@@ -476,6 +481,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         byActiveIngredient: t.byActiveIngredient,
         notSubstitutable: t.notSubstitutable,
         notSubstitutableReason: t.notSubstitutableReason,
+        notSubstitutableCode: t.notSubstitutableCode,
         posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
       });
     }
@@ -566,6 +572,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
               byActiveIngredient: t.byActiveIngredient,
               notSubstitutable: t.notSubstitutable,
               notSubstitutableReason: t.notSubstitutableReason,
+              notSubstitutableCode: t.notSubstitutableCode,
               posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
             })),
           },
@@ -648,9 +655,24 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       p.kind === 'pharma_ssn' &&
       painTherapyCodes(compiledAt).some((c) => c.toUpperCase() === exemption);
     const phone = pain ? await contactPhone(db, doctorUserId, p.patientId) : null;
+    // indicazionePrescr: la S o la H delle schede delle terapie, come il campo 14 del promemoria.
+    const therapyIds = lines.map((l) => l.therapyId).filter((x): x is string => !!x);
+    const typologies =
+      p.kind === 'pharma_ssn' && therapyIds.length
+        ? await db
+            .select({
+              id: therapy.id,
+              suggestedS: therapy.suggestedS,
+              hospitalH: therapy.hospitalH,
+            })
+            .from(therapy)
+            .where(and(inArray(therapy.id, therapyIds), eq(therapy.patientId, p.patientId)))
+        : [];
     return {
       localId: p.id,
       kind: p.kind,
+      prescriptionIndication:
+        p.kind === 'pharma_ssn' ? prescriptionTypology(lines, typologies) : null,
       patientFiscalCode: pt!.fiscalCode,
       doctor: await doctorInfo(doctorUserId),
       exemptionCode: p.exemptionCode,
@@ -667,7 +689,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         serviceDescription: l.serviceDescription,
         quantity: l.quantity,
         aifaNote: l.aifaNote,
+        byActiveIngredient: l.byActiveIngredient,
         notSubstitutable: l.notSubstitutable,
+        notSubstitutableCode: l.notSubstitutable ? l.notSubstitutableCode : null,
         notSubstitutableReason: l.notSubstitutableReason,
         ...(pain ? { notes: stupNote(l.posologyText, phone) } : {}),
         repeatCount: l.repeatCount,
@@ -862,6 +886,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
             messages: accepted.messages ?? null,
           },
           message.lines,
+          undefined,
+          undefined,
+          message.prescriptionIndication,
         );
       } catch {
         promemoriaMissing = true;
@@ -1051,6 +1078,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           },
           message.lines,
           snapshot?.paziente ?? null,
+          undefined,
+          message.prescriptionIndication,
         );
       } catch {
         notFixed = true;

@@ -110,6 +110,7 @@ const saved: TherapyFull = {
   byActiveIngredient: false,
   notSubstitutable: false,
   notSubstitutableReason: null,
+  notSubstitutableCode: null,
   multiPrescription: false,
   suggestedS: false,
   hospitalH: false,

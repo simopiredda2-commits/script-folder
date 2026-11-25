@@ -284,6 +284,8 @@ export const prescriptionLine = pgTable(
     byActiveIngredient: boolean().notNull().default(false),
     notSubstitutable: boolean().notNull().default(false),
     notSubstitutableReason: text(),
+    /** Codice della motivazione di non sostituibilità, da 1 a 4 (codMotivazione, Prescrizione1; D273). */
+    notSubstitutableCode: text(),
     posologyText: text(),
     /**
      * Ricetta bianca ripetibile: volte e mesi di validità, solo se diversi dalla regola del farmaco

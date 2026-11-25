@@ -406,6 +406,8 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
             drugName: 'FARMACO EQUIVALENTE DI PROVA 5 MG',
             quantity: 1,
             notSubstitutable: true,
+            // Dalla versione delle regole 2026-11-25.1 la motivazione è il codice (D273).
+            notSubstitutableCode: '1',
             notSubstitutableReason: 'motivazione di prova',
           },
         ],
@@ -418,7 +420,7 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
             "ZZ1 - PRINCIPIO DI PROVA 28 UNITA' 5 MG - USO ORALE",
             '099999019 - FARMACO EQUIVALENTE DI PROVA 5 MG',
           ],
-          dettagli: 'NON SOSTITUIBILE - motivazione di prova',
+          dettagli: 'NON SOSTITUIBILE - motivazione 1 - motivazione di prova',
           quantita: 1,
           nota: NO_NOTE,
         },
@@ -429,7 +431,7 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
       );
       expect(text).toContain("ZZ1 - PRINCIPIO DI PROVA 28 UNITA' 5 MG - USO ORALE");
       expect(text).toContain('099999019 - FARMACO EQUIVALENTE DI PROVA 5 MG');
-      expect(text).toContain('NON SOSTITUIBILE - motivazione di prova');
+      expect(text).toContain('NON SOSTITUIBILE - motivazione 1 - motivazione di prova');
       expect(text).toContain(dpcPhrase);
     } finally {
       dpcPhrase = null;

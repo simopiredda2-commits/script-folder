@@ -148,3 +148,32 @@ export function painTherapyCodes(date: string, rulesets: Ruleset[] = loadRuleset
   const r23 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R23');
   return r23 && r23.status === 'active' ? (r23.lists?.painTherapyExemptions ?? []) : [];
 }
+
+/** Una voce di un elenco codificato nei dati di una regola: «codice=descrizione». */
+export interface CodedItem {
+  code: string;
+  label: string;
+}
+
+/** Legge le voci «codice=descrizione» di un elenco dei dati; senza «=» il codice fa da descrizione. */
+export function codedItems(items: readonly string[] | undefined): CodedItem[] {
+  return (items ?? []).map((item) => {
+    const at = item.indexOf('=');
+    return at === -1
+      ? { code: item.trim(), label: item.trim() }
+      : { code: item.slice(0, at).trim(), label: item.slice(at + 1).trim() };
+  });
+}
+
+/**
+ * I codici della motivazione di non sostituibilità della regola R13 in vigore alla data, con la
+ * loro descrizione (linee guida del Sistema TS per la prescrizione del principio attivo, D273).
+ * Vuoto se la versione in vigore non li ha: allora la motivazione è solo il testo.
+ */
+export function substitutionReasons(
+  date: string,
+  rulesets: Ruleset[] = loadRulesets(),
+): CodedItem[] {
+  const r13 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R13');
+  return r13 && r13.status === 'active' ? codedItems(r13.lists?.substitutionReasons) : [];
+}

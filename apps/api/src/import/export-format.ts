@@ -294,6 +294,7 @@ export function exportTables(doc: Record<string, unknown>): ExportRead {
     importante: yes(t.important),
     nonSostituibile: yes(t.not_substitutable),
     motivoNonSostituibile: text(t.not_substitutable_reason),
+    codiceMotivazioneNonSostituibile: text(t.not_substitutable_code),
     idOrigine: text(t.id),
   }));
 
