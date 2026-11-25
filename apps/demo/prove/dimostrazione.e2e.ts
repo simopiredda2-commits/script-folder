@@ -683,13 +683,28 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     const red = f.getByRole('region', { name: 'Ricette rosse in DPCM' });
     const item = red.locator('li.riquadro', { has: f.getByRole('link', { name, exact: true }) });
     await item.waitFor({ timeout: 30_000 });
+    // Se non parte, l'errore dice che cosa mostra la sezione e che cosa risponde il servizio.
+    const explain = async (err: unknown) => {
+      const shown = await red.innerText({ timeout: 2_000 }).catch(() => '(sezione non trovata)');
+      const answer = await f
+        .evaluate(async () => {
+          const res = await fetch('/api/ricette-rosse');
+          return `${res.status} ${await res.text()}`;
+        })
+        .catch((e: unknown) => String(e));
+      throw new Error(
+        `La ricetta rossa di ${name} non è partita.\nLa sezione mostra:\n${shown}\nIl servizio risponde:\n${answer}`,
+        { cause: err },
+      );
+    };
     for (let i = 0; i < 4; i += 1) {
       if (await item.getByText('Accolta', { exact: true }).count()) break;
       await red.getByRole('button', { name: 'Invia adesso' }).click();
       await item
         .getByText(/^(Mandata|Accolta)$/)
         .first()
-        .waitFor({ timeout: 30_000 });
+        .waitFor({ timeout: 30_000 })
+        .catch(explain);
     }
     await item.getByText('Accolta', { exact: true }).waitFor({ timeout: 30_000 });
     await item.getByText('010260000000101').waitFor();

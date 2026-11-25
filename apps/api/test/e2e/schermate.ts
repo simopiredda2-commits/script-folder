@@ -190,6 +190,43 @@ try {
   await page.locator('table').getByText(/NRE/).first().waitFor();
   await shot(page, '06-scheda-terapia-e-storico');
 
+  // Ricetta rossa (D270): una ricetta rimasta «in invio» da 20 minuti, come dopo un arresto del
+  // servizio mentre aspettava il SAR. Il medico la stampa sul modulo del Poligrafico e la segue in
+  // «Ricette rosse in DPCM». Modulo d'esempio della regione dello studio (010, il Piemonte).
+  const stuck = await db.execute<{ id: string }>(sql`
+    insert into prescription
+      (patient_id, archive_id, kind, status, prepared_by, prepared_at, signed_by, signed_at)
+    select p.patient_id, p.archive_id, 'pharma_ssn', 'sending', p.prepared_by,
+      now() - interval '30 minutes', p.signed_by, now() - interval '20 minutes'
+    from prescription p where p.status = 'sent' and p.patient_id = ${patientId}
+    order by p.sent_at desc limit 1
+    returning id`);
+  await db.execute(sql`
+    insert into prescription_line (prescription_id, position, therapy_id, drug_aic, drug_name,
+      active_ingredient, by_active_ingredient, quantity)
+    select ${stuck.rows[0]!.id}, 1, t.id, t.drug_aic, t.drug_name, t.active_ingredient,
+      t.by_active_ingredient, 1
+    from therapy t where t.id = ${therapyId}`);
+  await page.goto(`${base}/ricette#senza-risposta`);
+  const interrupted = page.getByRole('region', { name: 'Invii senza risposta' });
+  await interrupted.getByRole('button', { name: 'Stampa la ricetta rossa' }).first().click();
+  const form = interrupted.getByRole('group', { name: 'Ricetta rossa sul modulo del Poligrafico' });
+  await form.getByLabel(/Numero del modulo nella stampante/).fill('010260000000202');
+  await form.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await shot(page, '77-ricetta-rossa-modulo');
+  await form.getByRole('button', { name: 'Prepara la ricetta rossa' }).click();
+  await interrupted.getByText(/Ricetta rossa pronta sul modulo/).waitFor();
+  const red = page.getByRole('region', { name: 'Ricette rosse in DPCM' });
+  await red.getByRole('button', { name: 'Invia adesso' }).click();
+  await red
+    .getByText(/^(Mandata|Accolta)$/)
+    .first()
+    .waitFor();
+  await page
+    .getByRole('heading', { level: 2, name: 'Ricette rosse in DPCM' })
+    .evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await shot(page, '78-ricette-rosse-dpcm');
+
   // Pazienti con un quadro adatto al farmaco della schermata (D150): dulaglutide a chi ha il
   // diabete tipo 2, l'amlodipina a un iperteso; il paziente principale ha il diabete tipo 1.
   const withProblem = async (code: string) => {
