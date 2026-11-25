@@ -2059,7 +2059,7 @@ Non provato: la validità sul promemoria con un collaudo del Sistema TS; la dimo
 6. **PSS: allineato alla guida HL7 Italia v1.5 dove non contrasta con il Ministero.** «Sì, dove non contrasta (Consigliato)».
    - Si correggono le voci su cui i due schematron vanno d'accordo: quello del Ministero (v4.0, il controllo del Gateway) e quello della guida (ART-DECOR).
    - Ogni PSS deve passarli tutti e due.
-   - Dove si contraddicono resta il Ministero, finché il CSI non dice quale usa la Regione (domanda 7 per il CSI, `docs/avanzamento.md`).
+   - Dove si contraddicono resta il Ministero, finché il CSI non dice quale usa la Regione (domanda 10 delle domande nuove per il CSI, `docs/avanzamento.md`).
 7. **R14 resta com'è.** Risposta di Simone: «Atteniamoci alle disposizioni di TS o della Regione, se quello che abbiamo fatto è accettato allora ok». Verificato sulle fonti:
    - **Il Sistema TS accetta il tipo di accesso per ogni prestazione.** Tipo e classe di priorità «possono essere indicati dal medico, a sua discrezione oppure sulla base degli adempimenti normativi della propria Regione/PA di appartenenza, anche per le prestazioni che non fanno parte della lista» del PNGLA. Se sono indicati, valgono le stesse regole (Sistema TS, «Controlli secondo il PNGLA 2019-2021», 3/6/2019, p. 1–2). Le specifiche della prescrizione dicono lo stesso: il campo `tipoAccesso` è obbligatorio per le prestazioni del PNGLA ed «elemento facoltativo per tutte le altre» (versione del 08/07/2026, p. 28).
    - **Con il primo accesso indicato, la classe di priorità è obbligatoria (1301).** È quello che fa R14.

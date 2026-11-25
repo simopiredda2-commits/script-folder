@@ -1612,6 +1612,18 @@ Poi il Fascicolo con il PSS secondo la guida v1.5 (seconda pull request, D268). 
 - Domande per il CSI: elenchi aggiornati dopo il 2020; decodifiche regionali del TDL; esclusioni regionali dalla dematerializzata (piani terapeutici, distribuzione diretta e per conto, ossigeno), che la cartella non ha.
 - Non provato: Sistema TS e SAR veri; le note su un promemoria stampato.
 
+**Domande per la prossima fermata** (annotate fra le fermate):
+
+1. **Il tipo di terapia mentre si prepara la ricetta.** Domanda di Simone del 25/11/2026, con l'esempio di Next², che suggerisce la funzione (D89).
+   - Oggi il tipo (cronica, ciclo, al bisogno), la tipologia (S o H) e «Non rimborsabile SSN» si segnano solo nella scheda della terapia, e solo dal medico.
+   - Un farmaco cercato in «Nuova ricetta» entra senza terapia.
+   - Per la segreteria c'è un conflitto con i requisiti: il tipo di terapia lo decide il medico, e la segreteria prepara solo le ripetizioni delle terapie croniche (requisiti, «Terapia»; D259).
+
+   Opzioni:
+   - A. Casella del medico sulla riga della ricetta (tipo, S o H, non SSN). Alla firma il programma crea la terapia, o aggiorna quella collegata. La segreteria la spunta come proposta, che il medico conferma quando convalida (consigliata).
+   - B. Casella solo per il medico; la segreteria resta come oggi.
+   - C. Come oggi: si segna nella scheda della terapia.
+
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 
 Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche regionali scaricate (SAR V06 e piano dei test V03, accesso con SPID o CIE V08, servizi AURA per i medici, FSE V09, modulo di accesso al Fascicolo LCCE V13), indicare i documenti nazionali per la ricetta rossa (DPCM) e per i lotti di NRE, sistemare ciò che non cambia una decisione presa e poi fermarsi con le cinque domande del confronto (`confronto-specifiche-regionali.md`, preparato da Simone in un'altra conversazione con Claude).
@@ -1621,6 +1633,13 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 - Quelli con le impronte nel confronto (25 della Regione e del CSI, 7 del Sistema TS) sono uguali, byte per byte. Due di `www.servizi.piemonte.it` (report del piano dei test FSE V02 e LCCE V13) li ha mandati Simone, perché da qui il sito chiudeva la connessione: uguali anche quelli.
 - I 18 «da scaricare» del confronto sono scaricati, con le impronte. Il foglio delle scadenze regionali delle ricette è un xlsx, anche se il sito lo chiama xls.
 - AURA: la nota AVL-17 (99.398 byte) e i cinque WSDL dei servizi per i medici, riscaricati e uguali. L'elenco ufficiale di oggi dei documenti AURA è nella scheda del portale degli operatori, che dal 3/12/2025 sostituisce le pagine di Sistema Piemonte. Il collegamento della nota AVL-17 (RUPAR Piemonte, 2013) non vale più. Dalla scheda sono scaricati anche il manuale di cooperazione AURA--ORG-01-V08, le note di versione da 1 a 24 e i tracciati dei file mensili per i medici.
+- **Ricontrollo della sera del 25/11/2026**, con la precisazione di Simone (i documenti della tabella sono gli stessi della sua cartella; non si sostituiscono con altri; una versione più recente va alla fermata):
+  - i 32 documenti con le impronte, riscaricati dai link della tabella: tutti uguali, byte e SHA-256. `www.servizi.piemonte.it` chiude a volte la connessione: con due–quattro tentativi sono arrivati tutti, anche report V02 e LCCE V13;
+  - i 18 «da scaricare», riscaricati: uguali a quelli del pomeriggio;
+  - la scheda AURA (68 documenti) è uguale a quella del pomeriggio. Ci sono tutti e nove i documenti AURA della cartella di Simone (cinque WSDL, SER-01 V19 e V17, LST-01 V05 e VU), agli stessi indirizzi e senza versioni più recenti. Per AURA si usano questi anche se una scheda non li elencasse (Simone);
+  - note di versione più recenti della AVL-17: dalla 18 alla 24 (2014–2020), nello zip della scheda, con le impronte in `docs/provenienze.md`. Nessuna cambia i servizi per i medici; per il programma contano solo i certificati SHA-256 (AVL-22) e la virgola e il punto nei nomi (AVL-24), accettati, con una prova e un sabotaggio (`docs/aura.md`);
+  - versioni più recenti dei 32 documenti: nessuna trovata. Niente da portare alla fermata;
+  - oltre a quelli scaricati nel pomeriggio (manuale di cooperazione, note di versione, due tracciati per i medici), gli altri documenti della scheda non sono scaricati: non rispondono a una domanda di adesso.
 
 **In sospeso con il CSI** (mail di Simone del 25/11/2026 a supporto.sar@csi.it, con integrazione.auracartelle@csi.it e supporto.fse@csi.it in copia; paragrafo 6 del confronto). Non si aspettano: si va avanti con i simulatori.
 
@@ -1630,21 +1649,47 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 - FSE: kit di test, registrazione sul portale di provisioning, eventuale piano dei test per FSE 2.0.
 - Dati: catalogo regionale in formato strutturato (il file Excel da cui è stampato l'allegato A della D.D. 590/2026) e associazioni aggiornate tra esenzioni e prestazioni (D196).
 
-**Da aggiungere alle domande per il CSI** (non sono nella mail del 25/11/2026):
+**Domande nuove per il CSI**, in un elenco a parte: non sono nella mail del 25/11/2026, e Simone le manda con il prossimo messaggio (sua richiesta del 25/11/2026). Le domande nuove si aggiungono qui. Ultimo aggiornamento: sera del 25/11/2026.
 
-1. Il documento tecnico sui servizi AURA per le cartelle di MMG e PLS, a cui rimanda il manuale di cooperazione AURA--ORG-01-V08 (§1, p. 2: «si rimanda ad apposito documento pubblicato nel portale di Sistema Piemonte»). Nella scheda AURA di oggi non c'è. Non ci sono nemmeno i due documenti citati dalla nota AVL-17 del 2013: «Modalità di utilizzo servizi per i medici (versione 2.0)» e «Allegato tecnico di utilizzo dei servizi per i medici (versione 4.0)». Richiesta di Simone del 25/11/2026.
-2. **SAR: le ricette DM senza NRE.** Le specifiche nazionali della prescrizione dicono che l'NRE è facoltativo: se manca lo assegna il SAC, anche quando l'invio passa da un SAR (08/07/2026, §4.2.1). La V06 dice che in Piemonte la cartella numera da sé le ricette, DM e DPCM, con il lotto che le dà il SAR (3.2, p. 7–8). Il SAR accetta anche ricette DM senza NRE?
-3. **SAR: pre-autorizzazione del sostituto.** È un servizio nazionale facoltativo, che attiva la Regione; se è attivo, il SAC blocca le ricette del sostituto non autorizzato (Sistema TS, specifiche del 05/08/2015, §3). La V06 non ne parla: in Piemonte è attivo?
-4. **RUPAR: scadenza della password.** Il programma la mette a tre mesi, dal piano dei test V02; il piano V03 non ne parla più. Vale ancora?
-5. **Accesso con SPID o CIE:**
+_AURA_
+
+1. **Il documento sui servizi per i medici.** Oggi nomi e significato dei campi vengono solo dai cinque WSDL (confronto, §3.1).
+   - Il manuale di cooperazione AURA--ORG-01-V08 rimanda per le cartelle di MMG e PLS a un «apposito documento pubblicato nel portale di Sistema Piemonte» (§1, p. 2).
+   - Nella scheda AURA del portale degli operatori non c'è.
+   - Non ci sono nemmeno i due documenti citati dalla nota AVL-17 del 2013: «Modalità di utilizzo servizi per i medici (versione 2.0)» e «Allegato tecnico di utilizzo dei servizi per i medici (versione 4.0)».
+
+_SAR e accesso con SPID o CIE_
+
+2. **Ricette DM senza NRE.** Le specifiche nazionali della prescrizione dicono che l'NRE è facoltativo: se manca lo assegna il SAC, anche quando l'invio passa da un SAR (08/07/2026, §4.2.1). La V06 dice che in Piemonte la cartella numera da sé le ricette, DM e DPCM, con il lotto che le dà il SAR (3.2, p. 7–8). Il SAR accetta anche ricette DM senza NRE?
+3. **Lotti di NRE** (V06, 3.1.1 e 4.1):
+   - si può chiedere un lotto nuovo prima che finisca quello in uso?
+   - quanti lotti aperti può avere un medico?
+   - con quale codice il SAR rifiuta un NRE già usato?
+4. **Pre-autorizzazione del sostituto.** È un servizio nazionale facoltativo, che attiva la Regione; se è attivo, il SAC blocca le ricette del sostituto non autorizzato (Sistema TS, specifiche del 05/08/2015, §3). La V06 non ne parla: in Piemonte è attivo?
+5. **RUPAR, scadenza della password.** Il programma la mette a tre mesi, dal piano dei test V02; il piano V03 non ne parla più. Vale ancora?
+6. **Accesso con SPID o CIE (REL-STC-01 V08):**
    - la revoca è `DELETE` nella V08 (4.3.5) e `GET` nella descrizione OpenAPI pubblicata con la V08 (`yaml.zip`): quale vale?
    - che cosa contiene `expires_in`?
-6. **Fascicolo dalla cartella (LCCE V13):**
+   - quali `client_id` registrate per un gestionale: uno per ogni ASL dei medici, o solo la forma «codice del gestionale + _ + codice ASL» (4.3.1)?
+7. **Ricetta rossa in DPCM (V06, 4.2):**
+   - l'NRE sul modulo: la V06 dice solo «accanto alla denominazione dell'ente». Il programma lo stampa nella fascia libera sopra il codice fiscale: va bene?
+   - un invio DPCM rimasto senza risposta la cartella lo rimanda. Se il primo file era arrivato, come risponde il SAR (stesso NRE e stesso modulo)?
+   - variazione e cancellazione di una ricetta DPCM già mandata (RicettaV e RicettaC): il SAR le accetta dalle cartelle, e con quali regole?
+   - i presidi si mandano in DPCM?
+   - l'archivio dei ricettari del medico (manuale del Sistema TS v11, 7.3 e 7.4): lo espone anche il SAR, o la cartella usa quello del SAC?
+8. **Stupefacenti sulla ricetta del SSN** (regola R23 del programma; circolare MEF e Salute del 14/05/2020):
+   - elenchi AIC aggiornati dopo il 2020, per la sezione A e per l'allegato III-bis;
+   - le decodifiche regionali del codice TDL usate in Piemonte, oltre a TDL e TDL01 (specifiche del Sistema TS, «Nota STUP»);
+   - le esclusioni regionali dalla ricetta dematerializzata che la Regione manda al Sistema TS: piani terapeutici AIFA, distribuzione diretta e per conto, ossigeno (Sistema TS, nota del 15/11/2023). Elenco e formato, perché la cartella non le ha.
+
+_Fascicolo_
+
+9. **Fascicolo dalla cartella (LCCE V13):**
    - quanto dura il token;
    - se `ipClient` è obbligatorio (lo schema dice 0..1, la tabella degli errori ha AUTH_ER_512);
    - il parametro del token nella pagina regionale: `tokenCCEMed` in 6.3 (p. 21), `tokenLCCE` nei facsimili delle dichiarazioni di certificazione (p. 34–35);
    - per una cartella in cloud, token di `getAuthentication` o accesso diretto dentro Shibboleth (6.4)?
-7. **Profilo Sanitario Sintetico:** il servizio regionale valida con lo schematron del Ministero (quello del Gateway, v4.0) o anche con quello della guida HL7 Italia v1.5?
+10. **Profilo Sanitario Sintetico:** il servizio regionale valida con lo schematron del Ministero (quello del Gateway, v4.0) o anche con quello della guida HL7 Italia v1.5?
 
 **Controllo del confronto sui documenti** (punto 2). Paragrafi e pagine del confronto tornano con i documenti. Dove il confronto sbaglia o non dice, vale il documento:
 
@@ -4327,3 +4372,4 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D272: 19 codici della sezione A nei dati                                                                      | regole-2026-11-25-1.json: un codice tolto                                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D272: codici della terapia del dolore nella cartella                                                          | patient-routes.ts: elenco vuoto                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D272: TDL solo sulla ricetta farmaceutica SSN nell'interfaccia                                                | PrescriptionEditor.tsx: codici anche sulla bianca                                                                         | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D265: virgola e punto nei nomi di AURA (AVL-24)                                                               | codice-fiscale.ts: virgola e punto contati come lettere                                                                   | Al primo tentativo verde: gli esempi non toccavano le prime tre lettere. Prova rafforzata con «Re, Oa» e «U. Ida», poi rosso, poi verde                                                                                                                                                                          |
