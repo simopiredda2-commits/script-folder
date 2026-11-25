@@ -16,10 +16,10 @@ type Decision = 'success' | 'unreachable' | FseAccessErrorCode;
 
 /**
  * Aprire il Fascicolo regionale dalla cartella (D220), con il simulatore del modulo di accesso del
- * CSI: chi può, che cosa si registra, le credenziali RUPAR del medico, gli errori delle specifiche,
- * la pagina simulata con il token che vale una volta e solo dall'IP di chi l'ha chiesto.
+ * CSI (LCCE V13): chi può, che cosa si registra, le credenziali RUPAR del medico, gli errori delle
+ * specifiche, la pagina simulata con il token che vale una volta.
  */
-describe('apertura del Fascicolo regionale dalla cartella (D220)', () => {
+describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () => {
   let t: TestDatabase;
   let s: Scenario;
   let decision: Decision = 'success';
@@ -76,7 +76,7 @@ describe('apertura del Fascicolo regionale dalla cartella (D220)', () => {
         clientIp: '127.0.0.1',
         documentType: null,
         role: 'MMG',
-        application: 'DMAWA',
+        application: 'DMAWACCE',
       },
     ]);
     // Ogni apertura resta nel registro degli accessi alla cartella.
@@ -85,11 +85,9 @@ describe('apertura del Fascicolo regionale dalla cartella (D220)', () => {
       outcome: 'consentito',
       details: { permesso: 'fse.consult' },
     });
-    // Da un altro IP il token non vale; dall'IP giusto una volta; poi non più.
-    const other = await page(body.indirizzo, 'titolare', '198.51.100.7');
-    expect(other.statusCode).toBe(403);
-    expect(other.body).toContain('Controllo IP chiamante fallito (WEB_002)');
-    const ok = await page(body.indirizzo);
+    // Il token vale una volta; l'IP di chi apre si traccia, non si confronta (V13, 2.2): anche da
+    // un altro indirizzo la pagina si apre.
+    const ok = await page(body.indirizzo, 'titolare', '198.51.100.7');
     expect(ok.statusCode).toBe(200);
     expect(ok.headers['content-type']).toMatch(/^text\/html/);
     expect(ok.headers['content-security-policy']).toBe("default-src 'none'; sandbox");
@@ -175,6 +173,42 @@ describe('apertura del Fascicolo regionale dalla cartella (D220)', () => {
     expect(events.map((e) => [e.service, e.detail])).toEqual([
       ['rupar_piemonte', 'AUTH_ER_501: Errore di autenticazione'],
     ]);
+  });
+
+  it('PIN o credenziali mancanti per la Regione (V13: AUTH_ER_510, AUTH_ER_516): come le credenziali rifiutate', async () => {
+    for (const code of ['AUTH_ER_510', 'AUTH_ER_516'] as const) {
+      decision = code;
+      const res = await open('titolare');
+      expect(res.statusCode, code).toBe(422);
+      expect(res.json(), code).toMatchObject({
+        errore: expect.stringMatching(/«Credenziali dei servizi»/),
+        dettagli: { codice: 'CREDENZIALI_RIFIUTATE', servizio: 'rupar', codiceFascicolo: code },
+      });
+    }
+    // Un altro errore della tabella 1 non porta alle credenziali.
+    decision = 'AUTH_ER_502';
+    const role = await open('titolare');
+    expect(role.statusCode).toBe(422);
+    expect(role.json()).toEqual({
+      errore: 'Ruolo non valido (AUTH_ER_502)',
+      dettagli: { codiceFascicolo: 'AUTH_ER_502' },
+    });
+    // Si annotano come le credenziali rifiutate.
+    const events = await t.db
+      .select()
+      .from(serviceCredentialEvent)
+      .where(
+        and(
+          eq(serviceCredentialEvent.userId, s.users.titolare.id),
+          eq(serviceCredentialEvent.event, 'credenziali_rifiutate'),
+        ),
+      );
+    expect(events.map((e) => e.detail)).toEqual(
+      expect.arrayContaining([
+        'AUTH_ER_510: Il parametro Pin del richiedente deve essere valorizzato',
+        'AUTH_ER_516: Le credenziali devono essere valorizzate',
+      ]),
+    );
   });
 
   it('senza credenziali RUPAR la richiesta non parte', async () => {

@@ -2006,3 +2006,27 @@ Non provato: la validità sul promemoria con un collaudo del Sistema TS; la dimo
 - **Controllati i Bollettini dopo la D.D. 710**, il 25/11/2026: n. 44 (5/11), 45 (12/11) e 46 (19/11). L'unico atto nuovo sul catalogo è la D.G.R. 2/11/2026, n. 40-3255, nel supplemento ordinario n. 2 del n. 44. Il n. 47 esce il 26/11.
 - **La D.G.R. 40-3255 non cambia la trascrizione.** Riapprova gli elenchi della D.D. 710, con la brachiterapia «≤ 2 sedute» che la trascrizione ha già. Le esenzioni nuove del DPCM 7/8/2026 (068 sindrome fibromialgica molto severa, 069 idrosadenite suppurativa, 070 micobatteri non tubercolari) sono già nell'allegato 8 trascritto. Scelta: la trascrizione resta quella della D.D. 710; la delibera si aggiunge fra le fonti in `docs/catalogo-regionale.md`. L'unica differenza letta, la tariffa di 92.2C.5, si controlla sul PDF con il resto del catalogo (A8): il testo letto da qui ha altri errori di lettura.
 - **Non provato**: il PDF della delibera non si scarica da qui (regione.piemonte.it chiude la connessione a metà). Il testo è stato letto con uno strumento di lettura dei PDF.
+
+**D265 · Specifiche regionali del 25/11/2026: documenti registrati e allineamenti che non cambiano decisioni.** Richiesta di Simone del 25/11/2026, con il confronto `confronto-specifiche-regionali.md`: «sistema solo ciò che non cambia una decisione già presa». Fino alle sue risposte non si toccano l'esito incerto e la ricetta rossa, la DPCM e i lotti di NRE, AURA, la pubblicazione sul Fascicolo e il `client_id`.
+
+- **Documenti.** Tutti quelli del confronto, e quelli che segnava «da scaricare», sono scaricati da qui il 25/11/2026. Link, byte e SHA-256 sono in `docs/provenienze.md`; i documenti restano fuori dal repository (D92). Dove il confronto sbaglia vale il documento: le differenze sono in `docs/avanzamento.md`.
+- **SAR, «Cartelle cliniche MMG e PLS» V06 (10/04/2026).**
+  - Tempo d'attesa: «al momento definiti in 8 secondi» (3.5.2, p. 10), non più «6-8» della V05. Il valore per difetto resta 8 secondi (D94). L'avviso dello studio ora parte per ogni valore diverso da 8; il valore si salva lo stesso.
+  - I riferimenti passano da 4.4.3 e 4.4.7 a 4.3.3 (riga «codice regionale – nominativo» del promemoria) e 3.5.2.
+- **Accesso con SPID o CIE, REL-STC-01 V08 (23/09/2026).**
+  - Il simulatore emette un token con la forma e i campi del JWT della V08 (4.3.2): sub, aud, nbf, iat, exp, jti, iss, scope e userData con cfutente, idSessione, autenticazioneTs, livello e modalità di autenticazione, organizzazione e clientid. Il token non ha firma («alg»: «none»): l'adattatore vero, che controlla la firma con la chiave del servizio JWKS (4.3.3), lo rifiuterebbe.
+  - La scadenza si legge da `exp`, non da `expires_in`: la V08 descrive `expires_in` come «Unix time», ma nell'esempio vale 7199, una durata. L'Id-Sessione della prescrizione vale 8 ore (V08, 3).
+  - Il servizio rifiuta, come «token-negato», un token rilasciato per un altro gestionale (`aud` diverso dal `client_id`) o già scaduto.
+  - La revoca è la DELETE della V08 (4.3.5). La risposta 401 (token già scaduto, revocato o sconosciuto) chiude la sessione anche qui e si annota nel registro. La descrizione OpenAPI pubblicata con la V08 (`yaml.zip`) dice GET: è una domanda per il CSI.
+  - Le intestazioni delle chiamate al SAR sono scritte e provate in `sarAuthentication`, per l'adattatore vero:
+    - con il token (4.3.6): solo `X-OAuth2-Authorization: Bearer <jwt>`, niente `Authorization: Basic`, `<pinCode>` vuoto;
+    - con il codice per email (4.1.1, 4.2.5): Basic con utente e password RUPAR, `X-idSessione: Bearer <Id-Sessione>`, `X-Gestionale` con il valore della configurazione, e il PIN da cifrare.
+
+    Il token insieme a utente, password, PIN o Id-Sessione si rifiuta, anche nel SAR simulato. Come si sceglie `X-Gestionale` per ogni ASL resta la domanda del `client_id`.
+- **Modulo di accesso al Fascicolo, LCCE--SRS-01 V13 (aprile 2026).**
+  - L'applicazione è DMAWACCE, «Servizi FSE per Cartelle Cliniche» (tabella 5).
+  - Utente, password e PIN RUPAR sono obbligatori: AUTH_ER_516 senza credenziali, AUTH_ER_510 senza PIN. Questi due, come AUTH_ER_501, portano il medico a «Credenziali dei servizi».
+  - Gli errori sono quelli delle tabelle 1 e 6 della V13. WEB_002 non c'è più: l'IP della postazione va nella richiesta e la Regione lo traccia (2.2), ma la pagina non lo confronta. WEB_001 vale anche per il token scaduto. La V13 non dice quanto dura il token, quindi nel simulatore la durata è un'impostazione vuota per difetto, da completare con il CSI.
+  - I tipi di documento del filtro sono i 20 della tabella 3: «DOCUMENTO DEI CONSENSI» non c'è più, 57827-8 è «ATTESTATO DI ESENZIONE», si aggiungono le schede vaccinali, il piano di cura personalizzato, il bilancio di salute e il certificato di condizione o malattia.
+  - Gli indirizzi della pagina regionale (6.3) sono una costante per l'adattatore vero: il programma, oggi, non li apre.
+- **Non provato**: nessun servizio vero. Le intestazioni, la firma del token e gli errori veri si provano in collaudo con il kit del CSI, che è fra le cose chieste con la mail del 25/11/2026.

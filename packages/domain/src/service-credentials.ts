@@ -80,9 +80,9 @@ export const SERVICE_FOR_USE: Record<ServiceUse, CredentialService> = {
 /**
  * Quali invii chiedono il secondo fattore. Ricetta SSN: DM 27/2/2025 e SIRPED, autenticazione
  * forte. Ricetta bianca: DM 8/6/2023. Certificato INPS: le fonti lette non lo chiedono, da
- * verificare in collaudo (D102). Fascicolo regionale dalla cartella: il modulo del CSI del 2019
- * chiede utente, password e PIN RUPAR, senza secondo fattore; con l'autenticazione forte di oggi
- * è una domanda per il CSI (D220).
+ * verificare in collaudo (D102). Fascicolo regionale dalla cartella: il modulo del CSI (LCCE V13,
+ * aprile 2026) chiede utente, password e PIN RUPAR, senza secondo fattore; con l'autenticazione
+ * forte di oggi è una domanda per il CSI (D220, D265).
  */
 export const NEEDS_SECOND_FACTOR: Record<ServiceUse, boolean> = {
   ricetta_ssn: true,

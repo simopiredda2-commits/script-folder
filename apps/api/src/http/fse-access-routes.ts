@@ -19,6 +19,9 @@ const body = z
   })
   .strict();
 
+/** Errori di `getAuthentication` che riguardano le credenziali RUPAR del medico (V13, tabella 1). */
+const CREDENTIAL_ERRORS = new Set(['AUTH_ER_501', 'AUTH_ER_510', 'AUTH_ER_516']);
+
 export interface FseAccessDeps {
   db: Database;
   credentials: Pick<ReturnType<typeof createCredentialService>, 'authFor' | 'authRefused'>;
@@ -73,8 +76,9 @@ export function registerFseAccessRoutes(app: FastifyInstance, deps: FseAccessDep
       return { indirizzo: result.url, simulato: access.environment === 'simulator' };
     if (result.outcome === 'unreachable')
       throw new HttpError(503, `${result.message}: riprova più tardi`);
-    // Credenziali rifiutate: si annota, come per gli invii (D102), e si porta il medico alla pagina.
-    if (result.code === 'AUTH_ER_501') {
+    // Credenziali rifiutate o incomplete (V13, tabella 1: errate, PIN o credenziali mancanti): si
+    // annota, come per gli invii (D102), e si porta il medico alla pagina.
+    if (CREDENTIAL_ERRORS.has(result.code)) {
       await credentials.authRefused(
         { userId: actor.userId, workstation: actor.workstation },
         'fascicolo_regionale',
@@ -94,7 +98,7 @@ export function registerFseAccessRoutes(app: FastifyInstance, deps: FseAccessDep
 
   /**
    * La pagina regionale simulata: al posto del Fascicolo vero, dice per chi e con quale filtro si
-   * sarebbe aperta. Il token vale una volta e solo dall'IP che l'ha chiesto, come nelle specifiche.
+   * sarebbe aperta. Il token vale una volta, come nella V13; l'IP non si confronta (2.2).
    */
   if (access instanceof SimulatedRegionalFseAccess) {
     app.get('/api/simulatori/fascicolo', async (req, reply) => {
