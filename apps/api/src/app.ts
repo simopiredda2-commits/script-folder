@@ -65,7 +65,7 @@ import { raoSources } from './rao/tables';
 import { studioSendTimeoutMs } from './admin/studio-service';
 import type { CredentialService } from '@mmg/domain';
 import {
-  FseGatewayClient,
+  type FseGatewayClient,
   isDpcmServices,
   isSarRegionalServices,
   SIMULATED_FSE_AUDIENCE,
