@@ -1,0 +1,18 @@
+{
+  "tipo": "siap_corrispondenze_prestazioni_aggiuntive",
+  "serie": "piemonte-prestazioni-aggiuntive",
+  "ambito": {
+    "regione": "Piemonte"
+  },
+  "atto": "Corrispondenza fra le voci dell'accordo integrativo regionale del Piemonte 2024 a prestazione (trascrizione air-piemonte-2024) e i dettagli della tipologia 5, «PIPP», dell'allegato 2 delle specifiche funzionali del SIAP, versione 1.3 (valori-ministero-1.3)",
+  "trascritto_da": "Claude Code, per descrizione: ogni voce dell'accordo con il dettaglio del Ministero che la nomina",
+  "trascritto_il": "2026-11-26",
+  "controllato_da": null,
+  "nota": "La trasfusione dell'art. 35, comma 4, è il dettaglio 10, «Trasfusione sanguigna con assistenza del MMG». File della regione: con i pacchetti regionali va nel pacchetto del Piemonte (D288).",
+  "voci": [
+    {
+      "codice": "AIR35.4",
+      "dettaglio": 10
+    }
+  ]
+}

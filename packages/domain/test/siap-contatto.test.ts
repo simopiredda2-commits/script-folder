@@ -60,7 +60,7 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
       [{ kind: 'vaccination', id: 'v', seasonal: false, ageYears: 12 }, [[7, 3]]],
       [{ kind: 'vaccination', id: 'v', seasonal: false, ageYears: 17 }, [[7, 3]]],
       [{ kind: 'vaccination', id: 'v', seasonal: false, ageYears: 18 }, [[7, 4]]],
-      [{ kind: 'ppip', id: 'p', detail: 39 }, [[5, 39]]],
+      [{ kind: 'ppip', id: 'p', detail: 39, quantity: 1 }, [[5, 39]]],
       [{ kind: 'choice', id: 'x' }, [[0, 1]]],
     ];
     for (const [act, pairs] of cases)
@@ -91,6 +91,20 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
     }));
     expect(SIAP_MAX_QUANTITY).toBe(9);
     expect(servicesOf(many)).toEqual([{ tipologia: 6, dettaglio: 1, quantita: 9 }]);
+    // Le prestazioni aggiuntive contano per quante ne sono registrate, sempre al più 9.
+    const ppip = (id: string, quantity: number): SiapAct => ({
+      kind: 'ppip',
+      id,
+      detail: 7,
+      quantity,
+    });
+    expect(servicesOf([ppip('p1', 3), ppip('p2', 2)])).toEqual([
+      { tipologia: 5, dettaglio: 7, quantita: 5 },
+    ]);
+    expect(servicesOf([ppip('p1', 12)])).toEqual([{ tipologia: 5, dettaglio: 7, quantita: 9 }]);
+    expect(servicesOf([ppip('p1', 6), ppip('p2', 6)])).toEqual([
+      { tipologia: 5, dettaglio: 7, quantita: 9 },
+    ]);
     expect(servicesOf([])).toEqual([]);
   });
 

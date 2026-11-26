@@ -24,8 +24,11 @@ export type SiapAct =
   | { kind: 'certificate'; id: string; sport: boolean }
   /** Vaccinazione: se è stagionale (influenza o COVID) e l'età del paziente quel giorno. */
   | { kind: 'vaccination'; id: string; seasonal: boolean; ageYears: number }
-  /** Prestazione aggiuntiva, con il dettaglio della corrispondenza con l'ACN. */
-  | { kind: 'ppip'; id: string; detail: number }
+  /**
+   * Prestazione aggiuntiva, con il dettaglio della corrispondenza con il catalogo e quante ne sono
+   * state registrate (per esempio tre medicazioni successive nella stessa registrazione).
+   */
+  | { kind: 'ppip'; id: string; detail: number; quantity: number }
   /** Scelta del medico che comincia quel giorno: la presa in carico. */
   | { kind: 'choice'; id: string };
 
@@ -114,8 +117,9 @@ export function servicesOfAct(act: SiapAct): Pair[] {
 }
 
 /**
- * Le attività e prestazioni del contatto: una per tipologia e dettaglio, con quanti atti le hanno,
- * al più 9. In ordine di tipologia e dettaglio, come nel tracciato.
+ * Le attività e prestazioni del contatto: una per tipologia e dettaglio, con quanti atti le hanno
+ * (per le prestazioni aggiuntive, quante ne sono registrate), al più 9. In ordine di tipologia e
+ * dettaglio, come nel tracciato.
  */
 export function servicesOf(acts: readonly SiapAct[]): SiapService[] {
   const counts = new Map<string, SiapService>();
@@ -123,8 +127,9 @@ export function servicesOf(acts: readonly SiapAct[]): SiapService[] {
     for (const p of servicesOfAct(act)) {
       const key = `${p.tipologia}.${p.dettaglio}`;
       const found = counts.get(key);
-      if (found) found.quantita = Math.min(SIAP_MAX_QUANTITY, found.quantita + 1);
-      else counts.set(key, { ...p, quantita: 1 });
+      const n = act.kind === 'ppip' ? Math.max(1, act.quantity) : 1;
+      if (found) found.quantita = Math.min(SIAP_MAX_QUANTITY, found.quantita + n);
+      else counts.set(key, { ...p, quantita: Math.min(SIAP_MAX_QUANTITY, n) });
     }
   return [...counts.values()].sort(
     (a, b) => a.tipologia - b.tipologia || a.dettaglio - b.dettaglio,

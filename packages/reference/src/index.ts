@@ -33,6 +33,12 @@ export const SERVICE_SEARCH_DATA = join(DATA_DIR, 'ricerca-prestazioni.json');
 export const SIAP_VALUES_FILE = join(DATA_DIR, 'siap', 'valori-ministero-1.3.json');
 
 /**
+ * Cartella dei dati del SIAP: i valori del Ministero e le corrispondenze fra le voci dei cataloghi
+ * delle prestazioni aggiuntive e i dettagli della tipologia «PIPP» (D291), un file per serie.
+ */
+export const SIAP_DIR = join(DATA_DIR, 'siap');
+
+/**
  * Tabelle RAO, Raggruppamenti di attesa omogenei (D285): il manuale di AGENAS e le determine della
  * Regione Piemonte per la cardiologia e la gastroenterologia, trascritti con il legame ai codici del
  * nomenclatore di oggi.
