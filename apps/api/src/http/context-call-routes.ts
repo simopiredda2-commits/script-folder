@@ -1,11 +1,11 @@
 import type { Action, ServiceUse } from '@mmg/domain';
 import {
-  isContextCallKind,
+  CONTEXT_CALL_KINDS,
   isOptionOf,
   type ContextCallKind,
   type RegionalContextCall,
 } from '@mmg/integrations';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import type { AccessAction } from '../audit/access-log';
 import type { createCredentialService } from '../credentials/service';
@@ -15,7 +15,7 @@ import type { RegionalChoice } from '../regions/integrations';
 import { studioRegion } from '../regions/region';
 import { HttpError } from './errors';
 
-const params = z.object({ id: z.uuid(), tipo: z.string().max(40) });
+const params = z.object({ id: z.uuid() });
 const body = z
   .object({
     /** Le scelte dei parametri della destinazione; una scelta vuota vale «tutti». */
@@ -84,10 +84,16 @@ export function registerContextCallRoutes(app: FastifyInstance, deps: ContextCal
     })),
   }));
 
-  app.post('/api/pazienti/:id/chiamate-di-contesto/:tipo', scoped, async (req) => {
+  // Una rotta per ogni tipo che il nucleo conosce: prima la guardia, che registra l'accesso alla
+  // cartella anche quando la richiesta è sbagliata; un tipo sconosciuto non è una rotta (404).
+  for (const tipo of CONTEXT_CALL_KINDS)
+    app.post(`/api/pazienti/:id/chiamate-di-contesto/${tipo}`, scoped, (req) =>
+      openCall(req, tipo),
+    );
+
+  async function openCall(req: FastifyRequest, tipo: ContextCallKind) {
     const actor = req.actor!;
-    const { id, tipo } = params.parse(req.params);
-    if (!isContextCallKind(tipo)) throw new HttpError(404, 'Destinazione non prevista');
+    const { id } = params.parse(req.params);
     const rules = CONTEXT_CALL_RULES[tipo];
     const { patient: pt } = await guardPatient(db, actor, id, rules.permission, rules.log);
     const { parametri = {} } = body.parse(req.body ?? {});
@@ -130,7 +136,7 @@ export function registerContextCallRoutes(app: FastifyInstance, deps: ContextCal
       });
     }
     throw new HttpError(422, `${result.message} (${result.code})`, { codiceRegione: result.code });
-  });
+  }
 
   /**
    * La pagina della regione simulata: al posto di quella vera, dice per chi e con quali scelte si

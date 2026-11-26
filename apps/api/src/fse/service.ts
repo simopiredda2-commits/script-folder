@@ -39,6 +39,7 @@ import {
   type PssItem,
 } from './compose';
 import { renderPssPdf } from './pdf';
+import { NO_GATEWAY_CREDENTIALS } from './gateways';
 import {
   NO_REGIONAL_FSE_PUBLICATION,
   regimeList,
@@ -58,7 +59,8 @@ import {
 
 export interface PssDeps {
   db: Database;
-  gateway: FseGatewayClient;
+  /** Il cliente del Gateway con i certificati della regione dello studio (D298), o null. */
+  gatewayFor: (studioId: string) => Promise<FseGatewayClient | null>;
   /** Indirizzo di base del servizio, destinatario dei token (aud). */
   gatewayAudience: string;
   signer: DocumentSigner;
@@ -357,6 +359,7 @@ export function createPssService(deps: PssDeps) {
     const publication = await deps.regional.publicationOfStudio(actor.studioId);
     return [
       ...settingsIssues(await settingsOf(actor.studioId), publication),
+      ...((await deps.gatewayFor(actor.studioId)) ? [] : [NO_GATEWAY_CREDENTIALS]),
       ...(publication ? [] : [NO_REGIONAL_FSE_PUBLICATION]),
       ...doctor,
       // Che cosa vuole la regione dal medico autore, per esempio il codice dell'ASL (D297).
@@ -542,7 +545,9 @@ export function createPssService(deps: PssDeps) {
         xml,
         at,
       );
-      const res = await deps.gateway.validate(caller(s, d.fiscalCode!), patient.fiscalCode, pdf);
+      const gateway = await deps.gatewayFor(actor.studioId);
+      if (!gateway) throw new HttpError(422, NO_GATEWAY_CREDENTIALS);
+      const res = await gateway.validate(caller(s, d.fiscalCode!), patient.fiscalCode, pdf);
       await logCall(r.id, actor, 'validation', res);
       if (res.outcome !== 'ok') {
         if (res.outcome === 'problem')

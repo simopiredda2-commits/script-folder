@@ -90,11 +90,14 @@ import {
   type AuraGateway,
   SimulatedAdditionalServicesPortal,
   type AdditionalServicesPortal,
+  type FseCredentials,
   type RegionalContextCall,
   type RegionalFsePublication,
 } from '@mmg/integrations';
+import { gatewayChoice } from './fse/gateways';
 import { createRegionalQueue, type RegionalQueue } from './fse/regional-queue';
 import { contextCallChoice, fsePublicationChoice } from './regions/integrations';
+import { studioRegionCode } from './regions/region';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
 import { ReferenceUpdates } from './reference/updates-service';
@@ -166,7 +169,16 @@ export interface AppDeps {
    * simulatore rilascia i certificati del programma all'avvio, solo in memoria (regola 7).
    */
   fse?: {
-    gateway: FseGatewayClient;
+    /**
+     * Il cliente del Gateway: dato qui, vale per ogni regione (le prove). Per difetto uno per
+     * regione, con i certificati della regione dello studio (D298).
+     */
+    gateway?: FseGatewayClient;
+    /**
+     * I certificati del Gateway di una regione, dal suo codice («010»): li danno i referenti della
+     * Regione. Per difetto, con il simulatore, una coppia di prova per regione.
+     */
+    credentialsFor?: (regionCode: string) => FseCredentials | null;
     audience: string;
     signer: DocumentSigner;
     /**
@@ -568,6 +580,13 @@ export function buildApp({
     calls: contextCallChoice(contextCalls, now ? { now } : {}),
     environment: config.environment ?? 'prova',
   });
+  // Il Gateway del Fascicolo con i certificati della regione dello studio (D298).
+  const fseGateways = gatewayChoice({
+    ...(fse.gateway ? { override: fse.gateway } : {}),
+    ...(fse.simulator ? { transport: fse.simulator } : {}),
+    ...(fse.credentialsFor ? { credentialsFor: fse.credentialsFor } : {}),
+    ...(now ? { now } : {}),
+  });
   // Profilo Sanitario Sintetico al Fascicolo della regione dello studio (D280, D297): la coda con
   // le politiche di invio della regione.
   const regionalQueue = createRegionalQueue({
@@ -600,7 +619,7 @@ export function buildApp({
     (studioId) => regionalQueue.publicationOfStudio(studioId),
     createPssService({
       db,
-      gateway: fse.gateway,
+      gatewayFor: async (studioId) => fseGateways.for(await studioRegionCode(db, studioId)),
       gatewayAudience: fse.audience,
       signer: fse.signer,
       regional: regionalQueue,
@@ -624,12 +643,10 @@ const FSE_APPLICATION = {
  * valida (D280).
  */
 function defaultFse(now?: () => Date): NonNullable<AppDeps['fse']> {
-  const simulator = new SimulatedFseGateway({ now });
   return {
-    gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Programma'), now),
     audience: SIMULATED_FSE_AUDIENCE,
     signer: new SimulatedDocumentSigner({ now }),
-    simulator,
+    simulator: new SimulatedFseGateway({ now }),
   };
 }
 
