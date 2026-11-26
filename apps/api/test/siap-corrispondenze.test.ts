@@ -1,8 +1,9 @@
-import { findTranscriptions, readCsv, REGIONAL_TRANSCRIPTIONS, SIAP_DIR } from '@mmg/reference';
+import { readCsv, SIAP_DIR, TRANSCRIPTION_DIRS } from '@mmg/reference';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { transcriptionsIn } from '../src/reference/importer';
 import { loadPpipMappings, ppipMappings } from '../src/siap/ppip-mapping';
 
 /**
@@ -17,7 +18,8 @@ describe('corrispondenze delle prestazioni aggiuntive con il SIAP (D291)', () =>
   afterAll(() => rmSync(tmp, { recursive: true, force: true }));
 
   it('ogni voce di ogni catalogo trascritto ha la sua corrispondenza, e nessuna voce in più', () => {
-    const { found } = findTranscriptions(REGIONAL_TRANSCRIPTIONS);
+    // Le trascrizioni nazionali e quelle dei pacchetti regionali (D292).
+    const { found } = transcriptionsIn(TRANSCRIPTION_DIRS);
     const catalogs = found.filter((f) => f.sheet.tipo === 'prestazioni_aggiuntive');
     expect(catalogs.length).toBeGreaterThan(0);
     // Ogni catalogo delle prestazioni aggiuntive ha il suo file, e ogni file un catalogo.

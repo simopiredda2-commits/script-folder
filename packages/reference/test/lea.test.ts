@@ -7,14 +7,14 @@ import {
   loadMappings,
   mappingForTranscription,
   readTable,
-  REGIONAL_TRANSCRIPTIONS,
+  TRANSCRIPTIONS_DIR,
 } from '../src';
 
 /**
  * Esenzioni del DPCM LEA (D190): l'allegato 8, malattie e condizioni croniche e invalidanti, dal
  * PDF della pagina del Ministero. Da controllare prima dell'uso (A8).
  */
-const sheet = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+const sheet = findTranscriptions(TRANSCRIPTIONS_DIR).found.find(
   (f) => f.path === 'lea/allegato-8-malattie-croniche.json',
 )!;
 const table = readTable(readFileSync(sheet.csvPath), 'allegato-8-malattie-croniche.csv');
@@ -107,7 +107,7 @@ describe('allegato 8 del DPCM LEA: codici di esenzione delle malattie croniche (
  * codice proprio. Da controllare prima dell'uso (A8).
  */
 describe('allegato 7 del DPCM LEA: codici di esenzione delle malattie rare (D195)', () => {
-  const rare = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+  const rare = findTranscriptions(TRANSCRIPTIONS_DIR).found.find(
     (f) => f.path === 'lea/allegato-7-malattie-rare.json',
   )!;
   const rareTable = readTable(readFileSync(rare.csvPath), 'allegato-7-malattie-rare.csv');
@@ -185,7 +185,7 @@ describe('allegato 7 del DPCM LEA: codici di esenzione delle malattie rare (D195
  * Da controllare prima dell'uso (A8).
  */
 describe('allegato 3 del DPCM LEA: presidi per diabete e malattie rare (D218)', () => {
-  const sheet3 = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+  const sheet3 = findTranscriptions(TRANSCRIPTIONS_DIR).found.find(
     (f) => f.path === 'lea/allegato-3-presidi.json',
   )!;
   const table3 = readTable(readFileSync(sheet3.csvPath), 'allegato-3-presidi.csv');
@@ -288,7 +288,7 @@ describe('allegato 3 del DPCM LEA: presidi per diabete e malattie rare (D218)', 
  * (29/9/2026), con le modifiche dell'allegato M del DM 3/8/2026. Da controllare prima dell'uso (A8).
  */
 describe('allegato 2 del DPCM LEA: ausili monouso (D236)', () => {
-  const sheet2 = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+  const sheet2 = findTranscriptions(TRANSCRIPTIONS_DIR).found.find(
     (f) => f.path === 'lea/allegato-2-ausili-monouso.json',
   )!;
   const table2 = readTable(readFileSync(sheet2.csvPath), 'allegato-2-ausili-monouso.csv');
@@ -453,7 +453,7 @@ describe('famiglie dei codici di esenzione (D190)', () => {
 });
 
 describe('allegati 4 e 4D del DPCM LEA: note del nomenclatore (D276)', () => {
-  const noteSheet = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+  const noteSheet = findTranscriptions(TRANSCRIPTIONS_DIR).found.find(
     (f) => f.path === 'lea/allegato-4-note.json',
   )!;
   const noteTable = readTable(readFileSync(noteSheet.csvPath), 'allegato-4-note.csv');

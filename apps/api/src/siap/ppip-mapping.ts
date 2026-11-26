@@ -1,4 +1,4 @@
-import { SIAP_DIR } from '@mmg/reference';
+import { SIAP_DIRS } from '@mmg/reference';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { siapValues, type SiapValues } from './values';
 /** La tipologia «PIPP» dell'allegato 1 delle specifiche funzionali del SIAP. */
 export const SIAP_PPIP_TYPOLOGY = 5;
 
-/** I file delle corrispondenze nella cartella del SIAP: uno per serie del catalogo. */
+/** I file delle corrispondenze nelle cartelle del SIAP: uno per serie del catalogo. */
 const FILE_PATTERN = /^corrispondenze-prestazioni-aggiuntive.*\.json$/;
 
 export const ppipMappingSchema = z
@@ -39,6 +39,7 @@ export const ppipMappingSchema = z
 export type PpipMappingFile = z.infer<typeof ppipMappingSchema>;
 
 export interface PpipMappings {
+  /** I file letti, con il nome del file. */
   files: { name: string; data: PpipMappingFile }[];
   /** Il dettaglio «Altro», per le voci che nessun file lega a un dettaglio. */
   other: number;
@@ -49,22 +50,26 @@ export interface PpipMappings {
 /**
  * Le corrispondenze fra le voci dei cataloghi delle prestazioni aggiuntive e i dettagli della
  * tipologia «PIPP» (D291), lette e controllate: ogni dettaglio esiste nei valori del Ministero, una
- * serie ha un file solo, il dettaglio «Altro» lo dice un file solo.
+ * serie ha un file solo, il dettaglio «Altro» lo dice un file solo. Per difetto dalla cartella
+ * nazionale e da quelle dei pacchetti regionali (D295).
  */
 export function loadPpipMappings(
-  dir: string = SIAP_DIR,
+  dirs: string | readonly string[] = SIAP_DIRS,
   values: SiapValues = siapValues(),
 ): PpipMappings {
   const typology = values.tipologie.find((t) => t.codice === SIAP_PPIP_TYPOLOGY);
   if (!typology) throw new Error(`Nei valori del SIAP manca la tipologia ${SIAP_PPIP_TYPOLOGY}`);
   const known = new Set(typology.dettagli.map((d) => d.codice));
-  const files = readdirSync(dir)
-    .filter((f) => FILE_PATTERN.test(f))
-    .sort()
-    .map((name) => ({
-      name,
-      data: ppipMappingSchema.parse(JSON.parse(readFileSync(join(dir, name), 'utf8'))),
-    }));
+  const list = typeof dirs === 'string' ? [dirs] : dirs;
+  const files = list.flatMap((dir) =>
+    readdirSync(dir)
+      .filter((f) => FILE_PATTERN.test(f))
+      .sort()
+      .map((name) => ({
+        name,
+        data: ppipMappingSchema.parse(JSON.parse(readFileSync(join(dir, name), 'utf8'))),
+      })),
+  );
   const bySeries = new Map<string, Map<string, number>>();
   for (const { name, data } of files) {
     if (bySeries.has(data.serie))
@@ -87,7 +92,7 @@ export function loadPpipMappings(
 
 let cached: PpipMappings | undefined;
 
-/** Le corrispondenze della cartella del SIAP, lette una volta. */
+/** Le corrispondenze delle cartelle del SIAP, lette una volta. */
 export function ppipMappings(): PpipMappings {
   cached ??= loadPpipMappings();
   return cached;

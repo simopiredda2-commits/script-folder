@@ -176,6 +176,20 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await new Promise((ok) => (server ? server.close(ok) : ok(null)));
   });
 
+  /**
+   * La pagina ferma prima di un clic (D295): nessuna sezione ancora in caricamento e, nel riquadro
+   * dato, le righe della ricetta già arrivate. Nella pagina Ricette ogni sezione e le righe di ogni
+   * ricetta si caricano per conto loro: arrivando, spostano in basso il pulsante. Con WebKit il
+   * clic su «Stampa la ricetta rossa» è finito una volta nel vuoto, e il modulo non si è aperto.
+   */
+  async function settled(item?: Locator) {
+    await f
+      .locator('main .stato-caricamento')
+      .first()
+      .waitFor({ state: 'detached', timeout: 30_000 });
+    if (item) await item.locator('.elenco-semplice li').first().waitFor({ timeout: 30_000 });
+  }
+
   /** Un cambio di pagina dell'interfaccia, senza ricaricare (ricaricare riparte da capo). */
   const go = (path: string) =>
     f.evaluate((p) => {
@@ -633,6 +647,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
         { cause: err },
       );
     });
+    await settled(group);
     await form.getByLabel(/Numero di ricetta/).fill('DIMO00000000001');
     await form.getByLabel(/Codice di autenticazione/).fill('DIMOAUT01');
     await form.getByRole('button', { name: /È arrivata/ }).click();
@@ -670,8 +685,20 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     const group = section.locator('li.riquadro', {
       has: f.getByRole('link', { name, exact: true }),
     });
+    await settled(group);
     await group.getByRole('button', { name: 'Stampa la ricetta rossa' }).click();
-    await group.getByLabel(/Numero del modulo nella stampante/).fill('010260000000101');
+    // Se il modulo non si apre, l'errore dice che cosa mostra il riquadro (D295).
+    const poligrafico = group.getByLabel(/Numero del modulo nella stampante/);
+    await poligrafico.waitFor({ timeout: 30_000 }).catch(async (err: unknown) => {
+      const shown = await group.innerText({ timeout: 2_000 }).catch(() => '(riquadro non trovato)');
+      throw new Error(
+        `Il modulo della ricetta rossa non si è aperto per ${name}.\nIl riquadro mostra:\n${shown}`,
+        {
+          cause: err,
+        },
+      );
+    });
+    await poligrafico.fill('010260000000101');
     await group.getByRole('button', { name: 'Prepara la ricetta rossa' }).click();
     await group.getByText(/Ricetta rossa pronta sul modulo/).waitFor({ timeout: 30_000 });
     await expectAccessible('ricetta rossa pronta');

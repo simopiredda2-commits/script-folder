@@ -9,7 +9,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
+import { loadMappings, TRANSCRIPTIONS_DIR } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { referenceDataset } from '../src/db/schema';
@@ -43,7 +43,7 @@ describe('catalogo ICD-9-CM nel database (D186)', () => {
   /** Solo le trascrizioni delle diagnosi, con chi le ha controllate. */
   function transcriptions(name: string, checkedBy: string | null) {
     const dir = join(work, name);
-    cpSync(join(REGIONAL_TRANSCRIPTIONS, 'icd9cm'), join(dir, 'icd9cm'), { recursive: true });
+    cpSync(join(TRANSCRIPTIONS_DIR, 'icd9cm'), join(dir, 'icd9cm'), { recursive: true });
     const sheets = join(dir, 'icd9cm');
     for (const f of readdirSync(sheets).filter((n) => n.endsWith('.json'))) {
       const sheet = JSON.parse(readFileSync(join(sheets, f), 'utf-8')) as Record<string, unknown>;

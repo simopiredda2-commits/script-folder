@@ -8,6 +8,7 @@ import {
   type RegionalPartEntry,
 } from './types';
 
+export * from './data';
 export * from './types';
 export { REGIONAL_PACKAGES } from './registry';
 

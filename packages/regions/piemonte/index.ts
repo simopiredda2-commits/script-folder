@@ -1,8 +1,9 @@
 import type { RegionalPackage } from '../src/types';
 
 /**
- * Il pacchetto della Regione Piemonte (D288, D292): il primo. Oggi è il manifesto: che cosa dà la
- * Regione e dove sta nel programma. Le parti passano nelle cartelle del pacchetto una alla volta
+ * Il pacchetto della Regione Piemonte (D288, D292): il primo. Il manifesto dice che cosa dà la
+ * Regione e dove sta nel programma; i dati sono in `data/` (D295). Le parti passano nelle cartelle
+ * del pacchetto una alla volta
  * (`packages/regions/piemonte/`, `apps/api/src/regions/piemonte/`, `apps/web/src/regions/piemonte/`,
  * `apps/demo/src/regions/piemonte/` e le loro prove), con le prove sempre verdi.
  */
@@ -39,8 +40,8 @@ export const piemonte: RegionalPackage = {
     },
     {
       part: 'waiting_groups',
-      where: 'core',
-      what: 'Tabelle RAO della cardiologia e della gastroenterologia (D.D. 973/2019 e 259/2019, D285)',
+      where: 'package',
+      what: 'Tabelle RAO della cardiologia e della gastroenterologia (D.D. 973/2019 e 259/2019, D285), in `data/rao`',
     },
     {
       part: 'distribution',

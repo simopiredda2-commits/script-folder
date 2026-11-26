@@ -6,7 +6,7 @@ import { z } from 'zod';
  * Tabelle RAO, Raggruppamenti di attesa omogenei (D285): per ogni prestazione, le condizioni
  * cliniche per classe di priorità. Il medico sceglie la condizione del paziente e il programma
  * mette la classe della tabella; il medico la può cambiare. Le tabelle sono trascrizioni (il manuale
- * di AGENAS, le determine della Regione Piemonte), lette dai file e controllate qui. Il legame con
+ * di AGENAS e quelle dei pacchetti regionali, D292), lette dai file e controllate qui. Il legame con
  * il catalogo è il codice del nomenclatore di oggi, con l'inizio della descrizione dove lo stesso
  * codice vale per discipline diverse (per esempio 89.7, «PRIMA VISITA»).
  */
@@ -127,7 +127,7 @@ export interface RaoCatalogEntry {
 
 /** Quali tabelle il programma usa: della regione dello studio, e controllate fuori dalla prova. */
 export interface RaoScope {
-  /** La regione dello studio («PIEMONTE»): le tabelle regionali valgono solo lì. */
+  /** La regione dello studio, come è scritta nei suoi dati: le tabelle regionali valgono solo lì. */
   region: string | null;
   /**
    * Anche le trascrizioni che nessuno ha ancora controllato: solo nell'ambiente di prova e nella

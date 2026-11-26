@@ -47,6 +47,21 @@ Come quella del nome del prodotto (regola 6), una prova (`packages/regions/test/
 
 Le eccezioni hanno un motivo scritto nella prova: le migrazioni (storia del database), l'elenco nazionale delle aziende sanitarie (nomina tutte le regioni), l'elenco ICD-9-CM (il nome dell'anagrafe regionale vi compare come sintomo dell'emicrania), l'elenco dei pacchetti e l'inventario stesso.
 
+## I dati di un pacchetto (D295)
+
+I dati di una regione stanno in `packages/regions/<chiave>/data/`, divisi per tipo:
+
+- `trascrizioni/`: le trascrizioni degli atti della regione (per il Piemonte il catalogo delle prestazioni e le prestazioni aggiuntive dell'AIR), nello stesso formato di quelle nazionali di `packages/reference/data/trascrizioni/`;
+- `rao/`: le tabelle RAO della regione, accanto al manuale nazionale di AGENAS;
+- `siap/`: le corrispondenze fra le prestazioni aggiuntive degli accordi della regione e i dettagli del SIAP.
+
+Il nucleo le trova dall'elenco dei pacchetti (`regionalDataDirs` in `@mmg/regions`), senza nominare la regione:
+
+- l'importazione legge le trascrizioni da tutte le cartelle, prima la nazionale e poi quelle dei pacchetti; lo stesso percorso in due cartelle non entra da nessuna delle due;
+- una versione di una banca dati si riconosce dalla serie e dall'impronta del CSV, non dal percorso: spostare un file non crea una versione nuova;
+- le tabelle RAO si leggono nell'ordine: prima AGENAS, poi i file di ogni pacchetto per nome;
+- la dimostrazione porta nel suo disco virtuale le tabelle RAO e le corrispondenze di ogni pacchetto; le trascrizioni entrano già nel database di partenza.
+
 ## Come si sposta un pezzo
 
 1. Il codice o il dato passa nelle cartelle del pacchetto; il nucleo lo chiama attraverso il contratto, senza nominare la regione.
@@ -64,24 +79,26 @@ Quando c'è l'elenco di che cosa serve dalla regione e dai suoi enti:
 
 ## Lo stato al 26/11/2026
 
-Un pacchetto, quello del Piemonte (`packages/regions/piemonte/`), con otto parti, tutte ancora nel nucleo:
+Un pacchetto, quello del Piemonte (`packages/regions/piemonte/`), con otto parti.
 
-- ricetta (SAR del CSI, ricetta rossa in DPCM, lotti di NRE, codice del gestionale);
-- anagrafe (AURA, con un simulatore);
-- Fascicolo regionale (pubblicazione V09, accesso LCCE);
-- prestazioni aggiuntive dell'AIR, con la corrispondenza per il SIAP;
-- catalogo regionale;
-- tabelle RAO regionali;
-- distribuzione per conto;
-- valori regionali delle regole.
+- **Nel pacchetto**: le tabelle RAO regionali (`data/rao`, D295).
+- **Nel nucleo, con i dati già nel pacchetto** (D295):
+  - catalogo regionale: restano nel nucleo la fonte di `sync/` e i dati d'esempio;
+  - prestazioni aggiuntive dell'AIR, con la corrispondenza per il SIAP: restano i testi delle pagine.
+- **Nel nucleo**:
+  - ricetta (SAR del CSI, ricetta rossa in DPCM, lotti di NRE, codice del gestionale);
+  - anagrafe (AURA, con un simulatore);
+  - Fascicolo regionale (pubblicazione V09, accesso LCCE);
+  - distribuzione per conto: la fonte di `sync/` e i dati d'esempio; la mappatura della trascrizione è già senza nomi regionali;
+  - valori regionali delle regole.
 
 Mancano, anche per il Piemonte: l'invio del SIAP (viene con il modulo del CSI), la rendicontazione dell'AIR (D287), le esenzioni regionali, le scadenze regionali delle ricette.
 
-L'inventario: 235 file e 2298 righe fuori dal pacchetto.
+L'inventario: 219 file e 2250 righe fuori dal pacchetto (con lo scheletro erano 235 e 2298).
 
 | Area                                        | File | Righe |
 | ------------------------------------------- | ---: | ----: |
-| `apps/api/src`                              |   48 |   603 |
+| `apps/api/src`                              |   47 |   601 |
 | `apps/api/test`                             |   42 |   742 |
 | `apps/api/modelli`                          |    1 |     1 |
 | `apps/web/src`                              |   19 |   174 |
@@ -89,7 +106,7 @@ L'inventario: 235 file e 2298 righe fuori dal pacchetto.
 | `apps/demo` (codice, prove e script)        |   11 |   100 |
 | `packages/integrations` (codice e prove)    |   22 |   216 |
 | `packages/domain` (codice, prove e script)  |   21 |    97 |
-| `packages/reference` (dati, codice e prove) |   23 |    63 |
+| `packages/reference` (dati, codice e prove) |    8 |    17 |
 | `packages/rules` (dati, codice e prove)     |   14 |    86 |
 | `fixtures`                                  |   19 |    61 |
 | `sync`                                      |    2 |    21 |
@@ -98,7 +115,8 @@ L'inventario: 235 file e 2298 righe fuori dal pacchetto.
 
 Un pezzo per pull request, con le prove sempre verdi:
 
-1. **dati**: catalogo regionale, tabelle RAO regionali, prestazioni aggiuntive dell'AIR, distribuzione per conto, corrispondenza per il SIAP;
+1. **dati** (fatto, D295): catalogo regionale, tabelle RAO regionali, prestazioni aggiuntive dell'AIR, corrispondenza per il SIAP; le mappature delle trascrizioni senza nomi regionali;
+   - le **fonti di `sync/`** (catalogo e distribuzione per conto, in Python) restano per un pezzo a sé, che insegna a `sync/` a leggere le fonti dei pacchetti;
 2. **regole**: i valori regionali, separati da quelli nazionali, con la regione a cui valgono;
 3. **integrazioni senza il database**: SAR e il suo simulatore, Fascicolo regionale, accesso con il modulo della Regione;
 4. **servizi con il database**: AURA e i suoi giri;
@@ -108,7 +126,7 @@ Dopo, nel pacchetto del Piemonte: il modulo del SIAP con il CSI, la rendicontazi
 
 ## Che cosa non è fatto, che cosa non è provato
 
-- Nessun pezzo è ancora spostato: le otto parti del Piemonte sono nel nucleo.
+- Spostati i dati (D295); il resto, nell'ordine qui sopra. Le prove regionali stanno ancora nelle cartelle nazionali: si spostano per ultime.
 - Per una regione senza pacchetto il programma oggi non ha le parti nazionali al posto di quelle regionali: per esempio la ricetta SSN va solo con il SAR (la ricetta bianca va già al Sistema TS). Le alternative nazionali (per esempio l'invio al Sistema TS senza un servizio regionale) si scrivono quando servono.
 - Le varianti delle ASL ci sono nel contratto, nessuna nel pacchetto del Piemonte.
 - Le parole del pacchetto sono quelle di oggi; con lo spostamento se ne aggiungono, se servono.

@@ -59,8 +59,11 @@ export interface ImportOptions {
   db: Database;
   /** Cartella dei dati di sync (quella di --dest). */
   syncDir: string;
-  /** Cartella delle trascrizioni dei PDF, se c'è. */
-  transcriptionsDir?: string;
+  /**
+   * Cartella delle trascrizioni dei PDF, se c'è, o più cartelle: quella nazionale e quelle dei
+   * pacchetti regionali (D295).
+   */
+  transcriptionsDir?: string | readonly string[];
   mappings: MappingSet;
   /** Importa le righe valide anche se alcune sono state scartate (come --accetta di sync). */
   acceptDiscarded?: boolean;
@@ -434,15 +437,38 @@ async function importChanges(
 }
 
 /**
+ * Le trascrizioni di una cartella o di più cartelle, nell'ordine delle cartelle (D295). Il percorso
+ * dentro la cartella nomina la trascrizione nel rapporto: lo stesso percorso in due cartelle non
+ * vale, perché non si saprebbe quale delle due è entrata.
+ */
+export function transcriptionsIn(dirs: string | readonly string[] | undefined) {
+  const list = dirs === undefined ? [] : typeof dirs === 'string' ? [dirs] : dirs;
+  const all = list.map((d) => findTranscriptions(d));
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const t of all.flatMap((r) => [...r.found, ...r.invalid]))
+    (seen.has(t.path) ? repeated : seen).add(t.path);
+  return {
+    found: all.flatMap((r) => r.found).filter((t) => !repeated.has(t.path)),
+    invalid: [
+      ...all.flatMap((r) => r.invalid).filter((t) => !repeated.has(t.path)),
+      ...[...repeated].map((path) => ({
+        path,
+        problem:
+          'lo stesso percorso è in più cartelle delle trascrizioni: non entra nessuno di quei file',
+      })),
+    ],
+  };
+}
+
+/**
  * Importa nel database i file in uso di sync (correnti/) e le trascrizioni dei PDF.
  * Non cambia nulla di ciò che è già importato: ogni file nuovo diventa una versione.
  */
 export async function importReferenceData(opts: ImportOptions): Promise<ImportLine[]> {
   const report: ImportLine[] = [];
   const entries = readSyncState(opts.syncDir);
-  const transcriptions = opts.transcriptionsDir
-    ? findTranscriptions(opts.transcriptionsDir)
-    : { found: [], invalid: [] };
+  const transcriptions = transcriptionsIn(opts.transcriptionsDir);
   const transcribed = new Set(
     transcriptions.found
       .filter((t) => t.sheet.fonte && t.sheet.chiave)

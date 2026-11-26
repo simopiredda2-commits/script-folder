@@ -1,21 +1,14 @@
-import {
-  cpSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
+import { loadMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { referenceDataset } from '../src/db/schema';
 import { importReferenceData, type ImportLine } from '../src/reference/importer';
 import { ReferenceData } from '../src/reference/lookup';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { copyTranscriptions, subdirsOf } from './helpers/transcriptions';
 
 /**
  * Il catalogo regionale che il programma porta con sé (D159), nel database: resta fuori finché
@@ -40,22 +33,21 @@ describe('catalogo regionale in vigore, nel database (D159)', () => {
     if (work) rmSync(work, { recursive: true, force: true });
   });
 
-  /** Le trascrizioni del repository, con chi le ha controllate. */
+  /** Le trascrizioni del repository, nazionali e dei pacchetti (D292), con chi le ha controllate. */
   function transcriptions(name: string, checkedBy: string | null) {
-    const dir = join(work, name);
-    cpSync(REGIONAL_TRANSCRIPTIONS, dir, { recursive: true });
-    const sheets = join(dir, 'piemonte_catalogo');
-    for (const f of readdirSync(sheets).filter((n) => n.endsWith('.json'))) {
-      const sheet = JSON.parse(readFileSync(join(sheets, f), 'utf-8')) as Record<string, unknown>;
-      writeFileSync(join(sheets, f), JSON.stringify({ ...sheet, controllato_da: checkedBy }));
-    }
-    return dir;
+    const dirs = copyTranscriptions(join(work, name));
+    for (const sheets of subdirsOf(dirs, 'piemonte_catalogo'))
+      for (const f of readdirSync(sheets).filter((n) => n.endsWith('.json'))) {
+        const sheet = JSON.parse(readFileSync(join(sheets, f), 'utf-8')) as Record<string, unknown>;
+        writeFileSync(join(sheets, f), JSON.stringify({ ...sheet, controllato_da: checkedBy }));
+      }
+    return dirs;
   }
-  const load = (dir: string) =>
+  const load = (dirs: string[]) =>
     importReferenceData({
       db: t.db,
       syncDir,
-      transcriptionsDir: dir,
+      transcriptionsDir: dirs,
       mappings: loadMappings(),
       importedBy: 'prova',
     });

@@ -1,5 +1,5 @@
 {
-  "versione": "2026-11-21.1",
+  "versione": "2026-11-26.1",
   "mappature": [
     {
       "id": "istat-comuni",
@@ -157,7 +157,7 @@
     },
     {
       "id": "trascrizione-farmaci-dpc",
-      "titolo": "Regione Piemonte: farmaci PHT in DPC (trascrizione)",
+      "titolo": "Farmaci PHT in distribuzione per conto della regione (trascrizione)",
       "tipo": "farmaci_dpc",
       "origine": "trascrizione",
       "colonne": {
@@ -171,7 +171,7 @@
     },
     {
       "id": "trascrizione-prestazioni",
-      "titolo": "Regione Piemonte: catalogo delle prestazioni (trascrizione)",
+      "titolo": "Catalogo regionale delle prestazioni (trascrizione)",
       "tipo": "prestazioni",
       "origine": "trascrizione",
       "colonne": {

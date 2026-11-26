@@ -4,7 +4,7 @@
  * src/worker/shims; i file che il servizio legge dal disco entrano in un disco virtuale.
  */
 import { generateKeyPairSync } from 'node:crypto';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, extname, join, relative, resolve, sep } from 'node:path';
 import react from '@vitejs/plugin-react';
@@ -15,6 +15,18 @@ import { COMPANY_BRAND, PRODUCT_NAME } from '../../packages/brand/brand';
 const HERE = import.meta.dirname;
 const REPO = resolve(HERE, '..', '..');
 const require = createRequire(import.meta.url);
+
+/**
+ * I dati dei pacchetti regionali che il servizio legge mentre lavora (D295): le tabelle RAO e le
+ * corrispondenze per il SIAP di ogni pacchetto, `packages/regions/<chiave>/data/…`. Le trascrizioni
+ * no: entrano nel database di partenza (scripts/prepara-database.ts).
+ */
+const REGIONAL_RUNTIME_DATA = ['rao', 'siap'];
+const regionalRuntimeFiles = () =>
+  readdirSync(join(REPO, 'packages', 'regions'), { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .flatMap((e) => REGIONAL_RUNTIME_DATA.map((kind) => `packages/regions/${e.name}/data/${kind}`))
+    .filter((rel) => existsSync(join(REPO, rel)));
 
 /** Cartelle e file che il servizio legge mentre lavora, sotto /repo nel disco virtuale. */
 const RUNTIME_FILES = [
@@ -27,6 +39,7 @@ const RUNTIME_FILES = [
   'packages/reference/data/ricerca-prestazioni.json',
   'packages/reference/data/siap',
   'packages/rules/data',
+  ...regionalRuntimeFiles(),
 ];
 const BINARY = new Set(['.ttf', '.otf', '.woff', '.woff2', '.pdf', '.png', '.jpg', '.gz', '.zip']);
 /** Chiavi RSA di prova per i simulatori del Fascicolo (rsa.ts): nuove a ogni costruzione. */
