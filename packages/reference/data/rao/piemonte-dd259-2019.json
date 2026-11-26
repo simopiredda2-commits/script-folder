@@ -1,0 +1,478 @@
+{
+  "tipo": "rao_tabelle",
+  "fonte": "piemonte-dd259-2019",
+  "ambito": "regionale",
+  "regione": "Piemonte",
+  "atto": "Regione Piemonte, D.D. 10 aprile 2019, n. 259, allegato A: criteri per le classi di priorità della gastroenterologia, che «devono essere adottate da tutti i soggetti che hanno titolo ad emettere prescrizioni per conto del Servizio Sanitario Regionale»",
+  "titolo_breve": "D.D. 259/2019 della Regione Piemonte (gastroenterologia)",
+  "url": "https://www.regione.piemonte.it/web/sites/default/files/media/documenti/2023-03/det_rao_n_259_del_10_04_2019_ok.pdf",
+  "sha256_origine": "bcef91e6da39234a7f361d1bd6f581de6c80d6be5de6f2ad58abe908b748fd8a",
+  "trascritto_da": "Claude Code, dalle celle delle tabelle del PDF (pdfplumber), controllato a vista sulle pagine 6-9",
+  "trascritto_il": "2026-11-26",
+  "controllato_da": null,
+  "nota": "Testi come nell'atto. Nel PDF il trattino compare come «-», trattino morbido e «-» (per esempio «5-­-7 giorni»): sulla pagina è un trattino solo, e così è scritto. Le voci con un elenco puntato sotto («Sintomi d’allarme:») sono una voce sola, con le parti separate da «; ». La tabella della colonscopia non stampa il numero CLASS_RAO. Le pagine sono quelle del PDF.",
+  "tabelle": [
+    {
+      "id": "dd259-1",
+      "class_rao": "022",
+      "pagine": [6, 7],
+      "testata": "PRIMA VISITA GASTROENTEROLOGICA - Codice 89.7",
+      "servizi": [
+        {
+          "nome": "PRIMA VISITA GASTROENTEROLOGICA",
+          "codici_stampati": ["89.7"]
+        }
+      ],
+      "righe": [
+        {
+          "classe": "U",
+          "pediatria": false,
+          "attesa": "72 h",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITA' NON PREVISTO"
+        },
+        {
+          "classe": "U",
+          "pediatria": true,
+          "attesa": "72 h",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITA' NON PREVISTO"
+        },
+        {
+          "classe": "B",
+          "pediatria": false,
+          "attesa": "10 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Epatopatie acute o croniche in fase di scompenso"
+            },
+            {
+              "numero": "2",
+              "testo": "Ascite di nuova insorgenza"
+            },
+            {
+              "numero": "3",
+              "testo": "Prima diagnosi di IBD (inflammatory bowel disease o malattie infiammatorie intestinali)"
+            },
+            {
+              "numero": "4",
+              "testo": "Riacutizzazione moderata di IBD (inflammatory bowel disease o malattie infiammatorie intestinali)"
+            },
+            {
+              "numero": "5",
+              "testo": "Sospetto clinico e/o strumentale di neoplasia dell'apparato digerente"
+            },
+            {
+              "numero": "6",
+              "testo": "Sintomi d’allarme: vomito ricorrente (presenti da almeno 5-7 giorni) con esclusione di cause di natura infettiva, metabolica, neurologica e psicogena; disfagia/odinofagia (presenti da almeno 5-7 giorni)"
+            },
+            {
+              "numero": "7",
+              "testo": "Ittero senza dolore"
+            }
+          ]
+        },
+        {
+          "classe": "B",
+          "pediatria": true,
+          "attesa": "10 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Calo ponderale (già indagata con esami di laboratorio e ecografia addominale)"
+            },
+            {
+              "numero": "2",
+              "testo": "Ematochezia"
+            },
+            {
+              "numero": "3",
+              "testo": "IBD (inflammatory bowel disease o malattie infiammatorie intestinali)"
+            },
+            {
+              "numero": "4",
+              "testo": "Sospetto di malattia celiaca e/o malassorbimento (già indagata con esami di laboratorio)"
+            },
+            {
+              "numero": "5",
+              "testo": "Altro (10%)",
+              "altro": true
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": false,
+          "attesa": "60 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Anemia sideropenica di sospetta origine gastroenterologica (già indagata con EGDS e colonscopia)"
+            },
+            {
+              "numero": "2",
+              "testo": "Diarrea cronica"
+            },
+            {
+              "numero": "3",
+              "testo": "Dolore toracico non cardiaco"
+            },
+            {
+              "numero": "4",
+              "testo": "Ipertransaminasemia (già indagata con esami di laboratorio e ecografia addominale)"
+            },
+            {
+              "numero": "5",
+              "testo": "Sindrome dispeptico/dolorosa in soggetti >50 anni (già indagata con ecografia addominale, EGDS e colonscopia)"
+            },
+            {
+              "numero": "6",
+              "testo": "Sospetto di malattia celiaca e/o malassorbimento (già indagata con esami di laboratorio)"
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": true,
+          "attesa": "60 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Alterazione di funzione epatica (già indagata con esami di laboratorio e ecografia addominale)"
+            },
+            {
+              "numero": "2",
+              "testo": "Deficit accrescitivo ponderale"
+            },
+            {
+              "numero": "3",
+              "testo": "Altro (10%)",
+              "altro": true
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": false,
+          "attesa": "180 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Paziente < 50 anni con sintomatologia di sospetta origine funzionale, suggestiva per intestino irritabile"
+            },
+            {
+              "numero": "2",
+              "testo": "Pazienti < 50 anni con sindrome da reflusso gastroesofageo o sindrome dispeptica"
+            },
+            {
+              "numero": "3",
+              "testo": "Reperti strumentali patologici senza sintomi o segni compresi nelle altre indicazioni"
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": true,
+          "attesa": "180 gg",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITA' NON PREVISTO"
+        }
+      ],
+      "note": [],
+      "legame": [
+        {
+          "codice": "89.7A.9"
+        }
+      ],
+      "nota_legame": "89.7 è il codice del nomenclatore regionale del 2013; nel DPCM LEA del 2017 la prima visita gastroenterologica è 89.7A.9 (lo dice la stessa determina)."
+    },
+    {
+      "id": "dd259-2",
+      "class_rao": "018",
+      "pagine": [8],
+      "testata": "ESOFAGOGASTRODUODENOSCOPIA [EGDS] - Codice 45.13 / ESOFAGOGASTRODUODENOSCOPIA [EGDS] - Codice 45.13 E BIOPSIA ENDOSCOPICA / ESOFAGO, GASTRICA E DUODENALE SEDE UNICA O MULTIPLA - Codice 42.24",
+      "servizi": [
+        {
+          "nome": "ESOFAGOGASTRODUODENOSCOPIA [EGDS]",
+          "codici_stampati": ["45.13"]
+        },
+        {
+          "nome": "ESOFAGOGASTRODUODENOSCOPIA [EGDS] E BIOPSIA ENDOSCOPICA ESOFAGO, GASTRICA E DUODENALE SEDE UNICA O MULTIPLA",
+          "codici_stampati": ["45.13", "42.24"]
+        }
+      ],
+      "righe": [
+        {
+          "classe": "U",
+          "pediatria": false,
+          "attesa": "72 h",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITÀ NON PREVISTO"
+        },
+        {
+          "classe": "U",
+          "pediatria": true,
+          "attesa": "72 h",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITÀ NON PREVISTO"
+        },
+        {
+          "classe": "B",
+          "pediatria": false,
+          "attesa": "10 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Anemizzazione di recente insorgenza con sintomi digestivi, con Hb <10 g/dl"
+            },
+            {
+              "numero": "2",
+              "testo": "Esigenza di escludere lesioni per terapie cardiologiche urgenti in pazienti con fattori di rischio per emorragia digestiva"
+            },
+            {
+              "numero": "3",
+              "testo": "Sintomi d’allarme: vomito ricorrente (presenti da almeno 5-7 giorni) con esclusione di cause di natura infettiva, metabolica, neurologica e psicogena; disfagia/odinofagia (presenti da almeno 5-7 giorni); calo ponderale significativo con sintomi digestivi (> 10% in 3 mesi)"
+            },
+            {
+              "numero": "4",
+              "testo": "Sospette neoplasie rilevate obiettivamente e/o con diagnostica strumentale"
+            }
+          ]
+        },
+        {
+          "classe": "B",
+          "pediatria": true,
+          "attesa": "10 gg",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITÀ NON PREVISTO"
+        },
+        {
+          "classe": "D",
+          "pediatria": false,
+          "attesa": "60 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Anemia sideropenica"
+            },
+            {
+              "numero": "2",
+              "testo": "Pazienti > 50 anni con sindrome da reflusso gastroesofageo o sindrome dispeptica dolorosa di recente insorgenza ( < 6 mesi), persistente (> 4 settimane) o non responsivi alla terapia (mai indagata con EGDS)"
+            },
+            {
+              "numero": "3",
+              "testo": "Sospetta celiachia-malassorbimento"
+            },
+            {
+              "numero": "4",
+              "testo": "Stadiazione pretrapianto"
+            },
+            {
+              "numero": "5",
+              "testo": "Valutazione varici/gastropatia da ipertensione portale"
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": true,
+          "attesa": "60 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Positività test del sangue occulto in asintomatico"
+            },
+            {
+              "numero": "2",
+              "testo": "Altro (10%)",
+              "altro": true
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": false,
+          "attesa": "180 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Pazienti < 50 anni con sindrome da reflusso gastroesofageo o sindrome dispeptica (mai indagata con EGDS) con sintomi persistenti anche dopo test and treat per HP"
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": true,
+          "attesa": "180 gg",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITÀ NON PREVISTO"
+        }
+      ],
+      "note": [],
+      "legame": [
+        {
+          "codice": "45.13"
+        },
+        {
+          "codice": "45.16.1"
+        },
+        {
+          "codice": "45.16.2"
+        },
+        {
+          "codice": "42.24"
+        }
+      ],
+      "nota_legame": "I codici del DPCM LEA del 2017 sono quelli della tabella di corrispondenza nella stessa determina."
+    },
+    {
+      "id": "dd259-3",
+      "class_rao": null,
+      "pagine": [9],
+      "testata": "COLONSCOPIA TOTALE CON ENDOSCOPIO FLESSIBILE - Codice 45.23 / COLONSCOPIA TOTALE CON ENDOSCOPIO FLESSIBILE - Codice 45.23 E BIOPSIA / COLON E ILEO IN SEDE UNICA O MULTIPLA - Codice 45.25 / COLONSCOPIA TOTALE CON ENDOSCOPIO FLESSIBILE - Codice 45.23 E BIOPSIA / RETTO - Codice 48.24 / COLONSCOPIA TOTALE CON ENDOSCOPIO FLESSIBILE - Codice 45.23 E / POLIPECTOMIA ENDOSCOPICA INTESTINO CRASSO - Codice 45.42",
+      "servizi": [
+        {
+          "nome": "COLONSCOPIA TOTALE CON ENDOSCOPIO FLESSIBILE",
+          "codici_stampati": ["45.23"]
+        },
+        {
+          "nome": "COLONSCOPIA TOTALE CON ENDOSCOPIO FLESSIBILE E BIOPSIA COLON E ILEO IN SEDE UNICA O MULTIPLA",
+          "codici_stampati": ["45.23", "45.25"]
+        },
+        {
+          "nome": "COLONSCOPIA TOTALE CON ENDOSCOPIO FLESSIBILE E BIOPSIA RETTO",
+          "codici_stampati": ["45.23", "48.24"]
+        },
+        {
+          "nome": "COLONSCOPIA TOTALE CON ENDOSCOPIO FLESSIBILE E POLIPECTOMIA ENDOSCOPICA INTESTINO CRASSO",
+          "codici_stampati": ["45.23", "45.42"]
+        }
+      ],
+      "righe": [
+        {
+          "classe": "U",
+          "pediatria": false,
+          "attesa": "72 h",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITÀ NON PREVISTO"
+        },
+        {
+          "classe": "U",
+          "pediatria": true,
+          "attesa": "72 h",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITÀ NON PREVISTO"
+        },
+        {
+          "classe": "B",
+          "pediatria": false,
+          "attesa": "10 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Anemizzazione di recente insorgenza con sintomi digestivi, con Hb <10 g/dl"
+            },
+            {
+              "numero": "2",
+              "testo": "Sanguinamento non compendiato come urgente, rettorragia/enterorragia non grave, diarrea muco-sanguinolenta non infettiva"
+            },
+            {
+              "numero": "3",
+              "testo": "Sospetto clinico e/o strumentale di neoplasia"
+            }
+          ]
+        },
+        {
+          "classe": "B",
+          "pediatria": true,
+          "attesa": "10 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Melena accertata (dopo aver escluso un'eziologia del tratto digestivo superiore)"
+            },
+            {
+              "numero": "2",
+              "testo": "Altro (10%)",
+              "altro": true
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": false,
+          "attesa": "60 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Anemia sideropenica"
+            },
+            {
+              "numero": "2",
+              "testo": "Diarrea che perdura da almeno 30 giorni con accertamenti infettivologici negativi"
+            },
+            {
+              "numero": "3",
+              "testo": "Perdite ematiche minori (ematochezia)"
+            },
+            {
+              "numero": "4",
+              "testo": "Sangue occulto positivo nelle feci in paziente asintomatico"
+            },
+            {
+              "numero": "5",
+              "testo": "Sintomatologia dolorosa addominale e alterazione dell'alvo (mai indagata con colonscopia) in paziente con età > 50 anni"
+            },
+            {
+              "numero": "6",
+              "testo": "Alterazioni radiologiche di natura non neoplastica con quadro clinico compatibile"
+            },
+            {
+              "numero": "7",
+              "testo": "Stadiazione pretrapianto"
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": true,
+          "attesa": "60 gg",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITÀ NON PREVISTO"
+        },
+        {
+          "classe": "P",
+          "pediatria": false,
+          "attesa": "180 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Modificazioni significative e persistenti dell’alvo da almeno 3 mesi in pazienti < 50 anni, senza segni o fattori di rischio, dopo inefficacia trattamenti empirici"
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": true,
+          "attesa": "180 gg",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITA’ NON PREVISTO"
+        }
+      ],
+      "note": [],
+      "legame": [
+        {
+          "codice": "45.23"
+        },
+        {
+          "codice": "45.23.3"
+        },
+        {
+          "codice": "45.23.4"
+        }
+      ],
+      "nota_legame": "I codici del DPCM LEA del 2017 sono quelli della tabella di corrispondenza nella stessa determina."
+    }
+  ]
+}
