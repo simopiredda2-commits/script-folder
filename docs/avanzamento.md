@@ -1822,6 +1822,7 @@ Domanda di Simone: «la reportistica accordi integrativi regionali è prevista?�
 - **Un requisito non fatto**: il «registro degli accessi a domicilio» dei requisiti («Accessi domiciliari»). Non era fatto e non era fra le cose aperte: trovato con questa domanda.
 - **Risposte di Simone**: «Dopo il SIAP (Consigliata)» e, per che cosa comprende, «Fa' ciò che serve».
 - **Ordine**: il resto del SIAP senza il CSI, poi l'AIR in una pull request a sé, poi AURA quando risponde il CSI.
+- **Importazione** (domanda di Simone dello stesso giorno): c'è dalla tappa 15, con il rapporto riga per riga; le vaccinazioni sono una destinazione, le prestazioni aggiuntive no. Risposta: «Sì, con l'AIR». Nel blocco dell'AIR le prestazioni aggiuntive fatte con altri programmi diventano una destinazione: entrano nella distinta solo per i mesi non ancora inviati, altrimenti restano storia. Le domande di `docs/importazione.md` ora riportano le risposte della fermata (D181).
 - **Da chiedere all'ASL** (si annota, non blocca): il formato dei portali per gli accessi domiciliari, l'ADP-PID e l'antinfluenzale; i criteri degli screening; gli indicatori di AFT dell'anno.
 
 ## Specifiche regionali e nazionali (25/11/2026, D265)

@@ -2507,3 +2507,7 @@ Tutto nello stesso branch, con una sola pull request alla fine.
     - la categoria di rischio sulla vaccinazione antinfluenzale e l'elenco dei vaccinati per il portale;
     - screening e indicatori di AFT come meccanismo, con i valori vuoti «da completare» finché Regione e ASL non li danno.
   - **Formati**: quelli dei portali non sono pubblici. Come per le prestazioni aggiuntive, CSV con i campi che l'AIR nomina, da confermare con l'ASL.
+- **Importazione** (domanda di Simone dello stesso giorno: «l'importazione da altri software, con un rapporto di cosa è entrato e cosa no, l'abbiamo già lavorata? Le vaccinazioni e prestazioni PIPP?»). L'importazione c'è dalla tappa 15 (D173), con il rapporto riga per riga; le vaccinazioni sono una destinazione, le prestazioni aggiuntive no. Risposta con il pulsante: «Sì, con l'AIR (Consigliata)».
+  - Nello stesso blocco dell'AIR, le **prestazioni aggiuntive fatte con altri programmi** diventano una destinazione dell'importazione. Passano dagli stessi controlli della registrazione a mano e hanno il segno «con un altro programma».
+  - Entrano nella distinta solo per i mesi non ancora inviati; per gli altri restano storia della cartella.
+  - La **categoria di rischio** dell'antinfluenzale entra anche fra i campi della destinazione «Vaccinazioni».
