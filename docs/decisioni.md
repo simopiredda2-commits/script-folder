@@ -2511,3 +2511,19 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - Nello stesso blocco dell'AIR, le **prestazioni aggiuntive fatte con altri programmi** diventano una destinazione dell'importazione. Passano dagli stessi controlli della registrazione a mano e hanno il segno «con un altro programma».
   - Entrano nella distinta solo per i mesi non ancora inviati; per gli altri restano storia della cartella.
   - La **categoria di rischio** dell'antinfluenzale entra anche fra i campi della destinazione «Vaccinazioni».
+
+**D288 · Pacchetti regionali: niente di specifico di una regione nel nucleo.** Richiesta di Simone del 26/11/2026: il programma deve poter servire, un domani, tutte le regioni. Integrazioni (ricetta, anagrafe, Fascicolo), cataloghi, esenzioni, scadenze, regole e tutto ciò che è strettamente legato al Piemonte stanno in un pacchetto regionale, scelto in base alla regione e all'ASL del medico. Il Piemonte è il primo pacchetto; quelli delle altre regioni si scrivono quando c'è l'elenco di che cosa serve da ogni regione o ente. Domanda: «Fattibile?».
+
+- **Fattibile.** Oggi il piemontese è sparso:
+  - nelle integrazioni: SAR del CSI per la ricetta dematerializzata e per la rossa in DPCM, AURA, Fascicolo regionale con la pubblicazione V09 e l'accesso con SPID o CIE, codice del gestionale con l'ASL del medico;
+  - nei dati: catalogo regionale (D.D. 590 e 710/2026), tabelle RAO delle due determine, prestazioni aggiuntive dell'AIR;
+  - nelle regole: valori piemontesi nello stesso insieme di quelli nazionali, senza dire a quale regione valgono (R1 della specialistica, la DPC dei farmaci PHT);
+  - in circa 90 file di servizio, interfaccia, dimostrazione e pacchetti che nominano Piemonte, CSI, SAR o AURA, fra testi, pagine e flussi.
+- **Come**:
+  - un pacchetto per regione, con dentro le varianti delle singole ASL (gli accordi aziendali), scelto dal codice della regione dello studio e dall'ASL del medico;
+  - nel pacchetto le integrazioni (ricetta, anagrafe, Fascicolo, invio del SIAP, canale delle prestazioni aggiuntive), ognuna con il suo simulatore, e cataloghi, esenzioni regionali, scadenze e valori delle regole, con versioni e fonti come oggi;
+  - il nucleo tiene solo il nazionale (Sistema TS, INPS, Gateway del Fascicolo nazionale, nomenclatore LEA, AIFA, ICD-9-CM, RAO di AGENAS, valori del SIAP). Per una regione senza pacchetto il programma usa le parti nazionali e dice che cosa manca;
+  - una prova, come quella del nome del prodotto: fuori dal pacchetto della regione nessun nome di regione, di ente o di atto regionale.
+- **Risposta di Simone con il pulsante**: «Dopo il SIAP nazionale (Consigliata)».
+  - **Ordine**: prima la parte nazionale del SIAP (codice della struttura, contatto, documenti) con la sua pull request. Poi lo scheletro (interfacce, scelta del pacchetto, la prova) e lo spostamento del Piemonte, un pezzo alla volta (dati, regole, integrazioni, testi), con le prove sempre verdi, in pull request loro. Poi il modulo del SIAP con il CSI, la rendicontazione dell'AIR (D287) e AURA, scritti già nel pacchetto del Piemonte.
+  - **Fino allo spostamento**: il codice nuovo nazionale non nomina il Piemonte; quello regionale si scrive in moduli a parte, facili da spostare.

@@ -32,7 +32,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Fermata del 26/11/2026, dopo l'unione della #41** (D282): le domande 1, 3, 4 e 5 hanno avuto risposta. Adesso, nello stesso branch ripartito da `main`: i nomi nuovi dei menu («Risultati degli esami», «Visite ed esami da prescrivere») e il tipo di terapia sulla riga della ricetta, in una pull request; poi il SIAP, prima la parte che non dipende dal CSI e poi il modulo con un simulatore. Le pull request di questo blocco si uniscono con le prove verdi (via in anticipo). AURA dopo le risposte del CSI; per il CSI le domande nuove, dalla 1 alla 13.
 - **26/11/2026, nello stesso branch**: i nomi nuovi dei menu e il tipo di terapia sulla riga della ricetta, fatti (D282, D283); sezione «Dopo l'unione della #41 – Nomi dei menu e tipo di terapia sulla riga». Pull request #42 unita lo stesso giorno (commit `8029a44`), con il via dato in anticipo e le 14 prove su GitHub verdi; dimostrazione alla versione 30 e pagina del collaudo aggiornate (G4, G6, G10). Il branch riparte da `main`; adesso il SIAP.
 - **26/11/2026, dopo l'unione della #42**: SIAP, valori del Ministero come dato e fumo codificato (D284). Poi la domanda della Dr.ssa Rocca sulle RAO: Simone ha scelto di farle adesso, in una pull request a sé, con il medico che sceglie la condizione e il programma che mette la classe (D285). Fatte: tabelle del manuale di AGENAS e delle due determine del Piemonte, condizione nella ricetta specialistica, classe vuota per difetto. Il SIAP riprende dopo. Sezione «Dopo l'unione della #42 – SIAP senza il CSI e RAO». Simone, lo stesso giorno: il collaudo può aspettare.
-- **26/11/2026, unione della #43**: pull request #43 unita (commit `1806799`), con il via dato in anticipo e le 14 prove su GitHub verdi. Prima, due cadute della CI con le loro cause, corrette (D286). Dimostrazione alla versione 31 e pagina del collaudo aggiornate (G6, K9). Il branch riparte da `main`. Lo stesso giorno la domanda di Simone sulla rendicontazione dell'AIR del Piemonte 2024: «Dopo il SIAP», con tutto ciò che serve (D287). Adesso il resto del SIAP senza il CSI, poi l'AIR, poi AURA quando risponde il CSI.
+- **26/11/2026, unione della #43**: pull request #43 unita (commit `1806799`), con il via dato in anticipo e le 14 prove su GitHub verdi. Prima, due cadute della CI con le loro cause, corrette (D286). Dimostrazione alla versione 31 e pagina del collaudo aggiornate (G6, K9). Il branch riparte da `main`. Lo stesso giorno la domanda di Simone sulla rendicontazione dell'AIR del Piemonte 2024: «Dopo il SIAP», con tutto ciò che serve (D287). Poi la richiesta dei pacchetti regionali, niente di piemontese nel nucleo: «Dopo il SIAP nazionale» (D288, sezione «Pacchetti regionali»). Adesso la parte nazionale del SIAP; poi scheletro e spostamento del Piemonte; poi, nel pacchetto del Piemonte, modulo del SIAP con il CSI, AIR e AURA.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -1824,6 +1824,17 @@ Domanda di Simone: «la reportistica accordi integrativi regionali è prevista?�
 - **Ordine**: il resto del SIAP senza il CSI, poi l'AIR in una pull request a sé, poi AURA quando risponde il CSI.
 - **Importazione** (domanda di Simone dello stesso giorno): c'è dalla tappa 15, con il rapporto riga per riga; le vaccinazioni sono una destinazione, le prestazioni aggiuntive no. Risposta: «Sì, con l'AIR». Nel blocco dell'AIR le prestazioni aggiuntive fatte con altri programmi diventano una destinazione: entrano nella distinta solo per i mesi non ancora inviati, altrimenti restano storia. Le domande di `docs/importazione.md` ora riportano le risposte della fermata (D181).
 - **Da chiedere all'ASL** (si annota, non blocca): il formato dei portali per gli accessi domiciliari, l'ADP-PID e l'antinfluenzale; i criteri degli screening; gli indicatori di AFT dell'anno.
+
+## Pacchetti regionali (26/11/2026, D288)
+
+Richiesta di Simone: il programma deve poter servire tutte le regioni, con niente di piemontese nel codice del nucleo. Integrazioni, cataloghi, esenzioni, scadenze e regole del Piemonte vanno in un pacchetto regionale, scelto dalla regione e dall'ASL del medico; gli altri pacchetti si scrivono quando c'è l'elenco di che cosa serve.
+
+- **Risposta**: fattibile. L'inventario di che cosa è piemontese oggi e il modo sono in D288. La regola 9 di `CLAUDE.md` lo fissa.
+- **Ordine scelto da Simone** («Dopo il SIAP nazionale»):
+  1. la parte nazionale del SIAP, con la sua pull request;
+  2. lo scheletro e lo spostamento del Piemonte, in pull request loro;
+  3. nel pacchetto del Piemonte, il modulo del SIAP con il CSI, l'AIR e AURA.
+- **Non fatto**: tutto il resto, da fare in quest'ordine.
 
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 
