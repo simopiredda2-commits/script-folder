@@ -16,6 +16,7 @@ import {
 } from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 
@@ -71,7 +72,7 @@ interface QueueGroup {
 describe('ricetta rimasta «in invio» (D233)', () => {
   let t: TestDatabase;
   let s: Scenario;
-  const sar = new GatedGateway(new SimulatedGateway('sar'));
+  const sar = new GatedGateway(regionalGateway());
   const cookies = { titolare: '', segreteria: '' };
   type Who = keyof typeof cookies;
 
@@ -84,7 +85,7 @@ describe('ricetta rimasta «in invio» (D233)', () => {
       { idleLockMinutes: null },
       {
         clockAt: new Date('2026-11-20T10:00:00Z'),
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         preSendChecks: noRules,
         sendTimeoutMs: 60_000,
       },

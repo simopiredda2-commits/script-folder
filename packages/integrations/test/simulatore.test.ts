@@ -11,8 +11,8 @@ import {
 } from '../src';
 
 /**
- * Credenziali inventate: i simulatori ne controllano solo la forma. Con l'Id-Sessione per email il
- * SAR vuole anche X-Gestionale, la RUPAR l'informazione «APP» (REL-STC-01 V08; D266).
+ * Credenziali inventate: i simulatori ne controllano solo la forma. Il codice del gestionale lo
+ * vogliono alcuni servizi della regione (D266): qui c'è, e il simulatore nazionale non lo guarda.
  */
 const auth: ServiceAuth = {
   username: 'utente-di-prova',
@@ -30,9 +30,9 @@ const message = (localId = 'r1'): PrescriptionMessage => ({
   compiledAt: '2026-11-18',
 });
 
-describe('simulatore del SAR e del Sistema TS', () => {
+describe('simulatore nazionale delle ricette (servizio della regione e Sistema TS, D300)', () => {
   it('per difetto accetta e dà numeri di ricetta di fantasia, uno diverso per ricetta', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedGateway('regional');
     const a = await sar.send(message('a'), auth);
     const b = await sar.send(message('b'), auth);
     expect(a.outcome).toBe('accepted');
@@ -46,7 +46,7 @@ describe('simulatore del SAR e del Sistema TS', () => {
   it.each(['rejected', 'unreachable', 'timeout'] as const)(
     'simula l’esito «%s»',
     async (outcome) => {
-      const sar = new SimulatedGateway('sar', { decide: () => outcome });
+      const sar = new SimulatedGateway('regional', { decide: () => outcome });
       const r = await sar.send(message(), auth);
       expect(r.outcome).toBe(outcome);
       if (r.outcome === 'rejected') expect(r.message).toMatch(/rifiutata/);
@@ -54,7 +54,7 @@ describe('simulatore del SAR e del Sistema TS', () => {
   );
 
   it('non sostituibile senza il codice della motivazione: rifiutata, come dal SAC (D273)', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedGateway('regional');
     const line = {
       drugName: 'Farmaco di prova',
       drugAic: '099998011',
@@ -71,7 +71,7 @@ describe('simulatore del SAR e del Sistema TS', () => {
   });
 
   it('annulla solo ricette che ha emesso, una volta', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedGateway('regional');
     const r = await sar.send(message(), auth);
     if (r.outcome !== 'accepted') throw new Error('atteso accettato');
     const doctor = message().doctor;
@@ -86,29 +86,21 @@ describe('simulatore del SAR e del Sistema TS', () => {
     );
   });
 
-  it('la ricetta bianca va al Sistema TS, le altre al SAR', () => {
+  it('la ricetta bianca va al Sistema TS, le altre al servizio della regione', () => {
     expect(systemFor('white')).toBe('sistema_ts');
     for (const k of ['pharma_ssn', 'specialist_ssn', 'devices'] as const)
-      expect(systemFor(k)).toBe('sar');
+      expect(systemFor(k)).toBe('regional');
   });
 });
 
 describe('nessuna chiamata a servizi reali (regola 7)', () => {
   it('il codice delle integrazioni non contiene indirizzi di rete né richieste HTTP', () => {
     const dir = join(import.meta.dirname, '..', 'src');
-    /** Nomi di spazi XML: sono identificatori, non indirizzi da chiamare. */
-    // Spazi dei nomi XML: identificativi dei messaggi, non indirizzi da chiamare. Quelli dei
-    // messaggi SOAP del Fascicolo regionale sono della V09 (5.2.1) e di WS-Security (D280).
+    // Spazi dei nomi XML: identificativi dei messaggi, non indirizzi da chiamare. Le integrazioni
+    // dei pacchetti regionali hanno la loro prova (`packages/regions/test/regola-7.test.ts`).
     const XML_NAMESPACES = [
       'http://purl.oclc.org/dsdl/schematron',
       'http://www.w3.org/2001/XMLSchema-instance',
-      'http://www.w3.org/2003/05/soap-envelope',
-      'http://schemas.xmlsoap.org/soap/envelope/',
-      'http://dmaclbl.csi.it/',
-      'http://tipodaticomunicazionemetadati.xsd.fse.ini.finanze.it',
-      'http://dma.csi.it/',
-      'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd',
-      'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText',
     ];
     const files = readdirSync(dir, { recursive: true, withFileTypes: true }).filter((e) =>
       e.isFile(),
@@ -126,7 +118,7 @@ describe('nessuna chiamata a servizi reali (regola 7)', () => {
 describe('stato di erogazione (D70)', () => {
   const doctor = { userId: 'u1', name: 'Medico inventato' };
   it('per difetto non ancora presa in carico; annullata dopo l’annullamento; sconosciuta se l’NRE non c’è', async () => {
-    const g = new SimulatedGateway('sar');
+    const g = new SimulatedGateway('regional');
     const sent = await g.send(
       {
         localId: 'r1',
@@ -152,7 +144,7 @@ describe('stato di erogazione (D70)', () => {
   });
 
   it('nelle prove si sceglie lo stato, anche «non raggiungibile»', async () => {
-    const g = new SimulatedGateway('sar', {
+    const g = new SimulatedGateway('regional', {
       decideStatus: (nre) => (nre === 'A' ? 'erogata' : 'unreachable'),
     });
     expect(await g.status({ nre: 'A', doctor }, auth)).toMatchObject({
@@ -164,8 +156,8 @@ describe('stato di erogazione (D70)', () => {
 });
 
 describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
-  it('senza utente, password o PIN il simulatore rifiuta come il SAR', async () => {
-    const sar = new SimulatedGateway('sar');
+  it('senza utente, password o PIN il simulatore rifiuta come il servizio vero', async () => {
+    const sar = new SimulatedGateway('regional');
     expect(await sar.send(message(), { ...auth, password: '' })).toMatchObject({
       outcome: 'rejected',
       code: 'CREDENZIALI',
@@ -224,9 +216,9 @@ describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
     });
   });
 
-  it('con il secondo fattore, il SAR simulato vuole un Id-Sessione valido a ogni chiamata', async () => {
+  it('con il secondo fattore, il simulatore vuole un Id-Sessione valido a ogni chiamata', async () => {
     const sf = new SimulatedSecondFactor('rupar_piemonte');
-    const sar = new SimulatedGateway('sar', { sessions: sf });
+    const sar = new SimulatedGateway('regional', { sessions: sf });
     expect(await sar.send(message(), auth)).toMatchObject({
       outcome: 'rejected',
       code: 'ID_SESSIONE',

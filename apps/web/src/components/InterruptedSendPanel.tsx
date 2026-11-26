@@ -5,6 +5,7 @@ import { normalizePrescriptionNumber, nrbeProblem, nreProblem } from '../lib/pre
 import { ConfirmQuestion, ErrorMessage, Notice } from './common';
 import { Icon } from './Icon';
 import { RedFormPrint, RedPrintedNotice, type RedPrinted } from './RedFormPrint';
+import { useRegionalService } from '../lib/regional-service';
 
 interface SettleOutcome {
   stato: 'sent' | 'error';
@@ -30,9 +31,9 @@ export interface InterruptedSendPanelProps {
    */
   fiscalCode?: string | null;
   /**
-   * Ricetta SSN farmaceutica o specialistica al SAR: come vuole la Regione, senza esito si stampa
-   * la ricetta rossa, che parte poi in DPCM; la dematerializzata si annulla da sé (V06, 4.3.1;
-   * D270).
+   * Ricetta SSN farmaceutica o specialistica, dove la regione vuole la ricetta rossa in DPCM:
+   * senza esito si stampa la ricetta rossa, che parte poi in DPCM; la dematerializzata si annulla
+   * da sé (D270, D300).
    */
   redForm?: boolean;
   /** Dopo l'esito: le code si ricaricano. Con la ricetta rossa resta in vista il PDF (D270). */
@@ -60,6 +61,7 @@ export function InterruptedSendPanel({
   redForm,
   onChange,
 }: InterruptedSendPanelProps) {
+  const service = useRegionalService();
   const white = kind === 'white';
   // Farmaceutica e specialistica SSN: senza il codice di autenticazione la ricetta non è valida,
   // come nell'invio (D240). Per i presidi il codice resta facoltativo, come nell'invio.
@@ -136,7 +138,7 @@ export function InterruptedSendPanel({
       </div>
     );
 
-  const ente = white ? 'il Sistema TS' : 'il SAR';
+  const ente = white ? 'il Sistema TS' : service.il;
   if (waiting && from !== null)
     return (
       <div className="pannello-invio">

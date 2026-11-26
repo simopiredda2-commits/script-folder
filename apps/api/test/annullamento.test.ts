@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { externalSubmission, prescription } from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 /**
  * D70 (richiesta di Simone): una ricetta già lavorata dall'ente (presa in carico, prenotata,
@@ -17,7 +18,7 @@ describe('annullamento secondo lo stato di erogazione (D70)', () => {
   let cookie: string;
   const states = new Map<string, DispensingState | 'unreachable'>();
   let cancelCalls = 0;
-  const sar = new SimulatedGateway('sar', {
+  const sar = regionalGateway({
     decideStatus: (nre) => states.get(nre) ?? 'non_erogata',
     decideCancel: () => {
       cancelCalls++;
@@ -30,7 +31,7 @@ describe('annullamento secondo lo stato di erogazione (D70)', () => {
     s = await createScenario(
       t.db,
       {},
-      { gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') } },
+      { gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') } },
     );
     cookie = await login(s, 'titolare');
   });

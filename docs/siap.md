@@ -11,7 +11,7 @@ Il SIAP raccoglie le attività dei medici di medicina generale e dei pediatri di
   - l'**assistito**, con i dati anagrafici e i fattori di rischio;
   - il **contatto** fra assistito e medico, con la modalità, il problema e le prestazioni;
   - l'**organizzazione**, cioè dove lavora il medico: struttura, AFT e UCCP.
-- **Quando.** Nel 2026 ogni mese, entro il mese successivo; dal 1° gennaio 2027 ogni settimana, entro la settimana successiva, con le settimane ISO 8601 (disciplinare, §7; Ministero, §2.2.3; CSI, §2). Variazioni e cancellazioni si mandano rimandando tutto il record (campo «Tipo trasmissione»: I, V o C).
+- **Quando.** Nel 2026 ogni mese, entro il mese successivo; dal 1° gennaio 2027 ogni settimana, entro la settimana successiva, con le settimane ISO 8601 (disciplinare, §7; Ministero, §2.2.3; CSI, §2). Nel flusso regionale del Piemonte il termine del 2026 è prima: entro il 15 del mese successivo (D.D. 570/2025, §2.1). Variazioni e cancellazioni si mandano rimandando tutto il record (campo «Tipo trasmissione»: I, V o C).
 - **In Piemonte** (CSI, §2):
   - la cartella manda i tre insiemi di dati con le API REST del CSI, in messaggi JSON;
   - il canale è cifrato, con certificati digitali e un'autenticazione forte;
@@ -33,6 +33,9 @@ Link, byte e SHA-256 in `docs/provenienze.md`, «SIAP». I documenti restano fuo
 | DM Salute 4/8/2025, GU n. 202 dell'1/9/2025                               | 2025       | L'istituzione del SIAP (articoli 1–12)                                                                                                                                         |
 | Comunicato, GU n. 226 del 29/9/2025 (25A05298)                            | 2025       | Nella GU n. 202 non fu stampato il disciplinare tecnico, allegato 1 del decreto: è sul portale del Ministero                                                                   |
 | Ministero della Salute, disciplinare tecnico del SIAP (allegato 1 del DM) | 2025       | I tre insiemi di dati con la fonte di ogni campo (Regione, anagrafe regionale degli assistiti, medico), il codice dell'assistito, l'invio al Ministero, la sicurezza e i tempi |
+| Regione Piemonte, DGR n. 26-1618                                          | 29/09/2025 | Il SIAP come flusso regionale: dal 1/1/2026 obbligo informativo delle ASR, che alimentano il sistema regionale e il NSIS                                                       |
+| Regione Piemonte, D.D. n. 570, disciplinare tecnico regionale del SIAP    | 30/09/2025 | La prima versione dei tre tracciati XML del flusso regionale, con i controlli di ogni giorno e i tempi del Piemonte                                                            |
+| Regione Piemonte, D.D. n. 340                                             | 29/05/2026 | L'affidamento al CSI del sistema regionale del SIAP                                                                                                                            |
 
 Che cosa non si è potuto scaricare da qui (`docs/provenienze.md`):
 
@@ -62,6 +65,59 @@ Dove il disciplinare e le specifiche del Ministero non dicono la stessa cosa (le
 - **quantità erogata** (insieme 2): c'è nel disciplinare e nel Ministero, non nel DataSet 2 del CSI.
 
 Quale versione vale in Piemonte è nella domanda 12 per il CSI. Nel testo c'è anche una svista: il §6.1 parla di «due tracciati distinti» e ne elenca tre.
+
+## Il disciplinare regionale del Piemonte (D.D. 570/2025)
+
+Simone l'ha mandato il 26/11/2026; la copia del Bollettino è identica, byte per byte. Gli atti sono tre:
+
+- la **DGR 26-1618 del 29/9/2025** adotta il SIAP come flusso regionale: dal 1/1/2026 è un obbligo informativo delle ASR, che alimentano il sistema regionale e il NSIS;
+- la **D.D. 570 del 30/9/2025** approva il disciplinare tecnico regionale, prima versione;
+- la **D.D. 340 del 29/5/2026** affida al CSI il sistema regionale del SIAP. L'indagine di mercato AP26_003 per le cartelle è dello stesso periodo.
+
+**Che cosa dice:**
+
+- **Formato** (§1.1, §3): tre tracciati XML, `SIAP_A0001_AN.xml` (assistito), `SIAP_A0001_CN.xml` (contatto) e `SIAP_A0001_OR.xml` (organizzazione). Assistito e contatto sono legati da paziente, medico, data e progressivo del contatto.
+- **Controlli** (§2): ogni giorno il sistema controlla i record ricevuti, per la «correttezza formale, logica e normativa». I record con errori tornano al mittente con gli errori segnalati; corretti, si rimandano.
+- **Tempi** (§2.1): nel 2026 ogni mese, entro il 15 del mese successivo; dal 1/1/2027 ogni settimana, entro la settimana successiva. Il decreto e il disciplinare del Ministero danno, per il 2026, la fine del mese successivo: quel termine è quello della Regione verso il Ministero.
+- **Assistito:**
+  - codice ASL, codice MMG/PLS (20 caratteri), ID del paziente «nelle anagrafiche AURA se disponibile» (20), tipo di movimento;
+  - tutti obbligatori: cognome, nome, data di nascita, genere, comune o provincia di nascita (6), codice identificativo (codice fiscale, TEAM, STP o ENI) con il suo tipo, cittadinanza, comuni di residenza e di domicilio (6), stato civile;
+  - esenzioni facoltative, con ambito e date;
+  - data di scelta obbligatoria, data di revoca facoltativa;
+  - fumo e patologie croniche obbligatori (fino a 11, ICD-9-CM), BMI facoltativo.
+- **Contatto:**
+  - codice ASL, codice MMG/PLS, ID del paziente, data del contatto, progressivo (2 cifre: i contatti dell'assistito nella stessa giornata), tipo di movimento;
+  - modalità, regime dell'attività (tag `<regimeAttività>`, con l'accento), tipologia di accesso;
+  - problema, stato e data di apertura, condizionati;
+  - tipologia (2) e dettaglio (1) della prestazione, obbligatori; quantità (2), facoltativa.
+- **Organizzazione:**
+  - regione e azienda di erogazione, codice regionale del medico (la lunghezza non è scritta), data e progressivo del contatto (3 cifre: i contatti dello stesso medico nella giornata, «totali nello studio»), tipo di movimento;
+  - codice della struttura (STS.11, 6), tipo di struttura;
+  - AFT (8) e UCCP (3), condizionati.
+
+**Che cosa non c'è.** I valori ammessi: il §3.2 li rimanda alle «schede», nel quadro «correttezza formale». Ma la prima versione finisce con le tabelle dei tre tracciati: niente valori, controlli o codici di errore, anche se l'allegato si chiama «Disciplinare_Controlli_2026». La versione elettronica che il CSI tiene su Sistema Piemonte da qui non si apre (`docs/provenienze.md`). Nel §2.1 manca anche una parola: «sono trasmesse al con cadenza mensile».
+
+**Dove non torna** (verificato sui testi e, per il programma, nel codice):
+
+- **Il dettaglio della prestazione è lungo 1.** I dettagli dell'allegato 2 del Ministero arrivano a 47 nella tipologia «PIPP» (`valori-ministero-1.3.json`), e lo schema XSD li ammette fino a 99. In un carattere non ci stanno i dettagli dal 10 in su.
+- **I codici hanno lunghezze diverse da quelle del Ministero:**
+  - codice del medico: 20, il Ministero 10;
+  - AFT: 8, il Ministero 6;
+  - UCCP: 3, il Ministero 6;
+  - per il Ministero AFT e UCCP sono codici STS.11.
+- **Il progressivo.**
+  - Il programma conta i contatti confermati nel giorno, nello studio, fino a 9999: è il conteggio del Ministero, codice della struttura più quattro cifre (`apps/api/src/siap/contacts.ts`, D291).
+  - La Regione ne vuole due: per assistito nel contatto (fino a 99) e per medico nello studio nell'organizzazione (fino a 999).
+  - Se vale il regionale, al programma servono quei due conteggi.
+- **«Studio medico MMG/PLS».** Le condizioni dell'AFT e dell'UCCP nominano questo tipo di struttura, che fra i nove del Ministero non c'è.
+- **I dati anagrafici.** La Regione li vuole tutti nel tracciato, con nome, cognome e codice fiscale. Il disciplinare del Ministero li fa venire dall'anagrafe regionale degli assistiti (§6.2), e il DataSet 1 del CSI non li chiede alla cartella. Che cosa c'è nel programma:
+  - nome, cognome, data di nascita, genere e codice fiscale ci sono;
+  - il comune di nascita c'è come codice catastale, e il codice ISTAT si ricava dall'elenco dei comuni;
+  - residenza e domicilio ci sono come nel tracciato 1, qui sotto;
+  - mancano cittadinanza e stato civile.
+- **Il formato.** Qui XML, nell'AP26_003 messaggi JSON con le API REST del CSI.
+
+**Come lo leggiamo.** La DGR mette l'obbligo sulle ASR, e il disciplinare regionale descrive i record del flusso regionale. La cartella manda i suoi dati al CSI come dice l'AP26_003. È una lettura, non una risposta: la conferma è nella domanda 12 per il CSI. Nel programma non si cambia niente prima della risposta (D299).
 
 ## Confronto: tracciato 1, assistito
 
@@ -129,7 +185,7 @@ Il programma propone un contatto per paziente, medico e giorno dagli atti del me
 - **C'è già** la maggior parte dei dati clinici: problemi con l'ICD-9-CM e la casella «cronica», BMI, tipo di contatto del diario, ricette, certificati, vaccinazioni, prestazioni aggiuntive, esenzioni, scelte, agenda, AFT, codici di regione, ASL e medico.
 - **Il contatto** come registrazione a sé c'è dal 26/11/2026 (D291): il programma lo propone dagli atti del medico, il medico lo conferma, lo cambia o lo scarta, in «Contatti per il SIAP». Manca l'invio, con il modulo del CSI.
 - **Fatti dal 26/11/2026**: il fumo codificato e la tabella delle tipologie e dei dettagli di prestazione (D284); il codice e il tipo della struttura dello studio, il codice della struttura dell'AFT e l'UCCP (D289); il contatto, con le corrispondenze delle prestazioni aggiuntive (D291).
-- **Non servono dalla cartella** cittadinanza, stato civile e gli altri dati anagrafici: vengono dall'anagrafe regionale degli assistiti (disciplinare, §6.2).
+- **Non servono dalla cartella** cittadinanza, stato civile e gli altri dati anagrafici: vengono dall'anagrafe regionale degli assistiti (disciplinare, §6.2). Il disciplinare regionale del Piemonte li ha tutti nel suo tracciato: per noi è il flusso delle ASR, da confermare con il CSI (D299).
 - **Dal CSI** servono il formato JSON, i servizi REST, i certificati del canale, l'ambiente di prova e il collaudo (domande 11 e 12 per il CSI).
 
 Che cosa si propone alla fermata: `docs/avanzamento.md`, «Domande per la prossima fermata».

@@ -5,11 +5,12 @@ import { SimulatedGateway } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { prescription, prescriptionCheck, prescriptionLine } from '../src/db/schema';
-import { EXAMPLE_TRANSCRIPTIONS } from '../src/reference/example-site';
-import { importReferenceData } from '../src/reference/importer';
-import { createScenario, login, type Scenario } from './helpers/scenario';
-import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { prescription, prescriptionCheck, prescriptionLine } from '../../../src/db/schema';
+import { EXAMPLE_TRANSCRIPTIONS } from '../../../src/reference/example-site';
+import { importReferenceData } from '../../../src/reference/importer';
+import { createScenario, login, type Scenario } from '../../helpers/scenario';
+import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
+import { SimulatedSar } from '@mmg/regions/piemonte';
 
 /**
  * I due codici della specialistica e il codice scritto a mano (D154). Specifiche del Sistema TS,
@@ -24,7 +25,7 @@ describe('due codici della specialistica e codice scritto a mano (D154)', () => 
   let work: string;
   // Il catalogo che la Regione ha trasmesso (simulato): conosce anche un codice nuovo, che la
   // nostra copia del catalogo non ha ancora.
-  const sar = new SimulatedGateway('sar', {
+  const sar = new SimulatedSar({
     regionalCatalog: (national, catalog) =>
       (catalog === '89.7' && national === '89.7') ||
       (catalog === 'NUOVO.1' && national === '99.99.1'),
@@ -47,7 +48,7 @@ describe('due codici della specialistica e codice scritto a mano (D154)', () => 
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
       },
     );
     doctor = await login(s, 'titolare');

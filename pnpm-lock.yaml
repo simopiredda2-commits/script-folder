@@ -126,6 +126,9 @@ importers:
       '@mmg/reference':
         specifier: workspace:*
         version: link:../../packages/reference
+      '@mmg/regions':
+        specifier: workspace:*
+        version: link:../../packages/regions
       '@mmg/rules':
         specifier: workspace:*
         version: link:../../packages/rules
@@ -296,6 +299,9 @@ importers:
       '@xmldom/xmldom':
         specifier: 0.9.12
         version: 0.9.12
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       xpath:
         specifier: 0.0.34
         version: 0.0.34

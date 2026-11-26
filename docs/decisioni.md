@@ -2729,3 +2729,43 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Certificati di test**: Sogei li dà solo a fornitori già costituiti in società. Arriveranno dopo la costituzione di SCRIPT, con le due CSR mandate per email come in it-fse-support. La fase 1 dell'accreditamento si prepara in locale e il Gateway di prova non si chiama (regola 7). Quando arrivano i certificati c'è una fermata, e Simone decide se fare un'eccezione per gli ambienti di test.
 - **Prova**: `apps/api/test/gateway-per-regione.test.ts`, con due regioni dall'elenco nazionale e certificati diversi, e una regione senza certificati. Il Gateway simulato guarda con quale certificato arriva ogni richiesta.
 - **Non fatto**: l'organizzazione dei token (`subject_organization_id`) viene ancora dalle impostazioni del Fascicolo dello studio. Va confrontata con la regione dello studio e con i casi della fase 1.
+
+**D299 · Il disciplinare regionale del SIAP (D.D. 570/2025) è il flusso delle ASR; la cartella segue l'AP26_003 (domanda di Simone del 26/11/2026).** Simone ha chiesto se due PDF del SIAP erano già lavorati. L'allegato A01 dell'AP26_003 sì, con la stessa impronta (`docs/provenienze.md`). La D.D. 570/2025 no: approva la prima versione del disciplinare tecnico regionale, con tre tracciati XML (`docs/siap.md`, «Il disciplinare regionale del Piemonte»).
+
+- **Lettura**: la DGR 26-1618/2025 fa del SIAP un obbligo informativo delle ASR, e il disciplinare regionale ne descrive i record. La cartella manda i suoi dati al CSI come dice l'AP26_003, con le API REST e i messaggi JSON.
+  - **Scelta: nel programma non si cambia niente prima della risposta del CSI** (domanda 12). Il modulo di invio si fa con le specifiche del CSI, nel pacchetto del Piemonte.
+  - **Motivo**: la prima versione non ha i valori ammessi, che il §3.2 rimanda a schede che nel documento non ci sono. In più non torna con il Ministero su lunghezze e conteggi: dettaglio della prestazione in un carattere, AFT e UCCP, progressivo per assistito e per medico. Costruire su questa versione vorrebbe dire scegliere valori che non abbiamo.
+- **Che cosa cambierebbe se valesse il regionale anche per la cartella**:
+  - i due progressivi, per assistito e per medico nello studio, al posto di quello dello studio;
+  - cittadinanza e stato civile, che il programma non ha;
+  - i codici ISTAT dei comuni di nascita, residenza e domicilio;
+  - il termine del 15 del mese.
+- **Non fatto**: la versione elettronica su Sistema Piemonte, che da qui non si apre.
+
+**D300 · La ricetta SSN della regione: un contratto nazionale, il SAR nel pacchetto del Piemonte (pezzo 3 dello spostamento, seconda parte).** Dopo il Fascicolo (D297), la ricetta: il SAR, i lotti di NRE, la ricetta rossa in DPCM e il codice regionale nel promemoria passano nel pacchetto del Piemonte. Il contratto regge anche il modello lombardo, con la ricetta fatta da un modulo della regione (`docs/lombardia.md`, paragrafo 5).
+
+- **Contratto** (`RegionalPrescription` in `@mmg/integrations`), con due vie:
+  - **servizio della regione**: il servizio delle ricette SSN, i lotti di NRE con il tipo che la regione ammette, la ricetta rossa in DPCM, il codice regionale del medico nel promemoria, il servizio delle credenziali, le parole;
+  - **prescrittore esterno**: la ricetta la fa un modulo della regione. Oggi è dichiarato soltanto: il programma lo dice e non manda niente, finché non ci sono le specifiche di una regione che lo chiede.
+- **Scelta**: dalla regione dello studio, a ogni richiesta (`prescriptionChoice`).
+  - Senza il servizio della regione la ricetta SSN non parte: «La regione dello studio non ha ancora, nel programma, il servizio delle ricette SSN». La bianca va sempre al Sistema TS.
+  - Lotti e coda DPCM prendono il servizio della regione dello studio di ogni ricetta. La ricetta rossa tiene l'ambiente scritto alla stampa.
+- **Parole**: il nome del servizio con l'articolo e le preposizioni, «il SAR», «al SAR», «dal SAR», «del SAR».
+  - Il nucleo compone i messaggi con quelle parole, senza scegliere l'articolo per la regione.
+  - Le pagine le hanno con i dati dell'utente (`/api/io`, `servizioRicette`); senza servizio, parole generiche.
+  - I messaggi del ciclo della ricetta nel dominio parlano del «servizio».
+- **Nel database**: il valore `sar` del sistema delle chiamate diventa `regional` (migrazione 0061), una rinomina: le chiamate già registrate restano come sono.
+- **Simulatori**: quello nazionale (`SimulatedGateway`) fa il Sistema TS e la base del servizio della regione.
+  - Il SAR simulato (`SimulatedSar`, nel pacchetto) lo estende con i lotti, la DPCM, il token dell'accesso regionale, X-Gestionale e il catalogo regionale.
+  - Il tipo di invio della DPCM («RPS») è un parametro del file nazionale, dato dal pacchetto.
+- **Prove**:
+  - del meccanismo con regioni inventate (`apps/api/test/ricetta-regionale-scelta.test.ts`): parole sue, senza lotti, con i lotti, prescrittore esterno, regione senza pacchetto;
+  - del contenuto del Piemonte nelle cartelle del pacchetto (lotti, ricetta rossa, catalogo, note, accesso regionale);
+  - le prove del ciclo della ricetta prendono il simulatore della regione degli studi di prova dal suo pacchetto, senza nominarla (`test/helpers/regional-gateway.ts`).
+- **Regola 7 nei pacchetti**: la prova che il codice delle integrazioni non chiama la rete guardava solo il nucleo; dal Fascicolo (D297) il codice del pacchetto ne era fuori. Una prova nuova guarda ogni pacchetto, con gli spazi dei nomi XML che il pacchetto elenca.
+- **Scelta: il codice regionale nel promemoria è della regione.** Prima si stampava per ogni regione, se il medico aveva il codice; adesso solo dove la regione lo chiede.
+- **Non fatto**:
+  - restano nel nucleo il codice del gestionale assegnato dalla Regione, l'accesso con SPID o CIE della Regione e le credenziali RUPAR, con il valore `rupar_piemonte` nel database: il pezzo seguente;
+  - le regole di compilazione della ricetta rossa in DPCM (Prescrizione2, termini e intervalli della V06) sono ancora nel servizio nazionale della DPCM, citate dalla V06: si spostano quando una seconda regione avrà la DPCM;
+  - le altre vie nazionali, per esempio la ricetta SSN mandata al SAC senza un servizio della regione, si scrivono quando servono.
+- **Non provato**: una ricetta mandata prima che lo studio cambi regione e annullata dopo. Il servizio si sceglie dalla regione di adesso, come la coda del Fascicolo (D297).

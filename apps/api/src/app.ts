@@ -58,7 +58,7 @@ import { registerPatientAdminRoutes } from './http/patient-admin-routes';
 import { registerImportRoutes } from './import/routes';
 import { createTemplateService } from './templates/service';
 import { createRulesCheck } from './prescriptions/rules-check';
-import { createDpcmService } from './prescriptions/dpcm';
+import { createDpcmService, type DpcmRegional } from './prescriptions/dpcm';
 import { createNreLots } from './prescriptions/nre-lots';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import { raoSources } from './rao/tables';
@@ -66,8 +66,6 @@ import { studioSendTimeoutMs } from './admin/studio-service';
 import type { CredentialService } from '@mmg/domain';
 import {
   type FseGatewayClient,
-  isDpcmServices,
-  isSarRegionalServices,
   SIMULATED_FSE_AUDIENCE,
   SimulatedDocumentSigner,
   SimulatedFseGateway,
@@ -83,7 +81,7 @@ import {
   type PrescriptionGateway,
   type ReminderSender,
   type RegionalAuthorizationGateway,
-  type SarRegionalServices,
+  type RegionalPrescription,
   type SecondFactorGateway,
   type SickLeaveGateway,
   SimulatedAura,
@@ -96,8 +94,12 @@ import {
 } from '@mmg/integrations';
 import { gatewayChoice } from './fse/gateways';
 import { createRegionalQueue, type RegionalQueue } from './fse/regional-queue';
-import { contextCallChoice, fsePublicationChoice } from './regions/integrations';
-import { studioRegionCode } from './regions/region';
+import {
+  contextCallChoice,
+  fsePublicationChoice,
+  prescriptionChoice,
+} from './regions/integrations';
+import { studioRegion, studioRegionCode } from './regions/region';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
 import { ReferenceUpdates } from './reference/updates-service';
@@ -131,15 +133,18 @@ export interface AppDeps {
   now?: () => Date;
   logger?: boolean;
   /**
-   * SAR e Sistema TS. Per difetto i simulatori, legati ai simulatori del secondo fattore: nessuna
-   * chiamata a servizi reali (regola 7).
+   * I servizi delle ricette. Per difetto i simulatori, legati ai simulatori del secondo fattore:
+   * nessuna chiamata a servizi reali (regola 7). `sistema_ts` riceve la ricetta bianca; `regional`,
+   * se c'è, prende il posto del simulatore del pacchetto della regione dello studio, con le parole
+   * e le scelte della regione (D300): lotti di NRE e ricetta rossa in DPCM se li sa dare.
    */
-  gateways?: Record<GatewaySystem, PrescriptionGateway>;
+  gateways?: Partial<Record<GatewaySystem, PrescriptionGateway>>;
   /**
-   * Lotti di NRE dal SAR (D269). Per difetto il SAR delle ricette, se sa darli (i simulatori sì):
-   * così il lotto e le ricette passano dallo stesso servizio.
+   * La ricetta SSN della regione, uguale per ogni regione: le prove, per esempio una regione con le
+   * sue parole o con il prescrittore esterno (D300). Per difetto quella del pacchetto della regione
+   * dello studio.
    */
-  sarServices?: SarRegionalServices;
+  prescription?: RegionalPrescription;
   /**
    * Ricetta rossa in DPCM (D270): ogni quanto la coda prova invii, esiti e annullamenti (per
    * difetto un minuto; null la ferma, le prove la fanno girare a mano) e l'attesa fra due file dello
@@ -249,8 +254,8 @@ export function buildApp({
     gateway: new SimulatedRegionalAuthorization({ now }),
     redirectUri: '/api/profilo/credenziali/rupar/accesso-regionale/ritorno',
   },
-  gateways = defaultGateways(secondFactor, regional.gateway),
-  sarServices = isSarRegionalServices(gateways.sar) ? gateways.sar : undefined,
+  gateways = {},
+  prescription: prescriptionOverride,
   dpcm: dpcmOptions = {},
   sickLeaveGateway = new SimulatedSickLeaveGateway({ now }),
   preSendChecks,
@@ -395,7 +400,26 @@ export function buildApp({
     now: now ?? (() => new Date()),
     expectedSince: (at) => referenceUpdates.expectedSince(at),
   });
-  registerPatientRoutes(app, db, { reference, now: now ?? (() => new Date()) });
+  // Le ricette SSN della regione dello studio (D300): per difetto il simulatore del pacchetto, con
+  // i simulatori del secondo fattore e dell'accesso regionale; la ricetta bianca al Sistema TS.
+  const simulatedSessions = (s: SecondFactorGateway) =>
+    s instanceof SimulatedSecondFactor ? s : undefined;
+  const nationalGateway =
+    gateways.sistema_ts ??
+    new SimulatedGateway('sistema_ts', { sessions: simulatedSessions(secondFactor.sistema_ts) });
+  const prescriptions = prescriptionChoice(prescriptionOverride, {
+    ...(gateways.regional ? { gateway: gateways.regional } : {}),
+    sessions: simulatedSessions(secondFactor.rupar_piemonte),
+    oauth:
+      regional.gateway instanceof SimulatedRegionalAuthorization ? regional.gateway : undefined,
+  });
+  const prescriptionOfStudio = async (studioId: string) =>
+    prescriptions.for(await studioRegion(db, studioId));
+  registerPatientRoutes(app, db, {
+    reference,
+    now: now ?? (() => new Date()),
+    prescriptionOf: prescriptionOfStudio,
+  });
   registerDoctorProfileRoutes(app, db, now ?? (() => new Date()));
   registerTodayRoutes(app, db, now ?? (() => new Date()), reference);
   registerTherapyRoutes(app, db, now ?? (() => new Date()), reference);
@@ -451,6 +475,8 @@ export function buildApp({
     environment: config.environment ?? 'prova',
     aura: auraService,
     auraNextRun: () => auraScheduler?.next ?? null,
+    prescriptionServiceName: async (studioId: string) =>
+      (await prescriptionOfStudio(studioId))?.texts.service.name ?? null,
   };
   registerStudioAdminRoutes(app, adminDeps);
   registerUserAdminRoutes(app, adminDeps);
@@ -484,39 +510,33 @@ export function buildApp({
   registerReferenceUpdateRoutes(app, db, referenceUpdates);
   // Alla chiusura si ferma l'orologio e il download in corso (il giro resta «interrotto»).
   app.addHook('onClose', async () => referenceUpdates.stop());
-  // Lotti di NRE (D269) e ricetta rossa in DPCM (D270), se il SAR li dà: i simulatori sì.
-  const nreLots = sarServices
-    ? createNreLots({
-        db,
-        sar: sarServices,
-        environment: gateways.sar.environment,
-        credentials,
-        timeoutMs: async (studioId) => sendTimeoutMs ?? studioSendTimeoutMs(db, studioId),
-      })
-    : undefined;
-  const dpcm =
-    nreLots && isDpcmServices(gateways.sar)
-      ? createDpcmService({
-          db,
-          sar: gateways.sar,
-          dm: gateways.sar,
-          environment: gateways.sar.environment,
-          credentials,
-          nreLots,
-          now: now ?? (() => new Date()),
-          producer: COMPANY_BRAND,
-          ...(dpcmOptions.minIntervalMs !== undefined
-            ? { minIntervalMs: dpcmOptions.minIntervalMs }
-            : {}),
-          equivalenceGroups: async (aics, date) =>
-            new Map(
-              [...(await reference.drugs(aics, date))].map(([aic, d]) => [aic, d.equivalenceGroup]),
-            ),
-          log: (message, err) => app.log.error({ err }, message),
-          auto: dpcmOptions.intervalMs !== null,
-        })
-      : undefined;
-  if (dpcm && dpcmOptions.intervalMs !== null) {
+  // Lotti di NRE (D269) e ricetta rossa in DPCM (D270), dove la regione dello studio li dà.
+  const nreLots = createNreLots({
+    db,
+    credentials,
+    timeoutMs: async (studioId) => sendTimeoutMs ?? studioSendTimeoutMs(db, studioId),
+  });
+  const dpcm = createDpcmService({
+    db,
+    regionalOf: async (studioId) => {
+      const r = await prescriptionOfStudio(studioId);
+      return r?.route === 'gateway' && r.nreLots && r.dpcm ? (r as DpcmRegional) : null;
+    },
+    credentials,
+    nreLots,
+    now: now ?? (() => new Date()),
+    producer: COMPANY_BRAND,
+    ...(dpcmOptions.minIntervalMs !== undefined
+      ? { minIntervalMs: dpcmOptions.minIntervalMs }
+      : {}),
+    equivalenceGroups: async (aics, date) =>
+      new Map(
+        [...(await reference.drugs(aics, date))].map(([aic, d]) => [aic, d.equivalenceGroup]),
+      ),
+    log: (message, err) => app.log.error({ err }, message),
+    auto: dpcmOptions.intervalMs !== null,
+  });
+  if (dpcmOptions.intervalMs !== null) {
     const every = dpcmOptions.intervalMs ?? 60_000;
     app.addHook('onReady', (done) => {
       dpcm.start(every);
@@ -524,12 +544,13 @@ export function buildApp({
     });
   }
   // Alla chiusura la coda si ferma; un giro in corso finisce prima.
-  if (dpcm) app.addHook('onClose', async () => dpcm.stop());
+  app.addHook('onClose', async () => dpcm.stop());
   registerPrescriptionRoutes(
     app,
     createPrescriptionService({
       db,
-      gateways,
+      national: nationalGateway,
+      regional: prescriptions,
       credentials,
       now,
       // Per difetto le regole di prescrizione vere (tappa 4), con le banche dati (tappa 5).
@@ -551,14 +572,25 @@ export function buildApp({
             },
           ]),
         ),
-      ...(nreLots ? { nreLots } : {}),
-      ...(dpcm ? { dpcm } : {}),
+      nreLots,
+      dpcm,
       rao,
     }),
     db,
     now ?? (() => new Date()),
   );
-  registerReminderRoutes(app, createReminderService({ db, sender: reminderSender, now }));
+  registerReminderRoutes(
+    app,
+    createReminderService({
+      db,
+      sender: reminderSender,
+      now,
+      doctorCodeFor: async (studioId) => {
+        const r = await prescriptionOfStudio(studioId);
+        return r?.route === 'gateway' && r.reminderDoctorCode;
+      },
+    }),
+  );
   // Modelli dei certificati (tappa 13): modelli ufficiali dagli atti, modelli dello studio.
   registerTemplateRoutes(app, createTemplateService({ db, now }));
   registerCertificateRoutes(
@@ -647,18 +679,5 @@ function defaultFse(now?: () => Date): NonNullable<AppDeps['fse']> {
     audience: SIMULATED_FSE_AUDIENCE,
     signer: new SimulatedDocumentSigner({ now }),
     simulator: new SimulatedFseGateway({ now }),
-  };
-}
-
-/** Simulatori del SAR e del Sistema TS che vogliono l'Id-Sessione dei rispettivi simulatori. */
-function defaultGateways(
-  secondFactor: Record<CredentialService, SecondFactorGateway>,
-  regional: RegionalAuthorizationGateway,
-): Record<GatewaySystem, PrescriptionGateway> {
-  const oauth = regional instanceof SimulatedRegionalAuthorization ? regional : undefined;
-  const sessions = (s: SecondFactorGateway) => (s instanceof SimulatedSecondFactor ? s : undefined);
-  return {
-    sar: new SimulatedGateway('sar', { sessions: sessions(secondFactor.rupar_piemonte), oauth }),
-    sistema_ts: new SimulatedGateway('sistema_ts', { sessions: sessions(secondFactor.sistema_ts) }),
   };
 }

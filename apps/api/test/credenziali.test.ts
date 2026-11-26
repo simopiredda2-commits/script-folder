@@ -12,6 +12,7 @@ import {
 import { studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 
@@ -50,13 +51,13 @@ describe('credenziali dei servizi e secondo fattore (D100–D102)', () => {
     t = await createTestDatabase();
     rupar2f = new SimulatedSecondFactor('rupar_piemonte', { now: () => s.clock.now() });
     const ts2f = new SimulatedSecondFactor('sistema_ts', { now: () => s.clock.now() });
-    sar = new SimulatedGateway('sar', { sessions: rupar2f });
+    sar = regionalGateway({ sessions: rupar2f });
     ts = new SimulatedGateway('sistema_ts', { sessions: ts2f });
     s = await createScenario(
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: ts },
+        gateways: { regional: sar, sistema_ts: ts },
         secondFactor: { rupar_piemonte: rupar2f, sistema_ts: ts2f },
         preSendChecks: noRules,
       },

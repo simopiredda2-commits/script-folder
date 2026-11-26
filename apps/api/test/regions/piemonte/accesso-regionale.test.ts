@@ -12,9 +12,10 @@ import {
   serviceCredential,
   serviceCredentialEvent,
   serviceSession,
-} from '../src/db/schema';
-import { createScenario, login, type Scenario } from './helpers/scenario';
-import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+} from '../../../src/db/schema';
+import { createScenario, login, type Scenario } from '../../helpers/scenario';
+import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
+import { SimulatedSar } from '@mmg/regions/piemonte';
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 const RETURN = '/api/profilo/credenziali/rupar/accesso-regionale/ritorno';
@@ -24,7 +25,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
   let s: Scenario;
   const c: Record<string, string> = {};
   let regional: SimulatedRegionalAuthorization;
-  let sar: SimulatedGateway;
+  let sar: SimulatedSar;
   /** Per le prove dei campi del token: cambia i campi prima dell'emissione (V08, 4.3.2). */
   let tamperClaims: ((c: Record<string, unknown>) => Record<string, unknown>) | null = null;
 
@@ -34,12 +35,12 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
       now: () => s.clock.now(),
       claims: (claims) => tamperClaims?.(claims) ?? claims,
     });
-    sar = new SimulatedGateway('sar', { oauth: regional });
+    sar = new SimulatedSar({ oauth: regional });
     s = await createScenario(
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         secondFactor: {
           sistema_ts: new SimulatedSecondFactor('sistema_ts', { now: () => s.clock.now() }),
           rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now: () => s.clock.now() }),

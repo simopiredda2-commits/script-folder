@@ -22,6 +22,7 @@ import { pdfText } from './helpers/pdf-text';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 import { studioDayFrom } from './helpers/dates';
+import { regionalGateway, regionalTexts } from './helpers/regional-gateway';
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 
@@ -104,7 +105,7 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
   let s: Scenario;
   const c: Record<string, string> = {};
   // Il SAR risponde dopo 1,5 secondi: con un'attesa di 1 secondo l'esito è incerto, con 3 arriva.
-  const sar = new SimulatedGateway('sar', { delayMs: 1500 });
+  const sar = regionalGateway({ delayMs: 1500 });
   let inps: SlowInps;
 
   beforeAll(async () => {
@@ -114,7 +115,7 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
       t.db,
       { name: 'Studio di prova', kind: 'group' },
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         sickLeaveGateway: inps,
         preSendChecks: noRules,
       },
@@ -803,7 +804,7 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
       salvataggi: { nelProgramma: boolean };
     }>();
     expect(v.collegamenti.map((x) => x.codice)).toEqual([
-      'sar',
+      'regional',
       'sistema_ts',
       'inps',
       'fse',
@@ -815,7 +816,12 @@ describe('dati e impostazioni dello studio (tappa 14)', () => {
     expect(new Set(v.collegamenti.map((x) => x.ambiente))).toEqual(new Set(['simulatore']));
     // Le prove sopra hanno inviato ricette e certificati: l'ultimo invio è andato al simulatore.
     const byCode = Object.fromEntries(v.collegamenti.map((x) => [x.codice, x.ultimoUso]));
-    expect(byCode.sar).toMatchObject({ ambiente: 'simulatore', operazione: 'invio' });
+    expect(byCode.regional).toMatchObject({ ambiente: 'simulatore', operazione: 'invio' });
+    // Il nome del servizio delle ricette è quello della regione dello studio (D300).
+    const ricette = v.collegamenti.find((x) => x.codice === 'regional') as unknown as {
+      nome: string;
+    };
+    expect(ricette.nome).toBe(regionalTexts().service.name);
     expect(byCode.inps).toMatchObject({
       ambiente: 'simulatore',
       operazione: 'invio',
@@ -889,7 +895,7 @@ describe('tempo di attesa dato al servizio: vale sopra quello dello studio', () 
       { sendTimeoutSeconds: 30 },
       {
         gateways: {
-          sar: new SimulatedGateway('sar', { delayMs: 300 }),
+          regional: regionalGateway({ delayMs: 300 }),
           sistema_ts: new SimulatedGateway('sistema_ts'),
         },
         preSendChecks: noRules,

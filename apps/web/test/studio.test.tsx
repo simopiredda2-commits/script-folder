@@ -355,8 +355,8 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
         body: {
           collegamenti: [
             {
-              codice: 'sar',
-              nome: 'SAR Piemonte',
+              codice: 'regional',
+              nome: 'Ricette della regione di prova',
               uso: 'Ricette SSN: farmaci e specialistica',
               ambiente: 'simulatore',
               ultimoUso: {

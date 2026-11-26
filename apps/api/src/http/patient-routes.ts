@@ -2,6 +2,7 @@ import { unseenLockCount } from '../auth/account-locks';
 import { ADVANCED_DRESSING_CODE, can, ROLE_LABELS } from '@mmg/domain';
 import { painTherapyCodes, substitutionReasons } from '@mmg/rules';
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
+import type { RegionalPrescription } from '@mmg/integrations';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
@@ -54,6 +55,11 @@ export interface PatientRouteDeps {
   /** Banche dati, per i farmaci carenti delle terapie in corso (D202); senza, nessuna carenza. */
   reference?: ReferenceData;
   now?: () => Date;
+  /**
+   * La ricetta SSN della regione dello studio (D300): le pagine ne prendono il nome del servizio,
+   * con l'articolo e le preposizioni. Senza, le parole generiche dell'interfaccia.
+   */
+  prescriptionOf?: (studioId: string) => Promise<RegionalPrescription | null>;
 }
 
 export function registerPatientRoutes(
@@ -124,6 +130,21 @@ export function registerPatientRoutes(
             .from(studio)
             .where(eq(studio.id, actor.studioId))
         )[0]?.minutes ?? null,
+      // Il servizio delle ricette SSN della regione dello studio, con le sue parole (D300).
+      servizioRicette: await (async () => {
+        const r = (await deps.prescriptionOf?.(actor.studioId)) ?? null;
+        if (!r) return null;
+        const w = r.texts.service;
+        return {
+          via: r.route === 'gateway' ? ('servizio' as const) : ('modulo' as const),
+          nome: w.name,
+          il: w.the,
+          al: w.to,
+          dal: w.from,
+          del: w.of,
+          ricettaRossaDpcm: r.route === 'gateway' && !!r.dpcm && !!r.nreLots,
+        };
+      })(),
     };
   });
 

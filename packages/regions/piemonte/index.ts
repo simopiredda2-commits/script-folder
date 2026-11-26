@@ -1,10 +1,13 @@
 import type { RegionalPackage } from '../src/types';
 import { SimulatedRegionalFseAccess } from './integrations/fse-access';
 import { simulatedFsePublication } from './integrations/fse-publication-simulator';
+import { simulatedSarPrescription } from './integrations/sar-simulator';
 
 export * from './integrations/fse-access';
 export * from './integrations/fse-publication';
 export * from './integrations/fse-publication-simulator';
+export * from './integrations/sar';
+export * from './integrations/sar-simulator';
 
 /**
  * Il pacchetto della Regione Piemonte (D288, D292): il primo. Il manifesto dice che cosa dà la
@@ -22,7 +25,7 @@ export const piemonte: RegionalPackage = {
     {
       part: 'prescription',
       where: 'core',
-      what: 'SAR del CSI Piemonte (SIRPED): ricetta dematerializzata, ricetta rossa in DPCM, lotti di NRE e codice del gestionale assegnato dalla Regione (D264–D270)',
+      what: 'SAR del CSI Piemonte (SIRPED): ricetta dematerializzata, lotti di NRE, ricetta rossa in DPCM e codice regionale nel promemoria nel pacchetto, in `integrations/` (D300); nel nucleo restano il codice del gestionale assegnato dalla Regione, l’accesso con SPID o CIE e le credenziali RUPAR (D264–D270)',
     },
     {
       part: 'registry',
@@ -69,6 +72,7 @@ export const piemonte: RegionalPackage = {
   integrations: {
     contextCalls: (options) => [new SimulatedRegionalFseAccess(options)],
     fsePublication: (options) => simulatedFsePublication(options),
+    prescription: (options) => simulatedSarPrescription(options),
   },
   terms: [
     /piemont/i,

@@ -1,7 +1,11 @@
 import type {
+  PrescriptionGateway,
   RegionalContextCall,
   RegionalFsePublication,
+  RegionalPrescription,
   SimulatedFseGateway,
+  SimulatedRegionalAuthorization,
+  SimulatorOptions,
 } from '@mmg/integrations';
 
 /**
@@ -84,6 +88,21 @@ export interface RegionalIntegrations {
     /** Il programma che chiede: nome, fornitore e versione, come li vuole la regione. */
     application: { id: string; vendor: string; version: string };
   }) => RegionalFsePublication;
+  /**
+   * Le ricette SSN della regione (D300): il servizio a cui vanno, con lotti di NRE e ricetta rossa
+   * in DPCM se la regione li ha, o il prescrittore esterno. Oggi il simulatore, con le scelte del
+   * simulatore nazionale (`decide` e le altre, per le prove) e il secondo fattore simulato del
+   * servizio delle credenziali della regione (`sessions`). Con `gateway` (le prove, o un
+   * adattatore dalla configurazione) si usa quello, con le parole e le scelte della regione.
+   */
+  prescription?: (
+    options: SimulatorOptions & {
+      now?: () => Date;
+      gateway?: PrescriptionGateway;
+      /** L'accesso regionale simulato, per i token. */
+      oauth?: SimulatedRegionalAuthorization;
+    },
+  ) => RegionalPrescription;
 }
 
 export interface RegionalPackage {

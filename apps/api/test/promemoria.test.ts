@@ -30,6 +30,7 @@ import { pdfFontNames } from './helpers/pdf-fonts';
 import { pdfText } from './helpers/pdf-text';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 const norm = (text: string) => text.replace(/\s+/g, ' ');
@@ -43,7 +44,7 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
   let deliveryOutcome: DeliveryResult['outcome'] = 'sent';
   /** Un guasto dove si fissano i dati del promemoria, dopo che il SAR ha accettato (D232). */
   let failPromemoria = false;
-  const sar = new SimulatedGateway('sar', {
+  const sar = regionalGateway({
     omitAuthCode: () => omitAuthCode,
     receiptMessages: () => (dpcPhrase ? [{ code: '0196', text: dpcPhrase }] : []),
   });
@@ -57,7 +58,7 @@ describe('promemoria della ricetta: stampa e invio (tappa 7)', () => {
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: ts },
+        gateways: { regional: sar, sistema_ts: ts },
         preSendChecks: noRules,
         reminderSender: sender,
         buildPromemoria: (...args) =>
@@ -707,14 +708,17 @@ describe('prima dell’invio: il promemoria si deve poter fare', () => {
   let t: TestDatabase;
   let s: Scenario;
   let cookie: string;
-  const sar = new SimulatedGateway('sar');
+  const sar = regionalGateway();
 
   beforeAll(async () => {
     t = await createTestDatabase();
     s = await createScenario(
       t.db,
       { regionName: null },
-      { gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') }, preSendChecks: noRules },
+      {
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        preSendChecks: noRules,
+      },
     );
     cookie = await login(s, 'titolare');
   });
@@ -738,7 +742,7 @@ describe('prima dell’invio: il promemoria si deve poter fare', () => {
     });
   };
 
-  it('senza regione dello studio: fermo prima, nessun invio al SAR', async () => {
+  it('senza regione dello studio: fermo prima, nessun invio', async () => {
     const res = await send();
     expect(res.statusCode).toBe(409);
     expect(res.json().errore).toMatch(/Manca la regione dello studio/);
@@ -769,7 +773,7 @@ describe('tempo massimo di attesa dell’invio (D94)', () => {
       {},
       {
         gateways: {
-          sar: new SimulatedGateway('sar', { delayMs: 300 }),
+          regional: regionalGateway({ delayMs: 300 }),
           sistema_ts: new SimulatedGateway('sistema_ts'),
         },
         preSendChecks: noRules,

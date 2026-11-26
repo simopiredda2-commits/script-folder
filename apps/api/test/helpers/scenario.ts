@@ -45,6 +45,13 @@ export class Clock {
 
 export const PASSWORD = 'password-di-prova-lunga';
 
+/**
+ * La regione degli studi delle prove: quella del primo pacchetto regionale, scritta come la scrive
+ * l'amministratore. Le prove del ciclo della ricetta prendono da qui il simulatore della regione,
+ * senza nominarla (D300).
+ */
+export const SCENARIO_REGION = 'PIEMONTE';
+
 export interface ScenarioUser {
   id: string;
   username: string;
@@ -125,7 +132,7 @@ export async function createScenario(
     .values({
       name: 'Studio associato di prova',
       kind: 'group',
-      regionName: 'PIEMONTE',
+      regionName: SCENARIO_REGION,
       ...settings,
     })
     .returning();

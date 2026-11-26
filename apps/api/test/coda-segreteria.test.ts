@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { archiveSecretary, patient, prescription, therapy } from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 interface QueueGroup {
   paziente: { id: string };
@@ -31,7 +32,7 @@ describe('code delle ricette viste dalla segreteria (D242)', () => {
       {},
       {
         gateways: {
-          sar: new SimulatedGateway('sar', { decide }),
+          regional: regionalGateway({ decide }),
           sistema_ts: new SimulatedGateway('sistema_ts', { decide }),
         },
       },

@@ -1,27 +1,25 @@
 /**
- * Lotti di NRE del medico (D269). La cartella numera da sé le ricette che vanno al SAR: chiede al
- * SAR un lotto di 1000 NRE legato al codice fiscale del medico e genera gli NRE agendo solo sul
- * progressivo (SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026, 3.2 e 4.1).
+ * Lotti di NRE del medico (D269, D300). Dove la regione dello studio dà i lotti, la cartella numera
+ * da sé le ricette SSN: chiede al servizio della regione un lotto di 1000 NRE legato al codice
+ * fiscale del medico e genera gli NRE agendo solo sul progressivo.
  *
- * - La richiesta usa «esclusivamente» utente, password e PIN RUPAR, senza secondo fattore e senza
- *   il token dell'accesso con SPID o CIE (3.1.1).
+ * - La richiesta usa le credenziali che vuole la regione (`texts.lotCredentials`).
  * - Il lotto si chiede alla firma, quando al medico restano meno di NRE_LOT_RESERVE numeri: con i
- *   numeri che restano la ricetta parte anche se il SAR non risponde. Senza numeri e senza lotto
- *   la ricetta non parte, e l'errore dice perché.
+ *   numeri che restano la ricetta parte anche se il servizio non risponde. Senza numeri e senza
+ *   lotto la ricetta non parte, e l'errore dice perché.
  * - Ogni richiesta resta nel registro degli invii, con la ricetta che l'ha fatta partire.
  * - Il numero si prende nella transazione che porta la ricetta «in invio»: due firme insieme non
- *   hanno mai lo stesso NRE, e la ricetta lo tiene anche dopo un rifiuto (4.3.1, caso 3).
+ *   hanno mai lo stesso NRE, e la ricetta lo tiene anche dopo un rifiuto.
  */
 
 import {
   composeNre,
   healthUnitsOfRegion,
-  NRE_LOT_REQUEST_TYPE,
   NRE_LOT_SIZE,
   nreLotPrefix,
   nreLotProblem,
 } from '@mmg/domain';
-import type { LotResult, SarRegionalServices } from '@mmg/integrations';
+import type { LotResult, RegionalPrescriptionGateway } from '@mmg/integrations';
 import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { secondsText } from '../admin/studio-service';
 import type { Actor } from '../auth/service';
@@ -33,17 +31,16 @@ import type { createCredentialService } from '../credentials/service';
 
 /**
  * Sotto questi numeri liberi, alla firma si chiede il lotto successivo (D269): un decimo del lotto,
- * perché la ricetta rossa e l'invio dopo un guasto hanno ancora un NRE quando il SAR non risponde.
- * Le fonti lette non danno una soglia.
+ * perché la ricetta rossa e l'invio dopo un guasto hanno ancora un NRE quando il servizio non
+ * risponde. Le fonti lette non danno una soglia.
  */
 export const NRE_LOT_RESERVE = 100;
 
+/** La prima lettera maiuscola, per i messaggi che cominciano con il nome del servizio. */
+const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 export interface NreLotDeps {
   db: Database;
-  /** Il SAR che dà i lotti: il simulatore, finché non c'è l'adattatore vero (regola 7). */
-  sar: SarRegionalServices;
-  /** «simulator», «test» o «production»: quello del SAR che riceve le ricette. */
-  environment: string;
   credentials: Pick<ReturnType<typeof createCredentialService>, 'authFor' | 'authRefused'>;
   /** Tempo massimo di attesa della risposta, lo stesso dell'invio della ricetta. */
   timeoutMs: (studioId: string) => Promise<number>;
@@ -51,11 +48,23 @@ export interface NreLotDeps {
 
 export type NreLots = ReturnType<typeof createNreLots>;
 
-export function createNreLots(deps: NreLotDeps) {
-  const { db, sar, environment, credentials } = deps;
+/** Il servizio delle ricette della regione, quando dà i lotti di NRE. */
+export type LotService = RegionalPrescriptionGateway & {
+  nreLots: NonNullable<RegionalPrescriptionGateway['nreLots']>;
+};
 
-  /** Numeri ancora da dare nei lotti del medico, in questo ambiente. */
-  async function freeNumbers(doctorUserId: string, q: Database | Tx = db): Promise<number> {
+/** L'ambiente dei lotti: quello del servizio che riceve le ricette. I lotti si tengono per ambiente. */
+export const lotEnvironment = (r: RegionalPrescriptionGateway) => r.gateway.environment;
+
+export function createNreLots(deps: NreLotDeps) {
+  const { db, credentials } = deps;
+
+  /** Numeri ancora da dare nei lotti del medico, nell'ambiente del servizio. */
+  async function freeNumbers(
+    doctorUserId: string,
+    environment: string,
+    q: Database | Tx = db,
+  ): Promise<number> {
     const [row] = await q
       .select({
         free: sql<number>`coalesce(sum(${nreLot.size} - ${nreLot.nextProgressive}), 0)::int`,
@@ -65,8 +74,8 @@ export function createNreLots(deps: NreLotDeps) {
     return Number(row?.free ?? 0);
   }
 
-  /** Il codice fiscale del medico: il SAR gli lega il lotto. */
-  async function doctorFiscalCodeOf(userId: string): Promise<string> {
+  /** Il codice fiscale del medico: il servizio gli lega il lotto. */
+  async function doctorFiscalCodeOf(userId: string, r: LotService): Promise<string> {
     const [row] = await db
       .select({ fiscalCode: doctorProfile.fiscalCode })
       .from(doctorProfile)
@@ -74,14 +83,14 @@ export function createNreLots(deps: NreLotDeps) {
     if (!row?.fiscalCode)
       throw new HttpError(
         422,
-        'Manca il codice fiscale del medico: il SAR lo vuole per dare i numeri di ricetta (lotto di NRE). Lo scrive l’amministratore nei dati del medico, in Strumenti › Utenti e ruoli',
-        { codice: 'CODICE_FISCALE_MEDICO_MANCANTE', servizio: 'rupar' },
+        `Manca il codice fiscale del medico: ${r.texts.service.the} lo vuole per dare i numeri di ricetta (lotto di NRE). Lo scrive l’amministratore nei dati del medico, in Strumenti › Utenti e ruoli`,
+        { codice: 'CODICE_FISCALE_MEDICO_MANCANTE', servizio: r.credentialService },
       );
     return row.fiscalCode;
   }
 
   /** Il codice della regione dello studio, dall'elenco delle aziende sanitarie (D267). */
-  async function regionCodeOf(studioId: string): Promise<string> {
+  async function regionCodeOf(studioId: string, r: RegionalPrescriptionGateway): Promise<string> {
     const [row] = await db
       .select({ region: studio.regionName })
       .from(studio)
@@ -90,14 +99,14 @@ export function createNreLots(deps: NreLotDeps) {
     if (!units)
       throw new HttpError(
         422,
-        'Manca la regione dello studio, o non è fra quelle dell’elenco delle aziende sanitarie del Ministero della Salute: il SAR la vuole per dare i numeri di ricetta (lotto di NRE). La scrive l’amministratore in Strumenti › Studio, «Dati dello studio»',
-        { codice: 'REGIONE_MANCANTE', servizio: 'rupar' },
+        `Manca la regione dello studio, o non è fra quelle dell’elenco delle aziende sanitarie del Ministero della Salute: ${r.texts.service.the} la vuole per dare i numeri di ricetta (lotto di NRE). La scrive l’amministratore in Strumenti › Studio, «Dati dello studio»`,
+        { codice: 'REGIONE_MANCANTE', servizio: r.credentialService },
       );
     return units[0]!.regionCode;
   }
 
-  /** Le credenziali per il lotto: solo utente, password e PIN RUPAR (V06, 3.1.1). */
-  async function authOf(userId: string) {
+  /** Le credenziali per il lotto: quelle che vuole la regione. */
+  async function authOf(userId: string, r: LotService) {
     try {
       return await credentials.authFor(userId, 'lotto_nre');
     } catch (err) {
@@ -105,26 +114,28 @@ export function createNreLots(deps: NreLotDeps) {
       if (details?.codice === 'CREDENZIALI_MANCANTI')
         throw new HttpError(
           422,
-          'Per chiedere al SAR i numeri di ricetta (lotto di NRE) servono utente, password e PIN RUPAR del medico, anche con l’accesso con SPID o CIE (SIRPED, V06, 3.1.1): inseriscili in «Credenziali dei servizi»',
+          `Per chiedere ${r.texts.service.to} i numeri di ricetta (lotto di NRE) servono ${r.texts.lotCredentials}: inseriscili in «Credenziali dei servizi»`,
           details,
         );
       throw err;
     }
   }
 
-  /** Chiede un lotto al SAR e lo conserva. L'errore dice che cosa non va. */
-  async function requestLot(actor: Actor, prescriptionId: string): Promise<void> {
-    const doctorFiscalCode = await doctorFiscalCodeOf(actor.userId);
-    const regionCode = await regionCodeOf(actor.studioId);
-    const auth = await authOf(actor.userId);
-    const input = { regionCode, lotType: NRE_LOT_REQUEST_TYPE, doctorFiscalCode };
+  /** Chiede un lotto al servizio della regione e lo conserva. L'errore dice che cosa non va. */
+  async function requestLot(actor: Actor, prescriptionId: string, r: LotService): Promise<void> {
+    const service = r.texts.service;
+    const environment = lotEnvironment(r);
+    const doctorFiscalCode = await doctorFiscalCodeOf(actor.userId, r);
+    const regionCode = await regionCodeOf(actor.studioId, r);
+    const auth = await authOf(actor.userId, r);
+    const input = { regionCode, lotType: r.nreLots.lotType, doctorFiscalCode };
     const timeoutMs = await deps.timeoutMs(actor.studioId);
     const started = Date.now();
     let result: LotResult;
     let timer: NodeJS.Timeout | undefined;
     try {
       result = await Promise.race([
-        sar.requestLot(input, auth),
+        r.nreLots.service.requestLot(input, auth),
         new Promise<LotResult>((ok) => {
           timer = setTimeout(
             () =>
@@ -152,7 +163,7 @@ export function createNreLots(deps: NreLotDeps) {
         result = {
           outcome: 'rejected',
           code: 'LOTTO_NON_VALIDO',
-          message: `Il SAR ha dato un lotto che non si può usare: ${problem}`,
+          message: `${capitalized(service.the)} ha dato un lotto che non si può usare: ${problem}`,
           raw: result.raw,
         };
     }
@@ -166,7 +177,7 @@ export function createNreLots(deps: NreLotDeps) {
     const final = result;
     const stored = await withActor(db, actor.userId, async (tx) => {
       await tx.insert(externalSubmission).values({
-        system: 'sar',
+        system: 'regional',
         environment,
         operation: 'lotto_nre',
         prescriptionId,
@@ -198,14 +209,14 @@ export function createNreLots(deps: NreLotDeps) {
     if (final.outcome === 'assigned')
       throw new HttpError(
         502,
-        `Il SAR ha dato di nuovo un lotto già ricevuto (${nreLotPrefix(final.lot)}): i suoi numeri non si possono dare due volte. Riprova; se si ripete, va segnalato al CSI Piemonte`,
+        `${capitalized(service.the)} ha dato di nuovo un lotto già ricevuto (${nreLotPrefix(final.lot)}): i suoi numeri non si possono dare due volte. Riprova; se si ripete, va segnalato ${r.texts.reportTo}`,
       );
     const reason =
       final.outcome === 'rejected'
-        ? `il SAR ha rifiutato la richiesta (${final.code}: ${final.message})`
+        ? `${service.the} ha rifiutato la richiesta (${final.code}: ${final.message})`
         : final.outcome === 'unreachable'
-          ? `il SAR non è raggiungibile (${final.message})`
-          : `il SAR non ha risposto in tempo (${final.message})`;
+          ? `${service.the} non è raggiungibile (${final.message})`
+          : `${service.the} non ha risposto in tempo (${final.message})`;
     throw new HttpError(
       final.outcome === 'rejected' ? 422 : 502,
       `Non si è potuto avere il lotto di numeri di ricetta (NRE): ${reason}`,
@@ -214,18 +225,19 @@ export function createNreLots(deps: NreLotDeps) {
   }
 
   /**
-   * Prima della firma di una ricetta che va al SAR: se i numeri liberi sono pochi, si chiede il
-   * lotto successivo. Se non ne restano e il lotto non arriva, la firma si ferma con il motivo; se
-   * ne restano, si va avanti e il motivo torna come avviso.
+   * Prima della firma di una ricetta SSN, dove la regione dà i lotti: se i numeri liberi sono
+   * pochi, si chiede il lotto successivo. Se non ne restano e il lotto non arriva, la firma si
+   * ferma con il motivo; se ne restano, si va avanti e il motivo torna come avviso.
    */
   async function ensureNumbers(
     actor: Actor,
     prescriptionId: string,
+    r: LotService,
   ): Promise<{ warning: string | null }> {
-    const free = await freeNumbers(actor.userId);
+    const free = await freeNumbers(actor.userId, lotEnvironment(r));
     if (free >= NRE_LOT_RESERVE) return { warning: null };
     try {
-      await requestLot(actor, prescriptionId);
+      await requestLot(actor, prescriptionId, r);
       return { warning: null };
     } catch (err) {
       if (free > 0 && err instanceof HttpError)
@@ -244,6 +256,7 @@ export function createNreLots(deps: NreLotDeps) {
   async function take(
     tx: Tx,
     doctorUserId: string,
+    environment: string,
   ): Promise<{ nre: string; lotId: string } | null> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const oldest = tx
@@ -272,13 +285,13 @@ export function createNreLots(deps: NreLotDeps) {
         });
       if (row) return { lotId: row.id, nre: composeNre(row, row.next - 1) };
       // Un'altra firma ha preso l'ultimo numero di quel lotto: se ne restano altrove, si riprova.
-      if ((await freeNumbers(doctorUserId, tx)) === 0) return null;
+      if ((await freeNumbers(doctorUserId, environment, tx)) === 0) return null;
     }
     return null;
   }
 
-  /** I lotti del medico, per l'esportazione e per vedere quanti numeri restano. */
-  async function lotsOf(doctorUserId: string) {
+  /** I lotti del medico nell'ambiente del servizio, per vedere quanti numeri restano. */
+  async function lotsOf(doctorUserId: string, environment: string) {
     return db
       .select()
       .from(nreLot)
@@ -286,5 +299,5 @@ export function createNreLots(deps: NreLotDeps) {
       .orderBy(asc(nreLot.receivedAt), asc(nreLot.id));
   }
 
-  return { environment, freeNumbers, ensureNumbers, take, requestLot, lotsOf, regionCodeOf };
+  return { freeNumbers, ensureNumbers, take, requestLot, lotsOf, regionCodeOf };
 }

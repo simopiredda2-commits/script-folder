@@ -1,7 +1,7 @@
 /**
  * Invii rimasti senza risposta nella dimostrazione (D233). Una ricetta e un certificato di
  * malattia sono «in invio» da 20 minuti, come se il servizio si fosse fermato mentre aspettava il
- * SAR e l'INPS: firmati dal medico, senza esito. Il medico ne segna l'esito chiesto all'ente, nella
+ * servizio delle ricette della regione e l'INPS: firmati dal medico, senza esito. Il medico ne segna l'esito chiesto all'ente, nella
  * pagina Ricette («Invii senza risposta») e nella scheda del certificato.
  *
  * Nella dimostrazione il servizio non si ferma: lo stato si scrive nel database prima dell'avvio,
@@ -9,6 +9,7 @@
  * non riceve il cambio di medico, che lo spostamento fermerebbe (D200). Paziente inventato
  * (regola 1), nessun invio vero (regola 7).
  */
+import { REGIONAL_PACKAGES } from '@mmg/regions';
 import { rulesetAt } from '@mmg/rules';
 import { and, desc, eq, like } from 'drizzle-orm';
 import type { Database } from '../../../api/src/db/client';
@@ -84,7 +85,12 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
   const checkedAt = new Date(signedAt.getTime() - 60_000);
   const day = studioDate(signedAt);
   // La versione delle regole con le aggiunte della regione dello studio, come nel controllo (D296).
-  const rulesVersion = rulesetAt(day, undefined, await archiveRegion(db, own!.id)).version;
+  const region = await archiveRegion(db, own!.id);
+  const rulesVersion = rulesetAt(day, undefined, region).version;
+  // Il nome del servizio delle ricette della regione dello studio, per la guida (D300).
+  const service =
+    REGIONAL_PACKAGES.find((p) => p.key === region)?.integrations?.prescription?.({}).texts.service
+      .the ?? 'il servizio delle ricette della regione';
   await withActor(db, doctor!.id, async (tx) => {
     const [red] = await tx
       .insert(prescription)
@@ -182,5 +188,6 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
     patient: `${p.firstName} ${p.lastName}`,
     doctor: doctor!.displayName,
     redPatient: `${second.p.firstName} ${second.p.lastName}`,
+    service,
   };
 }

@@ -21,8 +21,14 @@ import type {
   SendResult,
   ServiceAuth,
   StatusResult,
+  RegionalPrescription,
+  RegionalPrescriptionGateway,
 } from '@mmg/integrations';
-import { systemFor } from '@mmg/integrations';
+import {
+  EXTERNAL_PRESCRIBER_MISSING,
+  NO_REGIONAL_PRESCRIPTION,
+  systemFor,
+} from '@mmg/integrations';
 import { basePackLimit, painTherapyCodes, type ServiceNoteFacts } from '@mmg/rules';
 import { createHash } from 'node:crypto';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
@@ -56,7 +62,9 @@ import { contactPhone, studioDate, stupNote } from './rules-check';
 import type { DpcmContent, DpcmService } from './dpcm';
 import { renderRedForm } from './red-form-pdf';
 import { raoCondition, raoTablesFor, type RaoConditionFacts, type RaoSource } from '../rao/tables';
-import type { NreLots } from './nre-lots';
+import { lotEnvironment, type LotService, type NreLots } from './nre-lots';
+import type { RegionalChoice } from '../regions/integrations';
+import { archiveRegion } from '../regions/region';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
 import { prescriptionTypology } from './typology';
 import {
@@ -216,7 +224,13 @@ function parseSignInput(body: unknown): SignInput {
 
 export interface PrescriptionDeps {
   db: Database;
-  gateways: Record<GatewaySystem, PrescriptionGateway>;
+  /** Il Sistema TS, per la ricetta bianca. */
+  national: PrescriptionGateway;
+  /**
+   * La ricetta SSN della regione dello studio (D300): il servizio a cui va, con lotti di NRE,
+   * ricetta rossa in DPCM e parole della regione, o il prescrittore esterno.
+   */
+  regional: RegionalChoice<RegionalPrescription>;
   /**
    * Credenziali e secondo fattore del medico che firma (D100–D102): si prendono prima di ogni
    * chiamata e non entrano nei messaggi conservati.
@@ -229,10 +243,8 @@ export interface PrescriptionDeps {
    */
   preSendChecks?: (prescriptionId: string, actor: Actor, input: SignInput) => Promise<CheckOutcome>;
   /**
-   * Tempo massimo di attesa della risposta all'invio, in millisecondi. Regione Piemonte (SIRPED,
-   * «Cartelle cliniche MMG e PLS», V06 del 10/04/2026, 3.5.2 e 4.3.1): la cartella clinica ha un
-   * parametro per il tempo tra la richiesta di stampa e la stampa, «al momento definiti in 8
-   * secondi»; senza codice di autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto vale l'impostazione
+   * Tempo massimo di attesa della risposta all'invio, in millisecondi: senza codice di
+   * autenticazione in quel tempo si passa alla ricetta cartacea. Per difetto vale l'impostazione
    * dello studio, letta a ogni invio (`studio.sendTimeoutSeconds`, 8 secondi per difetto, D94); un
    * valore dato qui (lo usano le prove) vale sopra quello dello studio.
    */
@@ -256,14 +268,14 @@ export interface PrescriptionDeps {
   /** Come si fissano i dati del promemoria all'invio: le prove ci mettono un guasto (D232). */
   buildPromemoria?: typeof buildPromemoriaData;
   /**
-   * Lotti di NRE del medico (D269): con questi la cartella numera le ricette che vanno al SAR.
-   * Senza, l'NRE lo dà il servizio che riceve la ricetta, come i simulatori di prima.
+   * Lotti di NRE del medico (D269): con questi la cartella numera le ricette SSN, dove la regione
+   * dello studio dà i lotti. Senza, l'NRE lo dà il servizio che riceve la ricetta.
    */
   nreLots?: NreLots;
   /**
-   * Ricetta rossa in DPCM (D270): con questa, la ricetta SSN farmaceutica o specialistica senza
-   * esito si stampa sul modulo del Poligrafico e parte in DPCM, come vuole la Regione (V06, 4.3.1).
-   * Senza, il ripiego di prima.
+   * Ricetta rossa in DPCM (D270): dove la regione la vuole, la ricetta SSN farmaceutica o
+   * specialistica senza esito si stampa sul modulo del Poligrafico e parte in DPCM. Senza, il
+   * ripiego di prima.
    */
   dpcm?: DpcmService;
   /**
@@ -278,7 +290,7 @@ export interface PrescriptionDeps {
   rao?: { sources: () => readonly RaoSource[]; includeUnchecked: boolean };
 }
 
-/** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
+/** Le credenziali di ogni tipo di ricetta: della regione per la SSN, Sistema TS per la bianca. */
 const useFor = (kind: PrescriptionMessage['kind']): ServiceUse =>
   kind === 'white' ? 'ricetta_bianca' : 'ricetta_ssn';
 
@@ -383,14 +395,52 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return found;
   }
 
-  /** Ricetta che senza esito passa alla ricetta rossa in DPCM, come vuole la Regione (D270). */
-  const regionFlow = (p: PrescriptionRow) =>
-    !!deps.dpcm && (p.kind === 'pharma_ssn' || p.kind === 'specialist_ssn');
+  /** La ricetta SSN della regione dello studio dell'archivio (D300); null per la bianca. */
+  async function regionalOf(p: PrescriptionRow): Promise<RegionalPrescription | null> {
+    if (p.kind === 'white') return null;
+    return deps.regional.for(await archiveRegion(db, p.archiveId));
+  }
 
-  function check(p: PrescriptionRow, event: PrescriptionEvent): PrescriptionStatus {
+  /**
+   * Dove va la ricetta: la bianca al Sistema TS, le altre al servizio della regione dello studio.
+   * Se la regione non ha il servizio, o fa le ricette con il suo modulo, la ricetta non parte.
+   */
+  async function routeOf(p: PrescriptionRow): Promise<{
+    system: GatewaySystem;
+    gateway: PrescriptionGateway;
+    regional: RegionalPrescriptionGateway | null;
+  }> {
+    if (p.kind === 'white') return { system: 'sistema_ts', gateway: deps.national, regional: null };
+    const r = await regionalOf(p);
+    if (!r) throw new HttpError(422, NO_REGIONAL_PRESCRIPTION, { codice: 'RICETTA_REGIONALE' });
+    if (r.route === 'external')
+      throw new HttpError(422, EXTERNAL_PRESCRIBER_MISSING(r.texts.service), {
+        codice: 'PRESCRITTORE_ESTERNO',
+      });
+    return { system: 'regional', gateway: r.gateway, regional: r };
+  }
+
+  /** Il codice regionale del medico davanti al nome nel promemoria, dove la regione lo chiede. */
+  async function reminderDoctorCode(p: PrescriptionRow): Promise<boolean> {
+    const r = await regionalOf(p);
+    return r?.route === 'gateway' && r.reminderDoctorCode;
+  }
+
+  /** Il servizio della regione, se dà i lotti di NRE e il programma li tiene. */
+  const lotServiceOf = (r: RegionalPrescriptionGateway | null): LotService | null =>
+    deps.nreLots && r?.nreLots ? (r as LotService) : null;
+
+  /** Ricetta che senza esito passa alla ricetta rossa in DPCM, dove la regione la vuole (D270). */
+  async function regionFlow(p: PrescriptionRow): Promise<boolean> {
+    if (!deps.dpcm || (p.kind !== 'pharma_ssn' && p.kind !== 'specialist_ssn')) return false;
+    const r = await regionalOf(p);
+    return r?.route === 'gateway' && !!r.dpcm && !!lotServiceOf(r);
+  }
+
+  async function check(p: PrescriptionRow, event: PrescriptionEvent): Promise<PrescriptionStatus> {
     const r = transition(p.status, event, {
       lastErrorKind: p.lastErrorKind,
-      regionFlow: regionFlow(p),
+      regionFlow: await regionFlow(p),
       interrupted: interrupted(p),
     });
     if (!r.ok) throw new HttpError(409, r.reason);
@@ -778,13 +828,13 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
   async function submitForSigning(actor: Actor, id: string) {
     const p = await load(id, actor.studioId);
     await guardPrepare(actor, p, 'ricetta_da_firmare');
-    await setStatus(actor, p, check(p, 'submit_for_signing'));
+    await setStatus(actor, p, await check(p, 'submit_for_signing'));
   }
 
   async function backToDraft(actor: Actor, id: string) {
     const p = await load(id, actor.studioId);
     await guardPrepare(actor, p, 'ricetta_modifica');
-    await setStatus(actor, p, check(p, 'edit'), {
+    await setStatus(actor, p, await check(p, 'edit'), {
       lastErrorKind: null,
       lastErrorCode: null,
       lastErrorMessage: null,
@@ -939,12 +989,12 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return aics.length ? deps.drugCards(aics, studioDate(now())) : undefined;
   }
 
-  /** Il medico firma e invia: al SAR (SSN) o al Sistema TS (bianca). */
+  /** Il medico firma e invia: al servizio della regione (SSN) o al Sistema TS (bianca). */
   async function signAndSend(actor: Actor, id: string, body?: unknown) {
     const p = await load(id, actor.studioId);
     await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'ricetta_firma_invio');
     const input = parseSignInput(body);
-    check(p, 'start_sending');
+    await check(p, 'start_sending');
 
     const checked = await runChecks(p, actor, input);
     const { rulesVersion, issues, blocking } = checked;
@@ -974,16 +1024,21 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     }
 
     await ensurePromemoriaPossible(p, actor);
+    // Dove va: senza il servizio delle ricette della regione dello studio ci si ferma qui (D300).
+    const route = await routeOf(p);
     // Credenziali e codice di sessione di chi firma: se mancano ci si ferma qui, senza invio.
     const use = useFor(p.kind);
     const auth = await deps.credentials.authFor(actor.userId, use);
-    const system = systemFor(p.kind);
-    // Le ricette per il SAR hanno l'NRE dal lotto del medico (D269): alla prima firma se ne prende
-    // uno; dopo un rifiuto si rimanda lo stesso (V06, 4.3.1, caso 3). Se i numeri sono pochi si
+    const system = route.system;
+    // Dove la regione dà i lotti, la ricetta SSN ha l'NRE dal lotto del medico (D269): alla prima
+    // firma se ne prende uno; dopo un rifiuto si rimanda lo stesso. Se i numeri sono pochi si
     // chiede prima il lotto successivo; senza numeri e senza lotto la ricetta non parte.
-    const lots = system === 'sar' ? deps.nreLots : undefined;
+    const lotService = lotServiceOf(route.regional);
+    const lots = lotService ? deps.nreLots : undefined;
     const lotNotice =
-      lots && !p.assignedNre ? await lots.ensureNumbers(actor, p.id) : { warning: null };
+      lots && lotService && !p.assignedNre
+        ? await lots.ensureNumbers(actor, p.id, lotService)
+        : { warning: null };
 
     // Il messaggio e il paziente come partono: restano con la ricetta finché l'invio è in corso,
     // per l'esito segnato a mano se il servizio si ferma (D239).
@@ -999,7 +1054,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const message = await withActor(db, actor.userId, async (tx) => {
       let assigned = p.assignedNre ? { nre: p.assignedNre, lotId: p.nreLotId } : null;
       if (lots && !assigned) {
-        assigned = await lots.take(tx, actor.userId);
+        assigned = await lots.take(tx, actor.userId, lotEnvironment(lotService!));
         if (!assigned)
           throw new HttpError(
             409,
@@ -1048,7 +1103,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       return sent;
     });
 
-    const gateway = deps.gateways[system];
+    const gateway = route.gateway;
     // Il tempo di attesa dello studio, com'è adesso: l'amministratore può averlo appena cambiato.
     const timeoutMs = deps.sendTimeoutMs ?? (await studioSendTimeoutMs(db, actor.studioId));
     const started = Date.now();
@@ -1096,9 +1151,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       );
       result = { ...result, message: authMessage(authProblem, result.message) };
     }
-    // Eccezione di sistema del SAR (V06, 4.3.1, caso 4): come il tempo scaduto (caso 5), non si sa
-    // se la ricetta c'è. Nel registro degli invii resta l'eccezione; la ricetta ha l'esito incerto
-    // e si rimanda con lo stesso NRE (D269).
+    // Eccezione di sistema del servizio: come il tempo scaduto, non si sa se la ricetta c'è. Nel
+    // registro degli invii resta l'eccezione; la ricetta ha l'esito incerto e si rimanda con lo
+    // stesso NRE (D269).
     const errorKind: SendErrorKind | null =
       result.outcome === 'accepted'
         ? null
@@ -1131,6 +1186,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           undefined,
           undefined,
           message.prescriptionIndication,
+          { doctorCode: route.regional?.reminderDoctorCode ?? false },
         );
       } catch {
         promemoriaMissing = true;
@@ -1258,7 +1314,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const p = await load(id, actor.studioId);
     await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'ricetta_esito_invio');
     const input = settleSchema.parse(body ?? {});
-    check(p, input.esito === 'arrivata' ? 'settle_arrived' : 'settle_not_arrived');
+    await check(p, input.esito === 'arrivata' ? 'settle_arrived' : 'settle_not_arrived');
     if (!interrupted(p))
       throw new HttpError(
         409,
@@ -1322,6 +1378,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           snapshot?.paziente ?? null,
           undefined,
           message.prescriptionIndication,
+          { doctorCode: await reminderDoctorCode(p) },
         );
       } catch {
         notFixed = true;
@@ -1334,8 +1391,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       .where(eq(prescriptionCheck.prescriptionId, p.id))
       .orderBy(sql`${prescriptionCheck.at} desc`)
       .limit(1);
-    // Per la ricetta SSN al SAR non si rimanda: si stampa la ricetta rossa (V06, 4.3.1; D270).
-    const notArrived = regionFlow(p)
+    // Dove la regione vuole la ricetta rossa in DPCM, la ricetta SSN non si rimanda (D270).
+    const notArrived = (await regionFlow(p))
       ? 'Non arrivata all’ente, secondo l’ente: si stampa la ricetta rossa, che parte poi in DPCM'
       : 'Non arrivata all’ente, secondo l’ente: si può rimandare o stampare la ricetta rossa';
 
@@ -1456,8 +1513,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     doctor: PrescriptionMessage['doctor'],
     auth: ServiceAuth,
   ): Promise<StatusResult> {
-    const system = systemFor(p.kind);
-    const gateway = deps.gateways[system];
+    const { system, gateway } = await routeOf(p);
     const request = { nre: p.nre!, doctor };
     const started = Date.now();
     let result: StatusResult;
@@ -1563,7 +1619,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     if (p.status !== 'sent') {
       await guardPrepare(actor, p, 'ricetta_annullamento');
       const reason = cancelSchema.parse(body).motivo;
-      const to = check(p, 'cancel');
+      const to = await check(p, 'cancel');
       await setStatus(actor, p, to, {
         cancelledAt: now(),
         cancelledBy: actor.userId,
@@ -1573,9 +1629,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     }
     await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'ricetta_annullamento');
     const reason = cancelSchema.parse(body).motivo;
-    const to = check(p, 'cancel');
-    const system = systemFor(p.kind);
-    const gateway = deps.gateways[system];
+    const to = await check(p, 'cancel');
+    const { system, gateway } = await routeOf(p);
     const doctor = await doctorInfo(actor.userId);
     const use = useFor(p.kind);
     const auth = await deps.credentials.authFor(actor.userId, use);
@@ -1633,15 +1688,15 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
   }
 
   /**
-   * Ripiego sulla ricetta rossa: quando SAR o Sistema TS non rispondono. Restituisce i dati da
-   * stampare; il modulo di stampa conforme alle specifiche è da completare.
+   * Ripiego sulla ricetta rossa: quando il servizio della regione o il Sistema TS non rispondono.
+   * Restituisce i dati da stampare; il modulo di stampa conforme alle specifiche è da completare.
    */
   async function printPaper(actor: Actor, id: string, body?: unknown) {
     const p = await load(id, actor.studioId);
     await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'ricetta_cartacea');
-    const to = check(p, 'print_paper');
-    // Ricetta SSN al SAR: modulo del Poligrafico, NRE nuovo e invio in DPCM (D270).
-    if (deps.dpcm && regionFlow(p)) {
+    const to = await check(p, 'print_paper');
+    // Dove la regione la vuole: modulo del Poligrafico, NRE nuovo e invio in DPCM (D270).
+    if (deps.dpcm && (await regionFlow(p))) {
       await ensurePromemoriaPossible(p, actor);
       return deps.dpcm.print(actor, p, body, {
         message: await buildMessage(p, actor.userId),

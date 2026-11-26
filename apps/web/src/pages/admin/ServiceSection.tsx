@@ -96,8 +96,8 @@ export function ServiceSection() {
         </table>
       </div>
       <p className="aiuto">
-        L’ultima chiamata si vede per SAR, Sistema TS e INPS: ogni chiamata resta negli invii della
-        ricetta o del certificato, con l’ambiente.
+        L’ultima chiamata si vede per il servizio delle ricette della regione, il Sistema TS e
+        l’INPS: ogni chiamata resta negli invii della ricetta o del certificato, con l’ambiente.
       </p>
 
       <h3>Sessione</h3>

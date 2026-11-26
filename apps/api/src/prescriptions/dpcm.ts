@@ -1,19 +1,20 @@
 /**
- * Ricetta rossa in modalità DPCM (D270), come la vuole la Regione Piemonte quando la ricetta
- * dematerializzata non ha esito (SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026):
+ * Ricetta rossa in modalità DPCM (D270, D300), dove la regione dello studio la vuole quando la
+ * ricetta dematerializzata non ha esito (il pacchetto della regione dà i servizi DPCM):
  *
  * - il medico stampa la ricetta sul modulo del Poligrafico e la cartella legge il numero del
- *   modulo (4.3.1, caso 4; 4.2.2);
+ *   modulo;
  * - la ricetta ha un NRE nuovo del lotto del medico, stampato in chiaro e a barre accanto alla
- *   denominazione dell'ente (4.2.1 e 4.2.2);
- * - la cartella la manda al SAR in modalità DPCM entro 24 ore dalla compilazione, con «utente,
- *   password e PIN RUPAR», al più un file ogni 2 secondi (3.1.1, 3.4.2, 4.2.1);
- * - legge l'esito con l'elenco sintetico e l'elenco analitico (4.2.3);
+ *   denominazione dell'ente;
+ * - la cartella la manda al servizio della regione in modalità DPCM entro 24 ore dalla
+ *   compilazione, con le credenziali che vuole la regione, al più un file ogni 2 secondi;
+ * - legge l'esito con l'elenco sintetico e l'elenco analitico;
  * - se la ricetta dematerializzata può essere arrivata (tempo scaduto, eccezione di sistema, invio
- *   interrotto), la annulla da sé (4.3.1, casi 4 e 5; 4.3.2).
+ *   interrotto), la annulla da sé.
  *
- * Invii, letture degli esiti e annullamenti stanno in una coda: si riprovano finché il SAR non
- * risponde, con attese crescenti, e ogni chiamata resta nel registro degli invii.
+ * Invii, letture degli esiti e annullamenti stanno in una coda: si riprovano finché il servizio non
+ * risponde, con attese crescenti, e ogni chiamata resta nel registro degli invii. Ogni ricetta
+ * rossa va al servizio della regione del suo studio.
  */
 
 import { parsePoligrafico, poligraficoProblem, type PoligraficoCode } from '@mmg/domain';
@@ -27,6 +28,7 @@ import {
   type DpcmSummaryResult,
   type PrescriptionGateway,
   type PrescriptionMessage,
+  type RegionalServiceName,
 } from '@mmg/integrations';
 import {
   and,
@@ -49,6 +51,7 @@ import type { createCredentialService } from '../credentials/service';
 import type { Database } from '../db/client';
 import {
   appUser,
+  archive,
   doctorProfile,
   dpcmPrescription,
   externalSubmission,
@@ -58,7 +61,7 @@ import {
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { unrefTimer } from '../timers';
-import type { NreLots } from './nre-lots';
+import { lotEnvironment, type LotService, type NreLots } from './nre-lots';
 import { studioDate } from './rules-check';
 
 /** Doppione su un indice unico di Postgres (codice 23505), anche dentro l'errore di Drizzle. */
@@ -67,6 +70,16 @@ function uniqueViolation(e: unknown, constraint: string): boolean {
   const pg = (err.cause ?? err) as { code?: string; constraint?: string };
   return pg.code === '23505' && pg.constraint === constraint;
 }
+
+/** Quando la regione dello studio non ha, nel programma, la ricetta rossa in DPCM. */
+const NO_DPCM =
+  'La regione dello studio non ha, nel programma, la ricetta rossa in DPCM: non si manda';
+
+/** La prima lettera maiuscola, per i messaggi che cominciano con il nome del servizio. */
+const capitalized = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Nessuna risposta in tempo, con il nome del servizio della regione. */
+const noAnswer = (service: RegionalServiceName) => `Nessuna risposta ${service.from} in tempo`;
 
 /** Attese prima di riprovare un invio, una lettura o un annullamento, in minuti. */
 export const DPCM_RETRY_MINUTES = [1, 5, 15, 60] as const;
@@ -77,7 +90,7 @@ const LEASE_MINUTES = 5;
 /** Fra due file dello stesso medico almeno 2 secondi (6.1.1; V06, 3.4.2). */
 export const DPCM_MIN_INTERVAL_MS = 2000;
 /**
- * Attesa della risposta del SAR per i servizi DPCM: l'invio non è sincrono come la ricetta
+ * Attesa della risposta del servizio per i servizi DPCM: l'invio non è sincrono come la ricetta
  * dematerializzata, che vuole qualche secondo (V06, 3.5.1). Scelta mia: 30 secondi.
  */
 export const DPCM_TIMEOUT_MS = 30_000;
@@ -168,19 +181,23 @@ export interface RedFormData {
   doctorRegionalCode: string | null;
 }
 
-/** Contenuto conservato con la ricetta rossa: quello che va al SAR e quello che si stampa. */
+/** Contenuto conservato con la ricetta rossa: quello che va al servizio e quello che si stampa. */
 export interface DpcmContent {
   ricetta: DpcmPrescription;
   stampa: RedFormData;
 }
 
+/** Il servizio delle ricette della regione, quando riceve la ricetta rossa in DPCM. */
+export type DpcmRegional = LotService & { dpcm: DpcmServices };
+
 export interface DpcmDeps {
   db: Database;
-  /** Il SAR: invio dei file DPCM e lettura degli esiti. */
-  sar: DpcmServices;
-  /** Il SAR per la ricetta dematerializzata: il suo annullamento (4.3.2). */
-  dm: Pick<PrescriptionGateway, 'cancel'>;
-  environment: string;
+  /**
+   * Il servizio delle ricette della regione di uno studio, con i servizi DPCM e i lotti (D300):
+   * invio dei file, lettura degli esiti, annullamento della dematerializzata. Null se la regione
+   * non ha la ricetta rossa in DPCM.
+   */
+  regionalOf: (studioId: string) => Promise<DpcmRegional | null>;
   credentials: Pick<ReturnType<typeof createCredentialService>, 'authFor' | 'authRefused'>;
   nreLots: NreLots;
   now: () => Date;
@@ -246,10 +263,20 @@ export function specialistPrescription1(l: {
 export type DpcmService = ReturnType<typeof createDpcmService>;
 
 export function createDpcmService(deps: DpcmDeps) {
-  const { db, sar, nreLots, now } = deps;
+  const { db, nreLots, now } = deps;
   const minInterval = deps.minIntervalMs ?? DPCM_MIN_INTERVAL_MS;
   /** Ultimo file mandato da ogni medico, per i 2 secondi (6.1.1). */
   const lastSent = new Map<string, number>();
+
+  /** Il servizio della regione dello studio della ricetta rossa (D300). */
+  async function regionalOfRow(row: DpcmRow): Promise<DpcmRegional | null> {
+    const [place] = await db
+      .select({ studioId: archive.studioId })
+      .from(prescription)
+      .innerJoin(archive, eq(archive.id, prescription.archiveId))
+      .where(eq(prescription.id, row.prescriptionId));
+    return place ? deps.regionalOf(place.studioId) : null;
+  }
   let running: Promise<void> | null = null;
   let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -366,7 +393,10 @@ export function createDpcmService(deps: DpcmDeps) {
     ctx: { message: PrescriptionMessage; interrupted: boolean },
   ) {
     const input = printRedSchema.parse(body ?? {});
-    const regionCode = await nreLots.regionCodeOf(actor.studioId);
+    const r = await deps.regionalOf(actor.studioId);
+    if (!r) throw new HttpError(409, NO_DPCM);
+    const service = r.texts.service;
+    const regionCode = await nreLots.regionCodeOf(actor.studioId, r);
     const problem = poligraficoProblem(input.poligrafico, regionCode);
     if (problem) throw new HttpError(400, problem);
     const poligrafico = parsePoligrafico(input.poligrafico)!;
@@ -393,8 +423,9 @@ export function createDpcmService(deps: DpcmDeps) {
     });
     // I controlli del file prima di stampare: un modulo non si spreca per un dato che manca.
     const shape = dpcmPrescriptionProblem({ ...content.ricetta, nre: 'X' });
-    if (shape) throw new HttpError(422, `La ricetta rossa non si può mandare al SAR: ${shape}`);
-    const lots = await nreLots.ensureNumbers(actor, p.id);
+    if (shape)
+      throw new HttpError(422, `La ricetta rossa non si può mandare ${service.to}: ${shape}`);
+    const lots = await nreLots.ensureNumbers(actor, p.id, r);
     // La ricetta dematerializzata può essere arrivata: tempo scaduto, eccezione o invio interrotto.
     const dmNre =
       p.assignedNre &&
@@ -405,11 +436,11 @@ export function createDpcmService(deps: DpcmDeps) {
     let done: { nre: string; lotId: string };
     try {
       done = await withActor(db, actor.userId, async (tx) => {
-        const taken = await nreLots.take(tx, actor.userId);
+        const taken = await nreLots.take(tx, actor.userId, lotEnvironment(r));
         if (!taken)
           throw new HttpError(
             409,
-            'I numeri di ricetta (NRE) del medico sono finiti: la ricetta rossa ne vuole uno. Riprova quando il SAR dà il lotto nuovo',
+            `I numeri di ricetta (NRE) del medico sono finiti: la ricetta rossa ne vuole uno. Riprova quando ${service.the} dà il lotto nuovo`,
           );
         const stored: DpcmContent = {
           ricetta: { ...content.ricetta, nre: taken.nre },
@@ -441,7 +472,7 @@ export function createDpcmService(deps: DpcmDeps) {
         await tx.insert(dpcmPrescription).values({
           prescriptionId: p.id,
           doctorUserId: actor.userId,
-          environment: deps.environment,
+          environment: lotEnvironment(r),
           poligrafico: poligrafico.code,
           nre: taken.nre,
           nreLotId: taken.lotId,
@@ -496,12 +527,13 @@ export function createDpcmService(deps: DpcmDeps) {
     request: unknown,
     result: { outcome: string; code?: string | null; message?: string | null; raw?: unknown },
     started: number,
-    environment = deps.environment,
     userId = row.doctorUserId,
   ) {
+    // L'ambiente della ricetta rossa, scritto alla stampa: quello del servizio di allora.
+    const environment = row.environment;
     await withActor(db, userId, (tx) =>
       tx.insert(externalSubmission).values({
-        system: 'sar',
+        system: 'regional',
         environment,
         operation,
         prescriptionId: row.prescriptionId,
@@ -547,9 +579,10 @@ export function createDpcmService(deps: DpcmDeps) {
 
   async function sendOne(row: DpcmRow) {
     const content = row.content as DpcmContent;
-    const got = await authOrError(row.doctorUserId, 'ricetta_dpcm');
+    const r = await regionalOfRow(row);
+    const got = r ? await authOrError(row.doctorUserId, 'ricetta_dpcm') : { error: NO_DPCM };
     const attempts = row.attempts + 1;
-    if ('error' in got) {
+    if (!r || 'error' in got) {
       await db
         .update(dpcmPrescription)
         .set({
@@ -568,10 +601,10 @@ export function createDpcmService(deps: DpcmDeps) {
     const started = Date.now();
     let receipt: DpcmReceipt;
     try {
-      receipt = await within(sar.sendDpcm({ prescription: content.ricetta, fileName }, got.auth), {
-        outcome: 'timeout',
-        message: 'Nessuna risposta dal SAR in tempo',
-      });
+      receipt = await within(
+        r.dpcm.sendDpcm({ prescription: content.ricetta, fileName }, got.auth),
+        { outcome: 'timeout', message: noAnswer(r.texts.service) },
+      );
     } catch (err) {
       receipt = { outcome: 'timeout', message: `Errore dell'adattatore: ${String(err)}` };
     }
@@ -610,12 +643,13 @@ export function createDpcmService(deps: DpcmDeps) {
         .where(eq(dpcmPrescription.id, row.id));
       return;
     }
+    const service = r.texts.service;
     const reason =
       receipt.outcome === 'rejected'
-        ? `il SAR non ha accolto il file (${receipt.code}: ${receipt.message})`
+        ? `${service.the} non ha accolto il file (${receipt.code}: ${receipt.message})`
         : receipt.outcome === 'unreachable'
-          ? `il SAR non è raggiungibile (${receipt.message})`
-          : `il SAR non ha risposto in tempo (${receipt.message})`;
+          ? `${service.the} non è raggiungibile (${receipt.message})`
+          : `${service.the} non ha risposto in tempo (${receipt.message})`;
     await db
       .update(dpcmPrescription)
       .set({
@@ -628,11 +662,12 @@ export function createDpcmService(deps: DpcmDeps) {
   }
 
   async function checkOne(row: DpcmRow) {
-    const got = await authOrError(row.doctorUserId, 'ricetta_dpcm');
+    const r = await regionalOfRow(row);
+    const got = r ? await authOrError(row.doctorUserId, 'ricetta_dpcm') : { error: NO_DPCM };
     // L'esito si rilegge ogni 5 minuti, anche dopo una lettura non riuscita: i tentativi
     // dell'invio non contano qui.
     const again = () => new Date(now().getTime() + minutes(DPCM_CHECK_MINUTES));
-    if ('error' in got) {
+    if (!r || 'error' in got) {
       await db
         .update(dpcmPrescription)
         .set({
@@ -646,9 +681,9 @@ export function createDpcmService(deps: DpcmDeps) {
     const started = Date.now();
     let summary: DpcmSummaryResult;
     try {
-      summary = await within(sar.dpcmSummary({ protocol: row.protocol! }, auth), {
+      summary = await within(r.dpcm.dpcmSummary({ protocol: row.protocol! }, auth), {
         outcome: 'timeout',
-        message: 'Nessuna risposta dal SAR in tempo',
+        message: noAnswer(r.texts.service),
       });
     } catch (err) {
       summary = { outcome: 'timeout', message: `Errore dell'adattatore: ${String(err)}` };
@@ -692,9 +727,9 @@ export function createDpcmService(deps: DpcmDeps) {
       const analyticStarted = Date.now();
       let analytic: DpcmAnalyticResult;
       try {
-        analytic = await within(sar.dpcmAnalytic({ protocol: row.protocol! }, auth), {
+        analytic = await within(r.dpcm.dpcmAnalytic({ protocol: row.protocol! }, auth), {
           outcome: 'timeout',
-          message: 'Nessuna risposta dal SAR in tempo',
+          message: noAnswer(r.texts.service),
         });
       } catch (err) {
         analytic = { outcome: 'timeout', message: `Errore dell'adattatore: ${String(err)}` };
@@ -740,9 +775,10 @@ export function createDpcmService(deps: DpcmDeps) {
   async function cancelDm(row: DpcmRow) {
     // La dematerializzata la annulla chi l'aveva firmata, a suo nome (4.3.2).
     const signer = row.dmDoctorUserId ?? row.doctorUserId;
-    const got = await authOrError(signer, 'ricetta_ssn');
+    const r = await regionalOfRow(row);
+    const got = r ? await authOrError(signer, 'ricetta_ssn') : { error: NO_DPCM };
     const attempts = row.dmCancelAttempts + 1;
-    if ('error' in got) {
+    if (!r || 'error' in got) {
       await db
         .update(dpcmPrescription)
         .set({
@@ -754,13 +790,13 @@ export function createDpcmService(deps: DpcmDeps) {
       return;
     }
     const doctor = await doctorOf(signer);
-    const reason = 'Ricetta senza esito, rifatta come ricetta rossa (V06, 4.3.1)';
+    const reason = 'Ricetta senza esito, rifatta come ricetta rossa';
     const started = Date.now();
     let result: Awaited<ReturnType<PrescriptionGateway['cancel']>>;
     try {
-      result = await within(deps.dm.cancel({ nre: row.dmNre!, reason, doctor }, got.auth), {
+      result = await within(r.gateway.cancel({ nre: row.dmNre!, reason, doctor }, got.auth), {
         outcome: 'timeout',
-        message: 'Nessuna risposta dal SAR in tempo',
+        message: noAnswer(r.texts.service),
       });
     } catch (err) {
       result = { outcome: 'timeout', message: `Errore dell'adattatore: ${String(err)}` };
@@ -776,7 +812,6 @@ export function createDpcmService(deps: DpcmDeps) {
         raw: 'raw' in result ? result.raw : null,
       },
       started,
-      deps.environment,
       signer,
     );
     if (result.outcome === 'accepted') {
@@ -801,13 +836,13 @@ export function createDpcmService(deps: DpcmDeps) {
       );
     }
     if (result.outcome === 'rejected' && !result.authProblem) {
-      // Il SAR ha risposto e non l'ha annullata: per esempio non c'è perché non era arrivata.
+      // Il servizio ha risposto e non l'ha annullata: per esempio non c'è perché non era arrivata.
       await db
         .update(dpcmPrescription)
         .set({
           dmCancelStatus: 'failed',
           dmCancelAttempts: attempts,
-          dmCancelError: `Il SAR non ha annullato la ricetta dematerializzata ${row.dmNre} (${result.code}: ${result.message}). Se non era arrivata, non serve altro; altrimenti si annulla dal portale del SAR.`,
+          dmCancelError: `${capitalized(r.texts.service.the)} non ha annullato la ricetta dematerializzata ${row.dmNre} (${result.code}: ${result.message}). Se non era arrivata, non serve altro; altrimenti si annulla dal portale ${r.texts.service.of}.`,
           dmCancelNextAt: null,
         })
         .where(eq(dpcmPrescription.id, row.id));

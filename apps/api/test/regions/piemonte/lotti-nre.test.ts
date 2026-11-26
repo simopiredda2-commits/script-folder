@@ -2,11 +2,22 @@ import { composeNre, NRE_LOT_SIZE } from '@mmg/domain';
 import { SimulatedGateway, type SimulatedOutcome } from '@mmg/integrations';
 import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { Actor } from '../src/auth/service';
-import { doctorProfile, externalSubmission, nreLot, prescription, studio } from '../src/db/schema';
-import { createNreLots, NRE_LOT_RESERVE } from '../src/prescriptions/nre-lots';
-import { createScenario, login, type Scenario } from './helpers/scenario';
-import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import type { Actor } from '../../../src/auth/service';
+import {
+  doctorProfile,
+  externalSubmission,
+  nreLot,
+  prescription,
+  studio,
+} from '../../../src/db/schema';
+import {
+  createNreLots,
+  type LotService,
+  NRE_LOT_RESERVE,
+} from '../../../src/prescriptions/nre-lots';
+import { createScenario, login, type Scenario } from '../../helpers/scenario';
+import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
+import { sarPrescription, SimulatedSar } from '@mmg/regions/piemonte';
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 const noop = () => Promise.resolve();
@@ -22,7 +33,7 @@ describe('lotti di NRE (D269)', () => {
   /** Esiti scelti dalla prova, invio per invio e lotto per lotto. */
   const sends: SimulatedOutcome[] = [];
   const lots: SimulatedOutcome[] = [];
-  const sar = new SimulatedGateway('sar', {
+  const sar = new SimulatedSar({
     decide: () => sends.shift() ?? 'accepted',
     decideLot: () => lots.shift() ?? 'accepted',
   });
@@ -33,7 +44,7 @@ describe('lotti di NRE (D269)', () => {
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         preSendChecks: noRules,
       },
     );
@@ -281,13 +292,12 @@ describe('lotti di NRE (D269)', () => {
       // Il lotto da solo dice che cosa manca e chi lo scrive.
       const lots = createNreLots({
         db: t.db,
-        sar,
-        environment: 'simulator',
         credentials: { authFor: () => Promise.reject(new Error('non serve')), authRefused: noop },
         timeoutMs: () => Promise.resolve(1000),
       });
+      const r = sarPrescription(sar) as LotService;
       const actor = { userId: s.users.titolare.id, studioId: s.studioId } as Actor;
-      await expect(lots.requestLot(actor, id)).rejects.toThrow(
+      await expect(lots.requestLot(actor, id, r)).rejects.toThrow(
         /Manca il codice fiscale del medico.*Utenti e ruoli/,
       );
       await t.db
@@ -295,7 +305,7 @@ describe('lotti di NRE (D269)', () => {
         .set({ fiscalCode: profile!.fiscalCode })
         .where(eq(doctorProfile.userId, s.users.titolare.id));
       await t.db.update(studio).set({ regionName: null }).where(eq(studio.id, s.studioId));
-      await expect(lots.requestLot(actor, id)).rejects.toThrow(
+      await expect(lots.requestLot(actor, id, r)).rejects.toThrow(
         /Manca la regione dello studio.*Dati dello studio/,
       );
     } finally {
@@ -351,12 +361,14 @@ describe('lotti di NRE (D269)', () => {
     ]) {
       const bad = createNreLots({
         db: t.db,
-        sar: { requestLot: () => Promise.resolve({ outcome: 'assigned', lot, raw: lot }) },
-        environment: 'simulator',
         credentials: { authFor: () => Promise.resolve(auth), authRefused: noop },
         timeoutMs: () => Promise.resolve(1000),
       });
-      await expect(bad.requestLot(actor, id)).rejects.toThrow(
+      const giving = new SimulatedSar();
+      giving.requestLot = () => Promise.resolve({ outcome: 'assigned', lot, raw: lot });
+      await expect(
+        bad.requestLot(actor, id, sarPrescription(giving) as LotService),
+      ).rejects.toThrow(
         /lotto che non si può usare: (Il codice del lotto non ha le 6 cifre|il codice della regione è 020)/,
       );
     }

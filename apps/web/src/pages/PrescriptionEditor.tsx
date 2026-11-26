@@ -71,6 +71,7 @@ import {
   type Summary,
   type TherapyRow,
 } from './RecordPage';
+import { capitalized, useRegionalService } from '../lib/regional-service';
 
 export interface Drug {
   aic: string;
@@ -1768,8 +1769,9 @@ export function PackagePicker({
 
 /**
  * Prestazione scritta a mano (D154): solo se il catalogo del programma non ha ancora un codice
- * nuovo. Il SAR controlla i due codici sul catalogo che la Regione ha trasmesso; all'invio il
- * programma avvisa (R18) e chiede un motivo, che resta registrato.
+ * nuovo. Il servizio delle ricette della regione controlla i due codici sul catalogo che la
+ * regione ha trasmesso; all'invio il programma avvisa (R18) e chiede un motivo, che resta
+ * registrato.
  */
 function ManualServiceForm({
   disabled,
@@ -1782,6 +1784,7 @@ function ManualServiceForm({
     serviceDescription: string;
   }) => void;
 }) {
+  const service = useRegionalService();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
   const [national, setNational] = useState('');
@@ -1805,8 +1808,9 @@ function ManualServiceForm({
     <fieldset className="modulo-a-mano" disabled={disabled}>
       <legend>Prestazione scritta a mano</legend>
       <p className="aiuto">
-        Solo se il catalogo del programma non è ancora aggiornato. Il SAR controlla i due codici sul
-        catalogo della Regione e rifiuta la ricetta se non li trova; all’invio serve un motivo.
+        Solo se il catalogo del programma non è ancora aggiornato. {capitalized(service.il)}{' '}
+        controlla i due codici sul catalogo della regione e rifiuta la ricetta se non li trova;
+        all’invio serve un motivo.
       </p>
       <div className="campo">
         <label htmlFor="a-mano-catalogo">Codice del catalogo regionale</label>

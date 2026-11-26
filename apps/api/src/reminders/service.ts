@@ -25,6 +25,11 @@ export interface ReminderDeps {
   db: Database;
   sender: ReminderSender;
   now?: () => Date;
+  /**
+   * Se la regione dello studio vuole il codice regionale del medico davanti al nome nel promemoria
+   * (D300). Per difetto no.
+   */
+  doctorCodeFor?: (studioId: string) => Promise<boolean>;
 }
 
 const sendSchema = z
@@ -214,7 +219,13 @@ export function createReminderService(deps: ReminderDeps) {
         409,
         'Per l’anteprima serve il medico che firmerà: il paziente non ha una scelta del medico in corso',
       );
-    const data = await buildPromemoriaPreview(db, p.id, doctorId, studioDate(now()));
+    const data = await buildPromemoriaPreview(
+      db,
+      p.id,
+      doctorId,
+      studioDate(now()),
+      (await deps.doctorCodeFor?.(actor.studioId)) ?? false,
+    );
     const bytes = await renderPromemoria(data, await chosenPaper(actor));
     return { bytes, name: 'promemoria-bozza.pdf' };
   }

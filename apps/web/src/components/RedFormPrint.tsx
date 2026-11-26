@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { ErrorMessage, Notice } from './common';
 import { Icon } from './Icon';
+import { useRegionalService } from '../lib/regional-service';
 
 /** La ricetta rossa preparata: numero del modulo, NRE nuovo, PDF da stampare (D270). */
 export interface RedPrinted {
@@ -17,6 +18,7 @@ export interface RedPrinted {
  * vista anche quando la ricetta esce dalla coda, come il promemoria delle ricette inviate.
  */
 export function RedPrintedNotice({ red, who }: { red: RedPrinted; who?: string }) {
+  const service = useRegionalService();
   return (
     <>
       <Notice kind="fatto">
@@ -27,7 +29,7 @@ export function RedPrintedNotice({ red, who }: { red: RedPrinted; who?: string }
           vede nella pagina Ricette.
         </p>
         {red.annullamentoDematerializzata && (
-          <p>La ricetta dematerializzata, se era arrivata al SAR, si annulla da sola.</p>
+          <p>La ricetta dematerializzata, se era arrivata {service.al}, si annulla da sola.</p>
         )}
       </Notice>
       {red.avviso && <Notice kind="avviso">{red.avviso}</Notice>}
@@ -43,8 +45,9 @@ export function RedPrintedNotice({ red, who }: { red: RedPrinted; who?: string }
 /**
  * Ricetta rossa sul modulo del Poligrafico (D270): il medico legge il numero del modulo nella
  * stampante (codice a barre o a mano), sceglie il tipo di visita, e la cartella prepara il PDF con
- * un NRE nuovo; il file DPCM parte poi da sé. Serve quando la ricetta dematerializzata non ha esito
- * (SIRPED, V06, 4.3.1), anche dopo un invio rimasto senza risposta (D233).
+ * un NRE nuovo; il file DPCM parte poi da sé. Serve quando la ricetta dematerializzata non ha
+ * esito, dove la regione vuole la ricetta rossa in DPCM (D300), anche dopo un invio rimasto senza
+ * risposta (D233).
  */
 export function RedFormPrint({
   prescriptionId,

@@ -169,7 +169,7 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
         <p>
           Una ricetta e un certificato di malattia di {ready.interrupted.patient}, firmati da{' '}
           {ready.interrupted.doctor}, sono rimasti «in invio»: come se il servizio si fosse fermato
-          mentre aspettava il SAR e l’INPS.
+          mentre aspettava {ready.interrupted.service} e l’INPS.
         </p>
         <p>
           Il medico segna l’esito chiesto all’ente: la ricetta in{' '}
@@ -178,10 +178,11 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
         </p>
         <p>
           Anche una ricetta di {ready.interrupted.redPatient} è rimasta «in invio»: per lei{' '}
-          <strong>Stampa la ricetta rossa</strong>, come vuole la Regione quando il SAR non dà
-          esito. Il numero del modulo è quello del codice a barre del ricettario; qui va bene{' '}
-          <code>010260000000101</code>. Il PDF si apre per la stampa sul modulo; la ricetta parte da
-          sola in DPCM e si segue in <strong>Ricette › Ricette rosse in DPCM</strong>.
+          <strong>Stampa la ricetta rossa</strong>, come vuole la regione quando{' '}
+          {ready.interrupted.service} non dà esito. Il numero del modulo è quello del codice a barre
+          del ricettario; qui va bene <code>010260000000101</code>. Il PDF si apre per la stampa sul
+          modulo; la ricetta parte da sola in DPCM e si segue in{' '}
+          <strong>Ricette › Ricette rosse in DPCM</strong>.
         </p>
       </section>
       <section aria-labelledby="dimo-presidi">

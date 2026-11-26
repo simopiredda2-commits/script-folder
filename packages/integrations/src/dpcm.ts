@@ -1,17 +1,17 @@
 /**
- * Ricetta rossa in modalità DPCM (D270): il file che la cartella manda al SAR con il servizio
- * «invioTelematicoSanita», e gli esiti che legge con «elencoSintetico» ed «elencoAnalitico».
+ * Ricetta rossa in modalità DPCM (D270): il file che la cartella manda al servizio della regione
+ * con «invioTelematicoSanita», e gli esiti che legge con «elencoSintetico» ed «elencoAnalitico».
  *
  * Fonti:
  * - Sistema TS, «Collegamento telematico in rete dei medici», versione 11 del 1/3/2016, 6.1 (invio
  *   e ricevuta), 6.1.2 (schema dati della ricetta), 6.4 e 6.5 (elenchi degli esiti);
  * - Sistema TS, «WSDL e schemi XSD» del 5/9/2011, 3.1 (RicettaMIR.xsd, versione 2.1) e 3.2
- *   (TipiDatiMIR.xsd, versione 1.0.7): ordine degli elementi, lunghezze e valori ammessi;
- * - SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026, 3.4 e 4.2: TipoInvio «RPS», Bar1 e
- *   Bar2 con il numero del Poligrafico, Ricetta1 con l'NRE, PinCode e codice fiscale dell'assistito
- *   cifrati con il certificato della Regione, Prescrizione2 con catalogo e tipo di accesso.
+ *   (TipiDatiMIR.xsd, versione 1.0.7): ordine degli elementi, lunghezze e valori ammessi.
  *
- * Qui il file e le interfacce; il simulatore del SAR è in `simulator.ts` (regola 7).
+ * Come la regione vuole i campi (tipo di invio, Bar1 e Bar2 con il numero del Poligrafico,
+ * Ricetta1 con l'NRE, PinCode e codice fiscale dell'assistito cifrati con il certificato del suo
+ * servizio, Prescrizione2 con catalogo e tipo di accesso) lo dice il pacchetto della regione, che
+ * attua i servizi e il loro simulatore (regola 7). Qui il file e le interfacce.
  */
 
 import { strToU8, zipSync } from 'fflate';
@@ -168,7 +168,7 @@ function lineXml(l: DpcmLine): string {
  */
 export function dpcmInsertXml(
   p: DpcmPrescription,
-  input: { pinCode: string; crypto: DpcmCrypto },
+  input: { pinCode: string; crypto: DpcmCrypto; sendType: string },
 ): string {
   const problem = dpcmPrescriptionProblem(p);
   if (problem) throw new Error(problem);
@@ -201,7 +201,7 @@ export function dpcmInsertXml(
     '<RicetteMIR>',
     '<Testata>',
     element('PinCode', input.crypto.encrypt(input.pinCode), 256),
-    element('TipoInvio', 'RPS', 3),
+    element('TipoInvio', input.sendType, 3),
     '</Testata>',
     ricetta,
     '</RicetteMIR>',
@@ -221,13 +221,12 @@ export function dpcmFileName(base: string, producer: string): string {
 }
 
 /**
- * Il pacchetto da allegare (6.1 e V06, 4.2.1): un solo file compresso in formato zip, al più 1 MB
- * per i medici, con il file XML della ricetta. Data fissa nello zip: lo stesso contenuto dà gli
- * stessi byte.
+ * Il pacchetto da allegare (6.1): un solo file compresso in formato zip, al più 1 MB per i medici,
+ * con il file XML della ricetta. Data fissa nello zip: lo stesso contenuto dà gli stessi byte.
  */
 export function dpcmPackage(
   p: DpcmPrescription,
-  input: { pinCode: string; crypto: DpcmCrypto; xmlName: string },
+  input: { pinCode: string; crypto: DpcmCrypto; sendType: string; xmlName: string },
 ): { xml: string; zip: Uint8Array } {
   const xml = dpcmInsertXml(p, input);
   const zip = zipSync(
@@ -290,8 +289,8 @@ export type DpcmAnalyticResult =
   | { outcome: 'timeout'; message: string };
 
 /**
- * I servizi DPCM del SAR (V06, 4.2.1 e 4.2.3): invio del file e lettura degli esiti per protocollo.
- * Credenziali: utente, password e PIN RUPAR, senza secondo fattore (V06, 3.1.1).
+ * I servizi DPCM del servizio della regione: invio del file e lettura degli esiti per protocollo,
+ * con le credenziali che vuole la regione.
  */
 export interface DpcmServices {
   /**
@@ -306,7 +305,7 @@ export interface DpcmServices {
   dpcmAnalytic(input: { protocol: string }, auth: ServiceAuth): Promise<DpcmAnalyticResult>;
 }
 
-/** Il SAR dato al servizio sa anche ricevere le ricette DPCM? I simulatori sì. */
+/** Il servizio sa anche ricevere le ricette DPCM? */
 export function isDpcmServices(gateway: unknown): gateway is DpcmServices {
   const g = gateway as Partial<DpcmServices> | null;
   return (

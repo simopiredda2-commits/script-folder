@@ -3,14 +3,14 @@
  * destra del modulo SSN. Due parti (disciplinare tecnico del DM 17/3/2008, comma 2, 2.3.1.2;
  * Sistema TS, «Collegamento telematico in rete dei medici», versione 11 del 1/3/2016, 7.1):
  *
- * - parte 1, 5 cifre: codice dell'ente (la regione, 3 cifre: 010 il Piemonte, Allegato 11) e
+ * - parte 1, 5 cifre: codice dell'ente (la regione, 3 cifre, Allegato 11) e
  *   ultime due cifre dell'anno del ricettario;
  * - parte 2, 10 cifre: progressivo del ricettario (7), numero della ricetta nel ricettario da 00 a
  *   99 (2) e una cifra di controllo, che il Sistema TS non usa e di cui le fonti lette non danno il
  *   calcolo: per questo il numero si legge dal modulo (codice a barre o a mano) e non si calcola.
  *
  * Nella ricetta DPCM le due parti vanno in Bar1 e Bar2 (schema RicettaMIR, Bar1Type di 5 e Bar2Type
- * di 10 caratteri; V06 della Regione Piemonte, 4.2.1).
+ * di 10 caratteri).
  */
 
 export interface PoligraficoCode {
