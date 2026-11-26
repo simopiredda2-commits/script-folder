@@ -28,10 +28,33 @@ const skippedDirs = new Set([
 ]);
 
 /**
+ * Le versioni nazionali delle regole di prescrizione scritte prima delle aggiunte regionali (D296):
+ * con le parti della regione dentro. Le ricette già controllate restano con la versione di allora.
+ */
+const RULES_HISTORY = [
+  '2026-11-18',
+  '2026-11-18-2',
+  '2026-11-18-3',
+  '2026-11-19',
+  '2026-11-19-2',
+  '2026-11-19-3',
+  '2026-11-20-1',
+  '2026-11-24-1',
+  '2026-11-25-1',
+  '2026-11-25-2',
+];
+
+/**
  * Dove una parola regionale ha un altro senso o è storia: percorso (file, o cartella con la «/»
  * finale) e motivo. Si aggiunge solo con un motivo scritto.
  */
 export const EXCEPTIONS: Record<string, string> = {
+  ...Object.fromEntries(
+    RULES_HISTORY.map((v) => [
+      `packages/rules/data/regole-${v}.json`,
+      'le versioni passate delle regole sono storia, come le migrazioni: le ricette già controllate restano con la versione di allora, e dalla 2026-11-26.1 le parti della regione sono nelle sue aggiunte (D296)',
+    ]),
+  ),
   'apps/api/migrations/':
     'le migrazioni sono la storia del database: si aggiungono, non si cambiano',
   'packages/domain/src/asl-elenco.ts':

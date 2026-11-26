@@ -43,3 +43,15 @@ export function selectRegionalPackage(
   const given = new Set(parts.map((p) => p.part));
   return { region, package: pkg, asl, parts, missing: REGIONAL_PARTS.filter((p) => !given.has(p)) };
 }
+
+/**
+ * La chiave del pacchetto regionale della regione scritta nei dati dello studio, o null se la
+ * regione non ha un pacchetto o non si riconosce: con questa le regole di prescrizione portano le
+ * aggiunte della regione (D296).
+ */
+export function regionalPackageKey(
+  regionName: string | null | undefined,
+  packages: readonly RegionalPackage[] = REGIONAL_PACKAGES,
+): string | null {
+  return selectRegionalPackage({ regionName }, packages).package?.key ?? null;
+}

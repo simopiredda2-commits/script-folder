@@ -1,4 +1,5 @@
 import { SimulatedGateway } from '@mmg/integrations';
+import { regionalPackageKey } from '@mmg/regions';
 import { rulesetAt } from '@mmg/rules';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -9,14 +10,19 @@ import {
   prescriptionCheck,
   prescriptionDocument,
   prescriptionLine,
+  studio,
   therapy,
 } from '../src/db/schema';
 import { buildRuleContext, createRulesCheck, studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
-/** La versione delle regole in vigore oggi: le prove non la scrivono a mano, così una versione nuova non le rompe. */
-const currentRules = () => rulesetAt(studioDate(new Date())).version;
+/**
+ * La versione delle regole in vigore oggi per la regione dello studio della prova, con le sue
+ * aggiunte (D296): le prove non la scrivono a mano, così una versione nuova non le rompe.
+ */
+let region: string | null = null;
+const currentRules = () => rulesetAt(studioDate(new Date()), undefined, region).version;
 
 describe('regole di prescrizione prima dell’invio', () => {
   let t: TestDatabase;
@@ -37,6 +43,8 @@ describe('regole di prescrizione prima dell’invio', () => {
       },
     );
     cookie = await login(s, 'titolare');
+    const [place] = await t.db.select({ regionName: studio.regionName }).from(studio);
+    region = regionalPackageKey(place!.regionName);
   });
   afterAll(async () => {
     await s?.app.close();
@@ -374,6 +382,24 @@ describe('regole di prescrizione prima dell’invio', () => {
     const r11 = issues.find((i) => i.ruleId === 'R11')!;
     expect(r11.severity).toBe('info');
     expect(r11.message).toMatch(/copre fino al/);
+  });
+
+  it('D296: il contesto delle regole porta la regione dello studio; una regione senza pacchetto, nessuna', async () => {
+    const id = await draft(pharma());
+    const contextRegion = async () =>
+      (await buildRuleContext({ db: t.db }, id, { reasons: {}, confirmedAifaNotes: [] })).region;
+    expect(region).not.toBeNull();
+    expect(await contextRegion()).toBe(region);
+    const [place] = await t.db.select().from(studio);
+    await t.db
+      .update(studio)
+      .set({ regionName: 'Regione inventata' })
+      .where(eq(studio.id, place!.id));
+    expect(await contextRegion()).toBeNull();
+    await t.db
+      .update(studio)
+      .set({ regionName: place!.regionName })
+      .where(eq(studio.id, place!.id));
   });
 
   it('D252: le unità per confezione della descrizione AIFA contano solo con la posologia nella stessa unità', async () => {

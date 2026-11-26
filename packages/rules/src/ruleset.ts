@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { REGIONAL_PACKAGES, regionalDataDir, type RegionalPackage } from '@mmg/regions';
 import { z } from 'zod';
 
 /**
@@ -62,9 +63,12 @@ const ruleSchema = z
   })
   .strict();
 
+/** Una versione: la data da cui vale e un numero progressivo, per esempio 2026-11-26.1. */
+const versionSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}\.\d+$/);
+
 export const rulesetSchema = z
   .object({
-    version: z.string().regex(/^\d{4}-\d{2}-\d{2}\.\d+$/),
+    version: versionSchema,
     effectiveFrom: z.iso.date(),
     valuesSource: z.string().trim().min(1),
     validated: z.boolean(),
@@ -79,21 +83,106 @@ export const rulesetSchema = z
     { message: 'Ogni regola da R1 a R17 compare una e una sola volta; le altre al più una volta' },
   );
 
-export type Ruleset = z.infer<typeof rulesetSchema>;
-export type Rule = Ruleset['rules'][number];
+export type Source = z.infer<typeof sourceSchema>;
+
+/** Ciò che la regione dello studio ha aggiunto a una regola (D296). */
+export interface RegionalAddition {
+  /** La chiave del pacchetto della regione (D288). */
+  region: string;
+  /** La versione delle aggiunte della regione. */
+  version: string;
+  /** Le fonti della regione: sono anche in `sources`, dopo quelle nazionali. */
+  sources: Source[];
+}
+
+type ParsedRuleset = z.infer<typeof rulesetSchema>;
+export type Rule = ParsedRuleset['rules'][number] & { regional?: RegionalAddition };
+export type Ruleset = Omit<ParsedRuleset, 'rules'> & { rules: Rule[] };
+
+/**
+ * Le aggiunte di una regione a una regola nazionale (D288, D296): un testo che prende il posto di
+ * quello nazionale, fonti, valori ed elenchi nuovi, cose da completare. Non cambiano che cosa fa la
+ * regola (blocca, avvisa o informa) e non toccano i valori nazionali: un valore o un elenco che la
+ * versione nazionale ha già è un errore. Un valore o un elenco della regione porta la sua fonte.
+ */
+const regionalRuleSchema = z
+  .object({
+    id: z.enum(RULE_IDS),
+    text: z.string().trim().min(1).optional(),
+    sources: z.array(sourceSchema).optional(),
+    values: z.record(z.string(), z.number().nullable()).optional(),
+    lists: z.record(z.string(), z.array(z.string().trim().min(1))).optional(),
+    toComplete: z.array(z.string().trim().min(1)).optional(),
+  })
+  .strict()
+  .refine(
+    (r) =>
+      r.text !== undefined ||
+      !!r.sources?.length ||
+      !!r.toComplete?.length ||
+      Object.keys(r.values ?? {}).length + Object.keys(r.lists ?? {}).length > 0,
+    { message: 'Un’aggiunta della regione deve aggiungere qualcosa alla regola' },
+  )
+  .refine(
+    (r) =>
+      Object.keys(r.values ?? {}).length + Object.keys(r.lists ?? {}).length === 0 ||
+      !!r.sources?.length,
+    { message: 'I valori e gli elenchi della regione portano la loro fonte' },
+  );
+
+/** Le aggiunte di una regione alle regole nazionali, in una versione con la sua data (D296). */
+export const regionalRulesetSchema = z
+  .object({
+    version: versionSchema,
+    effectiveFrom: z.iso.date(),
+    valuesSource: z.string().trim().min(1),
+    rules: z.array(regionalRuleSchema).min(1),
+  })
+  .strict()
+  .refine((r) => RULE_IDS.every((id) => r.rules.filter((x) => x.id === id).length <= 1), {
+    message: 'Ogni regola compare al più una volta fra le aggiunte della regione',
+  });
+
+export type RegionalRuleset = z.infer<typeof regionalRulesetSchema> & {
+  /** La chiave del pacchetto della regione (D288). */
+  region: string;
+};
 
 export const DATA_DIR = join(import.meta.dirname, '..', 'data');
 
-/** Tutte le versioni delle regole, dalla più vecchia alla più recente. */
-export function loadRulesets(dir: string = DATA_DIR): Ruleset[] {
+/** I file delle versioni in una cartella, letti con il loro schema. */
+function readVersions<T>(dir: string, schema: z.ZodType<T>): T[] {
   return readdirSync(dir)
     .filter((f) => /^regole-.*\.json$/.test(f))
-    .map((f) => rulesetSchema.parse(JSON.parse(readFileSync(join(dir, f), 'utf8'))))
-    .sort(compareVersions);
+    .map((f) => schema.parse(JSON.parse(readFileSync(join(dir, f), 'utf8'))));
+}
+
+/** Tutte le versioni nazionali delle regole, dalla più vecchia alla più recente. */
+export function loadRulesets(dir: string = DATA_DIR): Ruleset[] {
+  return readVersions(dir, rulesetSchema).sort(compareVersions);
+}
+
+/**
+ * Le aggiunte alle regole dei pacchetti regionali (D288, D296), da
+ * `packages/regions/<chiave>/data/regole/`: per ogni pacchetto, dalla più vecchia alla più recente.
+ */
+export function loadRegionalRulesets(
+  packages: readonly RegionalPackage[] = REGIONAL_PACKAGES,
+): RegionalRuleset[] {
+  return packages.flatMap((p) => {
+    const dir = regionalDataDir('regole', p);
+    if (!dir) return [];
+    return readVersions(dir, regionalRulesetSchema)
+      .map((r) => ({ ...r, region: p.key }))
+      .sort(compareVersions);
+  });
 }
 
 /** Ordine delle versioni: data di efficacia, poi numero progressivo (a parità di data vince il più alto). */
-function compareVersions(a: Ruleset, b: Ruleset): number {
+function compareVersions(
+  a: { version: string; effectiveFrom: string },
+  b: { version: string; effectiveFrom: string },
+): number {
   const byDate = a.effectiveFrom.localeCompare(b.effectiveFrom);
   if (byDate !== 0) return byDate;
   const n = (v: string) => Number(v.split('.').at(-1));
@@ -102,13 +191,71 @@ function compareVersions(a: Ruleset, b: Ruleset): number {
 
 /**
  * La versione in vigore alla data della ricetta (A5 dei requisiti: si usano i dati in vigore
- * alla data della ricetta, non quelli dell'ultimo aggiornamento).
+ * alla data della ricetta, non quelli dell'ultimo aggiornamento). Con la regione dello studio
+ * (la chiave del suo pacchetto, D288), la versione nazionale porta le aggiunte della regione in
+ * vigore alla stessa data (D296); senza, o se la regione non ne ha, è la versione nazionale.
  */
-export function rulesetAt(date: string, rulesets: Ruleset[] = loadRulesets()): Ruleset {
+export function rulesetAt(
+  date: string,
+  rulesets: Ruleset[] = loadRulesets(),
+  region: string | null = null,
+  regional: RegionalRuleset[] = region ? loadRegionalRulesets() : [],
+): Ruleset {
   const valid = [...rulesets].sort(compareVersions).filter((r) => r.effectiveFrom <= date);
   const found = valid.at(-1);
   if (!found) throw new Error(`Nessuna versione delle regole in vigore il ${date}`);
-  return found;
+  if (!region) return found;
+  const added = regional
+    .filter((r) => r.region === region && r.effectiveFrom <= date)
+    .sort(compareVersions)
+    .at(-1);
+  return added ? withRegionalAdditions(found, added) : found;
+}
+
+/**
+ * La versione nazionale con le aggiunte di una regione (D296). La versione che resta registrata
+ * con la ricetta le dice tutte e due: «nazionale+regione@aggiunte», per esempio
+ * `2026-11-26.1+chiave@2026-11-26.1`. Le fonti della regione vanno dopo quelle nazionali, e la
+ * prima fonte, quella che accompagna i messaggi, resta la nazionale. Un'aggiunta a una regola che
+ * la versione nazionale non ha, o a un suo valore o elenco, è un errore dei dati.
+ */
+export function withRegionalAdditions(national: Ruleset, added: RegionalRuleset): Ruleset {
+  const label = `le aggiunte ${added.region}@${added.version}`;
+  for (const a of added.rules) {
+    if (!national.rules.some((r) => r.id === a.id))
+      throw new Error(
+        `${label} toccano la regola ${a.id}, che non è nella versione nazionale ${national.version}`,
+      );
+  }
+  return {
+    ...national,
+    version: `${national.version}+${added.region}@${added.version}`,
+    effectiveFrom:
+      added.effectiveFrom > national.effectiveFrom ? added.effectiveFrom : national.effectiveFrom,
+    valuesSource: `${national.valuesSource}. Aggiunte della regione (${added.region}@${added.version}): ${added.valuesSource}`,
+    rules: national.rules.map((r) => {
+      const a = added.rules.find((x) => x.id === r.id);
+      if (!a) return r;
+      const taken = [
+        ...Object.keys(a.values ?? {}).filter((k) => k in r.values),
+        ...Object.keys(a.lists ?? {}).filter((k) => k in (r.lists ?? {})),
+      ];
+      if (taken.length)
+        throw new Error(
+          `${label} cambiano ${taken.join(', ')} di ${r.id}, già nella versione nazionale ${national.version}`,
+        );
+      const lists = r.lists || a.lists ? { lists: { ...r.lists, ...a.lists } } : {};
+      return {
+        ...r,
+        text: a.text ?? r.text,
+        sources: [...r.sources, ...(a.sources ?? [])],
+        values: { ...r.values, ...a.values },
+        ...lists,
+        toComplete: [...r.toComplete, ...(a.toComplete ?? [])],
+        regional: { region: added.region, version: added.version, sources: a.sources ?? [] },
+      };
+    }),
+  };
 }
 
 /** Valore numerico di una regola: se manca, la regola non si può applicare. */
@@ -117,16 +264,19 @@ export function value(rule: Rule, key: string): number | null {
 }
 
 /**
- * Giorni di validità della ricetta specialistica secondo R1 alla data, per tipo di accesso
- * (D.D. 710/2026 della Regione, punto 4; D260): li stampa il promemoria. Null se la versione in
- * vigore non li ha: allora vale quello che dicono le specifiche di stampa.
+ * Giorni di validità della ricetta specialistica secondo R1 alla data, per tipo di accesso: sono
+ * della regione dello studio (D260), nelle sue aggiunte alle regole (D296), e li stampa il
+ * promemoria. Null se la versione in vigore non li ha: allora vale quello che dicono le
+ * specifiche di stampa.
  */
 export function specialistValidityDays(
   date: string,
   accessType: 'first' | 'subsequent',
+  region: string | null = null,
   rulesets: Ruleset[] = loadRulesets(),
+  regional?: RegionalRuleset[],
 ): number | null {
-  const r1 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R1');
+  const r1 = rulesetAt(date, rulesets, region, regional).rules.find((r) => r.id === 'R1');
   if (!r1 || r1.status !== 'active') return null;
   return value(
     r1,

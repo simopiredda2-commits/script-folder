@@ -1,4 +1,5 @@
 import { samePackUnit, type PackUnit } from '@mmg/reference';
+import { regionalPackageKey } from '@mmg/regions';
 import {
   checkPrescription,
   type DrugFacts,
@@ -131,6 +132,12 @@ export async function buildRuleContext(
   });
 
   const date = studioDate((deps.now ?? (() => new Date()))());
+  // La regione dello studio dell'archivio: le regole portano le sue aggiunte (D296).
+  const [place] = await db
+    .select({ regionName: studio.regionName })
+    .from(archive)
+    .innerJoin(studio, eq(studio.id, archive.studioId))
+    .where(eq(archive.id, p.archiveId));
   let drugFacts = deps.drugFacts;
   let { exemptionExists, exemptionServices, serviceCatalog, serviceNotes } = deps;
   if (deps.reference) {
@@ -174,6 +181,7 @@ export async function buildRuleContext(
 
   return {
     date,
+    region: regionalPackageKey(place?.regionName),
     prescription: {
       id: p.id,
       kind: p.kind,
@@ -209,7 +217,7 @@ export async function buildRuleContext(
     exemptions: await db
       .select({ code: exemption.code, validFrom: exemption.validFrom, validTo: exemption.validTo })
       .from(exemption)
-      // Un'esenzione annullata (per esempio tolta in AURA, D197) non vale più.
+      // Un'esenzione annullata (per esempio tolta nell'anagrafe regionale, D197) non vale più.
       .where(and(eq(exemption.patientId, p.patientId), isNull(exemption.annulledAt))),
     delegations: await db
       .select({

@@ -1,4 +1,5 @@
 import type { PrescriptionLineMessage, ReceiptMessage } from '@mmg/integrations';
+import { regionalPackageKey } from '@mmg/regions';
 import { specialistValidityDays } from '@mmg/rules';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '../db/client';
@@ -455,7 +456,12 @@ export async function buildPromemoriaData(
     altro: null,
     priorita: specialist ? p.priority : null,
     validitaGiorni: specialist
-      ? ((p.accessType && specialistValidityDays(accepted.compiledAt, p.accessType)) ??
+      ? ((p.accessType &&
+          specialistValidityDays(
+            accepted.compiledAt,
+            p.accessType,
+            regionalPackageKey(st.regionName),
+          )) ??
         SPECIALIST_VALIDITY_DAYS)
       : null,
     righe,

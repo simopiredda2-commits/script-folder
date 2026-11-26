@@ -1,91 +1,21 @@
-import { buildFiscalCode } from '@mmg/domain';
 import { describe, expect, it } from 'vitest';
 import {
   checkPrescription,
   loadRulesets,
   RULE_IDS,
   rulesetAt,
-  specialistValidityDays,
   substitutionReasons,
   type DrugFacts,
   type LineContext,
   type RuleContext,
   type SentLineContext,
 } from '../src';
-
-const CF = buildFiscalCode({
-  surname: 'Rota',
-  name: 'Lina',
-  birthDate: '1950-03-14',
-  sex: 'F',
-  placeCode: 'X101',
-});
-
-function line(extra: Partial<LineContext> = {}): LineContext {
-  return {
-    id: 'l1',
-    drugAic: 'AIC-PROVA-1',
-    drugName: 'Farmaco di prova 5 mg',
-    activeIngredient: 'principio di prova',
-    serviceCode: null,
-    quantity: 1,
-    aifaNote: null,
-    notSubstitutable: false,
-    notSubstitutableReason: null,
-    therapy: null,
-    ...extra,
-  };
-}
-
-function ctx(
-  over: Partial<Omit<RuleContext, 'prescription'>> & {
-    prescription?: Partial<RuleContext['prescription']>;
-    facts?: DrugFacts;
-  } = {},
-): RuleContext {
-  const { prescription, facts, ...rest } = over;
-  return {
-    date: '2026-11-18',
-    prescription: {
-      id: 'p1',
-      kind: 'pharma_ssn',
-      exemptionCode: null,
-      priority: null,
-      accessType: null,
-      diagnosticQuestion: null,
-      reminderChannel: null,
-      reminderContact: null,
-      lines: [line()],
-      ...prescription,
-    },
-    patient: {
-      fiscalCode: CF,
-      email: 'lina.rota@example.org',
-      phone: '+39 000 1234567',
-      reminderChannel: null,
-      reminderContact: null,
-      reminderChannelChosenOn: null,
-    },
-    exemptions: [],
-    delegations: [],
-    plans: [],
-    sentLines: [],
-    drugFacts: () => facts,
-    confirmedAifaNotes: new Set(),
-    reasons: {},
-    ...rest,
-  };
-}
-
-const run = (c: RuleContext) => checkPrescription(c);
-const of = (c: RuleContext, id: string) => run(c).issues.filter((i) => i.ruleId === id);
-const blocks = (c: RuleContext, id: string) =>
-  run(c).blocking.filter((i) => i.ruleId === id).length > 0;
+import { blocks, CF, ctx, line, of, run } from './helpers/contesto';
 
 describe('dati delle regole', () => {
   const [ruleset] = loadRulesets();
 
-  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3, R22 dalla 2026-11-20.1, R23 dalla 2026-11-25.1, R24 e R25 dalla 2026-11-25.2', () => {
+  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3, R22 dalla 2026-11-20.1, R23 dalla 2026-11-25.1, R24 e R25 dalla 2026-11-25.2; la 2026-11-26.1 senza le parti della regione', () => {
     const all = loadRulesets();
     expect(all.map((r) => r.version)).toEqual([
       '2026-11-18.1',
@@ -98,6 +28,7 @@ describe('dati delle regole', () => {
       '2026-11-24.1',
       '2026-11-25.1',
       '2026-11-25.2',
+      '2026-11-26.1',
     ]);
     const upTo17 = RULE_IDS.filter(
       (id) => !['R18', 'R19', 'R20', 'R21', 'R22', 'R23', 'R24', 'R25'].includes(id),
@@ -258,32 +189,6 @@ describe('dati delle regole', () => {
     }
   });
 
-  it('dalla 2026-11-24.1 R1 ha i giorni della specialistica della Regione (D260); il resto come la 2026-11-20.1', () => {
-    const all = loadRulesets();
-    const v7 = all.find((r) => r.version === '2026-11-20.1')!;
-    const v8 = all.find((r) => r.version === '2026-11-24.1')!;
-    expect(v8.effectiveFrom).toBe('2026-11-24');
-    expect(rulesetAt('2026-11-24').version).toBe('2026-11-24.1');
-    expect(rulesetAt('2026-11-23').version).toBe('2026-11-20.1');
-    expect(v8.rules).toHaveLength(v7.rules.length);
-    for (const r of v8.rules) {
-      if (r.id === 'R1') {
-        expect(r.values).toEqual({
-          validityDays: 30,
-          specialistFirstAccessDays: 60,
-          specialistOtherAccessDays: 180,
-        });
-        expect(r.behavior).toBe('inform');
-        expect(r.sources[0]).toEqual(v7.rules.find((x) => x.id === 'R1')!.sources[0]);
-        expect(r.sources[1]!.title).toMatch(/^Regione Piemonte, D\.D\. 30 ottobre 2026, n\. 710/);
-        expect(r.sources[1]!.title).toMatch(/punto 4/);
-        expect(r.sources.at(-1)!.title).toMatch(/D260/);
-      } else {
-        expect(r, r.id).toEqual(v7.rules.find((x) => x.id === r.id));
-      }
-    }
-  });
-
   it('la versione .2 rende R11 solo informativo (seconda fermata); la .1 resta com’era', () => {
     const [v1, v2] = loadRulesets();
     expect(v1!.rules.find((r) => r.id === 'R11')!.behavior).toBe('warn');
@@ -331,51 +236,6 @@ describe('R1 · validità di 30 giorni', () => {
   });
   it('non riguarda la ricetta bianca', () => {
     expect(of(ctx({ prescription: { kind: 'white' } }), 'R1')).toHaveLength(0);
-  });
-});
-
-describe('R1 · validità della ricetta specialistica (D.D. 710/2026, D260)', () => {
-  const specialist = (accessType: 'first' | 'subsequent' | null, date = '2026-11-24') =>
-    of(ctx({ date, prescription: { kind: 'specialist_ssn', accessType } }), 'R1');
-
-  it('primo accesso: 60 giorni, contando il giorno di compilazione, con la fonte della Regione', () => {
-    const [issue, ...rest] = specialist('first');
-    expect(rest).toEqual([]);
-    expect(issue!.severity).toBe('info');
-    expect(issue!.message).toBe(
-      'Primo accesso: la ricetta vale 60 giorni, fino al 22/01/2027 compreso; se la prestazione si prenota è il termine per prenotare, e la ricetta prenotata in tempo vale fino all’erogazione',
-    );
-    expect(issue!.source).toMatch(/^Regione Piemonte, D\.D\. 30 ottobre 2026, n\. 710.*punto 4/);
-  });
-
-  it('altra tipologia di accesso (successivo o diretto): 180 giorni', () => {
-    expect(specialist('subsequent')[0]!.message).toMatch(
-      /^Altra tipologia di accesso: la ricetta vale 180 giorni, fino al 22\/05\/2027 compreso;/,
-    );
-  });
-
-  it('senza tipo di accesso dice tutti e due i termini (R14 ferma comunque la ricetta)', () => {
-    expect(specialist(null)[0]!.message).toMatch(
-      /^La ricetta vale 60 giorni per il primo accesso e 180 per gli altri accessi;/,
-    );
-  });
-
-  it('la ricetta dei farmaci resta a 30 giorni, con la fonte di prima', () => {
-    const [issue] = of(ctx({ date: '2026-11-24' }), 'R1');
-    expect(issue!.message).toBe('La ricetta vale 30 giorni: fino al 23/12/2026 compreso');
-    expect(issue!.source).toBe('Tabella AIFA di classificazione dei medicinali');
-  });
-
-  it('con le versioni di prima anche la specialistica vale 30 giorni', () => {
-    expect(specialist('first', '2026-11-23')[0]!.message).toBe(
-      'La ricetta vale 30 giorni: fino al 22/12/2026 compreso',
-    );
-  });
-
-  it('il promemoria prende gli stessi giorni dalla versione in vigore', () => {
-    expect(specialistValidityDays('2026-11-24', 'first')).toBe(60);
-    expect(specialistValidityDays('2026-11-24', 'subsequent')).toBe(180);
-    expect(specialistValidityDays('2026-11-23', 'first')).toBeNull();
   });
 });
 
@@ -1510,7 +1370,7 @@ describe('R10, R24 e R25 · sedute, nota del nomenclatore e branca (D276)', () =
       'PROVA.1: le sedute si indicano solo per le prestazioni a ciclo',
     ]);
     expect(blocks(spec([{ serviceCode: 'PROVA.1', sessions: 3 }]), 'R10')).toBe(true);
-    // Fuori dal catalogo in uso le sedute le controlla il SAR.
+    // Fuori dal catalogo in uso le sedute le controlla il servizio che riceve la ricetta.
     const manual = { serviceCode: 'NUOVO.1', serviceNationalCode: '99.99.9', sessions: 30 };
     expect(of(spec([manual]), 'R10')).toEqual([]);
     // La versione di prima non le guardava.

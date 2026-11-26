@@ -1,0 +1,63 @@
+{
+  "version": "2026-11-26.1",
+  "effectiveFrom": "2026-11-26",
+  "valuesSource": "Le parti della Regione Piemonte nelle regole di prescrizione, spostate senza cambiarle dalla versione nazionale 2026-11-25.2 (D296): R1 per la ricetta specialistica, 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto, dalla D.D. 710/2026 (punto 4), per scelta di Simone alla fermata dopo la #35 (24/11/2026, D260); R5 con l'elenco regionale dei farmaci PHT in DPC (requisiti); R9 con AURA; R17 con la D.D. 1167/2022; R18 con il SAR; per R4 le regole del Piemonte da verificare (requisiti); per R23 le decodifiche del codice TDL, domanda per il CSI",
+  "rules": [
+    {
+      "id": "R1",
+      "text": "La ricetta SSN vale 30 giorni; la specialistica 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto",
+      "sources": [
+        {
+          "title": "Regione Piemonte, D.D. 30 ottobre 2026, n. 710/A1400B/2026 (BU n. 44 del 5/11/2026), punto 4, ai sensi della DGR 14 aprile 2022, n. 4-4878"
+        },
+        {
+          "title": "Scelta di Simone del 24/11/2026 (D260): per la ricetta specialistica i termini della Regione al posto dei 30 giorni"
+        }
+      ],
+      "values": {
+        "specialistFirstAccessDays": 60,
+        "specialistOtherAccessDays": 180
+      }
+    },
+    {
+      "id": "R4",
+      "toComplete": ["Condizioni esatte da verificare anche sulle regole del Piemonte (requisiti)"]
+    },
+    {
+      "id": "R5",
+      "sources": [
+        {
+          "title": "Regione Piemonte, farmaci PHT in DPC (piani ancora cartacei, es. Nota 85)",
+          "url": "https://www.regione.piemonte.it/web/node/964"
+        }
+      ]
+    },
+    {
+      "id": "R9",
+      "sources": [
+        {
+          "title": "AURA, l'anagrafe degli assistiti della Regione Piemonte"
+        }
+      ]
+    },
+    {
+      "id": "R17",
+      "sources": [
+        {
+          "title": "Regione Piemonte, D.D. 1167/2022 (controllo bloccante del SAR dal 28/06/2022)",
+          "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/2022/28/attach/dda1410001167_10100.pdf"
+        }
+      ]
+    },
+    {
+      "id": "R18",
+      "text": "Prestazione con un codice che non è nel catalogo regionale in uso (per esempio scritto a mano perché il catalogo del programma non è ancora aggiornato): si avvisa e serve un motivo; il controllo finale è del SAR, sul catalogo che la Regione ha trasmesso al Sistema TS"
+    },
+    {
+      "id": "R23",
+      "toComplete": [
+        "Le decodifiche regionali del codice TDL usate in Piemonte: domanda per il CSI"
+      ]
+    }
+  ]
+}

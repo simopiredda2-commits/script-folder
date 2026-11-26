@@ -144,6 +144,11 @@ export interface SentLineContext {
 export interface RuleContext {
   /** Data di compilazione della ricetta. */
   date: string;
+  /**
+   * La regione dello studio, con la chiave del suo pacchetto regionale (D288): le regole in vigore
+   * portano le aggiunte della regione (D296). Assente o null: solo le regole nazionali.
+   */
+  region?: string | null;
   prescription: {
     id: string;
     kind: 'pharma_ssn' | 'specialist_ssn' | 'white' | 'devices';
@@ -168,8 +173,8 @@ export interface RuleContext {
     deceasedOn?: string | null;
   };
   /**
-   * Scelte del medico del paziente, non annullate, a mano o da AURA (R20; D199): conta se ce n'è una
-   * in corso alla data della ricetta.
+   * Scelte del medico del paziente, non annullate, a mano o dall'anagrafe regionale (R20; D199):
+   * conta se ce n'è una in corso alla data della ricetta.
    */
   choices?: { chosenOn: string; expiresOn: string | null; endedOn: string | null }[];
   exemptions: { code: string; validFrom: string; validTo: string | null }[];

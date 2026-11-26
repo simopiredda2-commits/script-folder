@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mmg/domain": "workspace:*",
+    "@mmg/regions": "workspace:*",
     "zod": "^4.6.7"
   }
 }
