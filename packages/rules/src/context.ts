@@ -109,6 +109,8 @@ export interface PlanContext {
 /** Una voce del catalogo regionale delle prestazioni in uso (R10, R18, R25; D154, D276). */
 export interface ServiceCatalogEntry {
   nationalCode: string | null;
+  /** La descrizione del catalogo: per le tabelle RAO, dove un codice vale per più discipline (D285). */
+  description?: string;
   /** Le branche del codice nel catalogo: una voce può stare in più branche (R25). */
   branches?: readonly string[];
   /** Prestazione a ciclo di sedute (R10). */

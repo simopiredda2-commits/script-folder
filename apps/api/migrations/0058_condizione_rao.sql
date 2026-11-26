@@ -1,0 +1,5 @@
+ALTER TABLE "prescription" ADD COLUMN "rao_condition_key" text;--> statement-breakpoint
+ALTER TABLE "prescription" ADD COLUMN "rao_condition_priority" "priority_class";--> statement-breakpoint
+ALTER TABLE "prescription" ADD COLUMN "rao_condition_text" text;--> statement-breakpoint
+ALTER TABLE "prescription" ADD COLUMN "rao_condition_source" text;--> statement-breakpoint
+ALTER TABLE "prescription" ADD CONSTRAINT "prescription_rao_condition" CHECK (("prescription"."rao_condition_key" is null and "prescription"."rao_condition_priority" is null and "prescription"."rao_condition_text" is null and "prescription"."rao_condition_source" is null) or ("prescription"."rao_condition_key" is not null and "prescription"."rao_condition_priority" is not null and "prescription"."rao_condition_text" is not null and "prescription"."rao_condition_source" is not null and "prescription"."kind" = 'specialist_ssn' and "prescription"."access_type" = 'first'));

@@ -72,6 +72,15 @@ export const prescription = pgTable(
     priority: priorityClass(),
     accessType: accessType(),
     diagnosticQuestion: text(),
+    /**
+     * Condizione RAO scelta dal medico (D285), com'era alla scelta: la chiave (fonte, tabella, riga e
+     * indicazione), la classe della tabella, il testo dell'indicazione e la fonte con la tabella. La
+     * classe della ricetta resta `priority`: il programma ci mette questa, il medico la può cambiare.
+     */
+    raoConditionKey: text(),
+    raoConditionPriority: priorityClass(),
+    raoConditionText: text(),
+    raoConditionSource: text(),
     exemptionCode: text(),
     /** Richiesta del paziente da cui nasce, se c'è. */
     requestId: uuid().references(() => patientRequest.id),
@@ -134,6 +143,11 @@ export const prescription = pgTable(
     uniqueIndex('prescription_assigned_nre_key')
       .on(t.assignedNre)
       .where(sql`${t.assignedNre} is not null`),
+    // La condizione RAO c'è tutta o non c'è (D285), e solo sulla specialistica del primo accesso.
+    check(
+      'prescription_rao_condition',
+      sql`(${t.raoConditionKey} is null and ${t.raoConditionPriority} is null and ${t.raoConditionText} is null and ${t.raoConditionSource} is null) or (${t.raoConditionKey} is not null and ${t.raoConditionPriority} is not null and ${t.raoConditionText} is not null and ${t.raoConditionSource} is not null and ${t.kind} = 'specialist_ssn' and ${t.accessType} = 'first')`,
+    ),
   ],
 );
 

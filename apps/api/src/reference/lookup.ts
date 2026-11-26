@@ -1181,6 +1181,7 @@ export class ReferenceData {
       const key = item.regionalCode.trim().toUpperCase();
       const entry = byCode.get(key) ?? { nationalCode: null, branches: [], cycle: false };
       entry.nationalCode = item.nationalCode;
+      entry.description ??= item.description;
       const branch = item.branch?.trim();
       if (branch && !entry.branches.includes(branch)) entry.branches.push(branch);
       if (item.cycle) entry.cycle = true;

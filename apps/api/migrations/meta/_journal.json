@@ -407,6 +407,13 @@
       "when": 1795682775891,
       "tag": "0057_fumo_codificato",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1795685658453,
+      "tag": "0058_condizione_rao",
+      "breakpoints": true
     }
   ]
 }

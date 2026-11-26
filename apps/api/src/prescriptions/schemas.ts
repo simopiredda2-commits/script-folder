@@ -65,6 +65,8 @@ export const draftSchema = z
     priority: z.enum(['U', 'B', 'D', 'P']).nullable().optional(),
     accessType: z.enum(['first', 'subsequent']).nullable().optional(),
     diagnosticQuestion: z.string().max(1000).nullable().optional(),
+    /** Condizione RAO scelta dal medico (D285): la chiave della tabella. */
+    raoCondition: z.string().trim().max(120).nullable().optional(),
     exemptionCode: z.string().max(20).nullable().optional(),
     requestId: z.uuid().nullable().optional(),
     /** Canale del promemoria e recapito (R15, R16); vuoto = promemoria cartaceo. */
@@ -83,6 +85,10 @@ export const draftSchema = z
       d.kind === 'white' || d.lines.every((l) => l.repeatCount == null && l.validityMonths == null),
     { message: 'La ripetibilità si indica solo sulla ricetta bianca', path: ['lines'] },
   )
+  .refine((d) => !d.raoCondition || (d.kind === 'specialist_ssn' && d.accessType === 'first'), {
+    message: 'La condizione RAO vale per la ricetta specialistica del primo accesso',
+    path: ['raoCondition'],
+  })
   .refine((d) => !d.obscured || d.kind === 'pharma_ssn' || d.kind === 'specialist_ssn', {
     message: 'L’oscuramento di nome e indirizzo vale per le ricette SSN',
     path: ['obscured'],
