@@ -274,48 +274,6 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
         code: 'CREDENZIALI',
       });
   });
-
-  it('il SAR simulato accetta il token al posto di utente, password e PIN; revocato, rifiuta', async () => {
-    const oauth = new SimulatedRegionalAuthorization();
-    const sar = new SimulatedGateway('sar', { oauth });
-    const verifier = newPkceVerifier();
-    const code = oauth.approve({
-      clientId: 'MIOAPPLICATIVO_301',
-      redirectUri: '/r',
-      scope: ['prescrizione'],
-      codeChallenge: pkceChallenge(verifier),
-      fiscalCode: 'CF',
-    });
-    const token = await oauth.exchange({
-      code,
-      redirectUri: '/r',
-      clientId: 'MIOAPPLICATIVO_301',
-      codeVerifier: verifier,
-    });
-    if (token.outcome !== 'ok') throw new Error('scambio non riuscito');
-    expect((await sar.send(message, { bearer: token.accessToken })).outcome).toBe('accepted');
-    expect(sar.receivedAuth.at(-1)).toEqual({
-      username: '',
-      sessionId: null,
-      bearer: true,
-      software: null,
-    });
-    // Il token non si manda insieme a utente, password e PIN (V08, 4.3.6).
-    expect(
-      await sar.send(message, {
-        bearer: token.accessToken,
-        username: 'utente',
-        password: 'parola',
-        pin: '1',
-      }),
-    ).toMatchObject({ outcome: 'rejected', code: 'CREDENZIALI', authProblem: 'credentials' });
-    await oauth.revoke({ clientId: 'MIOAPPLICATIVO_301', accessToken: token.accessToken });
-    expect(await sar.send(message, { bearer: token.accessToken })).toMatchObject({
-      outcome: 'rejected',
-      code: 'TOKEN',
-      authProblem: 'session',
-    });
-  });
 });
 
 describe('codice del gestionale con il codice ASL del medico (REL-STC-01 V08; D266)', () => {
@@ -371,25 +329,6 @@ describe('codice del gestionale con il codice ASL del medico (REL-STC-01 V08; D2
     });
     expect(await sim.revoke(other)).toEqual({ outcome: 'invalid' });
     expect(sim.isValid(ok.accessToken)).toBe(true);
-  });
-
-  it('SAR simulato: con l’Id-Sessione per email vuole X-Gestionale; il Sistema TS no', async () => {
-    const auth = { username: 'utente', password: 'parola', pin: '1', sessionId: 's' };
-    const sar = new SimulatedGateway('sar');
-    expect(await sar.send(message, auth)).toMatchObject({
-      outcome: 'rejected',
-      code: 'GESTIONALE',
-    });
-    expect(await sar.send(message, { ...auth, software: 'MIOAPPLICATIVO' })).toMatchObject({
-      outcome: 'rejected',
-      code: 'GESTIONALE',
-    });
-    expect((await sar.send(message, { ...auth, software: 'MIOAPPLICATIVO_301' })).outcome).toBe(
-      'accepted',
-    );
-    expect(sar.receivedAuth.at(-1)?.software).toBe('MIOAPPLICATIVO_301');
-    const ts = new SimulatedGateway('sistema_ts');
-    expect((await ts.send({ ...message, kind: 'white' }, auth)).outcome).toBe('accepted');
   });
 
   it('secondo fattore della RUPAR: «APP» in richiesta e verifica; il Sistema TS non la usa', async () => {

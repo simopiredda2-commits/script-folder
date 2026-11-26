@@ -5,6 +5,7 @@ import { patient, patientChoice, prescription, prescriptionCheck, therapy } from
 import { createRulesCheck, studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 /** Giorno di oggi nello studio, spostato di `days` giorni (AAAA-MM-GG). */
 const day = (days: number) => studioDate(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
@@ -14,7 +15,7 @@ describe('stato del paziente alla ricetta (R19, R20; D199)', () => {
   let t: TestDatabase;
   let s: Scenario;
   let cookie: string;
-  const sar = new SimulatedGateway('sar');
+  const sar = regionalGateway();
 
   beforeAll(async () => {
     t = await createTestDatabase();
@@ -22,7 +23,7 @@ describe('stato del paziente alla ricetta (R19, R20; D199)', () => {
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         preSendChecks: (id, actor, input) =>
           createRulesCheck({ db: t.db, drugFacts: () => ({ unitsPerPack: 28 }) })(id, actor, input),
       },

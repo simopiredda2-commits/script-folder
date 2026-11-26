@@ -5,12 +5,13 @@ import { SimulatedGateway } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { externalSubmission, prescriptionDocument, prescriptionLine } from '../src/db/schema';
-import { specialistPrescription1 } from '../src/prescriptions/dpcm';
-import { EXAMPLE_TRANSCRIPTIONS } from '../src/reference/example-site';
-import { importReferenceData } from '../src/reference/importer';
-import { createScenario, login, type Scenario } from './helpers/scenario';
-import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { externalSubmission, prescriptionDocument, prescriptionLine } from '../../../src/db/schema';
+import { specialistPrescription1 } from '../../../src/prescriptions/dpcm';
+import { EXAMPLE_TRANSCRIPTIONS } from '../../../src/reference/example-site';
+import { importReferenceData } from '../../../src/reference/importer';
+import { createScenario, login, type Scenario } from '../../helpers/scenario';
+import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
+import { SimulatedSar } from '@mmg/regions/piemonte';
 
 /**
  * Note del nomenclatore, sedute dei cicli e prestazioni della stessa branca nella ricetta
@@ -23,7 +24,7 @@ describe('note del nomenclatore, sedute e branca nella ricetta specialistica (D2
   let doctor: string;
   let work: string;
   // Il SAR simulato conosce le coppie di codici del catalogo di prova.
-  const sar = new SimulatedGateway('sar', {
+  const sar = new SimulatedSar({
     regionalCatalog: (national, catalog) =>
       !!catalog && (national === catalog || catalog === '89.7'),
   });
@@ -80,7 +81,7 @@ describe('note del nomenclatore, sedute e branca nella ricetta specialistica (D2
     s = await createScenario(
       t.db,
       {},
-      { gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') } },
+      { gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') } },
     );
     doctor = await login(s, 'titolare');
   });

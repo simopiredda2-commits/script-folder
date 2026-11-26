@@ -6,6 +6,7 @@ import { withActor } from '../src/db/tx';
 import { buildRuleContext, studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 /** Il simulatore risponde con l'esito scelto dalla prova, ricetta per ricetta. */
 function scripted() {
@@ -13,7 +14,7 @@ function scripted() {
   const decide = () => next.shift() ?? 'accepted';
   return {
     next,
-    sar: new SimulatedGateway('sar', { decide }),
+    regional: regionalGateway({ decide }),
     ts: new SimulatedGateway('sistema_ts', { decide }),
   };
 }
@@ -36,7 +37,11 @@ describe('tipo di terapia sulla riga della ricetta (D283)', () => {
   beforeAll(async () => {
     t = await createTestDatabase();
     sim = scripted();
-    s = await createScenario(t.db, {}, { gateways: { sar: sim.sar, sistema_ts: sim.ts } });
+    s = await createScenario(
+      t.db,
+      {},
+      { gateways: { regional: sim.regional, sistema_ts: sim.ts } },
+    );
     for (const who of ['titolare', 'segreteria'] as const) cookies[who] = await login(s, who);
     const add = (drugName: string, values: Partial<typeof therapy.$inferInsert> = {}) =>
       withActor(t.db, s.users.titolare.id, (tx) =>

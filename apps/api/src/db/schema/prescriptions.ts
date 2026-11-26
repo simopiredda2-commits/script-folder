@@ -60,7 +60,7 @@ export const prescription = pgTable(
       .references(() => archive.id),
     kind: prescriptionKind().notNull(),
     status: prescriptionStatus().notNull().default('draft'),
-    /** Numero di ricetta elettronica (NRE; NRBE per la bianca), dato dal SAR o dal Sistema TS. */
+    /** Numero di ricetta elettronica (NRE; NRBE per la bianca), dal servizio o dal Sistema TS. */
     nre: text(),
     /**
      * NRE preso dal lotto del medico alla prima firma (D269): la ricetta lo tiene e, dopo un
@@ -118,9 +118,9 @@ export const prescription = pgTable(
     reminderChannel: reminderChannel(),
     reminderContact: text(),
     /**
-     * Codice di autenticazione restituito dal SAC, anche tramite il SAR: senza, la ricetta SSN non
-     * è valida e il promemoria non si dà; va stampato su ogni promemoria (specifiche del Sistema
-     * TS, prescrizione, 5/12/2024).
+     * Codice di autenticazione restituito dal SAC, anche tramite il servizio della regione: senza,
+     * la ricetta SSN non è valida e il promemoria non si dà; va stampato su ogni promemoria
+     * (specifiche del Sistema TS, prescrizione, 5/12/2024).
      */
     authCode: text(),
     /** Cognome e nome del medico come li restituisce il SAC, per il promemoria (stesse specifiche). */
@@ -152,8 +152,8 @@ export const prescription = pgTable(
 );
 
 /**
- * Lotto di NRE del medico (D269): 1000 numeri che il SAR «estrae» da un lotto avuto dal SAC e lega
- * al codice fiscale del medico (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.2 e 4.1). La
+ * Lotto di NRE del medico (D269, D300): 1000 numeri che il servizio della regione «estrae» da un
+ * lotto avuto dal SAC e lega al codice fiscale del medico, dove la regione dà i lotti. La
  * cartella genera gli NRE agendo solo sul progressivo, da 000 a 999, e non dà mai due volte lo
  * stesso: il prossimo progressivo cresce dentro la transazione che lo assegna. I lotti di un
  * simulatore non vanno al servizio vero: si tengono per ambiente.
@@ -165,11 +165,11 @@ export const nreLot = pgTable(
     doctorUserId: uuid()
       .notNull()
       .references(() => appUser.id),
-    /** Codice fiscale con cui il medico ha chiesto il lotto: il SAR lo lega a lui. */
+    /** Codice fiscale con cui il medico ha chiesto il lotto: il servizio lo lega a lui. */
     doctorFiscalCode: text().notNull(),
     /** «simulator», «test» o «production», come il registro degli invii. */
     environment: text().notNull(),
-    /** CodRegione, CodRagLotto, IdentificativoLotto e CodLotto della ricevuta del SAR. */
+    /** CodRegione, CodRagLotto, IdentificativoLotto e CodLotto della ricevuta del servizio. */
     regionCode: text().notNull(),
     groupCode: text().notNull(),
     lotType: text().notNull(),
@@ -180,7 +180,7 @@ export const nreLot = pgTable(
     /** Il prossimo progressivo da dare: quando arriva a `size`, il lotto è finito. */
     nextProgressive: integer().notNull().default(0),
     receivedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-    /** La ricevuta del SAR così com'è. */
+    /** La ricevuta del servizio così com'è. */
     response: jsonb(),
   },
   (t) => [
@@ -194,7 +194,7 @@ export const nreLot = pgTable(
 );
 
 export const dpcmStatus = pgEnum('dpcm_status', [
-  /** Da mandare al SAR: la coda ci riprova finché non è accolta. */
+  /** Da mandare al servizio della regione: la coda ci riprova finché non è accolta. */
   'to_send',
   /** Accolta, con il protocollo: si aspetta l'esito dei controlli. */
   'accepted',
@@ -207,11 +207,10 @@ export const dpcmStatus = pgEnum('dpcm_status', [
 ]);
 
 /**
- * Ricetta rossa in modalità DPCM (D270): la ricetta stampata sul modulo del Poligrafico quando la
- * ricetta dematerializzata non ha esito (SIRPED, «Cartelle cliniche MMG e PLS», V06, 4.3.1, casi
- * 4 e 5), mandata poi al SAR con il numero del modulo e un NRE nuovo del lotto del medico (4.2.1),
- * entro 24 ore dalla compilazione (3.4.2). Se la ricetta dematerializzata può essere arrivata, la
- * cartella la annulla da sé (4.3.1 e 4.3.2).
+ * Ricetta rossa in modalità DPCM (D270, D300): dove la regione la vuole, la ricetta stampata sul
+ * modulo del Poligrafico quando la ricetta dematerializzata non ha esito, mandata poi al servizio
+ * della regione con il numero del modulo e un NRE nuovo del lotto del medico, entro 24 ore dalla
+ * compilazione. Se la ricetta dematerializzata può essere arrivata, la cartella la annulla da sé.
  */
 export const dpcmPrescription = pgTable(
   'dpcm_prescription',
@@ -220,7 +219,7 @@ export const dpcmPrescription = pgTable(
     prescriptionId: uuid()
       .notNull()
       .references(() => prescription.id),
-    /** Il medico che ha stampato e firmato il modulo: il SAR lega l'NRE al suo codice fiscale. */
+    /** Il medico che ha stampato e firmato il modulo: il servizio gli lega l'NRE. */
     doctorUserId: uuid()
       .notNull()
       .references(() => appUser.id),
@@ -232,10 +231,10 @@ export const dpcmPrescription = pgTable(
     nre: text().notNull(),
     nreLotId: uuid().references(() => nreLot.id),
     printedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-    /** La ricetta come va al SAR, con i dati in chiaro: la cifratura si fa all'invio. */
+    /** La ricetta come va al servizio, con i dati in chiaro: la cifratura si fa all'invio. */
     content: jsonb().notNull(),
     status: dpcmStatus().notNull().default('to_send'),
-    /** ProtocolloSAR della ricevuta di accoglienza (23 cifre). */
+    /** Il protocollo della ricevuta di accoglienza (23 cifre). */
     protocol: text(),
     acceptedAt: timestamp({ withTimezone: true }),
     /** Ultimo stato dell'elenco sintetico (da 1 a 5) e messaggi dell'elenco analitico. */
@@ -248,7 +247,7 @@ export const dpcmPrescription = pgTable(
     /** Quando la coda riprova (invio o lettura dell'esito). */
     nextAttemptAt: timestamp({ withTimezone: true }),
     /**
-     * Ricetta dematerializzata da annullare: il suo NRE, se può essere arrivata al SAR (tempo
+     * Ricetta dematerializzata da annullare: il suo NRE, se può essere arrivata al servizio (tempo
      * scaduto o eccezione di sistema). Null se non serve.
      */
     dmNre: text(),
@@ -257,7 +256,7 @@ export const dpcmPrescription = pgTable(
      * e a suo nome, anche se la ricetta rossa l'ha stampata un altro medico dell'archivio.
      */
     dmDoctorUserId: uuid().references(() => appUser.id),
-    /** «pending», «done» (annullata), «failed» (il SAR non l'ha annullata: lo dice il messaggio). */
+    /** «pending», «done» (annullata), «failed» (non annullata: lo dice il messaggio). */
     dmCancelStatus: text(),
     dmCancelAttempts: integer().notNull().default(0),
     dmCancelNextAt: timestamp({ withTimezone: true }),
@@ -355,11 +354,15 @@ export const prescriptionLine = pgTable(
   ],
 );
 
-export const gatewaySystem = pgEnum('gateway_system', ['sar', 'sistema_ts']);
+/**
+ * Dove va la chiamata: al servizio delle ricette della regione dello studio o al Sistema TS (D300;
+ * prima del 26/11/2026 il primo valore aveva il nome del servizio di una regione, migrazione 0061).
+ */
+export const gatewaySystem = pgEnum('gateway_system', ['regional', 'sistema_ts']);
 
 /**
- * Invio esterno: ogni chiamata al SAR o al Sistema TS con richiesta, risposta ed esito.
- * Non si modifica e non si cancella (migrazione 0004).
+ * Invio esterno: ogni chiamata al servizio della regione o al Sistema TS con richiesta, risposta ed
+ * esito. Non si modifica e non si cancella (migrazione 0004).
  */
 export const externalSubmission = pgTable(
   'external_submission',

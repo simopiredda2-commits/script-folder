@@ -1,35 +1,28 @@
 import { nreProblem } from './prescription-numbers';
 
 /**
- * Lotti di NRE della Regione Piemonte (D269): la cartella numera da sé le ricette, con i lotti
- * che il SAR le «distribuisce» (SIRPED, «Cartelle cliniche MMG e PLS», V06 del 10/04/2026, 3.2 e
- * 4.1, p. 7–11).
+ * Lotti di NRE del medico (D269): dove la regione lo vuole, la cartella numera da sé le ricette,
+ * con i lotti di 1000 NRE che il servizio della regione le dà (D300). Il servizio li «estrae» da un
+ * lotto più grande avuto dal SAC e restituisce come identificativo del lotto quello del SAC; la
+ * cartella genera gli NRE agendo solo sul progressivo. Quale tipo di lotto si chiede lo dice la
+ * regione.
  *
- * - Il medico chiede un lotto di tipo 1, 1000 NRE: in Piemonte è l'unico ammesso (3.2).
- * - Il SAR lo «estrae» da un lotto più grande avuto dal SAC: restituisce come identificativo del
- *   lotto quello del SAC (per esempio 4) e come codice il lotto estratto. Esempio della V06:
- *   lotto «010 A0 4 000000»; la cartella genera gli NRE da «010 A0 4 000000 000» a
- *   «010 A0 4 000000 999», agendo solo sul progressivo (4.1, p. 10–11).
- * - L'NRE ha 15 caratteri: regione (3), raggruppamento (2), identificativo del lotto (1), poi 9
- *   cifre fra codice del lotto e progressivo (Sistema TS, «Gestione del numero ricetta
- *   elettronica», versione 2 del 21/05/2012, §2 e §2.1, p. 4).
- *
- * Per i 1000 NRE il codice del lotto ha 6 cifre e il progressivo 3, come nell'esempio della V06 e
- * nella composizione «AAA BB C DDDDDD EEE» della guida per il lotto da 1000 (§2.1).
+ * L'NRE ha 15 caratteri: regione (3), raggruppamento (2), identificativo del lotto (1), poi 9 cifre
+ * fra codice del lotto e progressivo (Sistema TS, «Gestione del numero ricetta elettronica»,
+ * versione 2 del 21/05/2012, §2 e §2.1, p. 4). Per i 1000 NRE il codice del lotto ha 6 cifre e il
+ * progressivo 3, nella composizione «AAA BB C DDDDDD EEE» della guida per il lotto da 1000 (§2.1).
  */
 
-/** Numeri di un lotto del medico: tipo 1, «1.000 NRE» (V06, 3.2). */
+/** Numeri di un lotto del medico: «1.000 NRE». */
 export const NRE_LOT_SIZE = 1000;
-/** Il tipo di lotto che la cartella chiede: solo 1 in Piemonte (V06, 3.2 e 4.1). */
-export const NRE_LOT_REQUEST_TYPE = '1';
 
-/** Il lotto come lo restituisce il SAR (ricevuta «LottoRicevutaNRE» della guida, §3.1). */
+/** Il lotto come lo restituisce il servizio (ricevuta «LottoRicevutaNRE» della guida, §3.1). */
 export interface NreLotCode {
-  /** CodRegione, 3 cifre: 010 il Piemonte. */
+  /** CodRegione, 3 cifre, come nell'elenco delle aziende sanitarie del Ministero. */
   regionCode: string;
   /** CodRagLotto, 2 caratteri: assegnato dal SAC. */
   groupCode: string;
-  /** IdentificativoLotto, 1 cifra: quello del lotto del SAR, non quello chiesto (V06, 4.1). */
+  /** IdentificativoLotto, 1 cifra: quello del lotto da cui il servizio lo estrae, non quello chiesto. */
   lotType: string;
   /** CodLotto: per il lotto estratto di 1000 NRE, 6 cifre. */
   lotCode: string;
@@ -42,7 +35,7 @@ export function nreLotProblem(lot: NreLotCode): string | null {
     return 'Il codice di raggruppamento del lotto non ha 2 lettere o cifre';
   if (!/^[0-7]$/.test(lot.lotType)) return 'L’identificativo del lotto non è una cifra da 0 a 7';
   if (!/^\d{6}$/.test(lot.lotCode))
-    return 'Il codice del lotto non ha le 6 cifre di un lotto da 1000 NRE (V06, 4.1)';
+    return 'Il codice del lotto non ha le 6 cifre di un lotto da 1000 NRE';
   return null;
 }
 

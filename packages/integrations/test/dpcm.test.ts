@@ -1,4 +1,4 @@
-import { buildFiscalCode, composeNre } from '@mmg/domain';
+import { buildFiscalCode } from '@mmg/domain';
 import { DOMParser, type Element } from '@xmldom/xmldom';
 import { strFromU8, unzipSync } from 'fflate';
 import { describe, expect, it } from 'vitest';
@@ -8,10 +8,8 @@ import {
   dpcmPackage,
   dpcmPrescriptionProblem,
   SIMULATED_DPCM_CRYPTO,
-  SimulatedGateway,
   toBasicLatin,
   type DpcmPrescription,
-  type ServiceAuth,
 } from '../src';
 
 /**
@@ -88,6 +86,9 @@ const PATIENT = buildFiscalCode({
   placeCode: 'X101',
 });
 
+/** Il tipo di invio lo dà la regione (D300): qui un valore di prova. */
+const SEND_TYPE = 'TST';
+
 const specialistica = (nre = '010ZZ4000123000'): DpcmPrescription => ({
   bar1: '01026',
   bar2: '0001234057',
@@ -114,10 +115,11 @@ const specialistica = (nre = '010ZZ4000123000'): DpcmPrescription => ({
 });
 
 describe('file della ricetta DPCM (RicettaMIR.xsd 2.1; D270)', () => {
-  it('rispetta l’ordine degli elementi dello schema, con TipoInvio «RPS» e l’NRE in Ricetta1', () => {
+  it('rispetta l’ordine degli elementi dello schema, con il TipoInvio della regione e l’NRE in Ricetta1', () => {
     const xml = dpcmInsertXml(specialistica(), {
       pinCode: '1234',
       crypto: SIMULATED_DPCM_CRYPTO,
+      sendType: SEND_TYPE,
     });
     const doc = new DOMParser().parseFromString(xml, 'text/xml');
     const root = doc.documentElement!;
@@ -128,7 +130,7 @@ describe('file della ricetta DPCM (RicettaMIR.xsd 2.1; D270)', () => {
     expect(names).toContain('Ricetta1');
     inOrder(doc.getElementsByTagName('Prescrizione')[0]!, PRESCRIZIONE);
     const one = (n: string) => doc.getElementsByTagName(n)[0]?.textContent;
-    expect(one('TipoInvio')).toBe('RPS');
+    expect(one('TipoInvio')).toBe(SEND_TYPE);
     expect(one('Bar1')).toBe('01026');
     expect(one('Bar2')).toBe('0001234057');
     expect(one('Ricetta1')).toBe('010ZZ4000123000');
@@ -148,7 +150,11 @@ describe('file della ricetta DPCM (RicettaMIR.xsd 2.1; D270)', () => {
     expect(toBasicLatin('Controllo\ndella\r\nfunzione\trenale')).toBe(
       'Controllo della funzione renale',
     );
-    const xml = dpcmInsertXml(specialistica(), { pinCode: '1', crypto: SIMULATED_DPCM_CRYPTO });
+    const xml = dpcmInsertXml(specialistica(), {
+      pinCode: '1',
+      crypto: SIMULATED_DPCM_CRYPTO,
+      sendType: SEND_TYPE,
+    });
     expect(/^[\x20-\x7e]*$/.test(xml)).toBe(true);
     expect(xml).toContain('<DescrizioneDiagnosi>Controllo dopo la terapia: e piu stanca');
   });
@@ -166,7 +172,10 @@ describe('file della ricetta DPCM (RicettaMIR.xsd 2.1; D270)', () => {
       /da 1 a 999/,
     );
     expect(() =>
-      dpcmInsertXml({ ...p, lines: [] }, { pinCode: '1', crypto: SIMULATED_DPCM_CRYPTO }),
+      dpcmInsertXml(
+        { ...p, lines: [] },
+        { pinCode: '1', crypto: SIMULATED_DPCM_CRYPTO, sendType: SEND_TYPE },
+      ),
     ).toThrow(/non ha righe/);
   });
 
@@ -181,120 +190,18 @@ describe('file della ricetta DPCM (RicettaMIR.xsd 2.1; D270)', () => {
     const a = dpcmPackage(specialistica(), {
       pinCode: '1',
       crypto: SIMULATED_DPCM_CRYPTO,
+      sendType: SEND_TYPE,
       xmlName: 'ricetta.xml',
     });
     const b = dpcmPackage(specialistica(), {
       pinCode: '1',
       crypto: SIMULATED_DPCM_CRYPTO,
+      sendType: SEND_TYPE,
       xmlName: 'ricetta.xml',
     });
     expect(Buffer.from(a.zip).equals(Buffer.from(b.zip))).toBe(true);
     const files = unzipSync(a.zip);
     expect(Object.keys(files)).toEqual(['ricetta.xml']);
     expect(strFromU8(files['ricetta.xml']!)).toBe(a.xml);
-  });
-});
-
-describe('ricetta DPCM nel simulatore del SAR (V06, 4.2; D270)', () => {
-  const auth: ServiceAuth = {
-    username: 'utente-di-prova',
-    password: 'parola-di-prova',
-    pin: '1234',
-  };
-  const withLot = async (sar: SimulatedGateway) => {
-    const r = await sar.requestLot(
-      { regionCode: '010', lotType: '1', doctorFiscalCode: DOCTOR },
-      auth,
-    );
-    if (r.outcome !== 'assigned') throw new Error('atteso un lotto');
-    return composeNre(r.lot, 5);
-  };
-
-  it('accoglie con un protocollo di 23 cifre; l’esito prima è «in attesa», poi senza errori', async () => {
-    const sar = new SimulatedGateway('sar', { now: () => new Date('2026-11-25T10:00:00Z') });
-    const nre = await withLot(sar);
-    const r = await sar.sendDpcm(
-      { prescription: specialistica(nre), fileName: 'ricetta01_PROVA.zip' },
-      auth,
-    );
-    if (r.outcome !== 'accepted') throw new Error(JSON.stringify(r));
-    expect(r.protocol).toMatch(/^99\d{21}$/);
-    expect(sar.dpcmFiles[0]!.xml).toContain('<TipoInvio>RPS</TipoInvio>');
-    expect(await sar.dpcmSummary({ protocol: r.protocol }, auth)).toMatchObject({
-      outcome: 'ok',
-      state: 1,
-    });
-    expect(await sar.dpcmSummary({ protocol: r.protocol }, auth)).toMatchObject({
-      outcome: 'ok',
-      state: 2,
-    });
-    const a = await sar.dpcmAnalytic({ protocol: r.protocol }, auth);
-    expect(a).toMatchObject({
-      outcome: 'ok',
-      records: [{ protocol: r.protocol, barcode: '010260001234057', errors: [] }],
-    });
-  });
-
-  it('il giorno dopo la compilazione dà l’avviso 2090, che non si corregge', async () => {
-    const sar = new SimulatedGateway('sar', {
-      now: () => new Date('2026-11-26T10:00:00Z'),
-      dpcmPendingChecks: 0,
-    });
-    const nre = await withLot(sar);
-    const r = await sar.sendDpcm(
-      { prescription: specialistica(nre), fileName: 'ricetta01_PROVA.zip' },
-      auth,
-    );
-    if (r.outcome !== 'accepted') throw new Error('attesa accolta');
-    expect(await sar.dpcmSummary({ protocol: r.protocol }, auth)).toMatchObject({ state: 3 });
-    const a = await sar.dpcmAnalytic({ protocol: r.protocol }, auth);
-    expect(a.outcome === 'ok' && a.records[0]!.errors).toEqual([
-      { code: '2090', description: 'Avviso: Data compilazione precedente alla data di ricezione' },
-    ]);
-  });
-
-  it('rifiuta il token, un nome di file corto e un NRE che non è dei lotti del medico', async () => {
-    const sar = new SimulatedGateway('sar');
-    const nre = await withLot(sar);
-    const ok = { prescription: specialistica(nre), fileName: 'ricetta01_PROVA.zip' };
-    expect(await sar.sendDpcm(ok, { bearer: 'token-di-prova' })).toMatchObject({
-      outcome: 'rejected',
-      authProblem: 'credentials',
-    });
-    expect(await sar.sendDpcm({ ...ok, fileName: 'a.zip' }, auth)).toMatchObject({
-      outcome: 'rejected',
-      code: '101',
-    });
-    expect(
-      await sar.sendDpcm({ ...ok, prescription: specialistica('010A04000000000') }, auth),
-    ).toMatchObject({ outcome: 'rejected', code: 'SIM-NRE-LOTTO' });
-  });
-
-  it('simula errori scartanti, rete assente e tempo scaduto', async () => {
-    const sar = new SimulatedGateway('sar', {
-      dpcmPendingChecks: 0,
-      decideDpcm: () => ({
-        state: 4,
-        errors: [{ code: 'SIM-ERR', description: 'Errore scartante (simulato)' }],
-      }),
-    });
-    const nre = await withLot(sar);
-    const r = await sar.sendDpcm(
-      { prescription: specialistica(nre), fileName: 'ricetta01_PROVA.zip' },
-      auth,
-    );
-    if (r.outcome !== 'accepted') throw new Error('attesa accolta');
-    expect(await sar.dpcmSummary({ protocol: r.protocol }, auth)).toMatchObject({ state: 4 });
-    for (const outcome of ['unreachable', 'timeout'] as const) {
-      const down = new SimulatedGateway('sar', { decideDpcmReceipt: () => outcome });
-      expect(
-        (
-          await down.sendDpcm(
-            { prescription: specialistica(nre), fileName: 'ricetta01_PROVA.zip' },
-            auth,
-          )
-        ).outcome,
-      ).toBe(outcome);
-    }
   });
 });

@@ -514,11 +514,16 @@ const OUTCOME_LABELS: Record<string, string> = {
 /**
  * Collegamenti con i servizi esterni. Oggi il programma ha solo simulatori: nessuna chiamata a
  * servizi reali (regola 7); gli adattatori veri arriveranno con le specifiche e le credenziali di
- * collaudo. L'ambiente di ogni chiamata fatta resta negli invii, e per SAR, Sistema TS e INPS si
- * vede l'ultimo.
+ * collaudo. L'ambiente di ogni chiamata fatta resta negli invii, e per il servizio delle ricette
+ * della regione, il Sistema TS e l'INPS si vede l'ultimo. Il nome del servizio delle ricette lo dà
+ * la regione dello studio (D300).
  */
 const INTEGRATIONS = [
-  { codice: 'sar', nome: 'SAR Piemonte', uso: 'Ricette SSN: farmaci e specialistica' },
+  {
+    codice: 'regional',
+    nome: 'Ricette della regione',
+    uso: 'Ricette SSN: farmaci e specialistica',
+  },
   { codice: 'sistema_ts', nome: 'Sistema TS', uso: 'Ricetta bianca elettronica' },
   { codice: 'inps', nome: 'Sistema TS per l’INPS', uso: 'Certificati di malattia' },
   { codice: 'fse', nome: 'Gateway del Fascicolo', uso: 'Profilo sanitario sintetico' },
@@ -907,11 +912,15 @@ export function createStudioAdminService(deps: AdminDeps) {
       const last = await lastCalls(actor.studioId);
       const updates = deps.referenceUpdates;
       return {
-        collegamenti: INTEGRATIONS.map((i) => ({
-          ...i,
-          ambiente: 'simulatore',
-          ultimoUso: last[i.codice] ?? null,
-        })),
+        collegamenti: await (async () => {
+          const regionalName = (await deps.prescriptionServiceName?.(actor.studioId)) ?? null;
+          return INTEGRATIONS.map((i) => ({
+            ...i,
+            ...(i.codice === 'regional' && regionalName ? { nome: regionalName } : {}),
+            ambiente: 'simulatore',
+            ultimoUso: last[i.codice] ?? null,
+          }));
+        })(),
         sessione: {
           durataMassimaOre: deps.sessionMaxHours,
           minutiInattivita: s.idleLockMinutes,
@@ -982,13 +991,13 @@ export function createStudioAdminService(deps: AdminDeps) {
     if (taken) throw duplicateName(name);
   }
 
-  /** L'ultima chiamata registrata a SAR, Sistema TS e INPS dello studio, con l'ambiente. */
+  /** L'ultima chiamata al servizio della regione, al Sistema TS e all'INPS dello studio. */
   async function lastCalls(studioId: string) {
     const out: Record<
       string,
       { quando: string; ambiente: string; operazione: string; esito: string }
     > = {};
-    for (const system of ['sar', 'sistema_ts'] as const) {
+    for (const system of ['regional', 'sistema_ts'] as const) {
       const [row] = await db
         .select({
           at: externalSubmission.at,

@@ -16,6 +16,7 @@ import {
 import { buildRuleContext, createRulesCheck, studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 /**
  * La versione delle regole in vigore oggi per la regione dello studio della prova, con le sue
@@ -28,7 +29,7 @@ describe('regole di prescrizione prima dell’invio', () => {
   let t: TestDatabase;
   let s: Scenario;
   let cookie: string;
-  const sar = new SimulatedGateway('sar');
+  const sar = regionalGateway();
 
   beforeAll(async () => {
     t = await createTestDatabase();
@@ -36,7 +37,7 @@ describe('regole di prescrizione prima dell’invio', () => {
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         // Banca dati farmaci di prova: 28 unità per confezione (serve al contatore R11).
         preSendChecks: (id, actor, input) =>
           createRulesCheck({ db: t.db, drugFacts: () => ({ unitsPerPack: 28 }) })(id, actor, input),

@@ -27,8 +27,8 @@ import { ReferenceData } from '../reference/lookup';
  *   versione 28/02/2024, che sostituiscono il modello dell'allegato tecnico del DM. I numeri dei
  *   campi sono quelli delle specifiche.
  * - **Versione 1**: il modello del DM 2 novembre 2011 (allegato 2), con le aggiunte delle specifiche
- *   del Sistema TS sulla prescrizione (5/12/2024) e della Regione Piemonte (SIRPED, «Cartelle
- *   cliniche MMG e PLS», V06, 4.3.3). Resta per ristampare i promemoria fissati prima.
+ *   del Sistema TS sulla prescrizione (5/12/2024) e quelle della regione dello studio (il codice
+ *   regionale del medico, D300). Resta per ristampare i promemoria fissati prima.
  */
 export type PromemoriaData = PromemoriaDataV1 | PromemoriaDataV2;
 
@@ -99,7 +99,7 @@ export interface PromemoriaDataV2 {
   medico: {
     /** Campo 25. */
     codiceFiscale: string;
-    /** Regione Piemonte (SIRPED, «Cartelle cliniche MMG e PLS», V06, 4.3.3): davanti al nome, nel campo 27. */
+    /** Davanti al nome, nel campo 27, dove la regione lo chiede (D300). */
     codiceRegionale: string | null;
     /** Campo 27: come lo restituisce il SAC; se manca, il nome nel programma. */
     nominativo: string;
@@ -321,6 +321,11 @@ export async function buildPromemoriaData(
    * partite prima, e allora si legge dalle terapie.
    */
   sentIndication?: 'S' | 'H' | null,
+  /**
+   * Il codice regionale del medico davanti al nome (campo 27), solo dove la regione lo chiede:
+   * lo dice il pacchetto della regione (D300). Per difetto no.
+   */
+  options: { doctorCode?: boolean } = {},
 ): Promise<PromemoriaDataV2> {
   const [row] = await db
     .select({ p: prescription, pt: patient, st: studio })
@@ -403,7 +408,7 @@ export async function buildPromemoriaData(
       };
     }
     const group = l.drugAic ? (groups.get(l.drugAic) ?? null) : null;
-    // AIC e nome; senza il nome, almeno l'AIC che è partito al SAR: mai una riga vuota (D232).
+    // AIC e nome; senza il nome, almeno l'AIC che è partito con la ricetta: mai una riga vuota (D232).
     const product = [l.drugAic, l.drugName].filter(Boolean).join(' - ') || null;
     // 17: gruppo di equivalenza e nome commerciale; per principio attivo solo il gruppo.
     const prescrizione = l.byActiveIngredient
@@ -478,7 +483,7 @@ export async function buildPromemoriaData(
     data: accepted.compiledAt,
     medico: {
       codiceFiscale: doctor.profile.fiscalCode,
-      codiceRegionale: doctor.profile.regionalCode,
+      codiceRegionale: options.doctorCode ? doctor.profile.regionalCode : null,
       nominativo: accepted.sacDoctorName ?? doctor.name,
     },
     dicitura: RELEASE_TEXT_2024,
@@ -496,6 +501,7 @@ export async function buildPromemoriaPreview(
   prescriptionId: string,
   doctorId: string,
   date: string,
+  doctorCode = false,
 ): Promise<PromemoriaDataV2> {
   const data = await buildPromemoriaData(
     db,
@@ -504,6 +510,8 @@ export async function buildPromemoriaPreview(
     undefined,
     null,
     doctorId,
+    undefined,
+    { doctorCode },
   );
   return { ...data, bozza: true };
 }

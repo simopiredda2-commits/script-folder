@@ -10,6 +10,7 @@ import {
 } from '../src/db/schema';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalGateway } from './helpers/regional-gateway';
 
 /** Il simulatore risponde con l'esito scelto dalla prova, ricetta per ricetta. */
 function scripted() {
@@ -20,7 +21,7 @@ function scripted() {
   return {
     next,
     cancels,
-    sar: new SimulatedGateway('sar', { decide, decideCancel }),
+    regional: regionalGateway({ decide, decideCancel }),
     ts: new SimulatedGateway('sistema_ts', { decide, decideCancel }),
   };
 }
@@ -36,7 +37,11 @@ describe('ciclo della ricetta', () => {
   beforeAll(async () => {
     t = await createTestDatabase();
     sim = scripted();
-    s = await createScenario(t.db, {}, { gateways: { sar: sim.sar, sistema_ts: sim.ts } });
+    s = await createScenario(
+      t.db,
+      {},
+      { gateways: { regional: sim.regional, sistema_ts: sim.ts } },
+    );
     for (const who of ['titolare', 'segreteria', 'sostituto', 'collega'] as const) {
       c[who] = await login(s, who);
     }
@@ -89,7 +94,7 @@ describe('ciclo della ricetta', () => {
       .where(eq(externalSubmission.operation, 'invio'));
     expect(rows.length).toBeGreaterThan(0);
     const r = rows[0]!;
-    expect(r.system).toBe('sar');
+    expect(r.system).toBe('regional');
     expect(r.environment).toBe('simulator');
     expect(JSON.stringify(r.request)).toContain('Farmaco di prova');
     expect(r.outcome).toBe('accepted');
@@ -200,7 +205,7 @@ describe('ciclo della ricetta', () => {
       'accepted',
     );
     expect((await status(id)).signedBy).toBe(s.users.sostituto.id);
-    const last = sim.sar.received.at(-1)!;
+    const last = sim.regional.received.at(-1)!;
     expect(last.doctor.userId).toBe(s.users.sostituto.id);
   });
 
@@ -274,14 +279,14 @@ describe('ciclo della ricetta', () => {
 
   it('un errore imprevisto dell’adattatore vale come esito incerto', async () => {
     const id = await newDraft();
-    const original = sim.sar.send.bind(sim.sar);
-    sim.sar.send = () => Promise.reject(new Error('guasto di prova'));
+    const original = sim.regional.send.bind(sim.regional);
+    sim.regional.send = () => Promise.reject(new Error('guasto di prova'));
     try {
       expect((await post('titolare', `/api/ricette/${id}/firma-e-invia`)).json().esito).toBe(
         'timeout',
       );
     } finally {
-      sim.sar.send = original;
+      sim.regional.send = original;
     }
     expect((await status(id)).lastErrorKind).toBe('timeout');
   });
@@ -322,13 +327,13 @@ describe('ciclo della ricetta', () => {
 
   it('annullamento di una bozza: solo locale, con il motivo, senza passare dal SAR', async () => {
     const id = await newDraft();
-    const before = sim.sar.received.length;
+    const before = sim.regional.received.length;
     expect(
       (await post('titolare', `/api/ricette/${id}/annulla`, { motivo: 'Non serve più' }))
         .statusCode,
     ).toBe(200);
     expect((await status(id)).status).toBe('cancelled');
-    expect(sim.sar.received.length).toBe(before);
+    expect(sim.regional.received.length).toBe(before);
   });
 
   it('la ricetta bianca va al Sistema TS', async () => {
@@ -368,12 +373,12 @@ describe('controlli prima dell’invio', () => {
   });
 
   it('un controllo che blocca ferma l’invio e lascia la ricetta com’era', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = regionalGateway();
     const s = await createScenario(
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         preSendChecks: () =>
           Promise.resolve({
             issues: [{ ruleId: 'R2', severity: 'block', message: 'Troppe confezioni' }],
@@ -404,12 +409,12 @@ describe('controlli prima dell’invio', () => {
     let arrived = 0;
     let release: () => void = () => undefined;
     const gate = new Promise<void>((r) => (release = r));
-    const sar = new SimulatedGateway('sar');
+    const sar = regionalGateway();
     const s = await createScenario(
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         preSendChecks: async () => {
           arrived += 1;
           if (arrived === 2) release();
@@ -437,12 +442,12 @@ describe('controlli prima dell’invio', () => {
     let arrived = 0;
     let release: () => void = () => undefined;
     const gate = new Promise<void>((r) => (release = r));
-    const sar = new SimulatedGateway('sar');
+    const sar = regionalGateway();
     const s = await createScenario(
       t.db,
       {},
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         preSendChecks: async () => {
           arrived += 1;
           if (arrived === 2) release();

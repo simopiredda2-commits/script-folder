@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { SimulatedGateway, type SimulatorOptions } from '@mmg/integrations';
+import { SimulatedGateway } from '@mmg/integrations';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -9,11 +9,12 @@ import {
   refDrugTransparency,
   referenceDataset,
   serviceCredential,
-} from '../src/db/schema';
-import { DPCM_CHECK_MINUTES } from '../src/prescriptions/dpcm';
-import { pdfText } from './helpers/pdf-text';
-import { createScenario, login, type Scenario } from './helpers/scenario';
-import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+} from '../../../src/db/schema';
+import { DPCM_CHECK_MINUTES } from '../../../src/prescriptions/dpcm';
+import { pdfText } from '../../helpers/pdf-text';
+import { createScenario, login, type Scenario } from '../../helpers/scenario';
+import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
+import { SimulatedSar, type SarSimulatorOptions } from '@mmg/regions/piemonte';
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 
@@ -29,10 +30,10 @@ describe('ricetta rossa in DPCM (D270)', () => {
   const c: Record<string, string> = {};
   /** Esiti scelti dalla prova, invio per invio; le altre opzioni del simulatore si cambiano qui. */
   const sends: ('accepted' | 'rejected' | 'unreachable' | 'timeout' | 'fault')[] = [];
-  const options: SimulatorOptions = {
+  const options: SarSimulatorOptions = {
     decide: () => sends.shift() ?? 'accepted',
   };
-  const sar = new SimulatedGateway('sar', options);
+  const sar = new SimulatedSar(options);
   let form = 1;
   /** Un modulo nuovo del ricettario: ente 010 (Piemonte), anno 26, ricettario 0001234. */
   const nextForm = () => `0102600012340${String(form++).padStart(2, '0')}`;
@@ -44,7 +45,7 @@ describe('ricetta rossa in DPCM (D270)', () => {
       t.db,
       { idleLockMinutes: null },
       {
-        gateways: { sar, sistema_ts: new SimulatedGateway('sistema_ts') },
+        gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         preSendChecks: noRules,
         sendTimeoutMs: 100,
         // I 2 secondi fra un file e l'altro dello stesso medico (6.1.1), qui accorciati.

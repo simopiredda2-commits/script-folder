@@ -1,17 +1,18 @@
 /**
  * Invio delle ricette dematerializzate.
  *
- * In Piemonte le ricette SSN (farmaceutica e specialistica) vanno al SAR della Regione
- * (progetto SIRPED), che le inoltra al SAC del Sistema TS; la ricetta bianca va al Sistema TS.
- * Qui c'è solo l'interfaccia: gli adattatori veri arriveranno con le specifiche e le credenziali
- * di collaudo. In sviluppo e nelle prove si usa il simulatore (regola 7: nessuna chiamata a
- * servizi reali).
+ * Le ricette SSN (farmaceutica e specialistica) vanno al servizio della regione dello studio, che
+ * le inoltra al SAC del Sistema TS (`regional-prescription.ts`, D300); la ricetta bianca va al
+ * Sistema TS. Qui c'è solo l'interfaccia: gli adattatori veri arriveranno con le specifiche e le
+ * credenziali di collaudo. In sviluppo e nelle prove si usano i simulatori (regola 7: nessuna
+ * chiamata a servizi reali).
  */
 
 import type { DispensingState } from '@mmg/domain';
 import type { AuthProblem, ServiceAuth } from './service-auth';
 
-export type GatewaySystem = 'sar' | 'sistema_ts';
+/** Dove va la ricetta: al servizio della regione dello studio o al Sistema TS. */
+export type GatewaySystem = 'regional' | 'sistema_ts';
 
 export interface PrescriptionLineMessage {
   drugAic?: string | null;
@@ -75,13 +76,12 @@ export interface PrescriptionMessage {
     userId: string;
     name: string;
     regionalCode?: string | null;
-    /** Codice fiscale del medico (cfMedico1): il SAR lega a lui il lotto di NRE (V06, 4.1). */
+    /** Codice fiscale del medico (cfMedico1): il servizio della regione gli lega i lotti. */
     fiscalCode?: string | null;
   };
   /**
-   * NRE della ricetta al SAR, generato dalla cartella con il lotto del medico (SIRPED, «Cartelle
-   * cliniche MMG e PLS», V06, 3.2 e 4.1; D269). Dopo un rifiuto si rimanda lo stesso (4.3.1, caso
-   * 3). Non c'è per la ricetta bianca: l'NRBE lo dà il Sistema TS.
+   * NRE generato dalla cartella con il lotto del medico, dove la regione dà i lotti (D269). Dopo
+   * un rifiuto si rimanda lo stesso. Non c'è per la ricetta bianca: l'NRBE lo dà il Sistema TS.
    */
   nre?: string | null;
   exemptionCode?: string | null;
@@ -98,10 +98,11 @@ export interface PrescriptionMessage {
 }
 
 /**
- * Ricetta accettata. Per la ricetta SSN il SAC, anche tramite il SAR, restituisce il codice di
- * autenticazione: senza, la ricetta non è valida e il promemoria non si può dare (specifiche del
- * Sistema TS, prescrizione, 5/12/2024). Per la ricetta bianca il SAC restituisce PIN-NRBE e il PDF
- * del promemoria, l'unico che il medico può rilasciare (Disciplinare tecnico, 1/12/2022).
+ * Ricetta accettata. Per la ricetta SSN il SAC, anche tramite il servizio della regione,
+ * restituisce il codice di autenticazione: senza, la ricetta non è valida e il promemoria non si
+ * può dare (specifiche del Sistema TS, prescrizione, 5/12/2024). Per la ricetta bianca il SAC
+ * restituisce PIN-NRBE e il PDF del promemoria, l'unico che il medico può rilasciare
+ * (Disciplinare tecnico, 1/12/2022).
  */
 export interface AcceptedSend {
   outcome: 'accepted';
@@ -142,8 +143,9 @@ export type SendResult =
   /** Nessuna risposta entro il tempo: non si sa se è arrivata. */
   | { outcome: 'timeout'; message: string }
   /**
-   * Il SAR ha risposto con un'eccezione di sistema (SOAP fault): «negativo con fault» (V06, 4.3.1,
-   * caso 4). Come per il tempo scaduto, la ricetta si annulla e si stampa la ricetta rossa.
+   * Il servizio ha risposto con un'eccezione di sistema (SOAP fault). Come per il tempo scaduto,
+   * non si sa se la ricetta è arrivata: dove la regione vuole la ricetta rossa in DPCM, la si
+   * annulla e si stampa la ricetta rossa.
    */
   | { outcome: 'fault'; message: string; raw: unknown };
 
@@ -160,8 +162,9 @@ export type CancelResult =
   | { outcome: 'timeout'; message: string };
 
 /**
- * Stato di erogazione chiesto all'ente (D70). Da verificare sulle specifiche del SAR e del Sistema
- * TS che il servizio esista e quali codici restituisce: qui i nomi del nostro prodotto.
+ * Stato di erogazione chiesto all'ente (D70). Da verificare sulle specifiche del servizio della
+ * regione e del Sistema TS che il servizio esista e quali codici restituisce: qui i nomi del nostro
+ * prodotto.
  */
 export type StatusResult =
   | { outcome: 'ok'; state: DispensingState; raw: unknown }
@@ -198,5 +201,5 @@ export interface PrescriptionGateway {
 
 /** Il sistema a cui va ogni tipo di ricetta. */
 export function systemFor(kind: PrescriptionMessage['kind']): GatewaySystem {
-  return kind === 'white' ? 'sistema_ts' : 'sar';
+  return kind === 'white' ? 'sistema_ts' : 'regional';
 }

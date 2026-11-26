@@ -1,6 +1,12 @@
 import { buildFiscalCode, composeNre, nreProblem } from '@mmg/domain';
 import { describe, expect, it } from 'vitest';
-import { SimulatedGateway, type PrescriptionMessage, type ServiceAuth } from '../src';
+import {
+  hasNreLots,
+  SimulatedGateway,
+  type PrescriptionMessage,
+  type ServiceAuth,
+} from '@mmg/integrations';
+import { SAR_LOT_TYPE, SimulatedSar } from '..';
 
 /** Credenziali inventate: il simulatore ne controlla solo la forma. */
 const auth: ServiceAuth = {
@@ -34,7 +40,7 @@ const message = (nre: string | null, fiscalCode = MARCHI, localId = 'r1'): Presc
 
 describe('lotti di NRE nel simulatore del SAR (V06, 3.2 e 4.1; D269)', () => {
   it('dà un lotto «estratto» come nell’esempio della V06, uno nuovo a ogni richiesta', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedSar();
     const a = await sar.requestLot(request(), auth);
     const b = await sar.requestLot(request(), auth);
     if (a.outcome !== 'assigned' || b.outcome !== 'assigned') throw new Error('atteso un lotto');
@@ -56,14 +62,14 @@ describe('lotti di NRE nel simulatore del SAR (V06, 3.2 e 4.1; D269)', () => {
     [{ regionCode: '020' }, '05'],
     [{ doctorFiscalCode: 'NONVALIDO' }, '06'],
   ])('rifiuta la richiesta %o con il codice %s della V06', async (change, code) => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedSar();
     const r = await sar.requestLot({ ...request(), ...change }, auth);
     expect(r.outcome).toBe('rejected');
     if (r.outcome === 'rejected') expect(r.code).toBe(code);
   });
 
   it('vuole utente, password e PIN RUPAR: niente token dell’accesso regionale (V06, 3.1.1)', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedSar();
     const r = await sar.requestLot(request(), { bearer: 'token-di-prova' });
     expect(r).toMatchObject({ outcome: 'rejected', authProblem: 'credentials' });
     const senzaPin = await sar.requestLot(request(), { username: 'u', password: 'p' });
@@ -71,32 +77,33 @@ describe('lotti di NRE nel simulatore del SAR (V06, 3.2 e 4.1; D269)', () => {
   });
 
   it.each(['unreachable', 'timeout'] as const)('simula l’esito «%s»', async (outcome) => {
-    const sar = new SimulatedGateway('sar', { decideLot: () => outcome });
+    const sar = new SimulatedSar({ decideLot: () => outcome });
     expect((await sar.requestLot(request(), auth)).outcome).toBe(outcome);
   });
 
-  it('il lotto lo dà solo il SAR', async () => {
-    const ts = new SimulatedGateway('sistema_ts');
-    expect((await ts.requestLot(request(), auth)).outcome).toBe('rejected');
+  it('il lotto lo dà il SAR: il simulatore nazionale non ha lotti, e il tipo chiesto è 1', () => {
+    expect(hasNreLots(new SimulatedSar())).toBe(true);
+    expect(hasNreLots(new SimulatedGateway('sistema_ts'))).toBe(false);
+    expect(SAR_LOT_TYPE).toBe('1');
   });
 });
 
 describe('ricetta con l’NRE della cartella (V06, 4.1 e 4.3.1)', () => {
-  const lotOf = async (sar: SimulatedGateway, doctorFiscalCode = MARCHI) => {
+  const lotOf = async (sar: SimulatedSar, doctorFiscalCode = MARCHI) => {
     const r = await sar.requestLot(request(doctorFiscalCode), auth);
     if (r.outcome !== 'assigned') throw new Error('atteso un lotto');
     return r.lot;
   };
 
   it('accetta l’NRE del lotto del medico e lo restituisce com’è', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedSar();
     const nre = composeNre(await lotOf(sar), 7);
     const r = await sar.send(message(nre), auth);
     expect(r).toMatchObject({ outcome: 'accepted', nre });
   });
 
   it('rifiuta un NRE fuori dai lotti, di un altro medico o già usato', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedSar();
     const lot = await lotOf(sar);
     // L'esempio della V06: un lotto vero, che il simulatore non ha dato.
     const fuori = await sar.send(message('010A04000000000'), auth);
@@ -110,7 +117,7 @@ describe('ricetta con l’NRE della cartella (V06, 4.1 e 4.3.1)', () => {
 
   it('dopo un rifiuto la stessa ricetta si rimanda con lo stesso NRE (caso 3)', async () => {
     let first = true;
-    const sar = new SimulatedGateway('sar', {
+    const sar = new SimulatedSar({
       decide: () => (first ? ((first = false), 'rejected') : 'accepted'),
     });
     const nre = composeNre(await lotOf(sar), 3);
@@ -119,20 +126,20 @@ describe('ricetta con l’NRE della cartella (V06, 4.1 e 4.3.1)', () => {
   });
 
   it('simula l’eccezione di sistema (caso 4)', async () => {
-    const sar = new SimulatedGateway('sar', { decide: () => 'fault' });
+    const sar = new SimulatedSar({ decide: () => 'fault' });
     const r = await sar.send(message(composeNre(await lotOf(sar), 0)), auth);
     expect(r.outcome).toBe('fault');
   });
 
   it('un lotto simulato dato prima di un riavvio si accetta ancora', async () => {
-    const before = new SimulatedGateway('sar');
+    const before = new SimulatedSar();
     const nre = composeNre(await lotOf(before), 9);
-    const after = new SimulatedGateway('sar');
+    const after = new SimulatedSar();
     expect(await after.send(message(nre), auth)).toMatchObject({ outcome: 'accepted', nre });
   });
 
   it('senza NRE della cartella il simulatore ne dà uno di fantasia, come prima', async () => {
-    const sar = new SimulatedGateway('sar');
+    const sar = new SimulatedSar();
     const r = await sar.send(message(null), auth);
     if (r.outcome !== 'accepted') throw new Error('atteso accettato');
     expect(r.nre).toMatch(/^SIMR\d{12}$/);

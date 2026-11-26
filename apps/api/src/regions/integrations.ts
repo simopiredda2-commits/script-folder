@@ -1,9 +1,10 @@
 import type {
   RegionalContextCall,
   RegionalFsePublication,
+  RegionalPrescription,
   SimulatedFseGateway,
 } from '@mmg/integrations';
-import { REGIONAL_PACKAGES, type RegionalPackage } from '@mmg/regions';
+import { REGIONAL_PACKAGES, type RegionalIntegrations, type RegionalPackage } from '@mmg/regions';
 
 /**
  * Le integrazioni con i servizi della regione (D297), una per pacchetto: il servizio le sceglie
@@ -64,3 +65,16 @@ export const fsePublicationChoice = (
   packages?: readonly RegionalPackage[],
 ) =>
   regionalChoice((pkg) => pkg.integrations?.fsePublication?.(options) ?? null, override, packages);
+
+/**
+ * Le ricette SSN della regione dello studio (D300): il servizio a cui vanno, con lotti di NRE e
+ * ricetta rossa in DPCM se la regione li ha, o il prescrittore esterno. Per difetto il simulatore
+ * del pacchetto; con `options.gateway` (le prove, o un adattatore dalla configurazione) quel
+ * servizio, con le parole e le scelte della regione. Con `override` la stessa ricetta per ogni
+ * regione.
+ */
+export const prescriptionChoice = (
+  override: RegionalPrescription | undefined,
+  options: Parameters<NonNullable<RegionalIntegrations['prescription']>>[0],
+  packages?: readonly RegionalPackage[],
+) => regionalChoice((pkg) => pkg.integrations?.prescription?.(options) ?? null, override, packages);

@@ -428,8 +428,8 @@ async function renderPromemoria2024(d: PromemoriaDataV2, paper: PaperSize): Prom
 }
 
 /**
- * Campo 27, con il codice regionale davanti al nome dove la Regione lo chiede (Piemonte, SIRPED,
- * «Cartelle cliniche MMG e PLS», V06, 4.3.3: «codice regionale – nominativo del medico»).
+ * Campo 27, con il codice regionale davanti al nome dove la regione lo chiede (D300): «codice
+ * regionale – nominativo del medico». Altrimenti il codice è vuoto e resta il nome.
  */
 function doctorName(d: PromemoriaDataV2) {
   return [d.medico.codiceRegionale, d.medico.nominativo.toUpperCase()].filter(Boolean).join(' - ');
@@ -621,7 +621,7 @@ function footerV1(w: Writer, d: PromemoriaDataV1) {
   w.section('MEDICO');
   w.field('Data', ddmmyyyy(d.data));
   w.field('Codice fiscale del medico', d.medico.codiceFiscale);
-  // Regione Piemonte: sotto il codice fiscale, allineati, senza etichetta, separati da «-».
+  // Dove la regione lo chiede: sotto il codice fiscale, allineati, senza etichetta, separati da «-».
   w.text(
     [d.medico.codiceRegionale, d.medico.nominativo.toUpperCase()].filter(Boolean).join(' - '),
     { x: LEFT + 150 },

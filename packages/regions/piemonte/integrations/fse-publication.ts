@@ -58,7 +58,7 @@ export const V09_NAMESPACES = {
 } as const;
 
 /** Password in chiaro nel token (su canale cifrato): profilo «username token» di WS-Security. */
-const PASSWORD_TEXT =
+export const PASSWORD_TEXT =
   'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText';
 
 /**

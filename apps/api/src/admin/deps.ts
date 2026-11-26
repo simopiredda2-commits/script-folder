@@ -17,4 +17,6 @@ export interface AdminDeps {
   aura?: AuraService;
   /** Prossimo controllo di ogni notte su AURA, se c'è l'ora. */
   auraNextRun?: () => Date | null;
+  /** Il nome del servizio delle ricette SSN della regione dello studio (D300), se c'è. */
+  prescriptionServiceName?: (studioId: string) => Promise<string | null>;
 }
