@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { ASL_LIST } from '@mmg/domain';
 import {
   SimulatedSecondFactor,
@@ -13,6 +14,7 @@ import { regionalPackageKey } from '@mmg/regions';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  doctorProfile,
   regionalAuthorizationRequest,
   serviceCredential,
   serviceSession,
@@ -29,6 +31,8 @@ import { createTestDatabase, type TestDatabase } from './helpers/test-db';
  * inventata dà alla regione degli studi delle prove le sue credenziali, con parole sue, il suo
  * secondo fattore, il suo codice del programma e il suo accesso con SPID o CIE.
  */
+
+const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 
 /** Il secondo fattore della regione inventata: vuole il codice del programma, come «PROG». */
 const second = new SimulatedSecondFactor('srp_inventata', {
@@ -255,6 +259,44 @@ describe('credenziali del servizio di una regione inventata (D301)', () => {
     expect(access.revoked.at(-1)?.clientId).toBe(url.searchParams.get('client_id'));
   });
 
+  it('il ritorno dalla pagina della regione vale solo per la richiesta del suo servizio', async () => {
+    // Una richiesta aperta di un altro servizio, con uno state noto: sul ritorno di questo servizio
+    // non si riconosce.
+    const state = 'state-di-un-altro-servizio';
+    await t.db.insert(regionalAuthorizationRequest).values({
+      userId: s.users.titolare.id,
+      service: 'altro_servizio',
+      stateHash: createHash('sha256').update(state).digest('hex'),
+      verifierEnc: Buffer.from('cifrato-di-prova'),
+      redirectUri: '/api/profilo/credenziali/srp/accesso-regionale/ritorno',
+      clientId: 'SIMULATORE-301',
+      expiresAt: new Date(s.clock.now().getTime() + 600_000),
+    });
+    const back = await s.app.inject({
+      method: 'GET',
+      url: `/api/profilo/credenziali/srp/accesso-regionale/ritorno?${new URLSearchParams({
+        state,
+        code: 'codice-1',
+      }).toString()}`,
+      headers: { cookie },
+    });
+    expect(back.headers.location).toBe(
+      '/profilo/credenziali?accesso=errore&motivo=non-riconosciuta',
+    );
+  });
+
+  it('nel database la chiave del servizio ha la forma di una chiave', async () => {
+    await expect(
+      t.db.insert(serviceCredential).values({
+        userId: s.users.titolare.id,
+        service: 'Non una chiave',
+        secretEnc: Buffer.from('x'),
+        usernameHint: '…x',
+        passwordChangedOn: '2026-11-01',
+      }),
+    ).rejects.toThrow();
+  });
+
   it('le credenziali di una regione che non è più quella dello studio: non si usano, si cancellano', async () => {
     const [row] = await t.db.select({ regionName: studio.regionName }).from(studio);
     const own = ASL_LIST.find((a) => a.regionName === row!.regionName)!.regionCode;
@@ -353,6 +395,54 @@ describe('credenziali degli invii della regione inventata (D301)', () => {
     // Gli invii nazionali vanno al Sistema TS, qualunque cosa dica il chiamante.
     await expect(c.authFor(s.users.titolare.id, 'certificato_inps')).resolves.toMatchObject({
       sessionId: null,
+    });
+  });
+});
+
+describe('il simulatore della ricetta controlla il secondo fattore della stessa regione (D301)', () => {
+  let t: TestDatabase;
+  let s: Scenario;
+
+  beforeAll(async () => {
+    t = await createTestDatabase();
+    // Nessun servizio dato: il servizio della ricetta e il secondo fattore sono quelli del
+    // pacchetto della regione degli studi delle prove, creati dal programma.
+    s = await createScenario(t.db, {}, { preSendChecks: noRules });
+  });
+  afterAll(async () => {
+    await s?.app.close();
+    await t?.drop();
+  });
+
+  it('con la sessione dello scenario la ricetta SSN parte; con la sessione chiusa dal servizio, no', async () => {
+    const cookie = await login(s, 'titolare');
+    const post = (url: string, payload: object = {}) =>
+      s.app.inject({ method: 'POST', url, payload, headers: { cookie } });
+    const draft = async () => {
+      const res = await post(`/api/pazienti/${s.richPatient}/ricette`, {
+        kind: 'pharma_ssn',
+        lines: [{ drugName: 'Farmaco di prova 5 mg', activeIngredient: 'principio', quantity: 1 }],
+      });
+      expect(res.statusCode, res.body).toBe(201);
+      return res.json<{ id: string }>().id;
+    };
+    expect((await post(`/api/ricette/${await draft()}/firma-e-invia`)).json()).toMatchObject({
+      esito: 'accepted',
+    });
+    // Una richiesta di un codice nuovo, da un altro programma, chiude la sessione presso il
+    // servizio della regione: il simulatore della ricetta lo sa.
+    const second = s.secondFactor.regional;
+    if (!(second instanceof SimulatedSecondFactor)) throw new Error('secondo fattore simulato');
+    const [profile] = await t.db
+      .select({ cf: doctorProfile.fiscalCode })
+      .from(doctorProfile)
+      .where(eq(doctorProfile.userId, s.users.titolare.id));
+    await second.requestCode({
+      auth: { username: 'altro', password: 'x', pin: '1', software: 'ALTRO_301' },
+      fiscalCode: profile!.cf!,
+    });
+    expect((await post(`/api/ricette/${await draft()}/firma-e-invia`)).json()).toMatchObject({
+      esito: 'auth',
     });
   });
 });
