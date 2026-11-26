@@ -53,7 +53,7 @@ Contatto per le applicazioni sanitarie della Regione gestite dal CSI (AURA, SAR,
 9. **SIAP, Sistema Informativo dell'Assistenza Primaria** (DM Salute 4/8/2025; D277, `docs/siap.md`). La cartella manda al CSI tre tracciati: assistito, contatto e organizzazione. Si usano le API REST in JSON, su un canale cifrato con certificati, e il CSI risponde con un ID di protocollo. L'invio è mensile nel 2026 e settimanale dal 2027. Non è costruito: è la domanda 3 della prossima fermata.
    - Dal programma mancano il contatto come registrazione a sé, il fumo codificato, il codice STS.11 dello studio con il tipo di struttura, l'UCCP e la tabella delle prestazioni.
    - Dal CSI servono il formato JSON, i servizi, i certificati, l'ambiente di prova e il collaudo, per un fornitore certificato SIRPED (domande 11 e 12 per il CSI).
-   - Da Simone serve il disciplinare tecnico del Ministero, che da qui non si scarica; le specifiche funzionali 1.3 le ha mandate il 26/11/2026 (`docs/provenienze.md`, «SIAP»).
+   - Il disciplinare tecnico e le specifiche funzionali 1.3 del Ministero, che da qui non si scaricano, li ha mandati Simone il 26/11/2026 (`docs/provenienze.md`, «SIAP»). Il disciplinare conferma il confronto: dalla cartella vengono fumo, BMI, patologie croniche e il contatto, l'anagrafica viene dall'anagrafe regionale degli assistiti (`docs/siap.md`).
 
 _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 
@@ -1659,6 +1659,7 @@ Poi il Fascicolo con il PSS secondo la guida v1.5 (seconda pull request, D268). 
    - Il programma ha già la maggior parte dei dati clinici: problemi con l'ICD-9-CM e la casella «cronica», BMI, tipo di contatto del diario, ricette, certificati, vaccinazioni, prestazioni aggiuntive, esenzioni, scelte, agenda, AFT, codici di regione, ASL e medico.
    - Mancano il contatto come registrazione a sé (data, progressivo, problema, che cosa si è fatto), il fumo codificato, il codice STS.11 dello studio con il tipo di struttura, l'UCCP e la tabella delle prestazioni.
    - Del CSI ci sono solo i nomi dei campi; formato JSON, servizi, certificati, ambiente di prova e collaudo sono domande (11 e 12).
+   - Il disciplinare tecnico del Ministero, mandato da Simone il 26/11/2026, conferma che l'anagrafica dell'assistito non la manda la cartella: viene dall'anagrafe regionale degli assistiti.
 
    Opzioni:
    - A. Dopo il Fascicolo e prima di AURA, che aspetta il CSI. Prima la parte che non dipende dal CSI: il contatto, il fumo codificato, il codice STS.11, l'UCCP e la tabella delle prestazioni. Poi il modulo con un simulatore del CSI, come per il SAR: i tre tracciati, l'invio mensile e poi settimanale, l'ID di protocollo, rettifiche e cancellazioni. I valori sono quelli delle specifiche del Ministero, finché il CSI non dà il suo JSON (consigliata).
@@ -1766,6 +1767,8 @@ _SIRPED e SIAP_ (domande di Simone del 25/11/2026)
 12. **SIAP per un fornitore che arriva dopo l'AP26_003** (D277):
     - come ottiene le specifiche aggiornate (formato del JSON, servizi REST, certificati del canale), l'ambiente di prova e il collaudo?
     - nel DataSet 3 vale la versione delle specifiche AP26_003, con data e progressivo del contatto, o quella del Ministero (1.3), che li ha tolti?
+    - il progressivo del contatto conta i contatti dell'assistito nella giornata, come nel disciplinare tecnico e nell'AP26_003, o è il codice della struttura con il numero di accettazione, come nel Ministero (1.3)?
+    - la quantità erogata, che il disciplinare (§6.3) e il Ministero hanno nel contatto, si manda anche al CSI, che nel DataSet 2 non la chiede?
 
 **Controllo del confronto sui documenti** (punto 2). Paragrafi e pagine del confronto tornano con i documenti. Dove il confronto sbaglia o non dice, vale il documento:
 
