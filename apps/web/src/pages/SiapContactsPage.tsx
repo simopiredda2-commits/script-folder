@@ -366,16 +366,16 @@ function ContactCard({
   return (
     <li className="riquadro scheda-contatto" aria-labelledby={headingId}>
       <h3 id={headingId}>
-        <Link to={`/pazienti/${c.paziente.id}`}>{who}</Link>{' '}
+        <Link to={`/pazienti/${c.paziente.id}`}>{who}</Link>
+      </h3>
+      <p>
         <span className={STATUS_CLASS[c.stato]}>
           {STATUS_LABEL[c.stato]}
           {c.stato !== 'scartato' && c.contatto?.progressivo
             ? `, n. ${c.contatto.progressivo}`
             : ''}
-        </span>
-      </h3>
-      <p className="tenue">
-        <span className="codice">{c.paziente.codiceFiscale}</span>
+        </span>{' '}
+        <span className="codice tenue">{c.paziente.codiceFiscale}</span>
       </p>
       <h4>Atti del giorno</h4>
       <ul className="elenco-semplice">
