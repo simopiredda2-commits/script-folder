@@ -2440,3 +2440,54 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - «Riservata» per la terapia nuova: si segna nella scheda;
   - la modifica di una ricetta della segreteria: il medico la annulla e la rifà, come prima.
 - **Non provato**: con il SAR e il Sistema TS veri, che la tipologia S o H sia accettata come la scrivono le specifiche lette (D273).
+
+**D284 · SIAP, la parte che non dipende dal CSI (D282, domanda 3).** Simone ha scelto alla fermata del 26/11/2026 il SIAP prima di AURA: prima ciò che il programma può avere senza il CSI, poi il modulo con un simulatore. Le fonti sono le specifiche funzionali del Ministero, versione 1.3 di aprile 2026, mandate da Simone (`docs/provenienze.md`, «SIAP»). Fatto finora:
+
+- **Valori del Ministero come dato.** Le tipologie e i dettagli delle prestazioni (allegati 1 e 2) e i domini dei campi dei tre tracciati sono trascritti in `packages/reference/data/siap/valori-ministero-1.3.json`, con l'impronta del PDF, «da controllare» come le altre trascrizioni. I domini sono modalità del contatto, regime dell'attività, tipologia di accesso, stato del problema, fumo e tipo di struttura.
+  - Nel codice ci sono solo le chiavi (`packages/domain/src/siap.ts`): il legame fra chiave e codice del Ministero è nel file.
+  - Il lettore controlla che ogni chiave del programma abbia un valore, uno solo, e che i codici non si ripetano. Se il Ministero cambia un codice, cambia il file, non il programma.
+  - Il documento ha due incongruenze, scritte nella nota del file. Il codice 13 della tipologia è «ATTIVITÀ DI INIZIATIVA» nell'allegato 1 e «attività amministrativa» nella definizione del campo e nell'allegato 2: vale l'allegato 2. Il «non noto» del fumo è 9 nella definizione del campo e 3 nello schema XSD: vale la definizione del campo. Sono domande per il CSI (domanda 12), che darà il formato del suo JSON.
+- **Fumo codificato negli stili di vita.** Il tracciato dell'assistito chiede il fumo come «sì», «no» o «non noto»; il programma lo aveva solo come testo.
+  - Per il fattore «Fumo» il modulo chiede «Fuma adesso»: sì, no o non noto, obbligatorio. «Com'è» resta per i dettagli ed è facoltativo; senza testo, la voce dice il valore in parole («Fuma», «Non fuma», «Non noto»).
+  - Gli altri fattori non hanno il valore codificato e vogliono il testo, come prima.
+  - Le voci importate da altri programmi entrano anche senza il valore codificato: il programma non lo ricava dal testo, il medico lo completa.
+  - Nel database è la colonna `smoking_status` dei fattori di rischio (migrazione 0057); la voce letta dalla cartella lo restituisce.
+- **Da fare, nello stesso blocco**: il codice STS.11 dello studio con il tipo di struttura, il codice dell'AFT e l'UCCP; il contatto come registrazione a sé, ricavato dagli atti e confermato dal medico; poi il modulo con un simulatore. Prima, su richiesta della Dr.ssa Rocca, le RAO (D285).
+- **Non provato**: il formato vero del CSI, che non c'è ancora.
+
+**D285 · Le RAO nella ricetta specialistica (domanda della Dr.ssa Rocca del 26/11/2026).** Chiara ha chiesto se il programma ha le RAO (Raggruppamenti di Attesa Omogenei), che per ogni prestazione legano le condizioni cliniche alla classe di priorità. Non le ha: il medico sceglie la classe da sé, e R14 controlla solo che ci sia per il primo accesso. Risposte di Simone con il pulsante:
+
+- **Quando**: «Adesso, poi il SIAP (Consigliata)». Si chiude il fumo codificato del SIAP, poi le RAO in una pull request a sé, poi si riprende il SIAP.
+- **Come**: «Il medico sceglie la condizione (Consigliata)». Accanto alla prestazione c'è l'elenco delle condizioni RAO per classe; il medico sceglie quella del paziente e il programma mette la classe corrispondente, che il medico può cambiare. Senza la scelta del medico la classe resta vuota.
+- **Regola 3**: la classe non la decide il programma. La condizione la sceglie il medico, che conosce il paziente; la classe viene dalla tabella ufficiale, come un dato letto, non come un suggerimento diagnostico.
+- **Fonti lette**, registrate in `docs/provenienze.md`:
+  - il Manuale RAO di AGENAS, luglio 2020, corretto il 13/01/2021, «in sostituzione dell'allegato C» del Piano nazionale di governo delle liste d'attesa 2019–2021;
+  - la D.D. 24/12/2019 n. 973 della Regione Piemonte per la cardiologia (prima visita cardiologica, ECG, ecocolordoppler cardiaco, Holter; adulti e bambini), che «deve essere adottata da tutti i soggetti che hanno titolo ad emettere prescrizioni per conto del Servizio Sanitario Regionale»;
+  - la D.D. 10/04/2019 n. 259 della Regione Piemonte per la gastroenterologia;
+  - la «Guida alla lettura» della Regione (2023), con le prestazioni monitorate e i loro codici;
+  - la nota della Direzione Sanità del 24/04/2024 sui percorsi di tutela: l'ASL verifica l'appropriatezza della prescrizione anche rispetto al modello RAO.
+- **Da verificare**: quali tabelle valgono oggi in Piemonte per ogni prestazione. Le determine regionali sono del 2019, il manuale AGENAS del 2020; per una prestazione con una tabella regionale vale quella, per le altre il manuale, finché la Regione o l'ASL non dicono altro. È una domanda per la Dr.ssa Rocca e per l'ASL.
+
+- **Costruito il 26/11/2026** (dettagli in `docs/rao.md`):
+  - **Dati**: le 77 tabelle del manuale di AGENAS e le tabelle delle due determine sono in `packages/reference/data/rao`, «da controllare», con l'impronta del PDF. Il manuale è la versione pubblicata oggi da AGENAS; il piano nazionale delle liste d'attesa in vigore, 2026-2028, rimanda a quello.
+  - **Precedenza**: per le prestazioni delle due determine, negli studi in Piemonte, valgono le tabelle regionali al posto di quelle del manuale. Ci sono la prima visita cardiologica con l'ECG, l'ecocardiogramma, l'Holter, la prima visita gastroenterologica, l'EGDS e la colonscopia.
+  - **Legame con il catalogo**: il codice del nomenclatore di oggi, dall'allegato 4. Otto codici stampati nel manuale oggi sono di un'altra prestazione e sono corretti, con la nota. Dove lo stesso codice vale per discipline diverse (89.7, 89.13, 89.7A.3, 89.26.x) serve in più l'inizio della descrizione: la tabella della visita cardiologica non va alla cardiochirurgica.
+  - **Scelta**: il programma mette la classe della condizione. Se il quesito è vuoto, o è il testo della condizione di prima, ci scrive il testo della condizione: è il «collegamento fra l'indicazione scelta e il quesito diagnostico» che il piano 2026-2028 chiede alla cartella (allegato A, punto 5). Con «Altro» il quesito resta del medico.
+  - **Classe cambiata**: se poi il medico cambia la classe, la pagina lo dice; non ferma niente e non chiede un motivo.
+  - **Righe d'emergenza** («invio al pronto soccorso»): il manuale le elenca «con finalità di promemoria». Si vedono in un riquadro a parte e non si scelgono.
+  - **Classe vuota per difetto**: prima la classe partiva da «P». Ora parte vuota per tutte le ricette specialistiche, con o senza tabella; R14 ferma l'invio del primo accesso senza classe, come prima.
+  - **Ricetta**: tiene la condizione com'era alla scelta: chiave, classe della tabella, testo e fonte (migrazione 0058). Il servizio la accetta solo sulla specialistica SSN del primo accesso, solo di una tabella delle prestazioni della ricetta, e mai una riga d'emergenza.
+  - **Trascrizioni non controllate**: si usano solo nell'ambiente di prova e nella dimostrazione, come il catalogo (D159, D260).
+- **Non fatto**: la condizione nel messaggio al SAR, che oggi non ha un campo (domanda per il CSI); le attese «vere» del Piemonte, perché le determine del 2019 dicono 180 giorni per la classe P e il manuale 120 (domanda per la Regione); le D.D. 43/2008 e 375/2009, non trovate.
+- **Non provato**: le tabelle controllate da una persona; la condizione con il SAR vero.
+
+**D286 · CI: il tempo massimo sulle prove, non sull'installazione dei browser; il PIN decifrato vuoto nel simulatore del Fascicolo.** Nel giro della pull request #43, sul commit `ccc3ac1`, la prova dell'interfaccia con WebKit si è fermata al tempo massimo del lavoro, 20 minuti (D258), con le prove quasi finite; l'altro giro dello stesso commit è verde. Il registro dice dove è andato il tempo. L'installazione di WebKit con i pacchetti di Ubuntu (`playwright install --with-deps`) ha preso 17 minuti e 48 secondi, con attese da 20 a 120 secondi per pacchetto sul server di Ubuntu (`us-east-2.ec2.archive.ubuntu.com`). Le prove, nell'altro giro, 3 minuti e mezzo. Nel giro di prima (commit `601d64d`) la stessa installazione aveva preso 9 minuti, quella della dimostrazione 4; nel giro della #41 era caduta per lo stesso motivo la dimostrazione con WebKit.
+
+- **Scelta**: il limite stretto va sul passo delle prove, dove si ferma una prova bloccata, come voleva D258:
+  - 15 minuti per la prova dell'interfaccia e per quella della dimostrazione (di solito da 4 a 6);
+  - 20 per le prove di TypeScript (di solito 6) e 10 per lint e tipi (di solito 2).
+- **Il limite del lavoro** sale a 45 minuti, per un'installazione lenta. Una prova bloccata si ferma come prima; un server di Ubuntu lento non fa più cadere le prove.
+- **Seconda caduta, nel giro dopo** (commit `a977793`): una prova di TypeScript rossa in un giro e verde nell'altro, la prova delle credenziali del Fascicolo regionale (D280). Il PIN cifrato con il certificato sbagliato doveva dare «credenziali sbagliate», e ha dato «PIN mancante». La causa è nel simulatore. Con la «implicit rejection» di OpenSSL un PIN cifrato con un'altra chiave si decifra in un valore a caso, a volte vuoto: con Node 22, 87 volte su 20.000 (circa una su 230, contate qui). Il simulatore prendeva un PIN decifrato vuoto per un PIN mancante.
+  - **Correzione**: «PIN mancante» vale solo per il campo vuoto o per un valore che non si decifra. Un PIN decifrato vuoto si confronta con quello del medico, come gli altri, ed è un PIN sbagliato. Il programma non cambia: è il simulatore.
+  - **Prova**: il caso si prova sempre, con un PIN vuoto cifrato con il certificato della Regione, non solo quando capita; sabotaggio nel registro.
+- **Non provato**: i limiti dei passi con un sabotaggio, come per D258. È il meccanismo di GitHub, e servirebbe una prova bloccata apposta per un quarto d'ora. Come si comporta il servizio vero della Regione con un PIN cifrato con un altro certificato si vede al collaudo con il CSI.

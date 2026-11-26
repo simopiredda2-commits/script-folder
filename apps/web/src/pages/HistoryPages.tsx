@@ -45,6 +45,8 @@ interface HistoryEntry {
     priorita: string | null;
     accesso: string | null;
     quesito: string | null;
+    /** La condizione RAO scelta dal medico (D285). */
+    condizioneRao?: { testo: string; classe: string; fonte: string } | null;
     annullataIl: string | null;
     annullataDa: string | null;
     motivoAnnullamento: string | null;
@@ -324,6 +326,12 @@ function HistoryTable({
                 {r.accesso && <div>{ACCESS_TYPE[r.accesso]}</div>}
                 {r.priorita && <div>Priorità {PRIORITY[r.priorita]}</div>}
                 {r.quesito && <div>Quesito: {r.quesito}</div>}
+                {r.condizioneRao && (
+                  <div>
+                    Condizione RAO: {r.condizioneRao.testo} (classe {r.condizioneRao.classe};{' '}
+                    {r.condizioneRao.fonte})
+                  </div>
+                )}
               </td>
               <td>
                 <div>Preparata da {r.preparataDa}</div>

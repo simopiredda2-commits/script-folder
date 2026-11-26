@@ -1,0 +1,425 @@
+{
+  "tipo": "rao_tabelle",
+  "fonte": "piemonte-dd973-2019",
+  "ambito": "regionale",
+  "regione": "Piemonte",
+  "atto": "Regione Piemonte, D.D. 24 dicembre 2019, n. 973 (BU n. 7, supplemento 1, del 13/02/2020), allegato A: criteri per le classi di priorità della cardiologia, che «devono essere adottate da tutti i soggetti che hanno titolo ad emettere prescrizioni per conto del Servizio Sanitario Regionale»",
+  "titolo_breve": "D.D. 973/2019 della Regione Piemonte (cardiologia)",
+  "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/2020/07/attach/dda1410000973_1040.pdf",
+  "sha256_origine": "733fc9e41c8d40c6e255fbdc38914b31750b138b033bddc62d97e6e512de46a1",
+  "trascritto_da": "Claude Code, dalle celle delle tabelle del PDF (pdfplumber), controllato a vista sulle pagine 6-9",
+  "trascritto_il": "2026-11-26",
+  "controllato_da": null,
+  "nota": "Testi come nell'atto; il trattino U+2010 è scritto «-». Le pagine sono quelle del PDF del Bollettino. La numerazione stampata continua da una tabella all'altra (per esempio la classe B dell'ecocardiogramma comincia da 14): «numero» è quello stampato. Le voci con un elenco sotto («Recente insorgenza, di:») sono una voce sola, con le parti separate da «; ». Nella tabella della visita degli adulti la classe U è «Livello di priorita’ non previsto»; le righe «U PS» (invio al pronto soccorso) e «U 48 ore» vengono dalle note sotto la tabella, che le chiamano criteri «per la visita in classe U entro 72 ore» (da_nota). Nella tabella dell'età pediatrica «13. In pazienti asintomatici con:» ha sotto tre voci numerate 6-8; «9- altro (10%)» è qui una voce a sé.",
+  "tabelle": [
+    {
+      "id": "dd973-1",
+      "class_rao": "017",
+      "pagine": [6, 7],
+      "testata": "PRIMA VISITA CARDIOLOGICA cod. 89.7 / ELETTROCARDIOGRAMMA (ECG) cod. 89.52 / PRIMA VISITA CARDIOLOGICA + ECG cod. 89.7A.3",
+      "servizi": [
+        {
+          "nome": "PRIMA VISITA CARDIOLOGICA",
+          "codici_stampati": ["89.7"]
+        },
+        {
+          "nome": "ELETTROCARDIOGRAMMA (ECG)",
+          "codici_stampati": ["89.52"]
+        },
+        {
+          "nome": "PRIMA VISITA CARDIOLOGICA + ECG",
+          "codici_stampati": ["89.7A.3"]
+        }
+      ],
+      "righe": [
+        {
+          "classe": "emergenza",
+          "pediatria": false,
+          "attesa": "PS",
+          "da_nota": true,
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Dolore Toracico Acuto di sospetta origine cardiaca"
+            },
+            {
+              "numero": "2",
+              "testo": "Angina di recente insorgenza /ingravescente"
+            },
+            {
+              "numero": "3",
+              "testo": "Dispnea acuta"
+            },
+            {
+              "numero": "4",
+              "testo": "Cardiopalmo in atto con o senza segni di insufficienza cardiaca (frequenza superiore a 100)."
+            },
+            {
+              "numero": "5",
+              "testo": "Sincope"
+            }
+          ]
+        },
+        {
+          "classe": "U",
+          "pediatria": false,
+          "attesa": "48 ore",
+          "da_nota": true,
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Angina di recente insorgenza (<1mese)"
+            },
+            {
+              "numero": "2",
+              "testo": "Dispnea con presenza di segni di congestione"
+            },
+            {
+              "numero": "3",
+              "testo": "Scarica isolata di defibrillatore automatico impiantato"
+            }
+          ]
+        },
+        {
+          "classe": "U",
+          "pediatria": false,
+          "attesa": "72 ore",
+          "indicazioni": [],
+          "non_previste": "Livello di priorita’ non previsto"
+        },
+        {
+          "classe": "B",
+          "pediatria": false,
+          "attesa": "10gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Dolore toracico” non acuto” di sospetta origine cardiaca"
+            },
+            {
+              "numero": "2",
+              "testo": "Cardiopalmo ricorrente, non indagato, in assenza di segni /sintomi di scompenso cardiaco"
+            },
+            {
+              "numero": "3",
+              "testo": "Bradiaritmie asintomatiche"
+            },
+            {
+              "numero": "4",
+              "testo": "Dispnea, palpitazioni o affaticamento per sforzi moderati o intensi"
+            },
+            {
+              "numero": "5",
+              "testo": "Altro 10%",
+              "altro": true
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": false,
+          "attesa": "30 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Cardiopalmo extrasistolico non noto in precedenza"
+            },
+            {
+              "numero": "2",
+              "testo": "Prima visita in ipertensione non controllata dalla terapia"
+            },
+            {
+              "numero": "3",
+              "testo": "Soffi cardiaci: primo riscontro in assenza di sintomi (escluso il neonato)"
+            },
+            {
+              "numero": "4",
+              "testo": "Valutazione di portatori di Malattia Sistemica che influenzi l'apparato cardiovascolare"
+            },
+            {
+              "numero": "5",
+              "testo": "Altro (10%)",
+              "altro": true
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": false,
+          "attesa": "180 gg",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Prima visita in pazienti con ipertensione arteriosa per screening di danno d’organo"
+            },
+            {
+              "numero": "2",
+              "testo": "Malattie cronico degenerative (connettivopatie, endocrinopatie, malattia metabolica, malattie infettive) che non rientrano nelle classi precedenti in base alla gravità clinica."
+            },
+            {
+              "numero": "3",
+              "testo": "Altro (10%)",
+              "altro": true
+            }
+          ]
+        },
+        {
+          "classe": "emergenza",
+          "pediatria": true,
+          "attesa": "PS",
+          "indicazioni": [],
+          "non_previste": "2. LIVELLO DI PRIORITA' NON PREVISTO"
+        },
+        {
+          "classe": "U",
+          "pediatria": true,
+          "attesa": "72 ore",
+          "indicazioni": [],
+          "non_previste": "3. LIVELLO DI PRIORITA' NON PREVISTO"
+        },
+        {
+          "classe": "B",
+          "pediatria": true,
+          "attesa": "10 gg",
+          "indicazioni": [
+            {
+              "numero": "4",
+              "testo": "Soffio di primo riscontro, associato a sintomatologia"
+            },
+            {
+              "numero": "5",
+              "testo": "Soffio di primo riscontro nel neonato anche asintomatico"
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": true,
+          "attesa": "30 gg",
+          "indicazioni": [
+            {
+              "numero": "6",
+              "testo": "Episodi di cardiopalmo sintomatico ripetuto"
+            },
+            {
+              "numero": "7",
+              "testo": "Soffio di nuova insorgenza nel bambino asintomatico"
+            },
+            {
+              "numero": "8",
+              "testo": "Necessità di iniziare terapia con potenziali effetti cardiotossici"
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": true,
+          "attesa": "120 gg",
+          "indicazioni": [
+            {
+              "numero": "9",
+              "testo": "Dolore toracico aspecifico, non correlato con eventi lipotimici e/o sincopali"
+            },
+            {
+              "numero": "10",
+              "testo": "Episodi di cardiopalmo saltuari e di breve durata, senza documentata tachicardia"
+            },
+            {
+              "numero": "11",
+              "testo": "Ipertensione documentata"
+            },
+            {
+              "numero": "12",
+              "testo": "Ritardo di crescita"
+            },
+            {
+              "numero": "13",
+              "testo": "In pazienti asintomatici con: familiarità per cardiopatia (es. S. di Marfan, cardiomiopatia ipertrofica, ostruttiva, cardiomiopatia dilatativa, valvulopatie, ecc.); familiarità per cardiopatia a trasmissione genetica; familiarità per morte improvvisa"
+            },
+            {
+              "numero": "9",
+              "testo": "altro (10%)",
+              "altro": true
+            }
+          ]
+        }
+      ],
+      "note": [
+        "La 1a visita in classe P per ipertensione arteriosa deve essere inviata allo specialista cardiologo soltanto per lo screening di danno d’organo, non per la valutazione iniziale e l’avvio della terapia ipotensiva che è di competenza del medico di medicina generale",
+        "Pediatria: nel soggetto in età neonatale la visita cardiologica oltre ad essere integrata con ECG va integrata con Ecocardiogramma."
+      ],
+      "legame": [
+        {
+          "codice": "89.7A.3",
+          "prefissi": ["PRIMA VISITA CARDIOLOGICA"]
+        },
+        {
+          "codice": "89.52"
+        }
+      ],
+      "nota_legame": "L'atto stampa i codici del nomenclatore regionale del 2013 (89.7 per la visita) e quelli del DPCM LEA del 2017 (89.7A.3); il legame è con il codice di oggi."
+    },
+    {
+      "id": "dd973-2",
+      "class_rao": "017",
+      "pagine": [8],
+      "testata": "ECO(COLOR)DOPPLERGRAFIA CARDIACA cod. 88.72.6 / ECO(COLOR)DOPPLERGRAFIA CARDIACA A RIPOSO (non / associabile a eco(color)dopplergrafia cardiaca a riposo e dopo / prova fisica o farmacologica cod. 88.72.2",
+      "servizi": [
+        {
+          "nome": "ECO(COLOR)DOPPLERGRAFIA CARDIACA",
+          "codici_stampati": ["88.72.6"]
+        },
+        {
+          "nome": "ECO(COLOR)DOPPLERGRAFIA CARDIACA A RIPOSO",
+          "codici_stampati": ["88.72.2"]
+        }
+      ],
+      "righe": [
+        {
+          "classe": "U",
+          "pediatria": false,
+          "attesa": "72 ore",
+          "indicazioni": [],
+          "non_previste": "Livello di Priorità NON PREVISTO in quanto relativo a patologia ad alto rischio che richiede una valutazione clinica; il paziente deve essere inviato in PS o a visita specialistica urgente"
+        },
+        {
+          "classe": "B",
+          "pediatria": false,
+          "attesa": "10 gg",
+          "gruppo": "Pazienti sintomatici, con o senza cardiopatia nota",
+          "indicazioni": [
+            {
+              "numero": "14",
+              "testo": "Recente insorgenza, di: Scadimento funzionale; Dispnea; Sincope; Fibrillazione atriale; Aritmie maggiori (es: tachicardia ventricolare non sostenuta)"
+            },
+            {
+              "numero": "15",
+              "testo": "primo controllo per diagnosi di sepsi in portatore di protesi valvolare o device (vedi nota 3)"
+            },
+            {
+              "numero": "16",
+              "testo": "patologia oncologica in previsione di chemioterapia (se non già programmata in apposito PDTA)"
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": false,
+          "attesa": "60 gg",
+          "gruppo": "Pazienti asintomatici con sospetto di cardiopatia",
+          "indicazioni": [
+            {
+              "numero": "1",
+              "testo": "Nuovo riscontro, di: Soffio cardiaco; BBS, BAV> I; Extrasistolia ventricolare; Atipie ECG sospette per Ipertrofia ventricolare sinistra/ischemia; Edemi declivi e/o epatomegalia"
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": false,
+          "attesa": "180 gg",
+          "gruppo": "Pazienti asintomatici con sospetto di cardiopatia",
+          "indicazioni": [
+            {
+              "numero": "10",
+              "testo": "Familiarità per cardiopatia a trasmissione genetica (es cardiomiopatia dilatativa, ipertrofica, aritmogena, Marfan) o morte improvvisa"
+            },
+            {
+              "numero": "11",
+              "testo": "Sospetto interessamento cardiaco in patologia sistemica (malattie autoimmuni, da accumulo)"
+            },
+            {
+              "numero": "12",
+              "testo": "Valutazione danno d'organo nella ipertensione arteriosa e nel diabete mellito insorti o noti da almeno 6 mesi (vedi nota 2)"
+            }
+          ]
+        }
+      ],
+      "note": [
+        "Nota 1 (Pazienti asintomatici con nota cardiopatia): Non è appropriata la ripetizione dell'esame nei pazienti asintomatici con cardiopatia nota, salvo rientranti in un programma di follow-up specialistico.",
+        "Nota 2 (Pazienti asintomatici): Non è appropriata la ripetizione dell'esame in pazienti ipertesi in assenza di variazioni del quadro clinico",
+        "Nota 3 (Pazienti con nota o sospetta sepsi): I controlli sono programmati in base al follow-up clinico."
+      ],
+      "legame": [
+        {
+          "codice": "88.72.2"
+        }
+      ],
+      "nota_legame": "88.72.6 è il codice del nomenclatore regionale del 2013."
+    },
+    {
+      "id": "dd973-3",
+      "class_rao": "017",
+      "pagine": [9],
+      "testata": "ELETTROCARDIOGRAMMA DINAMICO ( secondo Holter)- Codice 89.50",
+      "servizi": [
+        {
+          "nome": "ELETTROCARDIOGRAMMA DINAMICO (secondo Holter)",
+          "codici_stampati": ["89.50"]
+        }
+      ],
+      "righe": [
+        {
+          "classe": "U",
+          "pediatria": false,
+          "attesa": "72 h",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITA’ NON PREVISTO"
+        },
+        {
+          "classe": "B",
+          "pediatria": false,
+          "attesa": "10 GG",
+          "indicazioni": [
+            {
+              "numero": "17",
+              "testo": "Sintomatologia di sospetta origine aritmica (bradicardia-tachicardia) ad incidenza frequente (quotidiana o quasi quotidiana) a seguito di valutazione cardiologica"
+            },
+            {
+              "numero": "18",
+              "testo": "Valutazione quantitativa di aritmia ventricolare complessa (recente ECG) a seguito di valutazione cardiologica"
+            },
+            {
+              "numero": "19",
+              "testo": "Cardiopalmo ricorrente in cardiopatia organica"
+            }
+          ]
+        },
+        {
+          "classe": "D",
+          "pediatria": false,
+          "attesa": "60 gg",
+          "indicazioni": [
+            {
+              "numero": "13",
+              "testo": "Valutazione di efficacia di terapia (farmacologica o ablativa) in aritmia precedentemente documentata"
+            },
+            {
+              "numero": "14",
+              "testo": "Valutazione della frequenza ventricolare media in fibrillazione atriale nel sospetto di scarso controllo della stessa"
+            },
+            {
+              "numero": "15",
+              "testo": "Cardiopalmo in cardiopatia organica"
+            }
+          ]
+        },
+        {
+          "classe": "P",
+          "pediatria": false,
+          "attesa": "180 gg",
+          "indicazioni": [],
+          "non_previste": "LIVELLO DI PRIORITA’ NON PREVISTO"
+        }
+      ],
+      "note": [
+        "Inappropriato in: Portatori di pacemaker e/o defibrillatore; Cardiopalmo sporadico; Ipertensione arteriosa; Dolore toracico"
+      ],
+      "legame": [
+        {
+          "codice": "89.50"
+        }
+      ]
+    }
+  ]
+}

@@ -413,7 +413,7 @@ describe('Fascicolo regionale (V09): cliente e simulatore', () => {
     expect(o).toMatchObject({ outcome: 'rejected', retryable: false });
   });
 
-  it('credenziali: WS-Security o PIN rifiutati sono un problema di credenziali; un PIN vuoto no', async () => {
+  it('credenziali: WS-Security o PIN rifiutati, anche decifrati vuoti, sono un problema di credenziali; un PIN mancante no', async () => {
     const { client, ready, sim, spy } = setup({ credentials: (_u, _p, pin) => pin === AUTH.pin });
     const doc = await ready();
     const noPassword = await client.create(
@@ -440,6 +440,12 @@ describe('Fascicolo regionale (V09): cliente e simulatore', () => {
       outcome: 'rejected',
       authProblem: 'credentials',
     });
+    // Un PIN che si decifra vuoto è un PIN sbagliato, non un PIN mancante. Con la «implicit
+    // rejection» capita anche al PIN cifrato con un'altra chiave, circa una volta su 230: qui il
+    // caso si prova sempre, non solo quando capita (D286).
+    expect(
+      await client.create({ author, metadata: metadata(), ...doc }, { ...AUTH, pin: '' }),
+    ).toMatchObject({ outcome: 'rejected', authProblem: 'credentials' });
     // Senza PIN nel messaggio: errore del messaggio, da correggere.
     await client.create({ author, metadata: metadata(), ...doc }, AUTH);
     const envelope = spy.requests

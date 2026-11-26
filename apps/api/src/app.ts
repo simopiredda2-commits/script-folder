@@ -41,6 +41,7 @@ import { registerRegionalSimulatorRoutes } from './http/regional-simulator-route
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
+import { registerRaoRoutes } from './http/rao-routes';
 import { registerReferenceRoutes } from './http/reference-routes';
 import { registerReferenceUpdateRoutes } from './http/reference-update-routes';
 import { registerReminderRoutes } from './http/reminder-routes';
@@ -59,6 +60,7 @@ import { createRulesCheck } from './prescriptions/rules-check';
 import { createDpcmService } from './prescriptions/dpcm';
 import { createNreLots } from './prescriptions/nre-lots';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
+import { raoSources } from './rao/tables';
 import { studioSendTimeoutMs } from './admin/studio-service';
 import type { CredentialService } from '@mmg/domain';
 import {
@@ -450,6 +452,12 @@ export function buildApp({
   registerImportRoutes(app, adminDeps);
   registerFollowUpRoutes(app, db, now ?? (() => new Date()));
   registerReferenceRoutes(app, reference, now ?? (() => new Date()));
+  // Tabelle RAO (D285): le trascrizioni non controllate solo nell'ambiente di prova.
+  const rao = {
+    sources: () => raoSources(),
+    includeUnchecked: (config.environment ?? 'prova') === 'prova',
+  };
+  registerRaoRoutes(app, { db, reference, now: now ?? (() => new Date()), rao });
   // AURA (D197–D199): con le banche dati, per il nome del luogo di nascita dei nuovi assistiti.
   registerAuraRoutes(app, { db, aura: auraService, now: now ?? (() => new Date()), reference });
   registerReferenceUpdateRoutes(app, db, referenceUpdates);
@@ -524,6 +532,7 @@ export function buildApp({
         ),
       ...(nreLots ? { nreLots } : {}),
       ...(dpcm ? { dpcm } : {}),
+      rao,
     }),
     db,
     now ?? (() => new Date()),

@@ -55,6 +55,7 @@ import type { createCredentialService } from '../credentials/service';
 import { contactPhone, studioDate, stupNote } from './rules-check';
 import type { DpcmContent, DpcmService } from './dpcm';
 import { renderRedForm } from './red-form-pdf';
+import { raoCondition, raoTablesFor, type RaoConditionFacts, type RaoSource } from '../rao/tables';
 import type { NreLots } from './nre-lots';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
 import { prescriptionTypology } from './typology';
@@ -104,6 +105,8 @@ export interface DraftInput {
   priority?: 'U' | 'B' | 'D' | 'P' | null;
   accessType?: 'first' | 'subsequent' | null;
   diagnosticQuestion?: string | null;
+  /** Condizione RAO scelta dal medico (D285): la chiave della tabella, per la specialistica. */
+  raoCondition?: string | null;
   exemptionCode?: string | null;
   requestId?: string | null;
   reminderChannel?: 'paper' | 'email' | 'pec' | 'sms' | 'messaging_app' | 'phone' | 'fse' | null;
@@ -240,7 +243,9 @@ export interface PrescriptionDeps {
    */
   serviceCatalog?: (
     date: string,
-  ) => Promise<((code: string) => { nationalCode: string | null } | null) | undefined>;
+  ) => Promise<
+    ((code: string) => { nationalCode: string | null; description?: string } | null) | undefined
+  >;
   /**
    * Note del nomenclatore in vigore alla data (D276): danno il numero della nota alle righe che
    * non lo dicono. Per difetto nessuna nota.
@@ -266,6 +271,11 @@ export interface PrescriptionDeps {
    * nella scheda della terapia creata dalla riga alla firma (D283). Senza, restano vuoti.
    */
   drugCards?: (aics: readonly string[], date: string) => Promise<ReadonlyMap<string, DrugCard>>;
+  /**
+   * Tabelle RAO (D285): le fonti e se usare anche quelle che nessuno ha ancora controllato (solo
+   * nell'ambiente di prova). Senza, la ricetta non prende una condizione RAO.
+   */
+  rao?: { sources: () => readonly RaoSource[]; includeUnchecked: boolean };
 }
 
 /** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
@@ -331,6 +341,48 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     return row.p;
   }
 
+  /**
+   * La condizione RAO scelta per la ricetta (D285), controllata: di una tabella delle prestazioni
+   * della ricetta, mai una riga d'emergenza. Che sia la specialistica SSN del primo accesso lo
+   * dicono lo schema della bozza e il vincolo del database. Le tabelle sono quelle della regione
+   * dello studio; quelle che nessuno ha controllato, solo in prova.
+   */
+  async function raoConditionFor(
+    actor: Actor,
+    input: DraftInput,
+    catalog:
+      ((code: string) => { nationalCode: string | null; description?: string } | null) | undefined,
+  ): Promise<RaoConditionFacts | null> {
+    const key = input.raoCondition?.trim();
+    if (!key) return null;
+    if (!deps.rao) throw new HttpError(400, 'Le tabelle RAO non sono disponibili');
+    const [st] = await db
+      .select({ region: studio.regionName })
+      .from(studio)
+      .where(eq(studio.id, actor.studioId));
+    const scope = { region: st?.region ?? null, includeUnchecked: deps.rao.includeUnchecked };
+    const sources = deps.rao.sources();
+    const found = raoCondition(sources, key, scope);
+    if (!found)
+      throw new HttpError(400, 'Condizione RAO sconosciuta o non selezionabile: scegline un’altra');
+    const ofLine = input.lines.some((l) =>
+      raoTablesFor(
+        sources,
+        {
+          nationalCode: nationalCodeOf(l, catalog),
+          description:
+            (l.serviceCode ? catalog?.(l.serviceCode)?.description : undefined) ??
+            l.serviceDescription ??
+            '',
+        },
+        scope,
+      ).some((m) => m.source.fonte === found.source.fonte && m.table.id === found.table.id),
+    );
+    if (!ofLine)
+      throw new HttpError(400, 'La condizione RAO non è di una prestazione della ricetta');
+    return found;
+  }
+
   /** Ricetta che senza esito passa alla ricetta rossa in DPCM, come vuole la Regione (D270). */
   const regionFlow = (p: PrescriptionRow) =>
     !!deps.dpcm && (p.kind === 'pharma_ssn' || p.kind === 'specialist_ssn');
@@ -385,6 +437,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       input.kind === 'specialist_ssn' ? await deps.serviceCatalog?.(studioDate(now())) : undefined;
     const notes =
       input.kind === 'specialist_ssn' ? await deps.serviceNotes?.(studioDate(now())) : undefined;
+    const rao = await raoConditionFor(actor, input, catalog);
     return withActor(db, actor.userId, async (tx) => {
       // Il paziente resta fermo fino alla fine (D239): «Sposta» insieme a una ricetta nuova aspetta
       // e la trova aperta; oppure la ricetta trova lo spostamento già fatto e si ferma.
@@ -408,6 +461,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           priority: input.priority ?? null,
           accessType: input.accessType ?? null,
           diagnosticQuestion: input.diagnosticQuestion ?? null,
+          raoConditionKey: rao?.key ?? null,
+          raoConditionPriority: rao?.priority ?? null,
+          raoConditionText: rao?.indication.testo ?? null,
+          raoConditionSource: rao ? `${rao.source.titolo_breve}, tabella ${rao.table.id}` : null,
           exemptionCode: input.exemptionCode ?? null,
           requestId: input.requestId ?? null,
           reminderChannel: input.reminderChannel ?? null,

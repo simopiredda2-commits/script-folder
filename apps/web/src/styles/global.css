@@ -2882,3 +2882,20 @@ textarea[aria-invalid='true'] {
   height: 200px;
   margin: 0.5rem 0;
 }
+
+/* Condizione RAO (D285): il promemoria del pronto soccorso e le note si aprono a richiesta. */
+.rao-promemoria {
+  margin-top: 0.5rem;
+}
+
+.rao-promemoria summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--size-min-target);
+  cursor: pointer;
+}
+
+.rao-promemoria ul {
+  margin: 0.25rem 0 0.5rem;
+  padding-left: 1.25rem;
+}

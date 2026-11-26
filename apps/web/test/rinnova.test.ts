@@ -168,6 +168,23 @@ describe('«Rinnova» una ricetta già fatta (D278)', () => {
     expect(readStored('ricetta:p1:specialistica:quesito', null)).toBe('Controllo di prova');
   });
 
+  it('la condizione RAO torna solo con il primo accesso; la tabella la ricontrolla l’editor (D285)', async () => {
+    await renewIntoCurrentPrescription(
+      'p1',
+      { ...specialist, raoConditionKey: 'prova:t1:3:1' },
+      new Set(),
+    );
+    expect(readStored('ricetta:p1:specialistica:rao', null)).toBeNull();
+    sessionStorage.clear();
+    await renewIntoCurrentPrescription(
+      'p1',
+      { ...specialist, accessType: 'first', priority: 'B', raoConditionKey: 'prova:t1:3:1' },
+      new Set(),
+    );
+    expect(readStored('ricetta:p1:specialistica:rao', null)).toBe('prova:t1:3:1');
+    expect(readStored('ricetta:p1:specialistica:priorita', null)).toBe('B');
+  });
+
   it('la nota cambiata nell’elenco in uso: la nota nuova, senza la lettera di quella vecchia', async () => {
     const changed = {
       ...specialist,

@@ -48,6 +48,13 @@ const PLURAL: Record<EntryType, string> = {
 
 const text = (v: unknown) => (typeof v === 'string' ? v : '');
 
+/** Il fumo codificato in parole, come lo scrive il servizio quando la voce non ha un testo (D284). */
+const SMOKING_WORDS: Record<string, string> = {
+  yes: 'Fuma',
+  no: 'Non fuma',
+  unknown: 'Non noto',
+};
+
 /**
  * L'intervallo di riferimento come lo stampa il laboratorio: il testo, o minimo e massimo.
  * Nessun confronto con il valore (regola 3, D71).
@@ -103,8 +110,16 @@ export function entrySummary(e: Entry, catalog: Catalog | null): string {
       ]
         .filter(Boolean)
         .join(' ');
-    case 'stile_di_vita':
-      return `${text(d.fattore)}: ${text(d.valore)}`;
+    case 'stile_di_vita': {
+      // Il fumo codificato (D284) si dice quando il testo non lo dice già.
+      const smoking = SMOKING_WORDS[text(d.fumo)];
+      return [
+        `${text(d.fattore)}: ${text(d.valore)}`,
+        smoking && smoking !== text(d.valore) && `(${smoking.toLowerCase()})`,
+      ]
+        .filter(Boolean)
+        .join(' ');
+    }
     case 'esame_obiettivo':
       return [
         text(d.testo),
@@ -273,6 +288,10 @@ function NewEntryForm({
     return typeof v === 'string' ? v : '';
   };
   const value = (k: string) => str(k).trim() || undefined;
+  // Il fattore è il fumo: allora serve anche «Fuma adesso», codificato per il SIAP (D284).
+  const smoking =
+    (str('fattore') === 'altro' ? str('altroFattore') : str('fattore')).trim().toLowerCase() ===
+    'fumo';
 
   function body() {
     const common = {
@@ -332,7 +351,8 @@ function NewEntryForm({
         return {
           ...common,
           fattore: str('fattore') === 'altro' ? str('altroFattore') : str('fattore'),
-          valore: str('valore'),
+          ...(str('valore').trim() ? { valore: str('valore') } : {}),
+          ...(smoking && str('fumo') ? { fumo: str('fumo') } : {}),
         };
       case 'esame_obiettivo':
         return {
@@ -627,7 +647,22 @@ function NewEntryForm({
             ])}
             {str('fattore') === 'altro' &&
               input('altroFattore', 'Quale fattore', { required: true, maxLength: 100 })}
-            {input('valore', 'Com’è', { required: true, maxLength: 300 })}
+            {/* Il fumo codificato, come lo chiede il SIAP (D284); il testo resta per i dettagli. */}
+            {smoking &&
+              select(
+                'fumo',
+                'Fuma adesso',
+                [
+                  { chiave: 'yes', nome: 'Sì' },
+                  { chiave: 'no', nome: 'No' },
+                  { chiave: 'unknown', nome: 'Non noto' },
+                ],
+                { empty: 'Scegli', required: true },
+              )}
+            {input('valore', smoking ? 'Com’è (facoltativo)' : 'Com’è', {
+              required: !smoking,
+              maxLength: 300,
+            })}
           </div>
         )}
         {tipo === 'esame_obiettivo' && (

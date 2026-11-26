@@ -239,6 +239,14 @@ export async function prescriptionHistory(
         priorita: p.priority,
         accesso: p.accessType,
         quesito: p.diagnosticQuestion,
+        /** La condizione RAO scelta dal medico, com'era alla scelta (D285). */
+        condizioneRao: p.raoConditionKey
+          ? {
+              testo: p.raoConditionText,
+              classe: p.raoConditionPriority,
+              fonte: p.raoConditionSource,
+            }
+          : null,
         versioneRegole: p.rulesVersion,
         annullataIl: p.cancelledAt,
         annullataDa: p.cancelledBy ? (users.get(p.cancelledBy) ?? null) : null,

@@ -23,7 +23,9 @@ const RUNTIME_FILES = [
   'apps/api/modelli',
   'packages/integrations/fse-ufficiale',
   'packages/reference/data/mappature.json',
+  'packages/reference/data/rao',
   'packages/reference/data/ricerca-prestazioni.json',
+  'packages/reference/data/siap',
   'packages/rules/data',
 ];
 const BINARY = new Set(['.ttf', '.otf', '.woff', '.woff2', '.pdf', '.png', '.jpg', '.gz', '.zip']);
