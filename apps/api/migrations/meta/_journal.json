@@ -400,6 +400,13 @@
       "when": 1795678323935,
       "tag": "0056_tipo_di_terapia_sulla_riga",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1795682775891,
+      "tag": "0057_fumo_codificato",
+      "breakpoints": true
     }
   ]
 }

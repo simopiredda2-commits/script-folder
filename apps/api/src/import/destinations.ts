@@ -176,7 +176,8 @@ function validateEntry(
   const parsed = newEntryBody.safeParse(raw);
   if (!parsed.success)
     return { ok: false, errors: zodMessages(parsed.error, fieldLabel(dest, rename)) };
-  const issues = entryIssues(parsed.data, today);
+  // Il programma di prima non ha il fumo codificato: resta da segnare nella cartella (D284).
+  const issues = entryIssues(parsed.data, today, { smokingCode: 'optional' });
   if (issues.length) {
     // Il modulo del referto mette davanti il nome dell'esame; nel rapporto dell'importazione
     // nessun valore del file (D173): resta solo il motivo.

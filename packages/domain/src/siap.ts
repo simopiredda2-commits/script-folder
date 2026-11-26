@@ -25,6 +25,13 @@ export type ProblemState = (typeof PROBLEM_STATES)[number];
 export const SMOKING_STATUSES = ['yes', 'no', 'unknown'] as const;
 export type SmokingStatus = (typeof SMOKING_STATUSES)[number];
 
+/** Il fumo in parole, quando la voce non ha un testo suo. */
+export const SMOKING_STATUS_LABELS: Record<SmokingStatus, string> = {
+  yes: 'Fuma',
+  no: 'Non fuma',
+  unknown: 'Non noto',
+};
+
 /** Tipo di struttura del tracciato dell'organizzazione. */
 export const STRUCTURE_TYPES = [
   'gp_office',

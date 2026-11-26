@@ -1913,6 +1913,17 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByLabel('Testo', { exact: true }).fill('Telefonata di prova.');
     await page.getByRole('button', { name: 'Registra', exact: true }).click();
     await page.locator('.voce').filter({ hasText: 'Al telefono: Telefonata di prova.' }).waitFor();
+    // Il fumo codificato per il SIAP (D284): «Fuma adesso» è obbligatorio, il testo facoltativo.
+    await page.getByRole('button', { name: 'Stili di vita' }).click();
+    await page.getByLabel('Fattore', { exact: true }).selectOption('Fumo');
+    await expect(page.getByLabel('Fuma adesso').getAttribute('required')).resolves.not.toBeNull();
+    await expect(
+      page.getByLabel('Com’è (facoltativo)').getAttribute('required'),
+    ).resolves.toBeNull();
+    await page.getByLabel('Fuma adesso').selectOption('no');
+    await check(page, 'stili di vita con il fumo codificato');
+    await page.getByRole('button', { name: 'Registra', exact: true }).click();
+    await page.locator('.voce').filter({ hasText: 'Fumo: Non fuma' }).waitFor();
 
     // Parametri della stessa visita, poi l'andamento in grafico e in tabella.
     await page.getByRole('link', { name: 'Parametri' }).first().click();

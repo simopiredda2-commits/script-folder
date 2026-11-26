@@ -134,6 +134,9 @@ export function measureByKey(key: string): MeasureDefinition | undefined {
 /** Fattori proposti dai requisiti («Stili di vita e fattori di rischio»); si può scriverne altri. */
 export const LIFESTYLE_FACTORS = ['Fumo', 'Alcol', 'Attività fisica'] as const;
 
+/** Il fattore è il fumo: allora serve anche il valore codificato del SIAP (D284). */
+export const isSmokingFactor = (factor: string) => factor.trim().toLowerCase() === 'fumo';
+
 /**
  * Valore di un parametro scritto a mano: numero positivo, con la virgola o il punto, al più
  * due decimali. Restituisce il numero come testo con il punto, o un messaggio d'errore.

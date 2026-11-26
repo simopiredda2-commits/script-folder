@@ -21,10 +21,13 @@ import {
   PROBLEM_CATEGORIES,
   PROBLEM_CATEGORY_KIND,
   RELATIVE_KEYS,
+  SMOKING_STATUS_LABELS,
+  SMOKING_STATUSES,
   VACCINE_DOSE_MAX,
   checkLabReference,
   checkProblemDates,
   entryTypeOf,
+  isSmokingFactor,
   keyOf,
   measureByKey,
   motorCapacityByKey,
@@ -147,7 +150,10 @@ const lifestyle = z
     tipo: z.literal('stile_di_vita'),
     ...common,
     fattore: longText(100),
-    valore: longText(300),
+    /** Com'è, in parole; per il fumo basta il valore codificato. */
+    valore: optionalText(300),
+    /** Per il fumo, il valore codificato del SIAP: sì, no, non noto (D284). */
+    fumo: z.enum(SMOKING_STATUSES).optional(),
   })
   .strict();
 
@@ -279,8 +285,15 @@ export const listQuery = z
   })
   .strict();
 
-/** Errori formali di una voce nuova, in italiano; vuoto se va bene. */
-export function entryIssues(e: NewEntry, today: string): string[] {
+/**
+ * Errori formali di una voce nuova, in italiano; vuoto se va bene. Le voci importate da altri
+ * programmi non hanno il fumo codificato (D284): per loro resta facoltativo.
+ */
+export function entryIssues(
+  e: NewEntry,
+  today: string,
+  opts: { smokingCode: 'required' | 'optional' } = { smokingCode: 'required' },
+): string[] {
   const out: string[] = [];
   if (e.data > today) out.push('Data della voce: è nel futuro');
   if (e.promemoria && e.promemoria < e.data)
@@ -295,6 +308,14 @@ export function entryIssues(e: NewEntry, today: string): string[] {
     out.push(
       ...checkProblemDates({ state: e.stato, onsetOn: e.dal, resolvedOn: e.risoltoIl }, today),
     );
+  }
+  if (e.tipo === 'stile_di_vita') {
+    // Il fumo codificato per il SIAP (D284): sì, no o non noto, solo per il fumo.
+    const smoking = isSmokingFactor(e.fattore);
+    if (smoking && !e.fumo && opts.smokingCode === 'required')
+      out.push('Fumo: scegli «sì», «no» o «non noto»');
+    if (!smoking && e.fumo) out.push('Il valore codificato vale solo per il fumo');
+    if (!e.valore && !e.fumo) out.push('Com’è: manca');
   }
   if (e.tipo === 'anamnesi') {
     const family = e.parente !== undefined || e.codice !== undefined || e.etaEsordio !== undefined;
@@ -418,7 +439,13 @@ export async function insertEntry(
         .values({ entryId, motorCapacity: motorCapacityByKey(e.capacita)!.code });
       break;
     case 'stile_di_vita':
-      await tx.insert(riskFactorDetail).values({ entryId, factor: e.fattore, value: e.valore });
+      await tx.insert(riskFactorDetail).values({
+        entryId,
+        factor: e.fattore,
+        // Senza un testo, il fumo in parole: il Profilo e la cronologia lo leggono così.
+        value: e.valore || (e.fumo ? SMOKING_STATUS_LABELS[e.fumo] : ''),
+        smokingStatus: e.fumo ?? null,
+      });
       break;
     case 'esame_obiettivo':
       await tx.insert(examinationDetail).values({
@@ -490,7 +517,7 @@ export type EntryDetail =
       criticita: string | null;
       attiva: boolean;
     }
-  | { fattore: string; valore: string }
+  | { fattore: string; valore: string; fumo: string | null }
   | { testo: string; scala: string | null; punteggio: string | null }
   | { capacita: string | null; codice: string }
   | { vaccino: string; lotto: string | null; dose: number | null; campagna: string | null }
@@ -562,7 +589,7 @@ async function loadDetails(db: Database | Tx, ids: string[]) {
     .select()
     .from(riskFactorDetail)
     .where(inArray(riskFactorDetail.entryId, ids)))
-    out.set(r.entryId, { fattore: r.factor, valore: r.value });
+    out.set(r.entryId, { fattore: r.factor, valore: r.value, fumo: r.smokingStatus });
   for (const r of await db
     .select()
     .from(examinationDetail)

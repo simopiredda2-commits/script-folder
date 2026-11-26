@@ -154,11 +154,16 @@ export const allergyDetail = pgTable('allergy_detail', {
   active: boolean().notNull().default(true),
 });
 
+/** Fumo come lo chiede il SIAP: sì, no, non noto (D284). */
+export const smokingStatus = pgEnum('smoking_status', ['yes', 'no', 'unknown']);
+
 /** Stili di vita e fattori di rischio: fumo, alcol, attività fisica. */
 export const riskFactorDetail = pgTable('risk_factor_detail', {
   entryId: entryRef(),
   factor: text().notNull(),
   value: text().notNull(),
+  /** Per il fumo, il valore codificato (D284); vuoto per gli altri fattori e le voci di prima. */
+  smokingStatus: smokingStatus(),
 });
 
 /** Capacità motoria (Profilo Sanitario Sintetico): codice del dizionario ufficiale. */

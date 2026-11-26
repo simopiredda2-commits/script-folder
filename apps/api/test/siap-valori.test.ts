@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { knownActivity, siapValues } from '../src/siap/values';
+import { knownActivity, siapValues, siapValuesSchema } from '../src/siap/values';
 
 /**
  * I valori ammessi del SIAP (D284), trascritti dalle specifiche funzionali del Ministero,
@@ -52,6 +52,18 @@ describe('valori ammessi del SIAP (D284)', () => {
     // Il «non noto» del fumo è 9 nella definizione del campo (lo schema XSD dice 3): domanda 12.
     expect(codes(v.fumo)).toEqual({ yes: 1, no: 2, unknown: 9 });
     expect(v.tipoStruttura.map((x) => x.codice)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
+
+  it('una chiave del programma senza valore, o un codice ripetuto: il file non vale', () => {
+    const missing = { ...v, fumo: v.fumo.filter((x) => x.chiave !== 'unknown') };
+    expect(() => siapValuesSchema.parse(missing)).toThrow(/Ogni chiave del programma/);
+    const repeated = {
+      ...v,
+      regimeAttivita: v.regimeAttivita.map((x) =>
+        x.chiave === 'hourly' ? { ...x, codice: 1 } : x,
+      ),
+    };
+    expect(() => siapValuesSchema.parse(repeated)).toThrow(/Codici ripetuti/);
   });
 
   it('la fonte è quella registrata, con la stessa impronta', () => {

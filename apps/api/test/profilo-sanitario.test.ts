@@ -106,7 +106,7 @@ describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
     });
     await entry({ tipo: 'anamnesi', sezione: 'familiare', testo: 'Testo libero senza codice' });
     await entry({ tipo: 'misura', parametro: 'peso', valore: '70' });
-    await entry({ tipo: 'stile_di_vita', fattore: 'Fumo', valore: 'Ex fumatrice' });
+    await entry({ tipo: 'stile_di_vita', fattore: 'Fumo', valore: 'Ex fumatrice', fumo: 'no' });
     await entry({ tipo: 'stile_di_vita', fattore: 'Dieta', valore: 'Mediterranea' });
     await entry({ tipo: 'capacita_motoria', capacita: 'autonomo' });
     await withActor(t.db, s.users.titolare.id, (tx) =>

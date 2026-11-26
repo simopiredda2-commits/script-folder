@@ -94,6 +94,7 @@ describe('voci cliniche dalla cartella (tappa 9)', () => {
         data,
         fattore: 'Fumo',
         valore: 'Ex fumatore di prova',
+        fumo: 'no',
       }),
       esame_obiettivo: await create({
         tipo: 'esame_obiettivo',
