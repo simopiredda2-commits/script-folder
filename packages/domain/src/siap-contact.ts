@@ -19,6 +19,8 @@ export type SiapAct =
   | { kind: 'pharma'; id: string; continuing: boolean; newDrugs: boolean }
   /** Ricetta specialistica: se ha visite, e altre prestazioni. */
   | { kind: 'specialist'; id: string; visits: boolean; others: boolean }
+  /** Ricetta dei presidi dell'assistenza integrativa (allegati 2 e 3 dei LEA). */
+  | { kind: 'devices'; id: string }
   | { kind: 'sick_leave'; id: string }
   /** Certificato dai modelli: se è l'idoneità sportiva non agonistica. */
   | { kind: 'certificate'; id: string; sport: boolean }
@@ -29,10 +31,31 @@ export type SiapAct =
    * state registrate (per esempio tre medicazioni successive nella stessa registrazione).
    */
   | { kind: 'ppip'; id: string; detail: number; quantity: number }
-  /** Scelta del medico che comincia quel giorno: la presa in carico. */
+  /**
+   * Scelta del medico che comincia quel giorno: la presa in carico, nel contatto dello stesso
+   * giorno. Da sola non fa un contatto (D291).
+   */
   | { kind: 'choice'; id: string };
 
 export type SiapActKind = SiapAct['kind'];
+
+/** I tipi di atto, nell'ordine del database (una prova lo controlla). */
+export const SIAP_ACT_KINDS = [
+  'diary',
+  'pharma',
+  'specialist',
+  'devices',
+  'sick_leave',
+  'certificate',
+  'vaccination',
+  'ppip',
+  'choice',
+] as const satisfies readonly SiapActKind[];
+
+/** Un contatto c'è se nel giorno c'è un atto che non sia solo la scelta del medico (D291). */
+export function makesContact(acts: readonly SiapAct[]): boolean {
+  return acts.some((a) => a.kind !== 'choice');
+}
 
 /** Un'attività del contatto: tipologia e dettaglio dell'allegato 2, quantità. */
 export interface SiapService {
@@ -77,6 +100,11 @@ export const SIAP_ACT_SERVICES = {
   /** 9 Prescrizioni di specialistica: 1 visite specialistiche, 2 esami diagnostici. */
   visiteSpecialistiche: { tipologia: 9, dettaglio: 1 },
   esamiDiagnostici: { tipologia: 9, dettaglio: 2 },
+  /**
+   * 9 Prescrizioni di specialistica, 9 Altro: i presidi dell'assistenza integrativa, che non sono
+   * la «Protesica» (DPCM LEA del 12/1/2017, art. 10 e art. 17; da confermare, D291).
+   */
+  prescrizioneAltro: { tipologia: 9, dettaglio: 9 },
 } as const;
 
 /** Età sotto la quale una vaccinazione non stagionale è dell'infanzia, e dell'adolescenza (D291). */
@@ -100,6 +128,8 @@ export function servicesOfAct(act: SiapAct): Pair[] {
         ...(act.visits ? [s.visiteSpecialistiche] : []),
         ...(act.others || !act.visits ? [s.esamiDiagnostici] : []),
       ];
+    case 'devices':
+      return [s.prescrizioneAltro];
     case 'sick_leave':
       return [s.certificatoMalattia];
     case 'certificate':

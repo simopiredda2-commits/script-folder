@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   accessTypeOf,
+  makesContact,
   modeOf,
   problemStateOf,
   proposeContact,
@@ -50,6 +51,7 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
         ],
       ],
       [{ kind: 'specialist', id: 's', visits: false, others: false }, [[9, 2]]],
+      [{ kind: 'devices', id: 'p' }, [[9, 9]]],
       [{ kind: 'sick_leave', id: 'c' }, [[6, 1]]],
       [{ kind: 'certificate', id: 'm', sport: true }, [[6, 3]]],
       [{ kind: 'certificate', id: 'm', sport: false }, [[6, 7]]],
@@ -106,6 +108,14 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
       { tipologia: 5, dettaglio: 7, quantita: 9 },
     ]);
     expect(servicesOf([])).toEqual([]);
+  });
+
+  it('la scelta del medico da sola non fa un contatto: entra in quello dello stesso giorno', () => {
+    const choice: SiapAct = { kind: 'choice', id: 'x' };
+    expect(makesContact([])).toBe(false);
+    expect(makesContact([choice])).toBe(false);
+    expect(makesContact([choice, diary('office')])).toBe(true);
+    expect(makesContact([{ kind: 'sick_leave', id: 'c' }])).toBe(true);
   });
 
   it('modalità: dal diario, prima il domicilio, poi lo studio, la televisita e il telefono', () => {

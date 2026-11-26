@@ -9,6 +9,7 @@ import {
   PATIENT_TABLES,
   PRESCRIPTION_TABLES,
   PSS_TABLES,
+  SIAP_CONTACT_TABLES,
   type ExportDocument,
 } from '../src/export/export';
 import { studioDate } from '../src/prescriptions/rules-check';
@@ -129,13 +130,14 @@ describe('esportazione completa dei dati del medico', () => {
     const res = await s.db.execute<{ table_name: string }>(sql`
       select distinct table_name from information_schema.columns
       where table_schema = 'public'
-        and column_name in ('patient_id', 'entry_id', 'prescription_id', 'certificate_id', 'document_id')`);
+        and column_name in ('patient_id', 'entry_id', 'prescription_id', 'certificate_id', 'document_id', 'contact_id')`);
     const known = new Set<string>([
       ...PATIENT_TABLES,
       ...ENTRY_TABLES,
       ...PRESCRIPTION_TABLES,
       ...CERTIFICATE_TABLES,
       ...PSS_TABLES,
+      ...SIAP_CONTACT_TABLES,
       ...Object.keys(HANDLED_SEPARATELY),
     ]);
     for (const { table_name } of res.rows) expect(known, table_name).toContain(table_name);
@@ -145,6 +147,7 @@ describe('esportazione completa dei dati del medico', () => {
       ...PRESCRIPTION_TABLES,
       ...CERTIFICATE_TABLES,
       ...PSS_TABLES,
+      ...SIAP_CONTACT_TABLES,
       'patient',
       'family',
       // Esportata per archivio, non per paziente (D199).
@@ -152,6 +155,8 @@ describe('esportazione completa dei dati del medico', () => {
       // Per paziente e per archivio (D240).
       'ppip_record',
       'patient_archive_move',
+      // Per paziente e per medico (D291).
+      'siap_contact',
     ]) {
       expect(doc.tabelle, tname).toHaveProperty(tname);
     }

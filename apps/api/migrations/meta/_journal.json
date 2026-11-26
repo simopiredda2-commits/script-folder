@@ -421,6 +421,13 @@
       "when": 1795693250405,
       "tag": "0059_codice_della_struttura",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1795695798521,
+      "tag": "0060_contatto_siap",
+      "breakpoints": true
     }
   ]
 }
