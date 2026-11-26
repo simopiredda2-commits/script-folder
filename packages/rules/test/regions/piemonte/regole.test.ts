@@ -36,10 +36,15 @@ describe('aggiunte del Piemonte alle regole (D296)', () => {
     expect(run(ctx({ date: '2026-11-26', region: PIEMONTE })).rulesVersion).toBe(now.version);
   });
 
-  it('per uno studio del Piemonte le regole sono quelle della 2026-11-25.2, salvo quello che D294 e D296 cambiano', () => {
+  it('per uno studio del Piemonte le regole sono quelle della 2026-11-25.2, salvo quello che D196, D294 e D296 cambiano', () => {
     expect(now.rules.map((r) => r.id)).toEqual(before.rules.map((r) => r.id));
     // Spostate senza cambiarle: testo, fonti nello stesso ordine, valori.
-    for (const id of ['R1', 'R5', 'R17', 'R18']) expect(plain(rule(id)), id).toEqual(old(id));
+    for (const id of ['R1', 'R5', 'R18']) expect(plain(rule(id)), id).toEqual(old(id));
+    // R17: in più l'allegato C della D.D. 1452/2023, che ha sostituito l'elenco della 1167 (D196).
+    expect(rule('R17')!.sources.slice(0, -1)).toEqual(old('R17').sources);
+    expect(rule('R17')!.sources.at(-1)!.title).toMatch(
+      /^Regione Piemonte, D\.D\. 6 luglio 2023, n\. 1452.*D196/,
+    );
     // R9: prima l'anagrafe regionale con le parole nazionali, poi AURA.
     expect(rule('R9')!.sources.map((s) => s.title)).toEqual([
       'Anagrafe regionale degli assistiti e catalogo delle esenzioni',
@@ -59,7 +64,7 @@ describe('aggiunte del Piemonte alle regole (D296)', () => {
       expect(r.status, r.id).toBe(old(r.id).status);
       expect(r.values, r.id).toEqual(old(r.id).values);
       expect(r.lists, r.id).toEqual(old(r.id).lists);
-      if (!['R4', 'R9', 'R10', 'R11', 'R23'].includes(r.id))
+      if (!['R4', 'R9', 'R10', 'R11', 'R17', 'R23'].includes(r.id))
         expect(plain(r), r.id).toEqual(old(r.id));
     }
   });

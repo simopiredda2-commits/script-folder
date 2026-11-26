@@ -25,7 +25,7 @@ import {
   therapy,
 } from '../../../api/src/db/schema';
 import { withActor } from '../../../api/src/db/tx';
-import { studioDate } from '../../../api/src/prescriptions/rules-check';
+import { archiveRegion, studioDate } from '../../../api/src/prescriptions/rules-check';
 import type { InterruptedHints } from '../protocol';
 import { withOpenItems } from './aura';
 
@@ -82,6 +82,8 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
   const preparedAt = new Date(signedAt.getTime() - 10 * 60_000);
   const checkedAt = new Date(signedAt.getTime() - 60_000);
   const day = studioDate(signedAt);
+  // La versione delle regole con le aggiunte della regione dello studio, come nel controllo (D296).
+  const rulesVersion = rulesetAt(day, undefined, await archiveRegion(db, own!.id)).version;
   await withActor(db, doctor!.id, async (tx) => {
     const [red] = await tx
       .insert(prescription)
@@ -100,7 +102,7 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
       prescriptionId: red!.id,
       userId: doctor!.id,
       at: checkedAt,
-      rulesVersion: rulesetAt(day).version,
+      rulesVersion,
       outcome: 'superato',
       issues: [],
       reasons: {},
@@ -135,7 +137,7 @@ export async function prepareInterruptedSends(db: Database): Promise<Interrupted
       prescriptionId: rx!.id,
       userId: doctor!.id,
       at: checkedAt,
-      rulesVersion: rulesetAt(day).version,
+      rulesVersion,
       outcome: 'superato',
       issues: [],
       reasons: {},

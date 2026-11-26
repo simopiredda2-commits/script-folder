@@ -49,9 +49,14 @@ export const piemonte: RegionalPackage = {
       what: 'Elenco dei farmaci in distribuzione per conto (PHT e DPC) della Regione, da `sync/`',
     },
     {
+      part: 'deadlines',
+      where: 'package',
+      what: 'Validità della ricetta specialistica: 60 giorni per il primo accesso, 180 per gli altri (D.D. 710/2026, punto 4; D260), nelle aggiunte alle regole in `data/regole` (D296)',
+    },
+    {
       part: 'rules',
-      where: 'core',
-      what: 'Valori regionali delle regole di prescrizione, nello stesso insieme di quelli nazionali (D288)',
+      where: 'package',
+      what: 'Aggiunte alle regole di prescrizione nazionali (D296), in `data/regole`: i termini della specialistica in R1, le fonti della Regione per R5, R9 e R17, il SAR in R18',
     },
   ],
   asl: [],

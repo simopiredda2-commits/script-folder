@@ -57,6 +57,20 @@ function parseUnits(text: string | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/**
+ * La regione dello studio di un archivio, con la chiave del suo pacchetto regionale (D288): con
+ * questa le regole di prescrizione portano le aggiunte della regione (D296). Null se la regione
+ * dello studio non ha un pacchetto o non si riconosce.
+ */
+export async function archiveRegion(db: Database, archiveId: string): Promise<string | null> {
+  const [place] = await db
+    .select({ regionName: studio.regionName })
+    .from(archive)
+    .innerJoin(studio, eq(studio.id, archive.studioId))
+    .where(eq(archive.id, archiveId));
+  return regionalPackageKey(place?.regionName);
+}
+
 /** Costruisce dal database tutto ciò che le regole guardano. */
 export async function buildRuleContext(
   deps: RulesCheckDeps,
@@ -132,12 +146,6 @@ export async function buildRuleContext(
   });
 
   const date = studioDate((deps.now ?? (() => new Date()))());
-  // La regione dello studio dell'archivio: le regole portano le sue aggiunte (D296).
-  const [place] = await db
-    .select({ regionName: studio.regionName })
-    .from(archive)
-    .innerJoin(studio, eq(studio.id, archive.studioId))
-    .where(eq(archive.id, p.archiveId));
   let drugFacts = deps.drugFacts;
   let { exemptionExists, exemptionServices, serviceCatalog, serviceNotes } = deps;
   if (deps.reference) {
@@ -181,7 +189,8 @@ export async function buildRuleContext(
 
   return {
     date,
-    region: regionalPackageKey(place?.regionName),
+    // La regione dello studio dell'archivio: le regole portano le sue aggiunte (D296).
+    region: await archiveRegion(db, p.archiveId),
     prescription: {
       id: p.id,
       kind: p.kind,

@@ -966,6 +966,14 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .getByText(/Ricetta inviata/)
       .first()
       .waitFor({ timeout: 30_000 });
+    // Le regole in vigore portano le aggiunte della regione dello studio (D296): nel disco
+    // virtuale ci sono anche i dati delle regole del pacchetto.
+    await f
+      .getByText(
+        /Regole di prescrizione, versione \d{4}-\d{2}-\d{2}\.\d+\+[a-z-]+@\d{4}-\d{2}-\d{2}\.\d+/,
+      )
+      .first()
+      .waitFor();
 
     await go(`/pazienti/${id}/seguito`);
     await f.getByRole('heading', { level: 1, name: 'Seguito delle prestazioni' }).waitFor();

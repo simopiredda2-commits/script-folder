@@ -1,7 +1,7 @@
 {
   "version": "2026-11-26.1",
   "effectiveFrom": "2026-11-26",
-  "valuesSource": "Le parti della Regione Piemonte nelle regole di prescrizione, spostate senza cambiarle dalla versione nazionale 2026-11-25.2 (D296): R1 per la ricetta specialistica, 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto, dalla D.D. 710/2026 (punto 4), per scelta di Simone alla fermata dopo la #35 (24/11/2026, D260); R5 con l'elenco regionale dei farmaci PHT in DPC (requisiti); R9 con AURA; R17 con la D.D. 1167/2022; R18 con il SAR; per R4 le regole del Piemonte da verificare (requisiti); per R23 le decodifiche del codice TDL, domanda per il CSI",
+  "valuesSource": "Le parti della Regione Piemonte nelle regole di prescrizione, spostate senza cambiarle dalla versione nazionale 2026-11-25.2 (D296): R1 per la ricetta specialistica, 60 giorni per il primo accesso e 180 per gli accessi successivi e l'accesso diretto, dalla D.D. 710/2026 (punto 4), per scelta di Simone alla fermata dopo la #35 (24/11/2026, D260); R5 con l'elenco regionale dei farmaci PHT in DPC (requisiti); R9 con AURA; R17 con la D.D. 1167/2022 e, come chiedeva D196, l'allegato C della D.D. 1452/2023; R18 con il SAR; per R4 le regole del Piemonte da verificare (requisiti); per R23 le decodifiche del codice TDL, domanda per il CSI",
   "rules": [
     {
       "id": "R1",
@@ -46,6 +46,10 @@
         {
           "title": "Regione Piemonte, D.D. 1167/2022 (controllo bloccante del SAR dal 28/06/2022)",
           "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/2022/28/attach/dda1410001167_10100.pdf"
+        },
+        {
+          "title": "Regione Piemonte, D.D. 6 luglio 2023, n. 1452 (BU n. 28 del 13/07/2023), allegato C: le prestazioni di ogni esenzione, in vigore dal 20/07/2023; è precedente al nomenclatore del 2024 e non si importa (D196)",
+          "url": "https://www.regione.piemonte.it/governo/bollettino/abbonati/2023/28/attach/dda1410001452_11200.pdf"
         }
       ]
     },

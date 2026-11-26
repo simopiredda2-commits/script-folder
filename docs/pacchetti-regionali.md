@@ -62,6 +62,18 @@ Il nucleo le trova dall'elenco dei pacchetti (`regionalDataDirs` in `@mmg/region
 - le tabelle RAO si leggono nell'ordine: prima AGENAS, poi i file di ogni pacchetto per nome;
 - la dimostrazione porta nel suo disco virtuale le tabelle RAO e le corrispondenze di ogni pacchetto; le trascrizioni entrano già nel database di partenza.
 
+## Le regole di un pacchetto (D296)
+
+Le regole di prescrizione nazionali stanno in `packages/rules/data/`; quelle di una regione sono **aggiunte** alle nazionali, in `packages/regions/<chiave>/data/regole/`, versionate allo stesso modo (versione, data da cui valgono, fonte dei valori).
+
+- Per ogni regola un'aggiunta può dare: un testo che prende il posto di quello nazionale, fonti, valori ed elenchi nuovi, cose da completare. Non cambia che cosa fa la regola (blocca, avvisa o informa).
+- Un valore o un elenco che la versione nazionale ha già, o una regola che non ha, è un errore dei dati e il programma si ferma: si sistemano i dati.
+- Un valore o un elenco della regione porta la sua fonte.
+- Le regole in vigore alla data della ricetta sono la versione nazionale di quel giorno con le aggiunte della regione dello studio in vigore lo stesso giorno. La versione che resta con la ricetta le dice tutte e due, per esempio `2026-11-26.1+piemonte@2026-11-26.1`. Uno studio di una regione senza pacchetto ha solo le regole nazionali.
+- Le fonti della regione vanno dopo quelle nazionali: il messaggio di una regola porta la prima fonte, quella nazionale. Per la ricetta specialistica R1 mostra la fonte della regione, che ha dato i giorni.
+- Le versioni nazionali fino alla 2026-11-25.2 hanno dentro le parti del Piemonte: sono storia, come le migrazioni, e restano com'erano. Sono fra le eccezioni della prova dei nomi regionali.
+- Il servizio prende la regione dallo studio dell'archivio della ricetta, per il controllo prima dell'invio e per i giorni di validità sul promemoria; la dimostrazione porta le aggiunte nel suo disco virtuale.
+
 ## Come si sposta un pezzo
 
 1. Il codice o il dato passa nelle cartelle del pacchetto; il nucleo lo chiama attraverso il contratto, senza nominare la regione.
@@ -79,9 +91,12 @@ Quando c'è l'elenco di che cosa serve dalla regione e dai suoi enti:
 
 ## Lo stato al 26/11/2026
 
-Un pacchetto, quello del Piemonte (`packages/regions/piemonte/`), con otto parti.
+Un pacchetto, quello del Piemonte (`packages/regions/piemonte/`), con nove parti.
 
-- **Nel pacchetto**: le tabelle RAO regionali (`data/rao`, D295).
+- **Nel pacchetto**:
+  - le tabelle RAO regionali (`data/rao`, D295);
+  - le aggiunte alle regole di prescrizione (`data/regole`, D296): i termini della ricetta specialistica in R1, le fonti della Regione per R5, R9 e R17, il SAR in R18;
+  - le scadenze regionali delle ricette: la validità della ricetta specialistica, nelle stesse aggiunte (D296).
 - **Nel nucleo, con i dati già nel pacchetto** (D295):
   - catalogo regionale: restano nel nucleo la fonte di `sync/` e i dati d'esempio;
   - prestazioni aggiuntive dell'AIR, con la corrispondenza per il SIAP: restano i testi delle pagine.
@@ -89,17 +104,16 @@ Un pacchetto, quello del Piemonte (`packages/regions/piemonte/`), con otto parti
   - ricetta (SAR del CSI, ricetta rossa in DPCM, lotti di NRE, codice del gestionale);
   - anagrafe (AURA, con un simulatore);
   - Fascicolo regionale (pubblicazione V09, accesso LCCE);
-  - distribuzione per conto: la fonte di `sync/` e i dati d'esempio; la mappatura della trascrizione è già senza nomi regionali;
-  - valori regionali delle regole.
+  - distribuzione per conto: la fonte di `sync/` e i dati d'esempio; la mappatura della trascrizione è già senza nomi regionali.
 
-Mancano, anche per il Piemonte: l'invio del SIAP (viene con il modulo del CSI), la rendicontazione dell'AIR (D287), le esenzioni regionali, le scadenze regionali delle ricette.
+Mancano, anche per il Piemonte: l'invio del SIAP (viene con il modulo del CSI), la rendicontazione dell'AIR (D287), le esenzioni regionali.
 
-L'inventario: 219 file e 2250 righe fuori dal pacchetto (con lo scheletro erano 235 e 2298).
+L'inventario: 204 file e 2160 righe fuori dal pacchetto (con lo scheletro erano 235 e 2298, dopo i dati 219 e 2250).
 
 | Area                                        | File | Righe |
 | ------------------------------------------- | ---: | ----: |
-| `apps/api/src`                              |   47 |   601 |
-| `apps/api/test`                             |   42 |   742 |
+| `apps/api/src`                              |   46 |   598 |
+| `apps/api/test`                             |   42 |   741 |
 | `apps/api/modelli`                          |    1 |     1 |
 | `apps/web/src`                              |   19 |   174 |
 | `apps/web/test`                             |   13 |   134 |
@@ -107,7 +121,7 @@ L'inventario: 219 file e 2250 righe fuori dal pacchetto (con lo scheletro erano 
 | `packages/integrations` (codice e prove)    |   22 |   216 |
 | `packages/domain` (codice, prove e script)  |   21 |    97 |
 | `packages/reference` (dati, codice e prove) |    8 |    17 |
-| `packages/rules` (dati, codice e prove)     |   14 |    86 |
+| `packages/rules` (dati, codice e prove)     |    0 |     0 |
 | `fixtures`                                  |   19 |    61 |
 | `sync`                                      |    2 |    21 |
 
@@ -117,7 +131,7 @@ Un pezzo per pull request, con le prove sempre verdi:
 
 1. **dati** (fatto, D295): catalogo regionale, tabelle RAO regionali, prestazioni aggiuntive dell'AIR, corrispondenza per il SIAP; le mappature delle trascrizioni senza nomi regionali;
    - le **fonti di `sync/`** (catalogo e distribuzione per conto, in Python) restano per un pezzo a sé, che insegna a `sync/` a leggere le fonti dei pacchetti;
-2. **regole**: i valori regionali, separati da quelli nazionali, con la regione a cui valgono;
+2. **regole** (fatto, D296): le aggiunte della regione alle regole nazionali, nel pacchetto, con la regione dello studio nel controllo e nel promemoria;
 3. **integrazioni senza il database**: SAR e il suo simulatore, Fascicolo regionale, accesso con il modulo della Regione;
 4. **servizi con il database**: AURA e i suoi giri;
 5. **pagine e testi**, poi la **dimostrazione** e le **prove**.
@@ -126,7 +140,7 @@ Dopo, nel pacchetto del Piemonte: il modulo del SIAP con il CSI, la rendicontazi
 
 ## Che cosa non è fatto, che cosa non è provato
 
-- Spostati i dati (D295); il resto, nell'ordine qui sopra. Le prove regionali stanno ancora nelle cartelle nazionali: si spostano per ultime.
+- Spostati i dati (D295) e le regole (D296); il resto, nell'ordine qui sopra. Le prove regionali stanno ancora nelle cartelle nazionali: si spostano per ultime.
 - Per una regione senza pacchetto il programma oggi non ha le parti nazionali al posto di quelle regionali: per esempio la ricetta SSN va solo con il SAR (la ricetta bianca va già al Sistema TS). Le alternative nazionali (per esempio l'invio al Sistema TS senza un servizio regionale) si scrivono quando servono.
 - Le varianti delle ASL ci sono nel contratto, nessuna nel pacchetto del Piemonte.
 - Le parole del pacchetto sono quelle di oggi; con lo spostamento se ne aggiungono, se servono.
