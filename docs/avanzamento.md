@@ -1784,6 +1784,7 @@ Fermata del 26/11/2026 (D282, domanda 3): il SIAP prima di AURA, prima la parte 
 - **Condizione clinica nella ricetta specialistica** (D285): nel primo accesso il medico sceglie la condizione, il programma mette la classe della tabella e, se il quesito è vuoto, il testo della condizione. Il medico può cambiare la classe, e un avviso lo dice. Le righe del pronto soccorso sono un promemoria a parte. La ricetta tiene la condizione com'era (migrazione 0058); lo storico la mostra, «Rinnova» la ripropone.
 - **Classe di priorità vuota per difetto** (D285): prima partiva da «P».
 - **Fonti** (`docs/provenienze.md`, «RAO»): il manuale, le due determine, la guida regionale, la nota del 24/04/2024, il piano nazionale delle liste d'attesa 2026-2028 con gli allegati A e G, e i documenti trovati e non usati.
+- **CI, tempo massimo sulle prove** (D286): nel giro della #43 la prova dell'interfaccia con WebKit è caduta al limite dei 20 minuti del lavoro. Le prove erano quasi finite: l'installazione dei pacchetti di Ubuntu aveva preso quasi 18 minuti. Ora il limite stretto è sul passo delle prove (15 minuti per interfaccia e dimostrazione, 20 per le prove di TypeScript, 10 per lint e tipi) e quello del lavoro è di 45.
 
 **Come provarlo**:
 
@@ -1795,7 +1796,7 @@ Fermata del 26/11/2026 (D282, domanda 3): il SIAP prima di AURA, prima la parte 
 - «Rinnova» con la condizione: `apps/web/test/rinnova.test.ts`;
 - nella dimostrazione: `pnpm --filter @mmg/demo build`, poi `pnpm --filter @mmg/demo test:browser`. La prova «specialistica e seguito» sceglie una condizione della D.D. 973/2019 per la prima visita cardiologica con ECG del catalogo vero.
 
-**Scelte**: D284 per i valori del SIAP e il fumo; D285 per le RAO.
+**Scelte**: D284 per i valori del SIAP e il fumo; D285 per le RAO; D286 per i tempi della CI.
 
 **Non fatto**:
 
@@ -1806,7 +1807,7 @@ Fermata del 26/11/2026 (D282, domanda 3): il SIAP prima di AURA, prima la parte 
 
 - **Tabelle RAO in Piemonte**: per la cardiologia e la gastroenterologia le determine del 2019, per il resto il manuale di AGENAS del 2020, finché la Regione o l'ASL non dicono altro. Le attese si mostrano come le scrive la tabella; le determine danno 180 giorni alla classe P, il manuale 120. Da chiedere alla Dr.ssa Rocca o all'ASL.
 
-**Non provato**: il formato vero del CSI per il SIAP; le tabelle RAO controllate da una persona; la condizione con il SAR vero.
+**Non provato**: il formato vero del CSI per il SIAP; le tabelle RAO controllate da una persona; la condizione con il SAR vero; i limiti di tempo dei passi della CI con un sabotaggio (come per D258, è il meccanismo di GitHub).
 
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 

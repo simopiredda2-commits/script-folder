@@ -2480,3 +2480,11 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - **Trascrizioni non controllate**: si usano solo nell'ambiente di prova e nella dimostrazione, come il catalogo (D159, D260).
 - **Non fatto**: la condizione nel messaggio al SAR, che oggi non ha un campo (domanda per il CSI); le attese «vere» del Piemonte, perché le determine del 2019 dicono 180 giorni per la classe P e il manuale 120 (domanda per la Regione); le D.D. 43/2008 e 375/2009, non trovate.
 - **Non provato**: le tabelle controllate da una persona; la condizione con il SAR vero.
+
+**D286 · CI: il tempo massimo sulle prove, non sull'installazione dei browser.** Nel giro della pull request #43, sul commit `ccc3ac1`, la prova dell'interfaccia con WebKit si è fermata al tempo massimo del lavoro, 20 minuti (D258), con le prove quasi finite; l'altro giro dello stesso commit è verde. Il registro dice dove è andato il tempo. L'installazione di WebKit con i pacchetti di Ubuntu (`playwright install --with-deps`) ha preso 17 minuti e 48 secondi, con attese da 20 a 120 secondi per pacchetto sul server di Ubuntu (`us-east-2.ec2.archive.ubuntu.com`). Le prove, nell'altro giro, 3 minuti e mezzo. Nel giro di prima (commit `601d64d`) la stessa installazione aveva preso 9 minuti, quella della dimostrazione 4; nel giro della #41 era caduta per lo stesso motivo la dimostrazione con WebKit.
+
+- **Scelta**: il limite stretto va sul passo delle prove, dove si ferma una prova bloccata, come voleva D258:
+  - 15 minuti per la prova dell'interfaccia e per quella della dimostrazione (di solito da 4 a 6);
+  - 20 per le prove di TypeScript (di solito 6) e 10 per lint e tipi (di solito 2).
+- **Il limite del lavoro** sale a 45 minuti, per un'installazione lenta. Una prova bloccata si ferma come prima; un server di Ubuntu lento non fa più cadere le prove.
+- **Non provato**: i limiti dei passi con un sabotaggio, come per D258. È il meccanismo di GitHub, e servirebbe una prova bloccata apposta per un quarto d'ora.
