@@ -22,7 +22,7 @@ import {
   therapy,
 } from '../../../api/src/db/schema';
 import { withActor } from '../../../api/src/db/tx';
-import { studioDate } from '../../../api/src/prescriptions/rules-check';
+import { archiveRegion, studioDate } from '../../../api/src/prescriptions/rules-check';
 
 const DAY = 86_400_000;
 /**
@@ -52,6 +52,8 @@ export async function prepareSentPrescriptions(db: Database): Promise<number> {
     .select({ id: archive.id })
     .from(archive)
     .where(eq(archive.ownerUserId, doctor!.id));
+  // La versione delle regole con le aggiunte della regione dello studio, come nel controllo (D296).
+  const region = await archiveRegion(db, own!.id);
   const rows = await db
     .select({ p: patient, t: therapy })
     .from(patient)
@@ -87,7 +89,7 @@ export async function prepareSentPrescriptions(db: Database): Promise<number> {
       const preparedAt = new Date(sentAt.getTime() - 10 * 60_000);
       const checkedAt = new Date(sentAt.getTime() - 60_000);
       const archivedAt = new Date(Math.min(sentAt.getTime() + DAY, now - 60_000));
-      const version = rulesetAt(studioDate(sentAt)).version;
+      const version = rulesetAt(studioDate(sentAt), undefined, region).version;
       count += 1;
       const [rx] = await tx
         .insert(prescription)

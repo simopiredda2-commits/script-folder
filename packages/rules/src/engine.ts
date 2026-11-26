@@ -1,6 +1,13 @@
 import type { RuleContext } from './context';
 import { evaluateRule, type Issue } from './rules';
-import { loadRulesets, rulesetAt, type Rule, type RuleId, type Ruleset } from './ruleset';
+import {
+  loadRulesets,
+  rulesetAt,
+  type RegionalRuleset,
+  type Rule,
+  type RuleId,
+  type Ruleset,
+} from './ruleset';
 
 export interface CheckResult {
   /** Versione delle regole usata: resta registrata con la ricetta. */
@@ -14,12 +21,16 @@ export interface CheckResult {
   confirmedAifaNotes: string[];
 }
 
-/** Controlla una ricetta con le regole in vigore alla sua data. */
+/**
+ * Controlla una ricetta con le regole in vigore alla sua data: quelle nazionali, con le aggiunte
+ * della regione dello studio se il contesto la dice (D296).
+ */
 export function checkPrescription(
   ctx: RuleContext,
   rulesets: Ruleset[] = loadRulesets(),
+  regional?: RegionalRuleset[],
 ): CheckResult {
-  const ruleset = rulesetAt(ctx.date, rulesets);
+  const ruleset = rulesetAt(ctx.date, rulesets, ctx.region ?? null, regional);
   const byId = Object.fromEntries(ruleset.rules.map((r) => [r.id, r])) as Record<RuleId, Rule>;
   // Ogni problema porta la fonte della sua regola: chi è bloccato vede il perché (seconda fermata).
   const issues = ruleset.rules.flatMap((r) =>

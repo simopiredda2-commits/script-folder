@@ -8,7 +8,7 @@ Collegamento del programma con AURA, l'anagrafe regionale degli assistiti del Pi
 - **Manuale pubblico dei servizi di cooperazione**, AURA--ORG-01-V08 ([servizi.regione.piemonte.it/media/786](https://servizi.regione.piemonte.it/media/786/download)). Descrive i servizi delle aziende sanitarie, che il simulatore di oggi imita:
   - ricerca «massiva» dei profili (FIND) per codice fiscale e altri dati, che dà gli identificativi AURA;
   - ricerca puntuale del profilo sanitario completo (GET) per identificativo AURA;
-  - notifiche delle variazioni a un servizio dell'ente, per gli eventi sottoscritti presso il CSI. Nel servizio vero arrivano su un web service esposto sulla rete RUPAR, firmate con il certificato di AURA.
+  - notifiche delle variazioni a un servizio dell'ente, per gli eventi sottoscritti presso il CSI. Nel servizio vero arrivano su un web service esposto sulla rete RUPAR, firmate con il certificato di AURA. Le sottoscrive l'ASL o l'ASO dall'interfaccia web di AURA (§5.4.2); il manuale è scritto per gli enti (ASL, ASO, sistemi regionali) autorizzati dal referente regionale (§1). Per i medici le notifiche non ci sono: i loro servizi sono solo di interrogazione (nota AVL-17), e la cartella si allinea con le liste per medico (controllato il 26/11/2026, `docs/avanzamento.md`, «Che cosa dicono già i documenti pubblici»).
 
   Per le cartelle di MMG e PLS il manuale rimanda a un «apposito documento» (§1, p. 2).
 

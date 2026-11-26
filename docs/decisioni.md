@@ -2658,3 +2658,41 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - La prova ora aspetta la pagina ferma prima dei clic dei due passi degli invii senza risposta: nessuna sezione in caricamento e le righe della ricetta arrivate.
   - Se il modulo non si apre, l'errore dice che cosa mostra il riquadro.
   - La causa è quella probabile: WebKit qui non c'è, e il guasto non si ripete a comando.
+
+**D296 · Spostamento del Piemonte, secondo pezzo: le regole di prescrizione nazionali e le aggiunte della regione (D288, D292).** Il secondo pezzo dell'ordine di `docs/pacchetti-regionali.md`. Con questo pezzo cambia anche la fonte di R11, come aveva deciso D294, e la fonte di R17 prende l'allegato C della D.D. 1452/2023, come chiedeva D196.
+
+- **Versione nazionale 2026-11-26.1**, in vigore dal 26/11/2026. È la 2026-11-25.2 senza le parti della regione:
+  - R1 torna al testo dei requisiti, «La ricetta SSN vale 30 giorni», con la sola fonte AIFA;
+  - R5 e R17 hanno le sole fonti nazionali;
+  - R9 ha come fonte «Anagrafe regionale degli assistiti e catalogo delle esenzioni»;
+  - R18 dice che il controllo finale è del servizio che riceve la ricetta (della Regione o il Sistema TS);
+  - in R4, R10 e R23 le cose da completare non nominano la regione.
+- **R11**: la fonte è «Buona pratica, da validare con la Dr.ssa Rocca (fuori dal dispositivo medico, D294)», senza il consulente regolatorio. Il comportamento non cambia.
+- **Aggiunte del Piemonte**, versione 2026-11-26.1, in `packages/regions/piemonte/data/regole/`:
+  - R1: il testo e i giorni della specialistica, 60 e 180 (D.D. 710/2026, punto 4; D260), con le loro fonti;
+  - R5: l'elenco regionale dei farmaci PHT in DPC;
+  - R9: AURA;
+  - R17: la D.D. 1167/2022 e l'allegato C della D.D. 1452/2023 (D196);
+  - R18: il testo con il SAR;
+  - R4: le regole del Piemonte da verificare;
+  - R23: le decodifiche del codice TDL, domanda per il CSI.
+
+  Per uno studio del Piemonte le regole del 26/11/2026 sono quelle della 2026-11-25.2, salvo R11, R17 e le parole di R4, R9, R10 e R23: una prova lo controlla regola per regola.
+
+- **Come si uniscono** (`docs/pacchetti-regionali.md`, «Le regole di un pacchetto»):
+  - un'aggiunta può dare testo, fonti, valori ed elenchi nuovi e cose da completare;
+  - non può cambiare il comportamento né un valore o un elenco nazionale: sarebbe un errore dei dati, e il programma si ferma;
+  - un valore della regione porta la sua fonte;
+  - la versione registrata con la ricetta è «nazionale+chiave@aggiunte», per esempio `2026-11-26.1+piemonte@2026-11-26.1`. La pagina dell'invio la mostra così: è un identificativo, non un testo.
+- **Scelta: le aggiunte non cambiano i valori nazionali.** Un'aggiunta che volesse cambiarne uno (per esempio un'altra soglia) è una decisione da prendere quando serve, con la sua prova: oggi il programma la rifiuta.
+- **Scelta: la regione dello studio senza pacchetto ha le regole nazionali.** Per la ricetta specialistica vale quindi il termine di 30 giorni dei requisiti, come prima di D260. Il termine di quella regione si scrive nel suo pacchetto, quando c'è.
+- **Storia**: le versioni nazionali fino alla 2026-11-25.2 restano com'erano, con le parti del Piemonte dentro. Le ricette controllate prima del 26/11/2026 restano con la versione di allora. Sono fra le eccezioni della prova dei nomi regionali, con il motivo, una per una: una versione nuova con un nome regionale fa diventare rossa la prova.
+- **Servizio**: la regione la dà lo studio dell'archivio della ricetta (`archiveRegion`), nel controllo prima dell'invio e nei giorni di validità sul promemoria. La dimostrazione porta le aggiunte nel disco virtuale e registra così anche la versione delle ricette già inviate che prepara.
+- **Manifesto**: «Valori regionali delle regole» passa «nel pacchetto»; si aggiungono le scadenze regionali delle ricette (la validità della specialistica), che il pacchetto ora dà.
+- **Codice senza nomi regionali**: i commenti del motore e del promemoria non nominano la regione. Il messaggio di R18 dice «il servizio che riceve la ricetta» invece del SAR. Le prove del contenuto del Piemonte passano in `packages/rules/test/regions/piemonte/`, con gli aiuti comuni in `test/helpers/contesto.ts`.
+- **Inventario**: da 219 file e 2250 righe a 204 e 2160. In `packages/rules` non ne resta nessuna.
+- **Non fatto**: integrazioni, servizi, pagine e prove regionali, nell'ordine di `docs/pacchetti-regionali.md`.
+- **Prova della dimostrazione con WebKit** (pull request #47). «Invii senza risposta» è caduta una volta: dopo «È arrivata» la conferma dell'esito non è comparsa, mentre lo stesso commit era verde nell'altro giro.
+  - Nella pagina Ricette le ricette da firmare dei dati dimostrativi fanno da sé il controllo delle regole. Finendo, mostrano problemi e versione, e la sezione «Invii senza risposta», più in basso, scende: se succede durante il clic, il clic non arriva al pulsante, come per la ricetta rossa (D295).
+  - Con questo pezzo ogni controllo legge anche le aggiunte della regione e la regione dell'archivio, quindi dura un poco di più, e lo spostamento può cadere più tardi.
+  - La prova ora aspetta anche la fine dei controlli in corso, prima di scrivere e di nuovo prima del clic. Se la conferma non compare, l'errore dice che cosa mostra il riquadro e che cosa c'è nei campi del modulo.

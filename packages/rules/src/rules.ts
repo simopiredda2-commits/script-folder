@@ -115,13 +115,16 @@ const latestDate = (dates: (string | null)[]) =>
   dates.filter((d): d is string => d !== null).sort((a, b) => b.localeCompare(a))[0] ?? null;
 
 /**
- * R1 per la ricetta specialistica, dalle versioni delle regole che hanno i giorni della Regione
- * (D.D. 710/2026, punto 4; D260): primo accesso o altra tipologia di accesso (successivo o
- * diretto). Per le prestazioni da prenotare il termine è quello della prenotazione, e la ricetta
- * prenotata in tempo vale fino all'erogazione. La fonte mostrata è quella della Regione.
+ * R1 per la ricetta specialistica, quando le regole in vigore hanno i giorni della regione (D260):
+ * primo accesso o altra tipologia di accesso (successivo o diretto). Per le prestazioni da
+ * prenotare il termine è quello della prenotazione, e la ricetta prenotata in tempo vale fino
+ * all'erogazione. La fonte mostrata è quella della regione: la prima delle sue aggiunte (D296) o,
+ * nelle versioni fino alla 2026-11-25.2, quella fra le nazionali che comincia con «Regione».
  */
 function specialistValidity(rule: Rule, ctx: RuleContext, first: number, other: number): Issue {
-  const source = rule.sources.find((s) => s.title.startsWith('Regione'))?.title;
+  const source = (
+    rule.regional?.sources[0] ?? rule.sources.find((s) => s.title.startsWith('Regione'))
+  )?.title;
   const booking =
     'se la prestazione si prenota è il termine per prenotare, e la ricetta prenotata in tempo vale fino all’erogazione';
   const type = ctx.prescription.accessType;
@@ -437,7 +440,8 @@ const evaluators: Record<RuleId, Evaluator> = {
       }
       // Dalla versione che lo dice (D276): le sedute solo sulle prestazioni a ciclo e non oltre il
       // massimo del catalogo, un ciclo per riga (specifiche del Sistema TS, prescrizione,
-      // 08/07/2026, pp. 42–43). Senza la voce nel catalogo in uso le controlla il SAR.
+      // 08/07/2026, pp. 42–43). Senza la voce nel catalogo in uso le controlla il servizio che
+      // riceve la ricetta.
       if (isService && line.serviceCode && value(rule, 'checkCycleSessions') === 1) {
         const entry = ctx.serviceCatalog?.(line.serviceCode) ?? null;
         const sessions = line.sessions ?? null;
@@ -650,7 +654,7 @@ const evaluators: Record<RuleId, Evaluator> = {
         lineId: l.id,
         ...(asksReason ? { needs: 'reason' as const } : {}),
         message: asksReason
-          ? `${lineLabel(l)}: codice non presente nel catalogo regionale in uso. Se è un codice nuovo, il SAR lo controlla sul catalogo aggiornato della Regione e rifiuta la ricetta se non lo trova. Serve un motivo per procedere`
+          ? `${lineLabel(l)}: codice non presente nel catalogo regionale in uso. Se è un codice nuovo, il servizio che riceve la ricetta lo controlla sul catalogo aggiornato della Regione e rifiuta la ricetta se non lo trova. Serve un motivo per procedere`
           : `${lineLabel(l)}: codice non presente nel catalogo regionale in uso; motivo registrato: ${reason}`,
       }));
   },
