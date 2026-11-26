@@ -795,7 +795,7 @@ async function writeServices(tx: Tx, contactId: string, services: ContactChoice[
  * Il progressivo del contatto nel giorno, nello studio (D291). La riga dello studio si blocca per
  * la transazione: due conferme insieme non prendono lo stesso numero.
  */
-async function nextSequence(tx: Tx, studioId: string, day: string) {
+export async function nextSequence(tx: Tx, studioId: string, day: string) {
   const [s] = await tx
     .select({ code: studio.structureCode, type: studio.structureType })
     .from(studio)

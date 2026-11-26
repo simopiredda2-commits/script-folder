@@ -2899,3 +2899,33 @@ textarea[aria-invalid='true'] {
   margin: 0.25rem 0 0.5rem;
   padding-left: 1.25rem;
 }
+
+/* Contatti per il SIAP (D291): un riquadro per contatto, i dati in coppie nome e valore. */
+.scheda-contatto h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.0625rem;
+}
+
+.scheda-contatto h4 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+.dati-in-riga {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0;
+}
+
+.dati-in-riga dt {
+  font-weight: 600;
+}
+
+.dati-in-riga dd {
+  margin: 0;
+}
+
+.modulo-contatto fieldset {
+  margin-top: 0.75rem;
+}

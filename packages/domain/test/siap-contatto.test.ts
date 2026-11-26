@@ -90,6 +90,7 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
     const many = Array.from({ length: 12 }, (_, i): SiapAct => ({
       kind: 'sick_leave',
       id: `c${i}`,
+      visit: 'office',
     }));
     expect(SIAP_MAX_QUANTITY).toBe(9);
     expect(servicesOf(many)).toEqual([{ tipologia: 6, dettaglio: 1, quantita: 9 }]);

@@ -28,10 +28,13 @@ import {
   siapProblemState,
   sickLeaveCertificate,
   studio,
+  supplyPrescription,
   templateCertificate,
   therapy,
   vaccinationDetail,
 } from '../src/db/schema';
+import { withActor } from '../src/db/tx';
+import { nextSequence } from '../src/siap/contacts';
 import { importPpipCatalog } from './helpers/ppip';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -164,11 +167,11 @@ describe('contatti del SIAP dagli atti del medico (D291)', () => {
       },
       { prescriptionId: rx!.id, position: 2, drugName: 'Farmaco nuovo di prova', quantity: 1 },
     ]);
-    await t.db.insert(sickLeaveCertificate).values({
+    // Il certificato rettificato e quello che lo rettifica sono un atto solo.
+    const certificate = {
       patientId: rich,
       archiveId: s.archives.titolare,
       preparedBy: tit,
-      status: 'sent',
       signedBy: tit,
       signedAt: at,
       type: 'I',
@@ -177,6 +180,55 @@ describe('contatti del SIAP dagli atti del medico (D291)', () => {
       startDate: DAY,
       endDate: DAY,
       residence: { street: 'Via di Prova', number: '1' },
+    };
+    const [original] = await t.db
+      .insert(sickLeaveCertificate)
+      .values({ ...certificate, status: 'rectified' })
+      .returning();
+    await t.db
+      .insert(sickLeaveCertificate)
+      .values({ ...certificate, status: 'sent', rectifiesId: original!.id });
+    // Ricetta specialistica con una visita e un esame; presidi del medico di famiglia.
+    const [spec] = await t.db
+      .insert(prescription)
+      .values({
+        patientId: rich,
+        archiveId: s.archives.titolare,
+        kind: 'specialist_ssn',
+        status: 'sent',
+        preparedBy: tit,
+        signedBy: tit,
+        signedAt: at,
+        sentAt: at,
+      })
+      .returning();
+    await t.db.insert(prescriptionLine).values([
+      {
+        prescriptionId: spec!.id,
+        position: 1,
+        serviceCode: '00.00',
+        serviceDescription: 'PRIMA VISITA DI PROVA',
+        quantity: 1,
+      },
+      {
+        prescriptionId: spec!.id,
+        position: 2,
+        serviceCode: '00.01',
+        serviceDescription: 'ESAME DI PROVA',
+        quantity: 1,
+      },
+    ]);
+    await t.db.insert(supplyPrescription).values({
+      patientId: rich,
+      category: 'monouso',
+      product: 'Presidio di prova',
+      monthlyQuantity: 1,
+      unit: 'pezzi',
+      months: 1,
+      startOn: DAY,
+      endOn: DAY,
+      createdBy: tit,
+      createdAt: at,
     });
     const [vx] = await t.db
       .insert(clinicalEntry)
@@ -320,10 +372,23 @@ describe('contatti del SIAP dagli atti del medico (D291)', () => {
         { tipologia: 7, dettaglio: 1, quantita: 1 },
         { tipologia: 8, dettaglio: 1, quantita: 1 },
         { tipologia: 8, dettaglio: 2, quantita: 1 },
+        { tipologia: 9, dettaglio: 1, quantita: 1 },
+        { tipologia: 9, dettaglio: 2, quantita: 1 },
+        { tipologia: 9, dettaglio: 9, quantita: 1 },
       ],
     });
     expect(c.atti.map((a) => a.tipo).sort()).toEqual(
-      ['certificate', 'choice', 'diary', 'pharma', 'ppip', 'sick_leave', 'vaccination'].sort(),
+      [
+        'certificate',
+        'choice',
+        'devices',
+        'diary',
+        'pharma',
+        'ppip',
+        'sick_leave',
+        'specialist',
+        'vaccination',
+      ].sort(),
     );
     expect(c.atti.find((a) => a.tipo === 'pharma')!.descrizione).toBe(
       'Ricetta farmaceutica SSN, 2 farmaci',
@@ -546,6 +611,50 @@ describe('contatti del SIAP dagli atti del medico (D291)', () => {
     expect(results.map((r) => r.json<{ progressivo: number }>().progressivo).sort()).toEqual([
       3, 4,
     ]);
+  });
+
+  it('il progressivo si prende con la riga dello studio bloccata: la seconda conferma aspetta la prima', async () => {
+    const tit = s.users.titolare.id;
+    const day = '2026-11-23';
+    const order: string[] = [];
+    let release!: () => void;
+    const hold = new Promise<void>((r) => (release = r));
+    let locked!: () => void;
+    const taken = new Promise<void>((r) => (locked = r));
+    const first = withActor(t.db, tit, async (tx) => {
+      const a = await nextSequence(tx, s.studioId, day);
+      order.push(`primo ${a.next}`);
+      await tx.insert(siapContact).values({
+        studioId: s.studioId,
+        patientId: rich,
+        doctorId: tit,
+        occurredOn: day,
+        status: 'confirmed',
+        daySequence: a.next,
+        mode: 'office',
+        regime: 'choice',
+        accessType: 'direct',
+        problemCode: 'V70.0',
+        problemState: 'unknown',
+        decidedBy: tit,
+        decidedAt: at,
+        updatedAt: at,
+      });
+      locked();
+      await hold;
+      order.push('primo fine');
+    });
+    await taken;
+    const second = withActor(t.db, tit, async (tx) => {
+      const b = await nextSequence(tx, s.studioId, day);
+      order.push(`secondo ${b.next}`);
+    });
+    // Il tempo per finire, se la seconda non aspettasse.
+    await new Promise((r) => setTimeout(r, 300));
+    order.push('rilascio');
+    release();
+    await Promise.all([first, second]);
+    expect(order).toEqual(['primo 1', 'rilascio', 'primo fine', 'secondo 2']);
   });
 
   it('il database: un contatto non si cancella, e uno confermato ha il progressivo e i campi', async () => {
