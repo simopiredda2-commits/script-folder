@@ -1,3 +1,4 @@
+import { X509Certificate } from 'node:crypto';
 import { DOMParser } from '@xmldom/xmldom';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
@@ -432,8 +433,19 @@ describe('Fascicolo regionale (V09): cliente e simulatore', () => {
       authProblem: 'credentials',
     });
     // PIN cifrato con un altro certificato: decifrato dà un valore a caso, non quello del medico.
+    // L'altro certificato ha il modulo più piccolo di quello della Regione. Con uno più grande il
+    // valore cifrato può superarlo, e allora non si decifra affatto: è il PIN non cifrato con il
+    // certificato della Regione, un errore del messaggio. Con chiavi nuove a ogni prova capitava a
+    // caso: 118 volte su 1560 coppie di chiavi provate con Node 22, mai con il modulo più piccolo.
+    const modulus = (der: Uint8Array) =>
+      BigInt(
+        `0x${Buffer.from(new X509Certificate(der).publicKey.export({ format: 'jwk' }).n!, 'base64url').toString('hex')}`,
+      );
+    let other = createTestCertificate({ commonName: 'Altro' });
+    while (modulus(other.der) >= modulus(sim.encryptionCertificate))
+      other = createTestCertificate({ commonName: 'Altro' });
     const wrongKey = new RegionalFseClient(sim, {
-      encryptionCertificate: createTestCertificate({ commonName: 'Altro' }).der,
+      encryptionCertificate: other.der,
       application: caller.application,
     });
     expect(await wrongKey.create({ author, metadata: metadata(), ...doc }, AUTH)).toMatchObject({
