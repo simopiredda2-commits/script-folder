@@ -259,6 +259,18 @@ export function Shell({ children }: { children: ReactNode }) {
     ...(me && !me.archivio && me.ruoli.some((r) => r.codice === 'secretary')
       ? [{ to: '/archivio/riepiloghi', label: 'Riepiloghi', icon: 'storico' as const, end: false }]
       : []),
+    // Il sostituto non ha un archivio suo: i contatti per il SIAP dei suoi atti (D291) li apre
+    // dal menu.
+    ...(me && !me.archivio && me.ruoli.some((r) => r.codice === 'substitute_doctor')
+      ? [
+          {
+            to: '/archivio/contatti-siap',
+            label: 'Contatti SIAP',
+            icon: 'oggi' as const,
+            end: false,
+          },
+        ]
+      : []),
     // Strumenti, se c'è almeno una sezione per i ruoli di chi entra (D175).
     ...(me && toolsSectionsFor(me.ruoli.map((r) => r.codice)).length > 0
       ? [{ to: '/strumenti', label: 'Strumenti', icon: 'strumenti' as const, end: false }]

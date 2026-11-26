@@ -20,3 +20,4 @@ export * from './login-protection';
 export * from './identity';
 export * from './aura';
 export * from './ppip';
+export * from './siap';

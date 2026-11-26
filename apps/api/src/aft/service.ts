@@ -8,6 +8,7 @@ import {
   aftAccess,
   type AftMembership,
   currentConsents,
+  STRUCTURE_CODE_PATTERN,
 } from '@mmg/domain';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { z } from 'zod';
@@ -40,11 +41,27 @@ import { studioDate } from '../prescriptions/rules-check';
  * consultazione nel registro del medico curante e si compone il riepilogo.
  */
 
+/** Un codice della struttura per il SIAP (D289): 6 lettere o cifre, oppure vuoto per toglierlo. */
+const structureCode = (label: string) =>
+  z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase())
+    .refine((v) => !v || STRUCTURE_CODE_PATTERN.test(v), `${label}: 6 lettere o cifre`);
+
+/** I campi dell'AFT per il SIAP (D289): il codice della struttura dell'AFT e l'UCCP. */
+const siapFields = {
+  codiceStruttura: structureCode('Codice della struttura dell’AFT').optional(),
+  uccpNome: z.string().trim().max(120).optional(),
+  uccpCodiceStruttura: structureCode('Codice della struttura dell’UCCP').optional(),
+};
+
 export const createBody = z
   .object({
     nome: z.string().trim().min(3).max(120),
     asl: z.string().trim().max(120).optional(),
     codice: z.string().trim().max(40).optional(),
+    ...siapFields,
   })
   .strict();
 /**
@@ -56,6 +73,7 @@ export const updateBody = z
     nome: z.string().trim().min(3).max(120).optional(),
     asl: z.string().trim().max(120).optional(),
     codice: z.string().trim().max(40).optional(),
+    ...siapFields,
   })
   .strict()
   .refine((b) => Object.values(b).some((v) => v !== undefined), 'Niente da salvare');
@@ -176,6 +194,9 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
         nome: a!.name,
         asl: a!.asl,
         codice: a!.code,
+        codiceStruttura: a!.structureCode,
+        uccpNome: a!.uccpName,
+        uccpCodiceStruttura: a!.uccpStructureCode,
         condivido: member.sharing,
         dal: member.joinedAt,
         membri: rows.map((r) => ({
@@ -205,6 +226,9 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
           name: body.nome,
           asl: body.asl || null,
           code: body.codice || null,
+          structureCode: body.codiceStruttura || null,
+          uccpName: body.uccpNome || null,
+          uccpStructureCode: body.uccpCodiceStruttura || null,
           createdBy: actor.userId,
           createdAt: at,
         })
@@ -249,17 +273,35 @@ export function createAftService({ db, now }: { db: Database; now: () => Date })
       name: body.nome ?? a.name,
       asl: body.asl === undefined ? a.asl : body.asl || null,
       code: body.codice === undefined ? a.code : body.codice || null,
+      structureCode:
+        body.codiceStruttura === undefined ? a.structureCode : body.codiceStruttura || null,
+      uccpName: body.uccpNome === undefined ? a.uccpName : body.uccpNome || null,
+      uccpStructureCode:
+        body.uccpCodiceStruttura === undefined
+          ? a.uccpStructureCode
+          : body.uccpCodiceStruttura || null,
     };
     const campi = (
       [
         ['nome', 'name'],
         ['asl', 'asl'],
         ['codice', 'code'],
+        ['codiceStruttura', 'structureCode'],
+        ['uccpNome', 'uccpName'],
+        ['uccpCodiceStruttura', 'uccpStructureCode'],
       ] as const
     )
       .filter(([, column]) => next[column] !== a[column])
       .map(([field]) => field);
-    const view = (r: typeof a) => ({ id: r.id, nome: r.name, asl: r.asl, codice: r.code });
+    const view = (r: typeof a) => ({
+      id: r.id,
+      nome: r.name,
+      asl: r.asl,
+      codice: r.code,
+      codiceStruttura: r.structureCode,
+      uccpNome: r.uccpName,
+      uccpCodiceStruttura: r.uccpStructureCode,
+    });
     if (campi.length === 0) return view(a);
     const saved = await withActor(db, actor.userId, async (tx) => {
       const [row] = await tx.update(aft).set(next).where(eq(aft.id, aftId)).returning();

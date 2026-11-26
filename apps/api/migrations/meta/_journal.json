@@ -414,6 +414,20 @@
       "when": 1795685658453,
       "tag": "0058_condizione_rao",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1795693250405,
+      "tag": "0059_codice_della_struttura",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1795696446550,
+      "tag": "0060_contatto_siap",
+      "breakpoints": true
     }
   ]
 }

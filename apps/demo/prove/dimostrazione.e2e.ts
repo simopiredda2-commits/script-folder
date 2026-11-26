@@ -1145,6 +1145,13 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await closeViewer();
   });
 
+  it('contatti per il SIAP: il contatto proposto dagli atti di oggi si conferma con il numero del giorno (D291)', async () => {
+    await go('/archivio/contatti-siap');
+    await f.getByRole('heading', { level: 1, name: 'Contatti per il SIAP' }).waitFor();
+    await f.getByRole('button', { name: 'Conferma', exact: true }).first().click();
+    await f.getByText(/confermato: numero \d+ del giorno\./).waitFor({ timeout: 30_000 });
+  });
+
   it('importazione: file, anteprima, prova senza scrivere, importazione', async () => {
     // Pazienti inventati (D12): codici fiscali con la X, che nessun comune ha.
     const nuovi = generatePatients({ seed: 'importazione-della-dimostrazione', count: 2 });

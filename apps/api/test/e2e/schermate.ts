@@ -1031,6 +1031,12 @@ try {
   await page.getByRole('table', { name: 'Ricette fatte nell’archivio, per tipo' }).waitFor();
   await shot(page, '67-riepiloghi', true);
 
+  // D291: i contatti per il SIAP di oggi, proposti dagli atti del medico.
+  await page.goto(`${base}/archivio/contatti-siap?dal=${thisDay}&al=${thisDay}`);
+  await page.getByRole('heading', { level: 1, name: 'Contatti per il SIAP' }).waitFor();
+  await page.getByText(/^Dal .*: \d+ contatt/).waitFor();
+  await shot(page, '79-contatti-siap', true);
+
   // D202: la ricerca con la carenza e gli equivalenti. Per la documentazione, non per il sito: la
   // carenza è di una confezione, che porta il nome della ditta (D149).
   await page.goto(`${base}/banche-dati`);

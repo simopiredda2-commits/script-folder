@@ -69,6 +69,11 @@ export const ACTIONS = [
   'ppip.write',
   /** Inviare all'ASL la distinta del mese: la firma e la manda il titolare (regola 5, D212). */
   'ppip.send',
+  /**
+   * Contatti del SIAP (D291): vederli, confermarli, cambiarli e scartarli, per gli atti propri. Solo
+   * i medici, anche il sostituto per i contatti suoi; la segreteria no (regola 5).
+   */
+  'siap.contacts',
   /** Impostazioni dell'archivio: che cosa vede la segreteria. */
   'archive.settings',
   /** Autorizzazioni sull'archivio: sostituto e colleghi di medicina di gruppo (tappa 14). */
@@ -128,6 +133,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   'ppip.report': 'Leggere e scaricare la distinta mensile delle prestazioni aggiuntive',
   'ppip.write': 'Registrare e annullare le prestazioni aggiuntive (PPIP)',
   'ppip.send': 'Inviare all’ASL la distinta mensile delle prestazioni aggiuntive',
+  'siap.contacts': 'Confermare, cambiare e scartare i propri contatti per il SIAP',
   'archive.settings':
     'Decidere che cosa vede la segreteria dell’archivio e quali sono le medicazioni avanzate',
   'archive.grants': 'Autorizzare un sostituto o un collega di gruppo sull’archivio',
@@ -185,6 +191,7 @@ const DOCTOR_ON_OWN_ARCHIVE: Action[] = [
   'ppip.report',
   'ppip.write',
   'ppip.send',
+  'siap.contacts',
   'archive.settings',
   'archive.grants',
   'archive.transfer',

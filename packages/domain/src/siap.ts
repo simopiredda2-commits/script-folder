@@ -46,6 +46,21 @@ export const STRUCTURE_TYPES = [
 ] as const;
 export type StructureType = (typeof STRUCTURE_TYPES)[number];
 
+/**
+ * I tipi di struttura che può essere lo studio del programma (D289): lo studio di medicina generale
+ * o di pediatria, la sede unica di un'AFT o di un'UCCP, la Casa della Comunità. Guardia medica,
+ * guardia turistica e strutture semiresidenziali e residenziali sono sedi in cui il medico può
+ * lavorare, non il suo studio: vengono con il contatto, che dice dove è avvenuto.
+ */
+export const STUDIO_STRUCTURE_TYPES = [
+  'gp_office',
+  'pediatric_office',
+  'aft',
+  'uccp',
+  'community_house',
+] as const satisfies readonly StructureType[];
+export type StudioStructureType = (typeof STUDIO_STRUCTURE_TYPES)[number];
+
 /** La modalità del contatto dal tipo di contatto del diario. */
 export const CONTACT_MODE_OF_DIARY = {
   office: 'office',

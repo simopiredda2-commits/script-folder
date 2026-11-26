@@ -21,3 +21,4 @@ export * from './asl';
 export * from './nre-lots';
 export * from './poligrafico';
 export * from './siap';
+export * from './siap-contact';

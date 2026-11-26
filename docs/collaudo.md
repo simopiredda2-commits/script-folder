@@ -117,6 +117,12 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 - **Dove**: «Riepiloghi» e «Archivio» (esportazione dei dati del medico)
 - **Che cosa guardare**: visite, prescrizioni e vaccinazioni per periodo, con il CSV; l'esportazione completa in formato aperto: si apre e si capisce?
 
+### G17 · Contatti per il SIAP
+
+- **Chi**: Dr.ssa Rocca
+- **Dove**: «Archivio › Contatti per il SIAP» con l'utente `medico`; per il `sostituto`, «Contatti SIAP» nel menu
+- **Che cosa guardare**: dopo una nota del diario o una ricetta, il contatto del giorno proposto dagli atti, con modalità, accesso e attività con i nomi del Ministero; «Conferma», «Cambia e conferma» con un problema della cartella, «Scarta» con il motivo; un atto nuovo dopo la conferma lo fa vedere «da aggiornare». Al Ministero non parte niente: l'invio viene con il modulo del CSI (D291).
+
 ## Parte 2 · Contenuti da controllare
 
 Per la Dr.ssa Rocca, o per chi lei indica. Una trascrizione entra nel programma solo quando una persona diversa da chi l'ha scritta l'ha confrontata con l'atto e ha scritto il suo nome in «controllato da» (A8).
@@ -178,6 +184,18 @@ Per la Dr.ssa Rocca, o per chi lei indica. Una trascrizione entra nel programma 
   - gli otto codici del manuale corretti con l'allegato 4;
   - gli inizi di descrizione che legano le tabelle al catalogo;
   - quale tabella vale oggi in Piemonte, e con quali attese: le determine dicono 180 giorni per la classe P, il manuale 120.
+
+### K10 · Contatti per il SIAP
+
+- **Chi**: Dr.ssa Rocca
+- **Dove**: `docs/siap.md`, «Il contatto nel programma», e la decisione D291
+- **Che cosa guardare**:
+  - le corrispondenze delle 17 prestazioni aggiuntive con i dettagli del Ministero;
+  - la tipologia di accesso dall'appuntamento del giorno;
+  - lo stato del problema da «quesito aperto» e «cronica»;
+  - i presidi come «Prescrizioni di specialistica, altro»;
+  - le visite riconosciute dalla descrizione della prestazione, i vaccini stagionali dal nome o dalla campagna;
+  - la scelta del medico, che da sola non fa un contatto.
 
 ## Parte 3 · Decisioni e materiali di Simone
 

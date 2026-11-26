@@ -32,6 +32,7 @@ import { SignQueuePage } from './pages/SignQueuePage';
 import { SuppliesPage } from './pages/SuppliesPage';
 import { PpipPage } from './pages/PpipPage';
 import { PpipReportPage } from './pages/PpipReportPage';
+import { SiapContactsPage } from './pages/SiapContactsPage';
 import { HealthProfilePage } from './pages/HealthProfilePage';
 import { FseAccessPage } from './pages/FseAccessPage';
 import { TemplateCertificatesPage } from './pages/TemplateCertificatesPage';
@@ -92,6 +93,7 @@ function Screens() {
           <Route path="/archivio" element={<ArchivePage />} />
           <Route path="/archivio/riepiloghi" element={<ReportsPage />} />
           <Route path="/archivio/prestazioni-aggiuntive" element={<PpipReportPage />} />
+          <Route path="/archivio/contatti-siap" element={<SiapContactsPage />} />
           <Route path="/profilo/credenziali" element={<ServiceCredentialsPage />} />
           <Route path="/profilo/recapiti" element={<DoctorContactsPage />} />
           <Route path="/profilo/password" element={<PasswordPage />} />

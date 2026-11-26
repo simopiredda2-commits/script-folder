@@ -344,6 +344,8 @@ Il 26/11/2026 Simone ha mandato anche due file uguali, byte per byte, a quelli r
 
 Il disciplinare tecnico non era nei file mandati prima: Simone l'ha mandato a parte, lo stesso giorno. Le specifiche funzionali del Ministero lo citano come documento a parte, «allegato al DM del 4 agosto 2025», che «descrive i contenuti informativi» (§1.4), e avvertono che i loro tracciati non corrispondono perfettamente ai suoi (§3.8). Che cosa aggiunge e dove i due documenti non tornano è in `docs/siap.md`.
 
+Nel repository, dalle specifiche funzionali, entrano solo dati scritti qui: i valori ammessi dei tracciati (`packages/reference/data/siap/valori-ministero-1.3.json`, D284) e le corrispondenze fra le voci dei cataloghi delle prestazioni aggiuntive e i dettagli della tipologia «PIPP» (`corrispondenze-prestazioni-aggiuntive.json` per l'ACN, `corrispondenze-prestazioni-aggiuntive-piemonte.json` per l'accordo regionale, D291). Le corrispondenze le ha fatte Claude Code per descrizione, dalle trascrizioni già registrate (allegato 6 dell'ACN 2022-2024, art. 35 dell'AIR del Piemonte 2024) e dall'allegato 2 delle specifiche; sono da controllare (`controllato_da` vuoto).
+
 ### RAO, Raggruppamenti di attesa omogenei (D285)
 
 Scaricati e letti il 26/11/2026 per la domanda della Dr.ssa Rocca sulle RAO. Nel repository entrano solo le trascrizioni delle tabelle (`packages/reference/data/rao`, «da controllare»), non i PDF (D92). Le trascrizioni portano l'impronta del PDF da cui vengono.

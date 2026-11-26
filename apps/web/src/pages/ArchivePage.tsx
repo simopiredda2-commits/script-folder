@@ -98,6 +98,7 @@ const SECTIONS = [
   { key: 'esportazione', label: 'Esportazione completa' },
   { key: 'riepiloghi', label: 'Riepiloghi' },
   { key: 'prestazioni', label: 'Prestazioni aggiuntive' },
+  { key: 'siap', label: 'Contatti per il SIAP' },
   { key: 'autorizzazioni', label: 'Autorizzazioni' },
   { key: 'avvisi', label: 'Avvisi sugli accessi' },
   { key: 'registro', label: 'Registro degli accessi' },
@@ -260,6 +261,20 @@ export function ArchivePage() {
           </p>
           <Link className="pulsante" to="/archivio/prestazioni-aggiuntive">
             <Icon name="firma" /> <span>Apri la distinta</span>
+          </Link>
+        </section>
+      )}
+      {open.key === 'siap' && (
+        <section className="riquadro" aria-labelledby="titolo-siap-archivio">
+          <h2 id="titolo-siap-archivio">
+            <Icon name="oggi" /> Contatti per il SIAP
+          </h2>
+          <p>
+            Un contatto per paziente e giorno, proposto dagli atti tuoi: lo confermi, lo cambi o lo
+            scarti. Al SIAP del Ministero andranno i contatti confermati.
+          </p>
+          <Link className="pulsante" to="/archivio/contatti-siap">
+            <Icon name="oggi" /> <span>Apri i contatti</span>
           </Link>
         </section>
       )}

@@ -15,19 +15,20 @@ Documento per la revisione della tappa 12: che cosa vede un collega dell'AFT, a 
 
 ## Dove sta nel programma
 
-| Che cosa                                     | Dove                                                                                                                |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Regole di chi vede che cosa                  | `packages/domain/src/aft.ts` (`aftAccess`), con le prove in `packages/domain/test/aft.test.ts`                      |
-| AFT e membri, con lo storico delle modifiche | tabelle `aft` e `aft_member` (migrazione 0020): non si cancellano, si esce con una data                             |
-| Registro di AFT                              | tabella `aft_activity` (migrazione 0021): storico, nessuna modifica né cancellazione                                |
-| Consensi del paziente                        | `aft_condivisione` e `aft_condivisione_pregressi` tra i consensi di `packages/domain/src/privacy.ts`                |
-| Servizio e rotte                             | `apps/api/src/aft/service.ts`, `apps/api/src/http/aft-routes.ts`                                                    |
-| Riepilogo                                    | la composizione del Profilo sanitario sintetico (tappa 11), con lo stato clinico di ogni voce                       |
-| Scheda                                       | la cronologia della cartella (`chronology` in `apps/api/src/patients/timeline.ts`), con i filtri della condivisione |
-| Cronologia della cartella                    | `apps/api/src/patients/timeline.ts`: le attività dei colleghi, «Collega dell'AFT: …»                                |
-| Interfaccia                                  | Strumenti › AFT (`apps/web/src/pages/AftSection.tsx`); cartella › Privacy (`PrivacyPage.tsx`)                       |
-| Prove                                        | `apps/api/test/aft.test.ts` (due studi diversi), una prova nel browser in `test/e2e/interfaccia.test.ts`            |
-| Dimostrazione                                | `apps/demo/src/worker/colleghi.ts`: un altro studio dell'AFT, con un paziente che ha dato il consenso (D227)        |
+| Che cosa                                     | Dove                                                                                                                                                                                   |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Regole di chi vede che cosa                  | `packages/domain/src/aft.ts` (`aftAccess`), con le prove in `packages/domain/test/aft.test.ts`                                                                                         |
+| AFT e membri, con lo storico delle modifiche | tabelle `aft` e `aft_member` (migrazione 0020): non si cancellano, si esce con una data                                                                                                |
+| Codici per il SIAP                           | colonne `structure_code`, `uccp_name` e `uccp_structure_code` di `aft` (migrazione 0059, D289): codice della struttura dell'AFT e UCCP, in Strumenti › AFT, «Modifica i dati dell'AFT» |
+| Registro di AFT                              | tabella `aft_activity` (migrazione 0021): storico, nessuna modifica né cancellazione                                                                                                   |
+| Consensi del paziente                        | `aft_condivisione` e `aft_condivisione_pregressi` tra i consensi di `packages/domain/src/privacy.ts`                                                                                   |
+| Servizio e rotte                             | `apps/api/src/aft/service.ts`, `apps/api/src/http/aft-routes.ts`                                                                                                                       |
+| Riepilogo                                    | la composizione del Profilo sanitario sintetico (tappa 11), con lo stato clinico di ogni voce                                                                                          |
+| Scheda                                       | la cronologia della cartella (`chronology` in `apps/api/src/patients/timeline.ts`), con i filtri della condivisione                                                                    |
+| Cronologia della cartella                    | `apps/api/src/patients/timeline.ts`: le attività dei colleghi, «Collega dell'AFT: …»                                                                                                   |
+| Interfaccia                                  | Strumenti › AFT (`apps/web/src/pages/AftSection.tsx`); cartella › Privacy (`PrivacyPage.tsx`)                                                                                          |
+| Prove                                        | `apps/api/test/aft.test.ts` (due studi diversi), una prova nel browser in `test/e2e/interfaccia.test.ts`                                                                               |
+| Dimostrazione                                | `apps/demo/src/worker/colleghi.ts`: un altro studio dell'AFT, con un paziente che ha dato il consenso (D227)                                                                           |
 
 ## Regole, una per una
 

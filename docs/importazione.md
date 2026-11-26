@@ -59,7 +59,7 @@ Ogni riga passa dagli **stessi controlli dell'inserimento a mano**. Il paziente 
 - **Ricette fatte con altri programmi:** finiscono in uno storico a sola lettura. Non si firmano, non si inviano e non si annullano verso il SAR.
 - **Scelta del medico** (D174): è sempre del titolare che importa, perché il programma conosce solo i medici dello studio. Una scelta che vale in un periodo già coperto da un'altra scelta in cartella si scarta, con il motivo e senza date; la cessazione vuole il motivo, come nel pannello.
 - **Nucleo familiare** (D174): le righe con lo stesso valore nella colonna del nucleo vanno nello stesso nucleo, anche in importazioni diverse (maiuscole e minuscole non contano). L'etichetta è quella del file, se c'è, altrimenti il valore stesso; si cambia poi dal pannello. Un paziente che è già in un altro nucleo resta nel suo e la riga si scarta.
-- **Non ancora destinazioni** (scritte nel rapporto se servono): piani terapeutici, consensi, deleghe, referti con allegati, presidi.
+- **Non ancora destinazioni** (scritte nel rapporto se servono): piani terapeutici, consensi, deleghe, referti con allegati, presidi, prestazioni aggiuntive. Le prestazioni aggiuntive fatte con altri programmi entrano nel blocco della rendicontazione dell'AIR (D287), insieme alla categoria di rischio delle vaccinazioni antinfluenzali.
 
 ## Doppioni, provenienza, annullamento
 
@@ -77,16 +77,16 @@ Ogni riga passa dagli **stessi controlli dell'inserimento a mano**. Il paziente 
 
 `apps/api/test/importazione.test.ts`, `importazione-lettori.test.ts`, `importazione-esportazione.test.ts`, `importazione-pannello.test.ts`, `packages/domain/test/import-destinations.test.ts`; la prova nel browser «importazione a passi»; in Strumenti › Importazione, come titolare, con un CSV di pazienti inventati.
 
-## Domande per la fermata
+## Domande della fermata dopo la tappa 15, con le risposte
 
-Con l'opzione consigliata. Fino alla risposta vale la scelta di oggi.
+Fatte alla fermata del 19/11/2026 (D181). Dove la risposta non dice altro, resta la scelta di allora.
 
-1. **Chi importa.** Consigliata: solo il titolare, sul suo archivio (oggi così).
-2. **Programma d'origine e licenza.** Consigliata: nessun profilo per altri programmi nel repository. La Dr.ssa Rocca costruisce il suo profilo sul suo file, nello studio, e l'avvocato dà il parere sull'art. 7 della licenza prima del primo uso.
-3. **Voci importate e condivisione.** Consigliata: fuori dal Profilo e dall'AFT finché il medico non le rivede. Oggi entrano subito: manca uno stato «da rivedere».
-4. **Ricette passate e regole (R6, R11).** Consigliata: contano e il messaggio lo dice. Oggi non contano.
-5. **Campi facoltativi non validi.** Consigliata: si scarta il campo e si tiene la riga. Oggi si scarta la riga intera.
-6. **Pazienti senza codice fiscale** (STP, ENI): oggi non si importano.
+1. **Chi importa.** Solo il titolare, sul suo archivio: così.
+2. **Programma d'origine e licenza.** Nessun profilo per altri programmi nel repository. La Dr.ssa Rocca costruisce il suo profilo sul suo file, nello studio, e l'avvocato dà il parere sull'art. 7 della licenza prima del primo uso.
+3. **Voci importate e condivisione.** Risposta (D181): entrano subito nel Profilo sanitario sintetico e nel riepilogo dell'AFT, con il segno della provenienza.
+4. **Ricette passate e regole (R6, R11).** Risposta (D181): contano, e il messaggio dice che c'è una ricetta fatta con un altro programma. Fatto (D183).
+5. **Campi facoltativi non validi.** Resta la scelta di allora: si scarta la riga intera.
+6. **Pazienti senza codice fiscale** (STP, ENI): non si importano.
 
 ## Che cosa non è stato provato
 

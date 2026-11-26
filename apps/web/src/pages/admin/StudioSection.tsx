@@ -23,6 +23,12 @@ interface StudioView {
   };
   tipi: { codice: string; nome: string }[];
   indirizzoCompleto: string | null;
+  /** Codice e tipo della struttura per il SIAP (D289), con i tipi dalle specifiche del Ministero. */
+  struttura: {
+    codice: string | null;
+    tipo: string;
+    tipi: { codice: string; nome: string; codiceMinistero: number }[];
+  };
   intestazione: string[];
   sicurezza: {
     minutiInattivita: number | null;
@@ -67,6 +73,8 @@ type Fields = {
   telefono: string;
   email: string;
   pec: string;
+  codiceStruttura: string;
+  tipoStruttura: string;
   intestazione: string;
   minutiInattivita: string;
   tentativiFalliti: string;
@@ -93,6 +101,8 @@ function initial(d: StudioView): Fields {
     telefono: str(d.dati.telefono),
     email: str(d.dati.email),
     pec: str(d.dati.pec),
+    codiceStruttura: str(d.struttura.codice),
+    tipoStruttura: d.struttura.tipo,
     intestazione: d.intestazione.join('\n'),
     minutiInattivita: str(d.sicurezza.minutiInattivita),
     tentativiFalliti: str(d.sicurezza.tentativiFalliti),
@@ -204,6 +214,10 @@ function StudioForm({
                   telefono: text(f.telefono),
                   email: text(f.email),
                   pec: text(f.pec),
+                },
+                struttura: {
+                  codice: text(f.codiceStruttura),
+                  tipo: f.tipoStruttura,
                 },
                 sicurezza: {
                   minutiInattivita: number(f.minutiInattivita),
@@ -395,6 +409,39 @@ function StudioForm({
           {input('telefono', 'Telefono', { type: 'tel', maxLength: 30 })}
           {input('email', 'Email', { type: 'email', maxLength: 254 })}
           {input('pec', 'PEC', { type: 'email', maxLength: 254 })}
+        </div>
+      </fieldset>
+
+      <fieldset disabled={busy}>
+        <legend>Struttura per il SIAP</legend>
+        <div className="campi-in-riga">
+          {input('codiceStruttura', 'Codice della struttura (STS.11)', {
+            narrow: true,
+            maxLength: 6,
+            pattern: '[A-Za-z0-9]{6}',
+            code: true,
+            help: 'Sei lettere o cifre, come lo dà la Regione o l’ASL. Nel periodo transitorio, per uno studio di medicina generale, «MM» e un numero progressivo (specifiche funzionali del SIAP, allegato 3).',
+          })}
+          <div className="campo">
+            <label htmlFor="studio-tipoStruttura">Tipo di struttura</label>
+            <select
+              id="studio-tipoStruttura"
+              disabled={readOnly}
+              aria-describedby="studio-tipoStruttura-aiuto"
+              value={f.tipoStruttura}
+              onChange={(e) => set('tipoStruttura', e.target.value)}
+            >
+              {data.struttura.tipi.map((t) => (
+                <option key={t.codice} value={t.codice}>
+                  {t.nome}
+                </option>
+              ))}
+            </select>
+            <p className="aiuto" id="studio-tipoStruttura-aiuto">
+              Dove lavora il medico, nel tracciato dell’organizzazione del SIAP: lo studio, oppure
+              la sede unica dell’AFT o dell’UCCP, o la Casa della Comunità.
+            </p>
+          </div>
         </div>
       </fieldset>
 

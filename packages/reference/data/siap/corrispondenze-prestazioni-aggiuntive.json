@@ -1,0 +1,76 @@
+{
+  "tipo": "siap_corrispondenze_prestazioni_aggiuntive",
+  "serie": "acn-prestazioni-aggiuntive",
+  "atto": "Corrispondenza fra le voci dell'allegato 6 dell'ACN della medicina generale 2022-2024 (trascrizione acn-2022-2024-allegato-6) e i dettagli della tipologia 5, «PIPP», dell'allegato 2 delle specifiche funzionali del SIAP, versione 1.3 (valori-ministero-1.3)",
+  "trascritto_da": "Claude Code, per descrizione: ogni voce dell'ACN con il dettaglio del Ministero che la nomina",
+  "trascritto_il": "2026-11-26",
+  "controllato_da": null,
+  "nota": "Il Ministero ha un dettaglio solo per il cateterismo uretrale: le due voci dell'ACN, nell'uomo e nella donna, vanno tutte e due lì. Le voci senza corrispondenza (per esempio quelle di un accordo regionale o aziendale) vanno nel dettaglio 47, «Altro», finché una corrispondenza non le lega a un dettaglio. Le voci di un accordo regionale hanno un file loro, con la serie del catalogo della regione e l'ambito (D288).",
+  "altro": 47,
+  "voci": [
+    {
+      "codice": "A1",
+      "dettaglio": 6
+    },
+    {
+      "codice": "A2",
+      "dettaglio": 9
+    },
+    {
+      "codice": "A3",
+      "dettaglio": 7
+    },
+    {
+      "codice": "A4",
+      "dettaglio": 8
+    },
+    {
+      "codice": "A5",
+      "dettaglio": 1
+    },
+    {
+      "codice": "A6",
+      "dettaglio": 1
+    },
+    {
+      "codice": "A7",
+      "dettaglio": 12
+    },
+    {
+      "codice": "A8",
+      "dettaglio": 2
+    },
+    {
+      "codice": "A9",
+      "dettaglio": 5
+    },
+    {
+      "codice": "A10",
+      "dettaglio": 3
+    },
+    {
+      "codice": "A11",
+      "dettaglio": 4
+    },
+    {
+      "codice": "A12",
+      "dettaglio": 13
+    },
+    {
+      "codice": "B1",
+      "dettaglio": 39
+    },
+    {
+      "codice": "B2",
+      "dettaglio": 40
+    },
+    {
+      "codice": "B3",
+      "dettaglio": 41
+    },
+    {
+      "codice": "B4",
+      "dettaglio": 14
+    }
+  ]
+}

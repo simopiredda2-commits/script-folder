@@ -545,6 +545,9 @@ describe('archivio del titolare: autorizzazioni, registro di amministrazione, av
         nome: 'AFT Torino Nord di prova',
         asl: null,
         codice: 'AFT-01',
+        codiceStruttura: null,
+        uccpNome: null,
+        uccpCodiceStruttura: null,
       });
       expect((await call(s, c.titolare, 'GET', '/api/aft')).json().aft).toMatchObject({
         nome: 'AFT Torino Nord di prova',

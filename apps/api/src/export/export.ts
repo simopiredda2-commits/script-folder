@@ -70,6 +70,9 @@ export const CERTIFICATE_TABLES = ['certificate_submission', 'certificate_delive
  */
 export const PSS_TABLES = ['fse_transmission', 'fse_regional_send'] as const;
 
+/** Tabelle collegate per contatto del SIAP (D291): attività e prestazioni, atti da cui viene. */
+export const SIAP_CONTACT_TABLES = ['siap_contact_service', 'siap_contact_act'] as const;
+
 /**
  * Tabelle con una colonna `patient_id` o `entry_id` che non stanno nelle liste sopra, con il
  * motivo. Una prova controlla che ogni tabella del database sia in una delle tre liste.
@@ -88,6 +91,9 @@ export const HANDLED_SEPARATELY: Record<string, string> = {
     'le prestazioni aggiuntive dei pazienti dell’archivio e quelle nella sua distinta di pazienti passati poi a un altro archivio',
   patient_archive_move:
     'gli spostamenti dei pazienti dell’archivio e quelli dall’archivio o verso l’archivio',
+  // Per paziente e per medico (D291), come le prestazioni aggiuntive.
+  siap_contact:
+    'i contatti del SIAP dei pazienti dell’archivio e quelli del titolare con pazienti passati poi a un altro archivio',
 };
 
 type Row = Record<string, unknown>;
@@ -199,6 +205,21 @@ export async function buildExport(db: Database, archiveId: string, generatedAt: 
         where patient_id = any(${pgArray(patientIds)}::uuid[]) or archive_id = ${archiveId}
         order by id`,
   );
+  // Contatti del SIAP (D291): dei pazienti dell'archivio, e quelli del titolare con pazienti passati
+  // poi a un altro archivio, come le prestazioni aggiuntive. Con le attività e gli atti di ognuno.
+  tables.siap_contact = await rows(
+    db,
+    sql`select * from siap_contact
+        where patient_id = any(${pgArray(patientIds)}::uuid[]) or doctor_id = ${a.archive.ownerUserId}
+        order by occurred_on, id`,
+  );
+  const contactIds = tables.siap_contact.map((c) => c.id as string);
+  for (const t of SIAP_CONTACT_TABLES) {
+    tables[t] = await rows(
+      db,
+      sql`select * from ${sql.identifier(t)} where contact_id = any(${pgArray(contactIds)}::uuid[]) order by 1, 2, 3`,
+    );
+  }
   // Spostamenti fra gli archivi: dei pazienti dell'archivio, e quelli dall'archivio o verso (D240).
   tables.patient_archive_move = await rows(
     db,

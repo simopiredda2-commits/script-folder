@@ -22,6 +22,7 @@ import { registerIdentityRoutes } from './http/identity-routes';
 import { registerAuraRoutes } from './http/aura-routes';
 import { registerReportRoutes } from './http/report-routes';
 import { registerPpipRoutes } from './http/ppip-routes';
+import { registerSiapRoutes } from './http/siap-routes';
 import { createAuraService } from './aura/service';
 import { ReferenceUpdateScheduler } from './reference/scheduler';
 import { registerIdentitySimulatorRoutes } from './http/identity-simulator-routes';
@@ -437,6 +438,7 @@ export function buildApp({
   registerPrintRoutes(app, adminDeps);
   registerArchiveAdminRoutes(app, adminDeps);
   registerReportRoutes(app, { db, now: now ?? (() => new Date()) });
+  registerSiapRoutes(app, { db, now: now ?? (() => new Date()) });
   // Prestazioni aggiuntive (D212): catalogo, cartella, distinta del mese e invio predisposto.
   registerPpipRoutes(app, {
     db,
