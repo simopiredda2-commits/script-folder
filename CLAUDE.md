@@ -43,7 +43,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 6. **Il nome del prodotto sta solo in `packages/brand/brand.ts`** (`PRODUCT_NAME = "Folder"`, `COMPANY_BRAND = "SCRIPT"`). Altrove nel codice, nei test e nei testi dell'interfaccia non si scrive mai. Poiché la parola è anche inglese comune, nel codice non usarla nemmeno come termine tecnico: scrivi `directory` o `dir`. Un test lo controlla in `apps/`, `packages/` e `sync/`.
 7. **Niente segreti nel repository e nessuna chiamata a servizi reali**: le integrazioni sono interfacce con simulatori.
 8. **Nessuna risorsa da CDN esterne**, caratteri compresi: tutto servito dal nostro dominio, così nessun dato esce dall'UE.
-9. **Niente di regionale nel nucleo** (richiesta di Simone del 26/11/2026, D288): integrazioni (ricetta, anagrafe, Fascicolo), cataloghi, esenzioni, scadenze, regole e tutto ciò che è legato a una regione stanno nel pacchetto di quella regione, scelto dalla regione dello studio e dall'ASL del medico. Il Piemonte è il primo; gli altri si scrivono quando c'è l'elenco di che cosa serve. Fino allo spostamento (dopo la parte nazionale del SIAP) il codice nuovo nazionale non nomina il Piemonte, e quello regionale si scrive in moduli a parte.
+9. **Niente di regionale nel nucleo** (richiesta di Simone del 26/11/2026, D288): integrazioni (ricetta, anagrafe, Fascicolo), cataloghi, esenzioni, scadenze, regole e tutto ciò che è legato a una regione stanno nel pacchetto di quella regione, scelto dalla regione dello studio e dall'ASL del medico. Il Piemonte è il primo; gli altri si scrivono quando c'è l'elenco di che cosa serve. Il codice regionale nuovo va nelle cartelle del pacchetto (`regions/<chiave>/`, in ogni livello); una prova lo controlla, con l'inventario di ciò che è ancora da spostare, che si accorcia e non cresce (D292, `docs/pacchetti-regionali.md`).
 
 ## Come si lavora con Simone
 
@@ -79,6 +79,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 | `packages/rules`        | Regole di prescrizione: valori e fonti versionati come dati, mai scritti nel codice           |
 | `packages/integrations` | Interfacce e simulatori (SAR/SIRPED, Sistema TS, AURA, INPS, FSE)                             |
 | `packages/reference`    | Lettura dei file di `sync/` (CSV, XLSX), tipi di banca dati, mappature e trascrizioni (D159)  |
+| `packages/regions`      | Pacchetti regionali: nucleo, elenco, scelta, prova dei nomi regionali con l'inventario (D292) |
 | `sync/`                 | Banche dati pubbliche (Python)                                                                |
 | `fixtures/`             | Pazienti inventati (generatore deterministico); `banche-dati/`: sito e trascrizioni d'esempio |
 | `docs/`                 | Requisiti, prototipi, decisioni, avanzamento, logo                                            |
@@ -120,6 +121,7 @@ TypeScript ovunque, Node 22, pnpm workspaces, Postgres 16 con migrazioni version
 | `pnpm --filter @mmg/demo test:browser`                                                                                                                                     | Prova la dimostrazione costruita dentro una cornice come l’artifact; `DEMO_BROWSER=webkit` o `firefox` per gli altri motori (D224) |
 | `pnpm --filter @mmg/domain docs:permessi`                                                                                                                                  | Rigenera la matrice di `docs/ruoli-permessi.md` dal codice                                                                         |
 | `pnpm --filter @mmg/rules docs:regole`                                                                                                                                     | Rigenera la tabella di `docs/regole.md` dai dati delle regole                                                                      |
+| `pnpm --filter @mmg/regions inventario`                                                                                                                                    | Aggiorna l'inventario dei nomi regionali fuori dai pacchetti dopo uno spostamento; non lo fa crescere (D292)                       |
 | `pnpm --filter @mmg/api db:generate`                                                                                                                                       | Genera una migrazione dallo schema Drizzle                                                                                         |
 | `pnpm fixtures -- --seed 1 --count 20`                                                                                                                                     | Pazienti inventati in JSON (stesso seme, stessi pazienti)                                                                          |
 | `pnpm --filter @mmg/brand tokens:css`                                                                                                                                      | Rigenera `tokens.css` da `tokens.ts`                                                                                               |
@@ -150,6 +152,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/importazione.md`: importazione da altri programmi con lo smistamento verso i menu, formati, destinazioni, sicurezza (tappa 15, D173).
 - `docs/ppip.md`: prestazioni aggiuntive (PPIP). Catalogo versionato per livello (ACN, AIR, accordo dell'ASL); registrazione in cartella; distinta del mese con il CSV in un formato descritto come dato; invio predisposto con un simulatore; fonti e che cosa controllare (D212, D213).
 - `docs/rao.md`: tabelle RAO (manuale di AGENAS, determine del Piemonte per cardiologia e gastroenterologia), legame con il catalogo, che cosa controllare; la condizione clinica nella ricetta specialistica (D285).
+- `docs/pacchetti-regionali.md`: pacchetti regionali, scelta dalla regione dello studio e dall'ASL del medico, prova dei nomi regionali con l'inventario, come si sposta un pezzo e come si aggiunge una regione (D288, D292).
 - `docs/aura.md`: collegamento con AURA, oggi simulato: quando si controlla, che cosa si allinea, nuovi assistiti, cambio di medico dentro lo studio, registro, che cosa non è provato (D197–D200).
 
 ## Le tappe
