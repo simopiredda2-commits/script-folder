@@ -79,7 +79,7 @@ Il segno di oggi (nei prototipi) è un tratto di ECG accanto al nome, nato quand
 | `packages/rules`        | Regole di prescrizione: valori e fonti versionati come dati, mai scritti nel codice           |
 | `packages/integrations` | Interfacce e simulatori (SAR/SIRPED, Sistema TS, AURA, INPS, FSE)                             |
 | `packages/reference`    | Lettura dei file di `sync/` (CSV, XLSX), tipi di banca dati, mappature e trascrizioni (D159)  |
-| `packages/regions`      | Pacchetti regionali: nucleo, elenco, scelta, prova dei nomi regionali con l'inventario (D292) |
+| `packages/regions`      | Pacchetti regionali: nucleo, scelta, prova dei nomi (D292); dati in `<chiave>/data` (D295)    |
 | `sync/`                 | Banche dati pubbliche (Python)                                                                |
 | `fixtures/`             | Pazienti inventati (generatore deterministico); `banche-dati/`: sito e trascrizioni d'esempio |
 | `docs/`                 | Requisiti, prototipi, decisioni, avanzamento, logo                                            |

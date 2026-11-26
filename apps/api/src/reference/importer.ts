@@ -454,7 +454,8 @@ export function transcriptionsIn(dirs: string | readonly string[] | undefined) {
       ...all.flatMap((r) => r.invalid).filter((t) => !repeated.has(t.path)),
       ...[...repeated].map((path) => ({
         path,
-        problem: 'lo stesso percorso è in più cartelle delle trascrizioni: non entra nessuno di quei file',
+        problem:
+          'lo stesso percorso è in più cartelle delle trascrizioni: non entra nessuno di quei file',
       })),
     ],
   };

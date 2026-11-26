@@ -89,7 +89,7 @@ export const KINDS = {
       aifaNote: { type: 'text' },
     },
   },
-  /** Farmaci PHT in distribuzione per conto (Regione Piemonte), da una trascrizione controllata. */
+  /** Farmaci PHT in distribuzione per conto della regione, da una trascrizione controllata. */
   farmaci_dpc: {
     label: 'Farmaci in distribuzione per conto (DPC)',
     /** Campi che identificano una voce negli atti che aggiungono e tolgono voci (D157). */
@@ -238,7 +238,7 @@ export const KINDS = {
       atc: ATC,
     },
   },
-  /** Esenzioni e prestazioni associate per il controllo del SAR (R17), da una trascrizione. */
+  /** Esenzioni e prestazioni associate per il controllo R17, da una trascrizione. */
   /**
    * Prestazioni aggiuntive (PPIP) con il loro compenso: l'allegato 6 dell'ACN della medicina
    * generale in vigore, le aggiunte dell'accordo integrativo regionale e, quando l'ASL lo dirà,

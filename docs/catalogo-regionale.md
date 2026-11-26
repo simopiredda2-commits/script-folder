@@ -1,6 +1,6 @@
 # Catalogo regionale in vigore: trascrizione da controllare (D159)
 
-**Stato: da controllare.** Il programma non usa il catalogo finché le tre schede di `packages/reference/data/trascrizioni/piemonte_catalogo/` non dicono chi l'ha controllato (`controllato_da`). Fino ad allora ogni importazione lo segnala come «trascrizione da controllare» (A8).
+**Stato: da controllare.** Il programma non usa il catalogo finché le tre schede di `packages/regions/piemonte/data/trascrizioni/piemonte_catalogo/` (nel pacchetto regionale, D295) non dicono chi l'ha controllato (`controllato_da`). Fino ad allora ogni importazione lo segnala come «trascrizione da controllare» (A8).
 
 ## Da dove viene
 

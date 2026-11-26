@@ -3,10 +3,10 @@ import { extractRecords, type Mapping, type RowProblem } from './mapping';
 import { normalizeHeader } from './text';
 
 /**
- * Atti che modificano una tabella (D157). La Regione non ripubblica il catalogo intero: pubblica
- * le voci che finiscono (per esempio l'allegato A della D.D. 710/2026) e quelle che cominciano
- * (l'allegato C). Una trascrizione «solo modifiche» elenca queste voci con l'operazione, e la
- * versione intera si ricostruisce dalla versione in vigore il giorno prima.
+ * Atti che modificano una tabella (D157). Una regione può non ripubblicare il catalogo intero, ma
+ * solo le voci che finiscono e quelle che cominciano, in allegati diversi dello stesso atto. Una
+ * trascrizione «solo modifiche» elenca queste voci con l'operazione, e la versione intera si
+ * ricostruisce dalla versione in vigore il giorno prima.
  */
 
 export const CHANGE_OPERATIONS = ['aggiunge', 'toglie'] as const;

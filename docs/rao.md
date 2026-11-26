@@ -1,6 +1,6 @@
 # Tabelle RAO: trascrizione da controllare (D285)
 
-**Stato: da controllare.** Nel programma vero le tabelle entrano quando le schede di `packages/reference/data/rao/` dicono chi le ha controllate (`controllato_da`). Fino ad allora si vedono solo nell'ambiente di prova e nella dimostrazione, con «trascrizione da controllare» accanto (come il catalogo regionale, D159 e D260).
+**Stato: da controllare.** Nel programma vero le tabelle entrano quando le schede di `packages/reference/data/rao/` (AGENAS) e di `packages/regions/piemonte/data/rao/` (le determine regionali, D295) dicono chi le ha controllate (`controllato_da`). Fino ad allora si vedono solo nell'ambiente di prova e nella dimostrazione, con «trascrizione da controllare» accanto (come il catalogo regionale, D159 e D260).
 
 Le RAO (Raggruppamenti di attesa omogenei) legano, per ogni prestazione, le condizioni cliniche alla classe di priorità. Nella ricetta specialistica del primo accesso il medico sceglie la condizione del paziente e il programma mette la classe della tabella; il medico la può cambiare. Senza la sua scelta la classe resta vuota. La domanda è della Dr.ssa Rocca; la scelta di Simone è in `docs/decisioni.md`, D285.
 

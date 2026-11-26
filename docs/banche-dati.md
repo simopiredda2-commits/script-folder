@@ -93,13 +93,13 @@ I PDF non si estraggono da soli. Una persona copia i dati in un CSV (UTF-8, sepa
 
 ### Trascrizioni che il programma porta con sé (D159)
 
-`packages/reference/data/trascrizioni/` contiene le trascrizioni degli atti regionali e nazionali (catalogo, esenzioni, diagnosi ICD-9-CM, prestazioni aggiuntive), ed è la cartella delle trascrizioni per difetto (`BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` la sostituiscono). Oggi:
+Le trascrizioni stanno in due posti (D295): quelle degli atti nazionali (diagnosi ICD-9-CM, allegati del DPCM LEA, prestazioni aggiuntive dell'ACN) in `packages/reference/data/trascrizioni/`, quelle degli atti di una regione nella cartella `data/trascrizioni/` del suo pacchetto regionale, per il Piemonte `packages/regions/piemonte/data/trascrizioni/` (catalogo, prestazioni aggiuntive dell'AIR). Il programma le legge tutte, nell'ordine: prima la nazionale, poi i pacchetti; lo stesso percorso in due cartelle non entra da nessuna delle due. Sono le cartelle per difetto: `BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` le sostituiscono con una cartella sola. Oggi:
 
-| File (in `piemonte_catalogo/`) | Atto                                     | In vigore dal | Voci in vigore |
-| ------------------------------ | ---------------------------------------- | ------------- | -------------- |
-| `dd590-2026-allegato-a`        | D.D. 590/2026, allegato A: il catalogo   | 21/09/2026    | 5107           |
-| `dd710-2026-dal-2026-10-30`    | D.D. 710/2026, allegati A e C, modifiche | 30/10/2026    | 5149           |
-| `dd710-2026-dal-2027-01-13`    | D.D. 710/2026, allegato B, modifiche     | 13/01/2027    | 5093           |
+| File (in `piemonte_catalogo/`, nel pacchetto) | Atto                                     | In vigore dal | Voci in vigore |
+| --------------------------------------------- | ---------------------------------------- | ------------- | -------------- |
+| `dd590-2026-allegato-a`                       | D.D. 590/2026, allegato A: il catalogo   | 21/09/2026    | 5107           |
+| `dd710-2026-dal-2026-10-30`                   | D.D. 710/2026, allegati A e C, modifiche | 30/10/2026    | 5149           |
+| `dd710-2026-dal-2027-01-13`                   | D.D. 710/2026, allegato B, modifiche     | 13/01/2027    | 5093           |
 
 Sono estratte in automatico dai PDF e restano **da controllare**. Che cosa è diverso dal PDF e che cosa controllare: `docs/catalogo-regionale.md`.
 

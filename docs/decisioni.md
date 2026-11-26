@@ -2636,3 +2636,21 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - i valori fuori dall'intervallo del referto restano senza giudizio (D71).
 - **Nei documenti**: M2 del collaudo non è più il consulente ma la lettura di queste scelte da parte di Simone; la voce fra le cose aperte è tolta. I requisiti (`docs/requisiti.md`) sono la copia della revisione 45 e restano com'erano: dove parlano del consulente regolatorio per i calcolatori e gli avvisi, vale questa decisione, perché quelle funzioni non si aggiungono.
 - **Non letto**: il testo del regolamento su EUR-Lex (bloccato da qui) e le guide per i fabbricanti di classe I (MDCG 2019-15) e per la persona responsabile della conformità (MDCG 2019-7), che il sito della Commissione ha rifiutato per troppe richieste. Servono a Ponderis, non a questa decisione.
+
+**D295 · Spostamento del Piemonte, primo pezzo: i dati nel pacchetto regionale (D288, D292).** Il primo pezzo dell'ordine di `docs/pacchetti-regionali.md`.
+
+- **Che cosa si sposta**, in `packages/regions/piemonte/data/`:
+  - `trascrizioni/`: il catalogo regionale (D.D. 590 e 710/2026) e le prestazioni aggiuntive dell'AIR 2024;
+  - `rao/`: le tabelle delle D.D. 973 e 259/2019;
+  - `siap/`: la corrispondenza fra la voce dell'AIR e i dettagli del SIAP.
+- **Restano nazionali**, in `packages/reference/data/`: ICD-9-CM, allegati dei LEA, allegato 6 dell'ACN, manuale RAO di AGENAS e valori del Ministero per il SIAP.
+- **Come le trova il nucleo**: dall'elenco dei pacchetti (`regionalDataDirs` in `@mmg/regions`), senza nominare la regione. `@mmg/reference` dà le cartelle nazionali e quelle dei pacchetti (`TRANSCRIPTION_DIRS`, `SIAP_DIRS`, `RAO_FILES`); il nome vecchio `REGIONAL_TRANSCRIPTIONS`, che indicava una cartella sola con dentro anche il nazionale, non c'è più (`TRANSCRIPTIONS_DIR` è la cartella nazionale).
+- **Importazione da più cartelle**: le trascrizioni si leggono da tutte le cartelle, nell'ordine (prima la nazionale). Il percorso dentro la cartella nomina la trascrizione nel rapporto: lo stesso percorso in due cartelle è rifiutato per tutte e due, con il motivo, perché non si saprebbe quale è entrata. `BANCHE_DATI_TRASCRIZIONI` e `--trascrizioni` sostituiscono ancora tutto con una cartella sola.
+- **Nessuna versione nuova**: una versione di una banca dati si riconosce dalla serie e dall'impronta del CSV, non dal percorso; spostare i file non cambia niente nel database.
+- **Tabelle RAO**: si leggono nell'ordine AGENAS e poi i file di ogni pacchetto per nome, quindi la D.D. 259 prima della 973 (prima era il contrario). Le due determine non hanno codici del nomenclatore in comune: i risultati non cambiano.
+- **Mappature**: i titoli delle mappature delle trascrizioni del catalogo e della distribuzione per conto non nominano più la regione (versione 2026-11-26.1): il formato della trascrizione è il nostro, uguale per ogni regione.
+- **Dimostrazione**: lo script del database di partenza cerca ogni trascrizione nelle cartelle nazionale e dei pacchetti; il disco virtuale porta le tabelle RAO e le corrispondenze di ogni pacchetto, trovate dalla cartella `packages/regions` senza nominare la regione. Le trascrizioni non entrano nel disco virtuale: sono già nel database di partenza, come prima.
+- **Manifesto**: le tabelle RAO passano «nel pacchetto». Catalogo e prestazioni aggiuntive restano «nel programma, da spostare»: per il catalogo restano la fonte di `sync/` e i dati d'esempio, per le prestazioni aggiuntive i testi delle pagine.
+- **Inventario**: da 235 file e 2298 righe a 219 e 2250.
+- **Non fatto**: le fonti regionali di `sync/` (catalogo, distribuzione per conto), che vogliono un pezzo a sé: `sync/` è in Python e deve imparare a leggere le fonti dei pacchetti; le prove regionali, che si spostano per ultime.
+- **Prova instabile corretta**: nella prova del Fascicolo regionale, il PIN cifrato con il certificato sbagliato a volte non si decifra affatto, perché il numero cifrato supera il modulo della chiave della Regione. Allora il simulatore risponde «PIN mancante» invece di «credenziali». Misurato con Node 22 su 1560 coppie di chiavi: 118 volte; mai (0 su 780) quando il modulo del certificato sbagliato è più piccolo. La prova ora sceglie un certificato con il modulo più piccolo.

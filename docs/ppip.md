@@ -30,7 +30,7 @@ I tre PDF sono stati scaricati il 20/11/2026 e non sono nel repository: impronte
 
 ### Catalogo
 
-- **Tipo di banca dati** `prestazioni_aggiuntive`, con le trascrizioni in `packages/reference/data/trascrizioni/ppip/`: una serie per livello. Oggi sono due:
+- **Tipo di banca dati** `prestazioni_aggiuntive`, con le trascrizioni in `packages/reference/data/trascrizioni/ppip/` per l'ACN e nella cartella del pacchetto regionale per gli accordi di una regione (`packages/regions/piemonte/data/trascrizioni/ppip/`, D295): una serie per livello. Oggi sono due:
   - `acn-prestazioni-aggiuntive`: allegato 6, 16 voci;
   - `piemonte-prestazioni-aggiuntive`: AIR 2024, art. 35, comma 4, una voce.
 - **Campi**: codice, sezione, descrizione, se serve l'autorizzazione, compenso in euro, note.
@@ -138,7 +138,7 @@ Senza il controllo il catalogo non si usa.
 ## Come si aggiorna quando Regione e ASL rispondono
 
 - **Un accordo nuovo** (ACN, AIR o accordo aziendale dell'ASL):
-  1. si aggiunge una trascrizione in `packages/reference/data/trascrizioni/ppip/` con la sua serie (per esempio `asl-to3-prestazioni-aggiuntive`), l'atto e la data di efficacia;
+  1. si aggiunge una trascrizione nella cartella `data/trascrizioni/ppip/` del pacchetto della regione (D295) con la sua serie (per esempio `asl-to3-prestazioni-aggiuntive`), l'atto e la data di efficacia;
   2. una seconda persona la controlla;
   3. si importa con le banche dati.
 

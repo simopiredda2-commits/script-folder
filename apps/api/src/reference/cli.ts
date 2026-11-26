@@ -6,7 +6,7 @@
  *
  * --dati           cartella di sync (quella del suo --dest)
  * --trascrizioni   cartella delle trascrizioni dei PDF (schede .json con il CSV accanto); per
- *                  difetto quelle del programma (packages/reference/data/trascrizioni, D159)
+ *                  difetto quelle del programma, nazionali e dei pacchetti regionali (D159, D295)
  * --mappature      file di mappature in più: sostituisce quelle con lo stesso id (ripetibile)
  * --accetta-scarti importa le righe valide anche se alcune sono state scartate
  * --esempio        lancia sync sul sito d'esempio (fixtures/banche-dati) e importa quello
