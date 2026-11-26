@@ -1679,6 +1679,8 @@ Poi il Fascicolo con il PSS secondo la guida v1.5 (seconda pull request, D268). 
 
 - **«Rinnova» una ricetta già fatta** (D278, richiesta della Dr.ssa Rocca). Nella cronologia della cartella ogni ricetta ha «Rinnova», solo per il medico. Le sue righe vanno nella ricetta in corso del paziente, farmaceutica o specialistica, che si apre da rivedere e firmare. Le righe già in ricetta non si ripetono; per le prestazioni nota e tariffa sono quelle del catalogo in uso. La segreteria tiene «Ripeti».
 - **Dove si prescrivono gli esami** (D279). Nella pagina Esami una riga rimanda alla Specialistica. Se la ricerca dei farmaci non trova niente, propone la stessa ricerca in Specialistica. Nella dimostrazione c'è il pacchetto «Esami del sangue (pacchetto di prova)», con i codici del catalogo regionale. Il nome del menu è la domanda 4.
+- **Dimostrazione ripubblicata** nello stesso artifact (versione 28), con note e sedute, «Rinnova» e il pacchetto di prova. Prove: tutte le prove verdi (197 file, 2245 prove, e quelle di `sync/`) prima di «Rinnova»; poi le 323 dell'interfaccia, le 57 nel browser con Chromium e le 34 della dimostrazione; lint verde. WebKit e Firefox nella CI.
+- **Pull request #40**, con il via dato in anticipo da Simone (D275): si unisce con le prove su GitHub verdi. Poi il Fascicolo, nello stesso branch ripartito da `main`.
 
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 
