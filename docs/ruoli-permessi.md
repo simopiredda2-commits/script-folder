@@ -45,6 +45,7 @@ Calcolata dal codice (`packages/domain/src/permissions-matrix.ts`) chiamando le 
 | Leggere e scaricare la distinta mensile delle prestazioni aggiuntive | Sì | Sì | No | No | No | No |
 | Registrare e annullare le prestazioni aggiuntive (PPIP) | Sì | Sì | Sì | Sì | No | No |
 | Inviare all’ASL la distinta mensile delle prestazioni aggiuntive | Sì | No | No | No | No | No |
+| Confermare, cambiare e scartare i propri contatti per il SIAP | Sì | No | Sì | Sì | No | No |
 | Decidere che cosa vede la segreteria dell’archivio e quali sono le medicazioni avanzate | Sì | No | No | No | No | No |
 | Autorizzare un sostituto o un collega di gruppo sull’archivio | Sì | No | No | No | No | No |
 | Spostare un paziente nell’archivio del medico scelto in AURA | Sì | No | No | No | No | No |

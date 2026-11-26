@@ -104,7 +104,8 @@ export const siapContact = pgTable(
     index().on(t.doctorId, t.occurredOn),
     check(
       'siap_contact_decided',
-      sql`(${t.status} = 'confirmed' and ${t.daySequence} >= 1 and ${t.mode} is not null and ${t.regime} is not null and ${t.accessType} is not null and ${t.problemCode} is not null and ${t.problemState} is not null and ${t.discardReason} is null) or (${t.status} = 'discarded' and ${t.daySequence} is null and length(trim(${t.discardReason})) > 0)`,
+      // Con «is not null» davanti: un confronto con il vuoto non è falso, e il vincolo passerebbe.
+      sql`(${t.status} = 'confirmed' and ${t.daySequence} is not null and ${t.daySequence} >= 1 and ${t.mode} is not null and ${t.regime} is not null and ${t.accessType} is not null and ${t.problemCode} is not null and ${t.problemState} is not null and ${t.discardReason} is null) or (${t.status} = 'discarded' and ${t.daySequence} is null and ${t.discardReason} is not null and length(trim(${t.discardReason})) > 0)`,
     ),
     check('siap_contact_structure_code', sql`${t.structureCode} ~ '^[A-Z0-9]{6}$'`),
   ],

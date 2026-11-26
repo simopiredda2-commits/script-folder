@@ -26,7 +26,7 @@ CREATE TABLE "siap_contact" (
 	"decided_at" timestamp with time zone NOT NULL,
 	"updated_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "siap_contact_day" UNIQUE("patient_id","doctor_id","occurred_on"),
-	CONSTRAINT "siap_contact_decided" CHECK (("siap_contact"."status" = 'confirmed' and "siap_contact"."day_sequence" >= 1 and "siap_contact"."mode" is not null and "siap_contact"."regime" is not null and "siap_contact"."access_type" is not null and "siap_contact"."problem_code" is not null and "siap_contact"."problem_state" is not null and "siap_contact"."discard_reason" is null) or ("siap_contact"."status" = 'discarded' and "siap_contact"."day_sequence" is null and length(trim("siap_contact"."discard_reason")) > 0)),
+	CONSTRAINT "siap_contact_decided" CHECK (("siap_contact"."status" = 'confirmed' and "siap_contact"."day_sequence" is not null and "siap_contact"."day_sequence" >= 1 and "siap_contact"."mode" is not null and "siap_contact"."regime" is not null and "siap_contact"."access_type" is not null and "siap_contact"."problem_code" is not null and "siap_contact"."problem_state" is not null and "siap_contact"."discard_reason" is null) or ("siap_contact"."status" = 'discarded' and "siap_contact"."day_sequence" is null and "siap_contact"."discard_reason" is not null and length(trim("siap_contact"."discard_reason")) > 0)),
 	CONSTRAINT "siap_contact_structure_code" CHECK ("siap_contact"."structure_code" ~ '^[A-Z0-9]{6}$')
 );
 --> statement-breakpoint
@@ -55,4 +55,13 @@ ALTER TABLE "siap_contact_act" ADD CONSTRAINT "siap_contact_act_contact_id_siap_
 ALTER TABLE "siap_contact_service" ADD CONSTRAINT "siap_contact_service_contact_id_siap_contact_id_fk" FOREIGN KEY ("contact_id") REFERENCES "public"."siap_contact"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "siap_contact_sequence" ON "siap_contact" USING btree ("studio_id","occurred_on","day_sequence") WHERE "siap_contact"."day_sequence" is not null;--> statement-breakpoint
 CREATE INDEX "siap_contact_doctor_id_occurred_on_index" ON "siap_contact" USING btree ("doctor_id","occurred_on");--> statement-breakpoint
-CREATE INDEX "siap_contact_act_kind_act_id_index" ON "siap_contact_act" USING btree ("kind","act_id");
+CREATE INDEX "siap_contact_act_kind_act_id_index" ON "siap_contact_act" USING btree ("kind","act_id");--> statement-breakpoint
+-- Aggiunto a mano, come per le ricette rosse (0051): storico e divieto di cancellazione dei contatti del SIAP (D291). Uno scartato si riconferma, non si cancella.
+CREATE TRIGGER siap_contact_history AFTER INSERT OR UPDATE ON siap_contact
+  FOR EACH ROW EXECUTE FUNCTION mmg_record_change();
+--> statement-breakpoint
+CREATE TRIGGER siap_contact_no_delete BEFORE DELETE ON siap_contact
+  FOR EACH ROW EXECUTE FUNCTION mmg_forbid_change('I contatti del SIAP non si cancellano: si scartano con un motivo');
+--> statement-breakpoint
+CREATE TRIGGER siap_contact_no_truncate BEFORE TRUNCATE ON siap_contact
+  FOR EACH STATEMENT EXECUTE FUNCTION mmg_forbid_change('I contatti del SIAP non si cancellano');

@@ -152,7 +152,12 @@ export type AccessAction =
   | 'spostamento_archivio'
   | 'cambio_medico_non_spostato'
   | 'lettura_riepiloghi'
-  | 'esportazione_riepiloghi';
+  | 'esportazione_riepiloghi'
+  /** Contatti del SIAP del medico (D291): lettura del periodo, conferma, modifica, scarto. */
+  | 'lettura_contatti_siap'
+  | 'conferma_contatto_siap'
+  | 'modifica_contatto_siap'
+  | 'scarto_contatto_siap';
 
 export interface AccessEntry {
   studioId?: string | null;

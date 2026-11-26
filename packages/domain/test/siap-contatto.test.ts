@@ -52,7 +52,7 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
       ],
       [{ kind: 'specialist', id: 's', visits: false, others: false }, [[9, 2]]],
       [{ kind: 'devices', id: 'p' }, [[9, 9]]],
-      [{ kind: 'sick_leave', id: 'c' }, [[6, 1]]],
+      [{ kind: 'sick_leave', id: 'c', visit: 'office' }, [[6, 1]]],
       [{ kind: 'certificate', id: 'm', sport: true }, [[6, 3]]],
       [{ kind: 'certificate', id: 'm', sport: false }, [[6, 7]]],
       [{ kind: 'vaccination', id: 'v', seasonal: true, ageYears: 70 }, [[7, 1]]],
@@ -115,12 +115,12 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
     expect(makesContact([])).toBe(false);
     expect(makesContact([choice])).toBe(false);
     expect(makesContact([choice, diary('office')])).toBe(true);
-    expect(makesContact([{ kind: 'sick_leave', id: 'c' }])).toBe(true);
+    expect(makesContact([{ kind: 'sick_leave', id: 'c', visit: 'office' }])).toBe(true);
   });
 
   it('modalità: dal diario, prima il domicilio, poi lo studio, la televisita e il telefono', () => {
     expect(modeOf([])).toBe('unknown');
-    expect(modeOf([{ kind: 'sick_leave', id: 'c' }])).toBe('unknown');
+    expect(modeOf([{ kind: 'sick_leave', id: 'c', visit: 'office' }])).toBe('office');
     expect(modeOf([diary('phone')])).toBe('remote');
     expect(modeOf([diary('televisit')])).toBe('telemedicine');
     expect(modeOf([diary('office')])).toBe('office');
@@ -128,13 +128,24 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
     expect(modeOf([diary('phone'), diary('televisit')])).toBe('telemedicine');
     expect(modeOf([diary('phone'), diary('office'), diary('televisit')])).toBe('office');
     expect(modeOf([diary('office'), diary('home')])).toBe('home');
+    // Senza note del diario, la visita del certificato di malattia.
+    const sick = (visit: 'office' | 'home' | 'other', id = 'c'): SiapAct => ({
+      kind: 'sick_leave',
+      id,
+      visit,
+    });
+    expect(modeOf([sick('home')])).toBe('home');
+    expect(modeOf([sick('other')])).toBe('unknown');
+    expect(modeOf([sick('office', 'c1'), sick('home', 'c2')])).toBe('home');
+    // Con una nota del diario vale la nota.
+    expect(modeOf([sick('home'), diary('phone')])).toBe('remote');
   });
 
   it('accesso: programmato con l’appuntamento, diretto con il diario senza, altrimenti non noto', () => {
     expect(accessTypeOf([], true)).toBe('scheduled');
     expect(accessTypeOf([diary('office')], true)).toBe('scheduled');
     expect(accessTypeOf([diary('office')], false)).toBe('direct');
-    expect(accessTypeOf([{ kind: 'sick_leave', id: 'c' }], false)).toBe('unknown');
+    expect(accessTypeOf([{ kind: 'sick_leave', id: 'c', visit: 'office' }], false)).toBe('unknown');
     expect(accessTypeOf([], false)).toBe('unknown');
   });
 
@@ -147,7 +158,9 @@ describe('contatto del SIAP dagli atti del medico (D291)', () => {
 
   it('la proposta: ciclo di scelta, il problema generico V70.0 con lo stato non noto', () => {
     expect(SIAP_GENERIC_PROBLEM).toBe('V70.0');
-    expect(proposeContact([diary('home'), { kind: 'sick_leave', id: 'c' }], false)).toEqual({
+    expect(
+      proposeContact([diary('home'), { kind: 'sick_leave', id: 'c', visit: 'office' }], false),
+    ).toEqual({
       modalita: 'home',
       regime: 'choice',
       accesso: 'direct',

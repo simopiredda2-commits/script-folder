@@ -21,7 +21,8 @@ export type SiapAct =
   | { kind: 'specialist'; id: string; visits: boolean; others: boolean }
   /** Ricetta dei presidi dell'assistenza integrativa (allegati 2 e 3 dei LEA). */
   | { kind: 'devices'; id: string }
-  | { kind: 'sick_leave'; id: string }
+  /** Certificato di malattia, con la visita: ambulatoriale, domiciliare, altro (pronto soccorso). */
+  | { kind: 'sick_leave'; id: string; visit: 'office' | 'home' | 'other' }
   /** Certificato dai modelli: se è l'idoneità sportiva non agonistica. */
   | { kind: 'certificate'; id: string; sport: boolean }
   /** Vaccinazione: se è stagionale (influenza o COVID) e l'età del paziente quel giorno. */
@@ -169,11 +170,18 @@ export function servicesOf(acts: readonly SiapAct[]): SiapService[] {
 /** Con più note del diario nel giorno vale la prima di queste (D291). */
 const MODE_ORDER: readonly DiaryContactType[] = ['home', 'office', 'televisit', 'phone'];
 
-/** La modalità del contatto dalle note del diario; senza note, «non noto». */
+/**
+ * La modalità del contatto dalle note del diario; senza note, dalla visita del certificato di
+ * malattia, domiciliare o ambulatoriale (D291); altrimenti «non noto».
+ */
 export function modeOf(acts: readonly SiapAct[]): ContactMode {
   const types = new Set(acts.flatMap((a) => (a.kind === 'diary' ? [a.contactType] : [])));
   const first = MODE_ORDER.find((t) => types.has(t));
-  return first ? CONTACT_MODE_OF_DIARY[first] : 'unknown';
+  if (first) return CONTACT_MODE_OF_DIARY[first];
+  const visits = new Set(acts.flatMap((a) => (a.kind === 'sick_leave' ? [a.visit] : [])));
+  if (visits.has('home')) return 'home';
+  if (visits.has('office')) return 'office';
+  return 'unknown';
 }
 
 /**

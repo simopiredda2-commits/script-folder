@@ -1,5 +1,5 @@
 {
-  "id": "169f13c0-cc8f-404b-a810-39cdfe0ec0d6",
+  "id": "8a44a58b-1369-498d-a8cb-4b5f265a3a82",
   "prevId": "6661fe41-c8a3-4fd6-a421-6d613e796cc8",
   "version": "7",
   "dialect": "postgresql",
@@ -13661,7 +13661,7 @@
       "checkConstraints": {
         "siap_contact_decided": {
           "name": "siap_contact_decided",
-          "value": "(\"siap_contact\".\"status\" = 'confirmed' and \"siap_contact\".\"day_sequence\" >= 1 and \"siap_contact\".\"mode\" is not null and \"siap_contact\".\"regime\" is not null and \"siap_contact\".\"access_type\" is not null and \"siap_contact\".\"problem_code\" is not null and \"siap_contact\".\"problem_state\" is not null and \"siap_contact\".\"discard_reason\" is null) or (\"siap_contact\".\"status\" = 'discarded' and \"siap_contact\".\"day_sequence\" is null and length(trim(\"siap_contact\".\"discard_reason\")) > 0)"
+          "value": "(\"siap_contact\".\"status\" = 'confirmed' and \"siap_contact\".\"day_sequence\" is not null and \"siap_contact\".\"day_sequence\" >= 1 and \"siap_contact\".\"mode\" is not null and \"siap_contact\".\"regime\" is not null and \"siap_contact\".\"access_type\" is not null and \"siap_contact\".\"problem_code\" is not null and \"siap_contact\".\"problem_state\" is not null and \"siap_contact\".\"discard_reason\" is null) or (\"siap_contact\".\"status\" = 'discarded' and \"siap_contact\".\"day_sequence\" is null and \"siap_contact\".\"discard_reason\" is not null and length(trim(\"siap_contact\".\"discard_reason\")) > 0)"
         },
         "siap_contact_structure_code": {
           "name": "siap_contact_structure_code",
