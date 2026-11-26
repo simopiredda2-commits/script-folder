@@ -2491,3 +2491,19 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - **Correzione**: «PIN mancante» vale solo per il campo vuoto o per un valore che non si decifra. Un PIN decifrato vuoto si confronta con quello del medico, come gli altri, ed è un PIN sbagliato. Il programma non cambia: è il simulatore.
   - **Prova**: il caso si prova sempre, con un PIN vuoto cifrato con il certificato della Regione, non solo quando capita; sabotaggio nel registro.
 - **Non provato**: i limiti dei passi con un sabotaggio, come per D258. È il meccanismo di GitHub, e servirebbe una prova bloccata apposta per un quarto d'ora. Come si comporta il servizio vero della Regione con un PIN cifrato con un altro certificato si vede al collaudo con il CSI.
+
+**D287 · Rendicontazione dell'AIR del Piemonte 2024, dopo il SIAP.** Domanda di Simone del 26/11/2026: «la reportistica accordi integrativi regionali è prevista?». Riletto l'AIR (D.G.R. 27/5/2024, n. 31-8647, B.U. n. 22 del 30/5/2024; il PDF è in `docs/provenienze.md`, impronta verificata).
+
+- **C'è già**: la distinta delle prestazioni aggiuntive con il CSV (D212, D213), compresa la voce dell'art. 35, comma 4; i riepiloghi per periodo (D201); il registro di AFT (art. 22, D161).
+- **Manca**:
+  - **cure domiciliari** (art. 35 e norma finale 12): per l'ADI l'apertura del caso e la dimissione protetta (75 € ciascuna) e ogni accesso programmato (27 €); per l'ADP-PID la scheda di attivazione (75 €) e ogni visita (40 €), da registrare sul portale regionale. Nei requisiti c'è il «registro degli accessi a domicilio» (sezione «Accessi domiciliari»: data, ora di inizio e fine, tipo di assistenza, attività svolte) «per la rendicontazione prevista dagli accordi con l'ASL». Non era stato fatto, e non era nemmeno fra le cose aperte: trovato adesso;
+  - **vaccinazione antinfluenzale** (art. 37, comma 7): l'elenco nominativo dei vaccinati sul portale entro il 31 gennaio dell'anno dopo, con la data di nascita e, sotto i 65 anni, la categoria di rischio. Il compenso dipende da questo obbligo. Il programma registra vaccino, lotto, dose e campagna, non la categoria di rischio;
+  - **screening oncologici** (art. 37, comma 6): il compenso per caso dipende dalla quota degli eleggibili inviati;
+  - **governo clinico e obiettivi di AFT** (artt. 16–18): indicatori di processo e di risultato decisi ogni anno da ASL, Distretto e UCAD. L'art. 22 chiede ai programmi l'estrazione dei dati per rendicontarli.
+- **Risposte di Simone con il pulsante**: «Dopo il SIAP (Consigliata)»; per che cosa comprende, «Fa' ciò che serve».
+  - **Ordine**: prima il resto del SIAP senza il CSI (codice della struttura, contatto, documenti), poi l'AIR in una pull request a sé, poi AURA quando risponde il CSI (D268).
+  - **Che cosa**: tutto ciò che serve alla rendicontazione dell'AIR:
+    - gli accessi domiciliari (ADI, ADP, ADP-PID), con i compensi come dato e il riepilogo del mese con il CSV;
+    - la categoria di rischio sulla vaccinazione antinfluenzale e l'elenco dei vaccinati per il portale;
+    - screening e indicatori di AFT come meccanismo, con i valori vuoti «da completare» finché Regione e ASL non li danno.
+  - **Formati**: quelli dei portali non sono pubblici. Come per le prestazioni aggiuntive, CSV con i campi che l'AIR nomina, da confermare con l'ASL.

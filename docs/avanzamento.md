@@ -32,6 +32,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Fermata del 26/11/2026, dopo l'unione della #41** (D282): le domande 1, 3, 4 e 5 hanno avuto risposta. Adesso, nello stesso branch ripartito da `main`: i nomi nuovi dei menu («Risultati degli esami», «Visite ed esami da prescrivere») e il tipo di terapia sulla riga della ricetta, in una pull request; poi il SIAP, prima la parte che non dipende dal CSI e poi il modulo con un simulatore. Le pull request di questo blocco si uniscono con le prove verdi (via in anticipo). AURA dopo le risposte del CSI; per il CSI le domande nuove, dalla 1 alla 13.
 - **26/11/2026, nello stesso branch**: i nomi nuovi dei menu e il tipo di terapia sulla riga della ricetta, fatti (D282, D283); sezione «Dopo l'unione della #41 – Nomi dei menu e tipo di terapia sulla riga». Pull request #42 unita lo stesso giorno (commit `8029a44`), con il via dato in anticipo e le 14 prove su GitHub verdi; dimostrazione alla versione 30 e pagina del collaudo aggiornate (G4, G6, G10). Il branch riparte da `main`; adesso il SIAP.
 - **26/11/2026, dopo l'unione della #42**: SIAP, valori del Ministero come dato e fumo codificato (D284). Poi la domanda della Dr.ssa Rocca sulle RAO: Simone ha scelto di farle adesso, in una pull request a sé, con il medico che sceglie la condizione e il programma che mette la classe (D285). Fatte: tabelle del manuale di AGENAS e delle due determine del Piemonte, condizione nella ricetta specialistica, classe vuota per difetto. Il SIAP riprende dopo. Sezione «Dopo l'unione della #42 – SIAP senza il CSI e RAO». Simone, lo stesso giorno: il collaudo può aspettare.
+- **26/11/2026, unione della #43**: pull request #43 unita (commit `1806799`), con il via dato in anticipo e le 14 prove su GitHub verdi. Prima, due cadute della CI con le loro cause, corrette (D286). Pagina del collaudo aggiornata (G6, K9). Il branch riparte da `main`. Lo stesso giorno la domanda di Simone sulla rendicontazione dell'AIR del Piemonte 2024: «Dopo il SIAP», con tutto ciò che serve (D287). Adesso il resto del SIAP senza il CSI, poi l'AIR, poi AURA quando risponde il CSI.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -1809,6 +1810,19 @@ Fermata del 26/11/2026 (D282, domanda 3): il SIAP prima di AURA, prima la parte 
 - **Tabelle RAO in Piemonte**: per la cardiologia e la gastroenterologia le determine del 2019, per il resto il manuale di AGENAS del 2020, finché la Regione o l'ASL non dicono altro. Le attese si mostrano come le scrive la tabella; le determine danno 180 giorni alla classe P, il manuale 120. Da chiedere alla Dr.ssa Rocca o all'ASL.
 
 **Non provato**: il formato vero del CSI per il SIAP; le tabelle RAO controllate da una persona; la condizione con il SAR vero; i limiti di tempo dei passi della CI con un sabotaggio (come per D258, è il meccanismo di GitHub).
+
+Pull request #43 unita il 26/11/2026 (commit `1806799`): le 14 prove su GitHub tutte verdi, dopo le due correzioni di D286. Pagina del collaudo con G6 e la voce nuova K9, «Tabelle RAO» (https://claude.ai/artifact/X58AnakriJzqaApLjHa5kR). Il branch riparte da `main`.
+
+## Rendicontazione dell'AIR del Piemonte 2024 (26/11/2026, D287)
+
+Domanda di Simone: «la reportistica accordi integrativi regionali è prevista?». Riletto l'AIR (D.G.R. 31-8647 del 27/5/2024); la risposta e le scelte sono in D287.
+
+- **C'è già**: la distinta delle prestazioni aggiuntive con il CSV, i riepiloghi per periodo, il registro di AFT.
+- **Manca**: gli accessi domiciliari (ADI, ADP, ADP-PID) con i loro compensi; l'elenco dei vaccinati antinfluenzali per il portale, con la categoria di rischio; gli screening oncologici; gli indicatori di governo clinico e di AFT.
+- **Un requisito non fatto**: il «registro degli accessi a domicilio» dei requisiti («Accessi domiciliari»). Non era fatto e non era fra le cose aperte: trovato con questa domanda.
+- **Risposte di Simone**: «Dopo il SIAP (Consigliata)» e, per che cosa comprende, «Fa' ciò che serve».
+- **Ordine**: il resto del SIAP senza il CSI, poi l'AIR in una pull request a sé, poi AURA quando risponde il CSI.
+- **Da chiedere all'ASL** (si annota, non blocca): il formato dei portali per gli accessi domiciliari, l'ADP-PID e l'antinfluenzale; i criteri degli screening; gli indicatori di AFT dell'anno.
 
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 
