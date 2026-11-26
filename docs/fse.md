@@ -75,6 +75,17 @@ Dal processo pubblicato dal Ministero (`doc/accreditamento/README.md`):
 
 Sono passi esterni e con impegni di SCRIPT come fornitore: li decide e li fa Simone.
 
+Letti il 26/11/2026 (`docs/avanzamento.md`, «Che cosa dicono già i documenti pubblici»):
+
+- **Lista nazionale dei casi di prova**: nel repository `it-fse-accreditamento-v2`, che sostituisce il precedente. È arrivata alla versione 9.0.0 del 19/03/2026; per il PSS i casi obbligatori sono 444 e 476.
+- **Certificati di produzione per una cartella dei medici** (linee guida regionali V05 §4):
+  - il fornitore lo inseriscono gli amministratori regionali nella console «Provisioning» del Ministero;
+  - il responsabile dei certificati del fornitore entra con SPID o CIE e genera la coppia di certificati;
+  - per un programma in cloud c'è un certificato unico, con il codice fiscale della società.
+- **Autocertificazione con i servizi della Regione**:
+  - per PSS, BdS e PCP, FSE--PRJ-01-V01 §2: mail a supporto.fse@csi.it, kit del CSI, piano V04, report V02, «Valutazione finale», verifica insieme a CSI e Regione;
+  - per il modulo di accesso semplificato, LCCE V13 §8: in produzione serve un certificato della società per l'autenticazione del client, di un'autorità accreditata da AgID.
+
 ## Che cosa farebbe la tappa 11 (proposta)
 
 - Completare il modello dei dati per il PSS:

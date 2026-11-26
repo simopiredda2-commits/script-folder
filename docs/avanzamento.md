@@ -1917,6 +1917,38 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 - FSE: kit di test, registrazione sul portale di provisioning, eventuale piano dei test per FSE 2.0.
 - Dati: catalogo regionale in formato strutturato (il file Excel da cui è stampato l'allegato A della D.D. 590/2026) e associazioni aggiornate tra esenzioni e prestazioni (D196).
 
+**Che cosa dicono già i documenti pubblici** (domanda di Simone del 26/11/2026: «possiamo già chiudere noi qualche questione tra le domande chieste? Cerca bene»). Sono riletti i documenti del 25/11/2026 e cercate le fonti pubbliche; le nuove sono in `docs/provenienze.md`, «Domande al CSI del 25/11/2026». Per ogni domanda, che cosa si chiude e che cosa resta al CSI.
+
+1. **Requisiti del fornitore.** Nessun documento chiede un codice ATECO, contratti o lettere d'intenti con i medici, o certificazioni. Chiedono:
+   - una società fornitrice («Aziende fornitrici delle cartelle cliniche», SIRPED--01-V02 §1.1), con l'attestato firmato dal responsabile ICT o da un suo delegato;
+   - per il modulo di accesso al Fascicolo in produzione, un certificato della società per l'autenticazione del client (1.3.6.1.5.5.7.3.2), di un'autorità accreditata da AgID (LCCE V13 §8);
+   - per il Gateway nazionale, la richiesta di accreditamento con il modulo di Agenas e una dichiarazione firmata di presa di responsabilità (Ministero, `doc/accreditamento`).
+
+   Resta al CSI se esistono requisiti soggettivi non scritti.
+
+2. **SAR e accesso con SPID o CIE.**
+   - **Come si avvia: chiuso** (piano dei test V03, §2.1). Si manda una mail a supporto.sar@csi.it con l'intenzione di autocertificare. Prima dell'avvio si comunica l'IP del server di prova. Il CSI manda il piano dei test e i dati. Alla fine si scrive a sanitadigitale@regione.piemonte.it e a supporto.sar@csi.it, con le non applicabilità motivate. Per la produzione il CSI dà la CA del canale, la chiave pubblica per cifrare i dati e gli indirizzi.
+   - Per l'accesso con SPID o CIE c'è il modulo di richiesta (xlsx), con la modalità per ogni applicativo, e l'attestato OAuth2 (SIRPED--01-V02 §3).
+   - **I tempi** non sono scritti: restano al CSI.
+   - **IP del server cloud: chiuso sul testo.** Si chiede «l'indirizzo IP pubblico statico con cui il server di test … si presenta su internet», solo per l'ambiente di prova. Un IP statico di uscita del servizio cloud lo è. Per la produzione il piano non chiede l'IP: chiede altre «informazioni tecniche» dopo l'attestato.
+   - **`client_id`: chiuso sul testo** (V08 §4.3.1; attestato OAuth2). La Regione dà un solo codice del gestionale, nel kit del piano dei test, all'avvio dell'autocertificazione. Il programma ci aggiunge «_» e il codice dell'ASL del medico (D267). Nessun documento dice di chiederne uno per ogni ASL. Resta da confermare solo che le combinazioni con tutte le ASL siano abilitate insieme.
+   - **`redirect_uri`: chiuso.** Va nel modulo di richiesta, colonna «Url di callback», per l'ambiente di prova. Il sistema regionale la deve conoscere prima dell'avvio e la confronta esattamente, protocollo e percorso. Si può dare un elenco di indirizzi (V08 §4.3.1). Per la produzione la chiede il CSI dopo l'attestato (SIRPED--01-V02 §3, punto 5).
+   - **Attività durante la costituzione**: resta al CSI. La sua risposta del 25/11/2026 riserva la procedura ai fornitori.
+3. **AURA.**
+   - **Autenticazione: in parte chiuso.** I servizi dei medici sono solo di interrogazione, da Internet, con le credenziali individuali di ogni medico, quelle della ricetta elettronica (AVL-17, 2013). Non è scritto come si passano, e i WSDL non hanno regole di sicurezza: resta al CSI.
+   - **Notifiche: chiuso.** Sono un servizio per gli enti (ASL, ASO, sistemi regionali), autorizzati dal referente regionale. L'ASL o l'ASO le sottoscrive dall'interfaccia web di AURA e le riceve su un web service esposto in RUPAR (ORG-01-V08, §1 e §5.4). Per i medici non ci sono. Una cartella in cloud si allinea quindi con Lista Assistiti e Lista Assistiti esenti, che leggono una copia della base dati aggiornata ogni sera. È quello che il programma fa con il giro di notte (D197).
+   - **Indirizzi veri e ambiente di prova**: restano al CSI. I WSDL hanno un server interno, `vm-itgsan1.csi.it`, e per l'assistenza la scheda AURA indica integrazione.auracartelle@csi.it.
+4. **Fascicolo.**
+   - **Autocertificazione di PSS, BdS e PCP: chiuso** (FSE--PRJ-01-V01, §2). Si manda una mail a supporto.fse@csi.it con la società, il nome del gestionale e il tipo di medici. Il CSI manda il kit: indirizzi, dati di prova, codice della cartella, credenziali RUPAR di prova del medico, CA e chiave per il PIN. Poi si esegue il piano V04 e si compila il report V02. La «Valutazione finale» va a supporto.fse@csi.it e a gestione.informatica@regione.piemonte.it. Segue la verifica insieme a CSI e Regione, con un verbale.
+   - **Modulo di accesso semplificato: chiuso** (LCCE V13 §8). Si manda una mail a supporto.fse@csi.it con il prodotto e la modalità, con o senza Shibboleth. Il CSI dà gli indirizzi, un certificato di prova e le credenziali. La dichiarazione, sui facsimili dei capitoli 9 e 10, va alle stesse due caselle. Per la produzione serve il certificato della società.
+   - **Piano dei test del FSE 2.0: in parte chiuso.** Per il Gateway c'è la lista nazionale dei casi di prova (`it-fse-accreditamento-v2`, fino alla versione 9.0.0 del 19/03/2026; per il PSS i casi 444 e 476). Poi viene la verifica dell'impianto, con un piano «approntato dalla Azienda/Regione» che comprende tutti i casi nazionali. Resta al CSI se per i servizi regionali della V09 c'è un piano più recente della V04.
+   - **Portale dei certificati: chiuso** (linee guida V05 §4; console «Provisioning»). Il fornitore lo inseriscono sul portale gli amministratori regionali. Per nominare un «Responsabile certificati» servono codice fiscale, nome, cognome ed email della persona. La persona entra con SPID o CIE e genera la coppia di certificati, di autenticazione e di firma. Per un fornitore il nome comune del certificato è il nome del fornitore. Per un programma in cloud c'è un certificato unico per tutti i medici, con il codice fiscale della società. Per la prova i certificati li dà Sogei al fornitore (`doc/accreditamento`).
+5. **Dati di riferimento: restano al CSI.**
+   - La Regione pubblica il catalogo solo in PDF: la D.D. 868/2024 elenca come allegato il solo PDF, e il PDF della D.D. 590/2026 è stampato da un file Excel che non è pubblicato.
+   - I servizi del Sistema TS per scaricare il catalogo sono riservati alle Regioni (specifiche del 25/10/2024).
+   - Il sistema dei nomenclatori del CSI (SGN) è a uso interno.
+   - Per le esenzioni l'ultimo elenco pubblicato resta l'allegato C della D.D. 1452/2023 (D196). Atti più recenti non se ne trovano.
+
 **Domande nuove per il CSI**, in un elenco a parte: non sono nella mail del 25/11/2026, e Simone le manda con il prossimo messaggio (sua richiesta del 25/11/2026). Le domande nuove si aggiungono qui. Ultimo aggiornamento: notte del 26/11/2026, con la 11 e la 12.
 
 Nessuna blocca il lavoro di adesso (risposta a Simone, sera del 25/11/2026; la 14, delle RAO, nemmeno):
@@ -1947,7 +1979,7 @@ _SAR e accesso con SPID o CIE_
 6. **Accesso con SPID o CIE (REL-STC-01 V08):**
    - la revoca è `DELETE` nella V08 (4.3.5) e `GET` nella descrizione OpenAPI pubblicata con la V08 (`yaml.zip`): quale vale?
    - che cosa contiene `expires_in`?
-   - quali `client_id` registrate per un gestionale: uno per ogni ASL dei medici, o solo la forma «codice del gestionale + _ + codice ASL» (4.3.1)?
+   - quali `client_id` registrate per un gestionale: uno per ogni ASL dei medici, o solo la forma «codice del gestionale + _ + codice ASL» (4.3.1)? _In parte chiusa il 26/11/2026: il codice è uno, nel kit del piano dei test; resta se le combinazioni con le ASL sono abilitate insieme (sopra, «Che cosa dicono già i documenti pubblici»)._
 7. **Ricetta rossa in DPCM (V06, 4.2):**
    - l'NRE sul modulo: la V06 dice solo «accanto alla denominazione dell'ente». Il programma lo stampa nella fascia libera sopra il codice fiscale: va bene?
    - un invio DPCM rimasto senza risposta la cartella lo rimanda. Se il primo file era arrivato, come risponde il SAR (stesso NRE e stesso modulo)?
@@ -1987,7 +2019,7 @@ _Fascicolo con i servizi della Regione_ (D280, 26/11/2026)
     - il documento in MTOM: un allegato XOP, o il BASE64 nel messaggio va bene;
     - un CREATE rimandato dopo un tempo scaduto, che il Fascicolo aveva già lavorato: errore o doppione?
     - le politiche di invio FSE-INT-SRS-01-V02 sono scritte per le aziende sanitarie: valgono così per le cartelle dei medici (fermo dalle 00 alle 07, tre tentativi a 5 minuti, dieci giorni di coda)?
-    - il piano dei test FSE V04 (2022) non parla del FSE 2.0: c'è un piano nuovo per l'autocertificazione con il Gateway?
+    - il piano dei test FSE V04 (2022) non parla del FSE 2.0: c'è un piano nuovo per l'autocertificazione con il Gateway? _In parte chiusa il 26/11/2026: per il Gateway vale la lista nazionale dei casi di prova; resta il piano regionale per i servizi della V09._
 
 _RAO_ (D285, 26/11/2026)
 
