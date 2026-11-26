@@ -762,12 +762,15 @@ async function actsOfDay(
   archiveId: string,
   patientId: string,
   day: string,
+  purpose: 'conferma' | 'modifica' = 'conferma',
 ) {
   const acts = await collectActs(tx, doctorId, [archiveId], day, day, patientId);
   if (!makesContact(acts.map((a) => a.act)))
     throw new HttpError(
       409,
-      'Quel giorno il medico non ha atti con il paziente: non c’è un contatto da confermare',
+      purpose === 'modifica'
+        ? 'Quel giorno il medico non ha più atti con il paziente: il contatto si scarta'
+        : 'Quel giorno il medico non ha atti con il paziente: non c’è un contatto da confermare',
     );
   return acts;
 }
@@ -793,15 +796,22 @@ async function writeServices(tx: Tx, contactId: string, services: ContactChoice[
 }
 
 /**
- * Il progressivo del contatto nel giorno, nello studio (D291). La riga dello studio si blocca per
- * la transazione: due conferme insieme non prendono lo stesso numero.
+ * Blocca la riga dello studio fino alla fine della transazione (D291): conferme e scarti dello
+ * studio passano uno alla volta, così due conferme insieme non prendono lo stesso progressivo e
+ * la seconda di due conferme dello stesso contatto trova la prima. Restituisce la struttura.
  */
-export async function nextSequence(tx: Tx, studioId: string, day: string) {
+async function lockStudio(tx: Tx, studioId: string) {
   const [s] = await tx
     .select({ code: studio.structureCode, type: studio.structureType })
     .from(studio)
     .where(eq(studio.id, studioId))
     .for('update');
+  return { code: s?.code ?? null, type: s?.type ?? null };
+}
+
+/** Il progressivo del contatto nel giorno, nello studio (D291), con la riga dello studio bloccata. */
+export async function nextSequence(tx: Tx, studioId: string, day: string) {
+  const structure = await lockStudio(tx, studioId);
   const [m] = await tx
     .select({ max: sql<number | null>`max(${siapContact.daySequence})` })
     .from(siapContact)
@@ -809,7 +819,22 @@ export async function nextSequence(tx: Tx, studioId: string, day: string) {
   const next = (m?.max ?? 0) + 1;
   // Quattro cifre dopo il codice della struttura (§ 3.9.2, campo 4).
   if (next > 9999) throw new HttpError(409, 'Nel giorno ci sono già 9999 contatti confermati');
-  return { next, structure: { code: s?.code ?? null, type: s?.type ?? null } };
+  return { next, structure };
+}
+
+/** Il contatto del paziente, del medico e del giorno, se c'è: letto dopo il blocco dello studio. */
+async function existingContact(tx: Tx, patientId: string, doctorId: string, day: string) {
+  const [c] = await tx
+    .select()
+    .from(siapContact)
+    .where(
+      and(
+        eq(siapContact.patientId, patientId),
+        eq(siapContact.doctorId, doctorId),
+        eq(siapContact.occurredOn, day),
+      ),
+    );
+  return c;
 }
 
 /**
@@ -831,19 +856,10 @@ export async function confirmContact(
   checkServices(input.choice.prestazioni);
   const acts = await actsOfDay(tx, input.doctorId, input.archiveId, input.patientId, input.day);
   const problem = await problemOf(tx, input.patientId, input.choice.problema);
-  const [existing] = await tx
-    .select()
-    .from(siapContact)
-    .where(
-      and(
-        eq(siapContact.patientId, input.patientId),
-        eq(siapContact.doctorId, input.doctorId),
-        eq(siapContact.occurredOn, input.day),
-      ),
-    );
+  const { next, structure } = await nextSequence(tx, input.studioId, input.day);
+  const existing = await existingContact(tx, input.patientId, input.doctorId, input.day);
   if (existing?.status === 'confirmed')
     throw new HttpError(409, 'Il contatto è già confermato: si cambia con «Modifica»');
-  const { next, structure } = await nextSequence(tx, input.studioId, input.day);
   const values = {
     status: 'confirmed' as const,
     daySequence: next,
@@ -893,6 +909,7 @@ export async function updateContact(
     input.archiveId,
     contact.patientId,
     contact.occurredOn,
+    'modifica',
   );
   const problem = await problemOf(tx, contact.patientId, input.choice.problema);
   let structure = { structureCode: contact.structureCode, structureType: contact.structureType };
@@ -932,16 +949,8 @@ export async function discardContact(
     now: Date;
   },
 ) {
-  const [existing] = await tx
-    .select()
-    .from(siapContact)
-    .where(
-      and(
-        eq(siapContact.patientId, input.patientId),
-        eq(siapContact.doctorId, input.doctorId),
-        eq(siapContact.occurredOn, input.day),
-      ),
-    );
+  await lockStudio(tx, input.studioId);
+  const existing = await existingContact(tx, input.patientId, input.doctorId, input.day);
   if (existing?.status === 'discarded') throw new HttpError(409, 'Il contatto è già scartato');
   const acts = existing
     ? await collectActs(

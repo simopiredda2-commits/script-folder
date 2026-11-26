@@ -34,7 +34,8 @@ import {
   vaccinationDetail,
 } from '../src/db/schema';
 import { withActor } from '../src/db/tx';
-import { nextSequence } from '../src/siap/contacts';
+import { HttpError } from '../src/http/errors';
+import { confirmContact, discardContact, nextSequence } from '../src/siap/contacts';
 import { importPpipCatalog } from './helpers/ppip';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
@@ -655,6 +656,81 @@ describe('contatti del SIAP dagli atti del medico (D291)', () => {
     release();
     await Promise.all([first, second]);
     expect(order).toEqual(['primo 1', 'rilascio', 'primo fine', 'secondo 2']);
+  });
+
+  it('due conferme dello stesso contatto insieme: la seconda aspetta la prima e la trova (409, non un errore)', async () => {
+    const tit = s.users.titolare.id;
+    const [p] = (
+      await t.db.select().from(patient).where(eq(patient.archiveId, s.archives.titolare))
+    ).filter((x) => ![rich, second].includes(x.id));
+    const day = '2026-11-22';
+    const [e] = await t.db
+      .insert(clinicalEntry)
+      .values({ patientId: p!.id, kind: 'diary', occurredOn: day, authorUserId: tit })
+      .returning();
+    await t.db
+      .insert(diaryDetail)
+      .values({ entryId: e!.id, contactType: 'office', text: 'Prova.' });
+    const input = {
+      studioId: s.studioId,
+      doctorId: tit,
+      archiveId: s.archives.titolare,
+      patientId: p!.id,
+      day,
+      choice: {
+        modalita: 'office' as const,
+        accesso: 'direct' as const,
+        problema: null,
+        prestazioni: [{ tipologia: 1, dettaglio: 2, quantita: 1 }],
+      },
+      now: at,
+    };
+    let release!: () => void;
+    const hold = new Promise<void>((r) => (release = r));
+    let confirmed!: () => void;
+    const taken = new Promise<void>((r) => (confirmed = r));
+    const first = withActor(t.db, tit, async (tx) => {
+      await confirmContact(tx, input);
+      confirmed();
+      await hold;
+    });
+    await taken;
+    const racing = withActor(t.db, tit, (tx) => confirmContact(tx, input)).then(
+      () => 'confermato due volte',
+      (err: unknown) => (err instanceof HttpError ? err.statusCode : String(err)),
+    );
+    await new Promise((r) => setTimeout(r, 300));
+    release();
+    await first;
+    expect(await racing).toBe(409);
+    // Lo stesso per due scarti insieme, su un altro giorno.
+    const otherDay = '2026-11-21';
+    const [e2] = await t.db
+      .insert(clinicalEntry)
+      .values({ patientId: p!.id, kind: 'diary', occurredOn: otherDay, authorUserId: tit })
+      .returning();
+    await t.db
+      .insert(diaryDetail)
+      .values({ entryId: e2!.id, contactType: 'office', text: 'Prova.' });
+    const discard = { ...input, day: otherDay, reason: 'Prova' };
+    let releaseDiscard!: () => void;
+    const holdDiscard = new Promise<void>((r) => (releaseDiscard = r));
+    let discarded!: () => void;
+    const takenDiscard = new Promise<void>((r) => (discarded = r));
+    const firstDiscard = withActor(t.db, tit, async (tx) => {
+      await discardContact(tx, discard);
+      discarded();
+      await holdDiscard;
+    });
+    await takenDiscard;
+    const racingDiscard = withActor(t.db, tit, (tx) => discardContact(tx, discard)).then(
+      () => 'scartato due volte',
+      (err: unknown) => (err instanceof HttpError ? err.statusCode : String(err)),
+    );
+    await new Promise((r) => setTimeout(r, 300));
+    releaseDiscard();
+    await firstDiscard;
+    expect(await racingDiscard).toBe(409);
   });
 
   it('il database: un contatto non si cancella, e uno confermato ha il progressivo e i campi', async () => {
