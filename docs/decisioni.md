@@ -2692,3 +2692,7 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Codice senza nomi regionali**: i commenti del motore e del promemoria non nominano la regione. Il messaggio di R18 dice «il servizio che riceve la ricetta» invece del SAR. Le prove del contenuto del Piemonte passano in `packages/rules/test/regions/piemonte/`, con gli aiuti comuni in `test/helpers/contesto.ts`.
 - **Inventario**: da 219 file e 2250 righe a 204 e 2160. In `packages/rules` non ne resta nessuna.
 - **Non fatto**: integrazioni, servizi, pagine e prove regionali, nell'ordine di `docs/pacchetti-regionali.md`.
+- **Prova della dimostrazione con WebKit** (pull request #47). «Invii senza risposta» è caduta una volta: dopo «È arrivata» la conferma dell'esito non è comparsa, mentre lo stesso commit era verde nell'altro giro.
+  - Nella pagina Ricette le ricette da firmare dei dati dimostrativi fanno da sé il controllo delle regole. Finendo, mostrano problemi e versione, e la sezione «Invii senza risposta», più in basso, scende: se succede durante il clic, il clic non arriva al pulsante, come per la ricetta rossa (D295).
+  - Con questo pezzo ogni controllo legge anche le aggiunte della regione e la regione dell'archivio, quindi dura un poco di più, e lo spostamento può cadere più tardi.
+  - La prova ora aspetta anche la fine dei controlli in corso, prima di scrivere e di nuovo prima del clic. Se la conferma non compare, l'errore dice che cosa mostra il riquadro e che cosa c'è nei campi del modulo.

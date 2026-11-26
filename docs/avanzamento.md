@@ -1899,6 +1899,7 @@ Richiesta di Simone: il programma deve poter servire tutte le regioni, con nient
 - **Come provarlo**: `packages/rules/test/aggiunte-regionali.test.ts` (il meccanismo, con una regione inventata); `packages/rules/test/regions/piemonte/regole.test.ts` (il contenuto, regola per regola contro la 2026-11-25.2); in `apps/api/test/regole-http.test.ts` la prova D296; la prova del promemoria di primo accesso; `pnpm --filter @mmg/demo build` e la prova nel browser della ricetta preparata dalla segreteria: nella coda «da firmare» il controllo mostra la versione con la regione. Dopo un invio riuscito in un passo la pagina non mostra il controllo, quindi lì non si può guardare.
 - **Non provato**: una seconda regione con le sue aggiunte (il meccanismo è provato con una regione inventata); la dimostrazione con WebKit e Firefox, che qui gira solo con Chromium e su GitHub con tutti e tre.
 - **Non fatto**: le fonti regionali di `sync/`; integrazioni, servizi, pagine e prove regionali.
+- **Prova della dimostrazione con WebKit sulla #47**: «Invii senza risposta» è caduta una volta. Dopo «È arrivata» la conferma non è comparsa: le ricette da firmare, finendo il loro controllo delle regole, spostano in basso la sezione. La prova ora aspetta anche i controlli in corso, e se la conferma non compare l'errore dice che cosa mostra il riquadro (D296).
 
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 

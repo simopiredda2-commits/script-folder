@@ -177,14 +177,20 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   });
 
   /**
-   * La pagina ferma prima di un clic (D295): nessuna sezione ancora in caricamento e, nel riquadro
-   * dato, le righe della ricetta già arrivate. Nella pagina Ricette ogni sezione e le righe di ogni
-   * ricetta si caricano per conto loro: arrivando, spostano in basso il pulsante. Con WebKit il
-   * clic su «Stampa la ricetta rossa» è finito una volta nel vuoto, e il modulo non si è aperto.
+   * La pagina ferma prima di un clic (D295): nessuna sezione ancora in caricamento, nessun
+   * controllo delle regole in corso e, nel riquadro dato, le righe della ricetta già arrivate.
+   * Nella pagina Ricette ogni sezione e le righe di ogni ricetta si caricano per conto loro, e le
+   * ricette in bozza o da firmare fanno da sé il controllo delle regole: finendo, mostrano problemi
+   * e versione. In tutti e due i casi le sezioni sotto scendono. Con WebKit il clic su «Stampa la
+   * ricetta rossa» è finito una volta nel vuoto (D295), e poi quello su «È arrivata» (D296).
    */
   async function settled(item?: Locator) {
     await f
       .locator('main .stato-caricamento')
+      .first()
+      .waitFor({ state: 'detached', timeout: 30_000 });
+    await f
+      .locator('main .stato-controllo', { hasText: /^Controllo in corso/ })
       .first()
       .waitFor({ state: 'detached', timeout: 30_000 });
     if (item) await item.locator('.elenco-semplice li').first().waitFor({ timeout: 30_000 });
@@ -650,12 +656,24 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await settled(group);
     await form.getByLabel(/Numero di ricetta/).fill('DIMO00000000001');
     await form.getByLabel(/Codice di autenticazione/).fill('DIMOAUT01');
+    await settled(group);
     await form.getByRole('button', { name: /È arrivata/ }).click();
-    // L'esito non si cambia dopo: si conferma prima di segnarlo (D239).
-    await group
-      .getByRole('group', { name: 'Conferma dell’esito' })
-      .getByRole('button', { name: 'Sì, confermo' })
-      .click();
+    // L'esito non si cambia dopo: si conferma prima di segnarlo (D239). Se la conferma non
+    // compare, l'errore dice che cosa mostra il riquadro: un errore del modulo, o i campi vuoti
+    // (D296).
+    const confirm = group.getByRole('group', { name: 'Conferma dell’esito' });
+    await confirm.waitFor({ timeout: 30_000 }).catch(async (err: unknown) => {
+      const shown = await group.innerText({ timeout: 2_000 }).catch(() => '(riquadro non trovato)');
+      const fields = await form
+        .locator('input')
+        .evaluateAll((inputs) => inputs.map((i) => `«${(i as HTMLInputElement).value}»`).join(', '))
+        .catch(() => '(modulo non trovato)');
+      throw new Error(
+        `La conferma dell’esito non è comparsa per ${name}. Il riquadro mostra:\n${shown}\nI campi del modulo: ${fields}`,
+        { cause: err },
+      );
+    });
+    await confirm.getByRole('button', { name: 'Sì, confermo' }).click();
     await section.getByText('Ricetta segnata come arrivata. NRE DIMO00000000001').waitFor();
     await section.getByRole('link', { name: 'Promemoria (PDF)' }).click();
     await viewer().locator('canvas').first().waitFor({ timeout: 30_000 });
