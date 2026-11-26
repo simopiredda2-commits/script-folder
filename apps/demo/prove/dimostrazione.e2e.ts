@@ -966,14 +966,6 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .getByText(/Ricetta inviata/)
       .first()
       .waitFor({ timeout: 30_000 });
-    // Le regole in vigore portano le aggiunte della regione dello studio (D296): nel disco
-    // virtuale ci sono anche i dati delle regole del pacchetto.
-    await f
-      .getByText(
-        /Regole di prescrizione, versione \d{4}-\d{2}-\d{2}\.\d+\+[a-z-]+@\d{4}-\d{2}-\d{2}\.\d+/,
-      )
-      .first()
-      .waitFor();
 
     await go(`/pazienti/${id}/seguito`);
     await f.getByRole('heading', { level: 1, name: 'Seguito delle prestazioni' }).waitFor();
@@ -1137,10 +1129,16 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await login('medico');
     await go('/ricette');
     const group = f.locator('li.riquadro', { has: f.getByRole('link', { name, exact: true }) });
-    await group
-      .locator('li.ricetta-in-coda', { hasText: `preparata da ${secretary}` })
-      .getByRole('button', { name: 'Firma e invia' })
-      .click();
+    const queued = group.locator('li.ricetta-in-coda', { hasText: `preparata da ${secretary}` });
+    // Il controllo prima della firma: le regole in vigore portano le aggiunte della regione dello
+    // studio (D296), perché nel disco virtuale ci sono anche i dati delle regole del pacchetto.
+    await queued
+      .getByText(
+        /Regole di prescrizione, versione \d{4}-\d{2}-\d{2}\.\d+\+[a-z-]+@\d{4}-\d{2}-\d{2}\.\d+/,
+      )
+      .first()
+      .waitFor({ timeout: 30_000 });
+    await queued.getByRole('button', { name: 'Firma e invia' }).click();
     await f
       .getByText(new RegExp(`^Ricetta inviata per ${name}\\.`))
       .first()
