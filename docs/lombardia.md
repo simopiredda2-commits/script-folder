@@ -387,12 +387,13 @@ A queste le verifiche aggiungono:
 
 Sono tutte proposte da approvare alla fermata (`docs/avanzamento.md`, «Che cosa resta aperto»).
 
-## 10. Che cosa è già cambiato nel contratto delle integrazioni (D297, D298)
+## 10. Che cosa è già cambiato nel contratto delle integrazioni (D297, D298, D300)
 
 Il pezzo 3 dello spostamento ha tenuto conto del paragrafo 5 (`docs/pacchetti-regionali.md`, «Le integrazioni di un pacchetto» e «La Lombardia»):
 
 - **chiamate di contesto**: un meccanismo solo nel nucleo, con le destinazioni date dal pacchetto, ognuna di un tipo che il nucleo conosce, con il suo permesso e la sua voce nel registro; oggi c'è solo il Fascicolo del Piemonte;
 - **Fascicolo**: la pubblicazione è un contratto nazionale (documento nuovo, sostituzione, metadati, cancellazione, esito, ricerca) con le politiche e le parole della regione, adatto anche a un repository regionale; per la Lombardia gli servono due aggiunte, da fare con le specifiche: validazione sul Gateway facoltativa e firma del servizio della regione;
-- **certificati del Gateway**: uno per regione, dalla regione dello studio (D298).
+- **certificati del Gateway**: uno per regione, dalla regione dello studio (D298);
+- **ricetta** (D300): la ricetta SSN della regione è un contratto nazionale con due vie. Il servizio della regione (in Piemonte il SAR, con lotti di NRE e ricetta rossa in DPCM) e il **prescrittore esterno**, la ricetta fatta da un modulo della regione come il PRREG. Il prescrittore esterno è dichiarato soltanto: il programma dice che non c'è ancora e non manda niente. La chiamata di contesto del tipo «ricetta», con le righe preparate, e la ripresa dell'esito si scrivono con le specifiche (ARIA-PRREG-SIAA@01). Le parole del servizio (nome, articolo e preposizioni) sono della regione, così le pagine non nominano il SAR.
 
-Ricetta con un modulo regionale esterno, certificati con un servizio regionale, anagrafe da un file giornaliero e accesso con le chiavi del SISS si fissano nei pezzi che toccano ricetta, certificati, anagrafe e accesso, senza codice per la Lombardia finché non ci sono le specifiche.
+Certificati con un servizio regionale, anagrafe da un file giornaliero e accesso con le chiavi del SISS si fissano nei pezzi che toccano certificati, anagrafe e accesso, senza codice per la Lombardia finché non ci sono le specifiche.
