@@ -142,7 +142,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/interfaccia.md`: schermate (in `docs/schermate/`), accessibilità, che cosa manca.
 - `docs/credenziali.md`: credenziali dei servizi (Sistema TS, RUPAR) e secondo fattore.
 - `docs/certificati.md`: certificati di malattia INPS, copia e attestato, consegne.
-- `docs/fse.md`: Fascicolo Sanitario Elettronico 2.0 e Profilo Sanitario Sintetico, con le fonti (D110); apertura del Fascicolo regionale dalla cartella (D220).
+- `docs/fse.md`: Fascicolo Sanitario Elettronico 2.0 e Profilo Sanitario Sintetico, con le fonti (D110); apertura del Fascicolo regionale dalla cartella (D220); pubblicazione con i servizi della Regione, con la coda e le politiche di invio (D280); Profilo secondo la guida HL7 Italia v1.5 dove non contrasta con il Ministero (D281).
 - `docs/provenienze.md`: da dove viene ogni contenuto, a quali condizioni, chi lo controlla (D142).
 - `docs/aft.md`: condivisione del riepilogo tra i medici dell'AFT, con il consenso del paziente (D161).
 - `docs/amministrazione.md`: Strumenti e amministrazione per ruolo, primo avvio, utenti, studio, postazioni, stampa, elenchi (tappa 14, D163).

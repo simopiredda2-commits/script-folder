@@ -1966,8 +1966,11 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByText('Profilo firmato e pubblicato nel Fascicolo.').waitFor();
     await page.getByRole('heading', { name: 'Versioni nel Fascicolo' }).waitFor();
     // L'identificativo del documento con il suo nome (suggerimento S9 dell'audit, D259).
+    // Pubblicato con i servizi del Fascicolo regionale: l'identificativo è l'OID della Regione (D280).
     await page
-      .getByText(/^Identificativo nel Fascicolo: \S+$/)
+      .getByText(
+        /^Identificativo nel Fascicolo regionale: 2\.16\.840\.1\.113883\.2\.9\.2\.10\.4\.4\^\d+$/,
+      )
       .first()
       .waitFor();
     const signed = page.getByRole('link', { name: 'PDF firmato della versione 1' });
@@ -1976,6 +1979,15 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     expect(res.headers()['content-type']).toBe('application/pdf');
     expect((await res.body()).includes(Buffer.from('/ETSI.CAdES.detached'))).toBe(true);
     await check(page, 'Profilo pubblicato', true);
+    // Oscuramento su richiesta dell'assistito: solo i metadati (UPDATE, V09), con la conferma.
+    page.once('dialog', (d) => void d.accept());
+    await page.getByRole('button', { name: 'Oscura nel Fascicolo' }).click();
+    await page.getByText('Profilo oscurato nel Fascicolo.').waitFor();
+    await page.getByText('Oscurato nel Fascicolo', { exact: true }).waitFor();
+    page.once('dialog', (d) => void d.accept());
+    await page.getByRole('button', { name: 'Togli l’oscuramento' }).click();
+    await page.getByText('Oscuramento tolto.').waitFor();
+    await page.getByRole('button', { name: 'Cancella dal Fascicolo' }).waitFor();
   });
 
   it('recapiti di studio del medico e impostazioni del Fascicolo dell’amministratore (tappa 11)', async () => {
@@ -2006,11 +2018,18 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       await expect(admin.getByRole('button', { name: 'Impaginazione' }).count()).resolves.toBe(0);
       await admin.getByRole('button', { name: 'Fascicolo sanitario' }).click();
       await admin.getByText('Impostazioni complete.').waitFor();
-      expect(await admin.getByLabel('Tipo di attività clinica').inputValue()).toBe('OBS');
+      // Il tipo di attività lo fissa la Regione per il Profilo: «ERP» (V09, D280).
+      await admin.getByText(/Erogazione Prestazione Prenotata, come vuole la Regione/).waitFor();
       await admin.getByLabel('Regime').selectOption('SSN');
       await admin.getByRole('button', { name: 'Salva le impostazioni' }).click();
       await admin.getByText('Impostazioni salvate.').waitFor();
       await check(admin, 'strumenti dello studio', true);
+      // Invii al Fascicolo sospesi su richiesta del CSI, poi ripresi (FSE-INT-SRS-01-V02, 3.4).
+      await admin.getByLabel('Motivo (facoltativo)').fill('Richiesta del supporto del CSI');
+      await admin.getByRole('button', { name: 'Sospendi gli invii' }).click();
+      await admin.getByText(/Invii sospesi dal .*: Richiesta del supporto del CSI/).waitFor();
+      await admin.getByRole('button', { name: 'Riprendi gli invii' }).click();
+      await admin.getByRole('button', { name: 'Sospendi gli invii' }).waitFor();
     } finally {
       await ctx.close();
     }

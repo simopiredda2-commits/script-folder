@@ -4,7 +4,7 @@ Copie dei file con cui il Gateway nazionale controlla i documenti CDA2. Servono 
 
 ## Provenienza
 
-Repository pubblico del Ministero della salute `ministero-salute/it-fse-catalogs` su GitHub, commit `25b7b6b2fb297540f76ddb89bf047a34fbb93c22` (letto il 18/11/2026). Il README del repository dice che contiene «i file schematron» e «i dizionari» «utilizzati in fase di verifica dei CDA2 dal gateway FSE2.0».
+Repository pubblico del Ministero della salute `ministero-salute/it-fse-catalogs` su GitHub, commit `25b7b6b2fb297540f76ddb89bf047a34fbb93c22` (letto il 18/11/2026). Riletto il 26/11/2026 al commit `d636fc6c6b4170c64b6ff202534efbe2bdf86035`: schematron, dizionari ed estratto LOINC identici; aggiunto il dizionario `2.16.840.1.113883.1.11.19700`, che la guida v1.5 vuole per l'assenza di allergie (D281). Il README del repository dice che contiene «i file schematron» e «i dizionari» «utilizzati in fase di verifica dei CDA2 dal gateway FSE2.0».
 
 | Qui                                  | Nel repository del Ministero            | Che cos'è                                                       |
 | ------------------------------------ | --------------------------------------- | --------------------------------------------------------------- |
@@ -29,6 +29,7 @@ I dizionari copiati:
 | 2.16.840.1.113883.2.9.77.22.11.15 | Capacità motoria                                    |
 | 2.16.840.1.113883.2.9.77.22.11.17 | Organi mancanti (ICD-10)                            |
 | 2.16.840.1.113883.5.4             | ActCode (tipi di allergia e intolleranza, gravità)  |
+| 2.16.840.1.113883.1.11.19700      | ObservationIntoleranceType (assenza di allergie)    |
 | 2.16.840.1.113883.5.1063          | ObservationValue (criticità)                        |
 | 2.16.840.1.113883.5.111           | RoleCode (parentela)                                |
 | 2.16.840.1.113883.5.1             | Sesso amministrativo                                |

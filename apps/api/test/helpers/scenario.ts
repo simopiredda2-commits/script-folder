@@ -99,6 +99,7 @@ export async function createScenario(
     | 'ppipPortal'
     | 'fseAccess'
     | 'dpcm'
+    | 'fseQueue'
   > & {
     /** Aggiornamento delle banche dati (D156), costruito con l'orologio della prova. */
     referenceUpdates?: (now: () => Date) => NonNullable<AppDeps['referenceUpdates']>;
@@ -143,7 +144,7 @@ export async function createScenario(
     custodianIstatCode: '999999',
     custodianProvince: 'XX',
     locality: 'STUDIO DI PROVA^^^^^&2.999.10.5&ISO^^^^000001',
-    clinicalActivity: 'OBS',
+    clinicalActivity: 'ERP',
     administrativeRequest: 'SSN',
   });
   const passwordHash = await hashPassword(PASSWORD);
@@ -414,7 +415,7 @@ export async function createScenario(
   );
 
   // L'ora di partenza è già nell'orologio: al servizio vanno le altre opzioni.
-  const { referenceUpdates, clockAt, environment, dpcm, ...deps } = appOptions;
+  const { referenceUpdates, clockAt, environment, dpcm, fseQueue, ...deps } = appOptions;
   void clockAt;
   const app = buildApp({
     db,
@@ -428,6 +429,8 @@ export async function createScenario(
     ...deps,
     // La coda della ricetta rossa (D270) gira solo quando la prova la chiama, senza i 2 secondi.
     dpcm: dpcm ?? { intervalMs: null, minIntervalMs: 0 },
+    // Anche la coda del Fascicolo regionale (D280): gira con le azioni del medico o a mano.
+    fseQueue: fseQueue ?? { intervalMs: null, minIntervalMs: 0 },
     ...(referenceUpdates ? { referenceUpdates: referenceUpdates(clock.now) } : {}),
     secondFactor,
   });

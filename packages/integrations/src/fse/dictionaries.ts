@@ -19,6 +19,7 @@ export const FSE_DICTIONARIES = {
   motorCapacity: '2.16.840.1.113883.2.9.77.22.11.15',
   missingOrgans: '2.16.840.1.113883.2.9.77.22.11.17',
   actCode: '2.16.840.1.113883.5.4',
+  intoleranceType: '2.16.840.1.113883.1.11.19700',
   observationValue: '2.16.840.1.113883.5.1063',
   roleCode: '2.16.840.1.113883.5.111',
   gender: '2.16.840.1.113883.5.1',

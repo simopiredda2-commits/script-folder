@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common';
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
+import { dateTime } from '../lib/format';
 import { useSession } from '../lib/session';
 import { toolsSectionsFor } from '../lib/tools-sections';
 import { useApi } from '../lib/useApi';
@@ -39,20 +40,21 @@ interface Settings {
   struttura: string | null;
   tipologiaStruttura: string;
   assettoOrganizzativo: string;
+  /** Fissata dalla Regione per il PSS (V09): «ERP». */
   attivitaClinica: string | null;
   regime: string | null;
 }
 interface FseSettings {
   impostazioni: Settings | null;
   daCompletare: string[];
-  valori: { attivitaClinica: Option[]; regime: Option[] };
+  valori: { regime: Option[] };
+  /** Invii al Fascicolo regionale sospesi dall'amministratore (FSE-INT-SRS-01-V02, 3.4). */
+  inviiSospesi: { dal: string | null; motivo: string | null } | null;
   puoModificare: boolean;
 }
 
 type FieldKey =
   | 'radiceDocumenti'
-  | 'repository'
-  | 'radiceInvii'
   | 'custodeRadice'
   | 'custodeCodice'
   | 'custodeNome'
@@ -61,14 +63,11 @@ type FieldKey =
   | 'custodeIstat'
   | 'custodeProvincia'
   | 'struttura'
-  | 'attivitaClinica'
   | 'regime';
 
 function initial(s: Settings | null): Record<FieldKey, string> {
   return {
     radiceDocumenti: s?.radiceDocumenti ?? '',
-    repository: s?.repository ?? '',
-    radiceInvii: s?.radiceInvii ?? '',
     custodeRadice: s?.custode.radice ?? '',
     custodeCodice: s?.custode.codice ?? '',
     custodeNome: s?.custode.nome ?? '',
@@ -77,7 +76,6 @@ function initial(s: Settings | null): Record<FieldKey, string> {
     custodeIstat: s?.custode.istat ?? '',
     custodeProvincia: s?.custode.provincia ?? '',
     struttura: s?.struttura ?? '',
-    attivitaClinica: s?.attivitaClinica ?? '',
     regime: s?.regime ?? '',
   };
 }
@@ -146,7 +144,83 @@ function FseSection() {
         }}
       />
       {saved && <Notice kind="fatto">Impostazioni salvate.</Notice>}
+      <FseSendingPanel data={current.data} onChanged={() => current.reload()} />
     </>
+  );
+}
+
+/**
+ * Sospendere gli invii al Fascicolo regionale, per esempio su richiesta del supporto del CSI: i
+ * messaggi restano in coda e partono alla ripresa (FSE-INT-SRS-01-V02, 3.4 e 4.5). Solo
+ * l'amministratore; ogni cambio resta nel registro delle azioni di amministrazione.
+ */
+function FseSendingPanel({ data, onChanged }: { data: FseSettings; onChanged: () => void }) {
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const suspended = data.inviiSospesi;
+  async function toggle() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api('/api/studio/fascicolo/invii', {
+        method: 'PUT',
+        body: suspended
+          ? { sospesi: false }
+          : { sospesi: true, ...(reason ? { motivo: reason } : {}) },
+      });
+      setReason('');
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiError ? err : new ApiError(0, 'Servizio non raggiungibile'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="riquadro" aria-labelledby="titolo-invii-fascicolo">
+      <h2 id="titolo-invii-fascicolo">Invii al Fascicolo regionale</h2>
+      {suspended ? (
+        <Notice kind="avviso">
+          Invii sospesi{suspended.dal ? ` dal ${dateTime(suspended.dal)}` : ''}
+          {suspended.motivo ? `: ${suspended.motivo}` : ''}. I Profili restano in coda e partono
+          alla ripresa.
+        </Notice>
+      ) : (
+        <p>
+          Il programma manda i Profili al Fascicolo regionale, con le regole della Regione: niente
+          invii dalle 00 alle 07, tre tentativi a 5 minuti e poi uno al giorno per dieci giorni.
+        </p>
+      )}
+      {data.puoModificare && (
+        <>
+          {!suspended && (
+            <div className="campo">
+              <label htmlFor="fascicolo-motivo-sospensione">Motivo (facoltativo)</label>
+              <input
+                id="fascicolo-motivo-sospensione"
+                maxLength={500}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
+              <p className="aiuto">Per esempio: richiesta del supporto del Fascicolo del CSI.</p>
+            </div>
+          )}
+          <div className="azioni">
+            <button
+              type="button"
+              className="pulsante"
+              disabled={busy}
+              onClick={() => void toggle()}
+            >
+              <Icon name={suspended ? 'ripeti' : 'blocco'} />{' '}
+              <span>{suspended ? 'Riprendi gli invii' : 'Sospendi gli invii'}</span>
+            </button>
+          </div>
+        </>
+      )}
+      <ErrorMessage error={error} />
+    </section>
   );
 }
 
@@ -176,8 +250,6 @@ function FseSettingsForm({
         method: 'PUT',
         body: {
           radiceDocumenti: f.radiceDocumenti,
-          repository: f.repository,
-          radiceInvii: f.radiceInvii,
           custode: {
             radice: f.custodeRadice,
             codice: f.custodeCodice,
@@ -188,7 +260,6 @@ function FseSettingsForm({
             ...(f.custodeProvincia ? { provincia: f.custodeProvincia } : {}),
           },
           struttura: f.struttura,
-          attivitaClinica: f.attivitaClinica,
           regime: f.regime,
         },
       });
@@ -225,7 +296,7 @@ function FseSettingsForm({
       )}
     </div>
   );
-  const select = (k: 'attivitaClinica' | 'regime', label: string, options: Option[]) => (
+  const select = (k: 'regime', label: string, options: Option[]) => (
     <div className="campo">
       <label htmlFor={`fascicolo-${k}`}>{label}</label>
       <select
@@ -252,7 +323,8 @@ function FseSettingsForm({
       </h2>
       <p>
         I valori che lo studio riceve con l’accreditamento presso il Gateway del Fascicolo. Senza,
-        il Profilo sanitario sintetico non si pubblica.
+        il Profilo sanitario sintetico non si pubblica. Il Profilo va al Fascicolo della Regione,
+        che lo pubblica sul Gateway: repository, invii e tipo di attività li mette la Regione.
       </p>
       {data.daCompletare.length > 0 ? (
         <Notice kind="avviso">
@@ -284,6 +356,13 @@ function FseSettingsForm({
           <dt>Assetto organizzativo</dt>
           <dd className="codice">{s?.assettoOrganizzativo ?? 'AD_PSC130'}</dd>
         </div>
+        <div>
+          <dt>Tipo di attività clinica</dt>
+          <dd>
+            <span className="codice">ERP</span> Erogazione Prestazione Prenotata, come vuole la
+            Regione per il Profilo
+          </dd>
+        </div>
       </dl>
       <fieldset disabled={busy}>
         <legend>Identificativi</legend>
@@ -292,8 +371,6 @@ function FseSettingsForm({
             code: true,
             help: 'Numeri separati da punti, per esempio 2.16.840.1.113883.2.9.',
           })}
-          {input('repository', 'Identificativo del repository', { code: true })}
-          {input('radiceInvii', 'Radice OID degli invii', { code: true })}
         </div>
       </fieldset>
       <fieldset disabled={busy}>
@@ -322,12 +399,9 @@ function FseSettingsForm({
             help: 'NOME^^^^^&OID&ISO^^^^CODICE',
           })}
         </div>
-        <div className="campi-in-riga">
-          {select('attivitaClinica', 'Tipo di attività clinica', data.valori.attivitaClinica)}
-          {select('regime', 'Regime', data.valori.regime)}
-        </div>
+        <div className="campi-in-riga">{select('regime', 'Regime', data.valori.regime)}</div>
         <p className="aiuto">
-          Codici e nomi dalle tabelle 57 e 63 della specifica del Gateway (versione 2.26).
+          I regimi della Regione Piemonte (specifiche del Fascicolo regionale per le cartelle, V09).
         </p>
       </fieldset>
       {!readOnly && (

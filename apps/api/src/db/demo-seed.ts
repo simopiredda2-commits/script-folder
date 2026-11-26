@@ -208,7 +208,7 @@ export async function seedDemo(db: Database, options: DemoSeedOptions): Promise<
       custodianIstatCode: '999999',
       custodianProvince: 'XX',
       locality: 'STUDIO DIMOSTRATIVO^^^^^&2.999.10.5&ISO^^^^000001',
-      clinicalActivity: 'OBS',
+      clinicalActivity: 'ERP',
       administrativeRequest: 'SSN',
     })
     .onConflictDoNothing();

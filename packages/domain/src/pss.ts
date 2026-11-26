@@ -198,9 +198,12 @@ export const lifestyleFor = (factor: string) =>
 /* Stato del documento ------------------------------------------------------------------------ */
 
 /**
- * Bozza → validato dal Gateway → firmato (PAdES) → inviato (preso in carico) → pubblicato.
- * Si valida prima di firmare (domande frequenti del Ministero). Una versione pubblicata resta
- * consultabile e diventa «sostituita» quando se ne pubblica una nuova (DM 7/9/2023, art. 4).
+ * Bozza → validato dal Gateway → firmato (PAdES) → preso in carico dal Fascicolo regionale →
+ * pubblicato. Si valida prima di firmare (domande frequenti del Ministero). Una versione pubblicata
+ * resta consultabile e diventa «sostituita» quando se ne pubblica una nuova (DM 7/9/2023, art. 4).
+ * Con i servizi regionali (V09, D280): il Profilo firmato che la Regione non prende in carico si
+ * può scartare; quello preso in carico può essere scartato dalla Regione («KO»); quello pubblicato
+ * il medico che l'ha scritto lo può cancellare dal Fascicolo.
  */
 export const PSS_STATUSES = [
   'draft',
@@ -210,28 +213,35 @@ export const PSS_STATUSES = [
   'published',
   'replaced',
   'discarded',
+  'rejected',
+  'deleted',
 ] as const;
 export type PssStatus = (typeof PSS_STATUSES)[number];
 export const PSS_STATUS_LABELS: Record<PssStatus, string> = {
   draft: 'Bozza',
   validated: 'Validato dal Gateway',
   signed: 'Firmato',
-  submitted: 'Inviato, preso in carico',
+  submitted: 'Preso in carico dal Fascicolo regionale',
   published: 'Pubblicato nel Fascicolo',
   replaced: 'Sostituito da una versione nuova',
   discarded: 'Scartato',
+  rejected: 'Scartato dal Fascicolo regionale',
+  deleted: 'Cancellato dal Fascicolo',
 };
 
-export type PssEvent = 'validate' | 'sign' | 'submit' | 'publish' | 'replace' | 'discard';
+export type PssEvent =
+  'validate' | 'sign' | 'submit' | 'publish' | 'replace' | 'discard' | 'reject' | 'delete';
 
 const TRANSITIONS: Record<PssStatus, Partial<Record<PssEvent, PssStatus>>> = {
   draft: { validate: 'validated', discard: 'discarded' },
   validated: { sign: 'signed', discard: 'discarded' },
-  signed: { submit: 'submitted' },
-  submitted: { publish: 'published' },
-  published: { replace: 'replaced' },
+  signed: { submit: 'submitted', discard: 'discarded' },
+  submitted: { publish: 'published', reject: 'rejected' },
+  published: { replace: 'replaced', delete: 'deleted' },
   replaced: {},
   discarded: {},
+  rejected: {},
+  deleted: {},
 };
 
 /** Stato dopo l'evento, o null se l'evento non è ammesso in quello stato. */

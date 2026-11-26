@@ -8,7 +8,7 @@ Documento preparato durante le tappe 9 e 10 (D110), per decidere alla fermata fi
 - **È già dovuto**: il decreto del 2025 sui contenuti voleva il PSS di tutti i medici di famiglia entro il 30 settembre 2025. Un programma per medici di famiglia che non lo produce non basta allo studio.
 - **Che cosa contiene**: un elenco fissato dal decreto, con dati obbligatori e facoltativi. Obbligatori: allergie e reazioni avverse, patologie croniche, terapie croniche prescritte dal medico, anamnesi familiare, organi mancanti, trapianti, malformazioni. Facoltativi: peso, altezza, BMI, pressione, fattori di rischio. I dati anagrafici arrivano dall'Anagrafe nazionale degli assistiti. Tabella sotto.
 - **Dati oscurati**: le voci che il paziente ha chiesto di oscurare non devono mai essere visibili ad altri tramite il PSS (art. 4, c. 3; art. 9). Il programma le segna già (D116) e le terrà fuori.
-- **Come arriva nel Fascicolo**: il programma produce un documento nel formato nazionale (CDA2 di HL7 Italia), lo mette in un PDF firmato con firma PAdES, lo fa validare dal Gateway nazionale e poi lo pubblica. Il collegamento usa certificati rilasciati da Sogei.
+- **Come arriva nel Fascicolo**: il programma produce un documento nel formato nazionale (CDA2 di HL7 Italia), lo mette in un PDF firmato con firma PAdES e lo fa validare dal Gateway nazionale, con certificati rilasciati da Sogei. Poi lo manda ai servizi del Fascicolo della Regione Piemonte, che lo pubblicano sul Gateway (V09, D280).
 - **Prima di usarlo con pazienti veri**: il programma va accreditato. Sono tre fasi con Sogei, Agenas e la Regione, e ci sono impegni del fornitore (SCRIPT). È una decisione di Simone, non una cosa che posso fare io.
 - **Consensi**: per consultare il Fascicolo serve il consenso del paziente, dato separatamente per finalità; la verifica la fa il Fascicolo (art. 8, c. 11). In cartella resta quello che il paziente ha espresso in studio (D115).
 
@@ -110,6 +110,33 @@ Condividere la cartella tra i medici dell'AFT che usano il programma: le voci os
 ## Che cosa è costruito (tappa 11)
 
 Il Profilo si compone dalla cartella. Il medico lo controlla, lo valida, lo firma e lo pubblica nel simulatore del Gateway; poi lo stato della transazione conferma l'invio a INI. Le scelte sono in `docs/decisioni.md` (D130–D141); che cosa manca e che cosa non è stato provato, in `docs/avanzamento.md`.
+
+## Pubblicazione con i servizi del Fascicolo regionale (D280)
+
+Dal 26/11/2026 il Profilo non si pubblica più direttamente sul Gateway: va al Fascicolo della Regione Piemonte, che lo pubblica sul Gateway. Fonti: le specifiche del CSI per le cartelle dei medici, FSE-PSS-SRS-01-V09 (maggio 2026), e le politiche di invio FSE-INT-SRS-01-V02 (`docs/provenienze.md`). Le scelte sono in D280.
+
+1. **Validazione** sul Gateway nazionale, come prima: il workflowInstanceId e la struttura (Locality) vanno poi alla Regione.
+2. **Firma** PAdES del medico.
+3. **ComunicazioneMetadati** (SOAP, WS-Security con utente e password RUPAR, PIN cifrato con il certificato della Regione): CREATE per il primo Profilo del medico, REPLACE per la versione nuova dopo RicercaDocumenti. La Regione risponde con un identificativo temporaneo.
+4. **EsitoCaricamentoDocumento**: «ELAB» finché la Regione non ha finito, «OK» con l'OID del documento, «KO» con la motivazione.
+5. Dopo, sul Profilo pubblicato: **UPDATE** dei metadati per oscurarlo su richiesta dell'assistito («V» con P99) o per togliere l'oscuramento; **CancellazioneMetadati** per cancellarlo. Solo il medico che l'ha scritto.
+
+I campi del messaggio sono quelli delle tabelle della V09: tra gli altri, TipoAttivitaClinica «ERP», IstituzioneAutore con «010» e il codice ASL del medico, il regime dalla tabella della V09.
+
+**La coda** segue le politiche della Regione:
+
+| Che cosa succede                                                                                   | Che cosa fa il programma                                                                           |
+| -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Dalle 00 alle 07                                                                                   | Non manda niente: i messaggi partono alle 07 (con il servizio vero)                                |
+| Tempo scaduto, rete assente, nessun esito positivo esplicito, FSE_ER_000, errori di sistema di INI | Rimanda dopo 5 minuti, fino a tre volte; poi uno al giorno per dieci giorni; poi «non arrivato»    |
+| Altri errori                                                                                       | «Da correggere»: non rimanda da sé; il medico corregge e preme «Riprova»                           |
+| «Non arrivato» dopo dieci giorni                                                                   | Il programma dice di segnalarlo al supporto del Fascicolo del CSI (supporto.fse@csi.it)            |
+| Richiesta del supporto del CSI                                                                     | L'amministratore sospende gli invii in Strumenti › Fascicolo sanitario; alla ripresa partono       |
+| Ogni messaggio                                                                                     | Nel registro degli invii, senza credenziali, con il documento indicato dall'impronta e la risposta |
+
+Altre regole della coda (D280): un messaggio alla volta per documento, nell'ordine in cui è stato fatto, anche con due richieste insieme; il messaggio che sta partendo è di quel giro della coda, anche con più istanze del servizio, e lo scarto aspetta che finisca; dopo «KO» il Profilo resta scartato e se ne prepara una versione nuova; se la Regione non trova la versione da sostituire, il messaggio è da correggere con l'indicazione di segnalarlo al CSI.
+
+**Da chiedere al CSI** (`docs/avanzamento.md`, domande per il CSI): WSDL e spazi dei nomi dei servizi di cancellazione, esito e ricerca; l'algoritmo di HashDoc; il formato di transactionData; i codici di errore; il trasporto del documento in MTOM; che cosa succede con un CREATE ripetuto dopo un tempo scaduto; il kit di prova e il piano dei test per il FSE 2.0.
 
 ## Aprire il Fascicolo regionale dalla cartella (D220)
 

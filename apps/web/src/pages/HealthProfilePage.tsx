@@ -33,9 +33,27 @@ interface Problem {
   title: string;
   detail: string;
 }
+/** Il messaggio al Fascicolo regionale (V09, D280): com'è andato e che cosa succede ora. */
+interface RegionalSend {
+  operazione: 'create' | 'replace' | 'update' | 'delete';
+  stato: 'queued' | 'waiting' | 'done' | 'to_fix' | 'failed' | 'cancelled';
+  tentativi: number;
+  fase: string;
+  prossimoTentativo: string | null;
+  ultimoErrore: string | null;
+}
 interface Pss {
   id: string;
-  stato: 'draft' | 'validated' | 'signed' | 'submitted' | 'published' | 'replaced' | 'discarded';
+  stato:
+    | 'draft'
+    | 'validated'
+    | 'signed'
+    | 'submitted'
+    | 'published'
+    | 'replaced'
+    | 'discarded'
+    | 'rejected'
+    | 'deleted';
   statoNome: string;
   versione: number;
   documento: string;
@@ -47,13 +65,30 @@ interface Pss {
   inviatoIl: string | null;
   pubblicatoIl: string | null;
   sostituitoIl: string | null;
+  scartatoDalFascicoloIl?: string | null;
+  cancellatoIl?: string | null;
+  /** OID del documento nel Fascicolo regionale. */
+  identificativoFascicolo?: string | null;
+  oscurato?: boolean;
+  /** Il Profilo l'ha scritto chi guarda: solo lui lo oscura o lo cancella (V09, 5.1 e 5.3). */
+  mio?: boolean;
+  fascicolo?: RegionalSend | null;
 }
 interface Overview {
   versioni: Pss[];
   inLavorazione: Pss | null;
   mancano: string[];
   puoFirmare: boolean;
+  /** Invii al Fascicolo regionale sospesi dall'amministratore. */
+  inviiSospesi?: { dal: string | null; motivo: string | null } | null;
 }
+
+const OPERATIONS: Record<RegionalSend['operazione'], string> = {
+  create: 'Pubblicazione',
+  replace: 'Sostituzione della versione precedente',
+  update: 'Oscuramento',
+  delete: 'Cancellazione',
+};
 
 /** Le sezioni del Profilo, nell'ordine del documento; le prime quattro sono obbligatorie. */
 const SECTIONS: { key: SectionKey; title: string; mandatory: boolean }[] = [
@@ -90,11 +125,72 @@ const ABSENCES: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
-/** Che cosa dire dopo la firma o il controllo dello stato: pubblicato, o solo preso in carico. */
-const outcome = (p: Pss) =>
-  p.stato === 'published'
-    ? 'Profilo firmato e pubblicato nel Fascicolo.'
-    : 'Profilo firmato e preso in carico dal Gateway: è pubblicato quando i dati arrivano all’indice nazionale (INI).';
+/** Che cosa dire dopo la firma o «Riprova»: com'è andato il messaggio al Fascicolo regionale. */
+function outcome(p: Pss): string {
+  const f = p.fascicolo;
+  if (p.stato === 'published') return 'Profilo firmato e pubblicato nel Fascicolo.';
+  if (p.stato === 'submitted')
+    return 'Profilo preso in carico dal Fascicolo regionale: è pubblicato quando la Regione dà l’identificativo del documento.';
+  if (p.stato === 'rejected') return 'Il Fascicolo regionale ha scartato il Profilo.';
+  if (f?.stato === 'queued')
+    return `Profilo firmato: in coda per il Fascicolo regionale, prossimo tentativo ${f.prossimoTentativo ? `il ${dateTime(f.prossimoTentativo)}` : 'appena possibile'}.`;
+  if (f?.stato === 'to_fix')
+    return 'Il Fascicolo regionale non ha accettato il messaggio: va corretto.';
+  return 'Profilo firmato.';
+}
+
+/** Lo stato del messaggio al Fascicolo regionale, con che cosa fare. */
+function RegionalStatus({
+  send,
+  suspended,
+}: {
+  send: RegionalSend | null | undefined;
+  suspended: Overview['inviiSospesi'];
+}) {
+  if (!send || send.stato === 'done' || send.stato === 'cancelled') return null;
+  const what = OPERATIONS[send.operazione];
+  if (send.stato === 'to_fix')
+    return (
+      <Notice kind="errore">
+        <p>
+          {what}: il Fascicolo regionale non l’ha accettata. {send.ultimoErrore}
+        </p>
+        <p>Quando hai corretto, «Riprova» la rimanda.</p>
+      </Notice>
+    );
+  if (send.stato === 'failed')
+    return (
+      <Notice kind="errore">
+        <p>
+          {what}: il messaggio non è arrivato. {send.ultimoErrore}
+        </p>
+      </Notice>
+    );
+  return (
+    <Notice kind="avviso">
+      <p>
+        {what}:{' '}
+        {send.stato === 'waiting'
+          ? 'presa in carico dal Fascicolo regionale, si aspetta l’esito'
+          : 'in coda per il Fascicolo regionale'}
+        {send.prossimoTentativo && <>; prossimo tentativo il {dateTime(send.prossimoTentativo)}</>}.
+      </p>
+      {send.tentativi > 0 && send.ultimoErrore && (
+        <p>
+          Tentativi falliti: {send.tentativi}
+          {send.fase === 'coda' ? ', ora uno al giorno per dieci giorni' : ', ogni 5 minuti'}.
+          Ultimo errore: {send.ultimoErrore}
+        </p>
+      )}
+      {suspended && (
+        <p>
+          Gli invii al Fascicolo sono sospesi dall’amministratore dello studio
+          {suspended.motivo ? ` (${suspended.motivo})` : ''}: partono alla ripresa.
+        </p>
+      )}
+    </Notice>
+  );
+}
 
 /** Minuscola iniziale dentro una frase, ma non sulle sigle («AIC», «ICD-9-CM»). */
 const lowerFirst = (s: string) =>
@@ -225,7 +321,7 @@ export function HealthProfilePage() {
           </h2>
           {open.ultimoProblema && (
             <Notice kind="errore">
-              Gateway: {open.ultimoProblema.title} {open.ultimoProblema.detail}
+              {open.ultimoProblema.title} {open.ultimoProblema.detail}
             </Notice>
           )}
           <Exclusions c={open.contenuto} />
@@ -325,9 +421,10 @@ export function HealthProfilePage() {
           {open.stato === 'submitted' && (
             <div className="azioni-profilo">
               <p>
-                Preso in carico dal Gateway il {dateTime(open.inviatoIl)}: è pubblicato quando i
-                dati risultano arrivati all’indice nazionale (INI).
+                Preso in carico dal Fascicolo regionale il {dateTime(open.inviatoIl)}: è pubblicato
+                quando la Regione conferma il caricamento e dà l’identificativo del documento.
               </p>
+              <RegionalStatus send={open.fascicolo} suspended={o!.inviiSospesi} />
               {o!.puoFirmare && (
                 <button
                   type="button"
@@ -340,7 +437,7 @@ export function HealthProfilePage() {
                     )
                   }
                 >
-                  <Icon name="ripeti" /> <span>Controlla lo stato</span>
+                  <Icon name="ripeti" /> <span>Controlla l’esito</span>
                 </button>
               )}
             </div>
@@ -350,8 +447,11 @@ export function HealthProfilePage() {
               <p>
                 {open.stato === 'validated'
                   ? `Validato dal Gateway il ${dateTime(open.validatoIl)}: va firmato e pubblicato entro 5 giorni.`
-                  : `Firmato il ${dateTime(open.firmatoIl)}: la pubblicazione è da riprovare.`}
+                  : `Firmato il ${dateTime(open.firmatoIl)}: il Fascicolo regionale non l’ha ancora preso in carico.`}
               </p>
+              {open.stato === 'signed' && (
+                <RegionalStatus send={open.fascicolo} suspended={o!.inviiSospesi} />
+              )}
               <a
                 className="pulsante pulsante-piatto"
                 href={`${base}/${open.id}/pdf`}
@@ -360,37 +460,51 @@ export function HealthProfilePage() {
               >
                 <Icon name="apri" /> <span>Apri il PDF</span>
               </a>
-              <button
-                type="button"
-                className="pulsante"
-                disabled={busy}
-                onClick={() =>
-                  void run(
-                    () => api<Pss>(`${base}/${open.id}/firma-e-pubblica`, { method: 'POST' }),
-                    outcome,
-                  )
-                }
-              >
-                <Icon name="firma" />{' '}
-                <span>
-                  {open.stato === 'validated' ? 'Firma e pubblica' : 'Riprova la pubblicazione'}
-                </span>
-              </button>
-              {open.stato === 'validated' && (
+              {open.stato === 'validated' || !open.fascicolo ? (
                 <button
                   type="button"
-                  className="pulsante pulsante-piatto"
+                  className="pulsante"
                   disabled={busy}
                   onClick={() =>
                     void run(
-                      () => api(`${base}/${open.id}/scarta`, { method: 'POST' }),
-                      'Profilo scartato.',
+                      () => api<Pss>(`${base}/${open.id}/firma-e-pubblica`, { method: 'POST' }),
+                      outcome,
                     )
                   }
                 >
-                  <Icon name="annulla" /> <span>Scarta</span>
+                  <Icon name="firma" />{' '}
+                  <span>
+                    {open.stato === 'validated' ? 'Firma e pubblica' : 'Riprova la pubblicazione'}
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="pulsante"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () => api<Pss>(`${base}/${open.id}/stato`, { method: 'POST' }),
+                      outcome,
+                    )
+                  }
+                >
+                  <Icon name="ripeti" /> <span>Riprova adesso</span>
                 </button>
               )}
+              <button
+                type="button"
+                className="pulsante pulsante-piatto"
+                disabled={busy}
+                onClick={() =>
+                  void run(
+                    () => api(`${base}/${open.id}/scarta`, { method: 'POST' }),
+                    'Profilo scartato.',
+                  )
+                }
+              >
+                <Icon name="annulla" /> <span>Scarta</span>
+              </button>
             </div>
           )}
         </section>
@@ -406,19 +520,129 @@ export function HealthProfilePage() {
                   <strong>Versione {v.versione}</strong> – {v.statoNome}
                   {v.pubblicatoIl && <> il {dateTime(v.pubblicatoIl)}</>}
                   {v.sostituitoIl && <>; sostituita il {dateTime(v.sostituitoIl)}</>}
+                  {v.cancellatoIl && <>; cancellata il {dateTime(v.cancellatoIl)}</>}
+                  {v.scartatoDalFascicoloIl && <> il {dateTime(v.scartatoDalFascicoloIl)}</>}
                 </p>
+                {v.stato === 'rejected' && v.ultimoProblema && (
+                  <p className="tenue">Motivo: {v.ultimoProblema.detail}</p>
+                )}
+                {v.oscurato && (
+                  <p>
+                    <strong>Oscurato nel Fascicolo</strong> su richiesta dell’assistito: lo vede
+                    solo lui.
+                  </p>
+                )}
                 {/* L'identificativo con il suo nome, non un codice da solo (suggerimento S9, D259). */}
                 <p className="tenue">
-                  Identificativo nel Fascicolo: <span className="codice">{v.documento}</span>
+                  {v.identificativoFascicolo ? (
+                    <>
+                      Identificativo nel Fascicolo regionale:{' '}
+                      <span className="codice">{v.identificativoFascicolo}</span>
+                    </>
+                  ) : (
+                    <>
+                      Identificativo del documento: <span className="codice">{v.documento}</span>
+                    </>
+                  )}
                 </p>
-                <a
-                  className="pulsante pulsante-piatto"
-                  href={`${base}/${v.id}/pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <Icon name="stampa" /> <span>PDF firmato della versione {v.versione}</span>
-                </a>
+                <RegionalStatus send={v.fascicolo} suspended={o.inviiSospesi} />
+                <div className="azioni-profilo">
+                  <a
+                    className="pulsante pulsante-piatto"
+                    href={`${base}/${v.id}/pdf`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <Icon name="stampa" /> <span>PDF firmato della versione {v.versione}</span>
+                  </a>
+                  {v.mio &&
+                    o.puoFirmare &&
+                    v.fascicolo &&
+                    ['queued', 'waiting', 'to_fix', 'failed'].includes(v.fascicolo.stato) && (
+                      <button
+                        type="button"
+                        className="pulsante"
+                        disabled={busy}
+                        onClick={() =>
+                          void run(
+                            () => api<Pss>(`${base}/${v.id}/stato`, { method: 'POST' }),
+                            (r) =>
+                              r.fascicolo?.stato === 'done'
+                                ? `${OPERATIONS[r.fascicolo.operazione]}: fatta.`
+                                : 'Messaggio rimandato al Fascicolo regionale.',
+                          )
+                        }
+                      >
+                        <Icon name="ripeti" /> <span>Riprova adesso</span>
+                      </button>
+                    )}
+                  {v.mio &&
+                    o.puoFirmare &&
+                    v.stato === 'published' &&
+                    v.identificativoFascicolo &&
+                    !['queued', 'waiting'].includes(v.fascicolo?.stato ?? '') && (
+                      <>
+                        <button
+                          type="button"
+                          className="pulsante pulsante-piatto"
+                          disabled={busy}
+                          onClick={() => {
+                            const obscure = !v.oscurato;
+                            if (
+                              !window.confirm(
+                                obscure
+                                  ? `L’assistito chiede di oscurare nel Fascicolo la versione ${v.versione} del Profilo? Dopo, nel Fascicolo la vede solo lui.`
+                                  : `L’assistito chiede di togliere l’oscuramento della versione ${v.versione}?`,
+                              )
+                            )
+                              return;
+                            void run(
+                              () =>
+                                api<Pss>(`${base}/${v.id}/oscuramento`, {
+                                  method: 'POST',
+                                  body: { oscurato: obscure, richiestaAssistito: true },
+                                }),
+                              (r) =>
+                                r.fascicolo?.stato === 'done'
+                                  ? obscure
+                                    ? 'Profilo oscurato nel Fascicolo.'
+                                    : 'Oscuramento tolto.'
+                                  : 'Richiesta in coda per il Fascicolo regionale.',
+                            );
+                          }}
+                        >
+                          <Icon name="lucchetto" />{' '}
+                          <span>{v.oscurato ? 'Togli l’oscuramento' : 'Oscura nel Fascicolo'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="pulsante pulsante-piatto"
+                          disabled={busy}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Cancellare dal Fascicolo la versione ${v.versione} del Profilo? La versione precedente resta sostituita: per avere di nuovo un Profilo nel Fascicolo se ne pubblica uno nuovo.`,
+                              )
+                            )
+                              return;
+                            void run(
+                              () =>
+                                api<Pss>(`${base}/${v.id}/cancella`, {
+                                  method: 'POST',
+                                  body: { confermo: true },
+                                }),
+                              (r) =>
+                                r.stato === 'deleted'
+                                  ? 'Profilo cancellato dal Fascicolo.'
+                                  : 'Cancellazione in coda per il Fascicolo regionale.',
+                            );
+                          }}
+                        >
+                          <Icon name="annulla" /> <span>Cancella dal Fascicolo</span>
+                        </button>
+                      </>
+                    )}
+                </div>
               </li>
             ))}
           </ul>

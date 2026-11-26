@@ -69,6 +69,7 @@ export const SERVICE_USES = [
   'fascicolo_regionale',
   'lotto_nre',
   'ricetta_dpcm',
+  'profilo_sanitario',
 ] as const;
 export type ServiceUse = (typeof SERVICE_USES)[number];
 
@@ -79,6 +80,7 @@ export const SERVICE_FOR_USE: Record<ServiceUse, CredentialService> = {
   fascicolo_regionale: 'rupar_piemonte',
   lotto_nre: 'rupar_piemonte',
   ricetta_dpcm: 'rupar_piemonte',
+  profilo_sanitario: 'rupar_piemonte',
 };
 
 /**
@@ -97,6 +99,9 @@ export const NEEDS_SECOND_FACTOR: Record<ServiceUse, boolean> = {
   // autenticazione multifattore (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.1.1; D269).
   lotto_nre: false,
   ricetta_dpcm: false,
+  // Profilo Sanitario Sintetico ai servizi del Fascicolo regionale: WS-Security con utente,
+  // password e PIN RUPAR (V09, 3.2.1), senza secondo fattore (D280).
+  profilo_sanitario: false,
 };
 
 /** Le ultime tre lettere dell'utente, per riconoscere la credenziale senza mostrarla. */
