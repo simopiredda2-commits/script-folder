@@ -9,7 +9,7 @@ export const REGIONS_DIR = join(import.meta.dirname, '..');
 /**
  * I dati di un pacchetto regionale stanno in `packages/regions/<chiave>/data/`, divisi per tipo:
  * le trascrizioni degli atti della regione, le tabelle RAO della regione, le corrispondenze per il
- * SIAP (D292). Le cartelle nazionali restano in `packages/reference/data/`.
+ * SIAP (D292, D295). Le cartelle nazionali restano in `packages/reference/data/`.
  */
 export type RegionalDataKind = 'trascrizioni' | 'rao' | 'siap';
 

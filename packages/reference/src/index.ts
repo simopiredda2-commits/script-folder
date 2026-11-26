@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { regionalDataDirs } from '@mmg/regions';
 import { join } from 'node:path';
+import { regionalDataDirs } from '@mmg/regions';
 import { type MappingSet, parseMappings } from './mapping';
 
 export * from './changes';
@@ -20,11 +20,11 @@ export const DATA_DIR = join(import.meta.dirname, '..', 'data');
 /**
  * Trascrizioni nazionali che il programma porta con sé: le diagnosi ICD-9-CM (D186), gli allegati
  * del DPCM LEA, le prestazioni aggiuntive dell'ACN. Entrano in uso quando una persona le ha
- * controllate. Quelle delle regioni stanno nei pacchetti regionali (D292).
+ * controllate. Quelle delle regioni stanno nei pacchetti regionali (D295).
  */
 export const TRANSCRIPTIONS_DIR = join(DATA_DIR, 'trascrizioni');
 
-/** Le cartelle delle trascrizioni: quella nazionale e quelle dei pacchetti regionali (D292). */
+/** Le cartelle delle trascrizioni: quella nazionale e quelle dei pacchetti regionali (D295). */
 export const TRANSCRIPTION_DIRS: readonly string[] = [
   TRANSCRIPTIONS_DIR,
   ...regionalDataDirs('trascrizioni'),
@@ -47,13 +47,13 @@ export const SIAP_DIR = join(DATA_DIR, 'siap');
 
 /**
  * Le cartelle delle corrispondenze delle prestazioni aggiuntive per il SIAP: quella nazionale e
- * quelle dei pacchetti regionali, con gli accordi delle regioni (D291, D292).
+ * quelle dei pacchetti regionali, con gli accordi delle regioni (D291, D295).
  */
 export const SIAP_DIRS: readonly string[] = [SIAP_DIR, ...regionalDataDirs('siap')];
 
 /**
  * Tabelle RAO, Raggruppamenti di attesa omogenei (D285): il manuale di AGENAS e, dai pacchetti
- * regionali, le tabelle delle regioni (D292), trascritti con il legame ai codici del nomenclatore di
+ * regionali, le tabelle delle regioni (D295), trascritti con il legame ai codici del nomenclatore di
  * oggi. Prima il manuale nazionale, poi i file di ogni pacchetto in ordine di nome.
  */
 export const RAO_FILES: readonly string[] = [

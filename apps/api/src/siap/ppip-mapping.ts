@@ -39,7 +39,7 @@ export const ppipMappingSchema = z
 export type PpipMappingFile = z.infer<typeof ppipMappingSchema>;
 
 export interface PpipMappings {
-  /** I file letti: il nome, con la cartella quando sono più d'una. */
+  /** I file letti, con il nome del file. */
   files: { name: string; data: PpipMappingFile }[];
   /** Il dettaglio «Altro», per le voci che nessun file lega a un dettaglio. */
   other: number;
@@ -51,7 +51,7 @@ export interface PpipMappings {
  * Le corrispondenze fra le voci dei cataloghi delle prestazioni aggiuntive e i dettagli della
  * tipologia «PIPP» (D291), lette e controllate: ogni dettaglio esiste nei valori del Ministero, una
  * serie ha un file solo, il dettaglio «Altro» lo dice un file solo. Per difetto dalla cartella
- * nazionale e da quelle dei pacchetti regionali (D292).
+ * nazionale e da quelle dei pacchetti regionali (D295).
  */
 export function loadPpipMappings(
   dirs: string | readonly string[] = SIAP_DIRS,

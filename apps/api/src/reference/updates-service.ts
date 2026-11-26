@@ -152,7 +152,7 @@ export function referenceUpdatesFromConfig(
       : publicSourcesSync(config.sources === 'pubbliche' ? {} : { sourcesFile: config.sources }),
   };
   // Per difetto le trascrizioni che il programma porta con sé, nazionali e dei pacchetti regionali
-  // (D159, D292), o quelle d'esempio.
+  // (D159, D295), o quelle d'esempio.
   setup.transcriptionsDir =
     config.transcriptionsDir ?? (example ? EXAMPLE_TRANSCRIPTIONS : TRANSCRIPTION_DIRS);
   const sourcesFile = example

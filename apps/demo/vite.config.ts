@@ -17,7 +17,7 @@ const REPO = resolve(HERE, '..', '..');
 const require = createRequire(import.meta.url);
 
 /**
- * I dati dei pacchetti regionali che il servizio legge mentre lavora (D292): le tabelle RAO e le
+ * I dati dei pacchetti regionali che il servizio legge mentre lavora (D295): le tabelle RAO e le
  * corrispondenze per il SIAP di ogni pacchetto, `packages/regions/<chiave>/data/…`. Le trascrizioni
  * no: entrano nel database di partenza (scripts/prepara-database.ts).
  */

@@ -61,7 +61,7 @@ export interface ImportOptions {
   syncDir: string;
   /**
    * Cartella delle trascrizioni dei PDF, se c'è, o più cartelle: quella nazionale e quelle dei
-   * pacchetti regionali (D292).
+   * pacchetti regionali (D295).
    */
   transcriptionsDir?: string | readonly string[];
   mappings: MappingSet;
@@ -437,7 +437,7 @@ async function importChanges(
 }
 
 /**
- * Le trascrizioni di una cartella o di più cartelle, nell'ordine delle cartelle (D292). Il percorso
+ * Le trascrizioni di una cartella o di più cartelle, nell'ordine delle cartelle (D295). Il percorso
  * dentro la cartella nomina la trascrizione nel rapporto: lo stesso percorso in due cartelle non
  * vale, perché non si saprebbe quale delle due è entrata.
  */
