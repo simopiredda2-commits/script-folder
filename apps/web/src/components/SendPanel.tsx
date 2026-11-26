@@ -107,6 +107,8 @@ export function SendPanel({
   const [check, setCheck] = useState<CheckResult | null>(null);
   const [confirmed, setConfirmed] = useState<Set<string>>(new Set());
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  /** Le decisioni del medico sulle proposte della segreteria, per riga (D283). */
+  const [decisions, setDecisions] = useState<Record<string, 'conferma' | 'non_applicare'>>({});
   const [error, setError] = useState<ApiError | null>(null);
   const [outcome, setOutcome] = useState<SendOutcome | null>(null);
   const [busy, setBusy] = useState(false);
@@ -118,7 +120,7 @@ export function SendPanel({
   const checkable = status === 'draft' || status === 'to_sign' || status === 'error';
   const [checking, setChecking] = useState(checkable);
 
-  const body = { confermeNote: [...confirmed], motivi: reasons };
+  const body = { confermeNote: [...confirmed], motivi: reasons, proposte: decisions };
   // Il controllo legge le conferme e i motivi del momento, senza ripartire a ogni tasto.
   const latest = useRef(body);
   latest.current = body;
@@ -175,8 +177,22 @@ export function SendPanel({
     : status === 'error' && (lastErrorKind === 'unreachable' || lastErrorKind === 'timeout');
   const toRedForm = !!redForm && noOutcome;
   const aifa = (check?.problemi ?? []).filter((p) => p.needs === 'aifa_confirmation' && p.lineId);
+  // Le proposte della segreteria sul tipo di terapia: il medico le conferma o no (D283). Una
+  // proposta decisa qui resta con la sua scelta anche dopo «Controlla di nuovo», che la dice già
+  // decisa: il medico può cambiare idea fino alla firma.
+  const proposals = (check?.problemi ?? []).filter(
+    (p) =>
+      p.ruleId === 'PROPOSTA' &&
+      !!p.lineId &&
+      (p.needs === 'therapy_decision' || decisions[p.lineId] !== undefined),
+  );
+  const undecided = proposals.filter((p) => !decisions[p.lineId!]).length;
   const warns = [
-    ...new Set((check?.problemi ?? []).filter((p) => p.severity === 'warn').map((p) => p.ruleId)),
+    ...new Set(
+      (check?.problemi ?? [])
+        .filter((p) => p.severity === 'warn' && p.needs !== 'therapy_decision')
+        .map((p) => p.ruleId),
+    ),
   ];
 
   async function sign() {
@@ -309,7 +325,9 @@ export function SendPanel({
           ? `Controllo in corso: si ${isDoctor ? 'firma' : 'manda alla firma'} quando è finito.`
           : busy && isDoctor
             ? 'Firma e invio in corso.'
-            : ''}
+            : isDoctor && undecided > 0
+              ? 'Per firmare, decidi sulle proposte della segreteria.'
+              : ''}
       </p>
       {isDoctor && aifa.length > 0 && (
         <fieldset className="conferme">
@@ -332,6 +350,32 @@ export function SendPanel({
                 della nota
               </label>
             </div>
+          ))}
+        </fieldset>
+      )}
+      {isDoctor && proposals.length > 0 && (
+        <fieldset className="conferme">
+          <legend>Proposte della segreteria sul tipo di terapia</legend>
+          {proposals.map((p) => (
+            <fieldset key={p.lineId} className="proposta">
+              <legend>{lineNames[p.lineId!] ?? 'Riga'}</legend>
+              {(['conferma', 'non_applicare'] as const).map((d) => (
+                <div key={d} className="casella">
+                  <input
+                    type="radio"
+                    id={`proposta-${d}-${p.lineId}`}
+                    name={`proposta-${p.lineId}`}
+                    checked={decisions[p.lineId!] === d}
+                    onChange={() => setDecisions({ ...decisions, [p.lineId!]: d })}
+                  />
+                  <label htmlFor={`proposta-${d}-${p.lineId}`}>
+                    {d === 'conferma'
+                      ? 'Conferma la proposta: con la firma si aggiorna la terapia'
+                      : 'Non applicarla: la ricetta parte con la terapia com’è'}
+                  </label>
+                </div>
+              ))}
+            </fieldset>
           ))}
         </fieldset>
       )}
@@ -428,7 +472,7 @@ export function SendPanel({
             type="button"
             className="pulsante pulsante-primario"
             onClick={() => void sign()}
-            disabled={busy || checking || blocked.length > 0}
+            disabled={busy || checking || blocked.length > 0 || undecided > 0}
           >
             {/* Fermato il passo unico, il medico conferma di aver visto i controlli (D256). */}
             <Icon name="firma" />{' '}

@@ -2387,3 +2387,56 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - Modelli «chiusi» che vietano ciò che lo schema del CDA rende obbligatorio (`manufacturedMaterial` nell'assenza di terapie) o che non riconoscono le sezioni e le voci appena descritte; la sezione delle allergie è cercata con l'identificativo interno di ART-DECOR (`2.16.840.1.113883.3.1937.777.63.10.415`) invece del suo modello ufficiale.
 - **Prove**: nel programma (`packages/integrations/test/pss-cda.test.ts`) la versione 1.5, ogni `id` OID o UUID, unico nel documento e sempre lo stesso per lo stesso documento, l'uso dell'indirizzo del custode, il sistema del codice OINT; lo schematron del Ministero come prima. In locale, con Saxon-HE 12.5 e lo schematron della guida, sul Profilo dell'esempio delle prove (paziente inventato): 36 errori sul Profilo completo e 21 su quello con le assenze, tutti nelle due liste qui sopra; elenco in `docs/avanzamento.md`. Saxon e lo schematron della guida non sono nel repository (D92) e non girano nella CI.
 - **Da chiedere**: alla domanda 10 per il CSI (quale schematron applica il servizio regionale) si aggiungono i contrasti e i difetti qui sopra, da girare a HL7 Italia se il CSI usa anche lo schematron della guida. «Ogni PSS deve passarli tutti e due» non si può fare finché lo schematron della guida ha questi difetti: è da dire a Simone alla prossima fermata.
+
+**D282 · Risposte della fermata del 26/11/2026, dopo l'unione della #41.** Simone ha chiesto se si doveva aspettare o si poteva andare avanti. AURA aspetta il CSI (D268); le quattro domande annotate fra le fermate hanno avuto risposta con il pulsante.
+
+- **1. Tipo di terapia mentre si prepara la ricetta**: «Casella in ricetta (Consigliata)». Il medico segna tipo (cronica, ciclo, al bisogno), tipologia S o H e «Non rimborsabile SSN» sulla riga della ricetta; alla firma il programma crea la terapia o aggiorna quella collegata. La segreteria la segna come proposta, che il medico conferma quando convalida: così resta il medico a decidere il tipo di terapia, come vogliono i requisiti.
+- **3. SIAP**: «Adesso, prima di AURA (Consigliata)». Prima la parte che non dipende dal CSI: il contatto come registrazione a sé, il fumo codificato, il codice STS.11 dello studio con il tipo di struttura, l'UCCP e la tabella delle prestazioni. Poi il modulo con un simulatore del CSI, con i valori delle specifiche del Ministero finché il CSI non dà il suo formato (`docs/siap.md`).
+- **4. Nome del menu «Esami»**: «Nomi nuovi (Consigliata)». Il menu della cartella si chiama «Risultati degli esami» e la Specialistica «Visite ed esami da prescrivere».
+- **5. Profilo e schematron della guida HL7 Italia v1.5**: Simone ha chiesto «qual è la soluzione più corretta per fare in modo che [il programma] funzioni perfettamente?». Risposta: seguire il Ministero, l'opzione consigliata, perché il Gateway controlla il Profilo con lo schematron 4.0 e i dizionari del Ministero e non con quello della guida, che nessun documento valido può passare per intero. Seguire le regole della guida in contrasto farebbe anzi rifiutare il Profilo dal Gateway, per esempio con lo stato clinico in LOINC. L'unico dubbio, se anche il servizio della Regione usa lo schematron della guida, è la domanda 10 per il CSI; la conferma arriva con il kit di prova del CSI. Non c'è lavoro da fare: il Profilo resta com'è (D281).
+- **Unione delle pull request**: «Sì, unisci con le prove verdi (Consigliata)» per le pull request di questo blocco, come per la #40 e la #41 (D275).
+- **Ordine** (scelta mia): prima i nomi dei menu e il tipo di terapia sulla riga della ricetta, in una pull request; poi il SIAP. AURA dopo le risposte del CSI.
+
+**D283 · Il tipo di terapia sulla riga della ricetta (D282, domanda 1).** Il medico segna sulla riga del farmaco che cosa è la terapia, senza aprire la scheda; alla firma il programma crea la terapia, o aggiorna quella collegata. La segreteria propone, il medico decide.
+
+- **Dove**: sulla riga di ogni farmaco della ricetta farmaceutica, SSN o bianca, si apre il riquadro «Terapia». Ci sono:
+  - il tipo: cronica, ciclo con la data di fine, al bisogno;
+  - la tipologia: nessuna, suggerita (S) con medico suggeritore, struttura e data, ricovero (H);
+  - «Non rimborsabile SSN».
+
+  Per un farmaco della ricerca c'è anche «Nessuna: prescrizione occasionale», ed è la scelta per difetto: come prima, la terapia non si crea.
+
+- **Che cosa porta la riga**: la scelta solo se cambia qualcosa. Per una terapia collegata, se è diversa dalla scheda com'è adesso; per un farmaco nuovo, se ha un tipo. Il servizio fa lo stesso controllo: una scelta uguale alla scheda non resta sulla riga, così una riga della segreteria non diventa una proposta per niente.
+- **Alla firma**, quando la ricetta passa «in invio» e nella stessa transazione:
+  - la terapia collegata si aggiorna: tipo, fine se ciclo, S o H, medico suggeritore se S, «Non rimborsabile SSN»;
+  - senza terapia se ne crea una e la riga la prende, così la ricetta entra nel suo storico e nel contatore di R11.
+
+  Succede una volta sola: se l'invio non riesce la scelta resta fatta, e un nuovo invio non la rifà, anche se intanto la scheda è cambiata.
+
+- **La terapia nuova**:
+  - dalla riga: farmaco, AIC, principio attivo, confezioni per ricetta, nota AIFA, «per principio attivo» e «non sostituibile»;
+  - dalla banca dati in vigore: ATC, classe, gruppo di equivalenza e DPC;
+  - inizio alla data della firma, fine solo per il ciclo;
+  - esenzione abituale: quella della ricetta;
+  - non riservata.
+
+  La posologia della riga è un testo, la scheda ha dose, unità e frequenza. Il testo non si spezza: va nella frequenza, come per le terapie importate, se sta in 100 caratteri, altrimenti nelle istruzioni per il paziente. Dose, unità al giorno e indicazione si completano nella scheda; finché le unità al giorno mancano, R11 non conta quella terapia, come ogni scheda senza unità al giorno.
+
+- **Controlli**:
+  - la S vuole il medico suggeritore e il ciclo la data di fine, come nella scheda;
+  - il ciclo non finisce prima di oggi per una terapia nuova, né prima dell'inizio della terapia collegata;
+  - «Non rimborsabile SSN» va solo in ricetta bianca (requisiti, «Opzioni»; R8): in ricetta SSN la casella si toglie, non si mette;
+  - il tipo si segna solo sulle righe dei farmaci, solo nella ricetta dei farmaci;
+  - la terapia collegata è del paziente della ricetta.
+- **Per la ricetta stessa**: la tipologia della riga va nel messaggio (indicazionePrescr) e nel campo 14 del promemoria, con la regola di sempre: la stessa per tutte le righe (D217). Le regole R4 e R11 vedono già il tipo scelto.
+- **La segreteria** (requisiti, «Ruoli» e «Terapia»: il tipo lo decide il medico). Sulle righe delle terapie croniche che prepara, la sua scelta è una proposta. Il medico la vede ai controlli della ricetta da firmare, come «Proposta della segreteria · Chiede la decisione del medico», e sceglie fra due risposte:
+  - «Conferma la proposta»;
+  - «Non applicarla»: la ricetta parte con la terapia com'è.
+
+  Finché il medico non decide, «Firma e invia» resta spento e il servizio non manda la ricetta. La decisione resta sulla riga e nel controllo dell'invio. La terapia la aggiorna il medico che firma: lo storico delle modifiche è a suo nome.
+
+- **Non fatto**:
+  - il tipo nella ripetizione rapida («Ripeti le terapie scelte»), che usa la scheda com'è;
+  - «Riservata» per la terapia nuova: si segna nella scheda;
+  - la modifica di una ricetta della segreteria: il medico la annulla e la rifà, come prima.
+- **Non provato**: con il SAR e il Sistema TS veri, che la tipologia S o H sia accettata come la scrivono le specifiche lette (D273).

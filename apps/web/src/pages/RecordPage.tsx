@@ -77,6 +77,14 @@ export interface TherapyRow {
   notSubstitutable?: boolean;
   notSubstitutableReason?: string | null;
   notSubstitutableCode?: string | null;
+  /** Il tipo di terapia sulla riga della ricetta parte da qui (D283). */
+  endOn?: string | null;
+  suggestedS?: boolean;
+  hospitalH?: boolean;
+  notReimbursable?: boolean;
+  suggestedByName?: string | null;
+  suggestedByFacility?: string | null;
+  suggestedOn?: string | null;
 }
 
 /** La scheda intera, come la restituisce il servizio. */

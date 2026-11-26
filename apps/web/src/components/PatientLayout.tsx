@@ -47,7 +47,9 @@ interface Section {
 
 /**
  * Il menu della cartella: prima le scorciatoie per prescrivere (erano nel riepilogo), poi il
- * riepilogo e le voci, nell'ordine di prima; «Esami» (i referti) accanto ai parametri.
+ * riepilogo e le voci, nell'ordine di prima; «Risultati degli esami» (i referti) accanto ai
+ * parametri. I nomi dicono che cosa si fa: i risultati da una parte, le visite e gli esami da
+ * prescrivere dall'altra (D282).
  */
 export const RECORD_SECTIONS: readonly Section[] = [
   // I farmaci prescritti stanno nella ricetta (D246): la loro pagina completa resta sotto questa voce.
@@ -58,14 +60,19 @@ export const RECORD_SECTIONS: readonly Section[] = [
     prescribe: 'primary',
     also: ['farmaci'],
   },
-  { to: 'specialistica', label: 'Specialistica', icon: 'specialistica', prescribe: true },
+  {
+    to: 'specialistica',
+    label: 'Visite ed esami da prescrivere',
+    icon: 'specialistica',
+    prescribe: true,
+  },
   { to: 'certificati', label: 'Certificati', icon: 'firma', prescribe: true, doctorOnly: true },
   { to: '', label: 'Riepilogo', icon: 'info', end: true },
   { to: 'amministrazione', label: 'Dati amministrativi', icon: 'pazienti' },
   { to: 'visite-ed-esami', label: 'Visite ed esami prescritti', icon: 'specialistica' },
   { to: 'voci', label: 'Voci cliniche', icon: 'storico' },
   { to: 'parametri', label: 'Parametri', icon: 'esami' },
-  { to: 'esami', label: 'Esami', icon: 'esami' },
+  { to: 'esami', label: 'Risultati degli esami', icon: 'esami' },
   { to: 'piani', label: 'Piani terapeutici', icon: 'terapia' },
   { to: 'presidi', label: 'Presidi', icon: 'terapia' },
   { to: 'prestazioni-aggiuntive', label: 'Prestazioni aggiuntive', icon: 'firma' },

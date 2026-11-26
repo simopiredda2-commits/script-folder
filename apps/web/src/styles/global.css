@@ -1782,6 +1782,21 @@ a.coda:hover {
   padding-left: 0.75rem;
 }
 
+/* Il tipo di terapia sulla riga della ricetta (D283). */
+.scelta-terapia {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+  border-left: 4px solid var(--color-primary);
+  padding-left: 0.75rem;
+}
+
+.scelta-terapia legend {
+  float: left;
+  width: 100%;
+  margin-bottom: 0;
+}
+
 /* Le altre opzioni della ricetta e le banche dati in uso, chiuse in una riga (D242). */
 .altre-opzioni summary,
 .versioni-chiuse summary {

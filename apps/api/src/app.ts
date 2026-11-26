@@ -509,6 +509,19 @@ export function buildApp({
       ...(buildPromemoria ? { buildPromemoria } : {}),
       serviceCatalog: (date) => reference.serviceLookup(date),
       serviceNotes: (date) => reference.serviceNotes(date),
+      // La terapia creata dalla riga alla firma prende i dati del farmaco dalla banca dati (D283).
+      drugCards: async (aics, date) =>
+        new Map(
+          [...(await reference.drugs(aics, date))].map(([aic, d]) => [
+            aic,
+            {
+              atc: d.atc,
+              drugClass: d.drugClass,
+              equivalenceGroup: d.equivalenceGroup,
+              dpc: d.dpc,
+            },
+          ]),
+        ),
       ...(nreLots ? { nreLots } : {}),
       ...(dpcm ? { dpcm } : {}),
     }),

@@ -25,6 +25,7 @@ import {
   therapy,
 } from '../db/schema';
 import type { CheckOutcome, SignInput } from './service';
+import { effectiveChoice } from './therapy-choice';
 
 export interface RulesCheckDeps {
   db: Database;
@@ -96,6 +97,9 @@ export async function buildRuleContext(
 
   const lineContexts: LineContext[] = lines.map((l) => {
     const t = therapies.find((x) => x.id === l.therapyId);
+    // Il tipo segnato sulla riga vale già per questa ricetta (D283): la terapia lo prende alla
+    // firma. Una proposta della segreteria vale solo confermata.
+    const chosen = effectiveChoice(l, input.proposals);
     return {
       id: l.id,
       drugAic: l.drugAic,
@@ -116,7 +120,7 @@ export async function buildRuleContext(
       therapy: t
         ? {
             id: t.id,
-            kind: t.kind,
+            kind: chosen?.kind ?? t.kind,
             startOn: t.startOn,
             unitsPerDay: parseUnits(t.unitsPerDay),
             multiPrescription: t.multiPrescription,

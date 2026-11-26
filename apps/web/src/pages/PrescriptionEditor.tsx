@@ -34,6 +34,14 @@ import {
 import { RedPrintedNotice, type RedPrinted } from '../components/RedFormPrint';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
+import {
+  choiceBody,
+  choiceFromTherapy,
+  choiceSummary,
+  NO_CHOICE,
+  TherapyChoiceFields,
+  type ChoiceDraft,
+} from '../components/TherapyChoiceFields';
 import { api, ApiError, query } from '../lib/api';
 import { ACCESS_TYPE, date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
 import { readStored, removeStored, usePersistentState, writeStored } from '../lib/storage';
@@ -121,6 +129,11 @@ interface Line {
   /** Ricetta bianca ripetibile, solo se diverso dalla regola del farmaco (D93). */
   repeatCount?: string;
   validityMonths?: string;
+  /**
+   * Tipo di terapia segnato sulla riga (D283). Assente: com'è nella terapia collegata, o nessuna
+   * terapia per un farmaco nuovo.
+   */
+  therapyChoice?: ChoiceDraft;
 }
 
 /** Tariffa, ciclo e nota della prestazione nel catalogo e nell'elenco delle note in uso (D276). */
@@ -564,6 +577,12 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const therapies = useApi<{ terapie: TherapyRow[] }>(
     mode === 'farmaci' ? `/api/pazienti/${id}/terapie` : null,
   );
+  // Il tipo di terapia di una riga collegata parte dalla scheda com'è adesso (D283).
+  const therapyById = new Map((therapies.data?.terapie ?? []).map((t) => [t.id, t]));
+  const baseOf = (therapyId: string | undefined) => {
+    const t = therapyId ? therapyById.get(therapyId) : undefined;
+    return t ? choiceFromTherapy(t) : undefined;
+  };
   // I farmaci prescritti stanno qui, dove si prescrive (D246): ultima ricetta, tipo, storico.
   const prescribed = useApi<{ farmaci?: PrescribedDrug[] }>(
     mode === 'farmaci' ? `/api/pazienti/${id}/farmaci-prescritti` : null,
@@ -728,9 +747,14 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
             validityMonths,
             sessions,
             serviceNoteLetter,
+            therapyChoice,
             ...l
           }) => ({
             ...l,
+            // Il tipo di terapia della riga, solo se cambia qualcosa della terapia (D283).
+            ...(mode === 'farmaci'
+              ? { therapyChoice: choiceBody(therapyChoice, baseOf(l.therapyId)) }
+              : {}),
             // Nota con la lettera e sedute del ciclo, solo per la specialistica (D276).
             ...(mode === 'specialistica'
               ? {
@@ -926,12 +950,12 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           <p role="status" className="tenue stato-ricerca">
             {q && search.data ? resultsText(q, search.data) : ''}
           </p>
-          {/* Un esame cercato fra i farmaci (D279): si prescrive in Specialistica. */}
+          {/* Un esame cercato fra i farmaci (D279): si prescrive fra visite ed esami (D282). */}
           {mode === 'farmaci' && q && search.data && (search.data.farmaci ?? []).length === 0 && (
             <p className="tenue">
-              Cerchi un esame o una visita? Si prescrivono in Specialistica:{' '}
+              Cerchi un esame o una visita? Si prescrivono in «Visite ed esami da prescrivere»:{' '}
               <Link to={`/pazienti/${id}/specialistica${query({ cerca: q })}`}>
-                cerca «{q}» in Specialistica
+                cerca «{q}» fra visite ed esami
               </Link>
               .
             </p>
@@ -1133,7 +1157,15 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                         <strong className="riga-ricetta-nome">
                           {n + 1}. {name}
                         </strong>
-                        <span className="tenue">{lineSummary(l, mode, kind === 'white')}</span>
+                        <span className="tenue">
+                          {[
+                            lineSummary(l, mode, kind === 'white'),
+                            mode === 'farmaci' &&
+                              choiceSummary(l.therapyChoice, baseOf(l.therapyId)),
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
                       </span>
                     </button>
                     {l.aifaNote && <span className="etichetta">Nota {l.aifaNote}</span>}
@@ -1308,6 +1340,21 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                             </p>
                           </div>
                         )}
+                        <TherapyChoiceFields
+                          id={l.key}
+                          value={l.therapyChoice ?? baseOf(l.therapyId) ?? NO_CHOICE}
+                          base={baseOf(l.therapyId)}
+                          white={kind === 'white'}
+                          proposal={!isDoctor}
+                          onChange={(patch) =>
+                            update(l.key, {
+                              therapyChoice: {
+                                ...(l.therapyChoice ?? baseOf(l.therapyId) ?? NO_CHOICE),
+                                ...patch,
+                              },
+                            })
+                          }
+                        />
                       </>
                     )}
                     <button

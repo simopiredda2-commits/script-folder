@@ -61,7 +61,7 @@ Una ricetta inviata si annulla solo se l'ente non l'ha ancora lavorata. Prima di
 
 ## Chi fa che cosa
 
-- La segreteria prepara le ripetizioni di terapie croniche non riservate, nella coda «da firmare». Le ripetizioni sono **raggruppate** (scelta della seconda fermata): più terapie nella stessa ricetta se hanno lo stesso tipo di ricetta e la stessa esenzione, senza superare il limite di confezioni di R2 in vigore. Non firma, non invia, non prepara ricette nuove.
+- La segreteria prepara le ripetizioni di terapie croniche non riservate, nella coda «da firmare». Sulla riga può proporre il tipo di terapia, che il medico conferma o no alla firma (D283). Le ripetizioni sono **raggruppate** (scelta della seconda fermata): più terapie nella stessa ricetta se hanno lo stesso tipo di ricetta e la stessa esenzione, senza superare il limite di confezioni di R2 in vigore. Non firma, non invia, non prepara ricette nuove.
 - Il medico prepara, firma e invia. Il sostituto e il collega autorizzato firmano **a nome loro**.
 - Ogni operazione passa dalla guardia sui dati del paziente e finisce nel registro degli accessi (`ricetta_bozza`, `ricetta_ripetizione`, `ricetta_da_firmare`, `ricetta_firma_invio`, `ricetta_esito_invio`, `ricetta_annullamento`, `ricetta_cartacea`).
 
@@ -137,7 +137,14 @@ Quando la ricetta SSN farmaceutica o specialistica non ha esito dal SAR, la Regi
   - Sul promemoria si stampa «NON SOSTITUIBILE - motivazione N».
 
 - **Principio attivo**: nella ricetta rossa una riga per principio attivo porta solo il gruppo di equivalenza (caso A1). Senza il gruppo nella lista di trasparenza in vigore va l'AIC, come per l'unico farmaco autorizzato (caso D).
-- **Tipologia S o H** (`indicazionePrescr`, IndicazionePrescr nella ricetta rossa): c'è solo se tutte le righe vengono da terapie con la stessa tipologia, come il campo 14 del promemoria (D217).
+- **Tipologia S o H** (`indicazionePrescr`, IndicazionePrescr nella ricetta rossa): c'è solo se tutte le righe hanno la stessa tipologia, come il campo 14 del promemoria (D217). Per ogni riga vale quella segnata sulla riga, se c'è (D283), altrimenti quella della terapia collegata.
+
+## Tipo di terapia sulla riga (D282, D283)
+
+- Sulla riga di ogni farmaco il riquadro «Terapia» ha il tipo (cronica, ciclo con la fine, al bisogno), la tipologia (S con il medico suggeritore, H) e «Non rimborsabile SSN», che va solo in ricetta bianca. Per un farmaco della ricerca c'è anche «Nessuna: prescrizione occasionale», per difetto.
+- La riga porta la scelta solo se cambia qualcosa della terapia collegata, o se crea una terapia nuova.
+- Alla firma, quando la ricetta passa «in invio», la terapia collegata si aggiorna; senza terapia se ne crea una e la riga la prende. Una volta sola, anche se l'invio poi si ripete. La terapia nuova prende ATC, classe, gruppo di equivalenza e DPC dalla banca dati; dose, unità al giorno e indicazione si completano nella scheda.
+- La segreteria propone: il medico, alla firma della ricetta da firmare, conferma la proposta o non la applica. Finché non decide, la ricetta non parte.
 
 ## Note del nomenclatore, sedute e tariffa nella ricetta specialistica (D276)
 
