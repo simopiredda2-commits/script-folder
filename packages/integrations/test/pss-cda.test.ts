@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildPssCda, hl7Date, hl7Time, itDate, unitLabel, type PssCdaInput } from '../src/fse/cda';
+import {
+  buildPssCda,
+  derivedUuid,
+  hl7Date,
+  hl7Time,
+  itDate,
+  unitLabel,
+  type PssCdaInput,
+} from '../src/fse/cda';
 import { sampleInput } from './helpers/pss-esempio';
 import { pssSchematron } from '../src/fse/schematron';
 
@@ -68,5 +76,75 @@ describe('documento CDA2 del Profilo Sanitario Sintetico', () => {
     expect(hl7Time(new Date('2026-11-18T09:30:00Z'))).toBe('20261118103000+0100');
     expect(hl7Time(new Date('2026-07-01T09:30:00Z'))).toBe('20260701113000+0200');
     expect(hl7Date('2026-11-18')).toBe('20261118');
+  });
+});
+
+/** Guida HL7 Italia v1.5, dove non contrasta con lo schematron del Ministero (D281). */
+describe('Profilo secondo la guida HL7 Italia v1.5', () => {
+  const OID = /^[0-2](\.(0|[1-9]\d*))*$/;
+  const UUID = /^[A-Fa-f\d]{8}-[A-Fa-f\d]{4}-[A-Fa-f\d]{4}-[A-Fa-f\d]{4}-[A-Fa-f\d]{12}$/;
+  const ABSENT = {
+    allergies: { absent: 'no-known-allergies' },
+    therapies: { absent: 'no-medication-info' },
+    problems: { absent: 'no-known-problems' },
+    familyHistory: { absent: 'no-problem-info' },
+  } as const;
+  /** Le radici di tutti gli `id`, e quelle senza extension (le voci e le loro osservazioni). */
+  const ids = (xml: string) => {
+    const all = [...xml.matchAll(/<id root="([^"]*)"( extension="[^"]*")?/g)];
+    return {
+      roots: all.map((m) => m[1]!),
+      entries: all.filter((m) => !m[2]).map((m) => m[1]!),
+    };
+  };
+
+  it('il modello del documento dichiara la versione 1.5', () => {
+    expect(buildPssCda(sampleInput())).toContain(
+      '<templateId root="2.16.840.1.113883.2.9.10.1.4.1.1" extension="1.5"',
+    );
+  });
+
+  it('l’assenza di allergie usa il sistema di codici della guida, che il Ministero accetta', () => {
+    const xml = buildPssCda(sampleInput(ABSENT));
+    expect(xml).toContain('code="OINT" codeSystem="2.16.840.1.113883.1.11.19700"');
+    expect(check(sampleInput(ABSENT)).errors).toEqual([]);
+  });
+
+  it('l’indirizzo del custode dice l’uso, come vuole la guida', () => {
+    const xml = buildPssCda(sampleInput());
+    const custodian = /<custodian>.*<\/custodian>/s.exec(xml)![0];
+    expect(custodian).toContain('<addr use="WP">');
+  });
+
+  it('ogni identificativo è un OID o un UUID, anche nelle voci di assenza', () => {
+    for (const xml of [buildPssCda(sampleInput()), buildPssCda(sampleInput(ABSENT))]) {
+      const bad = ids(xml).roots.filter((r) => !OID.test(r) && !UUID.test(r));
+      expect(bad).toEqual([]);
+    }
+  });
+
+  it('gli identificativi delle voci sono unici nel documento e sempre gli stessi', () => {
+    for (const input of [sampleInput(), sampleInput(ABSENT)]) {
+      const { entries } = ids(buildPssCda(input));
+      expect(entries.length).toBeGreaterThan(3);
+      expect(new Set(entries).size).toBe(entries.length);
+      expect(ids(buildPssCda(input)).entries).toEqual(entries);
+    }
+    // Le voci di assenza di un altro documento hanno identificativi loro (le voci della cartella,
+    // come i parametri, restano quelle della cartella).
+    const onlyAbsent = { ...ABSENT, vitals: [], lifestyle: [], motorCapacity: null };
+    const other = sampleInput(onlyAbsent);
+    other.document = { ...other.document, id: { root: '2.999.1.1', extension: 'PSS.9' } };
+    const a = ids(buildPssCda(sampleInput(onlyAbsent))).entries;
+    const b = ids(buildPssCda(other)).entries;
+    expect(a).toHaveLength(6);
+    expect(a.filter((x) => b.includes(x))).toEqual([]);
+  });
+
+  it('l’identificativo ricavato è un UUID della versione 5', () => {
+    const u = derivedUuid('prova');
+    expect(u).toMatch(/^[\da-f]{8}-[\da-f]{4}-5[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/);
+    expect(derivedUuid('prova')).toBe(u);
+    expect(derivedUuid('prova2')).not.toBe(u);
   });
 });

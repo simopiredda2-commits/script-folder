@@ -8,7 +8,6 @@ import {
   type FseCaller,
   type FseGatewayClient,
   type FseProblem,
-  type FsePublicationMetadata,
   type FseResult,
   type PssCdaInput,
 } from '@mmg/integrations';
@@ -17,7 +16,14 @@ import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Actor } from '../auth/service';
 import type { Database } from '../db/client';
-import { doctorProfile, fseSetting, fseTransmission, pssDocument, pssFile } from '../db/schema';
+import {
+  doctorProfile,
+  fseRegionalSend,
+  fseSetting,
+  fseTransmission,
+  pssDocument,
+  pssFile,
+} from '../db/schema';
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { guardPatient } from '../patients/access';
@@ -32,13 +38,16 @@ import {
   type PssItem,
 } from './compose';
 import { renderPssPdf } from './pdf';
+import { regionalAuthorIssues, regionalRegimeOf, type RegionalQueue } from './regional-queue';
 
 /**
  * Profilo Sanitario Sintetico nel Fascicolo (tappa 11). Il medico compone dalla cartella, sceglie,
  * conferma di aver controllato; il programma scrive il documento CDA2, lo controlla con lo
- * schematron ufficiale, lo fa validare dal Gateway, lo firma PAdES e lo pubblica. Una versione
- * nuova sostituisce la precedente, che resta consultabile. Ogni chiamata al Gateway resta nel
- * registro degli invii; ogni accesso passa dalla guardia della cartella.
+ * schematron ufficiale, lo fa validare dal Gateway, lo firma PAdES e lo manda al Fascicolo della
+ * Regione, che lo pubblica sul Gateway (V09, D280): con la coda degli invii e le politiche della
+ * Regione (`regional-queue.ts`). Una versione nuova sostituisce la precedente, che resta
+ * consultabile; il medico che l'ha scritto può oscurarlo o cancellarlo dal Fascicolo. Ogni chiamata
+ * resta nel registro degli invii; ogni accesso passa dalla guardia della cartella.
  */
 
 export interface PssDeps {
@@ -47,6 +56,8 @@ export interface PssDeps {
   /** Indirizzo di base del servizio, destinatario dei token (aud). */
   gatewayAudience: string;
   signer: DocumentSigner;
+  /** La coda verso i servizi del Fascicolo regionale (D280). */
+  regional: RegionalQueue;
   reference?: Pick<ReferenceData, 'municipality'>;
   now?: () => Date;
   applicationVersion?: string;
@@ -70,27 +81,56 @@ const choiceBody = z
   })
   .strict();
 const validateBody = z.object({ confermo: z.literal(true) }).strict();
+/** L'oscuramento del documento lo chiede l'assistito (DM 7/9/2023, art. 9): il medico lo conferma. */
+const obscureBody = z
+  .object({ oscurato: z.boolean(), richiestaAssistito: z.literal(true) })
+  .strict();
+const deleteBody = z.object({ confermo: z.literal(true) }).strict();
+const inProgress = () =>
+  new HttpError(409, 'C’è già un messaggio al Fascicolo in corso per questo Profilo');
 
 const sha256 = (b: Uint8Array | string) => createHash('sha256').update(b).digest('hex');
 
 /** Che cosa manca nelle impostazioni del Fascicolo dello studio («da completare», D133). */
 export function settingsIssues(s: Settings | undefined): string[] {
   if (!s) return ['Impostazioni del Fascicolo da completare: ancora nessuna'];
+  // Repository, invii e attività clinica li mette il Fascicolo regionale quando pubblica sul
+  // Gateway (V09: TipoAttivitaClinica «ERP» per il PSS): qui non servono più (D280).
   const missing: string[] = [];
   if (!s.documentIdRoot) missing.push('radice OID dei documenti');
-  if (!s.repositoryId) missing.push('identificativo del repository');
-  if (!s.submissionIdRoot) missing.push('radice OID degli invii');
   if (!s.custodianIdRoot || !s.custodianIdExtension || !s.custodianName) missing.push('custode');
   if (!s.custodianStreet || !s.custodianCity || !s.custodianIstatCode)
     missing.push('indirizzo del custode');
   if (!s.locality) missing.push('struttura nel formato XON');
-  if (!s.clinicalActivity) missing.push('tipo di attività clinica');
-  if (!s.administrativeRequest) missing.push('regime');
+  if (!regionalRegimeOf(s.administrativeRequest))
+    missing.push('regime fra quelli della Regione (SSN, SSR, ricovero, privato, donatori)');
   return missing.length ? [`Impostazioni del Fascicolo da completare: ${missing.join(', ')}`] : [];
 }
 
+type SendRow = typeof fseRegionalSend.$inferSelect;
+
+/** Il messaggio al Fascicolo regionale per l'interfaccia: com'è andato e che cosa succede ora. */
+function sendView(s: SendRow | undefined) {
+  if (!s) return null;
+  return {
+    id: s.id,
+    operazione: s.operation,
+    stato: s.status,
+    tentativi: s.attempts,
+    fase: s.phase,
+    inCodaDal: s.queuedSince,
+    prossimoTentativo: s.status === 'queued' || s.status === 'waiting' ? s.nextAttemptAt : null,
+    ultimoTentativo: s.lastAttemptAt,
+    ultimoErrore: s.lastError,
+    errori: s.errors,
+    identificativoTemporaneo: s.temporaryId,
+    creatoIl: s.createdAt,
+    fattoIl: s.doneAt,
+  };
+}
+
 /** La parte della riga che va all'interfaccia. */
-function view(r: Row) {
+function view(r: Row, send?: SendRow) {
   return {
     id: r.id,
     stato: r.status,
@@ -106,6 +146,12 @@ function view(r: Row) {
     inviatoIl: r.submittedAt,
     pubblicatoIl: r.publishedAt,
     sostituitoIl: r.replacedAt,
+    scartatoDalFascicoloIl: r.rejectedAt,
+    cancellatoIl: r.deletedAt,
+    /** OID del documento nel Fascicolo regionale. */
+    identificativoFascicolo: r.regionalOid,
+    oscurato: r.confidentiality === 'V',
+    fascicolo: sendView(send),
   };
 }
 
@@ -120,6 +166,22 @@ export function createPssService(deps: PssDeps) {
   async function doctorOf(userId: string) {
     const [d] = await db.select().from(doctorProfile).where(eq(doctorProfile.userId, userId));
     return d;
+  }
+  /** L'ultimo messaggio al Fascicolo regionale di ogni documento. */
+  async function sendsOf(docIds: string[]) {
+    if (!docIds.length) return new Map<string, SendRow>();
+    const rows = await db
+      .select()
+      .from(fseRegionalSend)
+      .where(inArray(fseRegionalSend.documentId, docIds))
+      .orderBy(asc(fseRegionalSend.createdAt));
+    return new Map(rows.map((s) => [s.documentId, s]));
+  }
+  async function lastSend(docId: string) {
+    return (await sendsOf([docId])).get(docId);
+  }
+  async function viewOf(patientId: string, docId: string) {
+    return view(await load(patientId, docId), await lastSend(docId));
   }
   async function documentsOf(patientId: string) {
     return db
@@ -205,33 +267,6 @@ export function createPssService(deps: PssDeps) {
     });
   }
 
-  /**
-   * Lo stato della transazione: il Profilo è pubblicato quando i metadati sono andati a INI;
-   * con la versione nuova la precedente risulta sostituita. Altrimenti resta preso in carico.
-   */
-  async function checkIni(actor: Actor, patientCf: string, who: FseCaller, r: Row) {
-    const st = await deps.gateway.status(who, patientCf, r.workflowInstanceId!);
-    await logCall(r.id, actor, 'status', st.outcome === 'ok' ? { outcome: 'ok' } : st);
-    if (
-      st.outcome === 'ok' &&
-      st.events.some((e) => e.eventType === 'SEND_TO_INI' && e.eventStatus === 'SUCCESS')
-    ) {
-      const at = now();
-      await withActor(db, actor.userId, async (tx) => {
-        await tx
-          .update(pssDocument)
-          .set({ status: 'published', publishedAt: at })
-          .where(eq(pssDocument.id, r.id));
-        if (r.replacesId)
-          await tx
-            .update(pssDocument)
-            .set({ status: 'replaced', replacedAt: at })
-            .where(eq(pssDocument.id, r.replacesId));
-      });
-    }
-    return st;
-  }
-
   /** Il documento CDA2 dalle voci incluse, con le assenze per le sezioni obbligatorie vuote. */
   function cdaInput(
     r: Row,
@@ -298,16 +333,21 @@ export function createPssService(deps: PssDeps) {
   /** Che cosa manca per poter firmare: impostazioni, medico, paziente. */
   async function blockers(actor: Actor, p: Parameters<typeof patientIssues>[0]) {
     const d = await doctorOf(actor.userId);
+    const doctor = doctorIssues({
+      fiscalCode: d?.fiscalCode,
+      firstName: d?.firstName,
+      lastName: d?.lastName,
+      phone: d?.phone,
+      email: d?.email,
+      pec: d?.pec,
+    });
     return [
       ...settingsIssues(await settingsOf(actor.studioId)),
-      ...doctorIssues({
-        fiscalCode: d?.fiscalCode,
-        firstName: d?.firstName,
-        lastName: d?.lastName,
-        phone: d?.phone,
-        email: d?.email,
-        pec: d?.pec,
-      }),
+      ...doctor,
+      // Il Fascicolo regionale vuole il codice dell'ASL del medico (IstituzioneAutore, V09).
+      ...regionalAuthorIssues({ ...d, aslCode: d?.aslCode }).filter(
+        (m) => !doctor.length || m.includes('ASL'),
+      ),
       ...patientIssues(p),
     ];
   }
@@ -322,21 +362,28 @@ export function createPssService(deps: PssDeps) {
         'lettura_profilo_sanitario',
       );
       const docs = await documentsOf(patientId);
+      const sends = await sendsOf(docs.map((r) => r.id));
       const open = docs.find((r) =>
         ['draft', 'validated', 'signed', 'submitted'].includes(r.status),
       );
       const mancano = await blockers(actor, patient);
+      const s = await settingsOf(actor.studioId);
       return {
         versioni: docs
-          .filter((r) => ['published', 'replaced'].includes(r.status))
+          .filter((r) => ['published', 'replaced', 'rejected', 'deleted'].includes(r.status))
           .map((r) => {
-            const v = view(r);
-            return { ...v, contenuto: undefined };
+            const v = view(r, sends.get(r.id));
+            // Oscurare e cancellare li chiede il medico che l'ha scritto (V09, 5.1 e 5.3).
+            return { ...v, contenuto: undefined, mio: r.authorUserId === actor.userId };
           }),
-        inLavorazione: open ? view(open) : null,
+        inLavorazione: open ? view(open, sends.get(open.id)) : null,
         mancano,
         /** Chi guarda può preparare, firmare e pubblicare (titolare o sostituto). */
         puoFirmare: can(actor, 'fse.publish', { ...context, now: now() }).allowed,
+        /** Invii al Fascicolo regionale sospesi dall'amministratore (FSE-INT-SRS-01-V02, 3.4). */
+        inviiSospesi: s?.regionalSendingSuspended
+          ? { dal: s.regionalSuspendedAt, motivo: s.regionalSuspendedReason }
+          : null,
       };
     },
 
@@ -510,25 +557,21 @@ export function createPssService(deps: PssDeps) {
       return { ...view(await load(patientId, r.id)), avviso: res.warning ?? null };
     },
 
-    /** Firma PAdES del medico, poi pubblicazione (o sostituzione della versione precedente). */
+    /**
+     * Firma PAdES del medico, poi il Profilo va al Fascicolo regionale: in coda, e subito se si può
+     * (V09, scenari 1 e 3). Con la versione precedente pubblicata nel Fascicolo regionale è una
+     * sostituzione (REPLACE), altrimenti un documento nuovo (CREATE).
+     */
     async signAndPublish(actor: Actor, patientId: string, docId: string) {
-      const { patient } = await guardPatient(
-        db,
-        actor,
-        patientId,
-        'fse.publish',
-        'pubblicazione_profilo_sanitario',
-      );
+      await guardPatient(db, actor, patientId, 'fse.publish', 'pubblicazione_profilo_sanitario');
       let r = await load(patientId, docId);
       if (r.authorUserId !== actor.userId)
         throw new HttpError(403, 'Il Profilo lo firma il medico che lo ha preparato');
       if (r.status !== 'validated' && r.status !== 'signed')
         throw new HttpError(409, 'Si firma e si pubblica il Profilo validato dal Gateway');
-      const s = (await settingsOf(actor.studioId))!;
       const d = (await doctorOf(actor.userId))!;
       const files = await db.select().from(pssFile).where(eq(pssFile.documentId, r.id));
-      let signed = files.find((f) => f.kind === 'signed_pdf')?.content;
-      if (!signed) {
+      if (!files.some((f) => f.kind === 'signed_pdf')) {
         const pdf = files.find((f) => f.kind === 'pdf')!.content;
         const res = await deps.signer.signPdf(
           new Uint8Array(pdf),
@@ -537,13 +580,24 @@ export function createPssService(deps: PssDeps) {
         );
         if (res.outcome !== 'signed')
           throw new HttpError(res.outcome === 'rejected' ? 422 : 503, res.message);
-        signed = Buffer.from(res.pdf);
+        const signed = Buffer.from(res.pdf);
         await withActor(db, actor.userId, async (tx) => {
+          // Due «Firma e pubblica» insieme: il PDF firmato si salva una volta sola.
+          const [d] = await tx
+            .select({ status: pssDocument.status })
+            .from(pssDocument)
+            .where(eq(pssDocument.id, r.id))
+            .for('update');
+          const [already] = await tx
+            .select({ id: pssFile.id })
+            .from(pssFile)
+            .where(and(eq(pssFile.documentId, r.id), eq(pssFile.kind, 'signed_pdf')));
+          if (already || d!.status !== 'validated') return;
           await tx.insert(pssFile).values({
             documentId: r.id,
             kind: 'signed_pdf',
-            content: signed!,
-            sha256: sha256(signed!),
+            content: signed,
+            sha256: sha256(signed),
           });
           await tx
             .update(pssDocument)
@@ -552,89 +606,166 @@ export function createPssService(deps: PssDeps) {
         });
         r = await load(patientId, docId);
       }
+      // Un messaggio solo per documento: «Firma e pubblica» di nuovo lavora quello che c'è.
       const replaces = r.replacesId ? await load(patientId, r.replacesId) : undefined;
-      const metadata: FsePublicationMetadata = {
-        workflowInstanceId: r.workflowInstanceId!,
-        healthDataFormat: 'CDA',
-        mode: 'ATTACHMENT',
-        tipologiaStruttura: s.facilityType,
-        identificativoDoc: `${r.docRoot}^${r.docExtension}`,
-        identificativoRep: s.repositoryId!,
-        tipoDocumentoLivAlto: 'SUM',
-        assettoOrganizzativo: s.practiceSetting,
-        tipoAttivitaClinica: s.clinicalActivity!,
-        identificativoSottomissione: `${s.submissionIdRoot}.${now().getTime()}`,
-        administrativeRequest: [s.administrativeRequest!],
-      };
-      const who = caller(s, d.fiscalCode!);
-      const res = replaces
-        ? await deps.gateway.replace(
-            who,
-            patient.fiscalCode,
-            `${replaces.docRoot}^${replaces.docExtension}`,
-            new Uint8Array(signed),
-            metadata,
-          )
-        : await deps.gateway.publish(who, patient.fiscalCode, new Uint8Array(signed), metadata);
-      await logCall(r.id, actor, replaces ? 'replacement' : 'publication', res);
-      if (res.outcome !== 'ok') {
-        if (res.outcome === 'problem')
-          await withActor(db, actor.userId, (tx) =>
-            tx
-              .update(pssDocument)
-              .set({ lastProblem: res.problem })
-              .where(eq(pssDocument.id, r.id)),
-          );
-        throw gatewayError(res);
-      }
       await withActor(db, actor.userId, (tx) =>
-        tx
-          .update(pssDocument)
-          .set({ status: 'submitted', submittedAt: now(), lastProblem: null })
-          .where(eq(pssDocument.id, r.id)),
+        deps.regional.enqueue(
+          tx,
+          {
+            documentId: r.id,
+            doctorUserId: actor.userId,
+            operation:
+              replaces?.regionalOid && replaces.status === 'published' ? 'replace' : 'create',
+          },
+          (sends) => sends.every((s) => s.status === 'cancelled'),
+        ),
       );
-      await checkIni(actor, patient.fiscalCode, who, await load(patientId, r.id));
-      return view(await load(patientId, r.id));
+      await deps.regional.process(r.id);
+      return viewOf(patientId, r.id);
     },
 
     /**
-     * Preso in carico, ma i metadati non risultavano ancora a INI: si chiede di nuovo lo stato
-     * della transazione al Gateway. Pubblicato solo quando l'invio a INI è riuscito.
+     * «Riprova» del medico (FSE-INT-SRS-01-V02, 3.3): il messaggio da correggere o non arrivato
+     * riparte da capo; quello in coda o in attesa dell'esito parte subito.
      */
     async refreshStatus(actor: Actor, patientId: string, docId: string) {
-      const { patient } = await guardPatient(
-        db,
-        actor,
-        patientId,
-        'fse.publish',
-        'stato_profilo_sanitario',
-      );
+      await guardPatient(db, actor, patientId, 'fse.publish', 'stato_profilo_sanitario');
       const r = await load(patientId, docId);
-      if (r.status !== 'submitted')
+      if (r.authorUserId !== actor.userId)
+        throw new HttpError(
+          403,
+          'I messaggi al Fascicolo li manda il medico che ha scritto il Profilo',
+        );
+      // Lo scarto della Regione («KO») è definitivo: il Profilo firmato non cambia più.
+      if (r.status === 'rejected')
         throw new HttpError(
           409,
-          'Lo stato si controlla per il Profilo preso in carico dal Gateway',
+          'Il Fascicolo regionale ha scartato questo Profilo: preparane una versione nuova',
         );
-      const s = (await settingsOf(actor.studioId))!;
-      const d = (await doctorOf(actor.userId))!;
-      const st = await checkIni(actor, patient.fiscalCode, caller(s, d.fiscalCode!), r);
-      if (st.outcome !== 'ok' && st.outcome !== 'problem') throw gatewayError(st);
-      return view(await load(patientId, r.id));
+      const s = await lastSend(r.id);
+      if (!s || s.status === 'done' || s.status === 'cancelled')
+        throw new HttpError(409, 'Non c’è un messaggio al Fascicolo regionale da mandare');
+      await withActor(db, actor.userId, async (tx) => {
+        if (s.status === 'to_fix' || s.status === 'failed') await deps.regional.retry(tx, s);
+        else
+          await tx
+            .update(fseRegionalSend)
+            .set({ nextAttemptAt: now() })
+            .where(eq(fseRegionalSend.id, s.id));
+      });
+      await deps.regional.process(r.id);
+      return viewOf(patientId, r.id);
     },
 
-    /** Scartare la bozza o il Profilo validato e non ancora firmato. */
+    /**
+     * Oscurare il Profilo pubblicato nel Fascicolo, o togliere l'oscuramento, su richiesta
+     * dell'assistito: solo i metadati (UPDATE, V09 scenario 2), «V» con P99 oppure «N».
+     */
+    async obscure(actor: Actor, patientId: string, docId: string, body: unknown) {
+      await guardPatient(db, actor, patientId, 'fse.publish', 'oscuramento_profilo_sanitario');
+      const b = obscureBody.parse(body);
+      const r = await load(patientId, docId);
+      if (r.authorUserId !== actor.userId)
+        throw new HttpError(
+          403,
+          'L’oscuramento nel Fascicolo lo chiede il medico che ha scritto il Profilo',
+        );
+      if (r.status !== 'published' || !r.regionalOid)
+        throw new HttpError(409, 'Si oscura il Profilo pubblicato nel Fascicolo regionale');
+      if ((r.confidentiality === 'V') === b.oscurato)
+        throw new HttpError(
+          409,
+          b.oscurato ? 'Il Profilo è già oscurato' : 'Il Profilo non è oscurato',
+        );
+      const queued = await withActor(db, actor.userId, (tx) =>
+        deps.regional.enqueue(tx, {
+          documentId: r.id,
+          doctorUserId: actor.userId,
+          operation: 'update',
+          confidentiality: b.oscurato ? 'V' : 'N',
+        }),
+      );
+      if (!queued) throw inProgress();
+      await deps.regional.process(r.id);
+      return viewOf(patientId, r.id);
+    },
+
+    /** Cancellare dal Fascicolo il Profilo pubblicato: solo chi l'ha scritto (V09, scenario 4). */
+    async removeFromFse(actor: Actor, patientId: string, docId: string, body: unknown) {
+      await guardPatient(db, actor, patientId, 'fse.publish', 'cancellazione_profilo_sanitario');
+      deleteBody.parse(body);
+      const r = await load(patientId, docId);
+      if (r.authorUserId !== actor.userId)
+        throw new HttpError(
+          403,
+          'Il Profilo lo cancella dal Fascicolo il medico che lo ha scritto',
+        );
+      if (r.status !== 'published' || !r.regionalOid)
+        throw new HttpError(409, 'Si cancella il Profilo pubblicato nel Fascicolo regionale');
+      const queued = await withActor(db, actor.userId, (tx) =>
+        deps.regional.enqueue(tx, {
+          documentId: r.id,
+          doctorUserId: actor.userId,
+          operation: 'delete',
+        }),
+      );
+      if (!queued) throw inProgress();
+      await deps.regional.process(r.id);
+      return viewOf(patientId, r.id);
+    },
+
+    /**
+     * Scartare la bozza, il Profilo validato e non firmato, o quello firmato che il Fascicolo
+     * regionale non ha preso in carico (in coda, da correggere o non arrivato).
+     */
     async discard(actor: Actor, patientId: string, docId: string) {
       await guardPatient(db, actor, patientId, 'fse.publish', 'scarto_profilo_sanitario');
       const r = await load(patientId, docId);
-      if (r.status !== 'draft' && r.status !== 'validated')
-        throw new HttpError(409, 'Si scarta solo un Profilo non ancora firmato');
-      await withActor(db, actor.userId, (tx) =>
-        tx
+      await withActor(db, actor.userId, async (tx) => {
+        // I messaggi del documento si bloccano: la coda non li prende mentre si scarta, e un
+        // messaggio che sta partendo si aspetta (D280).
+        const sends = await tx
+          .select()
+          .from(fseRegionalSend)
+          .where(eq(fseRegionalSend.documentId, r.id))
+          .for('update');
+        if (sends.some((s) => s.leaseUntil && s.leaseUntil.getTime() > now().getTime()))
+          throw new HttpError(
+            409,
+            'Il messaggio al Fascicolo regionale sta partendo in questo momento: riprova fra qualche secondo',
+          );
+        const [d] = await tx
+          .select({ status: pssDocument.status })
+          .from(pssDocument)
+          .where(eq(pssDocument.id, r.id))
+          .for('update');
+        const accepted = sends.some(
+          (s) => s.status === 'waiting' || s.status === 'done' || s.temporaryId,
+        );
+        if (!(
+          d!.status === 'draft' ||
+          d!.status === 'validated' ||
+          (d!.status === 'signed' && !accepted)
+        ))
+          throw new HttpError(
+            409,
+            'Si scarta solo un Profilo non ancora preso in carico dal Fascicolo regionale',
+          );
+        await tx
+          .update(fseRegionalSend)
+          .set({ status: 'cancelled', doneAt: now() })
+          .where(
+            and(
+              eq(fseRegionalSend.documentId, r.id),
+              inArray(fseRegionalSend.status, ['queued', 'to_fix', 'failed']),
+            ),
+          );
+        await tx
           .update(pssDocument)
           .set({ status: 'discarded', discardedAt: now() })
-          .where(eq(pssDocument.id, r.id)),
-      );
-      return view(await load(patientId, r.id));
+          .where(eq(pssDocument.id, r.id));
+      });
+      return viewOf(patientId, r.id);
     },
 
     /** Il PDF del Profilo: quello firmato, se c'è. */

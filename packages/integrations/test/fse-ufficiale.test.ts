@@ -34,10 +34,10 @@ function filesIn(sub: string): string[] {
 describe('file ufficiali del Fascicolo', () => {
   const sums = readSums();
 
-  it('lo schematron del Profilo, sedici dizionari e l’estratto LOINC con la sua licenza', () => {
+  it('lo schematron del Profilo, diciassette dizionari e l’estratto LOINC con la sua licenza', () => {
     const names = [...sums.keys()];
     expect(names).toContain('schematron/schematron_PSS_v4.0.sch');
-    expect(names.filter((n) => n.startsWith('dizionari/'))).toHaveLength(16);
+    expect(names.filter((n) => n.startsWith('dizionari/'))).toHaveLength(17);
     expect(names).toContain('loinc/estratto.csv');
     expect(names).toContain('loinc/LOINC_short_license.txt');
   });

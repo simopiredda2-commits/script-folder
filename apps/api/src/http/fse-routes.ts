@@ -1,9 +1,11 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { FSE_ADMINISTRATIVE_REQUESTS, FSE_CLINICAL_ACTIVITIES } from '@mmg/integrations';
+import { REGIONAL_REGIMES, V09 } from '@mmg/integrations';
 import { z } from 'zod';
+import { logAccess } from '../audit/access-log';
 import type { Database } from '../db/client';
 import { fseSetting } from '../db/schema';
+import { withActor } from '../db/tx';
 import { settingsIssues, type createPssService } from '../fse/service';
 import { HttpError } from './errors';
 
@@ -33,8 +35,10 @@ const oidText = z
 const settingsBody = z
   .object({
     radiceDocumenti: oidText,
-    repository: z.string().trim().min(1).max(200),
-    radiceInvii: oidText,
+    // Repository e invii li assegna il Fascicolo regionale quando pubblica sul Gateway (D280):
+    // si possono ancora scrivere, ma non servono.
+    repository: z.string().trim().min(1).max(200).optional(),
+    radiceInvii: oidText.optional(),
     custode: z
       .object({
         radice: oidText,
@@ -56,9 +60,13 @@ const settingsBody = z
         /^[^^]+\^\^\^\^\^&[0-9.]+&ISO\^\^\^\^[^^]+$/,
         'Struttura nel formato XON: NOME^^^^^&OID&ISO^^^^CODICE',
       ),
-    attivitaClinica: z.enum(keysOf(FSE_CLINICAL_ACTIVITIES)),
-    regime: z.enum(keysOf(FSE_ADMINISTRATIVE_REQUESTS)),
+    // Per il PSS la Regione vuole «ERP» (V09, 5.2.2): non si sceglie più.
+    attivitaClinica: z.literal(V09.clinicalActivity).optional(),
+    regime: z.enum(keysOf(REGIONAL_REGIMES)),
   })
+  .strict();
+const suspensionBody = z
+  .object({ sospesi: z.boolean(), motivo: z.string().trim().max(500).optional() })
   .strict();
 
 /**
@@ -100,6 +108,14 @@ export function registerFseRoutes(
     const p = ids(req.params);
     return service.discard(req.actor!, p.id, p.documentoId);
   });
+  app.post(`${base}/:documentoId/oscuramento`, scoped, async (req) => {
+    const p = ids(req.params);
+    return service.obscure(req.actor!, p.id, p.documentoId, req.body);
+  });
+  app.post(`${base}/:documentoId/cancella`, scoped, async (req) => {
+    const p = ids(req.params);
+    return service.removeFromFse(req.actor!, p.id, p.documentoId, req.body);
+  });
   app.get(`${base}/:documentoId/invii`, scoped, async (req) => {
     const p = ids(req.params);
     return { invii: await service.transmissions(req.actor!, p.id, p.documentoId) };
@@ -140,18 +156,60 @@ export function registerFseRoutes(
             struttura: s.locality,
             tipologiaStruttura: s.facilityType,
             assettoOrganizzativo: s.practiceSetting,
-            attivitaClinica: s.clinicalActivity,
+            // Fissata dalla Regione per il PSS (V09): «ERP».
+            attivitaClinica: V09.clinicalActivity,
             regime: s.administrativeRequest,
           }
         : null,
       daCompletare: settingsIssues(s),
-      /** Valori ammessi, con i nomi delle tabelle 57 e 63 della specifica del Gateway. */
-      valori: {
-        attivitaClinica: options(FSE_CLINICAL_ACTIVITIES),
-        regime: options(FSE_ADMINISTRATIVE_REQUESTS),
-      },
+      /** Valori ammessi: i regimi della V09 (5.2.2, tabella dei regimi). */
+      valori: { regime: options(REGIONAL_REGIMES) },
+      /** Invii al Fascicolo regionale sospesi (FSE-INT-SRS-01-V02, 3.4 e 4.5). */
+      inviiSospesi: s?.regionalSendingSuspended
+        ? { dal: s.regionalSuspendedAt, motivo: s.regionalSuspendedReason }
+        : null,
       puoModificare: req.actor!.roles.includes('administrator'),
     };
+  });
+
+  /**
+   * Sospendere o riprendere gli invii al Fascicolo regionale, per esempio su richiesta del
+   * supporto del CSI: i messaggi restano in coda e partono alla ripresa (3.4, 4.5). Solo
+   * l'amministratore; ogni cambio resta nel registro delle azioni di amministrazione.
+   */
+  app.put('/api/studio/fascicolo/invii', async (req) => {
+    const actor = req.actor!;
+    if (!actor.roles.includes('administrator'))
+      throw new HttpError(403, 'Gli invii al Fascicolo li sospende l’amministratore dello studio');
+    const b = suspensionBody.parse(req.body);
+    const at = new Date();
+    await withActor(db, actor.userId, async (tx) => {
+      const values = {
+        regionalSendingSuspended: b.sospesi,
+        regionalSuspendedAt: b.sospesi ? at : null,
+        regionalSuspendedReason: b.sospesi ? (b.motivo ?? null) : null,
+        updatedAt: at,
+        updatedBy: actor.userId,
+      };
+      await tx
+        .insert(fseSetting)
+        .values({ studioId: actor.studioId, ...values })
+        .onConflictDoUpdate({ target: fseSetting.studioId, set: values });
+      await logAccess(tx, {
+        studioId: actor.studioId,
+        userId: actor.userId,
+        patientId: null,
+        action: 'amministrazione',
+        outcome: 'riuscito',
+        workstation: actor.workstation,
+        details: {
+          area: 'fascicolo',
+          azione: b.sospesi ? 'sospensione_invii_fascicolo' : 'ripresa_invii_fascicolo',
+          ...(b.motivo ? { motivo: b.motivo } : {}),
+        },
+      });
+    });
+    return { sospesi: b.sospesi };
   });
 
   app.put('/api/studio/fascicolo', async (req) => {
@@ -164,8 +222,8 @@ export function registerFseRoutes(
     const b = settingsBody.parse(req.body);
     const values = {
       documentIdRoot: b.radiceDocumenti,
-      repositoryId: b.repository,
-      submissionIdRoot: b.radiceInvii,
+      repositoryId: b.repository ?? null,
+      submissionIdRoot: b.radiceInvii ?? null,
       custodianIdRoot: b.custode.radice,
       custodianIdExtension: b.custode.codice,
       custodianName: b.custode.nome,
@@ -174,7 +232,7 @@ export function registerFseRoutes(
       custodianIstatCode: b.custode.istat,
       custodianProvince: b.custode.provincia || null,
       locality: b.struttura,
-      clinicalActivity: b.attivitaClinica,
+      clinicalActivity: V09.clinicalActivity,
       administrativeRequest: b.regime,
       updatedAt: new Date(),
       updatedBy: actor.userId,

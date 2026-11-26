@@ -386,6 +386,13 @@
       "when": 1795649000529,
       "tag": "0054_note_e_sedute_della_specialistica",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1795655725143,
+      "tag": "0055_pubblicazione_regionale_del_profilo",
+      "breakpoints": true
     }
   ]
 }

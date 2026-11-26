@@ -128,7 +128,7 @@ export type FseStatusResult =
 
 /** Richiesta così come arriva al servizio: intestazioni, corpo, certificato di collegamento. */
 export interface FseHttpRequest {
-  method: 'GET' | 'POST' | 'PUT';
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
   headers: Record<string, string>;
   /** Impronta del certificato client del collegamento HTTPS. */
@@ -166,10 +166,15 @@ export class FseGatewayClient {
     return this.transport.environment;
   }
 
+  /**
+   * I due token. Contesto operativo (purpose_of_use) e tipo di attività (action_id) come nella
+   * specifica 2.26, 8.1: TREATMENT e CREATE per validazione e creazione; UPDATE per sostituzione,
+   * aggiornamento dei metadati ed eliminazione, che ha DELETE come tipo di attività.
+   */
   private tokens(
     caller: FseCaller,
     patientFiscalCode: string,
-    action: 'CREATE' | 'UPDATE',
+    action: 'CREATE' | 'UPDATE' | 'DELETE',
     file?: Uint8Array,
   ) {
     const iat = Math.floor(this.now().getTime() / 1000);
@@ -294,6 +299,18 @@ export class FseGatewayClient {
       headers: this.tokens(caller, patientFiscalCode, 'UPDATE', signedPdf),
       requestBody: { ...metadata },
       file: signedPdf,
+    });
+  }
+
+  /**
+   * Eliminazione di un documento pubblicato (6): `DELETE /v1/documents/{identificativoDocUpdate}`,
+   * l'OID usato come identificativoDoc nella creazione. Sincrona: 200 se eseguita.
+   */
+  remove(caller: FseCaller, patientFiscalCode: string, documentId: string): Promise<FseResult> {
+    return this.call({
+      method: 'DELETE',
+      path: `/v1/documents/${encodeURIComponent(documentId)}`,
+      headers: this.tokens(caller, patientFiscalCode, 'DELETE'),
     });
   }
 

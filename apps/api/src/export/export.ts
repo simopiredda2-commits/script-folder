@@ -64,8 +64,11 @@ export const PRESCRIPTION_TABLES = [
 /** Tabelle collegate per certificato: invii all'INPS e consegne di copia e attestato. */
 export const CERTIFICATE_TABLES = ['certificate_submission', 'certificate_delivery'] as const;
 
-/** Tabelle collegate per Profilo Sanitario Sintetico: le chiamate al Gateway (tappa 11). */
-export const PSS_TABLES = ['fse_transmission'] as const;
+/**
+ * Tabelle collegate per Profilo Sanitario Sintetico: le chiamate al Gateway e al Fascicolo
+ * regionale (tappa 11, D280) e la coda degli invii regionali.
+ */
+export const PSS_TABLES = ['fse_transmission', 'fse_regional_send'] as const;
 
 /**
  * Tabelle con una colonna `patient_id` o `entry_id` che non stanno nelle liste sopra, con il

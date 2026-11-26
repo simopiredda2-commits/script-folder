@@ -90,7 +90,9 @@ const DRAFT = {
   },
 };
 
-function page() {
+function page(
+  overview: object = { versioni: [], inLavorazione: DRAFT, mancano: [], puoFirmare: true },
+) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) => {
@@ -98,9 +100,8 @@ function page() {
       if (path === '/api/io') return Promise.resolve(json(200, doctor));
       if (path === '/api/pazienti/p1') return Promise.resolve(json(200, RECORD));
       if (path === '/api/pazienti/p1/profilo-sanitario')
-        return Promise.resolve(
-          json(200, { versioni: [], inLavorazione: DRAFT, mancano: [], puoFirmare: true }),
-        );
+        return Promise.resolve(json(200, overview));
+      if (path === '/api/stampa/preferenze') return Promise.resolve(json(200, { preferenze: [] }));
       return Promise.resolve(json(200, {}));
     }),
   );
@@ -139,5 +140,119 @@ describe('Profilo sanitario sintetico: assenze vere (audit D259)', () => {
     const allergies = await section('Allergie e intolleranze');
     expect(allergies.getByLabelText('Nessuna allergia nota')).toBeTruthy();
     expect(allergies.getByLabelText('Nessuna informazione sulle allergie')).toBeTruthy();
+  });
+});
+
+/** Versioni nel Fascicolo regionale (D280): stato del messaggio, oscuramento e cancellazione. */
+const PUBLISHED = {
+  ...DRAFT,
+  id: 'v1',
+  stato: 'published',
+  statoNome: 'Pubblicato nel Fascicolo',
+  contenuto: undefined,
+  pubblicatoIl: '2026-11-18T10:00:00Z',
+  sostituitoIl: null,
+  identificativoFascicolo: '2.16.840.1.113883.2.9.2.10.4.4^150001',
+  oscurato: false,
+  mio: true,
+  fascicolo: {
+    operazione: 'create',
+    stato: 'done',
+    tentativi: 0,
+    fase: 'ripetizione',
+    prossimoTentativo: null,
+    ultimoErrore: null,
+  },
+};
+
+describe('Profilo nel Fascicolo regionale (D280)', () => {
+  it('chi l’ha scritto oscura e cancella la versione pubblicata; l’identificativo è quello della Regione', async () => {
+    page({ versioni: [PUBLISHED], inLavorazione: null, mancano: [], puoFirmare: true });
+    expect(await screen.findByRole('button', { name: 'Oscura nel Fascicolo' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cancella dal Fascicolo' })).toBeTruthy();
+    expect(screen.getByText('2.16.840.1.113883.2.9.2.10.4.4^150001')).toBeTruthy();
+  });
+
+  it('la versione di un altro medico: niente oscuramento né cancellazione', async () => {
+    page({
+      versioni: [{ ...PUBLISHED, mio: false }],
+      inLavorazione: null,
+      mancano: [],
+      puoFirmare: true,
+    });
+    await screen.findByText(/Pubblicato nel Fascicolo/);
+    expect(screen.queryByRole('button', { name: 'Oscura nel Fascicolo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancella dal Fascicolo' })).toBeNull();
+  });
+
+  it('il messaggio in coda dice quando riprova e che gli invii sono sospesi', async () => {
+    page({
+      versioni: [
+        {
+          ...PUBLISHED,
+          oscurato: true,
+          fascicolo: {
+            operazione: 'update',
+            stato: 'queued',
+            tentativi: 2,
+            fase: 'ripetizione',
+            prossimoTentativo: '2026-11-18T10:05:00Z',
+            ultimoErrore: 'Fascicolo regionale non raggiungibile',
+          },
+        },
+      ],
+      inLavorazione: null,
+      mancano: [],
+      puoFirmare: true,
+      inviiSospesi: { dal: '2026-11-18T09:00:00Z', motivo: 'Richiesta del supporto del CSI' },
+    });
+    expect(
+      await screen.findByText(/Oscuramento:\s+in coda per il Fascicolo regionale/),
+    ).toBeTruthy();
+    expect(screen.getByText(/Tentativi falliti: 2, ogni 5 minuti/)).toBeTruthy();
+    expect(
+      screen.getByText(
+        /sospesi dall’amministratore dello studio \(Richiesta del supporto del CSI\)/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Riprova adesso' })).toBeTruthy();
+    // Con un messaggio in corso non si oscura né si cancella di nuovo.
+    expect(screen.queryByRole('button', { name: 'Togli l’oscuramento' })).toBeNull();
+    expect(screen.getByText(/Oscurato nel Fascicolo/)).toBeTruthy();
+  });
+
+  it('la versione scartata dalla Regione: il motivo, e niente «Riprova» né oscuramento', async () => {
+    page({
+      versioni: [
+        {
+          ...PUBLISHED,
+          stato: 'rejected',
+          statoNome: 'Scartato dal Fascicolo regionale',
+          pubblicatoIl: null,
+          scartatoDalFascicoloIl: '2026-11-18T10:01:00Z',
+          identificativoFascicolo: null,
+          ultimoProblema: { detail: 'Il Gateway non ha pubblicato il documento (prova)' },
+          fascicolo: {
+            operazione: 'create',
+            stato: 'done',
+            tentativi: 0,
+            fase: 'ripetizione',
+            prossimoTentativo: null,
+            ultimoErrore:
+              'Scartato dal Fascicolo regionale: Il Gateway non ha pubblicato il documento (prova)',
+          },
+        },
+      ],
+      inLavorazione: null,
+      mancano: [],
+      puoFirmare: true,
+    });
+    expect(
+      await screen.findByText('Motivo: Il Gateway non ha pubblicato il documento (prova)'),
+    ).toBeTruthy();
+    expect(screen.getByText(/Scartato dal Fascicolo regionale/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Riprova adesso' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Oscura nel Fascicolo' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancella dal Fascicolo' })).toBeNull();
   });
 });

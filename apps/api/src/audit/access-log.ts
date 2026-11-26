@@ -106,6 +106,9 @@ export type AccessAction =
   | 'annullamento_certificato_modello'
   | 'scarto_profilo_sanitario'
   | 'pdf_profilo_sanitario'
+  /** Fascicolo regionale (D280): oscuramento e cancellazione del Profilo pubblicato. */
+  | 'oscuramento_profilo_sanitario'
+  | 'cancellazione_profilo_sanitario'
   /** Apertura del Fascicolo regionale del paziente dalla cartella (D220). */
   | 'apertura_fascicolo_regionale'
   | 'impostazioni_aft'

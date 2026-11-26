@@ -15,6 +15,9 @@ import {
   createPublicKey,
   generateKeyPairSync,
   KeyObject,
+  privateDecrypt,
+  publicEncrypt,
+  RSA_PKCS1_PADDING,
   sign,
   verify,
   X509Certificate,
@@ -217,13 +220,15 @@ export function createDecipheriv(algorithm: string, key: Data, iv: Data) {
 
 export const webcrypto = globalThis.crypto;
 export const subtle = globalThis.crypto.subtle;
-export const constants = {};
+export const constants = { RSA_PKCS1_PADDING };
 
 export {
   createPrivateKey,
   createPublicKey,
   generateKeyPairSync,
   KeyObject,
+  privateDecrypt,
+  publicEncrypt,
   sign,
   verify,
   X509Certificate,
@@ -247,6 +252,8 @@ export default {
   createPublicKey,
   generateKeyPairSync,
   KeyObject,
+  privateDecrypt,
+  publicEncrypt,
   sign,
   verify,
   X509Certificate,

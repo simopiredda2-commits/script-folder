@@ -232,18 +232,15 @@ describe('dati della cartella per il Profilo Sanitario Sintetico', () => {
     interface Settings {
       impostazioni: { attivitaClinica: string | null; regime: string | null } | null;
       daCompletare: string[];
-      valori: { attivitaClinica: { codice: string; nome: string }[]; regime: unknown[] };
+      valori: { regime: unknown[] };
       puoModificare: boolean;
     }
     const seen = (await at(doctor, 'GET')).json<Settings>();
     expect(seen).toMatchObject({ daCompletare: [], puoModificare: false });
-    expect(seen.impostazioni).toMatchObject({ attivitaClinica: 'OBS', regime: 'SSN' });
-    // Codici e nomi delle tabelle 57 e 63 della specifica del Gateway.
-    expect(seen.valori.attivitaClinica).toContainEqual({
-      codice: 'OBS',
-      nome: 'Documento stato di salute',
-    });
+    // Per il PSS la Regione vuole «ERP» (V09, 5.2.2, D280); i regimi sono quelli della V09.
+    expect(seen.impostazioni).toMatchObject({ attivitaClinica: 'ERP', regime: 'SSN' });
     expect(seen.valori.regime).toContainEqual({ codice: 'SSN', nome: 'Regime SSN' });
+    expect(seen.valori.regime).not.toContainEqual(expect.objectContaining({ codice: 'AUTO' }));
     const body = {
       radiceDocumenti: '2.999.10.1',
       repository: '2.999.10.2',
@@ -258,7 +255,6 @@ describe('dati della cartella per il Profilo Sanitario Sintetico', () => {
         provincia: 'XX',
       },
       struttura: 'STUDIO DI PROVA^^^^^&2.999.10.5&ISO^^^^000001',
-      attivitaClinica: 'OBS',
       regime: 'NOSSN',
     };
     const denied = await at(doctor, 'PUT', body);
@@ -271,7 +267,8 @@ describe('dati della cartella per il Profilo Sanitario Sintetico', () => {
     for (const wrong of [
       { ...body, radiceDocumenti: '2.999.x' },
       { ...body, struttura: 'STUDIO DI PROVA' },
-      { ...body, attivitaClinica: 'XYZ' },
+      { ...body, attivitaClinica: 'OBS' },
+      { ...body, regime: 'AUTO' },
       { ...body, custode: { ...body.custode, istat: '12345' } },
     ])
       expect((await at(admin, 'PUT', wrong)).statusCode).toBe(400);

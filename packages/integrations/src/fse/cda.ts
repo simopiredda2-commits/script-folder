@@ -8,6 +8,8 @@
  * voci oscurate sempre fuori (DM 7/9/2023, art. 4, c. 3) e la verifica del medico.
  */
 
+import { createHash } from 'node:crypto';
+
 export interface InstanceId {
   root: string;
   extension: string;
@@ -157,6 +159,8 @@ const OID = {
   authorCode: '2.16.840.1.113883.2.9.77.22.11.13',
   motorCapacity: '2.16.840.1.113883.2.9.77.22.11.15',
   actCode: '2.16.840.1.113883.5.4',
+  /** Value set ObservationIntoleranceType: la guida v1.5 lo vuole per l'assenza di allergie (D281). */
+  intoleranceType: '2.16.840.1.113883.1.11.19700',
   observationValue: '2.16.840.1.113883.5.1063',
   roleCode: '2.16.840.1.113883.5.111',
   gender: '2.16.840.1.113883.5.1',
@@ -200,8 +204,12 @@ const TPL = {
   familyAbsent: '2.16.840.1.113883.2.9.10.1.4.3.16.4',
 } as const;
 
-/** Versione della guida nel templateId del documento, come nell'esempio ufficiale. */
-export const PSS_TEMPLATE_VERSION = '1.4';
+/**
+ * Versione della guida nel templateId del documento: la v1.5 di HL7 Italia, come il titolo dello
+ * schematron 4.0 del Ministero (D281). Il Gateway sceglie schematron e trasformazione dalla radice
+ * del modello, non da questa versione.
+ */
+export const PSS_TEMPLATE_VERSION = '1.5';
 export const PSS_LOINC = '60591-5';
 
 const ABSENT_LABELS: Record<string, string> = {
@@ -313,6 +321,24 @@ const cfId = (cf: string) =>
 /** Identificativo di una voce: la radice è l'identificativo della voce in cartella. */
 const entryId = (id: string) => el('id', { root: id });
 
+/** Spazio dei nomi del programma per gli identificativi che ricava (UUID scelto una volta). */
+const ID_NAMESPACE = Buffer.from('6f1c2a4e8d3b4f0a9c5e7b21d4a8e3f6', 'hex');
+
+/**
+ * Identificativo ricavato dal nome, sempre lo stesso: UUID della versione 5 (RFC 9562, SHA-1).
+ * La guida v1.5 vuole in ogni `id` un OID o un UUID (D281): servono per le osservazioni dentro le
+ * voci e per le voci di assenza, che in cartella non hanno un identificativo loro.
+ */
+export function derivedUuid(name: string): string {
+  const h = createHash('sha1').update(ID_NAMESPACE).update(name, 'utf8').digest('hex');
+  const variant = ((parseInt(h[16]!, 16) & 0x3) | 0x8).toString(16);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-5${h.slice(13, 16)}-${variant}${h.slice(17, 20)}-${h.slice(20, 32)}`;
+}
+/** L'osservazione dentro una voce: dall'identificativo della voce. */
+const observationId = (entry: string) => el('id', { root: derivedUuid(`${entry}/osservazione`) });
+/** Una voce di assenza: dall'identificativo del documento. */
+const absenceId = (doc: string, what: string) => el('id', { root: derivedUuid(`${doc}/${what}`) });
+
 function section(
   key: string,
   template: string,
@@ -420,7 +446,7 @@ const commentAct = (refId: string) =>
 /* ------------------------------------------------------------------------------------------ */
 /* Sezioni                                                                                     */
 
-function allergiesSection(input: PssCdaInput['allergies']): string {
+function allergiesSection(input: PssCdaInput['allergies'], doc: string): string {
   if (!Array.isArray(input)) {
     const refId = 'all-assenza';
     const entry = el(
@@ -430,7 +456,7 @@ function allergiesSection(input: PssCdaInput['allergies']): string {
         'act',
         { classCode: 'ACT', moodCode: 'EVN' },
         tid(TPL.allergyConcern) +
-          el('id', { root: 'allergie-assenza' }) +
+          absenceId(doc, 'allergie-assenza') +
           el('code', { nullFlavor: 'NA' }) +
           el('statusCode', { code: 'active' }) +
           el('effectiveTime', {}, lowHigh(null)) +
@@ -441,10 +467,10 @@ function allergiesSection(input: PssCdaInput['allergies']): string {
               'observation',
               { classCode: 'OBS', moodCode: 'EVN' },
               tid(TPL.allergyAbsent) +
-                el('id', { root: 'allergie-assenza-osservazione' }) +
+                absenceId(doc, 'allergie-assenza/osservazione') +
                 el('code', {
                   code: 'OINT',
-                  codeSystem: OID.actCode,
+                  codeSystem: OID.intoleranceType,
                   codeSystemName: 'ObservationIntoleranceType',
                   displayName: 'intolerance',
                 }) +
@@ -531,7 +557,7 @@ function allergiesSection(input: PssCdaInput['allergies']): string {
                 'observation',
                 { classCode: 'OBS', moodCode: 'EVN' },
                 tid(TPL.allergyObservation) +
-                  el('id', { root: `${a.id}-osservazione` }) +
+                  observationId(a.id) +
                   el('code', {
                     code: '52473-6',
                     codeSystem: OID.loinc,
@@ -602,7 +628,7 @@ function allergiesSection(input: PssCdaInput['allergies']): string {
   );
 }
 
-function therapiesSection(input: PssCdaInput['therapies']): string {
+function therapiesSection(input: PssCdaInput['therapies'], doc: string): string {
   const title = 'Terapie farmacologiche';
   if (!Array.isArray(input)) {
     const refId = 'ter-assenza';
@@ -613,7 +639,7 @@ function therapiesSection(input: PssCdaInput['therapies']): string {
         'substanceAdministration',
         { classCode: 'SBADM', moodCode: 'EVN' },
         tid(TPL.medicationAbsent) +
-          el('id', { root: 'terapie-assenza' }) +
+          absenceId(doc, 'terapie-assenza') +
           el('code', {
             code: input.absent,
             codeSystem: OID.absentMedications,
@@ -733,7 +759,7 @@ function therapiesSection(input: PssCdaInput['therapies']): string {
   );
 }
 
-function problemsSection(input: PssCdaInput['problems']): string {
+function problemsSection(input: PssCdaInput['problems'], doc: string): string {
   const title = 'Lista dei problemi';
   if (!Array.isArray(input)) {
     const refId = 'pro-assenza';
@@ -744,7 +770,7 @@ function problemsSection(input: PssCdaInput['problems']): string {
         'act',
         { classCode: 'ACT', moodCode: 'EVN' },
         tid(TPL.problemConcern) +
-          el('id', { root: 'problemi-assenza' }) +
+          absenceId(doc, 'problemi-assenza') +
           el('code', { nullFlavor: 'NA' }) +
           el('statusCode', { code: 'active' }) +
           el('effectiveTime', {}, lowHigh(null)) +
@@ -755,7 +781,7 @@ function problemsSection(input: PssCdaInput['problems']): string {
               'observation',
               { classCode: 'OBS', moodCode: 'EVN' },
               tid(TPL.problemObservation) +
-                el('id', { root: 'problemi-assenza-osservazione' }) +
+                absenceId(doc, 'problemi-assenza/osservazione') +
                 el('code', {
                   code: '75326-9',
                   codeSystem: OID.loinc,
@@ -823,7 +849,7 @@ function problemsSection(input: PssCdaInput['problems']): string {
                 'observation',
                 { classCode: 'OBS', moodCode: 'EVN' },
                 tid(TPL.problemObservation) +
-                  el('id', { root: `${p.id}-osservazione` }) +
+                  observationId(p.id) +
                   el('code', {
                     code: '75326-9',
                     codeSystem: OID.loinc,
@@ -886,7 +912,7 @@ function problemsSection(input: PssCdaInput['problems']): string {
   );
 }
 
-function familySection(input: PssCdaInput['familyHistory']): string {
+function familySection(input: PssCdaInput['familyHistory'], doc: string): string {
   const title = 'Anamnesi familiare';
   if (!Array.isArray(input)) {
     const refId = 'fam-assenza';
@@ -897,7 +923,7 @@ function familySection(input: PssCdaInput['familyHistory']): string {
         'observation',
         { classCode: 'OBS', moodCode: 'EVN' },
         tid(TPL.familyAbsent) +
-          el('id', { root: 'anamnesi-familiare-assenza' }) +
+          absenceId(doc, 'anamnesi-familiare-assenza') +
           el('code', {
             code: '10157-6',
             codeSystem: OID.loinc,
@@ -987,7 +1013,7 @@ function familySection(input: PssCdaInput['familyHistory']): string {
                 'observation',
                 { classCode: 'OBS', moodCode: 'EVN' },
                 tid(TPL.familyObservation) +
-                  el('id', { root: `${f.id}-osservazione` }) +
+                  observationId(f.id) +
                   el('code', {
                     code: '52797-8',
                     codeSystem: OID.loinc,
@@ -1193,6 +1219,7 @@ function functionalSection(input: PssCdaInput['motorCapacity']): string {
 /** Il documento CDA2 del Profilo Sanitario Sintetico, come testo XML. */
 export function buildPssCda(input: PssCdaInput): string {
   const { document: d, patient: p, author: a } = input;
+  const docKey = `${d.id.root}^${d.id.extension}`;
   const patientAddress = completeAddress(p.address);
   const header =
     el('realmCode', { code: 'IT' }) +
@@ -1290,7 +1317,8 @@ export function buildPssCda(input: PssCdaInput): string {
           {},
           el('id', { root: input.custodian.id.root, extension: input.custodian.id.extension }) +
             el('name', {}, xmlText(input.custodian.name)) +
-            addr(input.custodian.address),
+            // L'uso dell'indirizzo lo vuole la guida v1.5 (D281); il Ministero non lo vincola.
+            addr(input.custodian.address, 'WP'),
         ),
       ),
     ) +
@@ -1322,10 +1350,10 @@ export function buildPssCda(input: PssCdaInput): string {
         )
       : '');
   const body =
-    allergiesSection(input.allergies) +
-    therapiesSection(input.therapies) +
-    problemsSection(input.problems) +
-    familySection(input.familyHistory) +
+    allergiesSection(input.allergies, docKey) +
+    therapiesSection(input.therapies, docKey) +
+    problemsSection(input.problems, docKey) +
+    familySection(input.familyHistory, docKey) +
     vitalsSection(input.vitals) +
     lifestyleSection(input.lifestyle) +
     functionalSection(input.motorCapacity);

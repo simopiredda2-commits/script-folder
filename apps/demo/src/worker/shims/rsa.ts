@@ -295,6 +295,50 @@ export function sign(
   return Buffer.from(fromBig(s, k));
 }
 
+/** Il riempimento PKCS#1 v1.5 per la cifratura (RFC 8017, 7.2): il PIN della V09 (D280). */
+export const RSA_PKCS1_PADDING = 1;
+
+type EncryptKey = KeyInput | { key: KeyInput; padding?: number };
+const keyOfEncrypt = (input: EncryptKey) => {
+  const padded =
+    typeof input === 'object' && !(input instanceof KeyObject) && 'padding' in input
+      ? input
+      : undefined;
+  if (padded && padded.padding !== RSA_PKCS1_PADDING)
+    throw new Error('Nella dimostrazione solo il riempimento PKCS#1 v1.5');
+  return keyFrom(padded ? padded.key : (input as KeyInput));
+};
+
+/** RSAES-PKCS1-v1_5: EM = 00 || 02 || PS (non zero, casuale) || 00 || M, poi m^e mod n. */
+export function publicEncrypt(keyInput: EncryptKey, data: ArrayBufferView | string): Buffer {
+  const key = publicOf(keyOfEncrypt(keyInput));
+  const k = Math.ceil(bitLength(key.rsa.n) / 8);
+  const m = bytesOf(data);
+  if (m.length > k - 11) throw new Error('Messaggio troppo lungo per la chiave RSA');
+  const ps = new Uint8Array(k - m.length - 3);
+  for (let i = 0; i < ps.length; i++) {
+    let b = 0;
+    while (b === 0) b = globalThis.crypto.getRandomValues(new Uint8Array(1))[0]!;
+    ps[i] = b;
+  }
+  const em = concat([Uint8Array.of(0, 2), ps, Uint8Array.of(0), m]);
+  return Buffer.from(fromBig(modPow(toBig(em), key.rsa.e, key.rsa.n), k));
+}
+
+/** La decifratura con la chiave privata; un riempimento sbagliato è un errore. */
+export function privateDecrypt(keyInput: EncryptKey, data: ArrayBufferView): Buffer {
+  const key = keyOfEncrypt(keyInput);
+  if (key.type !== 'private') throw new Error('Per decifrare serve la chiave privata');
+  const r = key.rsa as RsaPrivate;
+  const k = Math.ceil(bitLength(r.n) / 8);
+  const c = bytesOf(data);
+  if (c.length !== k) throw new Error('Testo cifrato della lunghezza sbagliata');
+  const em = fromBig(modPow(toBig(c), r.d, r.n), k);
+  const sep = em.indexOf(0, 2);
+  if (em[0] !== 0 || em[1] !== 2 || sep < 10) throw new Error('Decifratura RSA non riuscita');
+  return Buffer.from(em.subarray(sep + 1));
+}
+
 export function verify(
   algorithm: string | null | undefined,
   data: ArrayBufferView | ArrayBuffer | string,

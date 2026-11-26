@@ -11,6 +11,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { archiveGrant, fseTransmission, patient, pssDocument, therapy } from '../src/db/schema';
+import { simulatedRegionalClient } from '../src/app';
 import { withActor } from '../src/db/tx';
 import { studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
@@ -56,6 +57,7 @@ describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
           gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Prova'), now),
           audience: SIMULATED_FSE_AUDIENCE,
           signer: new SimulatedDocumentSigner({ now }),
+          regional: simulatedRegionalClient(simulator, now),
         },
       },
     );
@@ -261,11 +263,30 @@ describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
       .select()
       .from(fseTransmission)
       .where(eq(fseTransmission.documentId, open.id));
+    // Validazione sul Gateway, poi il Fascicolo regionale: CREATE ed esito (V09, scenario 1).
     expect(calls.map((c) => `${c.operation} ${c.outcome}`).sort()).toEqual([
-      'publication ok',
-      'status ok',
+      'regional_create ok',
+      'regional_outcome ok',
       'validation ok',
     ]);
+    const published = p as Pss & {
+      identificativoFascicolo: string | null;
+      fascicolo: { operazione: string; stato: string } | null;
+    };
+    expect(published.identificativoFascicolo).toMatch(
+      /^2\.16\.840\.1\.113883\.2\.9\.2\.10\.4\.4\^\d+$/,
+    );
+    expect(published.fascicolo).toMatchObject({ operazione: 'create', stato: 'done' });
+    // Nel registro il messaggio intero, senza credenziali e con il documento indicato dall'impronta.
+    const create = calls.find((c) => c.operation === 'regional_create')!;
+    expect(create.request).toContain('<tipoAttivita>CREATE</tipoAttivita>');
+    expect(create.request).toContain('<tip:TipoAttivitaClinica>ERP</tip:TipoAttivitaClinica>');
+    expect(create.request).toContain('<pinCode>[omessa]</pinCode>');
+    expect(create.request).toMatch(
+      /<documento>\[documento: sha256 [0-9a-f]{64}, \d+ byte, in pss_file\]<\/documento>/,
+    );
+    expect(create.request).not.toContain('parola-di-prova');
+    expect(create.response).toContain('TEMP_010_');
     const overview = await ok<{ versioni: Pss[]; inLavorazione: Pss | null }>('GET', base());
     expect(overview.inLavorazione).toBeNull();
     expect(overview.versioni.map((v) => [v.versione, v.stato])).toEqual([[1, 'published']]);
@@ -343,11 +364,14 @@ describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
       .select()
       .from(fseTransmission)
       .where(eq(fseTransmission.documentId, v3.id));
+    // Sostituzione regionale (V09, scenario 3): ricerca dell'UUID, REPLACE, poi tre esiti (due
+    // «ELAB» finché i metadati non sono a INI, poi «OK»).
     expect(calls.map((c) => c.operation).sort()).toEqual([
-      'replacement',
-      'status',
-      'status',
-      'status',
+      'regional_outcome',
+      'regional_outcome',
+      'regional_outcome',
+      'regional_replace',
+      'regional_search',
       'validation',
     ]);
   });

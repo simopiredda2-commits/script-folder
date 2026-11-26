@@ -40,7 +40,7 @@ export const SIMULATED_FSE_AUDIENCE = 'simulatore-gateway-fse/v1';
  */
 export type SimulatedFseOutcome =
   'ok' | 'unreachable' | 'timeout' | 'internal-error' | 'ini-pending';
-type Operation = 'validation' | 'publication' | 'replacement' | 'status';
+type Operation = 'validation' | 'publication' | 'replacement' | 'deletion' | 'status';
 
 /** Tabelle dei valori delle specifiche (16.3) usate nei controlli dei metadati. */
 const FACILITY_TYPES = [
@@ -138,6 +138,8 @@ interface Published {
   workflowInstanceId: string;
   patientCf: string;
   replacedBy?: string;
+  /** Eliminato (6): l'identificativo resta, per non riusarlo. */
+  deleted?: boolean;
 }
 
 /** Risposta del servizio (non un errore di rete). */
@@ -225,9 +227,11 @@ export class SimulatedFseGateway implements FseTransport {
         ? 'status'
         : req.method === 'PUT'
           ? 'replacement'
-          : req.path.endsWith('/validation')
-            ? 'validation'
-            : 'publication';
+          : req.method === 'DELETE'
+            ? 'deletion'
+            : req.path.endsWith('/validation')
+              ? 'validation'
+              : 'publication';
     const outcome = this.options.decide?.(op) ?? 'ok';
     if (outcome === 'unreachable' || outcome === 'timeout') {
       this.log.push({ operation: op, status: 0 });
@@ -321,7 +325,8 @@ export class SimulatedFseGateway implements FseTransport {
       'subject_application_id',
       'subject_application_vendor',
       'subject_application_version',
-      'resource_hl7_type',
+      // Il tipo di documento non è obbligatorio per l'eliminazione (2.26, 8.1).
+      ...(op === 'deletion' ? [] : ['resource_hl7_type']),
     ];
     for (const k of required)
       if (auth[k] === undefined || auth[k] === '')
@@ -349,12 +354,16 @@ export class SimulatedFseGateway implements FseTransport {
       return fail('Il campo person_id non è nel formato atteso');
     if (typeof auth.patient_consent !== 'boolean')
       return fail('Il campo patient_consent deve essere vero o falso');
-    const update = op === 'replacement';
+    const update = op === 'replacement' || op === 'deletion';
     if (auth.purpose_of_use !== (update ? 'UPDATE' : 'TREATMENT'))
       return fail('Contesto operativo (purpose_of_use) non ammesso per il servizio');
-    if (auth.action_id !== (update ? 'UPDATE' : 'CREATE'))
+    const action = op === 'deletion' ? 'DELETE' : update ? 'UPDATE' : 'CREATE';
+    if (auth.action_id !== action)
       return fail('Tipo di attività (action_id) non ammesso per il servizio');
-    if (auth.resource_hl7_type !== PSS_RESOURCE_TYPE)
+    if (
+      !(op === 'deletion' && auth.resource_hl7_type === undefined) &&
+      auth.resource_hl7_type !== PSS_RESOURCE_TYPE
+    )
       return fail('Tipo di documento (resource_hl7_type) non gestito dal simulatore');
     if ((op === 'publication' || op === 'replacement') && file) {
       if (!signature.attachment_hash)
@@ -483,6 +492,31 @@ export class SimulatedFseGateway implements FseTransport {
       }
       const trace = hex(8);
       return { status: 200, body: { traceID: trace, spanID: trace, transactionData: w.events } };
+    }
+    if (op === 'deletion') {
+      const target = decodeURIComponent(req.path.split('/').pop() ?? '');
+      const doc = this.documents.get(target);
+      if (!doc || doc.deleted)
+        return this.problem(
+          404,
+          '/msg/record-not-found',
+          'Record non trovato.',
+          `Documento ${target} non trovato`,
+        );
+      if (doc.patientCf !== tokens.patientCf)
+        return this.problem(
+          403,
+          '/msg/jwt-validation',
+          'Campo token JWT non valido.',
+          'Il paziente del token (person_id) non è quello del documento',
+          '/jwt-person-id',
+        );
+      doc.deleted = true;
+      const trace = hex(8);
+      return {
+        status: 200,
+        body: { traceID: trace, spanID: trace, workflowInstanceId: doc.workflowInstanceId },
+      };
     }
     const d = await this.document(req.file);
     if ('status' in d) return d;
@@ -634,7 +668,7 @@ export class SimulatedFseGateway implements FseTransport {
     if (op === 'replacement') {
       const target = decodeURIComponent(req.path.split('/').pop() ?? '');
       const old = this.documents.get(target);
-      if (!old || old.replacedBy)
+      if (!old || old.replacedBy || old.deleted)
         return this.problem(
           404,
           '/msg/record-not-found',
