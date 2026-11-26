@@ -30,7 +30,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **Dal 23 al 25/11/2026**, nello stesso branch, ripartito da `main` dopo ogni unione: pull request dalla #31 alla #39 unite (D247–D271); ogni blocco ha la sua sezione più sotto. Ultima fermata: «Risposte della fermata dopo la #39». Adesso le due parti nazionali della ricetta rossa, poi il Fascicolo con il PSS v1.5; AURA dopo le risposte del CSI (D268).
 - **26/11/2026**: pull request #40 unita (D275). Nello stesso branch ripartito da `main`, il Fascicolo con i servizi della Regione: messaggi della V09, simulatore, coda con le politiche di invio, oscuramento e cancellazione (D280); poi il Profilo allineato alla guida HL7 Italia v1.5 (D281). Sezione «Dopo l'unione della #40 – Il Fascicolo con i servizi della Regione». Pull request #41 unita lo stesso giorno (commit `f3007b9`), con il via dato in anticipo (D275) e le 14 prove su GitHub verdi; il branch riparte da `main`.
 - **Fermata del 26/11/2026, dopo l'unione della #41** (D282): le domande 1, 3, 4 e 5 hanno avuto risposta. Adesso, nello stesso branch ripartito da `main`: i nomi nuovi dei menu («Risultati degli esami», «Visite ed esami da prescrivere») e il tipo di terapia sulla riga della ricetta, in una pull request; poi il SIAP, prima la parte che non dipende dal CSI e poi il modulo con un simulatore. Le pull request di questo blocco si uniscono con le prove verdi (via in anticipo). AURA dopo le risposte del CSI; per il CSI le domande nuove, dalla 1 alla 13.
-- **26/11/2026, nello stesso branch**: i nomi nuovi dei menu e il tipo di terapia sulla riga della ricetta, fatti (D282, D283); sezione «Dopo l'unione della #41 – Nomi dei menu e tipo di terapia sulla riga». Poi il SIAP.
+- **26/11/2026, nello stesso branch**: i nomi nuovi dei menu e il tipo di terapia sulla riga della ricetta, fatti (D282, D283); sezione «Dopo l'unione della #41 – Nomi dei menu e tipo di terapia sulla riga». Pull request #42 unita lo stesso giorno (commit `8029a44`), con il via dato in anticipo e le 14 prove su GitHub verdi; dimostrazione alla versione 30 e pagina del collaudo aggiornate (G4, G6, G10). Il branch riparte da `main`; adesso il SIAP.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -1736,7 +1736,7 @@ Pull request #40 unita il 26/11/2026 con il via dato in anticipo (D275); il bran
 
 ## Dopo l'unione della #41 – Nomi dei menu e tipo di terapia sulla riga (26/11/2026, D282, D283)
 
-Fermata del 26/11/2026 dopo l'unione della #41 (D282). Nello stesso branch ripartito da `main`, le risposte 1 e 4, in una pull request; il SIAP viene dopo, in un'altra.
+Fermata del 26/11/2026 dopo l'unione della #41 (D282). Nello stesso branch ripartito da `main`, le risposte 1 e 4, in una pull request; il SIAP viene dopo, in un'altra. Pull request #42 unita il 26/11/2026 (commit `8029a44`): le 14 prove su GitHub tutte verdi. Dimostrazione ripubblicata nello stesso indirizzo, versione 30 (https://claude.ai/artifact/Md4KFYrVagjLdnNewSMzCQ); pagina del collaudo con le voci G4, G6 e G10 aggiornate (https://claude.ai/artifact/X58AnakriJzqaApLjHa5kR).
 
 **Fatto**:
 
