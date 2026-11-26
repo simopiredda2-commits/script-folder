@@ -8,7 +8,7 @@ Documento preparato durante le tappe 9 e 10 (D110), per decidere alla fermata fi
 - **È già dovuto**: il decreto del 2025 sui contenuti voleva il PSS di tutti i medici di famiglia entro il 30 settembre 2025. Un programma per medici di famiglia che non lo produce non basta allo studio.
 - **Che cosa contiene**: un elenco fissato dal decreto, con dati obbligatori e facoltativi. Obbligatori: allergie e reazioni avverse, patologie croniche, terapie croniche prescritte dal medico, anamnesi familiare, organi mancanti, trapianti, malformazioni. Facoltativi: peso, altezza, BMI, pressione, fattori di rischio. I dati anagrafici arrivano dall'Anagrafe nazionale degli assistiti. Tabella sotto.
 - **Dati oscurati**: le voci che il paziente ha chiesto di oscurare non devono mai essere visibili ad altri tramite il PSS (art. 4, c. 3; art. 9). Il programma le segna già (D116) e le terrà fuori.
-- **Come arriva nel Fascicolo**: il programma produce un documento nel formato nazionale (CDA2 di HL7 Italia), lo mette in un PDF firmato con firma PAdES e lo fa validare dal Gateway nazionale, con certificati rilasciati da Sogei. Poi lo manda ai servizi del Fascicolo della Regione Piemonte, che lo pubblicano sul Gateway (V09, D280).
+- **Come arriva nel Fascicolo**: il programma produce un documento nel formato nazionale (CDA2 di HL7 Italia), lo mette in un PDF firmato con firma PAdES e lo fa validare dal Gateway nazionale, con i certificati della regione dello studio: di test da Sogei, di produzione dai referenti di ogni Regione (D298). Poi lo manda ai servizi del Fascicolo della regione, che lo pubblicano sul Gateway: in Piemonte con la V09 (D280), dal pacchetto della regione (D297).
 - **Prima di usarlo con pazienti veri**: il programma va accreditato. Sono tre fasi con Sogei, Agenas e la Regione, e ci sono impegni del fornitore (SCRIPT). È una decisione di Simone, non una cosa che posso fare io.
 - **Consensi**: per consultare il Fascicolo serve il consenso del paziente, dato separatamente per finalità; la verifica la fa il Fascicolo (art. 8, c. 11). In cartella resta quello che il paziente ha espresso in studio (D115).
 
@@ -61,7 +61,7 @@ Il BMI è tra i dati facoltativi del PSS: è un dato in più per la domanda dell
 
 1. **Compilazione**: il programma propone i dati dalla cartella, senza le voci oscurate; il medico li controlla e li completa. Il decreto del 2025 prevede anche un servizio nazionale di supporto alla compilazione (EDS), «previa verifica da parte del medico».
 2. **Documento**: CDA2 secondo le specifiche HL7 Italia, controllato con gli schematron e i dizionari pubblicati dal Ministero; inserito in un PDF e firmato in formato PAdES.
-3. **Validazione e pubblicazione al Gateway**: il servizio `/v1/documents/validation`, poi la pubblicazione. Si autentica con un token JWT e una firma del token, con certificati X.509 rilasciati da Sogei.
+3. **Validazione e pubblicazione al Gateway**: il servizio `/v1/documents/validation`, poi la pubblicazione. Si autentica con un token JWT e una firma del token, con certificati X.509 di autenticazione e di firma: quelli di test li rilascia Sogei, quelli di produzione i referenti di ogni Regione (D298).
 4. **Indicizzazione**: il documento è registrato tramite INI (art. 13, c. 3). La Regione o l'ASL è titolare della conservazione del PSS (art. 4, c. 5).
 5. **Aggiornamenti**: il medico lo aggiorna quando cambia qualcosa. Se il paziente cambia medico, il nuovo ne scrive uno nuovo e i precedenti restano consultabili (art. 4, c. 6 e 7).
 
@@ -85,6 +85,38 @@ Letti il 26/11/2026 (`docs/avanzamento.md`, «Che cosa dicono già i documenti p
 - **Autocertificazione con i servizi della Regione**:
   - per PSS, BdS e PCP, FSE--PRJ-01-V01 §2: mail a supporto.fse@csi.it, kit del CSI, piano V04, report V02, «Valutazione finale», verifica insieme a CSI e Regione;
   - per il modulo di accesso semplificato, LCCE V13 §8: in produzione serve un certificato della società per l'autenticazione del client, di un'autorità accreditata da AgID.
+
+### Che cosa hanno detto Sogei e il repository dell'accreditamento (26/11/2026)
+
+Fonti:
+
+- la risposta di Sogei (fse_support) a Simone, email del 26/11/2026: resta a Simone, non entra nel repository;
+- `ministero-salute/it-fse-accreditamento-v2`, `README.md` del ramo main, 10.556 byte, SHA-256 `8af2203a1feed6ffe2877ec8c7e751938c5b57066ae7c7b38b0713d639d07bca` (`docs/provenienze.md`), riletto il 26/11/2026 sulla copia con la stessa impronta;
+- `ministero-salute/it-fse-support`, `README.md`, «Richiesta certificati x509», 3.437 byte, SHA-256 `7e68eebf681f53b92cbe48fbb1c55cb17398485fc7e41f417c509e910aa0e58b`.
+
+**Certificati del Gateway** (Sogei):
+
+- **di test**: Sogei li dà solo a fornitori che sono già società costituite. Arriveranno dopo la costituzione di SCRIPT, chiesti con le due CSR (una per l'autenticazione, una per la firma) mandate per email, come dice «Richiesta certificati x509» di it-fse-support. Le chiavi private delle CSR vanno conservate: con i certificati servono per entrare nel Gateway (it-fse-support);
+- **di produzione**: non li dà Sogei. Si chiedono ai referenti di ogni Regione. Per questo il programma tiene una coppia di certificati per regione e usa quella della regione dello studio del medico (D298).
+
+**Documentazione**: quella dell'accreditamento è nel repository `ministero-salute/it-fse-accreditamento-v2` (Sogei).
+
+**Risultati della fase 1** (README di it-fse-accreditamento-v2, «Procedura di caricamento dei risultati»):
+
+- si mandano con una pull request in quel repository;
+- vanno nella cartella `GATEWAY/{commonName auth}/{subject_application_vendor}/{subject_application_id}/{subject_application_version}`. Nel percorso valgono solo i caratteri `[a-zA-Z0-9.-_]`: gli spazi diventano `_`, gli altri caratteri si omettono;
+- dentro ci sono `data.json`, con i riferimenti di tracciatura dei test, e `report-checklist.xlsx`, con il riassunto dei casi eseguiti. I PDF usati nelle chiamate non si mandano;
+- si usano solo i codici fiscali dell'elenco `Test Case/CF WHITELIST.txt`, e nessun dato di persone identificate o identificabili;
+- la pull request si apre dopo l'informativa privacy e la dichiarazione di presa di responsabilità, allegata all'EUSurvey;
+- nelle chiamate di validazione per l'accreditamento il campo `activity` vale `VALIDATION_FOR_ACCREDITAMENTO`.
+
+**Versioni equivalenti** (stesso README, «Gestione equivalenza versione software»):
+
+- una release successiva a una versione già validata si può autodichiarare equivalente, senza rifare la convalida;
+- vale se non cambia il codice dei moduli che gestiscono i CDA2 e il colloquio con il Gateway: stesse tipologie di documento, stessi servizi chiamati, stessa gestione degli errori e casi di applicabilità;
+- si dichiara con una pull request intitolata «Dichiarazione di versioni equivalenti», con il solo `versions.json` (fornitore, applicazione, versione validata, data e ora, versioni equivalenti).
+
+**Che cosa vuol dire per il programma**: i moduli dei CDA2 e del colloquio con il Gateway restano separati dal resto, così i rilasci che non li toccano si dichiarano equivalenti. Oggi sono in `packages/integrations/src/fse/`: CDA, schematron, dizionari, PDF, firma, Gateway e token. Come mostrarlo a ogni rilascio, per esempio con un'impronta di quei moduli controllata da una prova, si prepara nella fase 1 (`docs/avanzamento.md`).
 
 ## Che cosa farebbe la tappa 11 (proposta)
 
@@ -134,7 +166,7 @@ Dal 26/11/2026 il Profilo non si pubblica più direttamente sul Gateway: va al F
 
 I campi del messaggio sono quelli delle tabelle della V09: tra gli altri, TipoAttivitaClinica «ERP», IstituzioneAutore con «010» e il codice ASL del medico, il regime dalla tabella della V09.
 
-**La coda** segue le politiche della Regione:
+**La coda** segue le politiche della Regione, che dal 26/11/2026 stanno nel pacchetto del Piemonte (D297): la coda è nazionale e prende fermo, intervallo, ripetizioni, giorni e chi avvisare dalla pubblicazione della regione dello studio. Per il Piemonte:
 
 | Che cosa succede                                                                                   | Che cosa fa il programma                                                                           |
 | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -157,7 +189,8 @@ Dalla cartella il medico apre il Fascicolo del paziente nella pagina regionale d
 - Pagine regionali da aprire con il token, senza Shibboleth (V13, 6.3, p. 21): `https://medtok.fsepiemonte.it/dmawa/lcce` da Internet e `https://medtokrup.fsepiemonte.it/dmawa/lcce` dalla RUPAR, con il token nel parametro `tokenCCEMed`. Vanno nella configurazione dell'adattatore vero: nel codice non ci sono (regola 7).
 
 - Pagina «Fascicolo regionale» della cartella, per i medici, con il filtro dei documenti delle specifiche.
-- Servizio: `GET /api/fascicolo-regionale` (filtri e stato del collegamento), `POST /api/pazienti/:id/fascicolo-regionale` (l'indirizzo con il token); ogni richiesta nel registro degli accessi.
+- È la destinazione «fascicolo» delle chiamate di contesto (D297): un meccanismo solo, con le destinazioni date dal pacchetto della regione dello studio. Parametri e parole che nominano la regione arrivano dal pacchetto.
+- Servizio: `GET /api/chiamate-di-contesto` (destinazioni, parametri, parole e stato del collegamento), `POST /api/pazienti/:id/chiamate-di-contesto/fascicolo` (l'indirizzo con il token); ogni richiesta nel registro degli accessi, come apertura del Fascicolo regionale.
 - Oggi con un simulatore, spento in produzione. Da chiedere al CSI:
   - con l'autenticazione forte di oggi, se per una cartella in cloud vale il token di `getAuthentication` o l'accesso diretto dentro Shibboleth (V13, 6.4);
   - quanto dura il token (la V13 dice solo che scaduto dà WEB_001; nel simulatore la durata è un'impostazione, vuota per difetto);

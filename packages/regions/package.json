@@ -4,13 +4,20 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./*": "./*/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
     "inventario": "tsx scripts/inventario.ts"
   },
   "dependencies": {
-    "@mmg/domain": "workspace:*"
+    "@mmg/domain": "workspace:*",
+    "@mmg/integrations": "workspace:*",
+    "@xmldom/xmldom": "0.9.12",
+    "xpath": "0.0.34"
+  },
+  "devDependencies": {
+    "pdf-lib": "1.17.1"
   }
 }

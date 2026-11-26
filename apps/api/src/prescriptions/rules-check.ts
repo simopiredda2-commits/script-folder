@@ -1,5 +1,4 @@
 import { samePackUnit, type PackUnit } from '@mmg/reference';
-import { regionalPackageKey } from '@mmg/regions';
 import {
   checkPrescription,
   type DrugFacts,
@@ -26,6 +25,7 @@ import {
   therapy,
 } from '../db/schema';
 import type { CheckOutcome, SignInput } from './service';
+import { archiveRegion } from '../regions/region';
 import { effectiveChoice } from './therapy-choice';
 
 export interface RulesCheckDeps {
@@ -55,20 +55,6 @@ function parseUnits(text: string | null): number | null {
   if (!text) return null;
   const n = Number(text.trim().replace(',', '.'));
   return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-/**
- * La regione dello studio di un archivio, con la chiave del suo pacchetto regionale (D288): con
- * questa le regole di prescrizione portano le aggiunte della regione (D296). Null se la regione
- * dello studio non ha un pacchetto o non si riconosce.
- */
-export async function archiveRegion(db: Database, archiveId: string): Promise<string | null> {
-  const [place] = await db
-    .select({ regionName: studio.regionName })
-    .from(archive)
-    .innerJoin(studio, eq(studio.id, archive.studioId))
-    .where(eq(archive.id, archiveId));
-  return regionalPackageKey(place?.regionName);
 }
 
 /** Costruisce dal database tutto ciò che le regole guardano. */

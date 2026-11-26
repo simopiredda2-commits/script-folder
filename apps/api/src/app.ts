@@ -31,7 +31,7 @@ import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
 import { registerFollowUpRoutes } from './http/followup-routes';
 import { registerFseRoutes } from './http/fse-routes';
-import { registerFseAccessRoutes } from './http/fse-access-routes';
+import { registerContextCallRoutes } from './http/context-call-routes';
 import { createPssService } from './fse/service';
 import { registerPrivacyRoutes } from './http/privacy-routes';
 import { registerAftRoutes } from './http/aft-routes';
@@ -65,7 +65,7 @@ import { raoSources } from './rao/tables';
 import { studioSendTimeoutMs } from './admin/studio-service';
 import type { CredentialService } from '@mmg/domain';
 import {
-  FseGatewayClient,
+  type FseGatewayClient,
   isDpcmServices,
   isSarRegionalServices,
   SIMULATED_FSE_AUDIENCE,
@@ -90,13 +90,14 @@ import {
   type AuraGateway,
   SimulatedAdditionalServicesPortal,
   type AdditionalServicesPortal,
-  SimulatedRegionalFseAccess,
-  type RegionalFseAccess,
-  RegionalFseClient,
-  SimulatedRegionalFse,
-  type SimulatedRegionalFseOptions,
+  type FseCredentials,
+  type RegionalContextCall,
+  type RegionalFsePublication,
 } from '@mmg/integrations';
+import { gatewayChoice } from './fse/gateways';
 import { createRegionalQueue, type RegionalQueue } from './fse/regional-queue';
+import { contextCallChoice, fsePublicationChoice } from './regions/integrations';
+import { studioRegionCode } from './regions/region';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
 import { ReferenceUpdates } from './reference/updates-service';
@@ -168,11 +169,28 @@ export interface AppDeps {
    * simulatore rilascia i certificati del programma all'avvio, solo in memoria (regola 7).
    */
   fse?: {
-    gateway: FseGatewayClient;
+    /**
+     * Il cliente del Gateway: dato qui, vale per ogni regione (le prove). Per difetto uno per
+     * regione, con i certificati della regione dello studio (D298).
+     */
+    gateway?: FseGatewayClient;
+    /**
+     * I certificati del Gateway di una regione, dal suo codice («010»): li danno i referenti della
+     * Regione. Per difetto, con il simulatore, una coppia di prova per regione.
+     */
+    credentialsFor?: (regionCode: string) => FseCredentials | null;
     audience: string;
     signer: DocumentSigner;
-    /** I servizi del Fascicolo regionale (V09, D280): il simulatore, sullo stesso Gateway. */
-    regional: RegionalFseClient;
+    /**
+     * Il Gateway simulato su cui il programma valida: i simulatori del Fascicolo delle regioni vi
+     * pubblicano (D280). Senza, uno loro.
+     */
+    simulator?: SimulatedFseGateway;
+    /**
+     * La pubblicazione nel Fascicolo della regione. Per difetto quella del pacchetto della regione
+     * dello studio del medico, oggi il simulatore (D297); data qui, vale per ogni regione (le prove).
+     */
+    regional?: RegionalFsePublication;
   };
   /**
    * Coda verso il Fascicolo regionale (D280): ogni quanto lavora (per difetto un minuto; null la
@@ -210,11 +228,12 @@ export interface AppDeps {
    */
   ppipPortal?: AdditionalServicesPortal;
   /**
-   * Apertura del Fascicolo regionale dalla cartella (D220), con il modulo di accesso del CSI. Per
-   * difetto il simulatore: l'adattatore vero si scrive con il CSI; con il simulatore, in
-   * produzione, l'apertura è spenta.
+   * Le chiamate di contesto, come l'apertura del Fascicolo regionale dalla cartella (D220). Per
+   * difetto quelle del pacchetto della regione dello studio, oggi i simulatori (D297); date qui,
+   * valgono per ogni regione (le prove, o adattatori veri dalla configurazione). Con i simulatori,
+   * in produzione, restano spente.
    */
-  fseAccess?: RegionalFseAccess;
+  contextCalls?: readonly RegionalContextCall[];
 }
 
 export function buildApp({
@@ -245,7 +264,7 @@ export function buildApp({
   identity = { gateway: new SimulatedDigitalIdentity({ now }), clientId: 'SIMULATORE_IDENTITA' },
   aura = {},
   ppipPortal = new SimulatedAdditionalServicesPortal(),
-  fseAccess = new SimulatedRegionalFseAccess(),
+  contextCalls,
 }: AppDeps): FastifyInstance {
   // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
   // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
@@ -553,17 +572,30 @@ export function buildApp({
       now,
     }),
   );
-  // Fascicolo regionale aperto dalla cartella (D220): modulo del CSI, oggi simulato.
-  registerFseAccessRoutes(app, {
+  // Chiamate di contesto, come il Fascicolo regionale aperto dalla cartella (D220): le pagine dei
+  // servizi della regione dello studio, oggi i simulatori del pacchetto (D297).
+  registerContextCallRoutes(app, {
     db,
     credentials,
-    access: fseAccess,
+    calls: contextCallChoice(contextCalls, now ? { now } : {}),
     environment: config.environment ?? 'prova',
   });
-  // Profilo Sanitario Sintetico al Fascicolo regionale (D280): la coda con le politiche di invio.
+  // Il Gateway del Fascicolo con i certificati della regione dello studio (D298).
+  const fseGateways = gatewayChoice({
+    ...(fse.gateway ? { override: fse.gateway } : {}),
+    ...(fse.simulator ? { transport: fse.simulator } : {}),
+    ...(fse.credentialsFor ? { credentialsFor: fse.credentialsFor } : {}),
+    ...(now ? { now } : {}),
+  });
+  // Profilo Sanitario Sintetico al Fascicolo della regione dello studio (D280, D297): la coda con
+  // le politiche di invio della regione.
   const regionalQueue = createRegionalQueue({
     db,
-    client: fse.regional,
+    publication: fsePublicationChoice(fse.regional, {
+      ...(now ? { now } : {}),
+      gateway: fse.simulator ?? new SimulatedFseGateway({ now }),
+      application: FSE_APPLICATION,
+    }),
     credentials,
     now: now ?? (() => new Date()),
     ...(fseQueueOptions.minIntervalMs !== undefined
@@ -584,9 +616,10 @@ export function buildApp({
   registerFseRoutes(
     app,
     db,
+    (studioId) => regionalQueue.publicationOfStudio(studioId),
     createPssService({
       db,
-      gateway: fse.gateway,
+      gatewayFor: async (studioId) => fseGateways.for(await studioRegionCode(db, studioId)),
       gatewayAudience: fse.audience,
       signer: fse.signer,
       regional: regionalQueue,
@@ -597,36 +630,24 @@ export function buildApp({
   return app;
 }
 
+/** Il programma che chiede ai servizi del Fascicolo delle regioni: nome, fornitore, versione. */
+const FSE_APPLICATION = {
+  id: PRODUCT_NAME.toUpperCase(),
+  vendor: COMPANY_BRAND,
+  version: '0.0.0',
+};
+
 /**
- * Simulatori del Gateway del Fascicolo, della firma e dei servizi del Fascicolo regionale, con i
- * certificati di prova in memoria. Il Fascicolo regionale simulato pubblica sullo stesso Gateway
- * simulato su cui il programma valida (D280).
+ * Simulatori del Gateway del Fascicolo e della firma, con i certificati di prova in memoria. Il
+ * Fascicolo della regione simulato pubblica sullo stesso Gateway simulato su cui il programma
+ * valida (D280).
  */
 function defaultFse(now?: () => Date): NonNullable<AppDeps['fse']> {
-  const simulator = new SimulatedFseGateway({ now });
   return {
-    gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Programma'), now),
     audience: SIMULATED_FSE_AUDIENCE,
     signer: new SimulatedDocumentSigner({ now }),
-    regional: simulatedRegionalClient(simulator, now),
+    simulator: new SimulatedFseGateway({ now }),
   };
-}
-
-/** Il cliente dei servizi regionali sul simulatore, con il certificato di cifratura del PIN. */
-export function simulatedRegionalClient(
-  gateway: SimulatedFseGateway,
-  now?: () => Date,
-  options: Omit<SimulatedRegionalFseOptions, 'gateway' | 'now'> = {},
-): RegionalFseClient {
-  const regional = new SimulatedRegionalFse({ gateway, ...(now ? { now } : {}), ...options });
-  return new RegionalFseClient(regional, {
-    encryptionCertificate: regional.encryptionCertificate,
-    application: {
-      id: PRODUCT_NAME.toUpperCase(),
-      vendor: COMPANY_BRAND,
-      version: '0.0.0',
-    },
-  });
 }
 
 /** Simulatori del SAR e del Sistema TS che vogliono l'Id-Sessione dei rispettivi simulatori. */

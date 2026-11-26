@@ -1,3 +1,9 @@
+import type {
+  RegionalContextCall,
+  RegionalFsePublication,
+  SimulatedFseGateway,
+} from '@mmg/integrations';
+
 /**
  * Pacchetti regionali (D288, D292): ciò che è legato a una regione sta nel pacchetto di quella
  * regione, scelto dalla regione dello studio e dall'ASL del medico. Qui il contratto di un
@@ -57,6 +63,29 @@ export interface AslVariant {
   parts: readonly RegionalPartEntry[];
 }
 
+/**
+ * Le integrazioni di un pacchetto con i servizi della regione, che non usano il database (D297):
+ * attuano i contratti nazionali di `@mmg/integrations`. Il servizio le sceglie dalla regione dello
+ * studio. Oggi ci sono i simulatori (regola 7); gli adattatori veri si aggiungono con l'ente.
+ */
+export interface RegionalIntegrations {
+  /**
+   * Le destinazioni delle chiamate di contesto (D220, D297): le pagine dei servizi della regione
+   * che il programma apre con il contesto del paziente, al più una per tipo. Oggi i simulatori.
+   */
+  contextCalls?: (options: { now?: () => Date }) => readonly RegionalContextCall[];
+  /**
+   * Pubblicazione del Profilo Sanitario Sintetico nel Fascicolo della regione (D280): il
+   * simulatore, che pubblica sul Gateway nazionale simulato su cui il programma valida.
+   */
+  fsePublication?: (options: {
+    now?: () => Date;
+    gateway: SimulatedFseGateway;
+    /** Il programma che chiede: nome, fornitore e versione, come li vuole la regione. */
+    application: { id: string; vendor: string; version: string };
+  }) => RegionalFsePublication;
+}
+
 export interface RegionalPackage {
   /** La chiave: il nome delle cartelle del pacchetto (`regions/<chiave>/`). */
   key: string;
@@ -71,4 +100,6 @@ export interface RegionalPackage {
    * pacchetto non si scrivono (prova dei nomi regionali, D292). Si confrontano riga per riga.
    */
   terms: readonly RegExp[];
+  /** Le integrazioni con i servizi della regione (D297), se il pacchetto ne ha. */
+  integrations?: RegionalIntegrations;
 }

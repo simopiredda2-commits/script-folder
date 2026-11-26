@@ -1,5 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import type { ServiceAuth } from '../service-auth';
+import type {
+  ContextCallParameter,
+  ContextCallRequest,
+  ContextCallResult,
+  RegionalContextCall,
+  ServiceAuth,
+  SimulatedContextPage,
+} from '@mmg/integrations';
 
 /**
  * Aprire il Fascicolo regionale del paziente dalla cartella clinica, senza riscrivere le
@@ -17,8 +24,9 @@ import type { ServiceAuth } from '../service-auth';
  *
  * La V13 descrive anche l'accesso diretto alla pagina del Fascicolo dentro una sessione Shibboleth,
  * senza token (6.4): con l'autenticazione forte di oggi (D102, D109) è da chiedere al CSI quale dei
- * due vale per una cartella in cloud. Qui l'interfaccia e il simulatore (regola 7); l'adattatore vero
- * si scrive con il CSI.
+ * due vale per una cartella in cloud. Qui il simulatore (regola 7): è la destinazione «fascicolo»
+ * delle chiamate di contesto, il contratto nazionale di `@mmg/integrations` (D297); l'adattatore
+ * vero si scrive con il CSI.
  */
 
 /**
@@ -105,28 +113,48 @@ export const FSE_ACCESS_ERRORS = {
 } as const;
 export type FseAccessErrorCode = keyof typeof FSE_ACCESS_ERRORS;
 
+/**
+ * Gli errori che riguardano le credenziali RUPAR del medico (V13, tabella 1: errate, PIN o
+ * credenziali mancanti): il programma li dice come «credenziali» e porta il medico alla pagina.
+ */
+export const FSE_ACCESS_CREDENTIAL_ERRORS: ReadonlySet<string> = new Set([
+  'AUTH_ER_501',
+  'AUTH_ER_510',
+  'AUTH_ER_516',
+]);
+
+/**
+ * Le parole per il medico: a chi si chiede l'accesso, con chi si attiva il collegamento, che
+ * credenziali controllare. Il token vale una volta; l'IP della postazione dalla V13 si traccia e
+ * non si confronta (2.2), quindi la pagina non dice più «solo da questo computer» (D297).
+ */
+export const FSE_ACCESS_TEXTS = {
+  intro:
+    'Il programma chiede l’accesso alla Regione Piemonte con le tue credenziali RUPAR e apre il Fascicolo di questo paziente in una scheda nuova, senza riscrivere utente e password. Il collegamento vale una volta sola; la Regione controlla che il paziente abbia dato il consenso alla consultazione.',
+  simulated:
+    'Collegamento simulato: si apre una pagina di prova del programma, non il Fascicolo vero. Il collegamento vero si attiva con il CSI Piemonte.',
+  notActive:
+    'Il collegamento con il Fascicolo regionale non è ancora attivo: si attiva con il CSI Piemonte',
+  credentials: 'Controlla utente, password e PIN RUPAR in «Credenziali dei servizi».',
+} as const;
+
+/** Il servizio delle credenziali del medico: quelle RUPAR. */
+export const FSE_ACCESS_CREDENTIAL_SERVICE = 'rupar';
+
+/** Il filtro dell'elenco dei documenti (TIPO_DOCUMENTO): l'unico parametro della pagina. */
+export const FSE_ACCESS_PARAMETER: ContextCallParameter = {
+  key: 'tipoDocumento',
+  label: 'Documenti da mostrare',
+  anyLabel: 'Tutti i documenti',
+  options: FSE_DOCUMENT_TYPES,
+};
+
+/** La richiesta come la vuole la V13: il paziente, l'IP della postazione e il filtro. */
 export interface FseAccessRequest {
-  /** Codice fiscale del paziente (codiceFiscaleAssistito). */
   patientFiscalCode: string;
-  /**
-   * IP della postazione che aprirà la pagina (ipClient); null se non noto. Lo schema lo dà come
-   * facoltativo (0..1), la tabella degli errori ha AUTH_ER_512 se manca: da chiarire con il CSI.
-   */
   clientIp: string | null;
-  /** Filtro dell'elenco dei documenti (TIPO_DOCUMENTO); null per l'operazione predefinita. */
+  /** Uno di `FSE_DOCUMENT_TYPES`; null per tutti. */
   documentType: string | null;
-}
-
-export type FseAccessResult =
-  /** L'indirizzo da aprire nel browser, con il token: vale una volta. */
-  | { outcome: 'success'; url: string }
-  | { outcome: 'failure'; code: string; message: string }
-  | { outcome: 'unreachable'; message: string };
-
-export interface RegionalFseAccess {
-  readonly environment: 'simulator' | 'test' | 'production';
-  /** Le credenziali RUPAR del medico passano a parte: non entrano nei registri. */
-  authenticate(request: FseAccessRequest, auth: ServiceAuth): Promise<FseAccessResult>;
 }
 
 export interface SimulatedRegionalFseAccessOptions {
@@ -172,15 +200,32 @@ export type SimulatedFsePage =
  * Simulatore del servizio e della pagina regionale: token in memoria, monouso, come nella V13. Non
  * chiama nessuno: la pagina è del programma (`pageUrl`).
  */
-export class SimulatedRegionalFseAccess implements RegionalFseAccess {
+export class SimulatedRegionalFseAccess implements RegionalContextCall {
+  readonly kind = 'fascicolo' as const;
   readonly environment = 'simulator' as const;
+  readonly parameters = [FSE_ACCESS_PARAMETER];
+  readonly texts = FSE_ACCESS_TEXTS;
+  readonly credentialService = FSE_ACCESS_CREDENTIAL_SERVICE;
   /** Richieste ricevute, per le prove: mai le credenziali. */
   readonly received: (FseAccessRequest & { role: string; application: string })[] = [];
   private readonly tokens = new Map<string, IssuedToken>();
 
   constructor(private readonly options: SimulatedRegionalFseAccessOptions = {}) {}
 
-  authenticate(request: FseAccessRequest, auth: ServiceAuth): Promise<FseAccessResult> {
+  /** La chiamata di contesto: il filtro dei documenti dal parametro della pagina. */
+  open(call: ContextCallRequest, auth: ServiceAuth): Promise<ContextCallResult> {
+    return this.authenticate(
+      {
+        patientFiscalCode: call.patientFiscalCode,
+        clientIp: call.clientIp,
+        documentType: call.parameters[FSE_ACCESS_PARAMETER.key] ?? null,
+      },
+      auth,
+    );
+  }
+
+  /** getAuthentication della V13: il token, o l'errore delle specifiche. */
+  authenticate(request: FseAccessRequest, auth: ServiceAuth): Promise<ContextCallResult> {
     this.received.push({ ...request, role: FSE_ACCESS_ROLE, application: FSE_ACCESS_APPLICATION });
     // Utente, password e PIN RUPAR sono tutti obbligatori (V13, 3.3; il PIN dalla V07).
     if (!auth.username?.trim() || !auth.password) return Promise.resolve(failure('AUTH_ER_516'));
@@ -205,7 +250,7 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
       documentType: request.documentType,
       expiresAt: minutes === null ? null : this.now() + minutes * 60_000,
     });
-    const page = this.options.pageUrl ?? '/api/simulatori/fascicolo';
+    const page = this.options.pageUrl ?? '/api/simulatori/chiamate-di-contesto';
     return Promise.resolve({ outcome: 'success', url: `${page}?token=${token}` });
   }
 
@@ -213,12 +258,28 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
     return (this.options.now?.() ?? new Date()).getTime();
   }
 
+  /** La pagina simulata con le sue parole: per chi e con quale filtro si sarebbe aperta. */
+  simulatedPage(token: string, clientIp: string | null): SimulatedContextPage {
+    const page = this.openPage(token, clientIp);
+    const head = 'Fascicolo Sanitario Elettronico regionale (simulatore).';
+    if (page.outcome === 'opened')
+      return {
+        status: 200,
+        text: `${head} Qui si aprirebbe il Fascicolo dell’assistito ${page.patientFiscalCode}${
+          page.documentType
+            ? `, con i documenti di tipo ${FSE_DOCUMENT_TYPES[page.documentType]}`
+            : ''
+        }.`,
+      };
+    return { status: 403, text: `${head} ${page.message} (${page.code}).` };
+  }
+
   /**
    * La pagina regionale simulata: il token vale una volta e fino alla sua scadenza; un token non
    * generato dal servizio, già usato o scaduto dà WEB_001 (V13, tabella 6). L'IP di chi apre non si
    * confronta con quello dichiarato: si traccia (2.2).
    */
-  open(token: string, clientIp: string | null): SimulatedFsePage {
+  openPage(token: string, clientIp: string | null): SimulatedFsePage {
     const t = this.tokens.get(token);
     // Usato o scaduto, non serve più: una seconda apertura non lo trova e dà WEB_001 lo stesso.
     this.tokens.delete(token);
@@ -234,6 +295,10 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
   }
 }
 
-function failure(code: FseAccessErrorCode): FseAccessResult {
-  return { outcome: 'failure', code, message: FSE_ACCESS_ERRORS[code] };
+function failure(code: FseAccessErrorCode): ContextCallResult {
+  return {
+    outcome: FSE_ACCESS_CREDENTIAL_ERRORS.has(code) ? 'credentials' : 'failure',
+    code,
+    message: FSE_ACCESS_ERRORS[code],
+  };
 }

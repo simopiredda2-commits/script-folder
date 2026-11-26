@@ -1,4 +1,10 @@
 import type { RegionalPackage } from '../src/types';
+import { SimulatedRegionalFseAccess } from './integrations/fse-access';
+import { simulatedFsePublication } from './integrations/fse-publication-simulator';
+
+export * from './integrations/fse-access';
+export * from './integrations/fse-publication';
+export * from './integrations/fse-publication-simulator';
 
 /**
  * Il pacchetto della Regione Piemonte (D288, D292): il primo. Il manifesto dice che cosa dà la
@@ -25,8 +31,8 @@ export const piemonte: RegionalPackage = {
     },
     {
       part: 'health_record',
-      where: 'core',
-      what: 'Fascicolo regionale: pubblicazione con i servizi della V09 (D280) e accesso dalla cartella con il modulo LCCE (D220, D265)',
+      where: 'package',
+      what: 'Fascicolo regionale: pubblicazione del Profilo con i servizi della V09 e le politiche di invio (D280) e accesso dalla cartella con il modulo LCCE (D220, D265), in `integrations/` (D297)',
     },
     {
       part: 'additional_services',
@@ -60,6 +66,10 @@ export const piemonte: RegionalPackage = {
     },
   ],
   asl: [],
+  integrations: {
+    contextCalls: (options) => [new SimulatedRegionalFseAccess(options)],
+    fsePublication: (options) => simulatedFsePublication(options),
+  },
   terms: [
     /piemont/i,
     /\bCSI\b/,

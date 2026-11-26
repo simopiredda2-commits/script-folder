@@ -10,6 +10,7 @@ import {
   type FseProblem,
   type FseResult,
   type PssCdaInput,
+  type RegionalFsePublication,
 } from '@mmg/integrations';
 import { createHash, randomUUID } from 'node:crypto';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
@@ -38,21 +39,28 @@ import {
   type PssItem,
 } from './compose';
 import { renderPssPdf } from './pdf';
-import { regionalAuthorIssues, regionalRegimeOf, type RegionalQueue } from './regional-queue';
+import { NO_GATEWAY_CREDENTIALS } from './gateways';
+import {
+  NO_REGIONAL_FSE_PUBLICATION,
+  regimeList,
+  regimesOf,
+  type RegionalQueue,
+} from './regional-queue';
 
 /**
  * Profilo Sanitario Sintetico nel Fascicolo (tappa 11). Il medico compone dalla cartella, sceglie,
  * conferma di aver controllato; il programma scrive il documento CDA2, lo controlla con lo
  * schematron ufficiale, lo fa validare dal Gateway, lo firma PAdES e lo manda al Fascicolo della
- * Regione, che lo pubblica sul Gateway (V09, D280): con la coda degli invii e le politiche della
- * Regione (`regional-queue.ts`). Una versione nuova sostituisce la precedente, che resta
+ * regione dello studio, che lo pubblica sul Gateway (D280, D297): con la coda degli invii e le
+ * politiche della regione (`regional-queue.ts`). Una versione nuova sostituisce la precedente, che resta
  * consultabile; il medico che l'ha scritto può oscurarlo o cancellarlo dal Fascicolo. Ogni chiamata
  * resta nel registro degli invii; ogni accesso passa dalla guardia della cartella.
  */
 
 export interface PssDeps {
   db: Database;
-  gateway: FseGatewayClient;
+  /** Il cliente del Gateway con i certificati della regione dello studio (D298), o null. */
+  gatewayFor: (studioId: string) => Promise<FseGatewayClient | null>;
   /** Indirizzo di base del servizio, destinatario dei token (aud). */
   gatewayAudience: string;
   signer: DocumentSigner;
@@ -91,19 +99,26 @@ const inProgress = () =>
 
 const sha256 = (b: Uint8Array | string) => createHash('sha256').update(b).digest('hex');
 
-/** Che cosa manca nelle impostazioni del Fascicolo dello studio («da completare», D133). */
-export function settingsIssues(s: Settings | undefined): string[] {
+/**
+ * Che cosa manca nelle impostazioni del Fascicolo dello studio («da completare», D133), con i regimi
+ * della regione dello studio (D297).
+ */
+export function settingsIssues(
+  s: Settings | undefined,
+  publication: RegionalFsePublication | null,
+): string[] {
   if (!s) return ['Impostazioni del Fascicolo da completare: ancora nessuna'];
-  // Repository, invii e attività clinica li mette il Fascicolo regionale quando pubblica sul
-  // Gateway (V09: TipoAttivitaClinica «ERP» per il PSS): qui non servono più (D280).
+  // Repository, invii e attività clinica li mette il Fascicolo della regione quando pubblica sul
+  // Gateway (l'attività clinica del PSS la fissa la regione): qui non servono più (D280).
   const missing: string[] = [];
   if (!s.documentIdRoot) missing.push('radice OID dei documenti');
   if (!s.custodianIdRoot || !s.custodianIdExtension || !s.custodianName) missing.push('custode');
   if (!s.custodianStreet || !s.custodianCity || !s.custodianIstatCode)
     missing.push('indirizzo del custode');
   if (!s.locality) missing.push('struttura nel formato XON');
-  if (!regionalRegimeOf(s.administrativeRequest))
-    missing.push('regime fra quelli della Regione (SSN, SSR, ricovero, privato, donatori)');
+  const regimes = regimesOf(publication);
+  if (!s.administrativeRequest || !Object.hasOwn(regimes, s.administrativeRequest))
+    missing.push(`regime fra quelli della Regione (${regimeList(regimes)})`);
   return missing.length ? [`Impostazioni del Fascicolo da completare: ${missing.join(', ')}`] : [];
 }
 
@@ -341,13 +356,14 @@ export function createPssService(deps: PssDeps) {
       email: d?.email,
       pec: d?.pec,
     });
+    const publication = await deps.regional.publicationOfStudio(actor.studioId);
     return [
-      ...settingsIssues(await settingsOf(actor.studioId)),
+      ...settingsIssues(await settingsOf(actor.studioId), publication),
+      ...((await deps.gatewayFor(actor.studioId)) ? [] : [NO_GATEWAY_CREDENTIALS]),
+      ...(publication ? [] : [NO_REGIONAL_FSE_PUBLICATION]),
       ...doctor,
-      // Il Fascicolo regionale vuole il codice dell'ASL del medico (IstituzioneAutore, V09).
-      ...regionalAuthorIssues({ ...d, aslCode: d?.aslCode }).filter(
-        (m) => !doctor.length || m.includes('ASL'),
-      ),
+      // Che cosa vuole la regione dal medico autore, per esempio il codice dell'ASL (D297).
+      ...(publication?.authorIssues({ aslCode: d?.aslCode ?? '' }) ?? []),
       ...patientIssues(p),
     ];
   }
@@ -368,22 +384,25 @@ export function createPssService(deps: PssDeps) {
       );
       const mancano = await blockers(actor, patient);
       const s = await settingsOf(actor.studioId);
+      const publication = await deps.regional.publicationOfStudio(actor.studioId);
       return {
         versioni: docs
           .filter((r) => ['published', 'replaced', 'rejected', 'deleted'].includes(r.status))
           .map((r) => {
             const v = view(r, sends.get(r.id));
-            // Oscurare e cancellare li chiede il medico che l'ha scritto (V09, 5.1 e 5.3).
+            // Oscurare e cancellare li chiede il medico che l'ha scritto.
             return { ...v, contenuto: undefined, mio: r.authorUserId === actor.userId };
           }),
         inLavorazione: open ? view(open, sends.get(open.id)) : null,
         mancano,
         /** Chi guarda può preparare, firmare e pubblicare (titolare o sostituto). */
         puoFirmare: can(actor, 'fse.publish', { ...context, now: now() }).allowed,
-        /** Invii al Fascicolo regionale sospesi dall'amministratore (FSE-INT-SRS-01-V02, 3.4). */
+        /** Invii al Fascicolo regionale sospesi dall'amministratore. */
         inviiSospesi: s?.regionalSendingSuspended
           ? { dal: s.regionalSuspendedAt, motivo: s.regionalSuspendedReason }
           : null,
+        /** Le politiche di invio della regione dello studio (D297); null senza la pubblicazione. */
+        politiche: publication?.policy ?? null,
       };
     },
 
@@ -397,7 +416,11 @@ export function createPssService(deps: PssDeps) {
         'bozza_profilo_sanitario',
       );
       const s = await settingsOf(actor.studioId);
-      if (!s?.documentIdRoot) throw new HttpError(422, settingsIssues(s)[0]!);
+      if (!s?.documentIdRoot)
+        throw new HttpError(
+          422,
+          settingsIssues(s, await deps.regional.publicationOfStudio(actor.studioId))[0]!,
+        );
       const docs = await documentsOf(patientId);
       const open = docs.find((r) => ['validated', 'signed', 'submitted'].includes(r.status));
       if (open)
@@ -522,7 +545,9 @@ export function createPssService(deps: PssDeps) {
         xml,
         at,
       );
-      const res = await deps.gateway.validate(caller(s, d.fiscalCode!), patient.fiscalCode, pdf);
+      const gateway = await deps.gatewayFor(actor.studioId);
+      if (!gateway) throw new HttpError(422, NO_GATEWAY_CREDENTIALS);
+      const res = await gateway.validate(caller(s, d.fiscalCode!), patient.fiscalCode, pdf);
       await logCall(r.id, actor, 'validation', res);
       if (res.outcome !== 'ok') {
         if (res.outcome === 'problem')

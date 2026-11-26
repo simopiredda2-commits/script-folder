@@ -2,25 +2,31 @@ import { X509Certificate } from 'node:crypto';
 import { DOMParser } from '@xmldom/xmldom';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { describe, expect, it } from 'vitest';
-import { buildPssCda, type PssCdaInput } from '../src/fse/cda';
-import { FseGatewayClient, type FseCaller } from '../src/fse/gateway';
-import { SIMULATED_FSE_AUDIENCE, SimulatedFseGateway } from '../src/fse/gateway-simulator';
-import { signPades, withEmbeddedCda } from '../src/fse/pdf';
+import {
+  buildPssCda,
+  createTestCertificate,
+  FseGatewayClient,
+  privateKeyOf,
+  signPades,
+  SIMULATED_FSE_AUDIENCE,
+  SimulatedFseGateway,
+  withEmbeddedCda,
+  type FseCaller,
+  type PssCdaInput,
+  type RegionalAuthor,
+  type RegionalPssMetadata,
+} from '@mmg/integrations';
+// Il Profilo d'esempio delle prove nazionali del Fascicolo: persone inventate (regola 1).
+import { sampleInput } from '../../../integrations/test/helpers/pss-esempio';
 import {
   RegionalFseClient,
   documentHash,
-  type RegionalAuthor,
-  type RegionalFseTransport,
-  type RegionalPssMetadata,
-  type RegionalSoapRequest,
-} from '../src/fse/regional-publication';
-import {
   SimulatedRegionalFse,
+  type RegionalFseTransport,
+  type RegionalSoapRequest,
   type SimulatedRegionalFseOptions,
   type SimulatedRegionalOutcome,
-} from '../src/fse/regional-publication-simulator';
-import { createTestCertificate, privateKeyOf } from '../src/fse/x509';
-import { sampleInput } from './helpers/pss-esempio';
+} from '..';
 
 /** Pubblicazione con i servizi del Fascicolo regionale (V09, D280). Persone inventate. */
 const created = new Date('2026-11-18T09:30:00Z');

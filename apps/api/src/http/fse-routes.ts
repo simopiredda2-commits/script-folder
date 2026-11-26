@@ -1,11 +1,12 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { REGIONAL_REGIMES, V09 } from '@mmg/integrations';
+import { FSE_CLINICAL_ACTIVITIES, type RegionalFsePublication } from '@mmg/integrations';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
 import type { Database } from '../db/client';
 import { fseSetting } from '../db/schema';
 import { withActor } from '../db/tx';
+import { regimesOf } from '../fse/regional-queue';
 import { settingsIssues, type createPssService } from '../fse/service';
 import { HttpError } from './errors';
 
@@ -32,39 +33,46 @@ const oidText = z
   .string()
   .trim()
   .regex(/^[0-2](\.(0|[1-9]\d*))+$/, 'OID: numeri separati da punti (es. 2.16.840.1.113883.2.9)');
-const settingsBody = z
-  .object({
-    radiceDocumenti: oidText,
-    // Repository e invii li assegna il Fascicolo regionale quando pubblica sul Gateway (D280):
-    // si possono ancora scrivere, ma non servono.
-    repository: z.string().trim().min(1).max(200).optional(),
-    radiceInvii: oidText.optional(),
-    custode: z
-      .object({
-        radice: oidText,
-        codice: z.string().trim().min(1).max(100),
-        nome: z.string().trim().min(1).max(200),
-        via: z.string().trim().min(1).max(200),
-        comune: z.string().trim().min(1).max(100),
-        istat: z
-          .string()
-          .trim()
-          .regex(/^\d{6}$/, 'Codice ISTAT del comune: 6 cifre'),
-        provincia: z.string().trim().max(2).optional(),
-      })
-      .strict(),
-    struttura: z
-      .string()
-      .trim()
-      .regex(
-        /^[^^]+\^\^\^\^\^&[0-9.]+&ISO\^\^\^\^[^^]+$/,
-        'Struttura nel formato XON: NOME^^^^^&OID&ISO^^^^CODICE',
-      ),
-    // Per il PSS la Regione vuole «ERP» (V09, 5.2.2): non si sceglie più.
-    attivitaClinica: z.literal(V09.clinicalActivity).optional(),
-    regime: z.enum(keysOf(REGIONAL_REGIMES)),
-  })
-  .strict();
+/**
+ * Le impostazioni del Fascicolo dello studio, con i regimi e l'attività clinica della regione dello
+ * studio (D297): senza la pubblicazione della regione, i regimi del Gateway.
+ */
+const settingsBody = (publication: RegionalFsePublication | null) =>
+  z
+    .object({
+      radiceDocumenti: oidText,
+      // Repository e invii li assegna il Fascicolo regionale quando pubblica sul Gateway (D280):
+      // si possono ancora scrivere, ma non servono.
+      repository: z.string().trim().min(1).max(200).optional(),
+      radiceInvii: oidText.optional(),
+      custode: z
+        .object({
+          radice: oidText,
+          codice: z.string().trim().min(1).max(100),
+          nome: z.string().trim().min(1).max(200),
+          via: z.string().trim().min(1).max(200),
+          comune: z.string().trim().min(1).max(100),
+          istat: z
+            .string()
+            .trim()
+            .regex(/^\d{6}$/, 'Codice ISTAT del comune: 6 cifre'),
+          provincia: z.string().trim().max(2).optional(),
+        })
+        .strict(),
+      struttura: z
+        .string()
+        .trim()
+        .regex(
+          /^[^^]+\^\^\^\^\^&[0-9.]+&ISO\^\^\^\^[^^]+$/,
+          'Struttura nel formato XON: NOME^^^^^&OID&ISO^^^^CODICE',
+        ),
+      // Per il PSS l'attività clinica la fissa la regione (D280): non si sceglie più.
+      attivitaClinica: publication
+        ? z.literal(publication.clinicalActivity).optional()
+        : z.string().trim().max(20).optional(),
+      regime: z.enum(keysOf(regimesOf(publication))),
+    })
+    .strict();
 const suspensionBody = z
   .object({ sospesi: z.boolean(), motivo: z.string().trim().max(500).optional() })
   .strict();
@@ -77,6 +85,8 @@ const suspensionBody = z
 export function registerFseRoutes(
   app: FastifyInstance,
   db: Database,
+  /** La pubblicazione della regione dello studio (D297), o null se la regione non ce l'ha. */
+  publicationOf: (studioId: string) => Promise<RegionalFsePublication | null>,
   service: ReturnType<typeof createPssService>,
 ) {
   const scoped = { config: { patientScoped: true } };
@@ -137,6 +147,7 @@ export function registerFseRoutes(
       .select()
       .from(fseSetting)
       .where(eq(fseSetting.studioId, req.actor!.studioId));
+    const publication = await publicationOf(req.actor!.studioId);
     return {
       impostazioni: s
         ? {
@@ -156,15 +167,26 @@ export function registerFseRoutes(
             struttura: s.locality,
             tipologiaStruttura: s.facilityType,
             assettoOrganizzativo: s.practiceSetting,
-            // Fissata dalla Regione per il PSS (V09): «ERP».
-            attivitaClinica: V09.clinicalActivity,
+            // Fissata dalla regione per il PSS (D280).
+            attivitaClinica: publication?.clinicalActivity ?? null,
             regime: s.administrativeRequest,
           }
         : null,
-      daCompletare: settingsIssues(s),
-      /** Valori ammessi: i regimi della V09 (5.2.2, tabella dei regimi). */
-      valori: { regime: options(REGIONAL_REGIMES) },
-      /** Invii al Fascicolo regionale sospesi (FSE-INT-SRS-01-V02, 3.4 e 4.5). */
+      daCompletare: settingsIssues(s, publication),
+      /** Valori ammessi: i regimi della regione dello studio (D297). */
+      valori: { regime: options(regimesOf(publication)) },
+      /** L'attività clinica che la regione fissa per il Profilo, con il nome del Gateway. */
+      attivitaClinica: publication
+        ? {
+            codice: publication.clinicalActivity,
+            nome:
+              (FSE_CLINICAL_ACTIVITIES as Record<string, string>)[publication.clinicalActivity] ??
+              publication.clinicalActivity,
+          }
+        : null,
+      /** Le politiche di invio della regione al suo Fascicolo; null senza la pubblicazione. */
+      politiche: publication?.policy ?? null,
+      /** Invii al Fascicolo regionale sospesi dall'amministratore. */
       inviiSospesi: s?.regionalSendingSuspended
         ? { dal: s.regionalSuspendedAt, motivo: s.regionalSuspendedReason }
         : null,
@@ -174,7 +196,7 @@ export function registerFseRoutes(
 
   /**
    * Sospendere o riprendere gli invii al Fascicolo regionale, per esempio su richiesta del
-   * supporto del CSI: i messaggi restano in coda e partono alla ripresa (3.4, 4.5). Solo
+   * supporto della regione: i messaggi restano in coda e partono alla ripresa. Solo
    * l'amministratore; ogni cambio resta nel registro delle azioni di amministrazione.
    */
   app.put('/api/studio/fascicolo/invii', async (req) => {
@@ -219,7 +241,8 @@ export function registerFseRoutes(
         403,
         'Le impostazioni del Fascicolo le cambia l’amministratore dello studio',
       );
-    const b = settingsBody.parse(req.body);
+    const publication = await publicationOf(actor.studioId);
+    const b = settingsBody(publication).parse(req.body);
     const values = {
       documentIdRoot: b.radiceDocumenti,
       repositoryId: b.repository ?? null,
@@ -232,7 +255,7 @@ export function registerFseRoutes(
       custodianIstatCode: b.custode.istat,
       custodianProvince: b.custode.provincia || null,
       locality: b.struttura,
-      clinicalActivity: V09.clinicalActivity,
+      clinicalActivity: publication?.clinicalActivity ?? null,
       administrativeRequest: b.regime,
       updatedAt: new Date(),
       updatedBy: actor.userId,

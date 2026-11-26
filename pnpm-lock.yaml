@@ -290,6 +290,19 @@ importers:
       '@mmg/domain':
         specifier: workspace:*
         version: link:../domain
+      '@mmg/integrations':
+        specifier: workspace:*
+        version: link:../integrations
+      '@xmldom/xmldom':
+        specifier: 0.9.12
+        version: 0.9.12
+      xpath:
+        specifier: 0.0.34
+        version: 0.0.34
+    devDependencies:
+      pdf-lib:
+        specifier: 1.17.1
+        version: 1.17.1
 
   packages/rules:
     dependencies:

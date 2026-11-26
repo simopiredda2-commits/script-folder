@@ -25,7 +25,8 @@ import {
   therapy,
 } from '../../../api/src/db/schema';
 import { withActor } from '../../../api/src/db/tx';
-import { archiveRegion, studioDate } from '../../../api/src/prescriptions/rules-check';
+import { studioDate } from '../../../api/src/prescriptions/rules-check';
+import { archiveRegion } from '../../../api/src/regions/region';
 import type { InterruptedHints } from '../protocol';
 import { withOpenItems } from './aura';
 

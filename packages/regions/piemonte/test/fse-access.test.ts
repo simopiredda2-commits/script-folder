@@ -6,9 +6,10 @@ import {
   FSE_ACCESS_ROLE,
   FSE_DOCUMENT_TYPES,
   MAX_TOKENS,
+  piemonte,
   SimulatedRegionalFseAccess,
   type FseAccessRequest,
-} from '../src';
+} from '..';
 
 /** Credenziali RUPAR inventate: il simulatore controlla solo che ci siano. */
 const auth = { username: 'medico.inventato', password: 'parola-inventata', pin: '0000' };
@@ -27,7 +28,7 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
     const r = await fse.authenticate(request(), auth);
     expect(r.outcome).toBe('success');
     if (r.outcome !== 'success') return;
-    expect(r.url).toMatch(/^\/api\/simulatori\/fascicolo\?token=[0-9a-f-]{36}$/);
+    expect(r.url).toMatch(/^\/api\/simulatori\/chiamate-di-contesto\?token=[0-9a-f-]{36}$/);
     expect(fse.received).toEqual([
       expect.objectContaining({ role: FSE_ACCESS_ROLE, application: FSE_ACCESS_APPLICATION }),
     ]);
@@ -43,19 +44,19 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
     const r = await fse.authenticate(request({ documentType: '11502-2' }), auth);
     if (r.outcome !== 'success') throw new Error('accesso non riuscito');
     const token = tokenOf(r.url);
-    expect(fse.open(token, '198.51.100.7')).toEqual({
+    expect(fse.openPage(token, '198.51.100.7')).toEqual({
       outcome: 'opened',
       patientFiscalCode: 'RSSMRA80A41X000Y',
       documentType: '11502-2',
       declaredIp: '192.0.2.10',
       openedFromIp: '198.51.100.7',
     });
-    expect(fse.open(token, '192.0.2.10')).toEqual({
+    expect(fse.openPage(token, '192.0.2.10')).toEqual({
       outcome: 'error',
       code: 'WEB_001',
       message: 'Token di autenticazione non valido',
     });
-    expect(fse.open('token-inventato', '192.0.2.10')).toMatchObject({ code: 'WEB_001' });
+    expect(fse.openPage('token-inventato', '192.0.2.10')).toMatchObject({ code: 'WEB_001' });
   });
 
   it('un token scaduto dà WEB_001; la durata, che la V13 non dice, è un’impostazione del simulatore', async () => {
@@ -65,9 +66,9 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
     const second = await fse.authenticate(request(), auth);
     if (first.outcome !== 'success' || second.outcome !== 'success') throw new Error('accesso');
     now += 60_000;
-    expect(fse.open(tokenOf(first.url), null)).toMatchObject({ outcome: 'opened' });
+    expect(fse.openPage(tokenOf(first.url), null)).toMatchObject({ outcome: 'opened' });
     now += 61_000;
-    expect(fse.open(tokenOf(second.url), null)).toEqual({
+    expect(fse.openPage(tokenOf(second.url), null)).toEqual({
       outcome: 'error',
       code: 'WEB_001',
       message: 'Token di autenticazione non valido',
@@ -77,7 +78,7 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
   it('utente, password e PIN obbligatori (V13, 3.3); tipo di documento sconosciuto: FSE_ER_504', async () => {
     const fse = new SimulatedRegionalFseAccess();
     expect(await fse.authenticate(request(), { username: 'x' })).toEqual({
-      outcome: 'failure',
+      outcome: 'credentials',
       code: 'AUTH_ER_516',
       message: 'Le credenziali devono essere valorizzate',
     });
@@ -85,7 +86,7 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
     expect(
       await fse.authenticate(request(), { username: 'medico.inventato', password: 'parola' }),
     ).toEqual({
-      outcome: 'failure',
+      outcome: 'credentials',
       code: 'AUTH_ER_510',
       message: 'Il parametro Pin del richiedente deve essere valorizzato',
     });
@@ -173,6 +174,53 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
     expect(Object.hasOwn(FSE_DOCUMENT_TYPES, '59284-0')).toBe(false);
   });
 
+  it('è la destinazione «fascicolo» delle chiamate di contesto (D297): filtro, parole, credenziali e pagina simulata', async () => {
+    const calls = piemonte.integrations!.contextCalls!({});
+    expect(calls.map((c) => c.kind)).toEqual(['fascicolo']);
+    const fse = calls[0]!;
+    expect(fse).toBeInstanceOf(SimulatedRegionalFseAccess);
+    expect(fse.parameters).toEqual([
+      {
+        key: 'tipoDocumento',
+        label: 'Documenti da mostrare',
+        anyLabel: 'Tutti i documenti',
+        options: FSE_DOCUMENT_TYPES,
+      },
+    ]);
+    expect(fse.texts.intro).toMatch(/Regione Piemonte con le tue credenziali RUPAR/);
+    // Dalla V13 l'IP della postazione si traccia e non si confronta (2.2): niente «solo da qui».
+    expect(fse.texts.intro).not.toMatch(/solo da questo computer/);
+    expect(fse.texts.simulated).toMatch(
+      /^Collegamento simulato: .*si attiva con il CSI Piemonte\.$/,
+    );
+    expect(fse.texts.notActive).toMatch(/si attiva con il CSI Piemonte/);
+    expect(fse.texts.credentials).toMatch(/PIN RUPAR in «Credenziali dei servizi»/);
+    expect(fse.credentialService).toBe('rupar');
+    // La chiamata porta il filtro come parametro; senza, tutti i documenti.
+    const r = await fse.open(
+      {
+        patientFiscalCode: 'RSSMRA80A41X000Y',
+        clientIp: null,
+        parameters: { tipoDocumento: '11502-2' },
+      },
+      auth,
+    );
+    if (r.outcome !== 'success') throw new Error(r.outcome);
+    expect(r.url).toMatch(/^\/api\/simulatori\/chiamate-di-contesto\?token=/);
+    const token = tokenOf(r.url);
+    expect(fse.simulatedPage!(token, null)).toEqual({
+      status: 200,
+      text: 'Fascicolo Sanitario Elettronico regionale (simulatore). Qui si aprirebbe il Fascicolo dell’assistito RSSMRA80A41X000Y, con i documenti di tipo REFERTO DI LABORATORIO.',
+    });
+    expect(fse.simulatedPage!(token, null)).toEqual({
+      status: 403,
+      text: 'Fascicolo Sanitario Elettronico regionale (simulatore). Token di autenticazione non valido (WEB_001).',
+    });
+    // AUTH_ER_501, errore di autenticazione: credenziali errate.
+    const wrong = new SimulatedRegionalFseAccess({ decide: () => 'AUTH_ER_501' });
+    expect((await wrong.authenticate(request(), auth)).outcome).toBe('credentials');
+  });
+
   it('il simulatore non tiene i token senza limite: usati escono, i più vecchi oltre il limite pure (D232)', async () => {
     const fse = new SimulatedRegionalFseAccess();
     const tokenOf = async () => {
@@ -182,9 +230,9 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
     };
     const first = await tokenOf();
     for (let i = 0; i < MAX_TOKENS; i++) await tokenOf();
-    expect(fse.open(first, '192.0.2.10')).toMatchObject({ outcome: 'error', code: 'WEB_001' });
+    expect(fse.openPage(first, '192.0.2.10')).toMatchObject({ outcome: 'error', code: 'WEB_001' });
     const last = await tokenOf();
-    expect(fse.open(last, '192.0.2.10')).toMatchObject({ outcome: 'opened' });
-    expect(fse.open(last, '192.0.2.10')).toMatchObject({ outcome: 'error', code: 'WEB_001' });
+    expect(fse.openPage(last, '192.0.2.10')).toMatchObject({ outcome: 'opened' });
+    expect(fse.openPage(last, '192.0.2.10')).toMatchObject({ outcome: 'error', code: 'WEB_001' });
   });
 });

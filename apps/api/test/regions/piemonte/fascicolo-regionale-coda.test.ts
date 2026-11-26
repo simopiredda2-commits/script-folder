@@ -1,15 +1,19 @@
 import {
   FseGatewayClient,
-  RegionalFseClient,
   SIMULATED_FSE_AUDIENCE,
   SimulatedDocumentSigner,
   SimulatedFseGateway,
-  SimulatedRegionalFse,
-  type RegionalSoapRequest,
-  type RegionalFseTransport,
   type SimulatedFseOutcome,
-  type SimulatedRegionalOutcome,
 } from '@mmg/integrations';
+import {
+  FSE_PUBLICATION_POLICY,
+  RegionalFseClient,
+  SimulatedRegionalFse,
+  V09FsePublication,
+  type RegionalFseTransport,
+  type RegionalSoapRequest,
+  type SimulatedRegionalOutcome,
+} from '@mmg/regions/piemonte';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -23,19 +27,23 @@ import {
   pssFile,
   serviceCredential,
   serviceCredentialEvent,
-} from '../src/db/schema';
+} from '../../../src/db/schema';
 import {
   createRegionalQueue,
   inQuietHours,
   LEASE_MS,
   nextAttempt,
   outsideQuietHours,
-  romeSeven,
-} from '../src/fse/regional-queue';
-import { createScenario, login, type Scenario } from './helpers/scenario';
-import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+  romeHour,
+} from '../../../src/fse/regional-queue';
+import { regionalChoice } from '../../../src/regions/integrations';
+import { createScenario, login, type Scenario } from '../../helpers/scenario';
+import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
 
-/** Coda verso il Fascicolo regionale con le politiche di invio della Regione (D280). */
+/**
+ * Coda verso il Fascicolo regionale con le politiche di invio della Regione (D280): la coda
+ * nazionale con la pubblicazione del pacchetto del Piemonte (D297).
+ */
 
 interface Send {
   operazione: string;
@@ -61,25 +69,41 @@ const DAY = 86_400_000;
 // sbagliato nel codice si vede.
 const RETRY_DELAY_MS = 5 * MINUTE;
 const FALLBACK_DAYS = 10;
+const QUIET_UNTIL = 7;
+const policy = FSE_PUBLICATION_POLICY;
 
 describe('orari e tentativi delle politiche di invio (FSE-INT-SRS-01-V02)', () => {
+  it('le politiche della Regione nel pacchetto: fermo fino alle 07, 3 secondi, 3 a 5 minuti, 10 giorni', () => {
+    expect(FSE_PUBLICATION_POLICY).toEqual({
+      quietUntilHour: QUIET_UNTIL,
+      minIntervalMs: 3000,
+      retries: 3,
+      retryDelayMs: RETRY_DELAY_MS,
+      fallbackDays: FALLBACK_DAYS,
+    });
+  });
+
   it('fermo dalle 00 alle 07 di Roma, anche con l’ora legale', () => {
-    expect(inQuietHours(new Date('2026-11-18T23:30:00Z'))).toBe(true); // 00:30 a Roma
-    expect(inQuietHours(new Date('2026-11-18T05:59:00Z'))).toBe(true); // 06:59
-    expect(inQuietHours(new Date('2026-11-18T06:00:00Z'))).toBe(false); // 07:00
-    expect(inQuietHours(new Date('2026-11-18T22:59:00Z'))).toBe(false); // 23:59
-    expect(romeSeven(new Date('2026-11-18T01:00:00Z')).toISOString()).toBe(
+    const quiet = policy.quietUntilHour;
+    expect(inQuietHours(new Date('2026-11-18T23:30:00Z'), quiet)).toBe(true); // 00:30 a Roma
+    expect(inQuietHours(new Date('2026-11-18T05:59:00Z'), quiet)).toBe(true); // 06:59
+    expect(inQuietHours(new Date('2026-11-18T06:00:00Z'), quiet)).toBe(false); // 07:00
+    expect(inQuietHours(new Date('2026-11-18T22:59:00Z'), quiet)).toBe(false); // 23:59
+    expect(romeHour(new Date('2026-11-18T01:00:00Z'), QUIET_UNTIL).toISOString()).toBe(
       '2026-11-18T06:00:00.000Z',
     );
     // Ora legale: le 07 di Roma sono le 05 UTC.
-    expect(romeSeven(new Date('2026-07-01T01:00:00Z')).toISOString()).toBe(
+    expect(romeHour(new Date('2026-07-01T01:00:00Z'), QUIET_UNTIL).toISOString()).toBe(
       '2026-07-01T05:00:00.000Z',
     );
     // Il giorno del cambio d'ora (29/3/2026, alle 02 si va alle 03).
-    expect(romeSeven(new Date('2026-03-29T00:30:00Z')).toISOString()).toBe(
+    expect(romeHour(new Date('2026-03-29T00:30:00Z'), QUIET_UNTIL).toISOString()).toBe(
       '2026-03-29T05:00:00.000Z',
     );
-    expect(outsideQuietHours(new Date('2026-11-18T10:00:00Z')).toISOString()).toBe(
+    expect(outsideQuietHours(new Date('2026-11-18T01:00:00Z'), quiet).toISOString()).toBe(
+      '2026-11-18T06:00:00.000Z',
+    );
+    expect(outsideQuietHours(new Date('2026-11-18T10:00:00Z'), quiet).toISOString()).toBe(
       '2026-11-18T10:00:00.000Z',
     );
   });
@@ -89,7 +113,7 @@ describe('orari e tentativi delle politiche di invio (FSE-INT-SRS-01-V02)', () =
     let at = new Date('2026-11-18T10:00:00Z');
     const times: string[] = [];
     for (;;) {
-      const n = nextAttempt(s, at);
+      const n = nextAttempt(s, at, policy);
       if (n === 'failed') break;
       times.push(`${n.phase} ${(n.at.getTime() - at.getTime()) / MINUTE}`);
       s = n;
@@ -105,6 +129,7 @@ describe('orari e tentativi delle politiche di invio (FSE-INT-SRS-01-V02)', () =
     const late = nextAttempt(
       { attempts: 0, phase: 'ripetizione', queuedSince: null },
       new Date('2026-11-18T22:58:00Z'),
+      policy,
     );
     expect(late !== 'failed' && late.at.toISOString()).toBe('2026-11-19T06:00:00.000Z');
   });
@@ -161,10 +186,12 @@ describe('coda verso il Fascicolo regionale (V09, D280)', () => {
           gateway: new FseGatewayClient(gateway, gateway.issueCredentials('Prova'), now),
           audience: SIMULATED_FSE_AUDIENCE,
           signer: new SimulatedDocumentSigner({ now }),
-          regional: (regionalClient = new RegionalFseClient(spy, {
-            encryptionCertificate: sim.encryptionCertificate,
-            application: { id: 'PROVA', vendor: 'PROVA', version: '0' },
-          })),
+          regional: new V09FsePublication(
+            (regionalClient = new RegionalFseClient(spy, {
+              encryptionCertificate: sim.encryptionCertificate,
+              application: { id: 'PROVA', vendor: 'PROVA', version: '0' },
+            })),
+          ),
         },
         // Il fermo notturno vale anche con il simulatore, per provarlo; 120 ms fra due messaggi.
         fseQueue: { intervalMs: null, minIntervalMs: 120, quietHours: true },
@@ -692,7 +719,7 @@ describe('coda verso il Fascicolo regionale (V09, D280)', () => {
     // Un'altra istanza del servizio, con la sua coda, sullo stesso database.
     const other = createRegionalQueue({
       db: t.db,
-      client: regionalClient,
+      publication: regionalChoice(() => null, new V09FsePublication(regionalClient)),
       credentials: {
         authFor: () => Promise.resolve({ username: 'u', password: 'p', pin: '12345' }),
         authRefused: () => Promise.resolve(),

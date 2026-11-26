@@ -52,11 +52,11 @@ export const fseSetting = pgTable('fse_setting', {
   practiceSetting: text().notNull().default('AD_PSC130'),
   /** Tabella 16.3.1 (XDSSubmissionSet.contentTypeCode): da completare. */
   clinicalActivity: text(),
-  /** Tabella 16.3.13: da completare. Per la Regione è RegimeDocumento (V09, tabella dei regimi). */
+  /** Tabella 16.3.13: fra i regimi che la regione dello studio ammette (D297). */
   administrativeRequest: text(),
   /**
    * Invii al Fascicolo regionale sospesi dall'amministratore, per esempio su richiesta del supporto
-   * del CSI (FSE-INT-SRS-01-V02, 3.4 e 4.5): i messaggi restano in coda e partono alla ripresa.
+   * della regione: i messaggi restano in coda e partono alla ripresa.
    */
   regionalSendingSuspended: boolean().notNull().default(false),
   regionalSuspendedAt: timestamp({ withTimezone: true }),
@@ -199,7 +199,7 @@ export const fseRegionalStatus = pgEnum('fse_regional_status', [
   'done',
   /** Errore del messaggio o del contenuto: si rimanda solo dopo la correzione. */
   'to_fix',
-  /** Dieci giorni di tentativi senza esito: da segnalare al supporto del CSI. */
+  /** I giorni di tentativi della regione senza esito: da segnalare a chi la regione indica. */
   'failed',
   /** Tolto dalla coda: il Profilo è stato scartato. */
   'cancelled',
@@ -207,10 +207,10 @@ export const fseRegionalStatus = pgEnum('fse_regional_status', [
 
 /**
  * Coda degli invii al Fascicolo regionale (D280): un messaggio per riga, nell'ordine in cui il
- * medico li ha fatti partire. Le politiche di invio della Regione (FSE-INT-SRS-01-V02): niente
- * invii dalle 00 alle 07; dopo un tempo scaduto, un errore di sistema o una risposta senza esito,
- * fino a tre tentativi a 5 minuti, poi uno al giorno per dieci giorni; gli altri errori si
- * correggono prima di rimandare.
+ * medico li ha fatti partire, con le politiche di invio della regione dello studio (D297): il
+ * fermo notturno; dopo un tempo scaduto, un errore di sistema o una risposta senza esito, le
+ * ripetizioni ravvicinate e poi un tentativo al giorno; gli altri errori si correggono prima di
+ * rimandare.
  */
 export const fseRegionalSend = pgTable(
   'fse_regional_send',
@@ -219,7 +219,7 @@ export const fseRegionalSend = pgTable(
     documentId: uuid()
       .notNull()
       .references(() => pssDocument.id),
-    /** Il medico autore: i servizi vogliono le sue credenziali RUPAR (V09, 3.2.1 e 5.1). */
+    /** Il medico autore: i servizi della regione vogliono le sue credenziali. */
     doctorUserId: uuid()
       .notNull()
       .references(() => appUser.id),
@@ -235,7 +235,7 @@ export const fseRegionalSend = pgTable(
     phase: text().notNull().default('ripetizione'),
     /** Richieste dell'esito con «ELAB». */
     polls: integer().notNull().default(0),
-    /** Quando è cominciata la coda di dieci giorni (FALLBACK, 4.2). */
+    /** Quando è cominciata la coda di un tentativo al giorno. */
     queuedSince: timestamp({ withTimezone: true }),
     nextAttemptAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     /**

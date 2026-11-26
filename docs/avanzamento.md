@@ -38,6 +38,12 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **26/11/2026, unione della #45**: pull request #45 unita (commit `4137a2c`), con il via dato in anticipo e le 14 prove su GitHub verdi: lo scheletro dei pacchetti regionali (D292). Il branch riparte da `main`. Dimostrazione e pagina del collaudo si ripubblicano con la prossima unione, che cambia anche i file della dimostrazione. Lo stesso giorno le domande di Simone su GPG e sulla classe I: il confine con il dispositivo medico è chiuso senza consulente, fuori con le scelte prudenti; la classe I fatta da noi non è fattibile per le funzioni che aiutano a decidere (D293, D294, `docs/dispositivo-medico.md`). Adesso lo spostamento del Piemonte, a cominciare dai dati.
 - **26/11/2026, unione della #46**: pull request #46 unita (commit `60d64a1`), con il via dato in anticipo e le 14 prove su GitHub verdi: i dati del Piemonte nel pacchetto regionale (D295) e il confine con il dispositivo medico (D293, D294). Prima, «Dimostrazione con webkit» era caduta una volta sul passo della ricetta rossa: la prova ora aspetta la pagina ferma prima dei clic (D295). Dimostrazione alla versione 33, pagina del collaudo alla 6 (M2). Il branch riparte da `main`. Adesso il pezzo seguente dello spostamento.
 - **26/11/2026, dopo l'unione della #46**: il secondo pezzo dello spostamento, le regole di prescrizione: la versione nazionale 2026-11-26.1 e le aggiunte del Piemonte nel suo pacchetto (D296), con R11 senza il consulente (D294) e la D.D. 1452/2023 per R17 (D196). In mezzo, la domanda di Simone sulla mail al CSI del 25/11/2026: che cosa chiudono già i documenti pubblici e che cosa resta («In sospeso con il CSI»).
+- **26/11/2026, unione della #47**: pull request #47 unita (commit `f37e284`), con il via dato in anticipo e le 14 prove su GitHub verdi: le regole nazionali e le aggiunte del Piemonte (D296). Prima, «Dimostrazione con webkit» era caduta una volta negli invii senza risposta: la prova ora aspetta anche i controlli delle regole in corso. Dimostrazione alla versione 34. Il branch riparte da `main`.
+- **26/11/2026, dopo l'unione della #47**: il terzo pezzo dello spostamento, il Fascicolo regionale nel pacchetto del Piemonte. Le chiamate di contesto e la pubblicazione sono contratti nazionali (D297); i certificati del Gateway sono uno per regione (D298). Nello stesso giorno, quattro richieste di Simone:
+  - la fase 1 dell'accreditamento al Gateway FSE 2.0, tutta in locale, quando lo spostamento del Piemonte è finito (sezione «Accreditamento FSE 2.0, fase 1»);
+  - il confronto con la qualificazione della cartella in Lombardia (`docs/lombardia.md`), di cui il contratto delle integrazioni tiene conto (sezione «Lombardia»);
+  - la risposta di Sogei sui certificati (`docs/fse.md`);
+  - i moduli del CDA2 e del Gateway separati dal resto, per dichiarare equivalenti i rilasci che non li toccano. Adesso il pezzo seguente dello spostamento.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -64,6 +70,15 @@ Contatto per le applicazioni sanitarie della Regione gestite dal CSI (AURA, SAR,
    - Dal programma c'è tutto quello che non dipende dal CSI: il fumo codificato e la tabella delle prestazioni (D284), il codice STS.11 dello studio con il tipo di struttura e l'UCCP (D289), il contatto proposto dagli atti e confermato dal medico (D291). Manca l'invio, che viene con il modulo del CSI.
    - Dal CSI servono il formato JSON, i servizi, i certificati, l'ambiente di prova e il collaudo, per un fornitore certificato SIRPED (domande 11 e 12 per il CSI).
    - Il disciplinare tecnico e le specifiche funzionali 1.3 del Ministero, che da qui non si scaricano, li ha mandati Simone il 26/11/2026 (`docs/provenienze.md`, «SIAP»). Il disciplinare conferma il confronto: dalla cartella vengono fumo, BMI, patologie croniche e il contatto, l'anagrafica viene dall'anagrafe regionale degli assistiti (`docs/siap.md`).
+10. **Accreditamento FSE 2.0, fase 1 vera** (D298, `docs/fse.md`). La parte in locale si fa dopo lo spostamento del Piemonte (sezione «Accreditamento FSE 2.0, fase 1»). Per la fase 1 vera mancano:
+    - **i certificati di test di Sogei**. Simone ha scritto a Sogei il 26/11/2026 e Sogei ha risposto lo stesso giorno: li dà solo a fornitori già costituiti in società, quindi arrivano dopo la costituzione di SCRIPT. Si chiedono con le due CSR, una di autenticazione e una di firma, per email (it-fse-support, «Richiesta certificati x509»). Le chiavi private delle CSR restano a SCRIPT, fuori dal repository;
+    - **il modulo EUSurvey** di Agenas, con la richiesta di accreditamento;
+    - **la dichiarazione di presa di responsabilità firmata**, da allegare all'EUSurvey;
+    - **l'account GitHub** con cui aprire la pull request dei risultati in `it-fse-accreditamento-v2`.
+
+    Quando arrivano i certificati c'è una fermata: Simone decide se fare un'eccezione alla regola 7 per gli ambienti di test. Fino ad allora il Gateway di prova non si chiama. I certificati di produzione si chiedono ai referenti di ogni Regione (Sogei).
+
+11. **Lombardia** (`docs/lombardia.md`): la procedura di ARIA parte con la domanda di qualifica, firmata dal legale rappresentante, con la partita IVA e un contratto con almeno un medico (Allegato 1). Le domande per ARIA sono nella sezione «Lombardia»; si mandano con il via di Simone.
 
 _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 
@@ -93,6 +108,23 @@ _C. Decisioni o materiali di Simone_
 5. **Banca dati farmaci con licenza** (per esempio Farmadati): note AIFA per AIC e i fatti oggi non noti (R3, R4, R8, R11).
 6. **Fornitore vero di email e SMS**; dove ospitare il servizio, con i salvataggi cifrati (D166).
 7. Revisione di un avvocato prima del lancio.
+8. **Lacune del nucleo trovate con il confronto con la Lombardia** (`docs/lombardia.md`, paragrafi 6 e 9): proposte da approvare alla fermata. Servono in ogni regione, non solo in Lombardia; non si fanno prima del via.
+   - Dalla domanda 7 del confronto:
+     - pulsazione e respirazione fra i parametri;
+     - anamnesi patologica prossima;
+     - recapiti dei genitori per i minori, come dato a sé;
+     - certificati di infortunio INAIL;
+     - importazione del PSS in CDA2;
+     - ICD-10-IM, che sostituisce ICD-9-CM dal 1/1/2027 (DM 23/10/2025).
+   - Dalle verifiche nel codice:
+     - i problemi attivi nella fascia del paziente;
+     - la stampa dell'informativa e del modulo del consenso;
+     - i filtri della cronologia per data, diagnosi e problema;
+     - un campo unico di note del paziente;
+     - l'evidenza nel testo del diario;
+     - la scelta dei parametri e dell'intervallo nei grafici;
+     - l'avviso dei presidi in scadenza in Oggi.
+   - Le procedure scritte di SCRIPT (NF4.4, NF4.10–NF4.14): Code può preparare le bozze tecniche di ripristino, inventario dei componenti e vulnerabilità.
 
 ## Come provarlo
 
@@ -1501,7 +1533,21 @@ Durante la tappa 11 (terzo giro):
 
 ## Domande per la prossima fermata
 
-Nessuna per ora: quelle annotate dopo la fermata della #39 hanno avuto risposta il 25 e il 26/11/2026 (D275, D282). Le domande nuove si scrivono qui durante il blocco (D237).
+Dal confronto con la qualificazione della cartella in Lombardia (`docs/lombardia.md`, paragrafo 6), richiesta di Simone del 26/11/2026. Toccano D113, D127, D294 e D78: niente cambia prima della risposta.
+
+1. **BMI calcolato** (F6.4.4, obbligatorio in Lombardia) e D127, che lascia il BMI scritto a mano. Due strade, che non si escludono:
+   - chiedere ad ARIA se basta il BMI scritto dal medico;
+   - riesaminare D127 per un BMI calcolato da peso e altezza, mostrato come numero, senza classi e senza giudizio. Anche il SIAP vuole il BMI dalla cartella.
+2. **Limiti di ammissibilità** (F6.4.3, obbligatorio) e D113, che oggi controlla solo «maggiore di zero» e la saturazione fino a 100. Proposta da valutare:
+   - limiti fisici per parametro, configurabili dallo studio, per esempio peso fino a 400 kg, con un messaggio sull'errore di battitura;
+   - niente «valori normali» e nessun giudizio clinico.
+     Resta fuori dal dispositivo medico come i controlli formali di oggi?
+3. **Scadenzario dei controlli** (F6.4.5, obbligatorio) e D294, che esclude i promemoria che segnalano un paziente da controllare. La data «Promemoria il» la sceglie il medico sulla voce: mostrarla in Oggi quando arriva è un'agenda del medico, non un promemoria del programma? Tocca anche l'agenda (Ready!, D78).
+4. **Unità di misura configurabili** (F6.1.5) e D113: per esempio grammi per i neonati, metri o centimetri.
+5. **Stati del problema** (F6.2.5): aggiungere sospetto, non attivo, ricorrente e intermittente ad attivo e risolto?
+6. **Versioni del prodotto**: in Lombardia ogni rilascio va comunicato ad ARIA (Allegato 3) e la versione distribuita deve essere quella qualificata. Per il Gateway, un rilascio che non tocca i moduli del CDA2 e del Gateway si dichiara equivalente (`docs/fse.md`). Serve una regola per un prodotto in cloud che si aggiorna spesso: rilasci numerati, l'elenco delle aree toccate, forse una versione qualificata per regione. Da decidere dopo la risposta di ARIA.
+
+Le lacune del nucleo (domanda 7 del confronto, e quelle trovate con le verifiche) sono proposte in «Che cosa resta aperto», C8.
 
 ## Richieste di Simone durante la pausa (22–23/11/2026), da fare alla ripresa
 
@@ -1900,6 +1946,80 @@ Richiesta di Simone: il programma deve poter servire tutte le regioni, con nient
 - **Non provato**: una seconda regione con le sue aggiunte (il meccanismo è provato con una regione inventata); la dimostrazione con WebKit e Firefox, che qui gira solo con Chromium e su GitHub con tutti e tre.
 - **Non fatto**: le fonti regionali di `sync/`; integrazioni, servizi, pagine e prove regionali.
 - **Prova della dimostrazione con WebKit sulla #47**: «Invii senza risposta» è caduta una volta. Dopo «È arrivata» la conferma non è comparsa: le ricette da firmare, finendo il loro controllo delle regole, spostano in basso la sezione. La prova ora aspetta anche i controlli in corso, e se la conferma non compare l'errore dice che cosa mostra il riquadro (D296).
+
+- **Fatto dopo l'unione della #47** (il Fascicolo regionale nel pacchetto, D297, D298):
+  - **chiamate di contesto**, un meccanismo solo (`RegionalContextCall` in `@mmg/integrations`):
+    - il pacchetto dà le destinazioni, ognuna di un tipo che il nucleo conosce, con permesso, voce del registro e credenziali;
+    - oggi c'è il tipo «fascicolo»: per il Piemonte è il modulo LCCE V13, con filtro, parole e credenziali RUPAR nel pacchetto;
+    - le rotte: `/api/chiamate-di-contesto` e `/api/pazienti/:id/chiamate-di-contesto/fascicolo`;
+    - la scheda nuova si prepara con `openContextCall`;
+  - **pubblicazione del Profilo**, un contratto nazionale (`RegionalFsePublication`):
+    - cliente V09, simulatore e prove nel pacchetto;
+    - `V09FsePublication` con le politiche FSE-INT-SRS-01-V02, i regimi e «ERP»;
+    - la coda è nazionale e prende fermo, intervallo, ripetizioni, giorni e testi dalla regione dello studio del medico autore;
+    - senza la pubblicazione della regione il Profilo non si valida;
+  - **certificati del Gateway**, una coppia per regione, scelta dal codice della regione dello studio; senza certificati il Profilo non si valida (D298);
+  - **pausa fra due messaggi della coda**, contata dalla fine dello scambio di prima: nella serie completa la prova della coda ha visto due invii a 102 ms invece di 120, perché la pausa si contava da prima di preparare il messaggio. Il difetto c'era già prima di questo pezzo (D297);
+  - **pagine**: le politiche di invio, l'attività clinica e i regimi arrivano dalla regione; il nome dell'organizzazione non ha più il Piemonte come valore di riserva. La frase «solo da questo computer» esce, perché dalla V13 l'IP si traccia e non si confronta;
+  - **inventario**: da 204 file e 2160 righe a 190 e 2063;
+  - **documenti**: `docs/fse.md` con i fatti di Sogei e del repository dell'accreditamento; `docs/pacchetti-regionali.md` con le integrazioni e la Lombardia; `docs/lombardia.md`; `docs/provenienze.md` con i sei documenti di ARIA; D297 e D298.
+- **Come provarlo**:
+  - le prove del meccanismo, con una regione inventata: `apps/api/test/chiamate-di-contesto-scelta.test.ts`, `apps/api/test/pubblicazione-regionale-scelta.test.ts`, `apps/api/test/gateway-per-regione.test.ts`;
+  - le prove del Piemonte: `packages/regions/piemonte/test/fse-access.test.ts`, `fse-publication.test.ts` e `fse-publication-contract.test.ts`; `apps/api/test/regions/piemonte/fascicolo-regionale.test.ts` e `fascicolo-regionale-coda.test.ts`;
+  - l'interfaccia: `apps/web/test/fascicolo-regionale.test.tsx`, `profilo-sanitario.test.tsx`;
+  - 19 sabotaggi nel registro.
+- **Non provato**: una seconda regione vera con il suo Fascicolo; certificati veri del Gateway, che arrivano con l'accreditamento; la dimostrazione con WebKit e Firefox, che qui gira con Chromium.
+- **Non fatto**: SAR, accesso con SPID o CIE della Regione, credenziali RUPAR (il resto del pezzo 3); AURA; pagine e prove che restano; le fonti regionali di `sync/`.
+
+## Lombardia: qualificazione della cartella con ARIA (26/11/2026)
+
+Richiesta di Simone: il confronto fra i documenti della qualificazione della cartella in Lombardia e il programma, fatto su `main` al commit `f37e284`. Non è la richiesta di costruire la Lombardia, e per la Lombardia non c'è codice. Nessuna chiamata al SISS o ad ARIA (regola 7).
+
+- **Fatto**:
+  - i sei documenti di ARIA registrati in `docs/provenienze.md`, con byte e impronte del confronto; non entrano nel repository (D92);
+  - il confronto salvato in `docs/lombardia.md`, con gli esiti delle verifiche nel codice dei punti «Da verificare» (paragrafo 9);
+  - il contratto delle integrazioni regge il modello lombardo: chiamate di contesto con un meccanismo solo, pubblicazione adatta a un repository regionale, certificati del Gateway per regione (D297, D298);
+  - che cosa servirà al pacchetto della Lombardia, in `docs/pacchetti-regionali.md`, «La Lombardia»;
+  - le domande del paragrafo 6 in «Domande per la prossima fermata»; le lacune del nucleo come proposte in «Che cosa resta aperto», C8.
+- **Domande per ARIA** (`docs/lombardia.md`, paragrafo 7). Si mandano a `isau_ssi@ariaspa.it` con il via di Simone, quando ARIA risponde alla mail del 26/11/2026:
+  1. cloud e ambiente di test ospitato;
+  2. comunicazione dei rilasci (Allegato 3);
+  3. ricetta con il PRREG e ricetta bianca;
+  4. certificati di malattia e INAIL;
+  5. BMI scritto e limiti di ammissibilità;
+  6. ICD-9-CM e ICD-10-IM;
+  7. repository del SISS o accreditamento nazionale, Firma Remota, PSS secondo la guida v1.5;
+  8. formato dell'elenco di Medboard;
+  9. specifiche del Gestionale SIAP;
+  10. contratto con un medico al momento della domanda;
+  11. canale per PPIP, ADI e ADP.
+- **Non verificato**: le citazioni dei documenti di ARIA, che sono sul Mac di Simone; i documenti del SISS citati, che non sono pubblici; l'interfaccia aperta nel browser per i punti verificati, guardati nel codice.
+
+## Accreditamento FSE 2.0, fase 1 (richiesta di Simone del 26/11/2026)
+
+**Quando**: dopo lo spostamento del Piemonte nel pacchetto regionale, tutta in locale. Il Gateway di prova non si chiama (regola 7). Quando arrivano i certificati di Sogei c'è una fermata, e Simone decide se fare un'eccezione per gli ambienti di test.
+
+**Che cosa** (richiesta di Simone, punti 1–5):
+
+1. Leggere la procedura in `ministero-salute/it-fse-support` (`doc/accreditamento`) e il repository `ministero-salute/it-fse-accreditamento-v2`:
+   - i casi di test della validazione;
+   - `accreditamento-checklist.xlsx` con i dataset;
+   - l'elenco dei codici fiscali fittizi ammessi (`Test Case/CF WHITELIST.txt`).
+     Commit e impronte vanno in `docs/provenienze.md`.
+2. Per il Profilo Sanitario Sintetico, i casi di test della checklist con i dataset di Sogei:
+   - PDF/A con il CDA2 iniettato;
+   - firma PAdES con il simulatore;
+   - controllo con gli XSD e gli schematron di `ministero-salute/it-fse-catalogs`, come per la guida v1.5.
+3. Il report-checklist da compilare, con timestamp, traceID e workflowInstanceID vuoti: arrivano solo dal Gateway.
+4. Qui, in «Che cosa resta aperto» (A10), che cosa manca alla fase 1 vera: certificati di test di Sogei, modulo EUSurvey, dichiarazione firmata, account GitHub.
+5. Nessuna chiamata al Gateway di prova.
+
+**Già noto** (`docs/fse.md`, «Che cosa hanno detto Sogei e il repository dell'accreditamento»):
+
+- i risultati vanno con una pull request, con `data.json` e `report-checklist.xlsx`, in `GATEWAY/{commonName auth}/{subject_application_vendor}/{subject_application_id}/{subject_application_version}`;
+- nelle validazioni per l'accreditamento `activity` vale `VALIDATION_FOR_ACCREDITAMENTO`;
+- un rilascio che non tocca i moduli del CDA2 e del colloquio con il Gateway si dichiara equivalente, senza rifare la fase 1. Quei moduli restano separati dal resto (oggi `packages/integrations/src/fse/`): nella fase 1 si prepara il modo di mostrarlo a ogni rilascio, per esempio un'impronta di quei moduli controllata da una prova;
+- i certificati di produzione li danno i referenti di ogni Regione: il programma ne usa uno per regione (D298).
 
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 
@@ -4975,3 +5095,22 @@ Ogni controllo nuovo viene rotto apposta (`scripts/sabotaggio.sh`), deve diventa
 | D296: il promemoria prende i giorni della regione                                                             | promemoria.ts: giorni senza la regione                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D296: le versioni passate delle regole fra le eccezioni, una per una                                          | nomi-regionali.ts: tolta la 2026-11-25.2                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
 | D296: le aggiunte della regione nel disco virtuale della dimostrazione                                        | vite.config.ts: senza i dati delle regole dei pacchetti                                                                   | Rosso sul controllo della versione nella coda «da firmare», poi verde con la serie completa nel browser                                                                                                                                                                                                          |
+| D297: le chiamate di contesto scelte dalla regione dello studio                                               | integrations.ts: il primo pacchetto per ogni regione                                                                      | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: le parole della pagina del Fascicolo dal pacchetto                                                      | context-call-routes.ts: introduzione vuota                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: senza la destinazione della regione la pagina non ha il modulo                                          | FseAccessPage.tsx: il modulo anche senza destinazione                                                                     | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: la frase «solo da questo computer» non c'è più                                                          | fse-access.ts: la frase rimessa                                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: le ripetizioni della coda sono quelle della regione                                                     | regional-queue.ts: tre ripetizioni fisse                                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: il fermo notturno è quello della regione                                                                | regional-queue.ts: fermo fino alle 07 fisso                                                                               | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: senza la pubblicazione della regione il Profilo non si valida                                           | service.ts: senza il motivo in «che cosa manca»                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: a chi segnalare lo dice la regione                                                                      | regional-queue.ts: «al supporto» fisso                                                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: presa in carico senza identificativo temporaneo, errore da ripetere                                     | fse-publication.ts: senza il controllo dell'identificativo                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: «1103» nella cancellazione dice che non c'è niente da cancellare                                        | fse-publication.ts: «1103» come un errore qualunque                                                                       | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: i minuti delle ripetizioni nella pagina del Profilo sono quelli della regione                           | HealthProfilePage.tsx: «ogni 5 minuti» fisso                                                                              | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: i regimi delle impostazioni sono quelli della regione dello studio                                      | fse-routes.ts: sempre i regimi del Gateway                                                                                | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: ogni apertura del Fascicolo resta nel registro con la sua voce                                          | context-call-routes.ts: un'altra voce del registro                                                                        | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: un parametro che la pagina della regione non ha è rifiutato                                             | context-call-routes.ts: il parametro sconosciuto ignorato                                                                 | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: con un errore la scheda preparata si chiude                                                             | context-call.ts: la scheda resta aperta                                                                                   | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: per una regione senza la destinazione la pagina lo dice                                                 | FseAccessPage.tsx: senza la nota                                                                                          | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D298: ogni regione con i suoi certificati del Gateway                                                         | gateways.ts: gli stessi certificati per tutte le regioni                                                                  | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D298: senza certificati per la regione il Profilo non si valida                                               | service.ts: senza il motivo in «che cosa manca»                                                                           | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
+| D297: la pausa fra due messaggi si conta dalla fine dello scambio di prima                                    | regional-queue.ts: la pausa contata da prima di preparare il messaggio                                                    | Rosso, poi verde                                                                                                                                                                                                                                                                                                 |
