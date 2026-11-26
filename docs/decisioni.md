@@ -2786,6 +2786,7 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Prove**:
   - del meccanismo con una regione inventata (`apps/api/test/credenziali-regione-scelta.test.ts`): parole, rotte, sei mesi di password, secondo fattore con il codice del programma, accesso con il suo `client_id` e la revoca, credenziali di un'altra regione, secondo fattore per legge e per scelta della regione;
   - del Piemonte nelle cartelle del pacchetto: `packages/regions/piemonte/test/accesso-regionale.test.ts`, `apps/api/test/regions/piemonte/credenziali.test.ts`, `accesso-regionale.test.ts`, `codice-gestionale.test.ts`;
-  - del contratto nazionale: `packages/integrations/test/accesso-regionale.test.ts` e `packages/domain/test/credenziali-servizi.test.ts`.
+  - del contratto nazionale: `packages/integrations/test/accesso-regionale.test.ts` e `packages/domain/test/credenziali-servizi.test.ts`;
+  - della coerenza dei pacchetti (`packages/regions/test/credenziali.test.ts`): chiavi e nomi corti unici, ogni integrazione con le credenziali del suo pacchetto o del Sistema TS, l'accesso con SPID o CIE con il modo in cui il programma si presenta.
 - **Non fatto**: il tempo di attesa degli invii consigliato dalla V06 e le regole di compilazione della ricetta rossa in DPCM restano nel nucleo; AURA, le pagine e le prove che nominano ancora la regione e le fonti di `sync/` sono i pezzi seguenti.
 - **Non provato**: due regioni vere con credenziali loro; un `APP_CODICE_GESTIONALE` vero, che arriva con l'autocertificazione; la revoca di una sessione con SPID o CIE aperta prima della migrazione, che resta solo nel programma.
