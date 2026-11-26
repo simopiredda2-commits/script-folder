@@ -290,7 +290,7 @@ export interface PrescriptionDeps {
   rao?: { sources: () => readonly RaoSource[]; includeUnchecked: boolean };
 }
 
-/** Quali credenziali usa ogni tipo di ricetta: quelle della regione per la SSN, Sistema TS per la bianca. */
+/** Le credenziali di ogni tipo di ricetta: della regione per la SSN, Sistema TS per la bianca. */
 const useFor = (kind: PrescriptionMessage['kind']): ServiceUse =>
   kind === 'white' ? 'ricetta_bianca' : 'ricetta_ssn';
 

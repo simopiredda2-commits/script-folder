@@ -2768,3 +2768,4 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - restano nel nucleo il codice del gestionale assegnato dalla Regione, l'accesso con SPID o CIE della Regione e le credenziali RUPAR, con il valore `rupar_piemonte` nel database: il pezzo seguente;
   - le regole di compilazione della ricetta rossa in DPCM (Prescrizione2, termini e intervalli della V06) sono ancora nel servizio nazionale della DPCM, citate dalla V06: si spostano quando una seconda regione avrà la DPCM;
   - le altre vie nazionali, per esempio la ricetta SSN mandata al SAC senza un servizio della regione, si scrivono quando servono.
+- **Non provato**: una ricetta mandata prima che lo studio cambi regione e annullata dopo. Il servizio si sceglie dalla regione di adesso, come la coda del Fascicolo (D297).
