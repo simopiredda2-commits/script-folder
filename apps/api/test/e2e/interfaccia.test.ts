@@ -1036,6 +1036,38 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByRole('heading', { name: 'Storico delle prescrizioni' }).waitFor();
     await page.getByText('Primo accesso').waitFor();
     await check(page, 'storico della prestazione');
+    // «Rinnova» dalla cronologia della cartella (D278): la ricetta nuova già compilata, da firmare.
+    await page.goto(`${base}/pazienti/${s.richPatient}`);
+    await page
+      .getByRole('button', { name: /^Rinnova la ricetta del .*: Ricetta specialistica SSN$/ })
+      .first()
+      .click();
+    await page.waitForURL(/\/specialistica$/);
+    await page
+      .locator('.righe-ricetta .riga-ricetta')
+      .filter({ hasText: 'Visita di prova' })
+      .waitFor();
+    expect(await page.getByLabel('Quesito diagnostico').inputValue()).toBe('Quesito di prova');
+    await check(page, 'ricetta rinnovata');
+    // Le prove dopo trovano la ricetta in corso vuota.
+    await page.getByRole('button', { name: 'Ricomincia' }).click();
+    await page.getByText('Aggiungi una prestazione dalla ricerca.').waitFor();
+  });
+
+  it('un esame cercato fra i farmaci: il rimando a Specialistica con la stessa ricerca (D279)', async () => {
+    await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('esame di prova');
+    await page.getByText('Nessun risultato per «esame di prova».').waitFor();
+    await page.getByRole('link', { name: 'cerca «esame di prova» in Specialistica' }).click();
+    await page.waitForURL(/\/specialistica\?cerca=/);
+    expect(await page.getByLabel('Prestazione, branca o codice').inputValue()).toBe(
+      'esame di prova',
+    );
+    await page.locator('.risultato').filter({ hasText: 'Esame di prova' }).waitFor();
+    // Nella pagina Esami, dove si prescrivono.
+    await page.goto(`${base}/pazienti/${s.richPatient}/esami`);
+    await page.getByText(/si prescrivono in Specialistica/).waitFor();
+    await check(page, 'esami con il rimando a Specialistica');
   });
 
   it('farmaci prescritti con i colori e la legenda, dentro «Nuova ricetta»; visite ed esami nei loro menu (D152, D246)', async () => {

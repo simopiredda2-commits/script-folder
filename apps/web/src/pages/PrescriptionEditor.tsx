@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import {
   DataVersions,
   ErrorMessage,
@@ -36,7 +36,7 @@ import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
 import { ACCESS_TYPE, date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
-import { readStored, usePersistentState, writeStored } from '../lib/storage';
+import { readStored, removeStored, usePersistentState, writeStored } from '../lib/storage';
 import { useMoreBelow } from '../lib/useMoreBelow';
 import {
   count,
@@ -401,6 +401,156 @@ export function addToCurrentPrescription(patientId: string, line: Omit<Line, 'ke
   return true;
 }
 
+/** Ricette già fatte: dopo, nell'editor si ricomincia da capo (D278). */
+const FINISHED_STATUSES = new Set(['sent', 'cancelled', 'paper']);
+/** Che cosa l'editor ricorda della ricetta in corso, campo per campo (D68). */
+const DRAFT_FIELDS = [
+  'bozza',
+  'righe',
+  'tipo',
+  'esenzione',
+  'canale',
+  'accesso',
+  'priorita',
+  'quesito',
+  'oscurato',
+] as const;
+
+/** Una riga di una ricetta già fatta, come la dà l'elenco delle ricette del paziente (D278). */
+export interface PastLine {
+  therapyId: string | null;
+  drugAic: string | null;
+  drugName: string | null;
+  activeIngredient: string | null;
+  serviceCode: string | null;
+  serviceNationalCode: string | null;
+  serviceDescription: string | null;
+  serviceNote?: string | null;
+  serviceNoteLetter?: string | null;
+  sessions?: number | null;
+  quantity: number;
+  aifaNote: string | null;
+  byActiveIngredient: boolean;
+  notSubstitutable: boolean;
+  notSubstitutableReason: string | null;
+  notSubstitutableCode?: string | null;
+  posologyText: string | null;
+  repeatCount: number | null;
+  validityMonths: number | null;
+}
+
+/** Una ricetta già fatta, con le righe (D278). */
+export interface PastPrescription {
+  id: string;
+  kind: string;
+  status: string;
+  exemptionCode: string | null;
+  accessType: 'first' | 'subsequent' | null;
+  priority: string | null;
+  diagnosticQuestion: string | null;
+  righe: PastLine[];
+}
+
+/** Che cosa dice il catalogo in uso di una prestazione, dalla ricerca (D276, D278). */
+async function catalogInfoFor(code: string): Promise<CatalogInfo | null> {
+  const found = await api<{ prestazioni: Service[] }>(`/api/prestazioni${query({ q: code })}`);
+  const s = found.prestazioni.find(
+    (x) => x.regionalCode.trim().toUpperCase() === code.trim().toUpperCase(),
+  );
+  return s
+    ? { fee: s.fee, cycle: !!s.cycle, maxSessions: s.sessions ?? null, note: s.note ?? null }
+    : null;
+}
+
+/**
+ * «Rinnova» una ricetta già fatta (D278, richiesta della Dr.ssa Rocca): le sue righe vanno nella
+ * ricetta in corso del paziente, da rivedere e firmare. Non si manda niente.
+ * - Le righe già in ricetta non si ripetono.
+ * - Con la ricetta in corso vuota vanno anche tipo, esenzione e, per la specialistica, accesso,
+ *   priorità e quesito.
+ * - Per le prestazioni la nota del nomenclatore è quella dell'elenco in uso; la lettera resta
+ *   solo se la nota è la stessa.
+ * - Una terapia che non è più in corso non resta collegata.
+ * - Se la ricetta di prima è già fatta (inviata, annullata o stampata su ricetta rossa) si
+ *   ricomincia da capo, come con «Nuova ricetta da capo».
+ * Dà dove aprire la ricetta e quante righe ha aggiunto; null se la ricetta in corso è ancora da
+ * finire: in bozza, da firmare, in invio o in errore.
+ */
+export async function renewIntoCurrentPrescription(
+  patientId: string,
+  past: PastPrescription,
+  activeTherapyIds: ReadonlySet<string>,
+): Promise<{ mode: 'farmaci' | 'specialistica'; added: number } | null> {
+  const mode = past.kind === 'specialist_ssn' ? 'specialistica' : 'farmaci';
+  const key = (field: string) => draftKey(patientId, mode, field);
+  const previous = readStored<{ status?: string } | null>(key('bozza'), null);
+  if (previous) {
+    if (!FINISHED_STATUSES.has(previous.status ?? '')) return null;
+    for (const field of DRAFT_FIELDS) removeStored(key(field));
+  }
+  const current = readStored<Line[]>(key('righe'), []);
+  const sameService = (a: Pick<Line, 'serviceCode'>, b: Pick<Line, 'serviceCode'>) =>
+    !!a.serviceCode && a.serviceCode.trim().toUpperCase() === b.serviceCode?.trim().toUpperCase();
+  const added: Line[] = [];
+  for (const l of past.righe) {
+    let line: Omit<Line, 'key'>;
+    if (mode === 'specialistica') {
+      const catalog = l.serviceCode ? await catalogInfoFor(l.serviceCode) : null;
+      const note = catalog?.note ?? null;
+      line = {
+        serviceCode: l.serviceCode,
+        serviceNationalCode: l.serviceNationalCode,
+        serviceDescription: l.serviceDescription,
+        quantity: l.quantity,
+        ...(note ? { serviceNote: note.note } : {}),
+        ...(note && l.serviceNote === note.note && l.serviceNoteLetter
+          ? { serviceNoteLetter: l.serviceNoteLetter }
+          : {}),
+        ...(l.sessions ? { sessions: String(l.sessions) } : {}),
+        ...(catalog ? { catalog } : {}),
+      };
+      if ([...current, ...added].some((x) => sameService(x, line))) continue;
+    } else {
+      line = {
+        ...(l.therapyId && activeTherapyIds.has(l.therapyId) ? { therapyId: l.therapyId } : {}),
+        drugAic: l.drugAic,
+        drugName: l.drugName,
+        activeIngredient: l.activeIngredient,
+        quantity: l.quantity,
+        aifaNote: l.aifaNote,
+        ...(l.posologyText ? { posologyText: l.posologyText } : {}),
+        ...(l.byActiveIngredient ? { byActiveIngredient: true } : {}),
+        ...(l.notSubstitutable
+          ? {
+              notSubstitutable: true,
+              notSubstitutableCode: l.notSubstitutableCode ?? '',
+              notSubstitutableReason: l.notSubstitutableReason ?? '',
+            }
+          : {}),
+        ...(past.kind === 'white'
+          ? {
+              repeatCount: l.repeatCount === null ? '' : String(l.repeatCount),
+              validityMonths: l.validityMonths === null ? '' : String(l.validityMonths),
+            }
+          : {}),
+      };
+      if ([...current, ...added].some((x) => sameDrug(x, line))) continue;
+    }
+    added.push({ ...line, key: newKey() });
+  }
+  if (current.length === 0) {
+    writeStored(key('tipo'), past.kind);
+    if (past.exemptionCode) writeStored(key('esenzione'), past.exemptionCode);
+    if (mode === 'specialistica') {
+      if (past.accessType) writeStored(key('accesso'), past.accessType);
+      if (past.priority) writeStored(key('priorita'), past.priority);
+      if (past.diagnosticQuestion) writeStored(key('quesito'), past.diagnosticQuestion);
+    }
+  }
+  writeStored(key('righe'), [...current, ...added]);
+  return { mode, added: added.length };
+}
+
 export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica' }) {
   const { id } = useParams<{ id: string }>();
   const record = useApi<{
@@ -441,7 +591,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const [priority, setPriority, resetPriority] = usePersistentState(k('priorita'), 'P');
   const [question, setQuestion, resetQuestion] = usePersistentState(k('quesito'), '');
   const [obscured, setObscured, resetObscured] = usePersistentState(k('oscurato'), false);
-  const [text, setText] = useState('');
+  // «Cercalo in Specialistica» dalla ricerca dei farmaci porta qui la stessa ricerca (D279).
+  const [params] = useSearchParams();
+  const [text, setText] = useState(
+    mode === 'specialistica' ? (params.get('cerca') ?? '').slice(0, 100) : '',
+  );
   const q = useDebounced(text);
   const search = useApi<{
     farmaci?: Drug[];
@@ -772,6 +926,16 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           <p role="status" className="tenue stato-ricerca">
             {q && search.data ? resultsText(q, search.data) : ''}
           </p>
+          {/* Un esame cercato fra i farmaci (D279): si prescrive in Specialistica. */}
+          {mode === 'farmaci' && q && search.data && (search.data.farmaci ?? []).length === 0 && (
+            <p className="tenue">
+              Cerchi un esame o una visita? Si prescrivono in Specialistica:{' '}
+              <Link to={`/pazienti/${id}/specialistica${query({ cerca: q })}`}>
+                cerca «{q}» in Specialistica
+              </Link>
+              .
+            </p>
+          )}
           <ul className="risultati">
             {search.data?.farmaci?.map((d) => {
               const line = {

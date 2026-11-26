@@ -1567,7 +1567,8 @@ a.coda:hover {
 
 .cronologia li {
   display: grid;
-  grid-template-columns: 6.5rem 9.5rem minmax(0, 1fr);
+  /* L'ultima colonna è per «Rinnova» sulle ricette (D278): vuota sulle altre voci. */
+  grid-template-columns: 6.5rem 9.5rem minmax(0, 1fr) auto;
   gap: 0.75rem;
   align-items: baseline;
   padding: 0.5rem 0;

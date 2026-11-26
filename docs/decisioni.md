@@ -2308,3 +2308,27 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Domanda per la fermata** (domanda 3, `docs/avanzamento.md`): un modulo SIAP con un simulatore del CSI, come per il SAR, e in che ordine. Consigliato dopo il Fascicolo e prima di AURA, cominciando dalla parte che non dipende dal CSI.
 - **Domande per il CSI** 11 e 12: l'autocertificazione SIRPED di una società senza ancora medici; specifiche, ambiente di prova e collaudo del SIAP per un fornitore che arriva dopo l'AP26_003, e quale versione del DataSet 3 vale.
 - **Non provato**: niente da provare, perché non c'è codice.
+
+**D278 · «Rinnova» una ricetta già fatta.** Richiesta della Dr.ssa Rocca, riferita da Simone il 25/11/2026: «implementare una funzione per rinnovare una ricetta già fatta ed evitare di fare ogni volta una nuova ricetta».
+
+- **Che cosa c'era**:
+  - «Ripeti le terapie scelte» nel riepilogo, per le terapie croniche in corso;
+  - «Aggiungi» sui farmaci prescritti (D249).
+  - Mancava il modo di rifare una ricetta intera, con le visite e gli esami.
+- **Scelte.**
+  - **Dove.** Nella cronologia della cartella ogni ricetta ha «Rinnova». È solo del medico: la segreteria prepara le ripetizioni delle terapie croniche con «Ripeti» (D259).
+  - **Che cosa fa.** Le righe della ricetta vanno nella ricetta in corso del paziente, farmaceutica o specialistica, e il programma la apre: il medico la rivede e la firma. Non si manda niente da sé.
+  - **Le righe già in ricetta** non si ripetono.
+  - **Con la ricetta in corso vuota** vanno anche tipo ed esenzione e, per la specialistica, tipo di accesso, priorità e quesito, che il medico rivede.
+  - **Le prestazioni** prendono dal catalogo in uso tariffa, ciclo e nota del nomenclatore. La lettera della condizione resta solo se la nota è la stessa di allora; con una nota cambiata il medico la sceglie di nuovo (D276).
+  - **Le terapie**: la riga resta collegata solo a una terapia ancora in corso.
+  - **Quando non si rinnova.** Se la ricetta in corso non è finita (bozza, da firmare, in invio o in errore), il programma lo dice e non tocca niente. Se è finita (inviata, annullata o stampata su ricetta rossa) si ricomincia da capo, come con «Nuova ricetta da capo». Per le ricette ancora in corso rimanda alla pagina Ricette, per i presidi alla pagina Presidi, che ha già «Rinnova» (tappa 10).
+- **Prove**: `apps/web/test/rinnova.test.ts` e, nel browser, «Rinnova» della ricetta specialistica dalla cronologia (`apps/api/test/e2e/interfaccia.test.ts`).
+- **Non provato**: con la Dr.ssa Rocca, se la ricetta rinnovata è quella che si aspetta.
+
+**D279 · Dove si prescrivono gli esami.** Domanda di Simone del 25/11/2026: come si prescrivono gli esami del sangue. Si prescrivono in «Specialistica», dal catalogo regionale. Il menu «Esami» della cartella è per i risultati, e lì non si capiva.
+
+- **Pagina Esami.** In cima una riga dice che lì si registrano e si leggono i risultati, e che gli esami, anche quelli del sangue, si prescrivono in Specialistica, con il collegamento.
+- **Ricerca dei farmaci.** Se non trova niente, propone «cerca … in Specialistica», che apre la specialistica con la stessa ricerca.
+- **Dimostrazione.** Lo studio ha un pacchetto di prova, «Esami del sangue (pacchetto di prova)». Ha prelievo di sangue venoso, emocromo, glucosio, creatinina, colesterolo totale e HDL e trigliceridi, con i codici del catalogo della D.D. 590/2026. Si compone dal catalogo in uso, come i pacchetti dello studio; senza il catalogo non c'è. È una comodità da provare, non un'indicazione clinica.
+- **Il nome del menu** è una domanda per la fermata (domanda 4, `docs/avanzamento.md`).

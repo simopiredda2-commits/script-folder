@@ -895,6 +895,12 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await go(`/pazienti/${id}/specialistica`);
     const restart = f.getByRole('button', { name: /Nuova ricetta da capo|Ricomincia/ });
     if (await restart.count()) await restart.click();
+    // Il pacchetto di prova di esami del sangue, composto dal catalogo vero (D279).
+    await f
+      .locator('#pacchetto-studio option', {
+        hasText: 'Esami del sangue (pacchetto di prova) (7 prestazioni)',
+      })
+      .waitFor({ state: 'attached' });
     await f.getByLabel('Prestazione, branca o codice').fill('cardiologica controllo ecg');
     await f
       .locator('.risultato')

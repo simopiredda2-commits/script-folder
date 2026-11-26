@@ -22,6 +22,7 @@ import { storeCredentials } from '../credentials/service';
 import { startOfStudioDay } from '../http/today-routes';
 import { insertHistorical } from '../prescriptions/historical';
 import { studioDate } from '../prescriptions/rules-check';
+import { ReferenceData } from '../reference/lookup';
 import { hashPassword } from '../security/password';
 import type { Database } from './client';
 import {
@@ -94,6 +95,21 @@ export interface DemoSeed {
 }
 
 /** Crea i dati dimostrativi; null se ci sono già. */
+/**
+ * Gli esami del pacchetto di prova (D279), con i codici del catalogo regionale della D.D. 590/2026:
+ * prelievo di sangue venoso, emocromo, glucosio, creatinina, colesterolo totale e HDL, trigliceridi.
+ * Una comodità dello studio da provare, non un'indicazione clinica.
+ */
+const DEMO_BLOOD_TESTS = [
+  '91.49.2',
+  '90622N.0',
+  '90271.0',
+  '90163.0',
+  '90.14.3',
+  '90.14.1',
+  '90.43.2',
+];
+
 export async function seedDemo(db: Database, options: DemoSeedOptions): Promise<DemoSeed | null> {
   const existing = await db
     .select({ username: appUser.username })
@@ -351,6 +367,35 @@ export async function seedDemo(db: Database, options: DemoSeedOptions): Promise<
       });
     }
   });
+
+  // Un pacchetto di esami del sangue (D279), solo con il catalogo delle prestazioni in uso, come
+  // nella dimostrazione nel browser: si compone dal catalogo, con la descrizione della voce, come i
+  // pacchetti dello studio. Senza il catalogo, o senza una delle voci, niente pacchetto.
+  const reference = new ReferenceData(db);
+  const today = studioDate(new Date());
+  const packageServices = [];
+  for (const code of DEMO_BLOOD_TESTS) {
+    const hit = (await reference.searchServices(code, today)).find((x) => x.regionalCode === code);
+    if (hit) packageServices.push({ codice: code, descrizione: hit.description });
+  }
+  if (packageServices.length === DEMO_BLOOD_TESTS.length) {
+    const parsed = parseStudioListData('pacchetto', {
+      nome: 'Esami del sangue (pacchetto di prova)',
+      prestazioni: packageServices,
+    });
+    if (!parsed.ok)
+      throw new Error(`Pacchetto dimostrativo non valido: ${parsed.problems.join('; ')}`);
+    const data = parsed.data as unknown as Record<string, unknown>;
+    await withActor(db, doctorId, (tx) =>
+      tx.insert(studioListItem).values({
+        studioId: st!.id,
+        kind: 'pacchetto',
+        label: studioListLabel('pacchetto', data),
+        data,
+        createdBy: doctorId,
+      }),
+    );
+  }
 
   const people = generatePatients(DEMO_PATIENTS);
   const rnd = new Random('demo-clinica');
