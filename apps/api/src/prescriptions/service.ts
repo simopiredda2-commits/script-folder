@@ -58,6 +58,18 @@ import { renderRedForm } from './red-form-pdf';
 import type { NreLots } from './nre-lots';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
 import { prescriptionTypology } from './typology';
+import {
+  applyTherapyChoices,
+  choiceColumns,
+  effectiveChoice,
+  linkedTherapies,
+  normalizeChoice,
+  proposalIssues,
+  sameAsTherapy,
+  type DrugCard,
+  type ProposalDecisions,
+  type TherapyChoiceInput,
+} from './therapy-choice';
 
 export interface LineInput {
   therapyId?: string | null;
@@ -83,6 +95,8 @@ export interface LineInput {
   posologyText?: string | null;
   repeatCount?: number | null;
   validityMonths?: number | null;
+  /** Tipo di terapia segnato sulla riga (D283): alla firma crea o aggiorna la terapia. */
+  therapyChoice?: TherapyChoiceInput | null;
 }
 
 export interface DraftInput {
@@ -105,7 +119,8 @@ export interface PreSendIssue {
   severity: 'block' | 'warn' | 'info';
   message: string;
   lineId?: string;
-  needs?: 'reason' | 'aifa_confirmation';
+  /** Che cosa chiede: un motivo, la conferma della nota AIFA, la decisione su una proposta (D283). */
+  needs?: 'reason' | 'aifa_confirmation' | 'therapy_decision';
   source?: string;
   remedy?: string;
 }
@@ -114,6 +129,8 @@ export interface PreSendIssue {
 export interface SignInput {
   reasons: Record<string, string>;
   confirmedAifaNotes: string[];
+  /** Decisioni del medico sulle proposte della segreteria, per riga (D283). */
+  proposals?: ProposalDecisions;
 }
 
 export interface CheckOutcome {
@@ -127,6 +144,8 @@ const signSchema = z
   .object({
     motivi: z.record(z.string(), z.string().trim().max(500)).optional(),
     confermeNote: z.array(z.uuid()).optional(),
+    /** Le proposte della segreteria sul tipo di terapia: confermate o non applicate (D283). */
+    proposte: z.record(z.uuid(), z.enum(['conferma', 'non_applicare'])).optional(),
   })
   .strict();
 
@@ -180,7 +199,16 @@ export const MANUAL_ENVIRONMENT = 'manuale';
 
 function parseSignInput(body: unknown): SignInput {
   const parsed = signSchema.parse(body ?? {});
-  return { reasons: parsed.motivi ?? {}, confirmedAifaNotes: parsed.confermeNote ?? [] };
+  return {
+    reasons: parsed.motivi ?? {},
+    confirmedAifaNotes: parsed.confermeNote ?? [],
+    proposals: Object.fromEntries(
+      Object.entries(parsed.proposte ?? {}).map(([id, d]) => [
+        id,
+        d === 'conferma' ? ('confirmed' as const) : ('declined' as const),
+      ]),
+    ),
+  };
 }
 
 export interface PrescriptionDeps {
@@ -233,6 +261,11 @@ export interface PrescriptionDeps {
    * Senza, il ripiego di prima.
    */
   dpcm?: DpcmService;
+  /**
+   * I dati del farmaco nella banca dati alla data (ATC, classe, gruppo di equivalenza, DPC): vanno
+   * nella scheda della terapia creata dalla riga alla firma (D283). Senza, restano vuoti.
+   */
+  drugCards?: (aics: readonly string[], date: string) => Promise<ReadonlyMap<string, DrugCard>>;
 }
 
 /** Quali credenziali usa ogni tipo di ricetta: RUPAR per il SAR, Sistema TS per la bianca. */
@@ -343,6 +376,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     archiveId: string,
     input: DraftInput,
     status: PrescriptionStatus,
+    /** Chi propone il tipo di terapia senza poter firmare (la segreteria, D283); null: il medico. */
+    proposedBy: string | null = null,
   ): Promise<string> {
     if (input.lines.length === 0) throw new HttpError(400, 'La ricetta non ha righe');
     // Le righe di specialistica conservano anche il codice del nomenclatore (D154).
@@ -407,10 +442,46 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           posologyText: l.posologyText ?? null,
           repeatCount: l.repeatCount ?? null,
           validityMonths: l.validityMonths ?? null,
+          ...choiceColumns(l.therapyChoice ? normalizeChoice(l.therapyChoice) : null, proposedBy),
         })),
       );
       return p!.id;
     });
+  }
+
+  /**
+   * Il tipo di terapia delle righe (D283), controllato prima della bozza: la terapia collegata è del
+   * paziente; il ciclo non finisce prima dell'inizio della terapia, o di oggi per una terapia nuova;
+   * una terapia nuova ha il nome del farmaco. Una scelta che non cambia niente della terapia
+   * collegata non resta sulla riga: così una riga della segreteria non diventa una proposta.
+   */
+  async function resolveChoices(patientId: string, input: DraftInput): Promise<DraftInput> {
+    const ids = input.lines
+      .filter((l) => l.therapyChoice && l.therapyId)
+      .map((l) => l.therapyId as string);
+    if (!input.lines.some((l) => l.therapyChoice)) return input;
+    const linked = await linkedTherapies(db, patientId, ids);
+    const today = studioDate(now());
+    const lines = input.lines.map((l) => {
+      if (!l.therapyChoice) return l;
+      const c = normalizeChoice(l.therapyChoice);
+      if (l.therapyId) {
+        const t = linked.get(l.therapyId);
+        if (!t) throw new HttpError(404, 'Terapia non trovata');
+        if (c.endOn && c.endOn < t.startOn)
+          throw new HttpError(
+            400,
+            `${t.drugName}: la fine del ciclo viene prima dell’inizio della terapia`,
+          );
+        return sameAsTherapy(c, t) ? { ...l, therapyChoice: null } : l;
+      }
+      if (!l.drugName?.trim())
+        throw new HttpError(400, 'Per creare la terapia serve il nome del farmaco');
+      if (c.endOn && c.endOn < today)
+        throw new HttpError(400, `${l.drugName}: il ciclo finisce prima di oggi`);
+      return l;
+    });
+    return { ...input, lines };
   }
 
   /**
@@ -452,7 +523,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       'ricetta_bozza',
     );
     assertNotDeceased(p);
-    return insertDraft(actor, patientId, p.archiveId, draftSchema.parse(body), 'draft');
+    const input = await resolveChoices(patientId, draftSchema.parse(body));
+    return insertDraft(actor, patientId, p.archiveId, input, 'draft');
   }
 
   /**
@@ -508,10 +580,14 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           },
         );
       if (t.status !== 'active') throw new HttpError(409, `Terapia non attiva: ${t.drugName}`);
-      if ((input.kind === 'white') !== t.notReimbursable)
+      // Con una proposta su «Non rimborsabile SSN» la ricetta segue la proposta (D283).
+      const notReimbursable = l.therapyChoice
+        ? (l.therapyChoice.notReimbursable ?? false)
+        : t.notReimbursable;
+      if ((input.kind === 'white') !== notReimbursable)
         throw new HttpError(
           400,
-          `${t.drugName}: la terapia va in ricetta ${t.notReimbursable ? 'bianca' : 'SSN'}`,
+          `${t.drugName}: la terapia va in ricetta ${notReimbursable ? 'bianca' : 'SSN'}`,
         );
       lines.push({
         therapyId: t.id,
@@ -525,9 +601,12 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         notSubstitutableReason: t.notSubstitutableReason,
         notSubstitutableCode: t.notSubstitutableCode,
         posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
+        // Il tipo di terapia della segreteria è una proposta per il medico (D282, D283).
+        therapyChoice: l.therapyChoice ?? null,
       });
     }
-    return insertDraft(actor, patientId, p.archiveId, { ...input, lines }, 'draft');
+    const resolved = await resolveChoices(patientId, { ...input, lines });
+    return insertDraft(actor, patientId, p.archiveId, resolved, 'draft', actor.userId);
   }
 
   /**
@@ -681,6 +760,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     p: PrescriptionRow,
     doctorUserId: string,
     compiledAt: string = studioDate(now()),
+    /** Le decisioni del medico sulle proposte, date con la firma e non ancora scritte (D283). */
+    decisions: ProposalDecisions = {},
   ): Promise<PrescriptionMessage> {
     const [pt] = await db.select().from(patient).where(eq(patient.id, p.patientId));
     const catalog =
@@ -697,7 +778,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       p.kind === 'pharma_ssn' &&
       painTherapyCodes(compiledAt).some((c) => c.toUpperCase() === exemption);
     const phone = pain ? await contactPhone(db, doctorUserId, p.patientId) : null;
-    // indicazionePrescr: la S o la H delle schede delle terapie, come il campo 14 del promemoria.
+    // indicazionePrescr: la S o la H delle righe (la scelta segnata sulla riga, D283) o delle
+    // schede delle terapie, come il campo 14 del promemoria.
     const therapyIds = lines.map((l) => l.therapyId).filter((x): x is string => !!x);
     const typologies =
       p.kind === 'pharma_ssn' && therapyIds.length
@@ -714,7 +796,15 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       localId: p.id,
       kind: p.kind,
       prescriptionIndication:
-        p.kind === 'pharma_ssn' ? prescriptionTypology(lines, typologies) : null,
+        p.kind === 'pharma_ssn'
+          ? prescriptionTypology(
+              lines.map((l) => ({
+                therapyId: l.therapyId,
+                choice: effectiveChoice(l, decisions),
+              })),
+              typologies,
+            )
+          : null,
       patientFiscalCode: pt!.fiscalCode,
       doctor: await doctorInfo(doctorUserId),
       exemptionCode: p.exemptionCode,
@@ -755,8 +845,16 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       rulesVersion: null,
       issues: [],
     };
-    const blocking = outcome.issues.filter((i) => i.severity === 'block' || i.severity === 'warn');
-    return { ...outcome, blocking };
+    // Le proposte della segreteria sul tipo di terapia (D283): finché il medico non decide, la
+    // ricetta non parte; decise, restano scritte nel controllo.
+    const lines = await db
+      .select()
+      .from(prescriptionLine)
+      .where(eq(prescriptionLine.prescriptionId, p.id))
+      .orderBy(asc(prescriptionLine.position));
+    const issues: PreSendIssue[] = [...outcome.issues, ...proposalIssues(lines, input.proposals)];
+    const blocking = issues.filter((i) => i.severity === 'block' || i.severity === 'warn');
+    return { ...outcome, issues, blocking };
   }
 
   /** Controllo senza invio: i problemi si vedono prima, non dopo un rifiuto. */
@@ -765,6 +863,23 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     await guardPrepare(actor, p, 'ricetta_controllo');
     const r = await runChecks(p, actor, parseSignInput(body));
     return { versioneRegole: r.rulesVersion, problemi: r.issues, bloccanti: r.blocking.length };
+  }
+
+  /**
+   * ATC, classe, gruppo di equivalenza e DPC dei farmaci delle righe che alla firma creano una
+   * terapia (D283), dalla banca dati in vigore oggi. Vuoto se nessuna riga la crea.
+   */
+  async function cardsForNewTherapies(p: PrescriptionRow, decisions: ProposalDecisions) {
+    if (!deps.drugCards) return undefined;
+    const lines = await db
+      .select()
+      .from(prescriptionLine)
+      .where(eq(prescriptionLine.prescriptionId, p.id));
+    const aics = lines
+      .filter((l) => !l.therapyId && !l.therapyChoiceAppliedAt && effectiveChoice(l, decisions))
+      .map((l) => l.drugAic)
+      .filter((x): x is string => !!x);
+    return aics.length ? deps.drugCards(aics, studioDate(now())) : undefined;
   }
 
   /** Il medico firma e invia: al SAR (SSN) o al Sistema TS (bianca). */
@@ -815,8 +930,11 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
 
     // Il messaggio e il paziente come partono: restano con la ricetta finché l'invio è in corso,
     // per l'esito segnato a mano se il servizio si ferma (D239).
-    const built = await buildMessage(p, actor.userId);
+    const decisions = input.proposals ?? {};
+    const built = await buildMessage(p, actor.userId, undefined, decisions);
     const [sendingPatient] = await db.select().from(patient).where(eq(patient.id, p.patientId));
+    // Le terapie nuove dalle righe prendono dalla banca dati ATC, classe, gruppo e DPC (D283).
+    const drugCards = await cardsForNewTherapies(p, decisions);
     // Passaggio atomico a «in invio»: se due richieste arrivano insieme, ne passa una sola. L'ora
     // della firma segna questo invio: l'esito si scrive solo se è ancora lui (D233). L'NRE del
     // lotto si prende nella stessa transazione: se la ricetta è cambiata, il numero torna al lotto.
@@ -850,6 +968,26 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         .returning({ id: prescription.id });
       if (rows.length === 0)
         throw new HttpError(409, 'La ricetta è cambiata nel frattempo: ricarica');
+      // Con la firma il tipo di terapia delle righe passa alla terapia, una volta sola (D283): se
+      // l'invio poi non riesce la scelta resta fatta, e un nuovo invio non la rifà.
+      const lines = await tx
+        .select()
+        .from(prescriptionLine)
+        .where(eq(prescriptionLine.prescriptionId, p.id))
+        .orderBy(asc(prescriptionLine.position));
+      await applyTherapyChoices(
+        tx,
+        {
+          patientId: p.patientId,
+          exemptionCode: p.exemptionCode,
+          actorUserId: actor.userId,
+          today: studioDate(claimedAt),
+          at: claimedAt,
+          decisions,
+          drugCards,
+        },
+        lines,
+      );
       return sent;
     });
 

@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   check,
+  date,
   index,
   integer,
   jsonb,
@@ -16,7 +17,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { patientRequest } from './agenda';
 import { patient, reminderChannel } from './patients';
-import { therapy } from './therapy';
+import { therapy, therapyKind } from './therapy';
 import { appUser, archive } from './users';
 
 export const prescriptionKind = pgEnum('prescription_kind', [
@@ -307,8 +308,37 @@ export const prescriptionLine = pgTable(
      */
     repeatCount: integer(),
     validityMonths: integer(),
+    /**
+     * Tipo di terapia segnato sulla riga (D283): con il tipo la riga porta la scelta intera (tipo,
+     * fine del ciclo, tipologia S o H, «Non rimborsabile SSN», medico suggeritore). Alla firma il
+     * programma crea la terapia, o aggiorna quella collegata. Vuoto: la riga non sceglie niente.
+     */
+    therapyKind: therapyKind(),
+    therapyEndOn: date(),
+    /** «S» suggerita o «H» ricovero; vuoto: nessuna delle due. */
+    therapyTypology: text(),
+    therapyNotReimbursable: boolean(),
+    therapySuggestedByName: text(),
+    therapySuggestedByFacility: text(),
+    therapySuggestedOn: date(),
+    /** La scelta è una proposta di chi non firma (la segreteria): il medico la conferma o no. */
+    therapyProposedBy: uuid().references(() => appUser.id),
+    /** Decisione del medico sulla proposta, alla firma: «confirmed» o «declined». */
+    therapyProposalDecision: text(),
+    /** Quando la scelta è passata alla terapia: una volta sola, anche se l'invio si ripete. */
+    therapyChoiceAppliedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [index().on(t.prescriptionId)],
+  (t) => [
+    index().on(t.prescriptionId),
+    check(
+      'prescription_line_therapy_typology',
+      sql`${t.therapyTypology} is null or ${t.therapyTypology} in ('S', 'H')`,
+    ),
+    check(
+      'prescription_line_therapy_decision',
+      sql`${t.therapyProposalDecision} is null or ${t.therapyProposalDecision} in ('confirmed', 'declined')`,
+    ),
+  ],
 );
 
 export const gatewaySystem = pgEnum('gateway_system', ['sar', 'sistema_ts']);

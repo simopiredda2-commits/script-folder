@@ -14,6 +14,7 @@ import {
 } from '../db/schema';
 import { HttpError } from '../http/errors';
 import { prescriptionTypology } from '../prescriptions/typology';
+import { effectiveChoice } from '../prescriptions/therapy-choice';
 import { ReferenceData } from '../reference/lookup';
 
 /**
@@ -362,7 +363,12 @@ export async function buildPromemoriaData(
   // Campo 14, uno per ricetta: la tipologia c'è se tutte le prescrizioni la hanno uguale. Se la
   // ricetta è partita con indicazionePrescr, vale quella partita (D273).
   const tipologia =
-    sentIndication !== undefined ? sentIndication : prescriptionTypology(lines, therapies);
+    sentIndication !== undefined
+      ? sentIndication
+      : prescriptionTypology(
+          lines.map((l) => ({ therapyId: l.therapyId, choice: effectiveChoice(l) })),
+          therapies,
+        );
 
   const specialist = p.kind === 'specialist_ssn';
   const groups = specialist

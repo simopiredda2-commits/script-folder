@@ -13,7 +13,7 @@ import { buildFiscalCode } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
 import { EMPTY_AURA_REGISTRY, SimulatedAura } from '@mmg/integrations';
 import { loadMappings } from '@mmg/reference';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import {
   chromium,
   firefox,
@@ -1462,6 +1462,118 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await check(page, 'ricette da firmare', true);
     await page.getByRole('button', { name: 'Firma e invia' }).first().click();
     await page.getByText(/Ricetta inviata per/).waitFor();
+  });
+
+  it('tipo di terapia sulla riga (D283): la segreteria propone, il medico conferma; un farmaco nuovo diventa terapia', async () => {
+    const [before] = await t.db
+      .select()
+      .from(therapy)
+      .where(
+        and(eq(therapy.patientId, s.richPatient), eq(therapy.drugName, 'Farmaco di prova 5 mg')),
+      );
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      locale: 'it-IT',
+    });
+    await ctx.clock.setFixedTime(s.clock.now());
+    const sec = settling(await ctx.newPage());
+    try {
+      await loginInBrowser(sec, 'segreteria');
+      await freshPrescription(
+        sec,
+        `${base}/pazienti/${s.richPatient}/ricetta`,
+        'Nuova ricetta',
+        'Farmaco, principio attivo, codice AIC o ATC',
+      );
+      await sec
+        .getByRole('list', { name: 'Farmaci prescritti' })
+        .getByRole('button', { name: 'Aggiungi Farmaco di prova 5 mg' })
+        .click();
+      const row = sec.locator('.riga-ricetta').filter({ hasText: 'Farmaco di prova 5 mg' });
+      await row.getByRole('button', { name: /Farmaco di prova 5 mg/ }).click();
+      // La terapia collegata: il tipo parte dalla scheda, senza «prescrizione occasionale».
+      await expect(row.getByLabel('Tipo di terapia').inputValue()).resolves.toBe('chronic');
+      await row.getByText('Come nella scheda della terapia.').waitFor();
+      await row.getByLabel('Tipologia').selectOption('S');
+      await row.getByLabel('Medico suggeritore').fill('Dr. Specialista di prova');
+      await row.getByText(/È una proposta per il medico/).waitFor();
+      await check(sec, 'tipo di terapia proposto dalla segreteria');
+      await sec.getByRole('button', { name: 'Prepara la ricetta' }).click();
+      await sec.getByRole('button', { name: 'Manda alla firma del medico' }).click();
+      await sec.getByText('La ricetta è nella coda «da firmare» del medico.').waitFor();
+    } finally {
+      await ctx.close();
+    }
+    // Il medico la trova da firmare: decide sulla proposta, poi firma.
+    await gotoNewPage(page, `${base}/ricette`);
+    const panel = page
+      .locator('.pannello-invio')
+      .filter({ hasText: 'Proposte della segreteria sul tipo di terapia' });
+    await panel.getByText(/Proposta della segreteria · Chiede la decisione del medico/).waitFor();
+    const sign = panel.getByRole('button', { name: 'Firma e invia' });
+    await expect(sign.isDisabled()).resolves.toBe(true);
+    await check(page, 'proposta della segreteria da decidere', true);
+    await panel.getByLabel(/Conferma la proposta/).check();
+    await sign.click();
+    await page.getByText(/Ricetta inviata per/).waitFor();
+    const [after] = await t.db.select().from(therapy).where(eq(therapy.id, before!.id));
+    expect(after).toMatchObject({ suggestedS: true, suggestedByName: 'Dr. Specialista di prova' });
+    // Le prove dopo trovano la terapia com'era.
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .update(therapy)
+        .set({ suggestedS: false, suggestedByName: before!.suggestedByName })
+        .where(eq(therapy.id, before!.id)),
+    );
+
+    // Il medico segna «Cronica» su un farmaco della ricerca: alla firma la terapia c'è.
+    await freshPrescription(
+      page,
+      `${base}/pazienti/${s.richPatient}/ricetta`,
+      'Nuova ricetta',
+      'Farmaco, principio attivo, codice AIC o ATC',
+    );
+    await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('amlodipina');
+    await page
+      .locator('.risultato')
+      .filter({ hasText: 'TEVA ITALIA' })
+      .getByRole('button', { name: 'Aggiungi' })
+      .click();
+    const line = page.locator('.riga-ricetta').filter({ hasText: 'TEVA ITALIA' });
+    await line.getByRole('button', { name: /TEVA ITALIA/ }).click();
+    await line.getByText(/la terapia in cartella non si crea/).waitFor();
+    await line.getByLabel('Tipo di terapia').selectOption('chronic');
+    await line.getByText(/Alla firma si crea la terapia in cartella/).waitFor();
+    await line.getByLabel('Posologia').fill('1 compressa al mattino');
+    // In ricetta SSN «Non rimborsabile SSN» non si segna: va in ricetta bianca.
+    await expect(line.getByLabel(/Non rimborsabile SSN/).isDisabled()).resolves.toBe(true);
+    await check(page, 'tipo di terapia sulla riga di un farmaco nuovo');
+    await line.getByRole('button', { name: /TEVA ITALIA/ }).click();
+    await line.getByText(/terapia cronica/).waitFor();
+    await page.getByRole('button', { name: 'Salva in bozza' }).click();
+    await page.getByRole('heading', { name: 'Controlli prima dell’invio' }).waitFor();
+    await signAndSend(page);
+    const made = await t.db
+      .select()
+      .from(therapy)
+      .where(and(eq(therapy.patientId, s.richPatient), eq(therapy.drugAic, '038548032')));
+    const created = made.find(
+      (x) => x.status === 'active' && x.frequency === '1 compressa al mattino',
+    );
+    // I dati del farmaco dalla banca dati in uso (anagrafica AIFA ed elenco di classe A d'esempio).
+    expect(created, JSON.stringify(made)).toMatchObject({
+      kind: 'chronic',
+      atc: 'C08CA01',
+      drugClass: 'A',
+      createdBy: s.users.titolare.id,
+    });
+    // Le prove dopo non la trovano in corso (la prova dei farmaci carenti ne fa una sua).
+    await withActor(t.db, s.users.titolare.id, (tx) =>
+      tx
+        .update(therapy)
+        .set({ status: 'ended', endOn: studioDate(s.clock.now()) })
+        .where(eq(therapy.id, created!.id)),
+    );
   });
 
   it('più cartelle aperte insieme (D68): schede, ritorno alla pagina lasciata, ricetta ricordata', async () => {

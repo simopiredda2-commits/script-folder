@@ -393,6 +393,13 @@
       "when": 1795655725143,
       "tag": "0055_pubblicazione_regionale_del_profilo",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1795678323935,
+      "tag": "0056_tipo_di_terapia_sulla_riga",
+      "breakpoints": true
     }
   ]
 }

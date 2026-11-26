@@ -277,7 +277,11 @@ export function IssueList({ issues }: { issues: RuleIssue[] }) {
           <div>
             <p>
               <strong>
-                {i.ruleId} · {SEVERITY_LABEL[i.severity]}
+                {/* La proposta della segreteria chiede al medico una decisione (D283). */}
+                {i.ruleId === 'PROPOSTA' ? 'Proposta della segreteria' : i.ruleId} ·{' '}
+                {i.needs === 'therapy_decision'
+                  ? 'Chiede la decisione del medico'
+                  : SEVERITY_LABEL[i.severity]}
               </strong>
               : {i.message}
             </p>

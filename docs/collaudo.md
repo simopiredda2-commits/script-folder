@@ -35,7 +35,7 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 
 - **Chi**: Dr.ssa Rocca
 - **Dove**: cartella › «Nuova ricetta»
-- **Che cosa guardare**: ripetere una terapia cronica; cercare un farmaco (amlodipina) e aggiungerlo con le confezioni; i controlli delle regole; il passo unico «Firma e invia» e quando si ferma; l'anteprima del promemoria prima della firma; il promemoria su A5 e su A4; la consegna per email al paziente o al delegato. I messaggi dei controlli sono comprensibili?
+- **Che cosa guardare**: ripetere una terapia cronica; cercare un farmaco (amlodipina) e aggiungerlo con le confezioni; sulla riga aperta il tipo di terapia (cronica, ciclo, al bisogno), la S o la H e «Non rimborsabile SSN», con la terapia creata o aggiornata alla firma (D283); i controlli delle regole; il passo unico «Firma e invia» e quando si ferma; l'anteprima del promemoria prima della firma; il promemoria su A5 e su A4; la consegna per email al paziente o al delegato. I messaggi dei controlli sono comprensibili?
 - **Quando**: adesso, tranne l'invio al SAR: quello si rifà con il SAR vero (D262)
 
 ### G5 · Farmaci fuori dalle classi A e H
@@ -72,7 +72,7 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 
 - **Chi**: Dr.ssa Rocca, con chi lavora in segreteria
 - **Dove**: utente `segreteria`, poi di nuovo `medico`
-- **Che cosa guardare**: la segreteria prepara le ripetizioni delle terapie croniche e stampa i promemoria, ma non firma e non invia; il medico convalida sempre le ricette preparate dalla segreteria. Che cosa altro dovrebbe poter fare la segreteria, o non fare?
+- **Che cosa guardare**: la segreteria prepara le ripetizioni delle terapie croniche e stampa i promemoria, ma non firma e non invia; il medico convalida sempre le ricette preparate dalla segreteria. Sulla riga la segreteria può proporre il tipo di terapia: il medico, alla firma, la conferma o non la applica (D283). Che cosa altro dovrebbe poter fare la segreteria, o non fare?
 
 ### G11 · Invii senza risposta
 

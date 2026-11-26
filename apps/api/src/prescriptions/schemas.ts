@@ -1,5 +1,6 @@
 import { PRESCRIPTION_KINDS } from '@mmg/domain';
 import { z } from 'zod';
+import { therapyChoiceSchema } from './therapy-choice';
 
 const lineSchema = z
   .object({
@@ -42,10 +43,19 @@ const lineSchema = z
     /** Ricetta bianca ripetibile, solo se diverso dalla regola del farmaco (D93). */
     repeatCount: z.number().int().min(0).max(99).nullable().optional(),
     validityMonths: z.number().int().min(1).max(99).nullable().optional(),
+    /**
+     * Tipo di terapia segnato sulla riga del farmaco (D283): alla firma il programma crea la terapia
+     * o aggiorna quella collegata. Della segreteria è una proposta, che il medico conferma.
+     */
+    therapyChoice: therapyChoiceSchema.nullable().optional(),
   })
   .strict()
   .refine((l) => l.drugName || l.drugAic || l.serviceCode || l.serviceDescription, {
     message: 'Ogni riga indica un farmaco o una prestazione',
+  })
+  .refine((l) => !l.therapyChoice || (!l.serviceCode && !l.serviceDescription), {
+    message: 'Il tipo di terapia si segna solo sulle righe dei farmaci',
+    path: ['therapyChoice'],
   });
 
 /** Corpo di una ricetta nuova. Si valida dopo la guardia: anche le richieste sbagliate si registrano. */
@@ -76,6 +86,16 @@ export const draftSchema = z
   .refine((d) => !d.obscured || d.kind === 'pharma_ssn' || d.kind === 'specialist_ssn', {
     message: 'L’oscuramento di nome e indirizzo vale per le ricette SSN',
     path: ['obscured'],
+  })
+  .refine(
+    (d) => d.kind === 'pharma_ssn' || d.kind === 'white' || d.lines.every((l) => !l.therapyChoice),
+    { message: 'Il tipo di terapia si segna nella ricetta dei farmaci', path: ['lines'] },
+  )
+  // «Non rimborsabile SSN»: la terapia si prescrive solo su ricetta bianca (requisiti, R8).
+  .refine((d) => d.kind === 'white' || d.lines.every((l) => !l.therapyChoice?.notReimbursable), {
+    message:
+      '«Non rimborsabile SSN» va in ricetta bianca: togli la spunta o scegli la ricetta bianca',
+    path: ['lines'],
   });
 
 export const repeatSchema = z.object({ terapie: z.array(z.uuid()).min(1).max(20) }).strict();
