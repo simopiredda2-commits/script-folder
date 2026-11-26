@@ -7,6 +7,7 @@ import { accessLog, appUser, archive, doctorProfile, serviceSession } from '../s
 import { base32Decode } from '../src/security/base32';
 import { totp } from '../src/security/totp';
 import { createScenario, login, PASSWORD, type Scenario } from './helpers/scenario';
+import { regionalCredentials } from './helpers/regional-gateway';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
 /** Codice fiscale inventato: luogo di nascita con la X, che nessun comune ha (D12). */
@@ -544,10 +545,9 @@ describe('utenti e ruoli dello studio (tappa 14)', () => {
         .select({ service: serviceSession.service })
         .from(serviceSession)
         .where(eq(serviceSession.userId, collega.id));
-    expect((await sessions()).map((r) => r.service).sort()).toEqual([
-      'rupar_piemonte',
-      'sistema_ts',
-    ]);
+    expect((await sessions()).map((r) => r.service).sort()).toEqual(
+      [regionalCredentials().key, 'sistema_ts'].sort(),
+    );
     // Lo stesso codice fiscale dello scenario: qui cambia solo il codice ASL.
     const scenarioCf = buildFiscalCode({
       surname: 'Serra',

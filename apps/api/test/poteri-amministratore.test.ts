@@ -31,7 +31,7 @@ import {
   type Actor,
   type SessionResult,
 } from '../src/auth/service';
-import { createCredentialService, storeSession } from '../src/credentials/service';
+import { storeSession } from '../src/credentials/service';
 import { createFirstStudio } from '../src/db/first-studio';
 import {
   accessLog,
@@ -57,7 +57,14 @@ import { hashPassword } from '../src/security/password';
 import { CONTROL_CHARACTERS_MESSAGE } from '../src/security/plain-text';
 import { hashToken, newToken } from '../src/security/secrets';
 import { totp } from '../src/security/totp';
-import { createScenario, login, PASSWORD, type Scenario } from './helpers/scenario';
+import { regionalCredentials } from './helpers/regional-gateway';
+import {
+  createScenario,
+  credentialServiceOf,
+  login,
+  PASSWORD,
+  type Scenario,
+} from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
 /** Codice fiscale inventato: luogo di nascita con la X, che nessun comune ha (D12). */
@@ -836,13 +843,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
   });
 
   it('H: una sessione dei servizi aperta con un codice fiscale diverso da quello attuale non vale, e si chiude', async () => {
-    const credentials = createCredentialService({
-      db: t.db,
-      encryptionKey: s.encryptionKey,
-      now: s.clock.now,
-      regionalSoftwareCode: 'SIMULATORE',
-      secondFactor: s.secondFactor,
-    });
+    const credentials = credentialServiceOf(s);
     const doctor = s.users.sostituto;
     // Con il codice fiscale di adesso le sessioni dello scenario valgono.
     await expect(credentials.authFor(doctor.id, 'ricetta_bianca')).resolves.toMatchObject({
@@ -874,9 +875,11 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
     // La gara del problema 8: la sessione si salva dopo la chiusura, con il codice fiscale letto
     // prima della correzione. Non vale, e si chiude.
     const later = () => new Date(s.clock.now().getTime() + 3_600_000);
-    for (const [service, mode, use] of [
-      ['rupar_piemonte', 'spid_cie', 'ricetta_ssn'],
-      ['sistema_ts', 'email', 'ricetta_bianca'],
+    // Il servizio della regione degli studi delle prove, con SPID o CIE, e il Sistema TS (D301).
+    const regional = regionalCredentials();
+    for (const [service, mode, use, slug] of [
+      [regional.key, 'spid_cie', 'ricetta_ssn', regional.slug],
+      ['sistema_ts', 'email', 'ricetta_bianca', undefined],
     ] as const) {
       await storeSession(t.db, s.encryptionKey, {
         userId: doctor.id,
@@ -886,7 +889,7 @@ describe('poteri dell’amministratore: gli attacchi della revisione falliscono 
         mode,
         subject: before!.fiscalCode,
       });
-      await expect(credentials.authFor(doctor.id, use)).rejects.toMatchObject({
+      await expect(credentials.authFor(doctor.id, use, slug)).rejects.toMatchObject({
         statusCode: 422,
         details: { codice: 'SESSIONE_MANCANTE' },
       });

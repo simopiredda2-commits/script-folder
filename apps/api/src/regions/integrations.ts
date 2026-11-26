@@ -75,6 +75,19 @@ export const fsePublicationChoice = (
  */
 export const prescriptionChoice = (
   override: RegionalPrescription | undefined,
-  options: Parameters<NonNullable<RegionalIntegrations['prescription']>>[0],
+  /**
+   * Le scelte del simulatore per ogni regione: con il secondo fattore e l'accesso con SPID o CIE
+   * simulati della stessa regione (D301), perché controlli i loro codici e token.
+   */
+  options:
+    | Parameters<NonNullable<RegionalIntegrations['prescription']>>[0]
+    | ((pkg: RegionalPackage) => Parameters<NonNullable<RegionalIntegrations['prescription']>>[0]),
   packages?: readonly RegionalPackage[],
-) => regionalChoice((pkg) => pkg.integrations?.prescription?.(options) ?? null, override, packages);
+) =>
+  regionalChoice(
+    (pkg) =>
+      pkg.integrations?.prescription?.(typeof options === 'function' ? options(pkg) : options) ??
+      null,
+    override,
+    packages,
+  );

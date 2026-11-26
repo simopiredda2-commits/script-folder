@@ -98,13 +98,17 @@ Le integrazioni con i servizi della regione che non usano il database stanno nel
   - il **servizio della regione**, con i lotti di NRE e il loro tipo, la ricetta rossa in DPCM, il codice regionale del medico nel promemoria, il servizio delle credenziali e le parole: il nome del servizio con l'articolo e le preposizioni («il SAR», «al SAR», «dal SAR», «del SAR»);
   - il **prescrittore esterno**: la ricetta la fa un modulo della regione. Oggi è dichiarato soltanto, e il programma lo dice.
     La bianca va sempre al Sistema TS. Lotti e coda della DPCM prendono il servizio della regione dello studio di ogni ricetta. Per il Piemonte è il SAR, in `integrations/sar.ts`, con il simulatore in `sar-simulator.ts`.
+- **Credenziali della regione** (`RegionalCredentials`, D301): che servizio è (chiave con cui le credenziali si conservano e si cifrano, nome corto, nome, uso, mesi della password), quali invii della regione chiedono il secondo fattore oltre a quelli che lo chiedono per legge, il secondo fattore, come il programma si presenta alla regione per un medico (variabile della configurazione, codice e ASL) e l'accesso con SPID o CIE (permessi, nota, servizio).
+  - Ogni integrazione della regione dice con quali credenziali si chiama (`credentialService`); gli invii nazionali vanno al Sistema TS.
+  - Le credenziali di un'altra regione non si usano: si possono solo cancellare.
+  - Per il Piemonte sono la RUPAR, in `integrations/rupar.ts`, con `gestionale.ts` (`APP_CODICE_GESTIONALE`) e `sirped-access.ts` (il token della V08 e il simulatore).
 - **Prove**:
-  - del meccanismo, con una regione inventata, nelle cartelle nazionali (`chiamate-di-contesto-scelta`, `pubblicazione-regionale-scelta`, `gateway-per-regione`, `ricetta-regionale-scelta`);
+  - del meccanismo, con una regione inventata, nelle cartelle nazionali (`chiamate-di-contesto-scelta`, `pubblicazione-regionale-scelta`, `gateway-per-regione`, `ricetta-regionale-scelta`, `credenziali-regione-scelta`);
   - del contenuto del Piemonte, in `packages/regions/piemonte/test/` e `apps/api/test/regions/piemonte/`;
   - della regola 7 nel codice delle integrazioni di ogni pacchetto, con gli spazi dei nomi XML che il pacchetto elenca in `integrations/xml-namespaces.ts` (`packages/regions/test/regola-7.test.ts`, D300).
 - **Le prove del ciclo della ricetta** prendono il simulatore della regione degli studi di prova dal suo pacchetto, senza nominarla (`apps/api/test/helpers/regional-gateway.ts`).
 
-Restano del pezzo 3: l'accesso con SPID o CIE della Regione, il codice del gestionale assegnato dalla Regione e le credenziali RUPAR. Poi i servizi con il database (AURA).
+Il pezzo 3 è finito con le credenziali (D301). Poi i servizi con il database (AURA).
 
 ## La Lombardia: che cosa servirà al pacchetto
 
@@ -116,7 +120,7 @@ Dal confronto con la qualificazione della cartella in Lombardia del 26/11/2026 (
 | Certificati          | Sistema TS (nazionale)                                          | Servizio regionale (GCM, INFOINAIL) o il tasto che apre la web application                                                                                         | Il servizio dei certificati dato dal pacchetto, oppure una destinazione delle chiamate di contesto; se basti il Sistema TS è una domanda per ARIA                                                                                                                                                                                     |
 | Fascicolo            | Validazione sul Gateway e pubblicazione con i servizi regionali | Firma con la Firma Remota del SISS e archiviazione nel repository del SISS; il Gateway è da chiarire con ARIA                                                      | Il contratto della pubblicazione regge il repository (documento nuovo, sostituzione, metadati, cancellazione, esito, ricerca). Servono due aggiunte, con le specifiche: la validazione sul Gateway facoltativa e la firma del servizio della regione al posto di quella del programma                                                 |
 | Anagrafe             | I servizi di AURA                                               | I servizi ICCE, più l'elenco degli assistiti scaricato ogni giorno da Medboard                                                                                     | Nel contratto dell'anagrafe (pezzo dei servizi con il database), anche un file giornaliero come fonte, letto con l'importazione (`docs/importazione.md`); il formato di Medboard è una domanda per ARIA                                                                                                                               |
-| Accesso del medico   | SPID o CIE con OAuth2 della Regione                             | Le chiavi APIMANAGER del programma e l'autenticazione dell'operatore sulla pagina `operatori.siss`                                                                 | Nel pezzo del SAR, l'accesso regionale come contratto, non come OAuth2 del Piemonte                                                                                                                                                                                                                                                   |
+| Accesso del medico   | SPID o CIE con OAuth2 della Regione                             | Le chiavi APIMANAGER del programma e l'autenticazione dell'operatore sulla pagina `operatori.siss`                                                                 | L'accesso regionale è un contratto (D301): il pacchetto dà il servizio delle credenziali, l'accesso e come si presenta il programma; per la Lombardia servirà un accesso che non è l'OAuth2 del Piemonte                                                                                                                              |
 | SIAP                 | Il CSI riceve                                                   | ARIA riceve, con il Gestionale SIAP                                                                                                                                | Gli stessi tracciati nazionali (D284, D289, D291); l'invio nel pacchetto                                                                                                                                                                                                                                                              |
 | Codifiche e consensi | Le tabelle del Piemonte                                         | Le tabelle del Dominio Centrale del SISS (DDC) e un consenso regionale in più (PIC)                                                                                | Dati del pacchetto (D295) e un tipo di consenso regionale                                                                                                                                                                                                                                                                             |
 | Chiamate di contesto | Una: il Fascicolo (D220)                                        | Tante: PRREG, SGDT, ARVAX, Assistant-RL, GP++, PT Online, OPE, Deleghe FSE, SMI, SMP, GSM                                                                          | Il meccanismo unico c'è (D297): ogni destinazione è un tipo che il nucleo conosce, con il suo permesso, aggiunto con le specifiche                                                                                                                                                                                                    |
@@ -145,6 +149,7 @@ Un pacchetto, quello del Piemonte (`packages/regions/piemonte/`), con nove parti
 - **Nel pacchetto**:
   - il Fascicolo regionale (D297): la pubblicazione V09 con le politiche di invio e l'accesso dalla cartella con il modulo LCCE, in `integrations/`;
   - la ricetta SSN con il SAR (D300): ricetta dematerializzata, lotti di NRE del tipo 1, ricetta rossa in DPCM, codice regionale nel promemoria, con il simulatore, in `integrations/`;
+  - le credenziali RUPAR, il loro secondo fattore, l'accesso con SPID o CIE della V08 e il codice del gestionale con il codice ASL del medico (D301), in `integrations/`;
   - le tabelle RAO regionali (`data/rao`, D295);
   - le aggiunte alle regole di prescrizione (`data/regole`, D296): i termini della ricetta specialistica in R1, le fonti della Regione per R5, R9 e R17, il SAR in R18;
   - le scadenze regionali delle ricette: la validità della ricetta specialistica, nelle stesse aggiunte (D296).
@@ -152,24 +157,24 @@ Un pacchetto, quello del Piemonte (`packages/regions/piemonte/`), con nove parti
   - catalogo regionale: restano nel nucleo la fonte di `sync/` e i dati d'esempio;
   - prestazioni aggiuntive dell'AIR, con la corrispondenza per il SIAP: restano i testi delle pagine.
 - **Nel nucleo**:
-  - della ricetta: il codice del gestionale assegnato dalla Regione, l'accesso con SPID o CIE e le credenziali RUPAR; le regole di compilazione della ricetta rossa in DPCM, citate dalla V06;
+  - della ricetta: il tempo di attesa degli invii consigliato dalla V06 e le regole di compilazione della ricetta rossa in DPCM, citate dalla V06;
   - anagrafe (AURA, con un simulatore);
   - distribuzione per conto: la fonte di `sync/` e i dati d'esempio; la mappatura della trascrizione è già senza nomi regionali.
 
 Mancano, anche per il Piemonte: l'invio del SIAP (viene con il modulo del CSI), la rendicontazione dell'AIR (D287), le esenzioni regionali.
 
-L'inventario: 164 file e 1803 righe fuori dal pacchetto (con lo scheletro erano 235 e 2298, dopo i dati 219 e 2250, dopo le regole 204 e 2160, dopo il Fascicolo 190 e 2063).
+L'inventario: 150 file e 1603 righe fuori dal pacchetto (con lo scheletro erano 235 e 2298, dopo i dati 219 e 2250, dopo le regole 204 e 2160, dopo il Fascicolo 190 e 2063, dopo la ricetta 164 e 1803).
 
 | Area                                        | File | Righe |
 | ------------------------------------------- | ---: | ----: |
-| `apps/api/src`                              |   36 |   486 |
-| `apps/api/test`                             |   35 |   648 |
+| `apps/api/src`                              |   33 |   452 |
+| `apps/api/test`                             |   34 |   576 |
 | `apps/api/modelli`                          |    1 |     1 |
-| `apps/web/src`                              |   12 |   149 |
-| `apps/web/test`                             |   11 |   128 |
+| `apps/web/src`                              |    9 |   139 |
+| `apps/web/test`                             |   10 |   123 |
 | `apps/demo` (codice, prove e script)        |   11 |    96 |
-| `packages/integrations` (codice e prove)    |   11 |   121 |
-| `packages/domain` (codice, prove e script)  |   18 |    75 |
+| `packages/integrations` (codice e prove)    |    7 |    76 |
+| `packages/domain` (codice, prove e script)  |   16 |    41 |
 | `packages/reference` (dati, codice e prove) |    8 |    17 |
 | `packages/rules` (dati, codice e prove)     |    0 |     0 |
 | `fixtures`                                  |   19 |    61 |
@@ -182,7 +187,7 @@ Un pezzo per pull request, con le prove sempre verdi:
 1. **dati** (fatto, D295): catalogo regionale, tabelle RAO regionali, prestazioni aggiuntive dell'AIR, corrispondenza per il SIAP; le mappature delle trascrizioni senza nomi regionali;
    - le **fonti di `sync/`** (catalogo e distribuzione per conto, in Python) restano per un pezzo a sé, che insegna a `sync/` a leggere le fonti dei pacchetti;
 2. **regole** (fatto, D296): le aggiunte della regione alle regole nazionali, nel pacchetto, con la regione dello studio nel controllo e nel promemoria;
-3. **integrazioni senza il database**: Fascicolo regionale (fatto, D297), con il meccanismo delle chiamate di contesto e i certificati del Gateway per regione (D298); la ricetta SSN con il SAR e il suo simulatore (fatto, D300); poi l'accesso con il modulo della Regione e le credenziali;
+3. **integrazioni senza il database**: Fascicolo regionale (fatto, D297), con il meccanismo delle chiamate di contesto e i certificati del Gateway per regione (D298); la ricetta SSN con il SAR e il suo simulatore (fatto, D300); le credenziali, l'accesso con SPID o CIE e il codice del gestionale (fatto, D301);
 4. **servizi con il database**: AURA e i suoi giri;
 5. **pagine e testi**, poi la **dimostrazione** e le **prove**.
 
@@ -190,7 +195,7 @@ Dopo, nel pacchetto del Piemonte: il modulo del SIAP con il CSI, la rendicontazi
 
 ## Che cosa non è fatto, che cosa non è provato
 
-- Spostati i dati (D295), le regole (D296), il Fascicolo regionale (D297) e la ricetta SSN con il SAR (D300); il resto, nell'ordine qui sopra. Le prove regionali stanno ancora nelle cartelle nazionali: si spostano per ultime.
+- Spostati i dati (D295), le regole (D296), il Fascicolo regionale (D297), la ricetta SSN con il SAR (D300) e le credenziali con l'accesso con SPID o CIE (D301); il resto, nell'ordine qui sopra. Le prove regionali stanno ancora nelle cartelle nazionali: si spostano per ultime.
 - Per una regione senza pacchetto il programma oggi non ha le parti nazionali al posto di quelle regionali: per esempio la ricetta SSN va solo con il SAR (la ricetta bianca va già al Sistema TS). Le alternative nazionali (per esempio l'invio al Sistema TS senza un servizio regionale) si scrivono quando servono.
 - Le varianti delle ASL ci sono nel contratto, nessuna nel pacchetto del Piemonte.
 - Le parole del pacchetto sono quelle di oggi; con lo spostamento se ne aggiungono, se servono.

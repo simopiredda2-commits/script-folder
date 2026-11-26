@@ -1,9 +1,5 @@
 import { NRE_LOT_SIZE, nreLotPrefix } from '@mmg/domain';
-import {
-  SimulatedGateway,
-  SimulatedRegionalAuthorization,
-  SimulatedSecondFactor,
-} from '@mmg/integrations';
+import { SimulatedGateway, SimulatedSecondFactor } from '@mmg/integrations';
 import { and, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -15,7 +11,7 @@ import {
 } from '../../../src/db/schema';
 import { createScenario, login, type Scenario } from '../../helpers/scenario';
 import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
-import { SimulatedSar } from '@mmg/regions/piemonte';
+import { RUPAR_CREDENTIALS, SimulatedSar, SimulatedSirpedAccess } from '@mmg/regions/piemonte';
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 const RETURN = '/api/profilo/credenziali/rupar/accesso-regionale/ritorno';
@@ -24,16 +20,16 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
   let t: TestDatabase;
   let s: Scenario;
   const c: Record<string, string> = {};
-  let regional: SimulatedRegionalAuthorization;
+  let regional: SimulatedSirpedAccess;
   let sar: SimulatedSar;
   /** Per le prove dei campi del token: cambia i campi prima dell'emissione (V08, 4.3.2). */
   let tamperClaims: ((c: Record<string, unknown>) => Record<string, unknown>) | null = null;
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    regional = new SimulatedRegionalAuthorization({
+    regional = new SimulatedSirpedAccess({
       now: () => s.clock.now(),
-      claims: (claims) => tamperClaims?.(claims) ?? claims,
+      claims: (claims: Record<string, unknown>) => tamperClaims?.(claims) ?? claims,
     });
     sar = new SimulatedSar({ oauth: regional });
     s = await createScenario(
@@ -43,7 +39,7 @@ describe('accesso regionale con SPID o CIE (D109)', () => {
         gateways: { regional: sar, sistema_ts: new SimulatedGateway('sistema_ts') },
         secondFactor: {
           sistema_ts: new SimulatedSecondFactor('sistema_ts', { now: () => s.clock.now() }),
-          rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now: () => s.clock.now() }),
+          regional: RUPAR_CREDENTIALS.secondFactor!({ now: () => s.clock.now() }),
         },
         regional: { gateway: regional, redirectUri: RETURN },
         preSendChecks: noRules,

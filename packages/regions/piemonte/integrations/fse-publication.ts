@@ -46,6 +46,7 @@ import {
   type ServiceAuth,
 } from '@mmg/integrations';
 import { DOMParser, type Element } from '@xmldom/xmldom';
+import { RUPAR_CREDENTIALS } from './rupar';
 
 /** Spazi dei nomi scritti nella V09 (5.2.1, ComunicazioneMetadati) e quelli di WS-Security. */
 export const V09_NAMESPACES = {
@@ -747,6 +748,8 @@ const incomplete = (r: RegionalExchange, esito: string, message: string) =>
  * da cancellare.
  */
 export class V09FsePublication implements RegionalFsePublication {
+  /** Si pubblica con utente, password e PIN RUPAR (V09, 3.2.1): le credenziali del pacchetto. */
+  readonly credentialService = RUPAR_CREDENTIALS.slug;
   readonly regimes = REGIONAL_REGIMES;
   readonly clinicalActivity = V09.clinicalActivity;
   readonly policy = FSE_PUBLICATION_POLICY;

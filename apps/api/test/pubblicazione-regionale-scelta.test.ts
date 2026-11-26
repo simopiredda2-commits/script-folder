@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fseRegionalSend, studio } from '../src/db/schema';
 import { NO_REGIONAL_FSE_PUBLICATION } from '../src/fse/regional-queue';
 import { studioRegion } from '../src/regions/region';
+import { regionalCredentials } from './helpers/regional-gateway';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -157,6 +158,8 @@ describe('la coda con le politiche e le parole della pubblicazione data (D297)',
   };
   const given: RegionalFsePublication = {
     environment: 'test',
+    // Le credenziali della regione degli studi delle prove (D301).
+    credentialService: regionalCredentials().slug,
     regimes: { SSN: 'Regime SSN' },
     clinicalActivity: 'PHR',
     policy,
@@ -301,6 +304,8 @@ describe('la pausa fra due messaggi si conta dalla fine dello scambio di prima (
   };
   const slow: RegionalFsePublication = {
     environment: 'test',
+    // Le credenziali della regione degli studi delle prove (D301).
+    credentialService: regionalCredentials().slug,
     regimes: { SSN: 'Regime SSN' },
     clinicalActivity: 'ERP',
     policy,

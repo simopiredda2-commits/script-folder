@@ -111,7 +111,7 @@ export function registerContextCallRoutes(app: FastifyInstance, deps: ContextCal
     if (!activeFor(call)) throw new HttpError(503, call.texts.notActive);
     // Credenziali del medico per i servizi della regione; se mancano, l'errore porta a
     // «Credenziali dei servizi».
-    const auth = await credentials.authFor(actor.userId, rules.credentials);
+    const auth = await credentials.authFor(actor.userId, rules.credentials, call.credentialService);
     const result = await call.open(
       { patientFiscalCode: pt.fiscalCode, clientIp: req.ip || null, parameters: chosen },
       auth,
@@ -128,6 +128,7 @@ export function registerContextCallRoutes(app: FastifyInstance, deps: ContextCal
         rules.credentials,
         'credentials',
         `${result.code}: ${result.message}`,
+        call.credentialService,
       );
       throw new HttpError(422, `${result.message} (${result.code}). ${call.texts.credentials}`, {
         codice: 'CREDENZIALI_RIFIUTATE',

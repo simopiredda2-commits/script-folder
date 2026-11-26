@@ -310,6 +310,7 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
           REGIONAL_USE,
           'credentials',
           `Fascicolo regionale: ${message}`,
+          publication.credentialService,
         );
       return toFix(
         row,
@@ -387,7 +388,7 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
     publication: RegionalFsePublication,
   ): Promise<ServiceAuth | { error: string }> {
     try {
-      return await deps.credentials.authFor(userId, REGIONAL_USE);
+      return await deps.credentials.authFor(userId, REGIONAL_USE, publication.credentialService);
     } catch (err) {
       if (err instanceof HttpError)
         return { error: `${err.message}. ${publication.texts.credentialsMissing}, poi «Riprova»` };

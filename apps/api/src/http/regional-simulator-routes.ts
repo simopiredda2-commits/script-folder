@@ -1,4 +1,4 @@
-import type { SimulatedRegionalAuthorization } from '@mmg/integrations';
+import type { SimulatedAuthorizationPage } from '@mmg/integrations';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { HttpError } from './errors';
@@ -7,7 +7,8 @@ import { HttpError } from './errors';
  * Pagina regionale simulata dell'accesso con SPID o CIE (D109). Esiste solo quando l'accesso
  * regionale è il simulatore: al suo posto, nel servizio vero, c'è la pagina della Regione. Non
  * imita il sito della Regione. Come la pagina vera, rimanda solo agli indirizzi di ritorno
- * registrati, quelli del programma: mai a un indirizzo scritto nella richiesta (D193).
+ * registrati, quelli del programma: mai a un indirizzo scritto nella richiesta (D193). Con più
+ * regioni, ognuna ha il suo simulatore e il suo ritorno: la pagina li distingue dal ritorno (D301).
  */
 const authorizeQuery = z.object({
   client_id: z.string().min(1).max(200),
@@ -66,23 +67,28 @@ ${hidden}
 </html>`;
 }
 
+/** Un simulatore con gli indirizzi di ritorno registrati per lui: solo quelli del programma. */
+export interface SimulatedAccessPage {
+  simulator: SimulatedAuthorizationPage;
+  returns: readonly string[];
+}
+
 /** Un indirizzo di ritorno non registrato non si usa: niente rimando fuori dal programma. */
-function registered(returns: readonly string[], redirectUri: string) {
-  if (!returns.includes(redirectUri))
-    throw new HttpError(400, 'Indirizzo di ritorno non registrato');
+function registered(pages: readonly SimulatedAccessPage[], redirectUri: string) {
+  const page = pages.find((p) => p.returns.includes(redirectUri));
+  if (!page) throw new HttpError(400, 'Indirizzo di ritorno non registrato');
+  return page.simulator;
 }
 
 export function registerRegionalSimulatorRoutes(
   app: FastifyInstance,
-  simulator: SimulatedRegionalAuthorization,
-  /** Gli indirizzi di ritorno registrati: solo quelli del programma. */
-  returns: readonly string[],
+  pages: readonly SimulatedAccessPage[],
 ) {
   const pub = { config: { public: true } };
 
   app.get('/api/simulatore/accesso-regionale', pub, async (req, reply) => {
     const q = authorizeQuery.parse(req.query);
-    registered(returns, q.redirect_uri);
+    registered(pages, q.redirect_uri);
     reply.header('content-type', 'text/html; charset=utf-8');
     reply.header('cache-control', 'no-store');
     return reply.send(page(q));
@@ -93,7 +99,7 @@ export function registerRegionalSimulatorRoutes(
       .omit({ response_type: true, code_challenge_method: true })
       .extend({ azione: z.enum(['spid', 'cie', 'annulla']) })
       .parse(req.query);
-    registered(returns, q.redirect_uri);
+    const simulator = registered(pages, q.redirect_uri);
     const back = new URLSearchParams({ state: q.state });
     if (q.azione === 'annulla') {
       back.set('error', 'access_denied');

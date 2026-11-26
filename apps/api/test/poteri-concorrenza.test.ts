@@ -22,7 +22,6 @@ import {
   SERVICE_BUSY_ERROR,
   TOO_MANY_CODES_ERROR,
 } from '../src/auth/service';
-import { createCredentialService } from '../src/credentials/service';
 import { createDatabase, createPool } from '../src/db/client';
 import { createFirstStudio } from '../src/db/first-studio';
 import {
@@ -46,7 +45,14 @@ import { base32Decode } from '../src/security/base32';
 import { hashToken } from '../src/security/secrets';
 import { totp } from '../src/security/totp';
 import { column } from './helpers/importazione-xlsx';
-import { createScenario, login, PASSWORD, type Scenario } from './helpers/scenario';
+import { regionalSecondFactor } from './helpers/regional-gateway';
+import {
+  createScenario,
+  credentialServiceOf,
+  login,
+  PASSWORD,
+  type Scenario,
+} from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
 /**
@@ -1291,11 +1297,11 @@ describe('sessione dei servizi durante la correzione del codice fiscale (seconda
 
   beforeAll(async () => {
     gated = new Gated('sistema_ts', { now: () => s.clock.now() });
-    const regional = new SimulatedSecondFactor('rupar_piemonte', { now: () => s.clock.now() });
+    const regional = regionalSecondFactor(() => s.clock.now());
     s = await createScenario(
       t.db,
       { idleLockMinutes: null },
-      { secondFactor: { sistema_ts: gated, rupar_piemonte: regional } },
+      { secondFactor: { sistema_ts: gated, regional } },
     );
   });
   afterAll(async () => {
@@ -1362,13 +1368,7 @@ describe('sessione dei servizi durante la correzione del codice fiscale (seconda
       st.json().servizi.find((x: { servizio: string }) => x.servizio === 'sistema-ts').sessione
         .attiva,
     ).toBe(false);
-    const credentials = createCredentialService({
-      db: t.db,
-      encryptionKey: s.encryptionKey,
-      now: s.clock.now,
-      regionalSoftwareCode: 'SIMULATORE',
-      secondFactor: s.secondFactor,
-    });
+    const credentials = credentialServiceOf(s);
     await expect(credentials.authFor(s.users.titolare.id, 'ricetta_bianca')).rejects.toMatchObject({
       statusCode: 422,
     });

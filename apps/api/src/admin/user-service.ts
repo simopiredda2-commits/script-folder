@@ -2,10 +2,8 @@ import { randomBytes } from 'node:crypto';
 import {
   can,
   checkFiscalCode,
-  CREDENTIAL_SERVICE_LABELS,
   ASL_LIST,
   ASL_SOURCE,
-  CREDENTIAL_SERVICES,
   findHealthUnit,
   healthUnitsOfRegion,
   opensPatientData,
@@ -20,6 +18,11 @@ import { and, asc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
 import type { Actor } from '../auth/service';
+import {
+  ALL_CREDENTIAL_SERVICES,
+  credentialServiceName,
+  REGIONAL_CREDENTIAL_SERVICES,
+} from '../credentials/registry';
 import { closeServiceSessions } from '../credentials/service';
 import {
   decisionOf,
@@ -662,7 +665,7 @@ function ensureOtherActiveAdmin(users: readonly UserRow[], target: UserRow) {
 
 /** Avviso sulle sessioni dei servizi chiuse dopo una correzione dei codici del medico. */
 export function servicesNotice(what: string, closed: readonly CredentialService[]): string {
-  const list = closed.map((s) => CREDENTIAL_SERVICE_LABELS[s]).join(' e ');
+  const list = closed.map((s) => credentialServiceName(s)).join(' e ');
   return closed.length === 1
     ? `${what} del medico cambiato: chiusa la sua sessione ${list}. Il medico la riattiva da «Credenziali dei servizi».`
     : `${what} del medico cambiato: chiuse le sue sessioni ${list}. Il medico le riattiva da «Credenziali dei servizi».`;
@@ -1248,9 +1251,9 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
         if (cfProposal) out.push(FISCAL_CODE_PENDING_NOTICE);
 
         // Codici del medico corretti (scelta 4): le sessioni dei servizi legate a quei codici
-        // si chiudono. Il codice fiscale vale per tutti e due i servizi (D102, D111), il codice
-        // regionale per il servizio regionale; anche il codice ASL, che è nel `client_id` con cui
-        // la sessione regionale si è aperta (D266).
+        // si chiudono. Il codice fiscale vale per tutti i servizi (D102, D111), il codice
+        // regionale per i servizi delle regioni; anche il codice ASL, con cui il programma si
+        // presenta alla regione e con cui la sessione regionale si è aperta (D266, D301).
         const cfChanged = !!profile && doctorChanges.includes('medico.codiceFiscale');
         const regionalChanged = !!profile && doctorChanges.includes('medico.codiceRegionale');
         const aslChanged = !!profile && doctorChanges.includes('medico.codiceAsl');
@@ -1263,7 +1266,7 @@ export function createUserAdminService({ db, now }: { db: Database; now: () => D
               : 'Codice ASL';
           servicesClosed = await closeServiceSessions(tx, {
             userId: id,
-            services: cfChanged ? CREDENTIAL_SERVICES : ['rupar_piemonte'],
+            services: cfChanged ? ALL_CREDENTIAL_SERVICES : REGIONAL_CREDENTIAL_SERVICES,
             at: t,
             workstation: actor.workstation,
             detail: `${what.toLowerCase()} del medico corretto dall’amministratore`,

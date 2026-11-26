@@ -1028,7 +1028,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     const route = await routeOf(p);
     // Credenziali e codice di sessione di chi firma: se mancano ci si ferma qui, senza invio.
     const use = useFor(p.kind);
-    const auth = await deps.credentials.authFor(actor.userId, use);
+    // Le credenziali del servizio che dice la regione (D301); la bianca, quelle del Sistema TS.
+    const credentialService = route.regional?.credentialService;
+    const auth = await deps.credentials.authFor(actor.userId, use, credentialService);
     const system = route.system;
     // Dove la regione dà i lotti, la ricetta SSN ha l'NRE dal lotto del medico (D269): alla prima
     // firma se ne prende uno; dopo un rifiuto si rimanda lo stesso. Se i numeri sono pochi si
@@ -1148,6 +1150,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         use,
         authProblem,
         `${result.code}: ${result.message}`,
+        credentialService,
       );
       result = { ...result, message: authMessage(authProblem, result.message) };
     }
@@ -1513,7 +1516,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     doctor: PrescriptionMessage['doctor'],
     auth: ServiceAuth,
   ): Promise<StatusResult> {
-    const { system, gateway } = await routeOf(p);
+    const { system, gateway, regional } = await routeOf(p);
     const request = { nre: p.nre!, doctor };
     const started = Date.now();
     let result: StatusResult;
@@ -1528,6 +1531,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         useFor(p.kind),
         result.authProblem,
         `${result.code}: ${result.message}`,
+        regional?.credentialService,
       );
     await withActor(db, actor.userId, async (tx) => {
       await tx.insert(externalSubmission).values({
@@ -1573,7 +1577,11 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     }
     let auth: ServiceAuth;
     try {
-      auth = await deps.credentials.authFor(actor.userId, useFor(p.kind));
+      auth = await deps.credentials.authFor(
+        actor.userId,
+        useFor(p.kind),
+        (await routeOf(p)).regional?.credentialService,
+      );
     } catch (err) {
       // Senza credenziali o codice di sessione (per esempio la segreteria) lo stato non si chiede.
       if (!(err instanceof HttpError)) throw err;
@@ -1630,10 +1638,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     await guardPatient(db, actor, p.patientId, 'prescription.sign_send', 'ricetta_annullamento');
     const reason = cancelSchema.parse(body).motivo;
     const to = await check(p, 'cancel');
-    const { system, gateway } = await routeOf(p);
+    const { system, gateway, regional } = await routeOf(p);
     const doctor = await doctorInfo(actor.userId);
     const use = useFor(p.kind);
-    const auth = await deps.credentials.authFor(actor.userId, use);
+    const auth = await deps.credentials.authFor(actor.userId, use, regional?.credentialService);
     // Prima lo stato: se l'ente ha già lavorato la ricetta non si chiede nemmeno l'annullamento.
     const status = await askDispensing(actor, p, doctor, auth);
     if (status.outcome === 'ok') {
@@ -1649,6 +1657,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         use,
         result.authProblem,
         `${result.code}: ${result.message}`,
+        regional?.credentialService,
       );
     await withActor(db, actor.userId, async (tx) => {
       await tx.insert(externalSubmission).values({

@@ -1,8 +1,9 @@
-import { CREDENTIAL_SERVICES, doctorIssues } from '@mmg/domain';
+import { doctorIssues } from '@mmg/domain';
 import { and, eq, ne, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { servicesNotice } from '../admin/user-service';
+import { ALL_CREDENTIAL_SERVICES } from '../credentials/registry';
 import { logAccess } from '../audit/access-log';
 import type { Actor } from '../auth/service';
 import { closeServiceSessions } from '../credentials/service';
@@ -201,7 +202,7 @@ export function registerDoctorProfileRoutes(
           .where(eq(doctorProfile.userId, actor.userId));
         closed = await closeServiceSessions(tx, {
           userId: actor.userId,
-          services: CREDENTIAL_SERVICES,
+          services: ALL_CREDENTIAL_SERVICES,
           at: t,
           workstation: actor.workstation,
           detail: 'codice fiscale corretto dall’amministratore, confermato dal medico',

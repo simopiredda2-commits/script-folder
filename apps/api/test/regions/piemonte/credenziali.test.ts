@@ -1,4 +1,5 @@
 import { SimulatedGateway, SimulatedSecondFactor } from '@mmg/integrations';
+import { RUPAR_CREDENTIALS } from '@mmg/regions/piemonte';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -8,11 +9,17 @@ import {
   serviceCredential,
   serviceCredentialEvent,
   serviceSession,
-} from '../src/db/schema';
-import { studioDate } from '../src/prescriptions/rules-check';
-import { createScenario, login, type Scenario } from './helpers/scenario';
-import { createTestDatabase, type TestDatabase } from './helpers/test-db';
-import { regionalGateway } from './helpers/regional-gateway';
+} from '../../../src/db/schema';
+import { studioDate } from '../../../src/prescriptions/rules-check';
+import { createScenario, login, type Scenario } from '../../helpers/scenario';
+import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
+import { regionalGateway } from '../../helpers/regional-gateway';
+
+/**
+ * Le credenziali RUPAR del Piemonte dalla pagina delle credenziali fino agli invii al SAR (D100–
+ * D102, D266, D301): codice ASL del medico, informazione «APP», X-Gestionale, tre mesi della
+ * password. Il meccanismo nazionale, con regioni inventate, è in `credenziali-regione-scelta`.
+ */
 
 const noRules = () => Promise.resolve({ rulesVersion: null, issues: [] });
 
@@ -39,7 +46,7 @@ interface ServiceStatus {
   sessione: { attiva: boolean; scadeIl: string | null };
 }
 
-describe('credenziali dei servizi e secondo fattore (D100–D102)', () => {
+describe('credenziali RUPAR e secondo fattore della Regione (D100–D102, D301)', () => {
   let t: TestDatabase;
   let s: Scenario;
   const c: Record<string, string> = {};
@@ -49,7 +56,9 @@ describe('credenziali dei servizi e secondo fattore (D100–D102)', () => {
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    rupar2f = new SimulatedSecondFactor('rupar_piemonte', { now: () => s.clock.now() });
+    const second = RUPAR_CREDENTIALS.secondFactor!({ now: () => s.clock.now() });
+    if (!(second instanceof SimulatedSecondFactor)) throw new Error('secondo fattore simulato');
+    rupar2f = second;
     const ts2f = new SimulatedSecondFactor('sistema_ts', { now: () => s.clock.now() });
     sar = regionalGateway({ sessions: rupar2f });
     ts = new SimulatedGateway('sistema_ts', { sessions: ts2f });
@@ -58,7 +67,7 @@ describe('credenziali dei servizi e secondo fattore (D100–D102)', () => {
       {},
       {
         gateways: { regional: sar, sistema_ts: ts },
-        secondFactor: { rupar_piemonte: rupar2f, sistema_ts: ts2f },
+        secondFactor: { regional: rupar2f, sistema_ts: ts2f },
         preSendChecks: noRules,
       },
     );

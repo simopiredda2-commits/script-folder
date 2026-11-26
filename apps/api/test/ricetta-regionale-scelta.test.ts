@@ -21,6 +21,7 @@ import {
 import { studioRegionCode } from '../src/regions/region';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalCredentials } from './helpers/regional-gateway';
 
 /**
  * La ricetta SSN scelta dalla regione dello studio (D300), con regioni inventate: la prova non
@@ -61,7 +62,8 @@ function invented(options: { decide?: () => SimulatedOutcome; lots?: RegionalNre
       gateway,
       ...(options.lots ? { nreLots: { service: options.lots, lotType: '7' } } : {}),
       reminderDoctorCode: false,
-      credentialService: 'regione-inventata',
+      // Le credenziali della regione degli studi delle prove, che lo scenario dà ai medici (D301).
+      credentialService: regionalCredentials().slug,
       texts: TEXTS,
     },
   };

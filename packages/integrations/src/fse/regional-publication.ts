@@ -158,6 +158,8 @@ export interface RegionalPublicationPolicy {
 
 export interface RegionalFsePublication {
   readonly environment: 'simulator' | 'test' | 'production';
+  /** Con quali credenziali del medico si pubblica: il nome corto del servizio (D301). */
+  readonly credentialService: string;
   /** I regimi che la regione ammette (codici del Gateway, administrativeRequest), con i nomi. */
   readonly regimes: Readonly<Record<string, string>>;
   /** L'attività clinica che la regione fissa per il Profilo (tipoAttivitaClinica del Gateway). */

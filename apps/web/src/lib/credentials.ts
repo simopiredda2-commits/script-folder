@@ -1,9 +1,15 @@
 /** Credenziali dei servizi del medico e codice di sessione (D100–D102). */
 
 export interface ServiceStatus {
-  servizio: 'sistema-ts' | 'rupar';
+  /** Il nome corto del servizio: il Sistema TS o il servizio della regione dello studio (D301). */
+  servizio: string;
   nome: string;
   uso: string;
+  /**
+   * Il Sistema TS o il servizio della regione dello studio: quello che si usa. Le credenziali di
+   * un'altra regione restano solo per poterle cancellare.
+   */
+  inUso: boolean;
   impostate: boolean;
   /** Solo le ultime tre lettere dell'utente: le credenziali non si rileggono. */
   utente: string | null;
@@ -13,9 +19,11 @@ export interface ServiceStatus {
   aggiornateIl: string | null;
   secondoFattore: boolean;
   sessione: { attiva: boolean; scadeIl: string | null; modalita?: 'email' | 'spid_cie' | null };
-  /** Ricette SSN in Piemonte: si entra con SPID o CIE (D109). */
+  /** Si entra con SPID o CIE della regione (D109). */
   accessoRegionale?: boolean;
-  ambiente: 'simulator' | 'test' | 'production';
+  /** La nota della regione sotto l'accesso: a che cosa servono ancora le credenziali. */
+  notaAccessoRegionale?: string | null;
+  ambiente: 'simulator' | 'test' | 'production' | null;
 }
 
 export interface CredentialsStatus {
@@ -43,7 +51,10 @@ export function credentialAlerts(
 ): { kind: 'avviso' | 'errore'; text: string }[] {
   const alerts: { kind: 'avviso' | 'errore'; text: string }[] = [];
   for (const s of servizi) {
-    // Con l'accesso regionale (SPID o CIE) le credenziali RUPAR servono solo per il codice via email.
+    // Le credenziali di un'altra regione non si usano: nessun avviso.
+    if (s.inUso === false) continue;
+    // Con l'accesso regionale (SPID o CIE) le credenziali della regione servono solo per il codice
+    // via email.
     if (!s.impostate && !s.accessoRegionale) {
       alerts.push({
         kind: 'avviso',

@@ -41,6 +41,7 @@ import {
   type Scenario,
   type ScenarioUser,
 } from './helpers/scenario';
+import { regionalCredentials } from './helpers/regional-gateway';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
 /** Codice fiscale inventato: luogo di nascita con la X, che nessun comune ha (D12). */
@@ -916,20 +917,22 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
 
   it('codice fiscale o codice regionale del medico corretti: si chiudono le sessioni dei servizi legate', async () => {
     const doctor = s.users.collega;
+    // Il servizio della regione degli studi delle prove (D301).
+    const service = regionalCredentials();
     const sessions = () =>
       t.db
         .select({ service: serviceSession.service })
         .from(serviceSession)
         .where(eq(serviceSession.userId, doctor.id));
-    expect((await sessions()).map((x) => x.service).sort()).toEqual([
-      'rupar_piemonte',
-      'sistema_ts',
-    ]);
+    expect((await sessions()).map((x) => x.service).sort()).toEqual(
+      [service.key, 'sistema_ts'].sort(),
+    );
     // Una richiesta di accesso con SPID o CIE ancora aperta: con il codice di prima non vale più.
     const [request] = await t.db
       .insert(regionalAuthorizationRequest)
       .values({
         userId: doctor.id,
+        service: service.key,
         stateHash: `impronta-di-prova-${randomBytes(4).toString('hex')}`,
         verifierEnc: Buffer.from('cifrato-di-prova'),
         redirectUri: '/ritorno-di-prova',
@@ -950,10 +953,9 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     expect(r.statusCode, r.body).toBe(200);
     // La correzione del codice fiscale aspetta il medico (D181): le sessioni restano.
     expect(r.json().avvisi).toEqual([FISCAL_CODE_PENDING_NOTICE]);
-    expect((await sessions()).map((x) => x.service).sort()).toEqual([
-      'rupar_piemonte',
-      'sistema_ts',
-    ]);
+    expect((await sessions()).map((x) => x.service).sort()).toEqual(
+      [service.key, 'sistema_ts'].sort(),
+    );
     expect((await adminLog()).at(-1)).toMatchObject({
       azione: 'modifica',
       utente: doctor.username,
@@ -972,7 +974,7 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     expect(ok.statusCode, ok.body).toBe(200);
     expect(ok.json().avvisi).toEqual([
       'Codice fiscale aggiornato: da adesso è questo, anche per i servizi.',
-      'Codice fiscale del medico cambiato: chiuse le sue sessioni Sistema TS e RUPAR Piemonte. Il medico le riattiva da «Credenziali dei servizi».',
+      `Codice fiscale del medico cambiato: chiuse le sue sessioni Sistema TS e ${service.name}. Il medico le riattiva da «Credenziali dei servizi».`,
     ]);
     expect(ok.json()).toMatchObject({
       codiceFiscale: medico().codiceFiscale,
@@ -994,17 +996,19 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
         ),
       );
     const detail = 'codice fiscale corretto dall’amministratore, confermato dal medico';
-    expect(events.map((e) => [e.service, e.detail, e.workstation]).sort()).toEqual([
-      ['rupar_piemonte', detail, 'postazione-collega'],
-      ['sistema_ts', detail, 'postazione-collega'],
-    ]);
+    expect(events.map((e) => [e.service, e.detail, e.workstation]).sort()).toEqual(
+      [
+        [service.key, detail, 'postazione-collega'],
+        ['sistema_ts', detail, 'postazione-collega'],
+      ].sort(),
+    );
     expect((await adminLog()).at(-1)).toMatchObject({
       area: 'profilo',
       azione: 'conferma_codice_fiscale',
       utente: doctor.username,
       campi: ['medico.codiceFiscale'],
       propostaDa: s.users.amministratore.username,
-      sessioniServiziChiuse: ['sistema_ts', 'rupar_piemonte'],
+      sessioniServiziChiuse: ['sistema_ts', service.key],
     });
     // Il medico le vede chiuse, e le riattiva lui.
     const status = (await req(cookies.collega, 'GET', '/api/profilo/credenziali')).json();
@@ -1013,11 +1017,11 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     );
 
     // Solo il codice regionale: si chiude la sessione regionale; quella del Sistema TS resta.
-    for (const service of ['sistema_ts', 'rupar_piemonte'] as const)
+    for (const key of ['sistema_ts', service.key])
       await storeSession(t.db, s.encryptionKey, {
         userId: doctor.id,
-        service,
-        token: `sessione-di-prova-${service}`,
+        service: key,
+        token: `sessione-di-prova-${key}`,
         validUntil: new Date(s.clock.now().getTime() + 3_600_000),
       });
     const regional = await req(cookies.amministratore, 'PATCH', `/api/studio/utenti/${doctor.id}`, {
@@ -1025,7 +1029,7 @@ describe('conferma dei titolari e poteri dell’amministratore (tappa 14)', () =
     });
     expect(regional.statusCode, regional.body).toBe(200);
     expect(regional.json().avvisi).toEqual([
-      'Codice regionale del medico cambiato: chiusa la sua sessione RUPAR Piemonte. Il medico la riattiva da «Credenziali dei servizi».',
+      `Codice regionale del medico cambiato: chiusa la sua sessione ${service.name}. Il medico la riattiva da «Credenziali dei servizi».`,
     ]);
     expect((await sessions()).map((x) => x.service)).toEqual(['sistema_ts']);
     // Un altro dato del medico, l'azienda sanitaria, non chiude nulla.

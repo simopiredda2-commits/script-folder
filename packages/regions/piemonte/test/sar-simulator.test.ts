@@ -2,11 +2,10 @@ import {
   newPkceVerifier,
   pkceChallenge,
   SimulatedGateway,
-  SimulatedRegionalAuthorization,
   type PrescriptionMessage,
 } from '@mmg/integrations';
 import { describe, expect, it } from 'vitest';
-import { piemonte, SAR_TEXTS, SimulatedSar } from '..';
+import { piemonte, SAR_TEXTS, SimulatedSar, SimulatedSirpedAccess } from '..';
 
 /** Una ricetta inventata: il simulatore guarda le credenziali e l'NRE, non il contenuto. */
 const message: PrescriptionMessage = {
@@ -19,8 +18,20 @@ const message: PrescriptionMessage = {
 };
 
 describe('SAR simulato: le credenziali della Regione (REL-STC-01 V08; D266, D300)', () => {
+  it('credenziali e PIN mancanti come li rifiuta il SAR (specifiche per i prescrittori, 3.1.1 e 4; D301)', async () => {
+    const sar = new SimulatedSar();
+    expect(await sar.send(message, { username: 'u', password: '', pin: '1' })).toMatchObject({
+      outcome: 'rejected',
+      code: 'CREDENZIALI',
+      message: 'Credenziali invalide (from client)',
+    });
+    expect(
+      await sar.send(message, { username: 'u', password: 'p', sessionId: 's', software: 'G_301' }),
+    ).toMatchObject({ outcome: 'rejected', code: 'EA01', message: 'Inserire il PinCode' });
+  });
+
   it('accetta il token al posto di utente, password e PIN; revocato, rifiuta', async () => {
-    const oauth = new SimulatedRegionalAuthorization();
+    const oauth = new SimulatedSirpedAccess();
     const sar = new SimulatedSar({ oauth });
     const verifier = newPkceVerifier();
     const code = oauth.approve({

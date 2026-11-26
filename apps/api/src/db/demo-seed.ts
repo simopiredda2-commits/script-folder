@@ -18,6 +18,7 @@ import { ageAt, generatePatients, Random } from '@mmg/fixtures';
 import { eq, inArray } from 'drizzle-orm';
 import { grantPeriod } from '../admin/archive-service';
 import { insertEntry } from '../clinical/entries';
+import { regionalCredentialsFor } from '../credentials/registry';
 import { storeCredentials } from '../credentials/service';
 import { startOfStudioDay } from '../http/today-routes';
 import { insertHistorical } from '../prescriptions/historical';
@@ -249,23 +250,37 @@ export async function seedDemo(db: Database, options: DemoSeedOptions): Promise<
       placeCode: 'X001',
     }),
   });
-  // Credenziali dei servizi inventate (D100): i simulatori ne controllano solo la forma. La
-  // password RUPAR del medico risulta cambiata 80 giorni fa, per mostrare l'avviso di scadenza.
+  // Credenziali dei servizi inventate (D100): i simulatori ne controllano solo la forma. Quelle
+  // del servizio della regione dello studio (D301) risultano cambiate 80 giorni fa, per mostrare
+  // l'avviso di scadenza dove la password scade.
   const daysAgo = (n: number) => studioDate(new Date(Date.now() - n * 86_400_000));
-  for (const [username, ruparChangedOn] of [
+  const regionalService = regionalCredentialsFor(st!.regionName);
+  for (const [username, regionalChangedOn] of [
     ['medico', daysAgo(80)],
     ['sostituto', daysAgo(0)],
   ] as const) {
-    for (const service of ['sistema_ts', 'rupar_piemonte'] as const) {
+    const services = [
+      { key: 'sistema_ts', prefix: 'TS', changedOn: daysAgo(0) },
+      ...(regionalService
+        ? [
+            {
+              key: regionalService.key,
+              prefix: regionalService.slug.toUpperCase(),
+              changedOn: regionalChangedOn,
+            },
+          ]
+        : []),
+    ];
+    for (const service of services) {
       await storeCredentials(db, options.encryptionKey, {
         userId: users.get(username)!,
-        service,
+        service: service.key,
         secret: {
-          username: `${service === 'sistema_ts' ? 'TS' : 'RUPAR'}-DEMO-${username.toUpperCase()}`,
+          username: `${service.prefix}-DEMO-${username.toUpperCase()}`,
           password: randomBytes(12).toString('base64url'),
           pin: String(randomBytes(2).readUInt16BE() % 10_000).padStart(4, '0'),
         },
-        passwordChangedOn: service === 'rupar_piemonte' ? ruparChangedOn : daysAgo(0),
+        passwordChangedOn: service.changedOn,
       });
     }
   }

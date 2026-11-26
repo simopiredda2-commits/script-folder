@@ -60,9 +60,11 @@ describe('pagina Oggi: avvisi dei servizi (D100–D102)', () => {
     stubFetch({
       servizi: [
         {
-          servizio: 'rupar',
-          nome: 'RUPAR Piemonte',
-          uso: 'Ricette SSN al SAR della Regione Piemonte',
+          // Il servizio di una regione inventata (D301).
+          servizio: 'srp',
+          nome: 'SRP Regione inventata',
+          uso: 'Ricette SSN al servizio della regione inventata',
+          inUso: true,
           impostate: true,
           utente: '…ABC',
           passwordCambiataIl: '2026-08-20',
@@ -77,6 +79,7 @@ describe('pagina Oggi: avvisi dei servizi (D100–D102)', () => {
           servizio: 'sistema-ts',
           nome: 'Sistema TS',
           uso: 'Certificati di malattia INPS e ricetta bianca elettronica',
+          inUso: true,
           impostate: false,
           utente: null,
           passwordCambiataIl: null,
@@ -87,16 +90,32 @@ describe('pagina Oggi: avvisi dei servizi (D100–D102)', () => {
           sessione: { attiva: false, scadeIl: null },
           ambiente: 'simulator',
         },
+        {
+          // Le credenziali di un'altra regione, rimaste da cancellare: nessun avviso (D301).
+          servizio: 'altro',
+          nome: 'Servizio di un’altra regione',
+          uso: 'Prove',
+          inUso: false,
+          impostate: true,
+          utente: '…XYZ',
+          passwordCambiataIl: '2020-01-01',
+          scadenzaPassword: '2020-04-01',
+          statoPassword: 'scaduta',
+          aggiornateIl: null,
+          secondoFattore: false,
+          sessione: { attiva: false, scadeIl: null },
+          ambiente: null,
+        },
       ],
     });
     render(<App />);
     await screen.findByRole('heading', { name: 'Servizi' });
     expect(
-      screen.getByText('La password RUPAR Piemonte scade a breve: cambiala per tempo.'),
+      screen.getByText('La password SRP Regione inventata scade a breve: cambiala per tempo.'),
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Codice di sessione RUPAR Piemonte non attivo: serve per mandare le ricette.',
+        'Codice di sessione SRP Regione inventata non attivo: serve per mandare le ricette.',
       ),
     ).toBeTruthy();
     // Sigle e nomi propri restano maiuscoli (audit D259).
@@ -105,5 +124,7 @@ describe('pagina Oggi: avvisi dei servizi (D100–D102)', () => {
         'Mancano le credenziali Sistema TS (certificati di malattia INPS e ricetta bianca elettronica).',
       ),
     ).toBeTruthy();
+    // Le credenziali di un'altra regione non danno avvisi, nemmeno con la password scaduta.
+    expect(screen.queryByText(/Servizio di un’altra regione/)).toBeNull();
   });
 });

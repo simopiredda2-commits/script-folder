@@ -2,9 +2,18 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { buildFiscalCode, type Role } from '@mmg/domain';
 import { generatePatients } from '@mmg/fixtures';
 import { SimulatedSecondFactor } from '@mmg/integrations';
+import {
+  regionalCredentialRuntime,
+  regionalCredentials,
+  regionalSecondFactor,
+} from './regional-gateway';
 import type { FastifyInstance } from 'fastify';
 import { buildApp, type AppDeps } from '../../src/app';
-import { storeCredentials, storeSession } from '../../src/credentials/service';
+import {
+  createCredentialService,
+  storeCredentials,
+  storeSession,
+} from '../../src/credentials/service';
 import { studioDate } from '../../src/prescriptions/rules-check';
 import type { Database } from '../../src/db/client';
 import {
@@ -100,6 +109,7 @@ export async function createScenario(
     | 'secondFactor'
     | 'sickLeaveGateway'
     | 'regional'
+    | 'regionalCredentials'
     | 'fse'
     | 'loginSources'
     | 'aura'
@@ -123,9 +133,10 @@ export async function createScenario(
 ): Promise<Scenario> {
   const clock = new Clock(appOptions.clockAt);
   const encryptionKey = randomBytes(32);
+  // Il secondo fattore del Sistema TS e quello della regione degli studi, dal suo pacchetto (D301).
   const secondFactor = appOptions.secondFactor ?? {
     sistema_ts: new SimulatedSecondFactor('sistema_ts', { now: clock.now }),
-    rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now: clock.now }),
+    regional: regionalSecondFactor(clock.now),
   };
   const [st] = await db
     .insert(studio)
@@ -217,7 +228,10 @@ export async function createScenario(
     [users.collega, doctorCf('Serra', 'Paolo', 'M')],
     [users.sostituto, doctorCf('Fiore', 'Marco', 'M')],
   ] as const) {
-    for (const service of ['sistema_ts', 'rupar_piemonte'] as const) {
+    for (const [service, gw] of [
+      ['sistema_ts', secondFactor.sistema_ts],
+      [regionalCredentials().key, secondFactor.regional],
+    ] as const) {
       await storeCredentials(db, encryptionKey, {
         userId: who.id,
         service,
@@ -235,7 +249,6 @@ export async function createScenario(
         token,
         validUntil: sessionUntil,
       });
-      const gw = secondFactor[service];
       if (gw instanceof SimulatedSecondFactor) gw.register(token, cf, sessionUntil);
     }
   }
@@ -482,4 +495,23 @@ export async function login(s: Scenario, who: keyof Scenario['users']): Promise<
   const cookie = done.cookies.find((c) => c.name === 'sessione');
   if (!cookie) throw new Error('Cookie di sessione mancante');
   return `sessione=${cookie.value}`;
+}
+
+/**
+ * Il servizio delle credenziali con le scelte dello scenario, fuori dalle rotte: il secondo
+ * fattore del Sistema TS e quello della regione degli studi delle prove (D301).
+ */
+export function credentialServiceOf(s: Scenario) {
+  const regional = s.secondFactor.regional;
+  return createCredentialService({
+    db: s.db,
+    encryptionKey: s.encryptionKey,
+    now: s.clock.now,
+    nationalSecondFactor: s.secondFactor.sistema_ts!,
+    regional: [
+      regionalCredentialRuntime({
+        secondFactor: regional instanceof SimulatedSecondFactor ? regional : null,
+      }),
+    ],
+  });
 }

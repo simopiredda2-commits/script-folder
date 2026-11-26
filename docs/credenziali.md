@@ -2,6 +2,8 @@
 
 Per mandare ricette e certificati, il medico usa le proprie credenziali presso i servizi pubblici. Il programma le conserva cifrate e le usa solo per gli invii del medico a cui appartengono. Decisioni D100–D103; fonti lette il 18/11/2026.
 
+Dove sta nel programma (D301): il nucleo ha il Sistema TS e il contratto delle credenziali della regione (`RegionalCredentials`); che cosa sono la RUPAR, il suo secondo fattore, l'accesso con SPID o CIE della V08 e il codice del gestionale lo dice il pacchetto del Piemonte (`packages/regions/piemonte/integrations/`: `rupar.ts`, `gestionale.ts`, `sirped-access.ts`). La pagina mostra il Sistema TS e il servizio della regione dello studio; le credenziali di un'altra regione restano solo per poterle cancellare, e non si mandano mai al servizio di un'altra regione.
+
 ## Quali credenziali, per che cosa
 
 | Servizio       | Che cosa serve                                    | A che cosa                                        | Fonte                                                                                     |
@@ -41,7 +43,7 @@ Per le ricette, oltre a utente, password e PIN serve un codice di sessione («Id
    - il token è stato rilasciato per il programma (`aud` uguale al `client_id` della richiesta, anche se nel frattempo l'ASL del medico è cambiata) e non è già scaduto.
 4. Il token si conserva cifrato. La scadenza è il campo `exp` del token, non `expires_in`: la V08 descrive `expires_in` come «Unix time», ma nell'esempio vale 7199, una durata (4.3.2, D265). Non si rinnova: alla scadenza si rientra.
 5. Le ricette SSN, i loro annullamenti e lo stato di erogazione usano il token nell'intestazione `X-OAuth2-Authorization: Bearer`, senza l'autenticazione Basic, con `<pinCode>` vuoto e nessun altro dato di autenticazione (V08, 4.3.6). Utente, password e PIN RUPAR non servono per questi invii. Servono invece per il lotto di NRE e per la ricetta rossa in modalità DPCM: lì la V06 vuole «esclusivamente» le credenziali RUPAR (3.1.1). Un medico che entra solo con SPID o CIE, senza credenziali RUPAR salvate, firma finché ha numeri di ricetta; al lotto successivo la firma si ferma e il messaggio dice di inserirle (D269).
-6. «Esci dall’accesso regionale» revoca il token (`DELETE /sessionid/revoke`, V08, 4.3.5), con il `client_id` che lo ha chiesto: è nel token, in `aud`. Se per la Regione il token era già scaduto, revocato o sconosciuto (risposta 401), si chiude solo qui e si annota.
+6. «Esci dall’accesso regionale» revoca il token (`DELETE /sessionid/revoke`, V08, 4.3.5), con il `client_id` che lo ha chiesto, scritto con la sessione (D301). Se per la Regione il token era già scaduto, revocato o sconosciuto (risposta 401), si chiude solo qui e si annota. Una sessione aperta prima della migrazione 0062 non ha il `client_id`: si chiude solo qui.
 
 ### Codice del gestionale e codice ASL (D266, D267)
 
