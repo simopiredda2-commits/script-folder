@@ -1,0 +1,16 @@
+{
+  "name": "@mmg/regions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "inventario": "tsx scripts/inventario.ts"
+  },
+  "dependencies": {
+    "@mmg/domain": "workspace:*"
+  }
+}
