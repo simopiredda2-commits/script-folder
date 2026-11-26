@@ -44,6 +44,9 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
   - il confronto con la qualificazione della cartella in Lombardia (`docs/lombardia.md`), di cui il contratto delle integrazioni tiene conto (sezione «Lombardia»);
   - la risposta di Sogei sui certificati (`docs/fse.md`);
   - i moduli del CDA2 e del Gateway separati dal resto, per dichiarare equivalenti i rilasci che non li toccano. Adesso il pezzo seguente dello spostamento.
+- **26/11/2026, unione della #48**: pull request #48 unita (commit `9e71eaa`), con il via dato in anticipo e le 14 prove su GitHub verdi: il Fascicolo regionale nel pacchetto, le chiamate di contesto e i certificati del Gateway per regione (D297, D298). Dimostrazione alla versione 35. Il branch riparte da `main`; adesso il pezzo seguente dello spostamento, il SAR. Lo stesso giorno, la domanda di Simone su due PDF del SIAP:
+  - l'allegato A01 dell'AP26_003 era già registrato, con la stessa impronta;
+  - il disciplinare regionale del SIAP (D.D. 570/2025) no: è registrato con la DGR 26-1618/2025 e la D.D. 340/2026, e confrontato in `docs/siap.md`. Per noi è il flusso delle ASR; nel programma non cambia niente prima della risposta del CSI (D299, domanda 12).
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -2134,11 +2137,18 @@ _Fascicolo_
 _SIRPED e SIAP_ (domande di Simone del 25/11/2026)
 
 11. **Autocertificazione SIRPED di una società appena costituita.** Una società appena costituita, con il programma pronto ma ancora senza medici che lo usano, può avviare l'autocertificazione SIRPED, o serve già un primo medico?
-12. **SIAP per un fornitore che arriva dopo l'AP26_003** (D277):
+12. **SIAP per un fornitore che arriva dopo l'AP26_003** (D277, D299):
     - come ottiene le specifiche aggiornate (formato del JSON, servizi REST, certificati del canale), l'ambiente di prova e il collaudo?
     - nel DataSet 3 vale la versione delle specifiche AP26_003, con data e progressivo del contatto, o quella del Ministero (1.3), che li ha tolti?
     - il progressivo del contatto conta i contatti dell'assistito nella giornata, come nel disciplinare tecnico e nell'AP26_003, o è il codice della struttura con il numero di accettazione, come nel Ministero (1.3)?
     - la quantità erogata, che il disciplinare (§6.3) e il Ministero hanno nel contatto, si manda anche al CSI, che nel DataSet 2 non la chiede?
+    - il disciplinare regionale del SIAP (D.D. 570/2025, prima versione, tre tracciati XML) vale solo per le ASR, o anche per le cartelle (D299)? C'è una versione più nuova, con i valori ammessi e i controlli che il §3.2 rimanda alle «schede»?
+    - se vale anche per le cartelle:
+      - il dettaglio della prestazione sta in un carattere, ma i dettagli del Ministero arrivano a 47;
+      - AFT in 8 caratteri e UCCP in 3 (il Ministero 6, codici STS.11), codice del medico in 20 (il Ministero 10);
+      - il tipo di struttura «Studio medico MMG/PLS», che il Ministero non ha;
+      - cittadinanza e stato civile, che il programma non ha: dalla cartella o da AURA?
+      - il termine del 15 del mese successivo vale anche per la cartella?
 
 _Fascicolo con i servizi della Regione_ (D280, 26/11/2026)
 

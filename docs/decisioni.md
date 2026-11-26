@@ -2729,3 +2729,15 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Certificati di test**: Sogei li dà solo a fornitori già costituiti in società. Arriveranno dopo la costituzione di SCRIPT, con le due CSR mandate per email come in it-fse-support. La fase 1 dell'accreditamento si prepara in locale e il Gateway di prova non si chiama (regola 7). Quando arrivano i certificati c'è una fermata, e Simone decide se fare un'eccezione per gli ambienti di test.
 - **Prova**: `apps/api/test/gateway-per-regione.test.ts`, con due regioni dall'elenco nazionale e certificati diversi, e una regione senza certificati. Il Gateway simulato guarda con quale certificato arriva ogni richiesta.
 - **Non fatto**: l'organizzazione dei token (`subject_organization_id`) viene ancora dalle impostazioni del Fascicolo dello studio. Va confrontata con la regione dello studio e con i casi della fase 1.
+
+**D299 · Il disciplinare regionale del SIAP (D.D. 570/2025) è il flusso delle ASR; la cartella segue l'AP26_003 (domanda di Simone del 26/11/2026).** Simone ha chiesto se due PDF del SIAP erano già lavorati. L'allegato A01 dell'AP26_003 sì, con la stessa impronta (`docs/provenienze.md`). La D.D. 570/2025 no: approva la prima versione del disciplinare tecnico regionale, con tre tracciati XML (`docs/siap.md`, «Il disciplinare regionale del Piemonte»).
+
+- **Lettura**: la DGR 26-1618/2025 fa del SIAP un obbligo informativo delle ASR, e il disciplinare regionale ne descrive i record. La cartella manda i suoi dati al CSI come dice l'AP26_003, con le API REST e i messaggi JSON.
+  - **Scelta: nel programma non si cambia niente prima della risposta del CSI** (domanda 12). Il modulo di invio si fa con le specifiche del CSI, nel pacchetto del Piemonte.
+  - **Motivo**: la prima versione non ha i valori ammessi, che il §3.2 rimanda a schede che nel documento non ci sono. In più non torna con il Ministero su lunghezze e conteggi: dettaglio della prestazione in un carattere, AFT e UCCP, progressivo per assistito e per medico. Costruire su questa versione vorrebbe dire scegliere valori che non abbiamo.
+- **Che cosa cambierebbe se valesse il regionale anche per la cartella**:
+  - i due progressivi, per assistito e per medico nello studio, al posto di quello dello studio;
+  - cittadinanza e stato civile, che il programma non ha;
+  - i codici ISTAT dei comuni di nascita, residenza e domicilio;
+  - il termine del 15 del mese.
+- **Non fatto**: la versione elettronica su Sistema Piemonte, che da qui non si apre.
