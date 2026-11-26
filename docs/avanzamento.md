@@ -47,6 +47,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **26/11/2026, unione della #48**: pull request #48 unita (commit `9e71eaa`), con il via dato in anticipo e le 14 prove su GitHub verdi: il Fascicolo regionale nel pacchetto, le chiamate di contesto e i certificati del Gateway per regione (D297, D298). Dimostrazione alla versione 35. Il branch riparte da `main`; adesso il pezzo seguente dello spostamento, il SAR. Lo stesso giorno, la domanda di Simone su due PDF del SIAP:
   - l'allegato A01 dell'AP26_003 era già registrato, con la stessa impronta;
   - il disciplinare regionale del SIAP (D.D. 570/2025) no: è registrato con la DGR 26-1618/2025 e la D.D. 340/2026, e confrontato in `docs/siap.md`. Per noi è il flusso delle ASR; nel programma non cambia niente prima della risposta del CSI (D299, domanda 12).
+- **26/11/2026, unione della #49**: pull request #49 unita (commit `bd67c62`), con il via dato in anticipo e le 14 prove su GitHub verdi: la ricetta SSN della regione come contratto nazionale e il SAR nel pacchetto del Piemonte (D300), con il disciplinare regionale del SIAP (D299). Dimostrazione alla versione 36, con 35 prove su 35 nel browser con Chromium. Il branch riparte da `main`; adesso il pezzo seguente dello spostamento: l'accesso con SPID o CIE della Regione, il codice del gestionale e le credenziali RUPAR.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
