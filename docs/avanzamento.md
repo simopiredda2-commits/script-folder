@@ -1694,7 +1694,7 @@ Poi il Fascicolo con il PSS secondo la guida v1.5 (seconda pull request, D268). 
 
 ## Dopo l'unione della #40 – Il Fascicolo con i servizi della Regione (26/11/2026, D280)
 
-Pull request #40 unita il 26/11/2026 con il via dato in anticipo (D275); il branch riparte da `main`. Secondo passo dell'ordine concordato (D268): la pubblicazione del Profilo con i servizi della Regione, poi il Profilo allineato alla guida v1.5. Pull request #41 unita lo stesso giorno (commit `f3007b9`): le prove su GitHub tutte verdi. Nel giro del push la dimostrazione con WebKit si era fermata al tempo massimo mentre il server di GitHub installava i pacchetti di Ubuntu, prima delle prove: rilanciata una volta, verde in 7 minuti, come nel giro della pull request.
+Pull request #40 unita il 26/11/2026 con il via dato in anticipo (D275); il branch riparte da `main`. Secondo passo dell'ordine concordato (D268): la pubblicazione del Profilo con i servizi della Regione, poi il Profilo allineato alla guida v1.5. Pull request #41 unita lo stesso giorno (commit `f3007b9`): le prove su GitHub tutte verdi. Nel giro del push la dimostrazione con WebKit si era fermata al tempo massimo mentre il server di GitHub installava i pacchetti di Ubuntu, prima delle prove: rilanciata una volta, verde in 7 minuti, come nel giro della pull request. Dimostrazione ripubblicata nello stesso indirizzo, versione 29 (https://claude.ai/artifact/Md4KFYrVagjLdnNewSMzCQ): le 34 prove nel browser verdi con Chromium in locale, WebKit e Firefox nella CI.
 
 **Fatto** (D280):
 
