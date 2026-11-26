@@ -1,17 +1,18 @@
 import {
-  REGIONAL_NOTHING_TO_DELETE,
-  REGIONAL_REGIMES,
+  FSE_ADMINISTRATIVE_REQUESTS,
+  regimeOf,
   type RegionalAuthor,
   type RegionalFailure,
-  type RegionalFseClient,
+  type RegionalFsePublication,
   type RegionalOutcomeResult,
   type RegionalPssMetadata,
-  type RegionalRegime,
+  type RegionalPublicationPolicy,
   type RegionalSearchResult,
   type RegionalSendResult,
+  type RegionalSubmitResult,
+  type ServiceAuth,
 } from '@mmg/integrations';
 import { and, asc, desc, eq, inArray, isNull, lt, lte, or } from 'drizzle-orm';
-import type { ServiceAuth } from '@mmg/integrations';
 import type { createCredentialService } from '../credentials/service';
 import type { Database } from '../db/client';
 import {
@@ -26,37 +27,48 @@ import {
 } from '../db/schema';
 import { withActor } from '../db/tx';
 import { HttpError } from '../http/errors';
+import type { RegionalChoice } from '../regions/integrations';
+import { studioRegion } from '../regions/region';
 import { unrefTimer } from '../timers';
 
 /**
- * Coda degli invii al Fascicolo regionale (D280), con le politiche della Regione per chi manda
- * messaggi al Fascicolo (FSE-INT-SRS-01-V02):
- * - niente invii dalle 00:00 alle 07:00, quando il Fascicolo è fermo per manutenzione (3.2);
- * - in ordine di emissione, un messaggio alla volta, almeno 3 secondi fra due invii (3.1, 3.5, 4.3);
- * - tempo scaduto, risposta senza un esito positivo esplicito, FSE_ER_000 o errori di sistema di
- *   INI: si rimanda dopo almeno 5 minuti, fino a tre volte a 5 minuti; poi un tentativo al giorno
- *   per dieci giorni, dalle 07:00 alle 00:00; poi si segnala al supporto del CSI (4.1, 4.2);
- * - gli altri errori: si rimanda solo dopo la correzione (2.1, 4.1); il medico chiede di
- *   rimandare il singolo messaggio quando vuole (3.3);
- * - invii sospesi dall'amministratore, per esempio su richiesta del supporto del CSI (3.4, 4.5);
- * - ogni messaggio e ogni risposta nel registro degli invii, senza credenziali (3.6, 4.4).
+ * Coda degli invii al Fascicolo della regione dello studio del medico (D280, D297), con le
+ * politiche di invio che la regione dà nel suo pacchetto (`RegionalPublicationPolicy`):
+ * - niente invii nel fermo notturno del Fascicolo della regione, se ce n'è uno;
+ * - in ordine di emissione, un messaggio alla volta, con l'intervallo della regione fra due invii;
+ * - tempo scaduto, risposta senza un esito positivo, errori di sistema: si rimanda, prima con le
+ *   ripetizioni ravvicinate della regione, poi un tentativo al giorno per i giorni che dice; poi il
+ *   messaggio va segnalato a chi la regione indica;
+ * - gli altri errori: si rimanda solo dopo la correzione; il medico chiede di rimandare il singolo
+ *   messaggio quando vuole («Riprova»);
+ * - invii sospesi dall'amministratore, per esempio su richiesta del supporto della regione;
+ * - ogni messaggio e ogni risposta nel registro degli invii, senza credenziali.
+ * Una regione senza la pubblicazione nel suo pacchetto non ne riceve: il messaggio resta da
+ * correggere, con il motivo.
  */
 
-export const RETRY_DELAY_MS = 5 * 60_000;
-/** Tentativi a 5 minuti dopo il primo invio fallito (4.1). */
-export const RETRIES = 3;
-/** Giorni della coda dei messaggi falliti, un tentativo al giorno (4.2). */
-export const FALLBACK_DAYS = 10;
-/** Fra due messaggi, negli invii in serie (4.3). */
-export const MIN_INTERVAL_MS = 3000;
-/** Il Fascicolo è fermo dalle 00 alle 07 (3.2). */
-export const QUIET_UNTIL_HOUR = 7;
-/** Le credenziali RUPAR del medico, senza secondo fattore (V09, 3.2.1). */
+/** Le credenziali del medico per i servizi della regione, senza secondo fattore (D280). */
 export const REGIONAL_USE = 'profilo_sanitario' as const;
 /** Quanto a lungo un giro tiene un messaggio prima che un altro giro lo possa riprendere. */
 export const LEASE_MS = 5 * 60_000;
 
 const DAY_MS = 86_400_000;
+
+/** Quando la regione dello studio non ha, nel programma, la pubblicazione nel suo Fascicolo (D297). */
+export const NO_REGIONAL_FSE_PUBLICATION =
+  'La regione dello studio non ha ancora, nel programma, la pubblicazione del Profilo nel suo Fascicolo';
+
+/** I regimi ammessi: quelli della regione; senza pubblicazione, quelli del Gateway (tabella 63). */
+export const regimesOf = (publication: RegionalFsePublication | null) =>
+  publication?.regimes ?? FSE_ADMINISTRATIVE_REQUESTS;
+
+/** I regimi in breve, per i messaggi: «SSN, ricovero, privato…». */
+export function regimeList(regimes: Readonly<Record<string, string>>): string {
+  return Object.values(regimes)
+    .map((name) => name.replace(/^Regime (?:di )?/, ''))
+    .map((n) => (n === n.toUpperCase() ? n : n.charAt(0).toLowerCase() + n.slice(1)))
+    .join(', ');
+}
 
 /** Ora, minuti e data nel fuso di Roma. */
 function romeParts(d: Date) {
@@ -87,22 +99,22 @@ function romeParts(d: Date) {
   };
 }
 
-/** Fra le 00 e le 07 di Roma il Fascicolo regionale non riceve. */
-export const inQuietHours = (d: Date) => romeParts(d).hour < QUIET_UNTIL_HOUR;
+/** Dalla mezzanotte all'ora `untilHour` di Roma il Fascicolo della regione non riceve. */
+export const inQuietHours = (d: Date, untilHour: number | null) =>
+  untilHour !== null && romeParts(d).hour < untilHour;
 
-/** Le 07:00 di Roma del giorno (di Roma) di `d`. */
-export function romeSeven(d: Date): Date {
+/** L'ora `hour`, in punto, di Roma del giorno (di Roma) di `d`. */
+export function romeHour(d: Date, hour: number): Date {
   const r = romeParts(d);
-  const guess = Date.UTC(r.year, r.month - 1, r.day, QUIET_UNTIL_HOUR) - r.offsetMinutes * 60_000;
-  // Al cambio d'ora l'offset delle 07 può essere diverso da quello di `d`.
+  const guess = Date.UTC(r.year, r.month - 1, r.day, hour) - r.offsetMinutes * 60_000;
+  // Al cambio d'ora l'offset di quell'ora può essere diverso da quello di `d`.
   const at = romeParts(new Date(guess));
-  return new Date(
-    Date.UTC(r.year, r.month - 1, r.day, QUIET_UNTIL_HOUR) - at.offsetMinutes * 60_000,
-  );
+  return new Date(Date.UTC(r.year, r.month - 1, r.day, hour) - at.offsetMinutes * 60_000);
 }
 
-/** Il primo momento utile da `d`: se cade fra le 00 e le 07 di Roma, le 07. */
-export const outsideQuietHours = (d: Date) => (inQuietHours(d) ? romeSeven(d) : d);
+/** Il primo momento utile da `d`: se cade nel fermo notturno, la sua fine. */
+export const outsideQuietHours = (d: Date, untilHour: number | null) =>
+  untilHour !== null && inQuietHours(d, untilHour) ? romeHour(d, untilHour) : d;
 
 export interface RetryState {
   attempts: number;
@@ -111,24 +123,25 @@ export interface RetryState {
 }
 
 /**
- * Dopo un tentativo fallito che si può ripetere (4.1, 4.2): il primo invio e tre ripetizioni a 5
- * minuti, poi dieci tentativi, uno al giorno, poi «failed».
+ * Dopo un tentativo fallito che si può ripetere: il primo invio e le ripetizioni ravvicinate della
+ * regione, poi un tentativo al giorno per i giorni che dice, poi «failed».
  */
 export function nextAttempt(
   s: RetryState,
   now: Date,
-  usable: (d: Date) => Date = outsideQuietHours,
+  policy: RegionalPublicationPolicy,
+  usable: (d: Date) => Date = (d) => outsideQuietHours(d, policy.quietUntilHour),
 ):
   | { attempts: number; phase: 'ripetizione' | 'coda'; queuedSince: Date | null; at: Date }
   | 'failed' {
   if (s.phase !== 'coda') {
     const attempts = s.attempts + 1;
-    if (attempts <= RETRIES)
+    if (attempts <= policy.retries)
       return {
         attempts,
         phase: 'ripetizione',
         queuedSince: null,
-        at: usable(new Date(now.getTime() + RETRY_DELAY_MS)),
+        at: usable(new Date(now.getTime() + policy.retryDelayMs)),
       };
     return {
       attempts: 0,
@@ -138,7 +151,7 @@ export function nextAttempt(
     };
   }
   const attempts = s.attempts + 1;
-  if (attempts >= FALLBACK_DAYS) return 'failed';
+  if (attempts >= policy.fallbackDays) return 'failed';
   return {
     attempts,
     phase: 'coda',
@@ -150,7 +163,7 @@ export function nextAttempt(
 /** Con «ELAB» si richiede l'esito: dopo 1 minuto, poi 2, 3… fino a un'ora. */
 export const elabDelayMs = (polls: number) => Math.min(Math.max(polls, 1), 60) * 60_000;
 
-/** Che cosa dire del fallimento, con i codici della Regione. */
+/** Che cosa dire del fallimento, con i codici del servizio della regione. */
 export function describeFailure(r: RegionalFailure): string {
   if (r.outcome !== 'rejected') return r.message;
   const parts = r.errors.map((e) => `${e.code}: ${e.message}`.trim()).filter(Boolean);
@@ -162,50 +175,36 @@ type Tx = Parameters<Parameters<typeof withActor>[2]>[0];
 
 export interface RegionalQueueDeps {
   db: Database;
-  client: RegionalFseClient;
+  /** La pubblicazione nel Fascicolo della regione dello studio del medico (D297). */
+  publication: RegionalChoice<RegionalFsePublication>;
   credentials: Pick<ReturnType<typeof createCredentialService>, 'authFor' | 'authRefused'>;
   now: () => Date;
-  /** Per difetto 3 secondi con il servizio vero, niente con il simulatore. */
+  /** Per difetto quello della regione con il servizio vero, niente con il simulatore. */
   minIntervalMs?: number;
   /**
-   * Il fermo dalle 00 alle 07 è del Fascicolo vero: per difetto vale con il servizio vero, non con
-   * il simulatore (che non si ferma). Le prove lo accendono per provarlo con un'ora fissata.
+   * Il fermo notturno è del Fascicolo vero: per difetto vale con il servizio vero, non con il
+   * simulatore (che non si ferma). Le prove lo accendono per provarlo con un'ora fissata.
    */
   quietHours?: boolean;
   log?: (message: string, err: unknown) => void;
 }
 
-/** Il medico autore, per i servizi della V09; i problemi da correggere prima dell'invio. */
-export function regionalAuthorIssues(d: {
-  fiscalCode?: string | null;
-  firstName?: string | null;
-  lastName?: string | null;
-  aslCode?: string | null;
-}): string[] {
-  const out: string[] = [];
-  if (!d.aslCode || !/^\d{3}$/.test(d.aslCode))
-    out.push(
-      'Medico: manca il codice ASL nel profilo (tre cifre): il Fascicolo regionale lo vuole con il codice della regione (IstituzioneAutore)',
-    );
-  if (!d.fiscalCode || !d.firstName || !d.lastName)
-    out.push('Medico: mancano codice fiscale, nome o cognome nel profilo');
-  return out;
-}
-
-/** Il regime per la Regione: un codice della tabella dei regimi della V09. */
-export const regionalRegimeOf = (v: string | null | undefined): RegionalRegime | null =>
-  v && Object.hasOwn(REGIONAL_REGIMES, v) ? (v as RegionalRegime) : null;
+/** Chi può leggere: il database o una transazione aperta. */
+type Reader = Pick<Database, 'select'>;
 
 export type RegionalQueue = ReturnType<typeof createRegionalQueue>;
 
 export function createRegionalQueue(deps: RegionalQueueDeps) {
-  const { db, client, now } = deps;
-  const simulated = client.environment === 'simulator';
-  const minInterval = deps.minIntervalMs ?? (simulated ? 0 : MIN_INTERVAL_MS);
-  const quiet = deps.quietHours ?? !simulated;
-  /** Fuori dal fermo notturno, se il fermo vale. */
-  const usable = (d: Date) => (quiet ? outsideQuietHours(d) : d);
-  let lastSent = -Infinity;
+  const { db, now } = deps;
+  const simulated = (p: RegionalFsePublication) => p.environment === 'simulator';
+  /** L'ora di fine del fermo notturno della regione, se il fermo vale; null se non vale. */
+  const quietOf = (p: RegionalFsePublication) =>
+    (deps.quietHours ?? !simulated(p)) ? p.policy.quietUntilHour : null;
+  /** Fuori dal fermo notturno della regione, se il fermo vale. */
+  const usable = (p: RegionalFsePublication | null, d: Date) =>
+    p ? outsideQuietHours(d, quietOf(p)) : d;
+  /** L'ultimo invio a ogni servizio della regione, per l'intervallo fra due messaggi. */
+  const lastSent = new Map<RegionalFsePublication, number>();
   let running: Promise<void> | null = null;
   let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -282,6 +281,15 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
     });
   }
 
+  /** La pubblicazione della regione dello studio del medico, o null se la regione non ce l'ha. */
+  async function publicationOfDoctor(q: Reader, userId: string) {
+    const [u] = await q
+      .select({ studioId: appUser.studioId })
+      .from(appUser)
+      .where(eq(appUser.id, userId));
+    return u ? deps.publication.for(await studioRegion(q, u.studioId)) : null;
+  }
+
   /** Da correggere: si rimanda solo con «Riprova», dopo la correzione. */
   async function toFix(row: SendRow, message: string, errors: unknown = null) {
     await update(row.id, {
@@ -292,8 +300,8 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
     });
   }
 
-  /** Un fallimento: si ripete secondo le politiche, o si corregge. */
-  async function failed(row: SendRow, r: RegionalFailure) {
+  /** Un fallimento: si ripete secondo le politiche della regione, o si corregge. */
+  async function failed(row: SendRow, r: RegionalFailure, publication: RegionalFsePublication) {
     const message = describeFailure(r);
     if (r.outcome === 'rejected' && !r.retryable) {
       if (r.authProblem)
@@ -306,17 +314,17 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       return toFix(
         row,
         r.authProblem
-          ? `${message}. Controlla utente, password e PIN RUPAR in «Credenziali dei servizi», poi «Riprova»`
+          ? `${message}. ${publication.texts.credentialsRefused}, poi «Riprova»`
           : message,
         r.errors,
       );
     }
-    const next = nextAttempt(row, now(), usable);
+    const next = nextAttempt(row, now(), publication.policy, (d) => usable(publication, d));
     if (next === 'failed')
       return update(row.id, {
         status: 'failed',
         lastAttemptAt: now(),
-        lastError: `${message}. Dopo dieci giorni di tentativi il messaggio non è arrivato: va segnalato al supporto del Fascicolo del CSI Piemonte (supporto.fse@csi.it) con data e ora dell'invio, codice fiscale dell'assistito, tipo di messaggio e documento`,
+        lastError: `${message}. Dopo ${publication.policy.fallbackDays} giorni di tentativi il messaggio non è arrivato: va segnalato ${publication.texts.reportTo} con data e ora dell'invio, codice fiscale dell'assistito, tipo di messaggio e documento`,
         errors: r.outcome === 'rejected' ? r.errors : null,
       });
     await update(row.id, {
@@ -343,17 +351,18 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       .leftJoin(doctorProfile, eq(doctorProfile.userId, appUser.id))
       .where(eq(appUser.id, row.doctorUserId));
     const [s] = await db.select().from(fseSetting).where(eq(fseSetting.studioId, u!.studioId));
+    const publication = deps.publication.for(await studioRegion(db, u!.studioId));
     const p = u?.p;
-    const issues = regionalAuthorIssues({
-      fiscalCode: p?.fiscalCode,
-      firstName: p?.firstName,
-      lastName: p?.lastName,
-      aslCode: p?.aslCode,
-    });
-    const regime = regionalRegimeOf(s?.administrativeRequest);
-    if (!regime)
+    const issues: string[] = [];
+    if (!publication) issues.push(NO_REGIONAL_FSE_PUBLICATION);
+    // Che cosa vuole la regione dal medico autore (per esempio il codice dell'ASL).
+    else issues.push(...publication.authorIssues({ aslCode: p?.aslCode ?? '' }));
+    if (!p?.fiscalCode || !p.firstName || !p.lastName)
+      issues.push('Medico: mancano codice fiscale, nome o cognome nel profilo');
+    const regime = publication ? regimeOf(publication, s?.administrativeRequest) : null;
+    if (publication && !regime)
       issues.push(
-        'Impostazioni del Fascicolo: il regime va scelto fra quelli della Regione (SSN, SSR, ricovero, privato, donatori)',
+        `Impostazioni del Fascicolo: il regime va scelto fra quelli della Regione (${regimeList(publication.regimes)})`,
       );
     const author: RegionalAuthor = {
       fiscalCode: p?.fiscalCode ?? '',
@@ -366,42 +375,48 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       patientFiscalCode: pt!.fiscalCode,
       author,
       settings: s,
-      regime: regime ?? 'SSN',
+      regime: regime ?? '',
+      publication,
       issues,
       suspended: s?.regionalSendingSuspended ?? false,
     };
   }
 
-  async function authOf(userId: string): Promise<ServiceAuth | { error: string }> {
+  async function authOf(
+    userId: string,
+    publication: RegionalFsePublication,
+  ): Promise<ServiceAuth | { error: string }> {
     try {
       return await deps.credentials.authFor(userId, REGIONAL_USE);
     } catch (err) {
       if (err instanceof HttpError)
-        return {
-          error: `${err.message}. Per il Fascicolo regionale servono utente, password e PIN RUPAR del medico (V09, 3.2.1): inseriscili in «Credenziali dei servizi», poi «Riprova»`,
-        };
+        return { error: `${err.message}. ${publication.texts.credentialsMissing}, poi «Riprova»` };
       throw err;
     }
   }
 
-  /** Al più un messaggio ogni 3 secondi (4.3). */
-  async function pace() {
-    const wait = lastSent + minInterval - Date.now();
+  /** Fra due messaggi allo stesso servizio, almeno l'intervallo della regione. */
+  async function pace(publication: RegionalFsePublication) {
+    const interval =
+      deps.minIntervalMs ?? (simulated(publication) ? 0 : publication.policy.minIntervalMs);
+    const wait = (lastSent.get(publication) ?? -Infinity) + interval - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastSent = Date.now();
+    lastSent.set(publication, Date.now());
   }
 
   async function step(candidate: SendRow) {
     const t = now();
-    if (quiet && inQuietHours(t)) {
-      // Fino alle 07 non parte niente; la riga di un giro ancora in corso resta sua.
+    const ctx = await contextOf(candidate);
+    const quiet = ctx.publication ? quietOf(ctx.publication) : null;
+    if (quiet !== null && inQuietHours(t, quiet)) {
+      // Fino alla fine del fermo non parte niente; la riga di un giro ancora in corso resta sua.
       await db
         .update(fseRegionalSend)
-        .set({ nextAttemptAt: romeSeven(t) })
+        .set({ nextAttemptAt: romeHour(t, quiet) })
         .where(and(eq(fseRegionalSend.id, candidate.id), free(t)));
       return;
     }
-    // In ordine: un messaggio aspetta quelli fatti prima per lo stesso documento (3.1).
+    // In ordine: un messaggio aspetta quelli fatti prima per lo stesso documento.
     const [earlier] = await db
       .select({ id: fseRegionalSend.id })
       .from(fseRegionalSend)
@@ -414,12 +429,12 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       )
       .limit(1);
     if (earlier) return;
-    const ctx = await contextOf(candidate);
     if (ctx.suspended) return;
     const row = await claim(candidate);
     if (!row) return;
-    if (ctx.issues.length) return toFix(row, ctx.issues.join('. '));
-    const auth = await authOf(row.doctorUserId);
+    const publication = ctx.publication;
+    if (ctx.issues.length || !publication) return toFix(row, ctx.issues.join('. '));
+    const auth = await authOf(row.doctorUserId, publication);
     if ('error' in auth) return toFix(row, auth.error);
     const metadata = (confidentiality: 'N' | 'V'): RegionalPssMetadata => ({
       patientFiscalCode: ctx.patientFiscalCode,
@@ -428,10 +443,10 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       regime: ctx.regime,
       signed: true,
     });
-    if (row.status === 'waiting') return poll(row, ctx, auth);
+    if (row.status === 'waiting') return poll(row, ctx, publication, auth);
     if (row.operation === 'update') {
-      await pace();
-      const r = await client.update(
+      await pace(publication);
+      const r = await publication.update(
         {
           author: ctx.author,
           metadata: metadata(row.confidentiality === 'V' ? 'V' : 'N'),
@@ -440,7 +455,7 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
         auth,
       );
       await record(row, 'regional_update', r, null, null);
-      if (r.outcome !== 'accepted') return failed(row, r);
+      if (r.outcome !== 'accepted') return failed(row, r, publication);
       await withActor(db, row.doctorUserId, async (tx) => {
         await updateIn(tx, row.id, {
           status: 'done',
@@ -457,8 +472,8 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       return;
     }
     if (row.operation === 'delete') {
-      await pace();
-      const r = await client.remove(
+      await pace(publication);
+      const r = await publication.remove(
         {
           author: ctx.author,
           patientFiscalCode: ctx.patientFiscalCode,
@@ -467,12 +482,10 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
         auth,
       );
       await record(row, 'regional_delete', r, null, null);
-      // «Nessun metadato trovato da cancellare» dopo un tentativo senza risposta: è già cancellato.
+      // Niente da cancellare dopo un tentativo senza risposta: è già cancellato.
       const gone =
-        r.outcome === 'rejected' &&
-        row.lastAttemptAt !== null &&
-        r.errors.some((e) => e.code === REGIONAL_NOTHING_TO_DELETE);
-      if (r.outcome !== 'accepted' && !gone) return failed(row, r);
+        r.outcome === 'rejected' && row.lastAttemptAt !== null && r.nothingToDelete === true;
+      if (r.outcome !== 'accepted' && !gone) return failed(row, r, publication);
       await withActor(db, row.doctorUserId, async (tx) => {
         await updateIn(tx, row.id, {
           status: 'done',
@@ -503,14 +516,14 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       workflowInstanceId: ctx.doc.workflowInstanceId ?? '',
       locality: ctx.settings?.locality ?? '',
     };
-    let r;
+    let r: RegionalSubmitResult;
     if (row.operation === 'replace') {
       const [previous] = await db
         .select()
         .from(pssDocument)
         .where(eq(pssDocument.id, ctx.doc.replacesId!));
-      await pace();
-      const found = await client.search(
+      await pace(publication);
+      const found = await publication.search(
         {
           author: ctx.author,
           patientFiscalCode: ctx.patientFiscalCode,
@@ -524,40 +537,27 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       if (found.outcome === 'not-found')
         return toFix(
           row,
-          `La versione precedente del Profilo (${previous!.regionalOid}) non risulta nel Fascicolo regionale, e senza di lei la sostituzione non si può fare: va segnalato al supporto del Fascicolo del CSI Piemonte (supporto.fse@csi.it); dopo la loro risposta, «Riprova»`,
+          `La versione precedente del Profilo (${previous!.regionalOid}) non risulta nel Fascicolo regionale, e senza di lei la sostituzione non si può fare: va segnalato ${publication.texts.reportTo}; dopo la loro risposta, «Riprova»`,
           found.warnings,
         );
-      if (found.outcome !== 'found') return failed(row, found);
-      await pace();
-      r = await client.replace({ ...part, target: found.uuid }, auth);
+      if (found.outcome !== 'found') return failed(row, found, publication);
+      await pace(publication);
+      r = await publication.replace({ ...part, target: found.uuid }, auth);
       await record(row, 'regional_replace', r, signed.sha256, document.byteLength);
     } else {
-      await pace();
-      r = await client.create(part, auth);
+      await pace(publication);
+      r = await publication.create(part, auth);
       await record(row, 'regional_create', r, signed.sha256, document.byteLength);
     }
-    if (r.outcome !== 'accepted') return failed(row, r);
-    if (!r.temporaryId)
-      return failed(row, {
-        outcome: 'rejected',
-        esito: r.esito,
-        errors: [
-          {
-            code: 'FSE_ER_000',
-            message: 'Presa in carico senza identificativo temporaneo',
-            kind: 'Bloccante',
-            source: 'programma',
-          },
-        ],
-        retryable: true,
-      });
+    if (r.outcome !== 'accepted') return failed(row, r, publication);
+    const temporaryId = r.temporaryId;
     const accepted = now();
     await withActor(db, row.doctorUserId, async (tx) => {
       await updateIn(tx, row.id, {
         status: 'waiting',
         // L'esito si chiede subito, in questo giro: la riga resta sua.
         leaseUntil: new Date(accepted.getTime() + LEASE_MS),
-        temporaryId: r.temporaryId,
+        temporaryId,
         acceptedAt: accepted,
         attempts: 0,
         phase: 'ripetizione',
@@ -574,14 +574,19 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
         .where(and(eq(pssDocument.id, row.documentId), eq(pssDocument.status, 'signed')));
     });
     const [fresh] = await db.select().from(fseRegionalSend).where(eq(fseRegionalSend.id, row.id));
-    return poll(fresh!, ctx, auth);
+    return poll(fresh!, ctx, publication, auth);
   }
 
-  /** L'esito del caricamento (V09, 5.4): OK con l'OID, KO con la motivazione, ELAB. */
-  async function poll(row: SendRow, ctx: Awaited<ReturnType<typeof contextOf>>, auth: ServiceAuth) {
+  /** L'esito della pubblicazione: OK con l'OID, KO con la motivazione, ancora in elaborazione. */
+  async function poll(
+    row: SendRow,
+    ctx: Awaited<ReturnType<typeof contextOf>>,
+    publication: RegionalFsePublication,
+    auth: ServiceAuth,
+  ) {
     const accepted = row.acceptedAt ?? row.createdAt;
-    await pace();
-    const r = await client.outcome(
+    await pace(publication);
+    const r = await publication.outcome(
       {
         author: ctx.author,
         temporaryId: row.temporaryId!,
@@ -591,22 +596,22 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       auth,
     );
     await record(row, 'regional_outcome', r, null, null);
-    if (r.outcome !== 'checked') return failed(row, r);
+    if (r.outcome !== 'checked') return failed(row, r, publication);
     if (r.state === 'ELAB') {
       const polls = row.polls + 1;
-      if (now().getTime() - accepted.getTime() > FALLBACK_DAYS * DAY_MS)
+      const days = publication.policy.fallbackDays;
+      if (now().getTime() - accepted.getTime() > days * DAY_MS)
         return update(row.id, {
           status: 'failed',
           polls,
           lastAttemptAt: now(),
-          lastError:
-            'Dopo dieci giorni il Fascicolo regionale dice ancora «in elaborazione»: va segnalato al supporto del Fascicolo del CSI Piemonte (supporto.fse@csi.it)',
+          lastError: `Dopo ${days} giorni il Fascicolo regionale dice ancora «in elaborazione»: va segnalato ${publication.texts.reportTo}`,
         });
       return update(row.id, {
         polls,
         lastAttemptAt: now(),
         lastError: null,
-        nextAttemptAt: usable(new Date(now().getTime() + elabDelayMs(polls))),
+        nextAttemptAt: usable(publication, new Date(now().getTime() + elabDelayMs(polls))),
       });
     }
     if (r.state === 'KO') {
@@ -637,20 +642,6 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       });
       return;
     }
-    if (!r.oid)
-      return failed(row, {
-        outcome: 'rejected',
-        esito: '',
-        errors: [
-          {
-            code: 'FSE_ER_000',
-            message: 'Esito «OK» senza OID',
-            kind: 'Bloccante',
-            source: 'programma',
-          },
-        ],
-        retryable: true,
-      });
     const at = now();
     await withActor(db, row.doctorUserId, async (tx) => {
       await updateIn(tx, row.id, {
@@ -711,7 +702,7 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
      * difetto: nessuno in coda o in attesa dell'esito); altrimenti null. Il documento resta
      * bloccato fino alla fine della transazione: due richieste insieme non mettono in coda due
      * messaggi. Il messaggio viene sempre dopo quelli già fatti per lo stesso documento, anche con
-     * l'orologio fermo: l'ordine di invio (3.1) e l'ultimo messaggio si leggono dall'ora di creazione.
+     * l'orologio fermo: l'ordine di invio e l'ultimo messaggio si leggono dall'ora di creazione.
      */
     async enqueue(
       tx: Tx,
@@ -741,14 +732,16 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
         last && last.createdAt.getTime() >= at.getTime()
           ? new Date(last.createdAt.getTime() + 1)
           : at;
+      const publication = await publicationOfDoctor(tx, v.doctorUserId);
       const [row] = await tx
         .insert(fseRegionalSend)
-        .values({ ...v, nextAttemptAt: usable(at), createdAt })
+        .values({ ...v, nextAttemptAt: usable(publication, at), createdAt })
         .returning();
       return row!;
     },
-    /** «Riprova» del medico (3.3): da capo, oppure l'esito di nuovo se era già preso in carico. */
+    /** «Riprova» del medico: da capo, oppure l'esito di nuovo se era già preso in carico. */
     async retry(tx: Tx, row: SendRow) {
+      const publication = await publicationOfDoctor(tx, row.doctorUserId);
       await tx
         .update(fseRegionalSend)
         .set({
@@ -759,9 +752,13 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
           attempts: 0,
           phase: 'ripetizione',
           queuedSince: null,
-          nextAttemptAt: usable(now()),
+          nextAttemptAt: usable(publication, now()),
         })
         .where(eq(fseRegionalSend.id, row.id));
+    },
+    /** La pubblicazione della regione di uno studio (D297), o null se la regione non ce l'ha. */
+    async publicationOfStudio(studioId: string) {
+      return deps.publication.for(await studioRegion(db, studioId));
     },
     /** Lavora subito i messaggi del documento (dopo il giro in corso, se c'è). */
     async process(documentId: string) {

@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon';
 import { PrintHint } from '../components/PrintHint';
 import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
+import { counted, retryMinutes, type RegionalPolicy } from '../lib/regional-policy';
 import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
@@ -70,7 +71,7 @@ interface Pss {
   /** OID del documento nel Fascicolo regionale. */
   identificativoFascicolo?: string | null;
   oscurato?: boolean;
-  /** Il Profilo l'ha scritto chi guarda: solo lui lo oscura o lo cancella (V09, 5.1 e 5.3). */
+  /** Il Profilo l'ha scritto chi guarda: solo lui lo oscura o lo cancella. */
   mio?: boolean;
   fascicolo?: RegionalSend | null;
 }
@@ -81,6 +82,8 @@ interface Overview {
   puoFirmare: boolean;
   /** Invii al Fascicolo regionale sospesi dall'amministratore. */
   inviiSospesi?: { dal: string | null; motivo: string | null } | null;
+  /** Le politiche di invio della regione dello studio (D297). */
+  politiche?: RegionalPolicy | null;
 }
 
 const OPERATIONS: Record<RegionalSend['operazione'], string> = {
@@ -143,9 +146,11 @@ function outcome(p: Pss): string {
 function RegionalStatus({
   send,
   suspended,
+  policy,
 }: {
   send: RegionalSend | null | undefined;
   suspended: Overview['inviiSospesi'];
+  policy: Overview['politiche'];
 }) {
   if (!send || send.stato === 'done' || send.stato === 'cancelled') return null;
   const what = OPERATIONS[send.operazione];
@@ -178,8 +183,11 @@ function RegionalStatus({
       {send.tentativi > 0 && send.ultimoErrore && (
         <p>
           Tentativi falliti: {send.tentativi}
-          {send.fase === 'coda' ? ', ora uno al giorno per dieci giorni' : ', ogni 5 minuti'}.
-          Ultimo errore: {send.ultimoErrore}
+          {policy &&
+            (send.fase === 'coda'
+              ? `, ora uno al giorno per ${counted(policy.fallbackDays, 'giorno', 'giorni')}`
+              : `, ogni ${retryMinutes(policy)}`)}
+          . Ultimo errore: {send.ultimoErrore}
         </p>
       )}
       {suspended && (
@@ -424,7 +432,11 @@ export function HealthProfilePage() {
                 Preso in carico dal Fascicolo regionale il {dateTime(open.inviatoIl)}: è pubblicato
                 quando la Regione conferma il caricamento e dà l’identificativo del documento.
               </p>
-              <RegionalStatus send={open.fascicolo} suspended={o!.inviiSospesi} />
+              <RegionalStatus
+                send={open.fascicolo}
+                suspended={o!.inviiSospesi}
+                policy={o!.politiche}
+              />
               {o!.puoFirmare && (
                 <button
                   type="button"
@@ -450,7 +462,11 @@ export function HealthProfilePage() {
                   : `Firmato il ${dateTime(open.firmatoIl)}: il Fascicolo regionale non l’ha ancora preso in carico.`}
               </p>
               {open.stato === 'signed' && (
-                <RegionalStatus send={open.fascicolo} suspended={o!.inviiSospesi} />
+                <RegionalStatus
+                  send={open.fascicolo}
+                  suspended={o!.inviiSospesi}
+                  policy={o!.politiche}
+                />
               )}
               <a
                 className="pulsante pulsante-piatto"
@@ -545,7 +561,11 @@ export function HealthProfilePage() {
                     </>
                   )}
                 </p>
-                <RegionalStatus send={v.fascicolo} suspended={o.inviiSospesi} />
+                <RegionalStatus
+                  send={v.fascicolo}
+                  suspended={o.inviiSospesi}
+                  policy={o.politiche}
+                />
                 <div className="azioni-profilo">
                   <a
                     className="pulsante pulsante-piatto"

@@ -8,7 +8,10 @@ import { archive, studio } from '../db/schema';
  * di prescrizione portano le aggiunte della regione (D296) e il servizio sceglie le integrazioni
  * della regione (D297). Null se la regione dello studio non ha un pacchetto o non si riconosce.
  */
-export async function studioRegion(db: Database, studioId: string): Promise<string | null> {
+export async function studioRegion(
+  db: Pick<Database, 'select'>,
+  studioId: string,
+): Promise<string | null> {
   const [place] = await db
     .select({ regionName: studio.regionName })
     .from(studio)

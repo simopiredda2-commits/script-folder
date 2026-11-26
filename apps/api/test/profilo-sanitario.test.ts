@@ -11,7 +11,6 @@ import {
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { archiveGrant, fseTransmission, patient, pssDocument, therapy } from '../src/db/schema';
-import { simulatedRegionalClient } from '../src/app';
 import { withActor } from '../src/db/tx';
 import { studioDate } from '../src/prescriptions/rules-check';
 import { createScenario, login, type Scenario } from './helpers/scenario';
@@ -57,7 +56,8 @@ describe('Profilo Sanitario Sintetico nel Fascicolo (tappa 11)', () => {
           gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Prova'), now),
           audience: SIMULATED_FSE_AUDIENCE,
           signer: new SimulatedDocumentSigner({ now }),
-          regional: simulatedRegionalClient(simulator, now),
+          // Il Fascicolo della regione dello studio, simulato, pubblica su questo Gateway (D297).
+          simulator,
         },
       },
     );

@@ -4,6 +4,7 @@ import { ErrorMessage, Loading, Notice, PageHeader } from '../components/common'
 import { Icon } from '../components/Icon';
 import { api, ApiError } from '../lib/api';
 import { dateTime } from '../lib/format';
+import { policyText, type RegionalPolicy } from '../lib/regional-policy';
 import { useSession } from '../lib/session';
 import { toolsSectionsFor } from '../lib/tools-sections';
 import { useApi } from '../lib/useApi';
@@ -40,7 +41,7 @@ interface Settings {
   struttura: string | null;
   tipologiaStruttura: string;
   assettoOrganizzativo: string;
-  /** Fissata dalla Regione per il PSS (V09): «ERP». */
+  /** Fissata dalla regione dello studio per il PSS (D297). */
   attivitaClinica: string | null;
   regime: string | null;
 }
@@ -48,7 +49,11 @@ interface FseSettings {
   impostazioni: Settings | null;
   daCompletare: string[];
   valori: { regime: Option[] };
-  /** Invii al Fascicolo regionale sospesi dall'amministratore (FSE-INT-SRS-01-V02, 3.4). */
+  /** L'attività clinica che la regione dello studio fissa per il Profilo (D297). */
+  attivitaClinica?: { codice: string; nome: string } | null;
+  /** Le politiche di invio della regione dello studio; null senza la sua pubblicazione. */
+  politiche?: RegionalPolicy | null;
+  /** Invii al Fascicolo regionale sospesi dall'amministratore. */
   inviiSospesi: { dal: string | null; motivo: string | null } | null;
   puoModificare: boolean;
 }
@@ -150,9 +155,9 @@ function FseSection() {
 }
 
 /**
- * Sospendere gli invii al Fascicolo regionale, per esempio su richiesta del supporto del CSI: i
- * messaggi restano in coda e partono alla ripresa (FSE-INT-SRS-01-V02, 3.4 e 4.5). Solo
- * l'amministratore; ogni cambio resta nel registro delle azioni di amministrazione.
+ * Sospendere gli invii al Fascicolo regionale, per esempio su richiesta del supporto della regione:
+ * i messaggi restano in coda e partono alla ripresa. Solo l'amministratore; ogni cambio resta nel
+ * registro delle azioni di amministrazione. Le politiche di invio sono della regione (D297).
  */
 function FseSendingPanel({ data, onChanged }: { data: FseSettings; onChanged: () => void }) {
   const [reason, setReason] = useState('');
@@ -186,10 +191,15 @@ function FseSendingPanel({ data, onChanged }: { data: FseSettings; onChanged: ()
           {suspended.motivo ? `: ${suspended.motivo}` : ''}. I Profili restano in coda e partono
           alla ripresa.
         </Notice>
+      ) : data.politiche ? (
+        <p>
+          Il programma manda i Profili al Fascicolo regionale, con le regole della Regione:{' '}
+          {policyText(data.politiche)}.
+        </p>
       ) : (
         <p>
-          Il programma manda i Profili al Fascicolo regionale, con le regole della Regione: niente
-          invii dalle 00 alle 07, tre tentativi a 5 minuti e poi uno al giorno per dieci giorni.
+          La regione dello studio non ha ancora, nel programma, la pubblicazione del Profilo nel suo
+          Fascicolo.
         </p>
       )}
       {data.puoModificare && (
@@ -203,7 +213,9 @@ function FseSendingPanel({ data, onChanged }: { data: FseSettings; onChanged: ()
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
-              <p className="aiuto">Per esempio: richiesta del supporto del Fascicolo del CSI.</p>
+              <p className="aiuto">
+                Per esempio: richiesta del supporto del Fascicolo della regione.
+              </p>
             </div>
           )}
           <div className="azioni">
@@ -344,8 +356,13 @@ function FseSettingsForm({
         <div>
           <dt>Organizzazione</dt>
           <dd>
-            <span className="codice">{s?.organizzazione.codice ?? '010'}</span>{' '}
-            {s?.organizzazione.nome ?? 'Regione Piemonte'}
+            {s ? (
+              <>
+                <span className="codice">{s.organizzazione.codice}</span> {s.organizzazione.nome}
+              </>
+            ) : (
+              'Da impostare'
+            )}
           </dd>
         </div>
         <div>
@@ -359,8 +376,14 @@ function FseSettingsForm({
         <div>
           <dt>Tipo di attività clinica</dt>
           <dd>
-            <span className="codice">ERP</span> Erogazione Prestazione Prenotata, come vuole la
-            Regione per il Profilo
+            {data.attivitaClinica ? (
+              <>
+                <span className="codice">{data.attivitaClinica.codice}</span>{' '}
+                {data.attivitaClinica.nome}, come vuole la Regione per il Profilo
+              </>
+            ) : (
+              'Senza la pubblicazione della regione dello studio'
+            )}
           </dd>
         </div>
       </dl>
@@ -400,9 +423,7 @@ function FseSettingsForm({
           })}
         </div>
         <div className="campi-in-riga">{select('regime', 'Regime', data.valori.regime)}</div>
-        <p className="aiuto">
-          I regimi della Regione Piemonte (specifiche del Fascicolo regionale per le cartelle, V09).
-        </p>
+        <p className="aiuto">I regimi che il Fascicolo della regione dello studio ammette.</p>
       </fieldset>
       {!readOnly && (
         <div className="azioni">

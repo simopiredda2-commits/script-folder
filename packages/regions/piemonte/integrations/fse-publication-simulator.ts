@@ -14,9 +14,16 @@
 import { constants, privateDecrypt, randomUUID } from 'node:crypto';
 import { DOMParser, type Element } from '@xmldom/xmldom';
 import * as xpathLib from 'xpath';
-import { FseGatewayClient, type FseCaller, type FseResult } from './gateway';
-import { SIMULATED_FSE_AUDIENCE, type SimulatedFseGateway } from './gateway-simulator';
-import { extractCda } from './pdf';
+import {
+  createTestCertificate,
+  extractCda,
+  FseGatewayClient,
+  SIMULATED_FSE_AUDIENCE,
+  type FseCaller,
+  type FseResult,
+  type SimulatedFseGateway,
+  type TestCertificate,
+} from '@mmg/integrations';
 import {
   documentHash,
   REGIONAL_FAILED,
@@ -25,14 +32,16 @@ import {
   REGIONAL_OK,
   REGIONAL_OK_WITH_WARNINGS,
   REGIONAL_REGIMES,
+  RegionalFseClient,
   V09,
   V09_NAMESPACES,
+  V09FsePublication,
+  type RegionalApplication,
   type RegionalFseService,
   type RegionalFseTransport,
   type RegionalSoapRequest,
   type RegionalSoapResponse,
-} from './regional-publication';
-import { createTestCertificate, type TestCertificate } from './x509';
+} from './fse-publication';
 
 export type SimulatedRegionalOutcome =
   'ok' | 'unreachable' | 'timeout' | 'system-error' | 'no-esito';
@@ -794,4 +803,22 @@ export class SimulatedRegionalFse implements RegionalFseTransport {
     d.deleted = true;
     return this.answer(service, 'DELETE', { esito: REGIONAL_OK, errors: [] });
   }
+}
+
+/**
+ * La pubblicazione simulata, pronta per la coda del programma (D297): il simulatore della Regione
+ * sul Gateway nazionale simulato, il cliente con il certificato per cifrare il PIN, le politiche di
+ * invio della Regione.
+ */
+export function simulatedFsePublication(
+  options: SimulatedRegionalFseOptions & { application: RegionalApplication },
+): V09FsePublication {
+  const { application, ...rest } = options;
+  const regional = new SimulatedRegionalFse(rest);
+  return new V09FsePublication(
+    new RegionalFseClient(regional, {
+      encryptionCertificate: regional.encryptionCertificate,
+      application,
+    }),
+  );
 }

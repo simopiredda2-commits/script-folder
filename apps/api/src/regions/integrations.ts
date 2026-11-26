@@ -1,4 +1,8 @@
-import type { RegionalFseAccess } from '@mmg/integrations';
+import type {
+  RegionalFseAccess,
+  RegionalFsePublication,
+  SimulatedFseGateway,
+} from '@mmg/integrations';
 import { REGIONAL_PACKAGES, type RegionalPackage } from '@mmg/regions';
 
 /**
@@ -42,3 +46,18 @@ export const fseAccessChoice = (
   options: { now?: () => Date } = {},
   packages?: readonly RegionalPackage[],
 ) => regionalChoice((pkg) => pkg.integrations?.fseAccess?.(options) ?? null, override, packages);
+
+/**
+ * La pubblicazione del Profilo nel Fascicolo della regione (D280): il simulatore del pacchetto, che
+ * pubblica sul Gateway nazionale simulato su cui il programma valida.
+ */
+export const fsePublicationChoice = (
+  override: RegionalFsePublication | undefined,
+  options: {
+    now?: () => Date;
+    gateway: SimulatedFseGateway;
+    application: { id: string; vendor: string; version: string };
+  },
+  packages?: readonly RegionalPackage[],
+) =>
+  regionalChoice((pkg) => pkg.integrations?.fsePublication?.(options) ?? null, override, packages);

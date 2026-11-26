@@ -1,4 +1,8 @@
-import type { RegionalFseAccess } from '@mmg/integrations';
+import type {
+  RegionalFseAccess,
+  RegionalFsePublication,
+  SimulatedFseGateway,
+} from '@mmg/integrations';
 
 /**
  * Pacchetti regionali (D288, D292): ciò che è legato a una regione sta nel pacchetto di quella
@@ -67,6 +71,16 @@ export interface AslVariant {
 export interface RegionalIntegrations {
   /** Apertura del Fascicolo della regione dalla cartella (D220): il simulatore. */
   fseAccess?: (options: { now?: () => Date }) => RegionalFseAccess;
+  /**
+   * Pubblicazione del Profilo Sanitario Sintetico nel Fascicolo della regione (D280): il
+   * simulatore, che pubblica sul Gateway nazionale simulato su cui il programma valida.
+   */
+  fsePublication?: (options: {
+    now?: () => Date;
+    gateway: SimulatedFseGateway;
+    /** Il programma che chiede: nome, fornitore e versione, come li vuole la regione. */
+    application: { id: string; vendor: string; version: string };
+  }) => RegionalFsePublication;
 }
 
 export interface RegionalPackage {

@@ -91,12 +91,10 @@ import {
   SimulatedAdditionalServicesPortal,
   type AdditionalServicesPortal,
   type RegionalFseAccess,
-  RegionalFseClient,
-  SimulatedRegionalFse,
-  type SimulatedRegionalFseOptions,
+  type RegionalFsePublication,
 } from '@mmg/integrations';
 import { createRegionalQueue, type RegionalQueue } from './fse/regional-queue';
-import { fseAccessChoice } from './regions/integrations';
+import { fseAccessChoice, fsePublicationChoice } from './regions/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
 import { ReferenceUpdates } from './reference/updates-service';
@@ -171,8 +169,16 @@ export interface AppDeps {
     gateway: FseGatewayClient;
     audience: string;
     signer: DocumentSigner;
-    /** I servizi del Fascicolo regionale (V09, D280): il simulatore, sullo stesso Gateway. */
-    regional: RegionalFseClient;
+    /**
+     * Il Gateway simulato su cui il programma valida: i simulatori del Fascicolo delle regioni vi
+     * pubblicano (D280). Senza, uno loro.
+     */
+    simulator?: SimulatedFseGateway;
+    /**
+     * La pubblicazione nel Fascicolo della regione. Per difetto quella del pacchetto della regione
+     * dello studio del medico, oggi il simulatore (D297); data qui, vale per ogni regione (le prove).
+     */
+    regional?: RegionalFsePublication;
   };
   /**
    * Coda verso il Fascicolo regionale (D280): ogni quanto lavora (per difetto un minuto; null la
@@ -561,10 +567,15 @@ export function buildApp({
     access: fseAccessChoice(fseAccess, now ? { now } : {}),
     environment: config.environment ?? 'prova',
   });
-  // Profilo Sanitario Sintetico al Fascicolo regionale (D280): la coda con le politiche di invio.
+  // Profilo Sanitario Sintetico al Fascicolo della regione dello studio (D280, D297): la coda con
+  // le politiche di invio della regione.
   const regionalQueue = createRegionalQueue({
     db,
-    client: fse.regional,
+    publication: fsePublicationChoice(fse.regional, {
+      ...(now ? { now } : {}),
+      gateway: fse.simulator ?? new SimulatedFseGateway({ now }),
+      application: FSE_APPLICATION,
+    }),
     credentials,
     now: now ?? (() => new Date()),
     ...(fseQueueOptions.minIntervalMs !== undefined
@@ -585,6 +596,7 @@ export function buildApp({
   registerFseRoutes(
     app,
     db,
+    (studioId) => regionalQueue.publicationOfStudio(studioId),
     createPssService({
       db,
       gateway: fse.gateway,
@@ -598,10 +610,17 @@ export function buildApp({
   return app;
 }
 
+/** Il programma che chiede ai servizi del Fascicolo delle regioni: nome, fornitore, versione. */
+const FSE_APPLICATION = {
+  id: PRODUCT_NAME.toUpperCase(),
+  vendor: COMPANY_BRAND,
+  version: '0.0.0',
+};
+
 /**
- * Simulatori del Gateway del Fascicolo, della firma e dei servizi del Fascicolo regionale, con i
- * certificati di prova in memoria. Il Fascicolo regionale simulato pubblica sullo stesso Gateway
- * simulato su cui il programma valida (D280).
+ * Simulatori del Gateway del Fascicolo e della firma, con i certificati di prova in memoria. Il
+ * Fascicolo della regione simulato pubblica sullo stesso Gateway simulato su cui il programma
+ * valida (D280).
  */
 function defaultFse(now?: () => Date): NonNullable<AppDeps['fse']> {
   const simulator = new SimulatedFseGateway({ now });
@@ -609,25 +628,8 @@ function defaultFse(now?: () => Date): NonNullable<AppDeps['fse']> {
     gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Programma'), now),
     audience: SIMULATED_FSE_AUDIENCE,
     signer: new SimulatedDocumentSigner({ now }),
-    regional: simulatedRegionalClient(simulator, now),
+    simulator,
   };
-}
-
-/** Il cliente dei servizi regionali sul simulatore, con il certificato di cifratura del PIN. */
-export function simulatedRegionalClient(
-  gateway: SimulatedFseGateway,
-  now?: () => Date,
-  options: Omit<SimulatedRegionalFseOptions, 'gateway' | 'now'> = {},
-): RegionalFseClient {
-  const regional = new SimulatedRegionalFse({ gateway, ...(now ? { now } : {}), ...options });
-  return new RegionalFseClient(regional, {
-    encryptionCertificate: regional.encryptionCertificate,
-    application: {
-      id: PRODUCT_NAME.toUpperCase(),
-      vendor: COMPANY_BRAND,
-      version: '0.0.0',
-    },
-  });
 }
 
 /** Simulatori del SAR e del Sistema TS che vogliono l'Id-Sessione dei rispettivi simulatori. */

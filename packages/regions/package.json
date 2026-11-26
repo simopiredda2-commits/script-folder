@@ -13,6 +13,11 @@
   },
   "dependencies": {
     "@mmg/domain": "workspace:*",
-    "@mmg/integrations": "workspace:*"
+    "@mmg/integrations": "workspace:*",
+    "@xmldom/xmldom": "0.9.12",
+    "xpath": "0.0.34"
+  },
+  "devDependencies": {
+    "pdf-lib": "1.17.1"
   }
 }

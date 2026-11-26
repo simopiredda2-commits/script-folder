@@ -204,15 +204,23 @@ describe('Profilo nel Fascicolo regionale (D280)', () => {
       inLavorazione: null,
       mancano: [],
       puoFirmare: true,
-      inviiSospesi: { dal: '2026-11-18T09:00:00Z', motivo: 'Richiesta del supporto del CSI' },
+      inviiSospesi: { dal: '2026-11-18T09:00:00Z', motivo: 'Richiesta del supporto della regione' },
+      // Le politiche della regione dello studio arrivano dal servizio (D297): qui inventate.
+      politiche: {
+        quietUntilHour: 6,
+        minIntervalMs: 1000,
+        retries: 2,
+        retryDelayMs: 4 * 60_000,
+        fallbackDays: 3,
+      },
     });
     expect(
       await screen.findByText(/Oscuramento:\s+in coda per il Fascicolo regionale/),
     ).toBeTruthy();
-    expect(screen.getByText(/Tentativi falliti: 2, ogni 5 minuti/)).toBeTruthy();
+    expect(screen.getByText(/Tentativi falliti: 2, ogni 4 minuti/)).toBeTruthy();
     expect(
       screen.getByText(
-        /sospesi dall’amministratore dello studio \(Richiesta del supporto del CSI\)/,
+        /sospesi dall’amministratore dello studio \(Richiesta del supporto della regione\)/,
       ),
     ).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Riprova adesso' })).toBeTruthy();
