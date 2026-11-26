@@ -2296,7 +2296,7 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 
 - **Documenti** (`docs/provenienze.md`, «SIAP»):
   - scaricati dal sito del CSI l'avviso e le specifiche tecniche dell'indagine AP26_003, e dalla Gazzetta il comunicato della GU n. 226 del 29/9/2025;
-  - la GU n. 202 non si scarica: la connessione si chiude a metà. Il testo del decreto è nelle specifiche del CSI;
+  - la GU n. 202 non si scarica: la connessione si chiude a metà. Il testo del decreto è nelle specifiche del CSI, e le pagine 5–9 della Gazzetta le ha mandate Simone il 26/11/2026, dalla notizia di regioni.it;
   - il comunicato dice che il disciplinare tecnico, allegato 1 del decreto, non fu stampato in Gazzetta ed è sul portale del Ministero. Quel portale da qui risponde 403. Le specifiche funzionali del SIAP (versione 1.3), bloccate allo stesso modo e lette prima come testo, le ha mandate Simone il 26/11/2026; il disciplinare va ancora chiesto;
   - con le specifiche Simone ha mandato la comunicazione FNOMCeO n. 85: riguarda il SIOC (ospedali di comunità), un altro decreto dello stesso giorno, e non serve al SIAP.
 - **Confronto** (`docs/siap.md`): campo per campo, per i tre tracciati, che cosa c'è nel programma, dove, e che cosa manca. I valori ammessi vengono dalle specifiche del Ministero, perché quelle del CSI elencano solo i nomi dei campi.
