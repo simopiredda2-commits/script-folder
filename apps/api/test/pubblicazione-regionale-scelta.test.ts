@@ -284,3 +284,88 @@ describe('la coda con le politiche e le parole della pubblicazione data (D297)',
     expect(v.attivitaClinica).toEqual({ codice: 'PHR', nome: 'Personal Health Record Update' });
   });
 });
+
+describe('la pausa fra due messaggi si conta dalla fine dello scambio di prima (D297)', () => {
+  let t: TestDatabase;
+  let s: Scenario;
+  let doctor: string;
+  let c: ReturnType<typeof client>;
+  /** Quando ogni messaggio parte davvero, dopo la sua preparazione. */
+  const sentAt: number[] = [];
+  const policy: RegionalPublicationPolicy = {
+    quietUntilHour: null,
+    minIntervalMs: 120,
+    retries: 1,
+    retryDelayMs: MINUTE,
+    fallbackDays: 1,
+  };
+  const slow: RegionalFsePublication = {
+    environment: 'test',
+    regimes: { SSN: 'Regime SSN' },
+    clinicalActivity: 'ERP',
+    policy,
+    texts: { credentialsRefused: 'prova', credentialsMissing: 'prova', reportTo: 'a nessuno' },
+    authorIssues: () => [],
+    // Il documento nuovo si prepara in 150 ms (PIN cifrato, documento), poi parte.
+    create: async () => {
+      await new Promise((r) => setTimeout(r, 150));
+      sentAt.push(Date.now());
+      return {
+        sent: '<c/>',
+        received: '<r/>',
+        outcome: 'accepted',
+        esito: 'OK',
+        warnings: [],
+        temporaryId: 'T1',
+      };
+    },
+    outcome: () => {
+      sentAt.push(Date.now());
+      return Promise.resolve({
+        sent: '<e/>',
+        received: '<r/>',
+        outcome: 'checked',
+        state: 'OK',
+        oid: '2.999.1^1',
+        warnings: [],
+      });
+    },
+    replace: () => Promise.reject(new Error('non usata')),
+    update: () => Promise.reject(new Error('non usata')),
+    remove: () => Promise.reject(new Error('non usata')),
+    search: () => Promise.reject(new Error('non usata')),
+  };
+
+  beforeAll(async () => {
+    t = await createTestDatabase();
+    const simulator = new SimulatedFseGateway();
+    s = await createScenario(
+      t.db,
+      {},
+      {
+        fse: {
+          gateway: new FseGatewayClient(simulator, simulator.issueCredentials('Prova')),
+          audience: SIMULATED_FSE_AUDIENCE,
+          signer: new SimulatedDocumentSigner(),
+          regional: slow,
+        },
+        fseQueue: { intervalMs: null },
+      },
+    );
+    doctor = await login(s, 'titolare');
+    c = client(s, () => doctor);
+  });
+  afterAll(async () => {
+    await s?.app.close();
+    await t?.drop();
+  });
+
+  it('dopo un documento lento da preparare, l’esito aspetta l’intervallo della regione', async () => {
+    const draft = await c.ok<Pss>('POST', `${c.base()}/bozza`);
+    await c.ok('POST', `${c.base()}/${draft.id}/valida`, { confermo: true });
+    const p = await c.ok<Pss>('POST', `${c.base()}/${draft.id}/firma-e-pubblica`);
+    expect(p.stato).toBe('published');
+    expect(sentAt).toHaveLength(2);
+    expect(sentAt[1]! - sentAt[0]!).toBeGreaterThanOrEqual(policy.minIntervalMs - 5);
+  });
+});

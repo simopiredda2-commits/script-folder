@@ -395,13 +395,22 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
     }
   }
 
-  /** Fra due messaggi allo stesso servizio, almeno l'intervallo della regione. */
-  async function pace(publication: RegionalFsePublication) {
+  /**
+   * Un messaggio al servizio della regione, almeno l'intervallo della regione dopo la fine dello
+   * scambio di prima. Si conta dalla fine: preparare il messaggio (PIN cifrato, documento) prende
+   * tempo, e contando da prima di prepararlo due invii potevano stare più vicini dell'intervallo
+   * (D297).
+   */
+  async function paced<T>(publication: RegionalFsePublication, call: () => Promise<T>) {
     const interval =
       deps.minIntervalMs ?? (simulated(publication) ? 0 : publication.policy.minIntervalMs);
     const wait = (lastSent.get(publication) ?? -Infinity) + interval - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastSent.set(publication, Date.now());
+    try {
+      return await call();
+    } finally {
+      lastSent.set(publication, Date.now());
+    }
   }
 
   async function step(candidate: SendRow) {
@@ -445,14 +454,15 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
     });
     if (row.status === 'waiting') return poll(row, ctx, publication, auth);
     if (row.operation === 'update') {
-      await pace(publication);
-      const r = await publication.update(
-        {
-          author: ctx.author,
-          metadata: metadata(row.confidentiality === 'V' ? 'V' : 'N'),
-          documentOid: ctx.doc.regionalOid!,
-        },
-        auth,
+      const r = await paced(publication, () =>
+        publication.update(
+          {
+            author: ctx.author,
+            metadata: metadata(row.confidentiality === 'V' ? 'V' : 'N'),
+            documentOid: ctx.doc.regionalOid!,
+          },
+          auth,
+        ),
       );
       await record(row, 'regional_update', r, null, null);
       if (r.outcome !== 'accepted') return failed(row, r, publication);
@@ -472,14 +482,15 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
       return;
     }
     if (row.operation === 'delete') {
-      await pace(publication);
-      const r = await publication.remove(
-        {
-          author: ctx.author,
-          patientFiscalCode: ctx.patientFiscalCode,
-          documentId: ctx.doc.regionalOid!,
-        },
-        auth,
+      const r = await paced(publication, () =>
+        publication.remove(
+          {
+            author: ctx.author,
+            patientFiscalCode: ctx.patientFiscalCode,
+            documentId: ctx.doc.regionalOid!,
+          },
+          auth,
+        ),
       );
       await record(row, 'regional_delete', r, null, null);
       // Niente da cancellare dopo un tentativo senza risposta: è già cancellato.
@@ -522,14 +533,15 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
         .select()
         .from(pssDocument)
         .where(eq(pssDocument.id, ctx.doc.replacesId!));
-      await pace(publication);
-      const found = await publication.search(
-        {
-          author: ctx.author,
-          patientFiscalCode: ctx.patientFiscalCode,
-          documentOid: previous!.regionalOid!,
-        },
-        auth,
+      const found = await paced(publication, () =>
+        publication.search(
+          {
+            author: ctx.author,
+            patientFiscalCode: ctx.patientFiscalCode,
+            documentOid: previous!.regionalOid!,
+          },
+          auth,
+        ),
       );
       await record(row, 'regional_search', found, null, null);
       // La versione da sostituire è pubblicata per il programma ma la Regione non la trova: non
@@ -541,12 +553,12 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
           found.warnings,
         );
       if (found.outcome !== 'found') return failed(row, found, publication);
-      await pace(publication);
-      r = await publication.replace({ ...part, target: found.uuid }, auth);
+      r = await paced(publication, () =>
+        publication.replace({ ...part, target: found.uuid }, auth),
+      );
       await record(row, 'regional_replace', r, signed.sha256, document.byteLength);
     } else {
-      await pace(publication);
-      r = await publication.create(part, auth);
+      r = await paced(publication, () => publication.create(part, auth));
       await record(row, 'regional_create', r, signed.sha256, document.byteLength);
     }
     if (r.outcome !== 'accepted') return failed(row, r, publication);
@@ -585,15 +597,16 @@ export function createRegionalQueue(deps: RegionalQueueDeps) {
     auth: ServiceAuth,
   ) {
     const accepted = row.acceptedAt ?? row.createdAt;
-    await pace(publication);
-    const r = await publication.outcome(
-      {
-        author: ctx.author,
-        temporaryId: row.temporaryId!,
-        from: new Date(accepted.getTime() - 3_600_000),
-        to: now(),
-      },
-      auth,
+    const r = await paced(publication, () =>
+      publication.outcome(
+        {
+          author: ctx.author,
+          temporaryId: row.temporaryId!,
+          from: new Date(accepted.getTime() - 3_600_000),
+          to: now(),
+        },
+        auth,
+      ),
     );
     await record(row, 'regional_outcome', r, null, null);
     if (r.outcome !== 'checked') return failed(row, r, publication);
