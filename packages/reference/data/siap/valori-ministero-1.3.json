@@ -1,0 +1,626 @@
+{
+  "tipo": "siap_valori_ammessi",
+  "atto": "Ministero della Salute, Sistema informativo per il monitoraggio dell'assistenza primaria (SIAP), «Specifiche funzionali», versione 1.3, aprile 2026: tracciati 1, 2 e 3 (§3.8.2, §3.9.2, §3.10.2) e allegati 1 e 2 (§4.1, §4.2)",
+  "versione": "1.3",
+  "sha256_origine": "80d00154fa28350d9537691255059580c7936799c7aab41255d80ada2ca76114",
+  "trascritto_da": "Claude Code, dal testo del PDF, controllato a vista sulle pagine 59-61",
+  "trascritto_il": "2026-11-26",
+  "controllato_da": null,
+  "nota": "Le descrizioni sono come nel documento, refusi compresi (per esempio «supporata», «Riamissione», «Fenulectomia»); solo le parole che il documento scrive tutte in maiuscolo (le tipologie dell'allegato 1, i valori della modalità del contatto e del regime) sono qui in minuscolo, con l'iniziale maiuscola. Il codice 13 della tipologia è «ATTIVITÀ DI INIZIATIVA» nell'allegato 1 e «attività amministrativa» nella definizione del campo (§3.9.2) e nell'allegato 2: qui vale il nome dell'allegato 2, con la nota. Il «non noto» del fumo è 9 nella definizione del campo (§3.8.2) e 3 nello schema XSD (FumoType): qui vale la definizione del campo. Le domande sono per il CSI (domanda 12). Le specifiche del CSI (AP26_003) non danno i valori: finché il CSI non dà il formato del suo JSON valgono questi. Ogni valore dei domini ha la «chiave» che il programma usa al posto del codice (per esempio «office» per 1, «In struttura/studio del medico»): il legame fra le due è qui, non nel codice.",
+  "tipologie": [
+    {
+      "codice": 0,
+      "descrizione": "Censimento",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Presa in carico iniziale paziente"
+        }
+      ]
+    },
+    {
+      "codice": 1,
+      "descrizione": "Visite",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Prima visita"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Visita di controllo"
+        },
+        {
+          "codice": 3,
+          "descrizione": "Visione esami o referti medici"
+        },
+        {
+          "codice": 4,
+          "descrizione": "Altro"
+        }
+      ]
+    },
+    {
+      "codice": 2,
+      "descrizione": "Bilanci",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Bilancio pediatrico a 60/90 gg"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Bilancio pediatrico a 180 gg"
+        },
+        {
+          "codice": 3,
+          "descrizione": "Bilancio pediatrico a 360 gg"
+        },
+        {
+          "codice": 4,
+          "descrizione": "Bilancio pediatrico a 24 mesi"
+        },
+        {
+          "codice": 5,
+          "descrizione": "Bilancio pediatrico a 3 anni"
+        },
+        {
+          "codice": 6,
+          "descrizione": "Bilancio pediatrico a 5/6 anni"
+        },
+        {
+          "codice": 7,
+          "descrizione": "Bilancio pediatrico oltre i 6 previsti dal ACN"
+        }
+      ]
+    },
+    {
+      "codice": 3,
+      "descrizione": "Terapia",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Terapia"
+        }
+      ]
+    },
+    {
+      "codice": 4,
+      "descrizione": "Monitoraggi e screening",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "HCV"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Virus interstiziale"
+        },
+        {
+          "codice": 3,
+          "descrizione": "Audiologico"
+        }
+      ]
+    },
+    {
+      "codice": 5,
+      "descrizione": "PIPP",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Cateterismo uretrale"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Fleboclisi"
+        },
+        {
+          "codice": 3,
+          "descrizione": "Iniezione di gammaglobulina o vaccinazione antitetanica"
+        },
+        {
+          "codice": 4,
+          "descrizione": "Iniezione sottocutanea desensibilizzante"
+        },
+        {
+          "codice": 5,
+          "descrizione": "Lavanda gastrica"
+        },
+        {
+          "codice": 6,
+          "descrizione": "Medicazione, prima"
+        },
+        {
+          "codice": 7,
+          "descrizione": "Medicazione, successiva"
+        },
+        {
+          "codice": 8,
+          "descrizione": "Rimozione di punti di sutura e medicazione"
+        },
+        {
+          "codice": 9,
+          "descrizione": "Sutura di ferita superficiale"
+        },
+        {
+          "codice": 10,
+          "descrizione": "Trasfusione sanguigna con assistenza del MMG"
+        },
+        {
+          "codice": 11,
+          "descrizione": "Infusione di albumina o farmaci particolari (MMG)"
+        },
+        {
+          "codice": 12,
+          "descrizione": "Tamponamento nasale anteriore"
+        },
+        {
+          "codice": 13,
+          "descrizione": "Tampone faringeo: prelievo per esame batteriologico"
+        },
+        {
+          "codice": 14,
+          "descrizione": "Vaccinazioni (come da programma prevenzione nazionale e regionale)"
+        },
+        {
+          "codice": 15,
+          "descrizione": "Rimozione tappo di cerume (PLS)"
+        },
+        {
+          "codice": 16,
+          "descrizione": "Rimozione di corpo estraneo (PLS)"
+        },
+        {
+          "codice": 17,
+          "descrizione": "Toilette di perionichia supporata (PLS)"
+        },
+        {
+          "codice": 18,
+          "descrizione": "Riduzione della pronazione dolorosa dell’ulna (PLS)"
+        },
+        {
+          "codice": 19,
+          "descrizione": "Riduzione della sublussazione articolare scapolo-omerale (PLS)"
+        },
+        {
+          "codice": 20,
+          "descrizione": "Ricerca SBEGA (PLS)"
+        },
+        {
+          "codice": 21,
+          "descrizione": "PCR (metodo quantitativo) (PLS)"
+        },
+        {
+          "codice": 22,
+          "descrizione": "Otoscopia pneumatica (PLS)"
+        },
+        {
+          "codice": 23,
+          "descrizione": "Impedenzometria (PLS)"
+        },
+        {
+          "codice": 24,
+          "descrizione": "Stick urine (PLS)"
+        },
+        {
+          "codice": 25,
+          "descrizione": "Emocromo (PLS)"
+        },
+        {
+          "codice": 26,
+          "descrizione": "Pulsiossimetria (PLS)"
+        },
+        {
+          "codice": 27,
+          "descrizione": "Glicemia (stick) (PLS)"
+        },
+        {
+          "codice": 28,
+          "descrizione": "Prick by prick con latte vaccino (PLS)"
+        },
+        {
+          "codice": 29,
+          "descrizione": "Terapia iniettoria desensibilizzante (PLS)"
+        },
+        {
+          "codice": 30,
+          "descrizione": "Asportazione di verruche (PLS)"
+        },
+        {
+          "codice": 31,
+          "descrizione": "Iniezione endovenosa (PLS)"
+        },
+        {
+          "codice": 32,
+          "descrizione": "Trattamento provvisorio di frattura o lussazione mediante immobilizzazione con materiale idoneo - piccoli segmenti (PLS)"
+        },
+        {
+          "codice": 33,
+          "descrizione": "Trattamento provvisorio di frattura o lussazione mediante immobilizzazione con materiale idoneo - grandi segmenti (PLS)"
+        },
+        {
+          "codice": 34,
+          "descrizione": "Prick Test (8 allergeni) (PLS)"
+        },
+        {
+          "codice": 35,
+          "descrizione": "Spirometria (PLS)"
+        },
+        {
+          "codice": 36,
+          "descrizione": "Ig E specifiche (pannello) (PLS)"
+        },
+        {
+          "codice": 37,
+          "descrizione": "Podoscopia (PLS)"
+        },
+        {
+          "codice": 38,
+          "descrizione": "Scoliometria (PLS)"
+        },
+        {
+          "codice": 39,
+          "descrizione": "Ciclo di fleboclisi (MMG)"
+        },
+        {
+          "codice": 40,
+          "descrizione": "Ciclo curativo di iniezioni endovenose (MMG)"
+        },
+        {
+          "codice": 41,
+          "descrizione": "Ciclo aerosol o inalazioni caldo-umide nello studio professionale del medico (MMG)"
+        },
+        {
+          "codice": 42,
+          "descrizione": "Fenulectomia linguale (PLS)"
+        },
+        {
+          "codice": 43,
+          "descrizione": "Cateterismo vescicale (PLS)"
+        },
+        {
+          "codice": 44,
+          "descrizione": "Drenaggio di ascesso sottocutaneo (PLS)"
+        },
+        {
+          "codice": 45,
+          "descrizione": "Boel test (PLS)"
+        },
+        {
+          "codice": 46,
+          "descrizione": "Screening per l’ambliopia (PLS)"
+        },
+        {
+          "codice": 47,
+          "descrizione": "Altro"
+        }
+      ]
+    },
+    {
+      "codice": 6,
+      "descrizione": "Certificati",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Malattia"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Incapacità temporanea al lavoro"
+        },
+        {
+          "codice": 3,
+          "descrizione": "Idoneità svolgimento attività sportive non agonistiche"
+        },
+        {
+          "codice": 4,
+          "descrizione": "Riammissione a scuola"
+        },
+        {
+          "codice": 5,
+          "descrizione": "Riamissione al lavoro alimentaristi"
+        },
+        {
+          "codice": 6,
+          "descrizione": "Valutazioni multidimensionali e certificazioni per ADI e per l’inserimento in strutture residenziali"
+        },
+        {
+          "codice": 7,
+          "descrizione": "Altro"
+        },
+        {
+          "codice": 9,
+          "descrizione": "Non noto"
+        }
+      ]
+    },
+    {
+      "codice": 7,
+      "descrizione": "Vaccinazioni",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Stagionali (influenza e covid)"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Dell'infanzia"
+        },
+        {
+          "codice": 3,
+          "descrizione": "Dell'adolescenza"
+        },
+        {
+          "codice": 4,
+          "descrizione": "Dell'età adulta"
+        },
+        {
+          "codice": 5,
+          "descrizione": "Altro"
+        }
+      ]
+    },
+    {
+      "codice": 8,
+      "descrizione": "Prescrizioni farmaceutiche",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Rinnovo farmaci continuativi"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Nuovi farmaci"
+        },
+        {
+          "codice": 9,
+          "descrizione": "Altro"
+        }
+      ]
+    },
+    {
+      "codice": 9,
+      "descrizione": "Prescrizioni di specialistica",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Visite specialistiche"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Esami diagnostici"
+        },
+        {
+          "codice": 3,
+          "descrizione": "Protesica"
+        },
+        {
+          "codice": 4,
+          "descrizione": "Cure termali"
+        },
+        {
+          "codice": 5,
+          "descrizione": "Riabilitative"
+        },
+        {
+          "codice": 6,
+          "descrizione": "Prestazioni Terapeutiche"
+        },
+        {
+          "codice": 9,
+          "descrizione": "Altro"
+        }
+      ]
+    },
+    {
+      "codice": 10,
+      "descrizione": "Prescrizioni di ricovero",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Prescrizioni di ricovero"
+        }
+      ]
+    },
+    {
+      "codice": 11,
+      "descrizione": "Informazione ed educazione sanitaria a pazienti e familiari",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Stili di vita positivi per la salute"
+        },
+        {
+          "codice": 2,
+          "descrizione": "Servizi e prestazioni dell'SSN e dell'SSR"
+        },
+        {
+          "codice": 3,
+          "descrizione": "Counselling per la gestione della malattia o della disabilità e la prevenzione delle complicanze"
+        },
+        {
+          "codice": 9,
+          "descrizione": "Altro"
+        }
+      ]
+    },
+    {
+      "codice": 12,
+      "descrizione": "Medicina di iniziativa",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Medicina di iniziativa"
+        }
+      ]
+    },
+    {
+      "codice": 13,
+      "descrizione": "Attività amministrativa",
+      "descrizioneAllegato1": "ATTIVITÀ DI INIZIATIVA",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Attività amministrativa"
+        }
+      ]
+    },
+    {
+      "codice": 99,
+      "descrizione": "Altro",
+      "dettagli": [
+        {
+          "codice": 1,
+          "descrizione": "Altro"
+        }
+      ]
+    }
+  ],
+  "modalitaContatto": [
+    {
+      "chiave": "office",
+      "codice": 1,
+      "descrizione": "In struttura/studio del medico"
+    },
+    {
+      "chiave": "home",
+      "codice": 2,
+      "descrizione": "A domicilio"
+    },
+    {
+      "chiave": "telemedicine",
+      "codice": 3,
+      "descrizione": "In telemedicina (solo in caso di televisita, telemonitoraggio e teleconsulenza)"
+    },
+    {
+      "chiave": "remote",
+      "codice": 4,
+      "descrizione": "Online/mail/telefonico"
+    },
+    {
+      "chiave": "unknown",
+      "codice": 9,
+      "descrizione": "Non noto"
+    }
+  ],
+  "regimeAttivita": [
+    {
+      "chiave": "choice",
+      "codice": 1,
+      "descrizione": "Ciclo di scelta"
+    },
+    {
+      "chiave": "hourly",
+      "codice": 2,
+      "descrizione": "Attività oraria"
+    },
+    {
+      "chiave": "unknown",
+      "codice": 9,
+      "descrizione": "Non noto"
+    }
+  ],
+  "tipologiaAccesso": [
+    {
+      "chiave": "scheduled",
+      "codice": 1,
+      "descrizione": "Programmato (con prenotazione)"
+    },
+    {
+      "chiave": "direct",
+      "codice": 2,
+      "descrizione": "Accesso diretto"
+    },
+    {
+      "chiave": "unknown",
+      "codice": 9,
+      "descrizione": "Non noto"
+    }
+  ],
+  "statoProblema": [
+    {
+      "chiave": "suspected",
+      "codice": 1,
+      "descrizione": "Sospetto"
+    },
+    {
+      "chiave": "evolving",
+      "codice": 2,
+      "descrizione": "In evoluzione"
+    },
+    {
+      "chiave": "chronic",
+      "codice": 3,
+      "descrizione": "Associato alla patologia cronica"
+    },
+    {
+      "chiave": "unknown",
+      "codice": 9,
+      "descrizione": "Non noto"
+    }
+  ],
+  "fumo": [
+    {
+      "chiave": "yes",
+      "codice": 1,
+      "descrizione": "Sì"
+    },
+    {
+      "chiave": "no",
+      "codice": 2,
+      "descrizione": "No"
+    },
+    {
+      "chiave": "unknown",
+      "codice": 9,
+      "descrizione": "Non noto"
+    }
+  ],
+  "tipoStruttura": [
+    {
+      "chiave": "gp_office",
+      "codice": 1,
+      "descrizione": "Studio medico MMG"
+    },
+    {
+      "chiave": "pediatric_office",
+      "codice": 2,
+      "descrizione": "Studio medico PLS"
+    },
+    {
+      "chiave": "aft",
+      "codice": 3,
+      "descrizione": "AFT"
+    },
+    {
+      "chiave": "uccp",
+      "codice": 4,
+      "descrizione": "UCCP"
+    },
+    {
+      "chiave": "community_house",
+      "codice": 5,
+      "descrizione": "Casa della Comunità"
+    },
+    {
+      "chiave": "out_of_hours",
+      "codice": 6,
+      "descrizione": "Sede di Guardia medica"
+    },
+    {
+      "chiave": "tourist_service",
+      "codice": 7,
+      "descrizione": "Sede di Guardia turistica"
+    },
+    {
+      "chiave": "semi_residential",
+      "codice": 8,
+      "descrizione": "Struttura semiresidenziale"
+    },
+    {
+      "chiave": "residential",
+      "codice": 9,
+      "descrizione": "Struttura residenziale"
+    }
+  ]
+}
