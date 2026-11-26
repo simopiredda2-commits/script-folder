@@ -97,9 +97,18 @@ describe('nessuna chiamata a servizi reali (regola 7)', () => {
   it('il codice delle integrazioni non contiene indirizzi di rete né richieste HTTP', () => {
     const dir = join(import.meta.dirname, '..', 'src');
     /** Nomi di spazi XML: sono identificatori, non indirizzi da chiamare. */
+    // Spazi dei nomi XML: identificativi dei messaggi, non indirizzi da chiamare. Quelli dei
+    // messaggi SOAP del Fascicolo regionale sono della V09 (5.2.1) e di WS-Security (D280).
     const XML_NAMESPACES = [
       'http://purl.oclc.org/dsdl/schematron',
       'http://www.w3.org/2001/XMLSchema-instance',
+      'http://www.w3.org/2003/05/soap-envelope',
+      'http://schemas.xmlsoap.org/soap/envelope/',
+      'http://dmaclbl.csi.it/',
+      'http://tipodaticomunicazionemetadati.xsd.fse.ini.finanze.it',
+      'http://dma.csi.it/',
+      'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd',
+      'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-username-token-profile-1.0#PasswordText',
     ];
     const files = readdirSync(dir, { recursive: true, withFileTypes: true }).filter((e) =>
       e.isFile(),

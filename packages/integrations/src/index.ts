@@ -14,6 +14,8 @@ export * from './fse/schematron';
 export * from './fse/gateway';
 export * from './fse/gateway-simulator';
 export * from './fse/regional-access';
+export * from './fse/regional-publication';
+export * from './fse/regional-publication-simulator';
 export * from './fse/pdf';
 export * from './fse/x509';
 export * from './fse/jwt';
