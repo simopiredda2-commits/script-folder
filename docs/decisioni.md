@@ -2550,3 +2550,25 @@ Tutto nello stesso branch, con una sola pull request alla fine.
     - una ricerca nelle linee guida e nelle schede tecniche che non usa i dati del paziente.
   - **Come**: il medico conferma sempre; il servizio di intelligenza artificiale è un'interfaccia con un simulatore, come le altre integrazioni (regola 7); i dati restano nell'UE (regola 8). Il fornitore e la valutazione d'impatto sulla protezione dei dati si decidono prima di collegarne uno vero. Niente si copia da Medi Suite (regola 2).
   - **Quando**: dopo il blocco di oggi, cioè SIAP, pacchetti regionali, AIR e AURA.
+
+**D291 · SIAP: il contatto, ricavato dagli atti e confermato dal medico (D284, passo 1d).** Il tracciato 2 del SIAP vuole un contatto per ogni incontro fra il medico e l'assistito: modalità, regime dell'attività, tipologia di accesso, il problema principale con il suo stato, e le attività e prestazioni con tipologia, dettaglio e quantità (specifiche funzionali del Ministero 1.3, § 3.9.2, allegato 2). Il programma oggi ha gli atti sparsi nel giorno: note del diario, ricette, certificati, vaccinazioni, prestazioni aggiuntive. Il contatto diventa una registrazione a sé: il programma lo propone dagli atti, il medico lo conferma o lo scarta, e al SIAP andranno solo i contatti confermati.
+
+- **Un contatto per paziente, medico e giorno**: il medico è chi ha fatto gli atti (autore della nota, chi ha firmato la ricetta o il certificato, chi ha registrato la vaccinazione o la prestazione aggiuntiva), anche il sostituto. Il Ministero ammette un contatto solo per eventi collegati anche in giorni diversi (§ 3.9.2, nota 1); qui si propone per giorno, e il medico unisce scartando.
+- **Atti che contano**: del medico, non annullati, non importati da altri programmi (quelli li ha già contati l'altro programma). Le ricette contano inviate o stampate, i certificati di malattia inviati, i certificati dai modelli rilasciati.
+- **Tipologia e dettaglio** (allegato 2), come dato e proposta, che il medico cambia:
+  - nota del diario in studio, a domicilio o in televisita: «Visite», «Visita di controllo»; al telefono: «Visite», «Altro»;
+  - ricetta farmaceutica: «Rinnovo farmaci continuativi» per le righe di una terapia continuativa in corso, «Nuovi farmaci» per le altre;
+  - ricetta specialistica: «Visite specialistiche» per le visite, «Esami diagnostici» per le altre prestazioni;
+  - certificato di malattia: «Malattia»; certificato dai modelli: «Idoneità svolgimento attività sportive non agonistiche» per quello sportivo, «Altro» per gli altri;
+  - vaccinazione: «Stagionali (influenza e covid)» se la campagna o il vaccino lo dicono; altrimenti «Dell'infanzia» sotto i 12 anni, «Dell'adolescenza» sotto i 18, «Dell'età adulta» dopo;
+  - prestazione aggiuntiva: il dettaglio della corrispondenza con l'allegato 6 dell'ACN (`packages/reference/data/siap/corrispondenze-prestazioni-aggiuntive.json`, «da controllare»); senza corrispondenza «Altro»;
+  - scelta del medico che comincia quel giorno: «Censimento», «Presa in carico iniziale paziente».
+  - La **quantità** è il numero di atti con quel dettaglio, al più 9: il campo ha una cifra.
+- **Modalità**: dal diario (studio, domicilio, televisita come telemedicina, telefono come online o telefono); con più note vale la prima di domicilio, studio, televisita, telefono; senza note «Non noto».
+- **Regime**: ciclo di scelta. L'attività oraria non è nel programma.
+- **Tipologia di accesso**: programmato se il paziente aveva un appuntamento quel giorno; diretto se c'è una nota del diario senza appuntamento; altrimenti non noto. Da confermare con la Dr.ssa Rocca (`docs/siap.md`).
+- **Problema**: il programma non sa per quale problema è avvenuto il contatto. Propone il codice generico V70.0, «Esame medico generale di routine in un servizio di cura» (l'esempio del Ministero è «V70 esame medico generale»; il codice con la cifra dopo il punto è quello dell'elenco ICD-9-CM), con lo stato «Non noto». Il medico sceglie fra i problemi attivi del paziente con il codice ICD-9-CM; allora lo stato viene dal problema (quesito aperto: sospetto; cronico: associato alla patologia cronica; gli altri: in evoluzione, da confermare con la Dr.ssa Rocca) e la data di apertura è l'inizio del problema.
+- **Progressivo**: alla conferma, il numero del contatto nel giorno, nello studio, dal primo in poi. Il Ministero lo vuole dopo il codice della struttura (6 caratteri più 4 cifre); per il disciplinare e per il CSI conta i contatti dell'assistito o del medico (domanda 12 per il CSI). Il codice della struttura e il tipo si fermano nel contatto alla conferma.
+- **Dopo la conferma**: un atto nuovo dello stesso paziente, medico e giorno fa vedere il contatto «da aggiornare»; aggiornandolo entrano le prestazioni nuove (per il SIAP sarà una variazione). Un contatto scartato, con il motivo, non si ripropone.
+- **Chi**: il medico per i suoi contatti (permesso nuovo `siap.contacts`, anche al sostituto per i contatti suoi); la segreteria no (regola 5).
+- **Regola 3**: è un dato amministrativo per il flusso del Ministero; il programma non suggerisce diagnosi, propone solo dagli atti del medico.
