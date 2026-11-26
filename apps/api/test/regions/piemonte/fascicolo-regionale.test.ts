@@ -1,4 +1,4 @@
-import type { FseAccessRequest, FseAccessResult, RegionalFseAccess } from '@mmg/integrations';
+import type { ContextCallRequest, ContextCallResult, RegionalContextCall } from '@mmg/integrations';
 import { SimulatedRegionalFseAccess, type FseAccessErrorCode } from '@mmg/regions/piemonte';
 import { and, desc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -16,8 +16,9 @@ type Decision = 'success' | 'unreachable' | FseAccessErrorCode;
 
 /**
  * Aprire il Fascicolo regionale dalla cartella (D220), con il simulatore del modulo di accesso del
- * CSI (LCCE V13): chi può, che cosa si registra, le credenziali RUPAR del medico, gli errori delle
- * specifiche, la pagina simulata con il token che vale una volta.
+ * CSI (LCCE V13), destinazione «fascicolo» delle chiamate di contesto (D297): chi può, che cosa si
+ * registra, le credenziali RUPAR del medico, gli errori delle specifiche, la pagina simulata con il
+ * token che vale una volta.
  */
 describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () => {
   let t: TestDatabase;
@@ -28,12 +29,13 @@ describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () 
   type Who = keyof typeof cookies;
   let pt: typeof patient.$inferSelect;
 
-  const open = (who: Who, payload: Record<string, unknown> = {}, patientId = pt.id) =>
+  /** La chiamata di contesto del Fascicolo, con il filtro dei documenti se dato. */
+  const open = (who: Who, documentType?: string | null, patientId = pt.id) =>
     s.app.inject({
       method: 'POST',
-      url: `/api/pazienti/${patientId}/fascicolo-regionale`,
+      url: `/api/pazienti/${patientId}/chiamate-di-contesto/fascicolo`,
       headers: { cookie: cookies[who] },
-      payload,
+      payload: documentType === undefined ? {} : { parametri: { tipoDocumento: documentType } },
     });
   const page = (url: string, who: Who = 'titolare', remoteAddress = '127.0.0.1') =>
     s.app.inject({ method: 'GET', url, headers: { cookie: cookies[who] }, remoteAddress });
@@ -51,7 +53,7 @@ describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () 
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    s = await createScenario(t.db, {}, { fseAccess: access });
+    s = await createScenario(t.db, {}, { contextCalls: [access] });
     for (const who of Object.keys(cookies) as Who[]) cookies[who] = await login(s, who);
     const [row] = await t.db.select().from(patient).where(eq(patient.id, s.richPatient));
     pt = row!;
@@ -68,7 +70,9 @@ describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () 
     expect(res.statusCode, res.body).toBe(200);
     const body = res.json<{ indirizzo: string; simulato: boolean }>();
     expect(body.simulato).toBe(true);
-    expect(body.indirizzo).toMatch(/^\/api\/simulatori\/fascicolo\?token=[0-9a-f-]{36}$/);
+    expect(body.indirizzo).toMatch(
+      /^\/api\/simulatori\/chiamate-di-contesto\?token=[0-9a-f-]{36}$/,
+    );
     // Al servizio vanno il codice fiscale del paziente, l'IP di chi chiede, ruolo e applicazione.
     expect(access.received.slice(before)).toEqual([
       {
@@ -100,23 +104,38 @@ describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () 
 
   it('con il filtro dei documenti: solo i tipi delle specifiche', async () => {
     decision = 'success';
-    const res = await open('titolare', { tipoDocumento: '11502-2' });
+    const res = await open('titolare', '11502-2');
     expect(res.statusCode, res.body).toBe(200);
     expect(access.received.at(-1)).toMatchObject({ documentType: '11502-2' });
     const shown = await page(res.json<{ indirizzo: string }>().indirizzo);
     expect(shown.body).toContain('con i documenti di tipo REFERTO DI LABORATORIO');
     const before = access.received.length;
-    const wrong = await open('titolare', { tipoDocumento: 'XYZ' });
+    const wrong = await open('titolare', 'XYZ');
     expect(wrong.statusCode).toBe(400);
-    expect(wrong.json().errore).toMatch(/non previsto dalle specifiche/);
+    expect(wrong.json().errore).toBe(
+      'Scelta non prevista dalla regione per «Documenti da mostrare»',
+    );
     // Nemmeno i nomi che ogni oggetto ha dal suo prototipo (D232).
     for (const tipoDocumento of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
-      const res = await open('titolare', { tipoDocumento });
+      const res = await open('titolare', tipoDocumento);
       expect(res.statusCode, tipoDocumento).toBe(400);
     }
-    // Nessuna richiesta parte con un tipo sbagliato; il tentativo resta nel registro.
+    // Né un parametro che la pagina della regione non ha.
+    const other = await s.app.inject({
+      method: 'POST',
+      url: `/api/pazienti/${pt.id}/chiamate-di-contesto/fascicolo`,
+      headers: { cookie: cookies.titolare },
+      payload: { parametri: { altro: 'x' } },
+    });
+    expect(other.statusCode).toBe(400);
+    expect(other.json().errore).toBe('Parametro non previsto: «altro»');
+    // Nessuna richiesta parte con una scelta sbagliata; il tentativo resta nel registro.
     expect(access.received.length).toBe(before);
     expect((await lastLog(s.users.titolare.id))?.outcome).toBe('consentito');
+    // Una scelta vuota vale «tutti».
+    const all = await open('titolare', null);
+    expect(all.statusCode, all.body).toBe(200);
+    expect(access.received.slice(before)).toMatchObject([{ documentType: null }]);
   });
 
   it('il sostituto autorizzato sull’archivio apre con le sue credenziali; segreteria, amministratore e collega no', async () => {
@@ -139,7 +158,7 @@ describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () 
     expect(consent.statusCode).toBe(422);
     expect(consent.json()).toEqual({
       errore: 'Il paziente non ha fornito il consenso alla consultazione (FSE_ER_505)',
-      dettagli: { codiceFascicolo: 'FSE_ER_505' },
+      dettagli: { codiceRegione: 'FSE_ER_505' },
     });
     decision = 'unreachable';
     const down = await open('titolare');
@@ -158,7 +177,7 @@ describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () 
       dettagli: {
         codice: 'CREDENZIALI_RIFIUTATE',
         servizio: 'rupar',
-        codiceFascicolo: 'AUTH_ER_501',
+        codiceRegione: 'AUTH_ER_501',
       },
     });
     const events = await t.db
@@ -182,7 +201,7 @@ describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () 
       expect(res.statusCode, code).toBe(422);
       expect(res.json(), code).toMatchObject({
         errore: expect.stringMatching(/«Credenziali dei servizi»/),
-        dettagli: { codice: 'CREDENZIALI_RIFIUTATE', servizio: 'rupar', codiceFascicolo: code },
+        dettagli: { codice: 'CREDENZIALI_RIFIUTATE', servizio: 'rupar', codiceRegione: code },
       });
     }
     // Un altro errore della tabella 1 non porta alle credenziali.
@@ -191,7 +210,7 @@ describe('apertura del Fascicolo regionale dalla cartella (D220, LCCE V13)', () 
     expect(role.statusCode).toBe(422);
     expect(role.json()).toEqual({
       errore: 'Ruolo non valido (AUTH_ER_502)',
-      dettagli: { codiceFascicolo: 'AUTH_ER_502' },
+      dettagli: { codiceRegione: 'AUTH_ER_502' },
     });
     // Si annotano come le credenziali rifiutate.
     const events = await t.db
@@ -256,13 +275,13 @@ describe('Fascicolo regionale fuori dal simulatore (D220)', () => {
       },
       now: s.clock.now,
       secondFactor: s.secondFactor,
-      fseAccess: simulator,
+      contextCalls: [simulator],
     });
     try {
       const cookie = await login(s, 'titolare');
       const res = await app.inject({
         method: 'POST',
-        url: `/api/pazienti/${s.richPatient}/fascicolo-regionale`,
+        url: `/api/pazienti/${s.richPatient}/chiamate-di-contesto/fascicolo`,
         headers: { cookie },
         payload: {},
       });
@@ -275,10 +294,11 @@ describe('Fascicolo regionale fuori dal simulatore (D220)', () => {
   });
 
   it('con un collegamento vero la pagina simulata non c’è', async () => {
-    const calls: FseAccessRequest[] = [];
-    const real: RegionalFseAccess = {
+    const calls: ContextCallRequest[] = [];
+    const real: RegionalContextCall = {
+      kind: 'fascicolo',
       environment: 'test',
-      documentTypes: {},
+      parameters: [],
       texts: {
         intro: 'Introduzione (prova)',
         simulated: 'Simulato (prova)',
@@ -286,7 +306,7 @@ describe('Fascicolo regionale fuori dal simulatore (D220)', () => {
         credentials: 'Controlla le credenziali (prova)',
       },
       credentialService: 'prova',
-      authenticate: (request): Promise<FseAccessResult> => {
+      open: (request): Promise<ContextCallResult> => {
         calls.push(request);
         return Promise.resolve({ outcome: 'success', url: 'https://regione.invalid/fse?token=1' });
       },
@@ -296,13 +316,13 @@ describe('Fascicolo regionale fuori dal simulatore (D220)', () => {
       config: { encryptionKey: s.encryptionKey, sessionMaxHours: 12, cookieSecure: false },
       now: s.clock.now,
       secondFactor: s.secondFactor,
-      fseAccess: real,
+      contextCalls: [real],
     });
     try {
       const cookie = await login(s, 'titolare');
       const res = await app.inject({
         method: 'POST',
-        url: `/api/pazienti/${s.richPatient}/fascicolo-regionale`,
+        url: `/api/pazienti/${s.richPatient}/chiamate-di-contesto/fascicolo`,
         headers: { cookie },
         payload: {},
       });
@@ -313,7 +333,7 @@ describe('Fascicolo regionale fuori dal simulatore (D220)', () => {
       expect(calls).toHaveLength(1);
       const sim = await app.inject({
         method: 'GET',
-        url: '/api/simulatori/fascicolo?token=1',
+        url: '/api/simulatori/chiamate-di-contesto?token=1',
         headers: { cookie },
       });
       expect(sim.statusCode).toBe(404);

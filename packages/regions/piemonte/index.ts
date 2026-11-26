@@ -67,7 +67,7 @@ export const piemonte: RegionalPackage = {
   ],
   asl: [],
   integrations: {
-    fseAccess: (options) => new SimulatedRegionalFseAccess(options),
+    contextCalls: (options) => [new SimulatedRegionalFseAccess(options)],
     fsePublication: (options) => simulatedFsePublication(options),
   },
   terms: [

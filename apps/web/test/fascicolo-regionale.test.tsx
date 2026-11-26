@@ -57,24 +57,39 @@ const PATIENT = {
   riepilogo: null,
 };
 
-/** Le parole arrivano dal pacchetto della regione dello studio (D297): qui una regione inventata. */
+/**
+ * La destinazione «fascicolo» delle chiamate di contesto (D297): parametri e parole arrivano dal
+ * pacchetto della regione dello studio, qui una regione inventata.
+ */
 const INFO = (over: Record<string, unknown> = {}) => ({
-  tipiDocumento: [
-    { codice: '57833-6', nome: 'PRESCRIZIONE FARMACEUTICA' },
-    { codice: '11502-2', nome: 'REFERTO DI LABORATORIO' },
+  destinazioni: [
+    {
+      tipo: 'fascicolo',
+      parametri: [
+        {
+          chiave: 'tipoDocumento',
+          etichetta: 'Documenti da mostrare',
+          tutti: 'Tutti i documenti',
+          valori: [
+            { codice: '57833-6', nome: 'PRESCRIZIONE FARMACEUTICA' },
+            { codice: '11502-2', nome: 'REFERTO DI LABORATORIO' },
+          ],
+        },
+      ],
+      simulato: true,
+      attivo: true,
+      testi: {
+        introduzione:
+          'Il programma chiede l’accesso alla Regione di prova con le credenziali di prova.',
+        simulato: 'Collegamento simulato: si apre una pagina di prova della Regione di prova.',
+        nonAttivo: 'Il collegamento non è ancora attivo: si attiva con l’ente di prova',
+      },
+      ...over,
+    },
   ],
-  simulato: true,
-  attivo: true,
-  testi: {
-    introduzione:
-      'Il programma chiede l’accesso alla Regione di prova con le credenziali di prova.',
-    simulato: 'Collegamento simulato: si apre una pagina di prova della Regione di prova.',
-    nonAttivo: 'Il collegamento non è ancora attivo: si attiva con l’ente di prova',
-  },
-  ...over,
 });
 
-const TOKEN_URL = '/api/simulatori/fascicolo?token=00000000-0000-4000-8000-000000000001';
+const TOKEN_URL = '/api/simulatori/chiamate-di-contesto?token=00000000-0000-4000-8000-000000000001';
 
 /** Una scheda nuova finta, come la restituisce window.open. */
 function fakeTab() {
@@ -106,8 +121,11 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     const calls = stubFetch({
       '/api/io': ok(me('owner_doctor')),
       '/api/pazienti/p1': ok(PATIENT),
-      '/api/fascicolo-regionale': ok(INFO()),
-      '/api/pazienti/p1/fascicolo-regionale': ok({ indirizzo: TOKEN_URL, simulato: true }),
+      '/api/chiamate-di-contesto': ok(INFO()),
+      '/api/pazienti/p1/chiamate-di-contesto/fascicolo': ok({
+        indirizzo: TOKEN_URL,
+        simulato: true,
+      }),
     });
     const user = userEvent.setup();
     start();
@@ -131,8 +149,8 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     expect(calls.filter((c) => c.method === 'POST')).toEqual([
       {
         method: 'POST',
-        path: '/api/pazienti/p1/fascicolo-regionale',
-        body: { tipoDocumento: null },
+        path: '/api/pazienti/p1/chiamate-di-contesto/fascicolo',
+        body: { parametri: { tipoDocumento: null } },
       },
     ]);
   });
@@ -142,8 +160,11 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     const calls = stubFetch({
       '/api/io': ok(me('owner_doctor')),
       '/api/pazienti/p1': ok(PATIENT),
-      '/api/fascicolo-regionale': ok(INFO()),
-      '/api/pazienti/p1/fascicolo-regionale': ok({ indirizzo: TOKEN_URL, simulato: true }),
+      '/api/chiamate-di-contesto': ok(INFO()),
+      '/api/pazienti/p1/chiamate-di-contesto/fascicolo': ok({
+        indirizzo: TOKEN_URL,
+        simulato: true,
+      }),
     });
     const user = userEvent.setup();
     start();
@@ -157,7 +178,9 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     expect(link.getAttribute('target')).toBe('_blank');
     expect(link.getAttribute('rel')).toBe('noopener noreferrer');
     expect(screen.getByText(/Il browser non ha aperto la scheda nuova/)).toBeTruthy();
-    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({ tipoDocumento: '11502-2' });
+    expect(calls.find((c) => c.method === 'POST')?.body).toEqual({
+      parametri: { tipoDocumento: '11502-2' },
+    });
   });
 
   it('credenziali rifiutate: la scheda preparata si chiude e la pagina porta alle credenziali', async () => {
@@ -166,8 +189,8 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     stubFetch({
       '/api/io': ok(me('owner_doctor')),
       '/api/pazienti/p1': ok(PATIENT),
-      '/api/fascicolo-regionale': ok(INFO()),
-      '/api/pazienti/p1/fascicolo-regionale': () => ({
+      '/api/chiamate-di-contesto': ok(INFO()),
+      '/api/pazienti/p1/chiamate-di-contesto/fascicolo': () => ({
         status: 422,
         body: {
           errore:
@@ -175,7 +198,7 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
           dettagli: {
             codice: 'CREDENZIALI_RIFIUTATE',
             servizio: 'servizio-di-prova',
-            codiceFascicolo: 'AUTH_ER_501',
+            codiceRegione: 'AUTH_ER_501',
           },
         },
       }),
@@ -198,7 +221,7 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     stubFetch({
       '/api/io': ok(me('owner_doctor')),
       '/api/pazienti/p1': ok(PATIENT),
-      '/api/fascicolo-regionale': ok(INFO({ attivo: false })),
+      '/api/chiamate-di-contesto': ok(INFO({ attivo: false })),
     });
     start();
     expect(
@@ -214,15 +237,17 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
 
   it('la regione dello studio senza pacchetto: la nota, senza modulo né parole di un’altra regione', async () => {
     const open = vi.spyOn(window, 'open');
-    const nota =
-      'La regione dello studio non ha ancora, nel programma, l’apertura del suo Fascicolo';
     const calls = stubFetch({
       '/api/io': ok(me('owner_doctor')),
       '/api/pazienti/p1': ok(PATIENT),
-      '/api/fascicolo-regionale': ok({ tipiDocumento: [], simulato: false, attivo: false, nota }),
+      '/api/chiamate-di-contesto': ok({ destinazioni: [] }),
     });
     start();
-    expect(await screen.findByText(`${nota}.`)).toBeTruthy();
+    expect(
+      await screen.findByText(
+        'La regione dello studio non ha ancora, nel programma, l’apertura del suo Fascicolo dalla cartella.',
+      ),
+    ).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Apri il Fascicolo' })).toBeNull();
     expect(screen.queryByLabelText('Documenti da mostrare')).toBeNull();
     expect(screen.queryByText(/Collegamento simulato|non è ancora attivo/)).toBeNull();
@@ -239,7 +264,7 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     expect(await screen.findByText(/lo apre il medico, con le sue credenziali/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Apri il Fascicolo' })).toBeNull();
     await waitFor(() => expect(calls.some((c) => c.path === '/api/pazienti/p1')).toBe(true));
-    expect(calls.some((c) => c.path === '/api/fascicolo-regionale')).toBe(false);
+    expect(calls.some((c) => c.path === '/api/chiamate-di-contesto')).toBe(false);
   });
 
   it('nella cartella il collegamento c’è per il medico, non per la segreteria', async () => {

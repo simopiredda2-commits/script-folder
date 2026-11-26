@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type {
-  FseAccessRequest,
-  FseAccessResult,
-  RegionalFseAccess,
+  ContextCallParameter,
+  ContextCallRequest,
+  ContextCallResult,
+  RegionalContextCall,
   ServiceAuth,
-  SimulatedFseAccessPage,
+  SimulatedContextPage,
 } from '@mmg/integrations';
 
 /**
@@ -23,8 +24,9 @@ import type {
  *
  * La V13 descrive anche l'accesso diretto alla pagina del Fascicolo dentro una sessione Shibboleth,
  * senza token (6.4): con l'autenticazione forte di oggi (D102, D109) è da chiedere al CSI quale dei
- * due vale per una cartella in cloud. Qui il simulatore (regola 7), che attua il contratto nazionale
- * di `@mmg/integrations` (D297); l'adattatore vero si scrive con il CSI.
+ * due vale per una cartella in cloud. Qui il simulatore (regola 7): è la destinazione «fascicolo»
+ * delle chiamate di contesto, il contratto nazionale di `@mmg/integrations` (D297); l'adattatore
+ * vero si scrive con il CSI.
  */
 
 /**
@@ -139,6 +141,22 @@ export const FSE_ACCESS_TEXTS = {
 /** Il servizio delle credenziali del medico: quelle RUPAR. */
 export const FSE_ACCESS_CREDENTIAL_SERVICE = 'rupar';
 
+/** Il filtro dell'elenco dei documenti (TIPO_DOCUMENTO): l'unico parametro della pagina. */
+export const FSE_ACCESS_PARAMETER: ContextCallParameter = {
+  key: 'tipoDocumento',
+  label: 'Documenti da mostrare',
+  anyLabel: 'Tutti i documenti',
+  options: FSE_DOCUMENT_TYPES,
+};
+
+/** La richiesta come la vuole la V13: il paziente, l'IP della postazione e il filtro. */
+export interface FseAccessRequest {
+  patientFiscalCode: string;
+  clientIp: string | null;
+  /** Uno di `FSE_DOCUMENT_TYPES`; null per tutti. */
+  documentType: string | null;
+}
+
 export interface SimulatedRegionalFseAccessOptions {
   /**
    * Esito di ogni richiesta: «success», un codice di errore delle specifiche o «unreachable». Per
@@ -182,9 +200,10 @@ export type SimulatedFsePage =
  * Simulatore del servizio e della pagina regionale: token in memoria, monouso, come nella V13. Non
  * chiama nessuno: la pagina è del programma (`pageUrl`).
  */
-export class SimulatedRegionalFseAccess implements RegionalFseAccess {
+export class SimulatedRegionalFseAccess implements RegionalContextCall {
+  readonly kind = 'fascicolo' as const;
   readonly environment = 'simulator' as const;
-  readonly documentTypes = FSE_DOCUMENT_TYPES;
+  readonly parameters = [FSE_ACCESS_PARAMETER];
   readonly texts = FSE_ACCESS_TEXTS;
   readonly credentialService = FSE_ACCESS_CREDENTIAL_SERVICE;
   /** Richieste ricevute, per le prove: mai le credenziali. */
@@ -193,7 +212,20 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
 
   constructor(private readonly options: SimulatedRegionalFseAccessOptions = {}) {}
 
-  authenticate(request: FseAccessRequest, auth: ServiceAuth): Promise<FseAccessResult> {
+  /** La chiamata di contesto: il filtro dei documenti dal parametro della pagina. */
+  open(call: ContextCallRequest, auth: ServiceAuth): Promise<ContextCallResult> {
+    return this.authenticate(
+      {
+        patientFiscalCode: call.patientFiscalCode,
+        clientIp: call.clientIp,
+        documentType: call.parameters[FSE_ACCESS_PARAMETER.key] ?? null,
+      },
+      auth,
+    );
+  }
+
+  /** getAuthentication della V13: il token, o l'errore delle specifiche. */
+  authenticate(request: FseAccessRequest, auth: ServiceAuth): Promise<ContextCallResult> {
     this.received.push({ ...request, role: FSE_ACCESS_ROLE, application: FSE_ACCESS_APPLICATION });
     // Utente, password e PIN RUPAR sono tutti obbligatori (V13, 3.3; il PIN dalla V07).
     if (!auth.username?.trim() || !auth.password) return Promise.resolve(failure('AUTH_ER_516'));
@@ -218,7 +250,7 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
       documentType: request.documentType,
       expiresAt: minutes === null ? null : this.now() + minutes * 60_000,
     });
-    const page = this.options.pageUrl ?? '/api/simulatori/fascicolo';
+    const page = this.options.pageUrl ?? '/api/simulatori/chiamate-di-contesto';
     return Promise.resolve({ outcome: 'success', url: `${page}?token=${token}` });
   }
 
@@ -227,8 +259,8 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
   }
 
   /** La pagina simulata con le sue parole: per chi e con quale filtro si sarebbe aperta. */
-  simulatedPage(token: string, clientIp: string | null): SimulatedFseAccessPage {
-    const page = this.open(token, clientIp);
+  simulatedPage(token: string, clientIp: string | null): SimulatedContextPage {
+    const page = this.openPage(token, clientIp);
     const head = 'Fascicolo Sanitario Elettronico regionale (simulatore).';
     if (page.outcome === 'opened')
       return {
@@ -247,7 +279,7 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
    * generato dal servizio, già usato o scaduto dà WEB_001 (V13, tabella 6). L'IP di chi apre non si
    * confronta con quello dichiarato: si traccia (2.2).
    */
-  open(token: string, clientIp: string | null): SimulatedFsePage {
+  openPage(token: string, clientIp: string | null): SimulatedFsePage {
     const t = this.tokens.get(token);
     // Usato o scaduto, non serve più: una seconda apertura non lo trova e dà WEB_001 lo stesso.
     this.tokens.delete(token);
@@ -263,7 +295,7 @@ export class SimulatedRegionalFseAccess implements RegionalFseAccess {
   }
 }
 
-function failure(code: FseAccessErrorCode): FseAccessResult {
+function failure(code: FseAccessErrorCode): ContextCallResult {
   return {
     outcome: FSE_ACCESS_CREDENTIAL_ERRORS.has(code) ? 'credentials' : 'failure',
     code,

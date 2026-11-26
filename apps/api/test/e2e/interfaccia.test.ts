@@ -3470,7 +3470,7 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
         /^Fascicolo Sanitario Elettronico regionale \(simulatore\)\. Qui si aprirebbe il Fascicolo dell’assistito [A-Z0-9]{16}, con i documenti di tipo REFERTO DI LABORATORIO\.$/,
       )
       .waitFor();
-    expect(new URL(tab.url()).pathname).toBe('/api/simulatori/fascicolo');
+    expect(new URL(tab.url()).pathname).toBe('/api/simulatori/chiamate-di-contesto');
     // La pagina regionale non vede la cartella che l'ha aperta.
     expect(await tab.evaluate(() => window.opener)).toBeNull();
     await page.getByText('Fascicolo aperto in una scheda nuova.').waitFor();

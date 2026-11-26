@@ -1,5 +1,5 @@
 import type {
-  RegionalFseAccess,
+  RegionalContextCall,
   RegionalFsePublication,
   SimulatedFseGateway,
 } from '@mmg/integrations';
@@ -69,8 +69,11 @@ export interface AslVariant {
  * studio. Oggi ci sono i simulatori (regola 7); gli adattatori veri si aggiungono con l'ente.
  */
 export interface RegionalIntegrations {
-  /** Apertura del Fascicolo della regione dalla cartella (D220): il simulatore. */
-  fseAccess?: (options: { now?: () => Date }) => RegionalFseAccess;
+  /**
+   * Le destinazioni delle chiamate di contesto (D220, D297): le pagine dei servizi della regione
+   * che il programma apre con il contesto del paziente, al più una per tipo. Oggi i simulatori.
+   */
+  contextCalls?: (options: { now?: () => Date }) => readonly RegionalContextCall[];
   /**
    * Pubblicazione del Profilo Sanitario Sintetico nel Fascicolo della regione (D280): il
    * simulatore, che pubblica sul Gateway nazionale simulato su cui il programma valida.

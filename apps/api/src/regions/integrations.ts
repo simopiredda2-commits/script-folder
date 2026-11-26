@@ -1,5 +1,5 @@
 import type {
-  RegionalFseAccess,
+  RegionalContextCall,
   RegionalFsePublication,
   SimulatedFseGateway,
 } from '@mmg/integrations';
@@ -40,12 +40,15 @@ export function regionalChoice<T>(
   };
 }
 
-/** L'apertura del Fascicolo della regione dalla cartella (D220): il simulatore del pacchetto. */
-export const fseAccessChoice = (
-  override?: RegionalFseAccess,
+/**
+ * Le destinazioni delle chiamate di contesto della regione (D220, D297): i simulatori del
+ * pacchetto. Date qui (le prove, o adattatori dalla configurazione), valgono per ogni regione.
+ */
+export const contextCallChoice = (
+  override?: readonly RegionalContextCall[],
   options: { now?: () => Date } = {},
   packages?: readonly RegionalPackage[],
-) => regionalChoice((pkg) => pkg.integrations?.fseAccess?.(options) ?? null, override, packages);
+) => regionalChoice((pkg) => pkg.integrations?.contextCalls?.(options) ?? null, override, packages);
 
 /**
  * La pubblicazione del Profilo nel Fascicolo della regione (D280): il simulatore del pacchetto, che

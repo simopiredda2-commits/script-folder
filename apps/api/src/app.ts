@@ -31,7 +31,7 @@ import { registerCertificateRoutes } from './http/certificate-routes';
 import { registerClinicalRoutes } from './http/clinical-routes';
 import { registerFollowUpRoutes } from './http/followup-routes';
 import { registerFseRoutes } from './http/fse-routes';
-import { registerFseAccessRoutes } from './http/fse-access-routes';
+import { registerContextCallRoutes } from './http/context-call-routes';
 import { createPssService } from './fse/service';
 import { registerPrivacyRoutes } from './http/privacy-routes';
 import { registerAftRoutes } from './http/aft-routes';
@@ -90,11 +90,11 @@ import {
   type AuraGateway,
   SimulatedAdditionalServicesPortal,
   type AdditionalServicesPortal,
-  type RegionalFseAccess,
+  type RegionalContextCall,
   type RegionalFsePublication,
 } from '@mmg/integrations';
 import { createRegionalQueue, type RegionalQueue } from './fse/regional-queue';
-import { fseAccessChoice, fsePublicationChoice } from './regions/integrations';
+import { contextCallChoice, fsePublicationChoice } from './regions/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
 import { ReferenceUpdates } from './reference/updates-service';
@@ -216,11 +216,12 @@ export interface AppDeps {
    */
   ppipPortal?: AdditionalServicesPortal;
   /**
-   * Apertura del Fascicolo regionale dalla cartella (D220). Per difetto quella del pacchetto della
-   * regione dello studio, oggi il simulatore (D297); data qui, vale per ogni regione (le prove, o
-   * un adattatore vero dalla configurazione). Con il simulatore, in produzione, l'apertura è spenta.
+   * Le chiamate di contesto, come l'apertura del Fascicolo regionale dalla cartella (D220). Per
+   * difetto quelle del pacchetto della regione dello studio, oggi i simulatori (D297); date qui,
+   * valgono per ogni regione (le prove, o adattatori veri dalla configurazione). Con i simulatori,
+   * in produzione, restano spente.
    */
-  fseAccess?: RegionalFseAccess;
+  contextCalls?: readonly RegionalContextCall[];
 }
 
 export function buildApp({
@@ -251,7 +252,7 @@ export function buildApp({
   identity = { gateway: new SimulatedDigitalIdentity({ now }), clientId: 'SIMULATORE_IDENTITA' },
   aura = {},
   ppipPortal = new SimulatedAdditionalServicesPortal(),
-  fseAccess,
+  contextCalls,
 }: AppDeps): FastifyInstance {
   // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
   // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
@@ -559,12 +560,12 @@ export function buildApp({
       now,
     }),
   );
-  // Fascicolo regionale aperto dalla cartella (D220), con il servizio della regione dello studio:
-  // oggi il simulatore del pacchetto (D297).
-  registerFseAccessRoutes(app, {
+  // Chiamate di contesto, come il Fascicolo regionale aperto dalla cartella (D220): le pagine dei
+  // servizi della regione dello studio, oggi i simulatori del pacchetto (D297).
+  registerContextCallRoutes(app, {
     db,
     credentials,
-    access: fseAccessChoice(fseAccess, now ? { now } : {}),
+    calls: contextCallChoice(contextCalls, now ? { now } : {}),
     environment: config.environment ?? 'prova',
   });
   // Profilo Sanitario Sintetico al Fascicolo della regione dello studio (D280, D297): la coda con

@@ -97,7 +97,7 @@ export async function createScenario(
     | 'loginSources'
     | 'aura'
     | 'ppipPortal'
-    | 'fseAccess'
+    | 'contextCalls'
     | 'dpcm'
     | 'fseQueue'
   > & {
