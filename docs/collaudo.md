@@ -208,8 +208,8 @@ Per la Dr.ssa Rocca, o per chi lei indica. Una trascrizione entra nel programma 
 ### M2 · Consulente regolatorio
 
 - **Chi**: Simone
-- **Dove**: `docs/requisiti.md`
-- **Che cosa guardare**: che il programma resti fuori dai dispositivi medici: controlli solo formali, nessun suggerimento; i valori fuori dall'intervallo del referto evidenziati.
+- **Dove**: `docs/requisiti.md`, `docs/dispositivo-medico.md`
+- **Che cosa guardare**: che il programma resti fuori dai dispositivi medici: controlli solo formali, nessun suggerimento; i valori fuori dall'intervallo del referto evidenziati; le voci «da confermare» del confine (D293), fra cui gli elenchi nominativi degli indicatori di governo clinico.
 
 ### M3 · Avvocato
 

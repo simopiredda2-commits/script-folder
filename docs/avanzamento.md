@@ -91,6 +91,7 @@ _C. Decisioni o materiali di Simone_
 5. **Banca dati farmaci con licenza** (per esempio Farmadati): note AIFA per AIC e i fatti oggi non noti (R3, R4, R8, R11).
 6. **Fornitore vero di email e SMS**; dove ospitare il servizio, con i salvataggi cifrati (D166).
 7. Revisione di un avvocato prima del lancio.
+8. **Consulente regolatorio** (M2 del collaudo): il confine con il dispositivo medico letto sulle linee guida europee, in `docs/dispositivo-medico.md` (D293), con le cinque voci da confermare; prima del parere non si costruiscono gli elenchi nominativi degli indicatori di governo clinico.
 
 ## Come provarlo
 

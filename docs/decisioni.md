@@ -2596,3 +2596,21 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Non fatto**:
   - lo spostamento, con l'ordine proposto in `docs/pacchetti-regionali.md` (dati, regole, integrazioni senza database, servizi con il database, pagine, dimostrazione, prove), una pull request per pezzo;
   - le alternative nazionali per una regione senza pacchetto (per esempio la ricetta SSN al Sistema TS senza il servizio regionale), da scrivere quando servono.
+
+**D293 · Governo clinico come MilleGPG, e il confine con il dispositivo medico.** Domanda di Simone del 26/11/2026: «quanto a GPG (General Practice Governance)? che ne pensi?». GPG è MilleGPG di Genomedics e Millennium, nato su indicazione della SIMG: un modulo aggiuntivo di Millewin che estrae i dati della cartella e ne ricava indicatori (audit clinico, appropriatezza farmacologica, rischio clinico), con un cruscotto, il confronto con Health Search e con la mediana del gruppo, e promemoria nella cartella. Proposta con il pulsante: il governo clinico che misura e non decide. Risposta di Simone: «Valuta fin dove possiamo spingerci senza che debba essere classificato in classe II. Finché possiamo fare noi tutto il lavoro ok. Valuta cosa offre quel tool e capiamo se è classificato come dispositivo medico».
+
+- **Fonti lette**: la linea guida MDCG 2019-11 rev. 1 (giugno 2025) e il manuale sui casi di confine, versione 5 (aprile 2026), dal sito della Commissione europea; EUDAMED per nome commerciale. La valutazione è in `docs/dispositivo-medico.md`, da confermare con il consulente regolatorio.
+- **Il confine**: per l'aiuto alla decisione non c'è una classe I.
+  - Un modulo che dà informazioni sul singolo paziente per decidere diagnosi o terapia è almeno di classe IIa per la regola 11. La linea guida dice che quella parte della regola «si applica in generale a tutto il software dispositivo medico». Gli esempi di classe I sono un'app per la fertilità e un aiuto alla comunicazione.
+  - Il confine utile è quindi fra «dispositivo medico» e «non dispositivo medico». Fin lì possiamo fare tutto da noi, e la regola 3 resta.
+- **Fuori dal dispositivo medico**: la cartella e i moduli non medici dell'elenco della linea guida (dati amministrativi, storia clinica, fatturazione, rimborsi, prescrizione e dispensazione); la ricerca con i criteri del medico, che è «ricerca semplice»; i dati di popolazione aggregati e i registri.
+- **Dentro, almeno classe IIa**:
+  - avvisi su interazioni e dosi, raccomandazioni terapeutiche, segnalazione dei pazienti ad alto rischio perché si intervenga (esempi della linea guida);
+  - calcolatori clinici come CHA₂DS₂-VASc e Cockcroft-Gault (manuale sui casi di confine).
+- **MilleGPG in EUDAMED** (26/11/2026): nessun dispositivo «MilleGPG» o «Mille GPG». C'è «MILLEWIN» di Millennium S.p.A., di classe I. La scheda intera non è letta: il controllo dei permessi della sessione ha fermato le altre interrogazioni. Non si sa se MilleGPG sia dentro quella registrazione. Letto con la linea guida, il suo cruscotto aggregato sta fuori dal dispositivo medico; appropriatezza farmacologica, rischio clinico e promemoria sul singolo paziente starebbero dentro.
+- **Che cosa si fa**: il governo clinico che non decide, con la rendicontazione dell'AIR (D287), che chiede già gli indicatori di AFT e l'estrazione dei dati (artt. 16–18 e 22):
+  - nel nucleo il meccanismo: indicatori come dato con fonte e versione, conteggi sui pazienti del medico, cruscotto, confronto nell'AFT con soli numeri aggregati, ricerca con i criteri del medico;
+  - nel pacchetto del Piemonte gli indicatori dell'AIR e dell'ASL, con i valori «da completare» finché non li danno;
+  - le definizioni da atti pubblici o scritte dal medico, mai da MilleGPG o da Health Search (regola 2).
+- **Non si fa**: promemoria nella cartella, punteggi e calcolatori clinici, giudizi di appropriatezza sul singolo paziente.
+- **Aspetta il consulente regolatorio**: gli elenchi nominativi degli indicatori per l'audit. Sono ricerche, ma servono ad agire sui singoli pazienti, e la linea guida dice che una ricerca non è «semplice» se contribuisce a uno scopo medico. Le altre voci da confermare sono in `docs/dispositivo-medico.md`.

@@ -376,6 +376,15 @@ Non scaricati da qui:
 - **Il regolamento dell'ASL TO4 sulla prescrizione e la prenotazione** (deliberazione n. 1061 del 24/12/2025): il sito dell'ASL risponde 403. Non serve alle tabelle.
 - **La D.D. 375 del 10/7/2009 e la D.D. 43 del 4/2/2008**, che le due determine del 2019 modificano: non trovate fra i documenti della pagina regionale. Le determine del 2019 «integrano e modificano» quegli allegati per la cardiologia e la gastroenterologia; se le determine del 2008 e del 2009 avevano criteri per altre prestazioni, qui non ci sono.
 
+### Dispositivo medico: linee guida europee (D293)
+
+Scaricate e lette il 26/11/2026 per la domanda di Simone sul confine con il dispositivo medico (`docs/dispositivo-medico.md`). Non entrano nel repository (D92). Sono linee guida del gruppo di coordinamento dei dispositivi medici (MDCG), non vincolanti. Il testo del regolamento (UE) 2017/745 su EUR-Lex da qui non si apre (il sito risponde con una verifica per i programmi): la regola 11 è letta dove la linea guida la cita per intero. In EUDAMED si è cercato per nome commerciale; il controllo dei permessi della sessione ha fermato le interrogazioni dopo le prime.
+
+| Documento                                                                                                                                                                      | Indirizzo                                                                               | Byte    | SHA-256                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------ |
+| MDCG 2019-11 rev. 1, «Guidance on Qualification and Classification of Software in Regulation (EU) 2017/745 – MDR and Regulation (EU) 2017/746 – IVDR», giugno 2025 (36 pagine) | `https://health.ec.europa.eu/document/download/b45335c5-1679-4c71-a91c-fc7a4d37f12b_en` | 489.666 | `ed60b2084a91648bf483eb6c33641e0635e51bfb9712f889124c279b1885f38d` |
+| «Manual on borderline and classification for medical devices under Regulation (EU) 2017/745 … and Regulation (EU) 2017/746», versione 5, aprile 2026 (32 pagine)               | `https://health.ec.europa.eu/document/download/71a87df8-5ca1-4555-b453-b65bdf8de909_en` | 540.448 | `bbd84361e46646bd49cfb1692d2dda8d09190de9f1186902bbec401ef0a907ef` |
+
 ## Fuori dal repository
 
 Le banche dati pubbliche non sono nel repository. Le scarica `sync/` nello studio e le importa il programma: AIFA, ISTAT, Regione Piemonte, DPCM LEA. Fonti e versioni sono in `sync/fonti.json` e in `docs/banche-dati.md`. Le condizioni d'uso di ciascuna fonte sono da verificare e scrivere qui prima del lancio.
