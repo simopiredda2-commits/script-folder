@@ -8,11 +8,11 @@ import { REGIONAL_PACKAGES, REGIONS_DIR, regionalDataDirs, type RegionalPackage 
  * li trova dall'elenco dei pacchetti, senza nominare le regioni; un pacchetto senza quel tipo di
  * dati non dà cartelle. La prova non scrive il nome di nessuna regione.
  */
-describe('dati dei pacchetti regionali (D295)', () => {
+describe('dati dei pacchetti regionali (D295, D296)', () => {
   const pkg = REGIONAL_PACKAGES[0]!;
 
   it('le cartelle che ci sono, una per pacchetto, nell’ordine dell’elenco', () => {
-    for (const kind of ['trascrizioni', 'rao', 'siap'] as const) {
+    for (const kind of ['trascrizioni', 'rao', 'siap', 'regole'] as const) {
       const dirs = regionalDataDirs(kind);
       expect(dirs, kind).toEqual(
         REGIONAL_PACKAGES.map((p) => join(REGIONS_DIR, p.key, 'data', kind)).filter((d) =>
