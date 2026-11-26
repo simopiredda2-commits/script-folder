@@ -28,15 +28,15 @@ Link, byte e SHA-256 in `docs/provenienze.md`, «SIAP». I documenti restano fuo
 | Documento                                                                 | Data       | Che cosa dice                                                                                                                        |
 | ------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | CSI Piemonte, AP26_003, avviso pubblico                                   | 2026       | L'indagine di mercato, chi può rispondere, la scadenza dell'8/6/2026                                                                 |
-| CSI Piemonte, AP26_003, allegato 01, specifiche tecniche                  | 2026       | Che cosa fa il modulo, i tre insiemi di dati (DataSet 1–3), invio e collaudo; nelle pagine 6–11 il decreto come stampato in Gazzetta |
+| CSI Piemonte, AP26_003, allegato 01, specifiche tecniche                  | 2026       | Che cosa fa il modulo, i tre insiemi di dati (DataSet 1–3), invio e collaudo; nelle pagine 7–11 il decreto come stampato in Gazzetta |
 | Ministero della Salute, «Specifiche funzionali» del SIAP, versione 1.3    | 11/02/2026 | I tracciati per l'invio dalla Regione al Ministero, campo per campo, con XSD, controlli e codici di errore                           |
-| DM Salute 4/8/2025, GU n. 202 dell'1/9/2025                               | 2025       | L'istituzione del SIAP (articoli 1–9)                                                                                                |
+| DM Salute 4/8/2025, GU n. 202 dell'1/9/2025                               | 2025       | L'istituzione del SIAP (articoli 1–12)                                                                                               |
 | Comunicato, GU n. 226 del 29/9/2025 (25A05298)                            | 2025       | Nella GU n. 202 non fu stampato il disciplinare tecnico, allegato 1 del decreto: è sul portale del Ministero                         |
 | Ministero della Salute, disciplinare tecnico del SIAP (allegato 1 del DM) | 2025       | Non letto: il portale del Ministero da qui risponde 403                                                                              |
 
 Che cosa non si è potuto scaricare da qui (`docs/provenienze.md`):
 
-- il PDF della GU n. 202: il collegamento con www.gazzettaufficiale.it si chiude a metà del trasferimento. Le pagine 5–9 con il decreto le ha mandate Simone il 26/11/2026, dalla notizia di regioni.it; il testo era anche nelle pagine 6–11 delle specifiche del CSI;
+- il PDF della GU n. 202: il collegamento con www.gazzettaufficiale.it si chiude a metà del trasferimento. Le pagine 5–9 con il decreto le ha mandate Simone il 26/11/2026, dalla notizia di regioni.it; il testo era anche nelle pagine 7–11 delle specifiche del CSI;
 - dal portale del Ministero (www.salute.gov.it) il disciplinare tecnico: il servizio di protezione del sito (Gcore) risponde 403. Le specifiche funzionali, bloccate allo stesso modo, le ha mandate Simone il 26/11/2026: sono le stesse lette prima come testo.
 
 Le specifiche del CSI elencano i campi senza i valori ammessi. I valori sono presi dalle specifiche del Ministero, finché il CSI non dice il formato del suo JSON (domanda 12 per il CSI, `docs/avanzamento.md`).
