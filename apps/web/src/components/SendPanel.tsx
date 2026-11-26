@@ -177,9 +177,14 @@ export function SendPanel({
     : status === 'error' && (lastErrorKind === 'unreachable' || lastErrorKind === 'timeout');
   const toRedForm = !!redForm && noOutcome;
   const aifa = (check?.problemi ?? []).filter((p) => p.needs === 'aifa_confirmation' && p.lineId);
-  // Le proposte della segreteria sul tipo di terapia: il medico le conferma o no (D283).
+  // Le proposte della segreteria sul tipo di terapia: il medico le conferma o no (D283). Una
+  // proposta decisa qui resta con la sua scelta anche dopo «Controlla di nuovo», che la dice già
+  // decisa: il medico può cambiare idea fino alla firma.
   const proposals = (check?.problemi ?? []).filter(
-    (p) => p.needs === 'therapy_decision' && p.lineId,
+    (p) =>
+      p.ruleId === 'PROPOSTA' &&
+      !!p.lineId &&
+      (p.needs === 'therapy_decision' || decisions[p.lineId] !== undefined),
   );
   const undecided = proposals.filter((p) => !decisions[p.lineId!]).length;
   const warns = [

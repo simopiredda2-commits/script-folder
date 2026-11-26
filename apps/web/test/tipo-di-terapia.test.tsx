@@ -164,23 +164,34 @@ describe('la proposta della segreteria nel pannello della firma (D283)', () => {
               archivio: null,
             }),
           );
-        if (path === '/api/ricette/r1/controlla')
+        if (path === '/api/ricette/r1/controlla') {
+          // Con la decisione nella richiesta il controllo la dice già presa, come il servizio.
+          const sent = JSON.parse(init?.body as string) as { proposte?: Record<string, string> };
+          const decided = !!sent.proposte?.l1;
           return Promise.resolve(
             json(200, {
               versioneRegole: 'prova-1',
-              bloccanti: 1,
+              bloccanti: decided ? 0 : 1,
               problemi: [
-                {
-                  ruleId: 'PROPOSTA',
-                  severity: 'warn',
-                  needs: 'therapy_decision',
-                  lineId: 'l1',
-                  message:
-                    'La segreteria propone per la terapia: Farmaco di prova: cronica, ricovero (H)',
-                },
+                decided
+                  ? {
+                      ruleId: 'PROPOSTA',
+                      severity: 'info',
+                      lineId: 'l1',
+                      message: 'Proposta della segreteria confermata: Farmaco di prova',
+                    }
+                  : {
+                      ruleId: 'PROPOSTA',
+                      severity: 'warn',
+                      needs: 'therapy_decision',
+                      lineId: 'l1',
+                      message:
+                        'La segreteria propone per la terapia: Farmaco di prova: cronica, ricovero (H)',
+                    },
               ],
             }),
           );
+        }
         if (path === '/api/ricette/r1/firma-e-invia') {
           bodies.push(JSON.parse(init?.body as string));
           return Promise.resolve(
@@ -206,6 +217,11 @@ describe('la proposta della segreteria nel pannello della firma (D283)', () => {
     expect(screen.getByText('Per firmare, decidi sulle proposte della segreteria.')).toBeTruthy();
     await user.click(screen.getByLabelText(/Conferma la proposta/));
     await waitFor(() => expect(sign.disabled).toBe(false));
+    // «Controlla di nuovo» la dice decisa; la scelta resta, e si può ancora cambiare.
+    await user.click(screen.getByRole('button', { name: 'Controlla di nuovo' }));
+    await screen.findByText(/Proposta della segreteria confermata/);
+    expect(screen.getByLabelText<HTMLInputElement>(/Conferma la proposta/).checked).toBe(true);
+    expect(screen.getByLabelText(/Non applicarla/)).toBeTruthy();
     await user.click(sign);
     await screen.findByText(/Ricetta inviata/);
     expect(bodies).toEqual([{ confermeNote: [], motivi: {}, proposte: { l1: 'conferma' } }]);
