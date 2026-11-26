@@ -27,6 +27,21 @@ export interface Me {
   blocchiDaVedere?: number;
   /** Minuti di inattività dopo cui la sessione si blocca (impostazione dello studio, D29). */
   minutiInattivita?: number | null;
+  /** Il servizio delle ricette SSN della regione dello studio, con le sue parole (D300). */
+  servizioRicette?: RegionalServiceWords | null;
+}
+
+/** Il servizio delle ricette SSN della regione dello studio: nome, articolo e preposizioni. */
+export interface RegionalServiceWords {
+  /** «servizio»: la ricetta va al servizio della regione; «modulo»: la fa il modulo della regione. */
+  via: 'servizio' | 'modulo';
+  nome: string;
+  il: string;
+  al: string;
+  dal: string;
+  del: string;
+  /** La ricetta SSN senza esito si stampa come ricetta rossa e parte in DPCM (D270). */
+  ricettaRossaDpcm: boolean;
 }
 
 /** Che cosa conta come attività di chi usa la pagina: tastiera, clic, tocco, rotella. */

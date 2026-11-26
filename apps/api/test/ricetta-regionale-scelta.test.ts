@@ -136,6 +136,23 @@ describe('ricetta SSN di una regione inventata, con parole sue e senza lotti (D3
     expect(calls.map((c) => [c.system, c.operation])).toEqual([['regional', 'invio']]);
   });
 
+  it('le pagine hanno il nome del servizio della regione, con l’articolo e le preposizioni', async () => {
+    const res = await x.s.app.inject({
+      method: 'GET',
+      url: '/api/io',
+      headers: { cookie: x.cookie },
+    });
+    expect(res.json<{ servizioRicette: unknown }>().servizioRicette).toEqual({
+      via: 'servizio',
+      nome: 'SRP',
+      il: 'lo SRP',
+      al: 'allo SRP',
+      dal: 'dallo SRP',
+      del: 'dello SRP',
+      ricettaRossaDpcm: false,
+    });
+  });
+
   it('nel promemoria niente codice regionale davanti al nome: la regione non lo chiede', async () => {
     const [profile] = await x.t.db
       .select({ regionalCode: doctorProfile.regionalCode })
@@ -274,6 +291,12 @@ describe('ricetta SSN in una regione senza pacchetto (D300)', () => {
       .set({ regionName: other.regionName })
       .where(eq(studio.id, x.studioId));
     try {
+      const me = await x.s.app.inject({
+        method: 'GET',
+        url: '/api/io',
+        headers: { cookie: x.cookie },
+      });
+      expect(me.json<{ servizioRicette: unknown }>().servizioRicette).toBeNull();
       const id = await draft(x);
       const res = await sign(x, id);
       expect(res.statusCode).toBe(422);

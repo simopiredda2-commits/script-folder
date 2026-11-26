@@ -7,6 +7,7 @@ import { useSession } from '../lib/session';
 import { ErrorMessage, IssueList, Notice, ResultNotice, type RuleIssue } from './common';
 import { Icon } from './Icon';
 import { RedFormPrint, RedPrintedNotice, type RedPrinted } from './RedFormPrint';
+import { capitalized, useRegionalService } from '../lib/regional-service';
 
 interface CheckResult {
   versioneRegole: string | null;
@@ -37,8 +38,9 @@ export interface SendPanelProps {
   /** Ricetta SSN: prima della firma si vede l'anteprima del promemoria (D253). */
   preview?: boolean;
   /**
-   * Ricetta SSN farmaceutica o specialistica al SAR: senza esito non si rimanda, si stampa la
-   * ricetta rossa sul modulo del Poligrafico, che parte poi in DPCM (V06, 4.3.1; D270).
+   * Ricetta SSN farmaceutica o specialistica, dove la regione vuole la ricetta rossa in DPCM:
+   * senza esito non si rimanda, si stampa la ricetta rossa sul modulo del Poligrafico, che parte
+   * poi in DPCM (D270, D300).
    */
   redForm?: boolean;
   /**
@@ -98,6 +100,7 @@ export function SendPanel({
   onEdit,
   focusOnArrival,
 }: SendPanelProps) {
+  const service = useRegionalService();
   const { isDoctor } = useSession();
   const heading = useRef<HTMLHeadingElement>(null);
   const arrival = useRef(focusOnArrival);
@@ -171,7 +174,7 @@ export function SendPanel({
   const unreachable = outcome
     ? outcome.esito === 'unreachable'
     : status === 'error' && lastErrorKind === 'unreachable';
-  // Nessun esito, nemmeno incerto: per la ricetta SSN al SAR si passa alla ricetta rossa (D270).
+  // Nessun esito, nemmeno incerto: dove la regione lo vuole si passa alla ricetta rossa (D270).
   const noOutcome = outcome
     ? outcome.esito === 'unreachable' || outcome.esito === 'timeout'
     : status === 'error' && (lastErrorKind === 'unreachable' || lastErrorKind === 'timeout');
@@ -413,8 +416,9 @@ export function SendPanel({
       )}
       {toRedForm ? (
         <Notice kind="avviso">
-          Il SAR non ha dato esito: come vuole la Regione, si stampa la ricetta rossa, che parte poi
-          in DPCM. Se la ricetta dematerializzata era arrivata, si annulla da sola (V06, 4.3.1).
+          {capitalized(service.il)} non ha dato esito: come vuole la regione, si stampa la ricetta
+          rossa, che parte poi in DPCM. Se la ricetta dematerializzata era arrivata, si annulla da
+          sola.
         </Notice>
       ) : (
         outcome?.esito === 'timeout' && (

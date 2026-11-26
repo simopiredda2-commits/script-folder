@@ -15,6 +15,7 @@
     "@mmg/fixtures": "workspace:*",
     "@mmg/integrations": "workspace:*",
     "@mmg/reference": "workspace:*",
+    "@mmg/regions": "workspace:*",
     "@mmg/rules": "workspace:*",
     "@noble/ciphers": "2.4.0",
     "@noble/hashes": "2.4.0",

@@ -92,8 +92,8 @@ export function registerPrescriptionRoutes(
     return { esito: (await service.cancel(req.actor!, id, req.body)).outcome };
   });
 
-  // Ricetta rossa: per la SSN al SAR con il numero del modulo del Poligrafico e l'invio in DPCM
-  // (D270); per le altre il ripiego di prima.
+  // Ricetta rossa: per la SSN, dove la regione la vuole, con il numero del modulo del Poligrafico e
+  // l'invio in DPCM (D270, D300); per le altre il ripiego di prima.
   app.post('/api/ricette/:id/ricetta-rossa', scoped, async (req) => {
     return service.printPaper(req.actor!, idParams.parse(req.params).id, req.body);
   });

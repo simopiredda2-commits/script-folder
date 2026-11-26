@@ -53,6 +53,8 @@ export interface InterruptedHints {
   doctor: string;
   /** La seconda ricetta «in invio», per la ricetta rossa (D270). */
   redPatient: string;
+  /** Il servizio delle ricette della regione dello studio, con l'articolo (D300). */
+  service: string;
 }
 
 export type ToWorker =

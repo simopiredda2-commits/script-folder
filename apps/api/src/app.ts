@@ -400,7 +400,26 @@ export function buildApp({
     now: now ?? (() => new Date()),
     expectedSince: (at) => referenceUpdates.expectedSince(at),
   });
-  registerPatientRoutes(app, db, { reference, now: now ?? (() => new Date()) });
+  // Le ricette SSN della regione dello studio (D300): per difetto il simulatore del pacchetto, con
+  // i simulatori del secondo fattore e dell'accesso regionale; la ricetta bianca al Sistema TS.
+  const simulatedSessions = (s: SecondFactorGateway) =>
+    s instanceof SimulatedSecondFactor ? s : undefined;
+  const nationalGateway =
+    gateways.sistema_ts ??
+    new SimulatedGateway('sistema_ts', { sessions: simulatedSessions(secondFactor.sistema_ts) });
+  const prescriptions = prescriptionChoice(prescriptionOverride, {
+    ...(gateways.regional ? { gateway: gateways.regional } : {}),
+    sessions: simulatedSessions(secondFactor.rupar_piemonte),
+    oauth:
+      regional.gateway instanceof SimulatedRegionalAuthorization ? regional.gateway : undefined,
+  });
+  const prescriptionOfStudio = async (studioId: string) =>
+    prescriptions.for(await studioRegion(db, studioId));
+  registerPatientRoutes(app, db, {
+    reference,
+    now: now ?? (() => new Date()),
+    prescriptionOf: prescriptionOfStudio,
+  });
   registerDoctorProfileRoutes(app, db, now ?? (() => new Date()));
   registerTodayRoutes(app, db, now ?? (() => new Date()), reference);
   registerTherapyRoutes(app, db, now ?? (() => new Date()), reference);
@@ -447,21 +466,6 @@ export function buildApp({
           );
       return check(id, actor, input);
     };
-  // Le ricette SSN della regione dello studio (D300): per difetto il simulatore del pacchetto, con
-  // i simulatori del secondo fattore e dell'accesso regionale; la ricetta bianca al Sistema TS.
-  const simulatedSessions = (s: SecondFactorGateway) =>
-    s instanceof SimulatedSecondFactor ? s : undefined;
-  const nationalGateway =
-    gateways.sistema_ts ??
-    new SimulatedGateway('sistema_ts', { sessions: simulatedSessions(secondFactor.sistema_ts) });
-  const prescriptions = prescriptionChoice(prescriptionOverride, {
-    ...(gateways.regional ? { gateway: gateways.regional } : {}),
-    sessions: simulatedSessions(secondFactor.rupar_piemonte),
-    oauth:
-      regional.gateway instanceof SimulatedRegionalAuthorization ? regional.gateway : undefined,
-  });
-  const prescriptionOfStudio = async (studioId: string) =>
-    prescriptions.for(await studioRegion(db, studioId));
   // Strumenti e amministrazione dello studio (tappa 14).
   const adminDeps = {
     db,

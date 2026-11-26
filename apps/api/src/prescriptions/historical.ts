@@ -13,7 +13,7 @@ import type { LineFields } from './history';
  * Servono allo storico dei farmaci e delle prestazioni prescritti (D152) e alla cronologia.
  *
  * Non sono ricette di questo programma: non entrano mai nella macchina degli stati delle ricette
- * (non si firmano, non si inviano, non si annullano verso il SAR) e non si ripetono. Sono dati
+ * (non si firmano, non si inviano, non si annullano verso il servizio) e non si ripetono. Sono dati
  * del paziente: non si cancellano; se registrate per errore si annullano con un motivo, e lo
  * storico delle modifiche (trigger della migrazione 0023) dice chi e quando.
  */
@@ -161,7 +161,7 @@ export async function loadHistorical(
   return row;
 }
 
-/** Annullamento con motivo: la ricetta resta, segnata; il SAR non c'entra. */
+/** Annullamento con motivo: la ricetta resta, segnata; il servizio delle ricette non c'entra. */
 export async function annulHistorical(tx: Tx, row: Row, reason: string, at: Date): Promise<void> {
   if (row.annulledAt) throw new HttpError(409, 'La ricetta è già annullata');
   await tx

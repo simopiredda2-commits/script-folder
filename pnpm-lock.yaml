@@ -126,6 +126,9 @@ importers:
       '@mmg/reference':
         specifier: workspace:*
         version: link:../../packages/reference
+      '@mmg/regions':
+        specifier: workspace:*
+        version: link:../../packages/regions
       '@mmg/rules':
         specifier: workspace:*
         version: link:../../packages/rules

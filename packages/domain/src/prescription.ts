@@ -4,11 +4,12 @@
  *   bozza → da firmare → inviata → errore o annullata
  *
  * La segreteria prepara (bozze di ripetizione, che mette nella coda «da firmare»); il medico
- * firma e invia. Se il SAR rifiuta, la ricetta va in errore con il motivo in chiaro. Se SAR o
- * Sistema TS non rispondono, si stampa la ricetta rossa (ripiego cartaceo).
+ * firma e invia. Se il servizio rifiuta, la ricetta va in errore con il motivo in chiaro. Se il
+ * servizio delle ricette della regione o il Sistema TS non rispondono, si stampa la ricetta rossa
+ * (ripiego cartaceo).
  *
  * «In invio» è uno stato tecnico di pochi istanti: impedisce di inviare due volte la stessa
- * ricetta mentre la risposta del SAR è in arrivo (decisione D36). Se il servizio si ferma proprio
+ * ricetta mentre la risposta del servizio è in arrivo (decisione D36). Se il servizio si ferma proprio
  * allora, la ricetta resta «in invio»: dopo INTERRUPTED_SEND_AFTER_MINUTES il medico ne segna
  * l'esito, chiesto all'ente (D233).
  */
@@ -52,7 +53,7 @@ export const PRESCRIPTION_KIND_LABELS: Record<PrescriptionKind, string> = {
 
 /** Perché l'ultimo invio non è andato: decide che cosa si può fare dopo. */
 export type SendErrorKind =
-  /** Il SAR (o il Sistema TS) ha risposto e ha rifiutato: il contenuto va corretto. */
+  /** Il servizio ha risposto e ha rifiutato: il contenuto va corretto. */
   | 'rejected'
   /** Il sistema non è raggiungibile: la ricetta certamente non è arrivata. */
   | 'unreachable'
@@ -74,7 +75,7 @@ export type PrescriptionEvent =
   /** Risposte dell'invio. */
   | 'send_succeeded'
   | 'send_failed'
-  /** Annullamento: prima dell'invio è solo locale, dopo passa dal SAR. */
+  /** Annullamento: prima dell'invio è solo locale, dopo passa dal servizio che l'ha ricevuta. */
   | 'cancel'
   /** Ripiego sulla ricetta rossa quando il sistema non risponde. */
   | 'print_paper'
@@ -89,9 +90,8 @@ export interface TransitionContext {
   /** Tipo dell'ultimo errore d'invio, se la ricetta è in errore. */
   lastErrorKind?: SendErrorKind | null;
   /**
-   * Ricetta SSN farmaceutica o specialistica al SAR del Piemonte: senza esito si passa alla
-   * ricetta rossa in DPCM, non si rimanda (SIRPED, «Cartelle cliniche MMG e PLS», V06, 3.5.1 e
-   * 4.3.1, casi 4 e 5; D270).
+   * Ricetta SSN farmaceutica o specialistica, dove la regione vuole la ricetta rossa in DPCM:
+   * senza esito si passa alla ricetta rossa, non si rimanda (D270, D300).
    */
   regionFlow?: boolean;
   /** La ricetta è «in invio» da più di INTERRUPTED_SEND_AFTER_MINUTES: l'invio si è interrotto. */
@@ -118,7 +118,7 @@ export function transition(
         return ok('draft');
       if (from === 'error') {
         return no(
-          'Una ricetta senza risposta del SAR non si modifica: riprova l’invio o annullala',
+          'Una ricetta senza risposta del servizio non si modifica: riprova l’invio o annullala',
         );
       }
       return no('Una ricetta inviata, annullata o stampata non si modifica');
@@ -131,7 +131,7 @@ export function transition(
         (ctx.lastErrorKind === 'unreachable' || ctx.lastErrorKind === 'timeout')
       )
         return no(
-          'Il SAR non ha dato esito: si stampa la ricetta rossa, che parte poi in DPCM (V06, 4.3.1)',
+          'Il servizio della regione non ha dato esito: si stampa la ricetta rossa, che parte poi in DPCM',
         );
       if (
         from === 'error' &&
@@ -140,7 +140,7 @@ export function transition(
         return ok('sending');
       }
       if (from === 'error')
-        return no('Il SAR l’ha rifiutata: correggila prima di inviarla di nuovo');
+        return no('Il servizio l’ha rifiutata: correggila prima di inviarla di nuovo');
       if (from === 'sending') return no('Invio già in corso');
       return no('Questa ricetta non si può inviare');
     case 'send_succeeded':
@@ -166,10 +166,10 @@ export function transition(
       if (from === 'error' && ctx.lastErrorKind === 'unreachable') return ok('paper');
       if (from === 'error' && ctx.lastErrorKind === 'timeout') {
         return no(
-          'Esito incerto: la ricetta potrebbe essere arrivata al SAR. Verifica prima di stamparla (da definire sulle specifiche)',
+          'Esito incerto: la ricetta potrebbe essere arrivata. Verifica prima di stamparla (da definire sulle specifiche)',
         );
       }
-      return no('La ricetta rossa si stampa solo quando il SAR o il Sistema TS non rispondono');
+      return no('La ricetta rossa si stampa solo quando il servizio delle ricette non risponde');
     case 'settle_arrived':
       return from === 'sending' ? ok('sent') : no('Nessun invio senza risposta da chiudere');
     case 'settle_not_arrived':
@@ -182,7 +182,7 @@ export function transition(
 export const FINAL_STATUSES: readonly PrescriptionStatus[] = ['cancelled', 'paper'];
 
 /**
- * Stato di erogazione di una ricetta inviata, come lo comunica il SAR o il Sistema TS. Sono i
+ * Stato di erogazione di una ricetta inviata, come lo comunica il servizio che l'ha ricevuta. Sono i
  * nomi del nostro prodotto: i codici ufficiali vanno mappati dalle specifiche (da completare).
  */
 export const DISPENSING_STATES = [

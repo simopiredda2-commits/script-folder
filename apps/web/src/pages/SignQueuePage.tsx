@@ -10,6 +10,7 @@ import { api, ApiError } from '../lib/api';
 import { dateTime, PRESCRIPTION_KIND } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { useRegionalService } from '../lib/regional-service';
 
 interface QueueGroup {
   paziente: { id: string; nome: string; cognome: string; codiceFiscale: string };
@@ -544,12 +545,13 @@ interface RedRow {
 
 /** Simbolo e parola dello stato, come in tutta la cartella: mai il solo colore. */
 function RedStatus({ r }: { r: RedRow }) {
+  const service = useRegionalService();
   const [kind, word, text]: ['info' | 'avviso' | 'errore' | 'fatto', string, string] =
     r.stato === 'to_send'
       ? [
           r.daSeguire ? 'avviso' : 'info',
           'Da mandare',
-          `al SAR entro il ${dateTime(r.inviareEntro)}. ${r.errore ?? 'Parte da sola.'}`,
+          `${service.al} entro il ${dateTime(r.inviareEntro)}. ${r.errore ?? 'Parte da sola.'}`,
         ]
       : r.stato === 'accepted'
         ? [
@@ -558,13 +560,13 @@ function RedStatus({ r }: { r: RedRow }) {
             `il ${dateTime(r.accoltaIl ?? r.stampataIl)}, protocollo ${r.protocollo ?? '—'}: si aspetta l’esito.${r.errore ? ` ${r.errore}` : ''}`,
           ]
         : r.stato === 'ok'
-          ? ['fatto', 'Accolta', `dal SAR, protocollo ${r.protocollo ?? '—'}.`]
+          ? ['fatto', 'Accolta', `${service.dal}, protocollo ${r.protocollo ?? '—'}.`]
           : r.stato === 'warnings'
             ? ['avviso', 'Accolta con avvisi', `protocollo ${r.protocollo ?? '—'}.`]
             : [
                 'errore',
                 'Scartata',
-                'dal SAR: i messaggi qui sotto dicono perché. La correzione di una ricetta DPCM già mandata non è ancora nella cartella.',
+                `${service.dal}: i messaggi qui sotto dicono perché. La correzione di una ricetta DPCM già mandata non è ancora nella cartella.`,
               ];
   return (
     <p>
@@ -607,7 +609,7 @@ function DmCancelStatus({ a }: { a: NonNullable<RedRow['annullamentoDematerializ
 
 /**
  * Le ricette rosse del medico (D270): in corso, e per 30 giorni quelle chiuse. Partono da sole per
- * il SAR; «Invia adesso» fa subito un giro della coda.
+ * il servizio della regione; «Invia adesso» fa subito un giro della coda.
  */
 function RedQueue({ reloadKey }: { reloadKey: number }) {
   const list = useApi<{ ricette: RedRow[] }>('/api/ricette-rosse');
@@ -693,6 +695,7 @@ function RedQueue({ reloadKey }: { reloadKey: number }) {
 }
 
 export function SignQueuePage() {
+  const service = useRegionalService();
   const { isDoctor, isSecretary } = useSession();
   const sees = isDoctor || isSecretary;
   // Una ricetta che passa da una coda all'altra: gli invii non riusciti si ricaricano (D239).
@@ -793,9 +796,9 @@ export function SignQueuePage() {
             Ricette rosse in DPCM
           </h2>
           <p className="tenue">
-            Le ricette rosse stampate quando il SAR non ha dato esito partono da sole per il SAR
-            entro 24 ore. Qui l’esito e l’annullamento della ricetta dematerializzata; quelle chiuse
-            restano per 30 giorni.
+            Le ricette rosse stampate quando {service.il} non ha dato esito partono da sole per{' '}
+            {service.il} entro 24 ore. Qui l’esito e l’annullamento della ricetta dematerializzata;
+            quelle chiuse restano per 30 giorni.
           </p>
           <RedQueue reloadKey={changes} />
         </section>

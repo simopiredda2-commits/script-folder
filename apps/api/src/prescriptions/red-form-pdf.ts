@@ -6,14 +6,16 @@
  * - Caselle per la lettura ottica: un carattere per casella, in nero; codici in OCR-A, tipo 1
  *   (2.3.1.3).
  * - NRE in chiaro e a barre, del tipo del numero del Poligrafico (3-of-9, barre alte almeno 7,5 mm,
- *   modulo di almeno 0,240 mm, largo 2,5 volte lo stretto), accanto alla denominazione dell'ente
- *   (SIRPED, V06, 4.2.2). In due parti come il numero del Poligrafico: 5 e 10 caratteri.
+ *   modulo di almeno 0,240 mm, largo 2,5 volte lo stretto), accanto alla denominazione dell'ente,
+ *   dove la regione vuole la ricetta rossa in DPCM (D300). In due parti come il numero del
+ *   Poligrafico: 5 e 10 caratteri.
  * - Casella «STAMPA PC» biffata: stampa con il sistema informatico del medico (elemento 25).
  *
  * Le posizioni sono misurate sul facsimile dell'Allegato 2 del disciplinare, che per la parte della
  * ricetta è in scala (2,78 punti dell'immagine per millimetro in larghezza e in altezza). Sono da
  * controllare con un modulo vero e la stampante dello studio: lo spostamento della stampa si regola
- * con `offset`. La posizione dell'NRE la V06 non la dà al millimetro: è da confermare con il CSI.
+ * con `offset`. La posizione dell'NRE le specifiche della regione non la danno al millimetro: è da
+ * confermare con chi gestisce il suo servizio delle ricette.
  */
 
 import fontkit from '@pdf-lib/fontkit';

@@ -724,7 +724,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
     await viewer().locator('canvas').first().waitFor({ timeout: 30_000 });
     await closeViewer();
     // La ricetta rossa si segue nella sua sezione: parte da sola; «Invia adesso» non aspetta il
-    // giro della coda. Il SAR simulato risponde «in attesa» alla prima lettura dell'esito.
+    // giro della coda. Il servizio simulato risponde «in attesa» alla prima lettura dell'esito.
     const red = f.getByRole('region', { name: 'Ricette rosse in DPCM' });
     const item = red.locator('li.riquadro', { has: f.getByRole('link', { name, exact: true }) });
     await item.waitFor({ timeout: 30_000 });

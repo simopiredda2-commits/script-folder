@@ -5,21 +5,10 @@ import {
   readRegionalToken,
   regionalSoftwareId,
   sarAuthentication,
-  SimulatedGateway,
   SimulatedRegionalAuthorization,
   SimulatedSecondFactor,
   tokenResultFrom,
-  type PrescriptionMessage,
 } from '../src';
-
-const message: PrescriptionMessage = {
-  localId: 'r1',
-  kind: 'pharma_ssn',
-  patientFiscalCode: 'RTOLNI50C54X101X',
-  doctor: { userId: 'u1', name: 'Medico inventato' },
-  lines: [{ drugName: 'Farmaco di prova', quantity: 1 }],
-  compiledAt: '2026-11-18',
-};
 
 describe('accesso regionale con SPID o CIE (D109)', () => {
   it('PKCE S256 come nell’esempio della RFC 7636 (appendice B)', () => {
