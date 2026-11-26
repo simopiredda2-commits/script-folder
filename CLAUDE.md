@@ -153,7 +153,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/ppip.md`: prestazioni aggiuntive (PPIP). Catalogo versionato per livello (ACN, AIR, accordo dell'ASL); registrazione in cartella; distinta del mese con il CSV in un formato descritto come dato; invio predisposto con un simulatore; fonti e che cosa controllare (D212, D213).
 - `docs/rao.md`: tabelle RAO (manuale di AGENAS, determine del Piemonte per cardiologia e gastroenterologia), legame con il catalogo, che cosa controllare; la condizione clinica nella ricetta specialistica (D285).
 - `docs/pacchetti-regionali.md`: pacchetti regionali, scelta dalla regione dello studio e dall'ASL del medico, prova dei nomi regionali con l'inventario, come si sposta un pezzo e come si aggiunge una regione (D288, D292).
-- `docs/dispositivo-medico.md`: confine con il dispositivo medico, letto sulle linee guida europee (MDCG 2019-11 rev. 1, manuale sui casi di confine): che cosa si fa da noi, che cosa aspetta il consulente regolatorio, che cosa resta fuori; MilleGPG (D293).
+- `docs/dispositivo-medico.md`: confine con il dispositivo medico, letto sulle linee guida europee (MDCG 2019-11 rev. 1, manuale sui casi di confine): che cosa si fa da noi, le scelte prudenti, che cosa resta fuori; la classe I fatta da noi non è fattibile per le funzioni che aiutano a decidere; MilleGPG (D293, D294). Deciso senza consulente esterno.
 - `docs/aura.md`: collegamento con AURA, oggi simulato: quando si controlla, che cosa si allinea, nuovi assistiti, cambio di medico dentro lo studio, registro, che cosa non è provato (D197–D200).
 
 ## Le tappe

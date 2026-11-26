@@ -35,7 +35,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **26/11/2026, unione della #43**: pull request #43 unita (commit `1806799`), con il via dato in anticipo e le 14 prove su GitHub verdi. Prima, due cadute della CI con le loro cause, corrette (D286). Dimostrazione alla versione 31 e pagina del collaudo aggiornate (G6, K9). Il branch riparte da `main`. Lo stesso giorno la domanda di Simone sulla rendicontazione dell'AIR del Piemonte 2024: «Dopo il SIAP», con tutto ciò che serve (D287). Poi la richiesta dei pacchetti regionali, niente di piemontese nel nucleo: «Dopo il SIAP nazionale» (D288, sezione «Pacchetti regionali»). Adesso la parte nazionale del SIAP; poi scheletro e spostamento del Piemonte; poi, nel pacchetto del Piemonte, modulo del SIAP con il CSI, AIR e AURA. Lo stesso giorno: la domanda sugli strumenti con l'intelligenza artificiale, «Solo strumenti che non decidono», dopo AURA (D290); fatto il passo 1c del SIAP, codice e tipo della struttura, AFT e UCCP (D289, sezione «Dopo l'unione della #43 – SIAP nazionale»).
 - **26/11/2026, dopo l'unione della #43**: la parte nazionale del SIAP che non dipende dal CSI. Struttura dello studio e dell'AFT (D289); il contatto, proposto dagli atti del medico e confermato, cambiato o scartato da lui nella pagina «Contatti per il SIAP» (D291). Decisioni della fermata: rendicontazione dell'AIR dopo il SIAP (D287), pacchetti regionali (D288), strumenti con l'intelligenza artificiale che non decidono (D290). Sezione «Dopo l'unione della #43 – SIAP nazionale».
 - **26/11/2026, unione della #44**: pull request #44 unita (commit `2e1d4a2`), con il via dato in anticipo e le 14 prove su GitHub verdi. Il branch riparte da `main`; dimostrazione alla versione 32 e pagina del collaudo con G17 e K10. Adesso lo scheletro dei pacchetti regionali (D288, D292).
-- **26/11/2026, unione della #45**: pull request #45 unita (commit `4137a2c`), con il via dato in anticipo e le 14 prove su GitHub verdi: lo scheletro dei pacchetti regionali (D292). Il branch riparte da `main`. Dimostrazione e pagina del collaudo si ripubblicano con la prossima unione, che cambia anche i file della dimostrazione. Adesso lo spostamento del Piemonte, a cominciare dai dati.
+- **26/11/2026, unione della #45**: pull request #45 unita (commit `4137a2c`), con il via dato in anticipo e le 14 prove su GitHub verdi: lo scheletro dei pacchetti regionali (D292). Il branch riparte da `main`. Dimostrazione e pagina del collaudo si ripubblicano con la prossima unione, che cambia anche i file della dimostrazione. Lo stesso giorno le domande di Simone su GPG e sulla classe I: il confine con il dispositivo medico è chiuso senza consulente, fuori con le scelte prudenti; la classe I fatta da noi non è fattibile per le funzioni che aiutano a decidere (D293, D294, `docs/dispositivo-medico.md`). Adesso lo spostamento del Piemonte, a cominciare dai dati.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -91,7 +91,6 @@ _C. Decisioni o materiali di Simone_
 5. **Banca dati farmaci con licenza** (per esempio Farmadati): note AIFA per AIC e i fatti oggi non noti (R3, R4, R8, R11).
 6. **Fornitore vero di email e SMS**; dove ospitare il servizio, con i salvataggi cifrati (D166).
 7. Revisione di un avvocato prima del lancio.
-8. **Consulente regolatorio** (M2 del collaudo): il confine con il dispositivo medico letto sulle linee guida europee, in `docs/dispositivo-medico.md` (D293), con le cinque voci da confermare; prima del parere non si costruiscono gli elenchi nominativi degli indicatori di governo clinico.
 
 ## Come provarlo
 
@@ -1861,7 +1860,7 @@ Domanda di Simone: «che ne dici di prevedere qualcosa tipo MediEvidence di Geno
 
 - **Che cosa**: valori dei referti letti e da validare, codici ICD-9 proposti dal testo del medico, ricerca in linee guida e schede tecniche senza i dati del paziente. Il medico conferma sempre.
 - **Quando**: dopo SIAP, pacchetti regionali, AIR e AURA.
-- **Da chiedere**: al consulente regolatorio, la conferma che questi strumenti restano fuori dal regolamento sui dispositivi medici. Il fornitore del servizio e la valutazione d'impatto sulla protezione dei dati si decidono prima di collegarne uno vero.
+- **Dispositivo medico**: restano fuori dal regolamento, per la lettura prudente delle linee guida europee scelta da Simone senza consulente (D294). Il fornitore del servizio e la valutazione d'impatto sulla protezione dei dati si decidono prima di collegarne uno vero.
 
 ## Pacchetti regionali (26/11/2026, D288)
 

@@ -205,11 +205,11 @@ Per la Dr.ssa Rocca, o per chi lei indica. Una trascrizione entra nel programma 
 - **Dove**: `docs/certificati.md`, `docs/ruoli-permessi.md`, `docs/amministrazione.md`
 - **Che cosa guardare**: l'email al datore di lavoro con nome e cognome (D108); ciò che vede la segreteria; le soglie degli avvisi sugli accessi anomali, oggi vuote (linee guida del Garante sul dossier sanitario).
 
-### M2 · Consulente regolatorio
+### M2 · Confine con il dispositivo medico
 
-- **Chi**: Simone
-- **Dove**: `docs/requisiti.md`, `docs/dispositivo-medico.md`
-- **Che cosa guardare**: che il programma resti fuori dai dispositivi medici: controlli solo formali, nessun suggerimento; i valori fuori dall'intervallo del referto evidenziati; le voci «da confermare» del confine (D293), fra cui gli elenchi nominativi degli indicatori di governo clinico.
+- **Chi**: Simone, senza consulente esterno (D294)
+- **Dove**: `docs/dispositivo-medico.md`
+- **Che cosa guardare**: che il programma resti fuori dai dispositivi medici, con le scelte prudenti: controlli solo formali, nessun suggerimento, niente elenchi di pazienti da richiamare, i valori dei referti senza giudizio.
 
 ### M3 · Avvocato
 
