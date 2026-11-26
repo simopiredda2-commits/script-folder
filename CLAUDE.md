@@ -148,6 +148,7 @@ Le prove del database vogliono `DATABASE_URL`: senza, falliscono (non si saltano
 - `docs/amministrazione.md`: Strumenti e amministrazione per ruolo, primo avvio, utenti, studio, postazioni, stampa, elenchi (tappa 14, D163).
 - `docs/importazione.md`: importazione da altri programmi con lo smistamento verso i menu, formati, destinazioni, sicurezza (tappa 15, D173).
 - `docs/ppip.md`: prestazioni aggiuntive (PPIP). Catalogo versionato per livello (ACN, AIR, accordo dell'ASL); registrazione in cartella; distinta del mese con il CSV in un formato descritto come dato; invio predisposto con un simulatore; fonti e che cosa controllare (D212, D213).
+- `docs/rao.md`: tabelle RAO (manuale di AGENAS, determine del Piemonte per cardiologia e gastroenterologia), legame con il catalogo, che cosa controllare; la condizione clinica nella ricetta specialistica (D285).
 - `docs/aura.md`: collegamento con AURA, oggi simulato: quando si controlla, che cosa si allinea, nuovi assistiti, cambio di medico dentro lo studio, registro, che cosa non è provato (D197–D200).
 
 ## Le tappe

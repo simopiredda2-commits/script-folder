@@ -907,9 +907,32 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
       .filter({ hasText: 'VISITA CARDIOLOGICA DI CONTROLLO CON ECG' })
       .first()
       .waitFor();
-    await f.getByLabel('Prestazione, branca o codice').fill('visita');
-    await f.locator('.risultato').first().getByRole('button', { name: 'Aggiungi' }).click();
-    await f.getByLabel('Quesito diagnostico').fill('Quesito dimostrativo');
+    // La prima visita cardiologica: in Piemonte la tabella RAO della D.D. 973/2019 (D285). Il
+    // medico sceglie la condizione, il programma mette la classe e scrive il quesito vuoto.
+    await f.getByLabel('Prestazione, branca o codice').fill('prima visita cardiologica con ecg');
+    await f
+      .locator('.risultato')
+      .filter({ hasText: 'PRIMA VISITA CARDIOLOGICA CON ECG' })
+      .first()
+      .getByRole('button', { name: 'Aggiungi' })
+      .click();
+    expect(await f.getByLabel('Quesito diagnostico').inputValue()).toBe('');
+    const condition = f.getByLabel('Condizione clinica (RAO)');
+    await condition.locator('option', { hasText: 'Bradiaritmie asintomatiche' }).waitFor({
+      state: 'attached',
+    });
+    await condition.selectOption({ label: 'Bradiaritmie asintomatiche' });
+    expect(await f.getByLabel('B – breve').isChecked()).toBe(true);
+    expect(await f.getByLabel('Quesito diagnostico').inputValue()).toBe(
+      'Bradiaritmie asintomatiche',
+    );
+    await f
+      .getByText(/D\.D\. 973\/2019 della Regione Piemonte \(cardiologia\), tabella dd973-1/)
+      .waitFor();
+    // Il medico cambia la classe: si può, e la pagina lo dice.
+    await f.getByLabel('D – differibile').check();
+    await f.getByText(/non è quella della condizione scelta/).waitFor();
+    await f.getByLabel('B – breve').check();
     // Ricetta del medico in un passo (D255): «Firma e invia» salva, controlla e invia.
     await f.getByRole('button', { name: 'Firma e invia' }).click();
     await f

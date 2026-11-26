@@ -31,7 +31,7 @@ Stato del lavoro, tappa per tappa. Una sessione nuova riparte da qui e da `CLAUD
 - **26/11/2026**: pull request #40 unita (D275). Nello stesso branch ripartito da `main`, il Fascicolo con i servizi della Regione: messaggi della V09, simulatore, coda con le politiche di invio, oscuramento e cancellazione (D280); poi il Profilo allineato alla guida HL7 Italia v1.5 (D281). Sezione «Dopo l'unione della #40 – Il Fascicolo con i servizi della Regione». Pull request #41 unita lo stesso giorno (commit `f3007b9`), con il via dato in anticipo (D275) e le 14 prove su GitHub verdi; il branch riparte da `main`.
 - **Fermata del 26/11/2026, dopo l'unione della #41** (D282): le domande 1, 3, 4 e 5 hanno avuto risposta. Adesso, nello stesso branch ripartito da `main`: i nomi nuovi dei menu («Risultati degli esami», «Visite ed esami da prescrivere») e il tipo di terapia sulla riga della ricetta, in una pull request; poi il SIAP, prima la parte che non dipende dal CSI e poi il modulo con un simulatore. Le pull request di questo blocco si uniscono con le prove verdi (via in anticipo). AURA dopo le risposte del CSI; per il CSI le domande nuove, dalla 1 alla 13.
 - **26/11/2026, nello stesso branch**: i nomi nuovi dei menu e il tipo di terapia sulla riga della ricetta, fatti (D282, D283); sezione «Dopo l'unione della #41 – Nomi dei menu e tipo di terapia sulla riga». Pull request #42 unita lo stesso giorno (commit `8029a44`), con il via dato in anticipo e le 14 prove su GitHub verdi; dimostrazione alla versione 30 e pagina del collaudo aggiornate (G4, G6, G10). Il branch riparte da `main`; adesso il SIAP.
-- **26/11/2026, dopo l'unione della #42**: SIAP, valori del Ministero come dato e fumo codificato (D284). Poi la domanda della Dr.ssa Rocca sulle RAO: Simone ha scelto di farle adesso, in una pull request a sé, con il medico che sceglie la condizione e il programma che mette la classe (D285); il SIAP riprende dopo. Sezione «Dopo l'unione della #42 – SIAP senza il CSI e RAO».
+- **26/11/2026, dopo l'unione della #42**: SIAP, valori del Ministero come dato e fumo codificato (D284). Poi la domanda della Dr.ssa Rocca sulle RAO: Simone ha scelto di farle adesso, in una pull request a sé, con il medico che sceglie la condizione e il programma che mette la classe (D285). Fatte: tabelle del manuale di AGENAS e delle due determine del Piemonte, condizione nella ricetta specialistica, classe vuota per difetto. Il SIAP riprende dopo. Sezione «Dopo l'unione della #42 – SIAP senza il CSI e RAO». Simone, lo stesso giorno: il collaudo può aspettare.
 
 **Che cosa resta aperto (20/11/2026).** Tutto quello che si poteva fare da qui è fatto o è una domanda della fermata. Resta, per chi lo sblocca:
 
@@ -1780,19 +1780,33 @@ Fermata del 26/11/2026 (D282, domanda 3): il SIAP prima di AURA, prima la parte 
 
 - **Valori del SIAP come dato** (D284): tipologie e dettagli delle prestazioni e domini dei tre tracciati, dalle specifiche funzionali 1.3 del Ministero, in `packages/reference/data/siap/valori-ministero-1.3.json`, «da controllare». Il programma usa le sue chiavi; il legame con i codici del Ministero è nel file, controllato dal lettore.
 - **Fumo codificato** (D284): per il fattore «Fumo» degli stili di vita, «Fuma adesso» con sì, no o non noto, obbligatorio; il testo resta facoltativo per i dettagli. Le voci importate entrano anche senza.
-- **RAO** (D285): decisione presa e fonti lette (manuale AGENAS 2020, D.D. 973/2019 e 259/2019 della Regione, guida alla lettura del 2023, nota del 24/04/2024). La costruzione è in corso.
+- **Tabelle RAO come dato** (D285, `docs/rao.md`): le 77 tabelle del manuale di AGENAS e le tabelle delle D.D. 973/2019 (cardiologia) e 259/2019 (gastroenterologia) della Regione Piemonte, «da controllare», con il legame ai codici del nomenclatore di oggi. Otto codici del manuale sono corretti con l'allegato 4; per le prestazioni delle determine, in Piemonte, valgono le tabelle regionali.
+- **Condizione clinica nella ricetta specialistica** (D285): nel primo accesso il medico sceglie la condizione, il programma mette la classe della tabella e, se il quesito è vuoto, il testo della condizione. Il medico può cambiare la classe, e un avviso lo dice. Le righe del pronto soccorso sono un promemoria a parte. La ricetta tiene la condizione com'era (migrazione 0058); lo storico la mostra, «Rinnova» la ripropone.
+- **Classe di priorità vuota per difetto** (D285): prima partiva da «P».
+- **Fonti** (`docs/provenienze.md`, «RAO»): il manuale, le due determine, la guida regionale, la nota del 24/04/2024, il piano nazionale delle liste d'attesa 2026-2028 con gli allegati A e G, e i documenti trovati e non usati.
 
 **Come provarlo**:
 
 - `pnpm test` e `pnpm lint`;
 - valori del SIAP: `apps/api/test/siap-valori.test.ts`;
-- fumo: `apps/api/test/fumo-codificato.test.ts` e, nel browser, «voci cliniche, parametri» in `apps/api/test/e2e/interfaccia.test.ts`.
+- fumo: `apps/api/test/fumo-codificato.test.ts` e, nel browser, «voci cliniche, parametri» in `apps/api/test/e2e/interfaccia.test.ts`;
+- tabelle RAO: `apps/api/test/rao-tabelle.test.ts`;
+- condizione nella ricetta: `apps/api/test/condizione-rao.test.ts` e `apps/web/test/condizione-rao.test.tsx`;
+- «Rinnova» con la condizione: `apps/web/test/rinnova.test.ts`;
+- nella dimostrazione: `pnpm --filter @mmg/demo build`, poi `pnpm --filter @mmg/demo test:browser`. La prova «specialistica e seguito» sceglie una condizione della D.D. 973/2019 per la prima visita cardiologica con ECG del catalogo vero.
 
 **Scelte**: D284 per i valori del SIAP e il fumo; D285 per le RAO.
 
-**Non fatto**, nello stesso blocco: codice STS.11 e tipo di struttura dello studio, codice dell'AFT e UCCP; il contatto come registrazione a sé; il modulo del SIAP con un simulatore.
+**Non fatto**:
 
-**Non provato**: il formato vero del CSI per il SIAP.
+- nello stesso blocco del SIAP: codice STS.11 e tipo di struttura dello studio, codice dell'AFT e UCCP; il contatto come registrazione a sé; il modulo del SIAP con un simulatore;
+- RAO: la condizione nel messaggio al SAR, che non ha un campo (domanda 14 per il CSI); le D.D. 43/2008 e 375/2009, non trovate.
+
+**Domande per la fermata** (si fanno insieme alle altre, non bloccano):
+
+- **Tabelle RAO in Piemonte**: per la cardiologia e la gastroenterologia le determine del 2019, per il resto il manuale di AGENAS del 2020, finché la Regione o l'ASL non dicono altro. Le attese si mostrano come le scrive la tabella; le determine danno 180 giorni alla classe P, il manuale 120. Da chiedere alla Dr.ssa Rocca o all'ASL.
+
+**Non provato**: il formato vero del CSI per il SIAP; le tabelle RAO controllate da una persona; la condizione con il SAR vero.
 
 ## Specifiche regionali e nazionali (25/11/2026, D265)
 
@@ -1823,7 +1837,7 @@ Richiesta di Simone del 25/11/2026: confrontare il programma con le specifiche r
 
 **Domande nuove per il CSI**, in un elenco a parte: non sono nella mail del 25/11/2026, e Simone le manda con il prossimo messaggio (sua richiesta del 25/11/2026). Le domande nuove si aggiungono qui. Ultimo aggiornamento: notte del 26/11/2026, con la 11 e la 12.
 
-Nessuna blocca il lavoro di adesso (risposta a Simone, sera del 25/11/2026):
+Nessuna blocca il lavoro di adesso (risposta a Simone, sera del 25/11/2026; la 14, delle RAO, nemmeno):
 
 - la 1 e gli ultimi tre punti della 7 servono per costruire parti già rimandate al CSI: AURA (D268) e le tre parti della ricetta rossa (D271);
 - la 2, la 3, la 4, la 5, la 6, i primi due punti della 7 e la 9 servono solo per il collaudo, perché il programma va avanti con i simulatori e le scelte di `docs/decisioni.md`;
@@ -1892,6 +1906,10 @@ _Fascicolo con i servizi della Regione_ (D280, 26/11/2026)
     - un CREATE rimandato dopo un tempo scaduto, che il Fascicolo aveva già lavorato: errore o doppione?
     - le politiche di invio FSE-INT-SRS-01-V02 sono scritte per le aziende sanitarie: valgono così per le cartelle dei medici (fermo dalle 00 alle 07, tre tentativi a 5 minuti, dieci giorni di coda)?
     - il piano dei test FSE V04 (2022) non parla del FSE 2.0: c'è un piano nuovo per l'autocertificazione con il Gateway?
+
+_RAO_ (D285, 26/11/2026)
+
+14. **Condizione RAO nella ricetta dematerializzata.** Il piano nazionale delle liste d'attesa 2026-2028 (allegato A, punto 5) chiede alla cartella di tenere traccia dell'indicazione clinica scelta «nel flusso della ricetta dematerializzata». Le specifiche del SAR (V06) non hanno un campo per la condizione RAO. Il SAR ne avrà uno, o per ora basta il quesito diagnostico? E il SAR controlla la classe di priorità contro le tabelle RAO del Piemonte?
 
 **Controllo del confronto sui documenti** (punto 2). Paragrafi e pagine del confronto tornano con i documenti. Dove il confronto sbaglia o non dice, vale il documento:
 

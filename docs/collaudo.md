@@ -49,6 +49,11 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 - **Chi**: Dr.ssa Rocca
 - **Dove**: cartella › «Visite ed esami da prescrivere» (prima «Specialistica», D282)
 - **Che cosa guardare**: la ricerca nel catalogo regionale (D.D. 590/2026 con le modifiche della D.D. 710/2026, trascrizione ancora da controllare: K3); tipo di accesso, classe di priorità, quesito diagnostico; la validità di 60 giorni per il primo accesso e 180 per gli altri (D260); l'esenzione per patologia (R17).
+- **Condizione clinica (RAO)**, D285: per esempio con la «PRIMA VISITA CARDIOLOGICA CON ECG», che in Piemonte ha la tabella della D.D. 973/2019. Si guarda:
+  - l'elenco delle condizioni per classe, con il promemoria del pronto soccorso a parte;
+  - la classe che il programma mette e che si può cambiare, con l'avviso;
+  - il quesito scritto dalla condizione;
+  - la classe che ora parte vuota.
 
 ### G7 · Certificato di malattia INPS
 
@@ -163,6 +168,16 @@ Per la Dr.ssa Rocca, o per chi lei indica. Una trascrizione entra nel programma 
 - **Chi**: Dr.ssa Rocca
 - **Dove**: «Oggi», scheda della terapia, «Farmaci e prestazioni»
 - **Che cosa guardare**: le frasi delle variazioni AIFA sui farmaci in terapia (confezione sospesa, classe cambiata, uscita dall'anagrafica) e dei registri e piani terapeutici: dicono il necessario, senza consigli clinici?
+
+### K9 · Tabelle RAO
+
+- **Chi**: Dr.ssa Rocca, con l'ASL
+- **Dove**: `docs/rao.md`
+- **Che cosa guardare**:
+  - le 77 tabelle del manuale di AGENAS (un campione) e le tabelle delle D.D. 973/2019 e 259/2019 della Regione Piemonte (tutte), trascritte dai PDF;
+  - gli otto codici del manuale corretti con l'allegato 4;
+  - gli inizi di descrizione che legano le tabelle al catalogo;
+  - quale tabella vale oggi in Piemonte, e con quali attese: le determine dicono 180 giorni per la classe P, il manuale 120.
 
 ## Parte 3 · Decisioni e materiali di Simone
 

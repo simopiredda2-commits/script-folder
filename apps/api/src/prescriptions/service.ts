@@ -342,9 +342,10 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
   }
 
   /**
-   * La condizione RAO scelta per la ricetta (D285), controllata: solo sulla specialistica SSN del
-   * primo accesso, di una tabella delle prestazioni della ricetta, mai una riga d'emergenza. Le
-   * tabelle sono quelle della regione dello studio; quelle che nessuno ha controllato, solo in prova.
+   * La condizione RAO scelta per la ricetta (D285), controllata: di una tabella delle prestazioni
+   * della ricetta, mai una riga d'emergenza. Che sia la specialistica SSN del primo accesso lo
+   * dicono lo schema della bozza e il vincolo del database. Le tabelle sono quelle della regione
+   * dello studio; quelle che nessuno ha controllato, solo in prova.
    */
   async function raoConditionFor(
     actor: Actor,
@@ -354,11 +355,6 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
   ): Promise<RaoConditionFacts | null> {
     const key = input.raoCondition?.trim();
     if (!key) return null;
-    if (input.kind !== 'specialist_ssn' || input.accessType !== 'first')
-      throw new HttpError(
-        400,
-        'La condizione RAO vale per la ricetta specialistica del primo accesso',
-      );
     if (!deps.rao) throw new HttpError(400, 'Le tabelle RAO non sono disponibili');
     const [st] = await db
       .select({ region: studio.regionName })

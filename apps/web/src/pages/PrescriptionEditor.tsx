@@ -31,6 +31,12 @@ import {
   SuspendedNote,
   type DrugShortage,
 } from '../components/Shortage';
+import {
+  afterRaoChoice,
+  RaoConditionField,
+  raoChoiceOf,
+  type RaoTable,
+} from '../components/RaoCondition';
 import { RedPrintedNotice, type RedPrinted } from '../components/RedFormPrint';
 import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
@@ -426,6 +432,7 @@ const DRAFT_FIELDS = [
   'accesso',
   'priorita',
   'quesito',
+  'rao',
   'oscurato',
 ] as const;
 
@@ -461,6 +468,8 @@ export interface PastPrescription {
   accessType: 'first' | 'subsequent' | null;
   priority: string | null;
   diagnosticQuestion: string | null;
+  /** La condizione RAO scelta (D285): si ripropone, se la tabella c'è ancora. */
+  raoConditionKey?: string | null;
   righe: PastLine[];
 }
 
@@ -558,6 +567,8 @@ export async function renewIntoCurrentPrescription(
       if (past.accessType) writeStored(key('accesso'), past.accessType);
       if (past.priority) writeStored(key('priorita'), past.priority);
       if (past.diagnosticQuestion) writeStored(key('quesito'), past.diagnosticQuestion);
+      if (past.raoConditionKey && past.accessType === 'first')
+        writeStored(key('rao'), past.raoConditionKey);
     }
   }
   writeStored(key('righe'), [...current, ...added]);
@@ -607,8 +618,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const [exemption, setExemption, resetExemption] = usePersistentState(k('esenzione'), '');
   const [channel, setChannel, resetChannel] = usePersistentState(k('canale'), '');
   const [accessType, setAccessType, resetAccess] = usePersistentState(k('accesso'), 'first');
-  const [priority, setPriority, resetPriority] = usePersistentState(k('priorita'), 'P');
+  // Senza la scelta del medico la classe resta vuota (D285): R14 la chiede prima dell'invio.
+  const [priority, setPriority, resetPriority] = usePersistentState(k('priorita'), '');
   const [question, setQuestion, resetQuestion] = usePersistentState(k('quesito'), '');
+  // La condizione RAO scelta dal medico (D285): la chiave della tabella.
+  const [raoCondition, setRaoCondition, resetRao] = usePersistentState(k('rao'), '');
   const [obscured, setObscured, resetObscured] = usePersistentState(k('oscurato'), false);
   // «Cercalo in Specialistica» dalla ricerca dei farmaci porta qui la stessa ricerca (D279).
   const [params] = useSearchParams();
@@ -628,6 +642,28 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
       : null,
   );
   const versions = useApi<{ versioni: DatasetVersion[] }>(`/api/banche-dati`);
+  // Le tabelle RAO delle prestazioni in ricetta (D285): solo specialistica SSN, primo accesso.
+  const raoCodes = [
+    ...new Set(lines.map((l) => l.serviceCode?.trim()).filter((c): c is string => !!c)),
+  ].sort();
+  const raoActive = mode === 'specialistica' && kind === 'specialist_ssn' && accessType === 'first';
+  const raoTables = useApi<{ tabelle: RaoTable[] }>(
+    raoActive && raoCodes.length
+      ? `/api/rao/tabelle${query({ prestazioni: raoCodes.join(',') })}`
+      : null,
+  );
+  const raoList = raoActive && raoCodes.length ? (raoTables.data?.tabelle ?? []) : [];
+  // Una condizione che non è più del primo accesso o di una prestazione in ricetta si toglie.
+  const raoStale =
+    !!raoCondition &&
+    (!raoActive ||
+      raoCodes.length === 0 ||
+      (!raoTables.loading &&
+        !!raoTables.data &&
+        !raoChoiceOf(raoTables.data.tabelle, raoCondition)));
+  useEffect(() => {
+    if (raoStale) setRaoCondition('');
+  }, [raoStale, setRaoCondition]);
   // Elenchi dello studio (tappa 14): i pacchetti nella specialistica, le posologie nei farmaci.
   const packages = useStudioList(mode === 'specialistica' ? 'pacchetto' : null);
   const posologies = useStudioList(mode === 'farmaci' ? 'posologia' : null);
@@ -671,7 +707,8 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const startOver = async () => {
     if (!(await dropDraft('Lasciata con «Nuova ricetta da capo»'))) return;
     for (const reset of [resetKind, resetLines, resetExemption, resetChannel, resetAccess]) reset();
-    for (const reset of [resetPriority, resetQuestion, resetDraft, resetObscured]) reset();
+    for (const reset of [resetPriority, resetQuestion, resetRao, resetDraft, resetObscured])
+      reset();
     setOneStep(false);
     setError(null);
   };
@@ -733,7 +770,12 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         exemptionCode: exemption || null,
         reminderChannel: channel || null,
         ...(mode === 'specialistica'
-          ? { accessType, priority, diagnosticQuestion: question || null }
+          ? {
+              accessType,
+              priority: priority || null,
+              diagnosticQuestion: question || null,
+              ...(raoActive && raoChoiceOf(raoList, raoCondition) ? { raoCondition } : {}),
+            }
           : {}),
         ...(kind !== 'white' && obscured ? { obscured: true } : {}),
         lines: lines.map(
@@ -1396,6 +1438,21 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                     </div>
                   ))}
                 </fieldset>
+                {raoList.length > 0 && (
+                  <RaoConditionField
+                    tables={raoList}
+                    value={raoCondition}
+                    priority={priority}
+                    onChange={(choice) => {
+                      const before = raoChoiceOf(raoList, raoCondition);
+                      setRaoCondition(choice?.key ?? '');
+                      if (!choice) return;
+                      const next = afterRaoChoice(choice, before, question);
+                      setPriority(next.priority);
+                      setQuestion(next.question);
+                    }}
+                  />
+                )}
                 <fieldset className="scelta scelta-in-riga">
                   <legend>Classe di priorità</legend>
                   {Object.entries(PRIORITY).map(([v, label]) => (

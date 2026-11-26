@@ -2467,3 +2467,16 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - la «Guida alla lettura» della Regione (2023), con le prestazioni monitorate e i loro codici;
   - la nota della Direzione Sanità del 24/04/2024 sui percorsi di tutela: l'ASL verifica l'appropriatezza della prescrizione anche rispetto al modello RAO.
 - **Da verificare**: quali tabelle valgono oggi in Piemonte per ogni prestazione. Le determine regionali sono del 2019, il manuale AGENAS del 2020; per una prestazione con una tabella regionale vale quella, per le altre il manuale, finché la Regione o l'ASL non dicono altro. È una domanda per la Dr.ssa Rocca e per l'ASL.
+
+- **Costruito il 26/11/2026** (dettagli in `docs/rao.md`):
+  - **Dati**: le 77 tabelle del manuale di AGENAS e le tabelle delle due determine sono in `packages/reference/data/rao`, «da controllare», con l'impronta del PDF. Il manuale è la versione pubblicata oggi da AGENAS; il piano nazionale delle liste d'attesa in vigore, 2026-2028, rimanda a quello.
+  - **Precedenza**: per le prestazioni delle due determine, negli studi in Piemonte, valgono le tabelle regionali al posto di quelle del manuale. Ci sono la prima visita cardiologica con l'ECG, l'ecocardiogramma, l'Holter, la prima visita gastroenterologica, l'EGDS e la colonscopia.
+  - **Legame con il catalogo**: il codice del nomenclatore di oggi, dall'allegato 4. Otto codici stampati nel manuale oggi sono di un'altra prestazione e sono corretti, con la nota. Dove lo stesso codice vale per discipline diverse (89.7, 89.13, 89.7A.3, 89.26.x) serve in più l'inizio della descrizione: la tabella della visita cardiologica non va alla cardiochirurgica.
+  - **Scelta**: il programma mette la classe della condizione. Se il quesito è vuoto, o è il testo della condizione di prima, ci scrive il testo della condizione: è il «collegamento fra l'indicazione scelta e il quesito diagnostico» che il piano 2026-2028 chiede alla cartella (allegato A, punto 5). Con «Altro» il quesito resta del medico.
+  - **Classe cambiata**: se poi il medico cambia la classe, la pagina lo dice; non ferma niente e non chiede un motivo.
+  - **Righe d'emergenza** («invio al pronto soccorso»): il manuale le elenca «con finalità di promemoria». Si vedono in un riquadro a parte e non si scelgono.
+  - **Classe vuota per difetto**: prima la classe partiva da «P». Ora parte vuota per tutte le ricette specialistiche, con o senza tabella; R14 ferma l'invio del primo accesso senza classe, come prima.
+  - **Ricetta**: tiene la condizione com'era alla scelta: chiave, classe della tabella, testo e fonte (migrazione 0058). Il servizio la accetta solo sulla specialistica SSN del primo accesso, solo di una tabella delle prestazioni della ricetta, e mai una riga d'emergenza.
+  - **Trascrizioni non controllate**: si usano solo nell'ambiente di prova e nella dimostrazione, come il catalogo (D159, D260).
+- **Non fatto**: la condizione nel messaggio al SAR, che oggi non ha un campo (domanda per il CSI); le attese «vere» del Piemonte, perché le determine del 2019 dicono 180 giorni per la classe P e il manuale 120 (domanda per la Regione); le D.D. 43/2008 e 375/2009, non trovate.
+- **Non provato**: le tabelle controllate da una persona; la condizione con il SAR vero.

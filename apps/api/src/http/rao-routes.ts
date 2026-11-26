@@ -39,6 +39,8 @@ function view({ source, table }: RaoMatch, prestazioni: string[]) {
     controllatoDa: source.controllato_da,
     noteDelDocumento: source.note_del_documento ?? null,
     id: table.id,
+    /** I nomi delle prestazioni della tabella, come li stampa l'atto. */
+    servizi: table.servizi.map((x) => x.nome),
     testata: table.testata,
     pagine: table.pagine,
     note: table.note,
