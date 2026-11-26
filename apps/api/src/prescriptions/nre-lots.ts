@@ -108,7 +108,7 @@ export function createNreLots(deps: NreLotDeps) {
   /** Le credenziali per il lotto: quelle che vuole la regione. */
   async function authOf(userId: string, r: LotService) {
     try {
-      return await credentials.authFor(userId, 'lotto_nre');
+      return await credentials.authFor(userId, 'lotto_nre', r.credentialService);
     } catch (err) {
       const details = err instanceof HttpError ? (err.details as { codice?: string }) : null;
       if (details?.codice === 'CREDENZIALI_MANCANTI')
@@ -173,6 +173,7 @@ export function createNreLots(deps: NreLotDeps) {
         'lotto_nre',
         result.authProblem,
         `${result.code}: ${result.message}`,
+        r.credentialService,
       );
     const final = result;
     const stored = await withActor(db, actor.userId, async (tx) => {

@@ -1,7 +1,9 @@
 import { randomBytes } from 'node:crypto';
+import type { RegionalCredentials } from '@mmg/integrations';
+import type { RegionalPackage } from '@mmg/regions';
 import { describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app';
-import { loadConfig } from '../src/config';
+import { loadConfig, regionalSoftwareCodesOf } from '../src/config';
 import type { Database } from '../src/db/client';
 
 const base = {
@@ -66,24 +68,57 @@ describe('APP_PROXY_FIDATI', () => {
   });
 });
 
-describe('APP_CODICE_GESTIONALE (D267)', () => {
-  it('per difetto «SIMULATORE», che vale solo con i simulatori', () => {
-    expect(loadConfig({ ...base }).regionalSoftwareCode).toBe('SIMULATORE');
-    expect(loadConfig({ ...base, APP_CODICE_GESTIONALE: '  ' }).regionalSoftwareCode).toBe(
-      'SIMULATORE',
-    );
+/**
+ * Il codice che una regione assegna al programma (D267, D301), dalla variabile che il pacchetto
+ * della regione dice: qui con regioni inventate. La variabile della prima regione è nelle prove del
+ * suo pacchetto.
+ */
+describe('codice del programma per ogni regione (D267, D301)', () => {
+  const credentials = (variable: string): RegionalCredentials => ({
+    key: `servizio_${variable.toLowerCase()}`,
+    slug: `servizio-${variable.toLowerCase()}`,
+    name: 'Servizio inventato',
+    use: 'Prove',
+    passwordValidityMonths: null,
+    secondFactorUses: [],
+    software: {
+      variable,
+      codeProblem: (code) => (/^[A-Z]+$/.test(code) ? null : 'solo lettere maiuscole (prova)'),
+      identify: (code) => ({ ok: true, value: code }),
+    },
   });
-  it('il codice che assegna la Regione: lettere, cifre, «-» e «_»', () => {
+  const pkg = (key: string, variable?: string): RegionalPackage => ({
+    key,
+    regionCode: '999',
+    name: key,
+    parts: [],
+    asl: [],
+    terms: [],
+    ...(variable ? { integrations: { credentials: credentials(variable) } } : {}),
+  });
+  const packages = [pkg('alfa', 'CODICE_ALFA'), pkg('beta', 'CODICE_BETA'), pkg('gamma')];
+
+  it('per difetto «SIMULATORE», che vale solo con i simulatori; vuoto è come assente', () => {
+    expect(regionalSoftwareCodesOf({ CODICE_ALFA: '  ' }, packages)).toEqual({
+      alfa: 'SIMULATORE',
+      beta: 'SIMULATORE',
+    });
+  });
+
+  it('ogni regione dalla sua variabile; una regione che non lo chiede non c’è', () => {
     expect(
-      loadConfig({ ...base, APP_CODICE_GESTIONALE: ' MIOAPPLICATIVO ' }).regionalSoftwareCode,
-    ).toBe('MIOAPPLICATIVO');
+      regionalSoftwareCodesOf({ CODICE_ALFA: ' PROGRAMMA ', CODICE_BETA: 'ALTRO' }, packages),
+    ).toEqual({ alfa: 'PROGRAMMA', beta: 'ALTRO' });
   });
-  it('un codice con spazi o altri segni ferma l’avvio, con il motivo', () => {
-    expect(() => loadConfig({ ...base, APP_CODICE_GESTIONALE: 'MIO APP' })).toThrow(
-      /APP_CODICE_GESTIONALE=MIO APP: il codice del gestionale assegnato dalla Regione/,
+
+  it('un codice che la regione non ammette ferma l’avvio, con la variabile e il motivo', () => {
+    expect(() => regionalSoftwareCodesOf({ CODICE_BETA: 'no' }, packages)).toThrow(
+      'CODICE_BETA=no: solo lettere maiuscole (prova)',
     );
-    expect(() => loadConfig({ ...base, APP_CODICE_GESTIONALE: 'GESTIONALE;301' })).toThrow(
-      /APP_CODICE_GESTIONALE/,
-    );
+  });
+
+  it('la configurazione li legge per i pacchetti del programma, ognuno con la sua chiave', () => {
+    const codes = loadConfig({ ...base }).regionalSoftwareCodes ?? {};
+    for (const code of Object.values(codes)) expect(code).toBe('SIMULATORE');
   });
 });

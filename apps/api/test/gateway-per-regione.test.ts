@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { studio } from '../src/db/schema';
 import { NO_GATEWAY_CREDENTIALS } from '../src/fse/gateways';
 import { studioRegionCode } from '../src/regions/region';
+import { regionalCredentials } from './helpers/regional-gateway';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -34,6 +35,8 @@ class WatchedGateway extends SimulatedFseGateway {
 /** Una pubblicazione data, per ogni regione: qui serve solo che ci sia. */
 const publication: RegionalFsePublication = {
   environment: 'test',
+  // Le credenziali della regione degli studi delle prove (D301).
+  credentialService: regionalCredentials().slug,
   regimes: { SSN: 'Regime SSN' },
   clinicalActivity: 'ERP',
   policy: { quietUntilHour: null, minIntervalMs: 0, retries: 0, retryDelayMs: 0, fallbackDays: 1 },

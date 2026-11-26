@@ -1,9 +1,7 @@
 import { checkFiscalCode, nreLotPrefix, splitNre, type NreLotCode } from '@mmg/domain';
 import {
-  authShapeProblem,
   decryptSimulated,
   dpcmPackage,
-  REGIONAL_SOFTWARE_ID,
   SIMULATED_DPCM_CRYPTO,
   SimulatedGateway,
   type DpcmAnalyticResult,
@@ -20,12 +18,13 @@ import {
   type ServiceAuth,
   type SimulatedOutcome,
   type SimulatedRefusal,
-  type SimulatedRegionalAuthorization,
+  type SimulatedValidity,
   type SimulatorOptions,
 } from '@mmg/integrations';
 import { DOMParser } from '@xmldom/xmldom';
 import { strFromU8, unzipSync } from 'fflate';
-import { DPCM_SEND_TYPE, SAR_LOT_TYPE, sarPrescription } from './sar';
+import { REGIONAL_SOFTWARE_ID } from './gestionale';
+import { DPCM_SEND_TYPE, SAR_LOT_TYPE, sarPrescription, sarShapeProblem } from './sar';
 
 export interface SarSimulatorOptions extends SimulatorOptions {
   /**
@@ -35,7 +34,7 @@ export interface SarSimulatorOptions extends SimulatorOptions {
    */
   regionalCatalog?: (nationalCode: string | null, catalogCode: string | null) => boolean;
   /** Accesso regionale con SPID o CIE: se c'è, il token deve essere valido per quel simulatore. */
-  oauth?: SimulatedRegionalAuthorization;
+  oauth?: SimulatedValidity;
   /** Esito di ogni richiesta del lotto di NRE. Per difetto: assegnato. */
   decideLot?: (input: { regionCode: string; doctorFiscalCode: string }) => SimulatedOutcome;
   /** Ricetta DPCM: esito della ricevuta di accoglienza. Per difetto: accolta. */
@@ -100,6 +99,11 @@ export class SimulatedSar extends SimulatedGateway implements RegionalNreLots, D
 
   constructor(private readonly sar: SarSimulatorOptions = {}) {
     super('regional', sar, 'SAR');
+  }
+
+  /** Le credenziali mancanti come le rifiuta il SAR (3.1.1 e 4). */
+  protected override shapeProblem(auth: ServiceAuth): { code: string; message: string } | null {
+    return sarShapeProblem(auth);
   }
 
   protected override bearerRefusal(auth: ServiceAuth): SimulatedRefusal | null {
@@ -203,7 +207,7 @@ export class SimulatedSar extends SimulatedGateway implements RegionalNreLots, D
         'Per il lotto di NRE servono utente, password e PIN RUPAR (V06, 3.1.1) (simulato)',
         'credentials',
       );
-    const shape = authShapeProblem(auth);
+    const shape = sarShapeProblem(auth);
     if (shape) return reject(shape.code, shape.message, 'credentials');
     const decided = this.sar.decideLot?.(input) ?? 'accepted';
     if (decided === 'timeout')
@@ -257,7 +261,7 @@ export class SimulatedSar extends SimulatedGateway implements RegionalNreLots, D
         code: 'CREDENZIALI',
         message: 'Per la ricetta DPCM servono utente, password e PIN RUPAR (V06, 3.1.1) (simulato)',
       };
-    return authShapeProblem(auth);
+    return sarShapeProblem(auth);
   }
 
   /**

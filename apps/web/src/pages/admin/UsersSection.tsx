@@ -835,8 +835,9 @@ function UserForm({
           <p className="aiuto" id={id('codiceAsl-aiuto')}>
             Il codice ASL è quello dell’azienda in cui il medico lavora
             {healthUnits.regione ? `, fra le ASL della regione ${healthUnits.regione}` : ''} (
-            {healthUnits.fonte}). Serve ai servizi della Regione Piemonte: senza, il medico non può
-            entrare con SPID o CIE né chiedere il codice di sessione RUPAR.
+            {healthUnits.fonte}). Serve ai servizi della Regione che lo chiedono: senza, il medico
+            non può entrare con SPID o CIE della Regione né chiedere il codice di sessione del suo
+            servizio.
           </p>
         </fieldset>
       )}

@@ -15,7 +15,9 @@ import { createIdentityService } from './auth/identity-service';
 import { LOGIN_SOURCE_LIMITS, type LoginSourceLimits } from './auth/login-sources';
 import { createCertificateService } from './certificates/service';
 import type { Config } from './config';
-import { createCredentialService } from './credentials/service';
+import { REGIONAL_PACKAGES } from '@mmg/regions';
+import { regionalCredentialsOf } from './credentials/registry';
+import { createCredentialService, type RegionalCredentialRuntime } from './credentials/service';
 import { isPoolTimeout, type Database } from './db/client';
 import { registerAuthRoutes, SESSION_COOKIE } from './http/auth-routes';
 import { registerIdentityRoutes } from './http/identity-routes';
@@ -38,7 +40,10 @@ import { registerAftRoutes } from './http/aft-routes';
 import { createAftService } from './aft/service';
 import { registerCredentialRoutes } from './http/credentials-routes';
 import { registerDoctorProfileRoutes } from './http/doctor-profile-routes';
-import { registerRegionalSimulatorRoutes } from './http/regional-simulator-routes';
+import {
+  registerRegionalSimulatorRoutes,
+  type SimulatedAccessPage,
+} from './http/regional-simulator-routes';
 import { HttpError } from './http/errors';
 import { registerPatientRoutes } from './http/patient-routes';
 import { registerPrescriptionRoutes } from './http/prescription-routes';
@@ -63,7 +68,6 @@ import { createNreLots } from './prescriptions/nre-lots';
 import { createPrescriptionService, type PrescriptionDeps } from './prescriptions/service';
 import { raoSources } from './rao/tables';
 import { studioSendTimeoutMs } from './admin/studio-service';
-import type { CredentialService } from '@mmg/domain';
 import {
   type FseGatewayClient,
   SIMULATED_FSE_AUDIENCE,
@@ -72,8 +76,9 @@ import {
   SimulatedGateway,
   SimulatedDigitalIdentity,
   SimulatedReminderSender,
-  SimulatedRegionalAuthorization,
   SimulatedSecondFactor,
+  SIMULATED_SOFTWARE_CODE,
+  isSimulatedAuthorizationPage,
   SimulatedSickLeaveGateway,
   type DigitalIdentityGateway,
   type DocumentSigner,
@@ -81,8 +86,10 @@ import {
   type PrescriptionGateway,
   type ReminderSender,
   type RegionalAuthorizationGateway,
+  type RegionalCredentials,
   type RegionalPrescription,
   type SecondFactorGateway,
+  type SimulatedValidity,
   type SickLeaveGateway,
   SimulatedAura,
   type AuraGateway,
@@ -129,7 +136,7 @@ declare module 'fastify' {
 export interface AppDeps {
   db: Database;
   config: Pick<Config, 'encryptionKey' | 'sessionMaxHours' | 'cookieSecure'> &
-    Partial<Pick<Config, 'environment' | 'trustedProxies' | 'regionalSoftwareCode'>>;
+    Partial<Pick<Config, 'environment' | 'trustedProxies' | 'regionalSoftwareCodes'>>;
   now?: () => Date;
   logger?: boolean;
   /**
@@ -151,16 +158,27 @@ export interface AppDeps {
    * stesso medico (per difetto 2 secondi, 6.1.1).
    */
   dpcm?: { intervalMs?: number | null; minIntervalMs?: number };
-  /** Secondo fattore (Id-Sessione) del Sistema TS e del SIRPED (D102). Per difetto i simulatori. */
-  secondFactor?: Record<CredentialService, SecondFactorGateway>;
+  /**
+   * Secondo fattore (Id-Sessione, D102) del Sistema TS e del servizio della regione. Per difetto i
+   * simulatori: quello nazionale e quello del pacchetto di ogni regione (D301). `regional`, se c'è,
+   * vale per ogni regione (le prove).
+   */
+  secondFactor?: { sistema_ts?: SecondFactorGateway; regional?: SecondFactorGateway };
   /** Certificati di malattia all'INPS tramite il Sistema TS. Per difetto il simulatore. */
   sickLeaveGateway?: SickLeaveGateway;
   /**
-   * Accesso regionale con SPID o CIE (D109). Per difetto il simulatore, con il ritorno interno al
-   * programma: quello vero lo registra la Regione (D103). Il `client_id` è il codice del gestionale
-   * della configurazione con il codice ASL di ogni medico (D266).
+   * Accesso con SPID o CIE della regione (D109). Per difetto il simulatore del pacchetto di ogni
+   * regione che lo ha (D301), con il ritorno interno al programma: quello vero lo registra la
+   * Regione (D103). Dato qui, vale per ogni regione (le prove). Il `client_id` è come il programma
+   * si presenta alla regione per ogni medico (D266).
    */
-  regional?: { gateway: RegionalAuthorizationGateway; redirectUri: string };
+  regional?: { gateway: RegionalAuthorizationGateway; redirectUri?: string };
+  /**
+   * Le credenziali dei servizi delle regioni, per chiave del pacchetto: le prove, per esempio una
+   * regione con le sue parole, il suo secondo fattore e il suo accesso (D301); null, una regione
+   * senza credenziali. Per difetto quelle dei pacchetti.
+   */
+  regionalCredentials?: Readonly<Record<string, RegionalCredentials | null>>;
   /** Controlli prima dell'invio delle ricette (regole di prescrizione). */
   preSendChecks?: PrescriptionDeps['preSendChecks'];
   /** Email e SMS del promemoria. Per difetto il simulatore (regola 7). */
@@ -246,14 +264,9 @@ export function buildApp({
   config,
   now,
   logger = false,
-  secondFactor = {
-    sistema_ts: new SimulatedSecondFactor('sistema_ts', { now }),
-    rupar_piemonte: new SimulatedSecondFactor('rupar_piemonte', { now }),
-  },
-  regional = {
-    gateway: new SimulatedRegionalAuthorization({ now }),
-    redirectUri: '/api/profilo/credenziali/rupar/accesso-regionale/ritorno',
-  },
+  secondFactor = {},
+  regional: regionalAccess,
+  regionalCredentials: credentialsOverride,
   gateways = {},
   prescription: prescriptionOverride,
   dpcm: dpcmOptions = {},
@@ -351,13 +364,43 @@ export function buildApp({
     now: now ?? (() => new Date()),
   });
   registerLockRoutes(app, db, now ?? (() => new Date()));
+  // Le credenziali dei servizi (D100, D301): il secondo fattore del Sistema TS e, per ogni regione
+  // con un pacchetto che le ha, i servizi del pacchetto (oggi i simulatori), con il codice che la
+  // regione assegna al programma dalla configurazione.
+  const nationalSecondFactor =
+    secondFactor.sistema_ts ??
+    new SimulatedSecondFactor('sistema_ts', { now, label: 'Sistema TS' });
+  const regionalInfos = REGIONAL_PACKAGES.flatMap((pkg) => {
+    const info =
+      credentialsOverride && Object.hasOwn(credentialsOverride, pkg.key)
+        ? credentialsOverride[pkg.key]
+        : regionalCredentialsOf([pkg])[0]?.credentials;
+    return info ? [{ region: pkg.key, credentials: info }] : [];
+  });
+  const regionalCredentials: RegionalCredentialRuntime[] = regionalInfos.map(
+    ({ region, credentials: info }) => ({
+      region,
+      info,
+      secondFactor: secondFactor.regional ?? info.secondFactor?.({ now }) ?? null,
+      strongAccess: info.strongAccess
+        ? {
+            gateway: regionalAccess?.gateway ?? info.strongAccess.gateway({ now }),
+            redirectUri:
+              regionalAccess?.redirectUri ??
+              `/api/profilo/credenziali/${info.slug}/accesso-regionale/ritorno`,
+          }
+        : null,
+      softwareCode: info.software
+        ? (config.regionalSoftwareCodes?.[region] ?? SIMULATED_SOFTWARE_CODE)
+        : null,
+    }),
+  );
   const credentials = createCredentialService({
     db,
     encryptionKey: config.encryptionKey,
     now: now ?? (() => new Date()),
-    secondFactor,
-    regional,
-    regionalSoftwareCode: config.regionalSoftwareCode ?? 'SIMULATORE',
+    nationalSecondFactor,
+    regional: regionalCredentials,
   });
   registerCredentialRoutes(app, credentials, {
     sessionCookie: SESSION_COOKIE,
@@ -367,8 +410,18 @@ export function buildApp({
       return r.status === 'ok' ? r.actor : null;
     },
   });
-  if (regional.gateway instanceof SimulatedRegionalAuthorization)
-    registerRegionalSimulatorRoutes(app, regional.gateway, [regional.redirectUri]);
+  // Le pagine simulate dell'accesso con SPID o CIE, una per simulatore, con i suoi ritorni.
+  const simulatedPages = new Map<RegionalAuthorizationGateway, SimulatedAccessPage>();
+  for (const r of regionalCredentials) {
+    const g = r.strongAccess?.gateway;
+    if (!g || !isSimulatedAuthorizationPage(g)) continue;
+    const page = simulatedPages.get(g);
+    simulatedPages.set(g, {
+      simulator: g,
+      returns: [...(page?.returns ?? []), r.strongAccess!.redirectUri],
+    });
+  }
+  if (simulatedPages.size > 0) registerRegionalSimulatorRoutes(app, [...simulatedPages.values()]);
   // Ripristino delle credenziali con SPID o CIE (D189).
   const identityReturns = ['/api/ripristino/ritorno', '/api/profilo/identita/ritorno'] as const;
   const identityService = createIdentityService({
@@ -402,16 +455,24 @@ export function buildApp({
   });
   // Le ricette SSN della regione dello studio (D300): per difetto il simulatore del pacchetto, con
   // i simulatori del secondo fattore e dell'accesso regionale; la ricetta bianca al Sistema TS.
-  const simulatedSessions = (s: SecondFactorGateway) =>
-    s instanceof SimulatedSecondFactor ? s : undefined;
+  // Un simulatore che sa dire se un Id-Sessione o un token vale: lo ricevono i simulatori delle
+  // ricette, perché controllino il secondo fattore o il token di quella regione.
+  const simulatedValidity = (g: { environment: string } | null | undefined) =>
+    g &&
+    g.environment === 'simulator' &&
+    typeof (g as Partial<SimulatedValidity>).isValid === 'function'
+      ? (g as unknown as SimulatedValidity)
+      : undefined;
   const nationalGateway =
     gateways.sistema_ts ??
-    new SimulatedGateway('sistema_ts', { sessions: simulatedSessions(secondFactor.sistema_ts) });
-  const prescriptions = prescriptionChoice(prescriptionOverride, {
-    ...(gateways.regional ? { gateway: gateways.regional } : {}),
-    sessions: simulatedSessions(secondFactor.rupar_piemonte),
-    oauth:
-      regional.gateway instanceof SimulatedRegionalAuthorization ? regional.gateway : undefined,
+    new SimulatedGateway('sistema_ts', { sessions: simulatedValidity(nationalSecondFactor) });
+  const prescriptions = prescriptionChoice(prescriptionOverride, (pkg) => {
+    const rc = regionalCredentials.find((r) => r.region === pkg.key);
+    return {
+      ...(gateways.regional ? { gateway: gateways.regional } : {}),
+      sessions: simulatedValidity(rc?.secondFactor),
+      oauth: simulatedValidity(rc?.strongAccess?.gateway),
+    };
   });
   const prescriptionOfStudio = async (studioId: string) =>
     prescriptions.for(await studioRegion(db, studioId));

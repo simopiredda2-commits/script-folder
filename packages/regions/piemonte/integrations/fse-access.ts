@@ -7,6 +7,7 @@ import type {
   ServiceAuth,
   SimulatedContextPage,
 } from '@mmg/integrations';
+import { RUPAR_CREDENTIALS } from './rupar';
 
 /**
  * Aprire il Fascicolo regionale del paziente dalla cartella clinica, senza riscrivere le
@@ -138,8 +139,8 @@ export const FSE_ACCESS_TEXTS = {
   credentials: 'Controlla utente, password e PIN RUPAR in «Credenziali dei servizi».',
 } as const;
 
-/** Il servizio delle credenziali del medico: quelle RUPAR. */
-export const FSE_ACCESS_CREDENTIAL_SERVICE = 'rupar';
+/** Il servizio delle credenziali del medico: quelle RUPAR (D301). */
+export const FSE_ACCESS_CREDENTIAL_SERVICE = RUPAR_CREDENTIALS.slug;
 
 /** Il filtro dell'elenco dei documenti (TIPO_DOCUMENTO): l'unico parametro della pagina. */
 export const FSE_ACCESS_PARAMETER: ContextCallParameter = {

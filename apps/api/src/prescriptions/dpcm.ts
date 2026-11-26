@@ -568,9 +568,9 @@ export function createDpcmService(deps: DpcmDeps) {
   }
 
   /** Le credenziali per i servizi DPCM: se mancano, si annota e si riprova più tardi. */
-  async function authOrError(userId: string, use: 'ricetta_dpcm' | 'ricetta_ssn') {
+  async function authOrError(userId: string, use: 'ricetta_dpcm' | 'ricetta_ssn', r: DpcmRegional) {
     try {
-      return { auth: await deps.credentials.authFor(userId, use) };
+      return { auth: await deps.credentials.authFor(userId, use, r.credentialService) };
     } catch (err) {
       if (err instanceof HttpError) return { error: err.message };
       throw err;
@@ -580,7 +580,7 @@ export function createDpcmService(deps: DpcmDeps) {
   async function sendOne(row: DpcmRow) {
     const content = row.content as DpcmContent;
     const r = await regionalOfRow(row);
-    const got = r ? await authOrError(row.doctorUserId, 'ricetta_dpcm') : { error: NO_DPCM };
+    const got = r ? await authOrError(row.doctorUserId, 'ricetta_dpcm', r) : { error: NO_DPCM };
     const attempts = row.attempts + 1;
     if (!r || 'error' in got) {
       await db
@@ -627,6 +627,7 @@ export function createDpcmService(deps: DpcmDeps) {
         'ricetta_dpcm',
         receipt.authProblem,
         `${receipt.code}: ${receipt.message}`,
+        r.credentialService,
       );
     if (receipt.outcome === 'accepted') {
       await db
@@ -663,7 +664,7 @@ export function createDpcmService(deps: DpcmDeps) {
 
   async function checkOne(row: DpcmRow) {
     const r = await regionalOfRow(row);
-    const got = r ? await authOrError(row.doctorUserId, 'ricetta_dpcm') : { error: NO_DPCM };
+    const got = r ? await authOrError(row.doctorUserId, 'ricetta_dpcm', r) : { error: NO_DPCM };
     // L'esito si rilegge ogni 5 minuti, anche dopo una lettura non riuscita: i tentativi
     // dell'invio non contano qui.
     const again = () => new Date(now().getTime() + minutes(DPCM_CHECK_MINUTES));
@@ -776,7 +777,7 @@ export function createDpcmService(deps: DpcmDeps) {
     // La dematerializzata la annulla chi l'aveva firmata, a suo nome (4.3.2).
     const signer = row.dmDoctorUserId ?? row.doctorUserId;
     const r = await regionalOfRow(row);
-    const got = r ? await authOrError(signer, 'ricetta_ssn') : { error: NO_DPCM };
+    const got = r ? await authOrError(signer, 'ricetta_ssn', r) : { error: NO_DPCM };
     const attempts = row.dmCancelAttempts + 1;
     if (!r || 'error' in got) {
       await db
@@ -833,6 +834,7 @@ export function createDpcmService(deps: DpcmDeps) {
         'ricetta_ssn',
         result.authProblem,
         `${result.code}: ${result.message}`,
+        r.credentialService,
       );
     }
     if (result.outcome === 'rejected' && !result.authProblem) {

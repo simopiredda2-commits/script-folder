@@ -1,10 +1,11 @@
 import type {
   PrescriptionGateway,
   RegionalContextCall,
+  RegionalCredentials,
   RegionalFsePublication,
   RegionalPrescription,
   SimulatedFseGateway,
-  SimulatedRegionalAuthorization,
+  SimulatedValidity,
   SimulatorOptions,
 } from '@mmg/integrations';
 
@@ -99,10 +100,17 @@ export interface RegionalIntegrations {
     options: SimulatorOptions & {
       now?: () => Date;
       gateway?: PrescriptionGateway;
-      /** L'accesso regionale simulato, per i token. */
-      oauth?: SimulatedRegionalAuthorization;
+      /** L'accesso con SPID o CIE simulato della regione, per i token. */
+      oauth?: SimulatedValidity;
     },
   ) => RegionalPrescription;
+  /**
+   * Le credenziali del medico per i servizi della regione (D301): che servizio è, il secondo
+   * fattore, come il programma si presenta alla regione e l'accesso con SPID o CIE. Si leggono
+   * all'avvio (la configurazione cerca la variabile del codice del programma); i servizi del
+   * secondo fattore e dell'accesso si creano con il servizio.
+   */
+  credentials?: RegionalCredentials;
 }
 
 export interface RegionalPackage {

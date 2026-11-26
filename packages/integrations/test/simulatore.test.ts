@@ -156,17 +156,17 @@ describe('stato di erogazione (D70)', () => {
 });
 
 describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
-  it('senza utente, password o PIN il simulatore rifiuta come il servizio vero', async () => {
+  it('senza utente, password o PIN il simulatore nazionale rifiuta, con parole sue', async () => {
     const sar = new SimulatedGateway('regional');
     expect(await sar.send(message(), { ...auth, password: '' })).toMatchObject({
       outcome: 'rejected',
       code: 'CREDENZIALI',
-      message: 'Credenziali invalide (from client)',
+      message: 'Utente o password mancanti (simulato)',
       authProblem: 'credentials',
     });
     expect(await sar.send(message(), { ...auth, pin: '' })).toMatchObject({
       outcome: 'rejected',
-      code: 'EA01',
+      code: 'PIN',
       authProblem: 'credentials',
     });
     expect(sar.receivedAuth.at(-1)).toEqual({
@@ -180,7 +180,7 @@ describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
 
   it('il codice arriva «per email», vale 8 ore, e uno nuovo annulla il precedente', async () => {
     let t = Date.parse('2026-11-18T08:00:00Z');
-    const sf = new SimulatedSecondFactor('rupar_piemonte', { now: () => new Date(t) });
+    const sf = new SimulatedSecondFactor('servizio_di_prova', { now: () => new Date(t) });
     const cf = 'MRCLNE70A41X001X';
     const first = await sf.requestCode({ auth, fiscalCode: cf });
     if (first.outcome !== 'sent' || !first.testCode) throw new Error('codice non inviato');
@@ -201,7 +201,7 @@ describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
   });
 
   it('il codice non si chiede senza credenziali, né con la password scaduta', async () => {
-    const sf = new SimulatedSecondFactor('rupar_piemonte', {
+    const sf = new SimulatedSecondFactor('servizio_di_prova', {
       rejectCredentials: () => 'expired',
     });
     expect(
@@ -212,12 +212,12 @@ describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
     });
     expect(await sf.requestCode({ auth, fiscalCode: 'X' })).toMatchObject({
       outcome: 'rejected',
-      message: 'Password scaduta (from client)',
+      message: 'Password scaduta (simulato)',
     });
   });
 
   it('con il secondo fattore, il simulatore vuole un Id-Sessione valido a ogni chiamata', async () => {
-    const sf = new SimulatedSecondFactor('rupar_piemonte');
+    const sf = new SimulatedSecondFactor('servizio_di_prova');
     const sar = new SimulatedGateway('regional', { sessions: sf });
     expect(await sar.send(message(), auth)).toMatchObject({
       outcome: 'rejected',
@@ -245,7 +245,7 @@ describe('credenziali e secondo fattore nei simulatori (D100–D102)', () => {
     const doctor = { userId: 'u1', name: 'Medico inventato', fiscalCode: 'CF' };
     expect(
       await inps.cancel({ protocol: 'SIM1', workerFiscalCode: 'W', doctor }, { ...auth, pin: '' }),
-    ).toMatchObject({ outcome: 'rejected', code: 'EA01', authProblem: 'credentials' });
+    ).toMatchObject({ outcome: 'rejected', code: 'PIN', authProblem: 'credentials' });
     expect(inps.receivedAuth).toEqual([{ operation: 'annullamento', username: 'utente-di-prova' }]);
   });
 });

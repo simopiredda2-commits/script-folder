@@ -1,5 +1,9 @@
 import type { ContextCallRequest, ContextCallResult, RegionalContextCall } from '@mmg/integrations';
-import { SimulatedRegionalFseAccess, type FseAccessErrorCode } from '@mmg/regions/piemonte';
+import {
+  SimulatedRegionalFseAccess,
+  type FseAccessErrorCode,
+  RUPAR_CREDENTIALS,
+} from '@mmg/regions/piemonte';
 import { and, desc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../../../src/app';
@@ -305,7 +309,8 @@ describe('Fascicolo regionale fuori dal simulatore (D220)', () => {
         notActive: 'Non attivo (prova)',
         credentials: 'Controlla le credenziali (prova)',
       },
-      credentialService: 'prova',
+      // Le credenziali RUPAR, che lo scenario dà ai medici (D301).
+      credentialService: RUPAR_CREDENTIALS.slug,
       open: (request): Promise<ContextCallResult> => {
         calls.push(request);
         return Promise.resolve({ outcome: 'success', url: 'https://regione.invalid/fse?token=1' });

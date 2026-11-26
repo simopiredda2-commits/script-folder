@@ -10,8 +10,10 @@ import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
 
 /**
- * Credenziali dei servizi del medico (D100–D102): Sistema TS e RUPAR Piemonte, cifrate e mai
- * rilette; codice di sessione del secondo fattore. Solo il medico le vede e le cambia.
+ * Credenziali dei servizi del medico (D100–D102, D301): il Sistema TS e il servizio della regione
+ * dello studio, cifrate e mai rilette; codice di sessione del secondo fattore; accesso con SPID o
+ * CIE della regione. Nomi e note della regione arrivano dal servizio. Solo il medico le vede e le
+ * cambia.
  */
 export function ServiceCredentialsPage() {
   const { isDoctor } = useSession();
@@ -150,6 +152,39 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
   const regionalActive = s.sessione.attiva && s.sessione.modalita === 'spid_cie';
   const emailActive = s.sessione.attiva && s.sessione.modalita !== 'spid_cie';
 
+  // Credenziali del servizio di un'altra regione (D301): non si usano, si possono cancellare.
+  if (s.inUso === false)
+    return (
+      <section className="riquadro" aria-labelledby={id('titolo')}>
+        <h2 id={id('titolo')}>
+          <Icon name="lucchetto" /> {s.nome}
+        </h2>
+        <p className="tenue">{s.uso}</p>
+        <Notice kind="info">
+          Non è il servizio della regione dello studio: queste credenziali non si usano. Puoi
+          cancellarle.
+        </Notice>
+        <div className="azioni">
+          {confirmDelete ? (
+            <button
+              type="button"
+              className="pulsante"
+              disabled={busy}
+              onClick={() => void remove()}
+            >
+              <Icon name="annulla" /> <span>Conferma la cancellazione</span>
+            </button>
+          ) : (
+            <button type="button" className="pulsante" onClick={() => setConfirmDelete(true)}>
+              <Icon name="annulla" /> <span>Cancella le credenziali</span>
+            </button>
+          )}
+        </div>
+        <ErrorMessage error={error} />
+        {done && <Notice kind="fatto">{done}</Notice>}
+      </section>
+    );
+
   return (
     <section className="riquadro" aria-labelledby={id('titolo')}>
       <h2 id={id('titolo')}>
@@ -264,10 +299,8 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
           </p>
           <p className="aiuto">
             La Regione riconosce il medico e autorizza il programma fino alla scadenza che indica;
-            poi si rientra. Con questo accesso le credenziali RUPAR non servono per mandare le
-            ricette. Servono però per chiedere al SAR i numeri di ricetta (lotto di NRE) e per la
-            ricetta rossa: tienile salvate qui sopra (SIRPED, «Cartelle cliniche MMG e PLS», V06,
-            3.1.1).
+            poi si rientra. Con questo accesso le credenziali {s.nome} non servono per mandare le
+            ricette.{s.notaAccessoRegionale ? ` ${s.notaAccessoRegionale}` : ''}
           </p>
           <div className="azioni">
             <button
@@ -296,7 +329,7 @@ function ServiceCard({ s, onChange }: { s: ServiceStatus; onChange: () => void }
             {emailActive
               ? `Attivo fino al ${dateTime(s.sessione.scadeIl)}.`
               : s.accessoRegionale
-                ? 'Non attivo. Serve con le credenziali RUPAR, al posto dell’accesso con SPID o CIE.'
+                ? `Non attivo. Serve con le credenziali ${s.nome}, al posto dell’accesso con SPID o CIE.`
                 : 'Non attivo: serve per mandare le ricette.'}
           </p>
           <p className="aiuto">

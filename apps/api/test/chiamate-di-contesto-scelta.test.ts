@@ -9,6 +9,7 @@ import { regionalChoice } from '../src/regions/integrations';
 import { studioRegion } from '../src/regions/region';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { regionalCredentials } from './helpers/regional-gateway';
 
 interface Destination {
   tipo: string;
@@ -113,7 +114,8 @@ describe('chiamate di contesto scelte dalla regione dello studio (D297)', () => 
         notActive: 'Non attivo (prova)',
         credentials: 'Credenziali (prova)',
       },
-      credentialService: 'prova',
+      // Le credenziali della regione degli studi delle prove, che lo scenario dà ai medici (D301).
+      credentialService: regionalCredentials().slug,
       open: (request): Promise<ContextCallResult> => {
         calls.push(request);
         return Promise.resolve({ outcome: 'success', url: 'https://ente.invalid/?token=1' });

@@ -1,5 +1,6 @@
 import { isIP } from 'node:net';
-import { REGIONAL_SOFTWARE_CODE } from '@mmg/integrations';
+import { SIMULATED_SOFTWARE_CODE } from '@mmg/integrations';
+import { REGIONAL_PACKAGES, type RegionalPackage } from '@mmg/regions';
 import { parseTime } from './reference/scheduler';
 import { parseKey } from './security/secrets';
 
@@ -47,22 +48,32 @@ export interface Config {
    */
   trustedProxies: string[];
   /**
-   * Codice del gestionale assegnato dalla Regione Piemonte all'avvio dell'autocertificazione, da
-   * APP_CODICE_GESTIONALE (D266, D267). Il programma ci aggiunge «_» e il codice ASL del medico
-   * (`client_id`, `X-Gestionale`, REL-STC-01 V08). Per difetto «SIMULATORE»: vale solo con i
-   * simulatori.
+   * Il codice che ogni regione assegna al programma (D266, D267, D301), per chiave del pacchetto:
+   * dalla variabile che il pacchetto dice. Il programma ci aggiunge ciò che la regione chiede, per
+   * esempio il codice ASL del medico. Per difetto «SIMULATORE»: vale solo con i simulatori.
    */
-  regionalSoftwareCode?: string;
+  regionalSoftwareCodes?: Readonly<Record<string, string>>;
 }
 
-/** APP_CODICE_GESTIONALE: lettere, cifre, «-» e «_»; vuoto vale «SIMULATORE» (D267). */
-export function regionalSoftwareCodeOf(raw: string | undefined): string {
-  const code = raw?.trim() || 'SIMULATORE';
-  if (!REGIONAL_SOFTWARE_CODE.test(code))
-    throw new Error(
-      `APP_CODICE_GESTIONALE=${raw}: il codice del gestionale assegnato dalla Regione ha solo lettere, cifre, «-» e «_» (per esempio MIOAPPLICATIVO)`,
-    );
-  return code;
+/**
+ * Il codice del programma di ogni regione che lo chiede, dalla variabile del suo pacchetto: con la
+ * forma che la regione ammette; vuoto vale «SIMULATORE» (D267). Un codice sbagliato ferma l'avvio.
+ */
+export function regionalSoftwareCodesOf(
+  env: NodeJS.ProcessEnv,
+  packages: readonly RegionalPackage[] = REGIONAL_PACKAGES,
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const pkg of packages) {
+    const software = pkg.integrations?.credentials?.software;
+    if (!software) continue;
+    const raw = env[software.variable];
+    const code = raw?.trim() || SIMULATED_SOFTWARE_CODE;
+    const problem = software.codeProblem(code);
+    if (problem) throw new Error(`${software.variable}=${raw}: ${problem}`);
+    out[pkg.key] = code;
+  }
+  return out;
 }
 
 function environmentOf(raw: string | undefined): AppEnvironment {
@@ -158,6 +169,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     auraTime: auraTimeOf(env.AURA_AGGIORNAMENTO),
     environment: environmentOf(env.APP_AMBIENTE),
     trustedProxies: trustedProxiesOf(env.APP_PROXY_FIDATI),
-    regionalSoftwareCode: regionalSoftwareCodeOf(env.APP_CODICE_GESTIONALE),
+    regionalSoftwareCodes: regionalSoftwareCodesOf(env),
   };
 }

@@ -8,7 +8,7 @@ import type {
   SendResult,
   StatusResult,
 } from './prescription-gateway';
-import { authShapeProblem, type ServiceAuth, type SimulatedSecondFactor } from './service-auth';
+import { authShapeProblem, type ServiceAuth, type SimulatedValidity } from './service-auth';
 import { simulatedWhiteReminderPdf } from './simulated-documents';
 
 export type SimulatedOutcome = 'accepted' | 'rejected' | 'unreachable' | 'timeout' | 'fault';
@@ -36,7 +36,7 @@ export interface SimulatorOptions {
    * Secondo fattore: se c'è, ogni chiamata deve portare un Id-Sessione valido per quel
    * simulatore (D102). Senza, il simulatore controlla solo la forma delle credenziali.
    */
-  sessions?: SimulatedSecondFactor;
+  sessions?: SimulatedValidity;
 }
 
 /** Un rifiuto delle credenziali, come lo dà il servizio vero. */
@@ -81,6 +81,14 @@ export class SimulatedGateway implements PrescriptionGateway {
     return null;
   }
 
+  /**
+   * Credenziali mancanti, o mescolate al token: il rifiuto con le parole del servizio. Il
+   * simulatore del servizio di una regione può dare le sue (D301).
+   */
+  protected shapeProblem(auth: ServiceAuth): { code: string; message: string } | null {
+    return authShapeProblem(auth);
+  }
+
   /** Controlli in più sulle credenziali, dopo utente, password, PIN e Id-Sessione. */
   protected extraAuthRefusal(_auth: ServiceAuth): SimulatedRefusal | null {
     return null;
@@ -95,7 +103,7 @@ export class SimulatedGateway implements PrescriptionGateway {
   protected authRefusal(auth: ServiceAuth): SimulatedRefusal | null {
     if (auth?.bearer) {
       // Token insieme a utente, password, PIN o Id-Sessione: non si accetta.
-      const mixed = authShapeProblem(auth);
+      const mixed = this.shapeProblem(auth);
       if (mixed)
         return {
           outcome: 'rejected',
@@ -105,7 +113,7 @@ export class SimulatedGateway implements PrescriptionGateway {
         };
       return this.bearerRefusal(auth);
     }
-    const shape = authShapeProblem(auth);
+    const shape = this.shapeProblem(auth);
     if (shape)
       return {
         outcome: 'rejected',
