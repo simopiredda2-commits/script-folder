@@ -2265,3 +2265,46 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Note di erogabilità, sedute e tariffa** (domanda 2 della prossima fermata). Risposta: «se manca qualcosa, provvedi e integra». Si fanno adesso, nella pull request delle parti nazionali, prima del Fascicolo (opzione A).
 - **Via dato in anticipo.** Simone: «ti autorizzo sin da ora a unire, visto che dopo non sarò operativo». La pull request di questo blocco si unisce con le prove su GitHub verdi. Lo stesso vale per quella del Fascicolo, che viene dopo nell'ordine concordato (D268), come gli ho scritto. Le domande della fermata restano in `docs/avanzamento.md` per quando torna.
 - Simone può spegnere il suo computer: il lavoro va avanti nella sessione in cloud, con commit e push dopo ogni passo.
+
+**D276 · Note del nomenclatore, sedute dei cicli e tariffa nella ricetta specialistica.** Dalla risposta di Simone del 25/11/2026 (D275): «se manca qualcosa, provvedi e integra». Il requisito («Prescrizione specialistica»: «Sedute per i cicli (es. riabilitazione), tariffa a titolo informativo, condizioni di erogabilità e note del catalogo quando presenti») non era fatto.
+
+- **Fonti.**
+  - DPCM 12/1/2017: allegato 4 (il nomenclatore, con il numero della nota accanto al codice) e allegato 4D (le note), nei PDF del Ministero del 29/9/2026, che hanno già le modifiche del DM 3/8/2026 e del DPCM 7/8/2026. La legenda dell'allegato 4 dice che per una condizione di erogabilità il medico riporta in ricetta il numero della nota e il quesito; per un'indicazione di appropriatezza prescrittiva il solo quesito. Dice anche: al più otto prestazioni della stessa branca sulla stessa ricetta, per la legge n. 8 del 1990, che non è letta.
+  - Sistema TS, prescrizione, 08/07/2026: numeroNota, condErogabilita, approprPrescrittiva e patologia, facoltativi (pp. 28–29); numsedute solo per i cicli del DPCM, fra il minimo e il massimo di sedute, con quantità 1 per ciclo; sulle altre prestazioni il SAC lo rifiuta (pp. 42–43).
+  - Specifiche di stampa del promemoria (05/12/2024): nel campo 18A «N.SEDUTE:» con le sedute; nel campo 20 numero della nota, spazio e lettera, e nella riga sotto il codice di patologia; senza nota «---».
+  - Specifiche DPCM (versione 11.0 dell'1/3/2016): Prescrizione1 della specialistica «#nota-condizione-appropriatezza-patologia#», con «*» per un campo vuoto.
+  - Catalogo regionale, D.D. 590/2026: colonne «Prestazione Ciclo» e «Numero Sedute». Le 52 voci a ciclo hanno tutte le sedute. Nelle 24 con un codice del nomenclatore il numero è il massimo del ciclo stampato nell'allegato 4. Le altre 28 hanno un codice regionale che nel nomenclatore non c'è (per esempio 93.11.6A).
+- **Scelte.**
+  - **Dati.** Le note sono una trascrizione nuova (`lea/allegato-4-note`, tipo `note_prestazioni`): una nota per codice del nomenclatore, con il tipo e il testo, 374 codici. Il catalogo ha le colonne ciclo e sedute. Le due cose sono da controllare prima dell'uso, come le altre trascrizioni (A8). Nella dimostrazione si vedono prima del controllo, come il catalogo (D260).
+  - **Sulla riga.** Il numero della nota lo mette il programma dall'elenco in uso, insieme al tipo della nota di quel momento. La lettera della condizione la sceglie il medico fra quelle che la nota scrive (A, B, C…); è facoltativa, perché le fonti chiedono il numero, non la lettera. Le sedute le scrive il medico, solo per i cicli, e sono facoltative.
+  - **Regole**, versione 2026-11-25.2:
+    - R24 blocca una prestazione con condizione di erogabilità senza il numero della nota. Blocca anche una nota che non è quella del codice e una nota su una prestazione che non ne ha. Con l'indicazione di appropriatezza la nota va con la riga, ma non è obbligatoria.
+    - R25 blocca più di otto prestazioni della stessa branca, contando le quantità. Non conta una voce che nel catalogo sta in più branche, come la 93.15 (Medicina fisica e riabilitazione, Ortopedia): potrebbe contare nell'una o nell'altra.
+    - R10 controlla anche le sedute: solo sui cicli, non oltre il massimo del catalogo, e un ciclo per riga, con quantità 1. Il minimo il catalogo non lo dà: lo controlla il SAR.
+  - **SAR e promemoria.** Nel messaggio vanno numero della nota, tipo, lettera e sedute. Sul promemoria, nel campo 18A, «N.SEDUTE:n» dopo il tipo di accesso; nel campo 20 il numero della nota e la lettera.
+  - **Ricetta rossa.** Prescrizione1 della specialistica con la nota e la lettera, e «*» per la patologia. Le sedute non hanno un campo nelle specifiche DPCM del 2016.
+  - **Tariffa.** È quella del catalogo («Tariffa indicativa di fascia A»): nella ricerca e sulla riga si chiama «indicativa» e si dà a titolo informativo. Non va nel messaggio né sul promemoria.
+- **Non fatto.**
+  - Il codice di patologia: le specifiche non dicono quale codifica usare. La riga sotto del campo 20 resta vuota.
+  - «AMBULATORIO EROGAZ:» nel campo 18A: viene dalla risposta del Sistema TS (tipoAmbulatorio), che il simulatore non dà.
+  - Gli allegati 4A (densitometria, nota 29), 4B (chirurgia refrattiva, nota 1) e «GEN» e «FAR» dell'allegato 4 (note 42, 62, 76, 92 e 93): non trascritti. Quelle note mostrano il rimando come lo stampa l'allegato 4D.
+  - Il modulo stampato della ricetta rossa non stampa la nota della specialistica.
+  - La scelta della lettera c'è per le 35 note che scrivono le lettere con la parentesi (32 maiuscole e 3 minuscole, su 112); con le altre la nota va senza lettera.
+- **Non provato**: il Sistema TS e il SAR veri; Safari vero.
+
+**D277 · SIAP: documenti, confronto con i dati del programma e una domanda per la fermata.** Richiesta di Simone del 25/11/2026: il flusso del Sistema Informativo dell'Assistenza Primaria (DM Salute 4/8/2025) manca, e prima della fermata non si costruisce niente.
+
+- **Documenti** (`docs/provenienze.md`, «SIAP»):
+  - scaricati dal sito del CSI l'avviso e le specifiche tecniche dell'indagine AP26_003, e dalla Gazzetta il comunicato della GU n. 226 del 29/9/2025;
+  - la GU n. 202 non si scarica: la connessione si chiude a metà. Il testo del decreto è nelle specifiche del CSI;
+  - il comunicato dice che il disciplinare tecnico, allegato 1 del decreto, non fu stampato in Gazzetta ed è sul portale del Ministero. Quel portale da qui risponde 403, come per le specifiche funzionali del SIAP (versione 1.3), lette solo come testo: i due file vanno chiesti a Simone.
+- **Confronto** (`docs/siap.md`): campo per campo, per i tre tracciati, che cosa c'è nel programma, dove, e che cosa manca. I valori ammessi vengono dalle specifiche del Ministero, perché quelle del CSI elencano solo i nomi dei campi.
+- **Che cosa manca di più**:
+  - il contatto come registrazione a sé, con il problema per cui è avvenuto;
+  - il fumo codificato;
+  - il codice STS.11 dello studio con il tipo di struttura;
+  - l'UCCP;
+  - la tabella che lega le azioni del programma alle tipologie di prestazione.
+- **Domanda per la fermata** (domanda 3, `docs/avanzamento.md`): un modulo SIAP con un simulatore del CSI, come per il SAR, e in che ordine. Consigliato dopo il Fascicolo e prima di AURA, cominciando dalla parte che non dipende dal CSI.
+- **Domande per il CSI** 11 e 12: l'autocertificazione SIRPED di una società senza ancora medici; specifiche, ambiente di prova e collaudo del SIAP per un fornitore che arriva dopo l'AP26_003, e quale versione del DataSet 3 vale.
+- **Non provato**: niente da provare, perché non c'è codice.

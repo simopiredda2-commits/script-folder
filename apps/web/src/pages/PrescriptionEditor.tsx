@@ -17,7 +17,13 @@ import {
   PackStepper,
   PrescribedDrugList,
 } from '../components/PrescribedDrugs';
-import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
+import {
+  cycleText,
+  NOTE_KIND_TEXT,
+  ServiceResultText,
+  type ServiceNote,
+  type ServiceResultData,
+} from '../components/ServiceResult';
 import { RegistryNote, type DrugRegistry } from '../components/Registries';
 import {
   isSuspended,
@@ -96,6 +102,14 @@ interface Line {
   /** Codice del nomenclatore, «codice DM» (D154). */
   serviceNationalCode?: string | null;
   serviceDescription?: string | null;
+  /** Numero della nota del nomenclatore (numeroNota, D276); assente: lo dà l'elenco in uso. */
+  serviceNote?: string | null;
+  /** Lettera della condizione o dell'indicazione della nota, scelta dal medico (D276). */
+  serviceNoteLetter?: string;
+  /** Sedute del ciclo (numsedute, D276), come le scrive il medico. */
+  sessions?: string;
+  /** Che cosa dice il catalogo della prestazione: si mostra, non parte con la ricetta (D276). */
+  catalog?: CatalogInfo;
   quantity: number;
   aifaNote?: string | null;
   posologyText?: string;
@@ -107,6 +121,25 @@ interface Line {
   /** Ricetta bianca ripetibile, solo se diverso dalla regola del farmaco (D93). */
   repeatCount?: string;
   validityMonths?: string;
+}
+
+/** Tariffa, ciclo e nota della prestazione nel catalogo e nell'elenco delle note in uso (D276). */
+interface CatalogInfo {
+  fee: string | null;
+  cycle: boolean;
+  maxSessions: number | null;
+  note: ServiceNote | null;
+}
+
+/**
+ * Le lettere delle condizioni o delle indicazioni di una nota, come la nota le scrive («A) …;
+ * B) …»): maiuscole, o minuscole se la nota non ne ha di maiuscole. Senza lettere, nessuna scelta.
+ */
+export function noteLetters(text: string): string[] {
+  const found = (re: RegExp) => [...text.matchAll(re)].map((m) => m[1]!.toUpperCase());
+  const upper = found(/(?:^|[\s.;:,])([A-Z])\)\s/g);
+  const letters = upper.length ? upper : found(/(?:^|[\s.;:,])([a-z])\)\s/g);
+  return [...new Set(letters)];
 }
 
 const SEARCH_DELAY_MS = 250;
@@ -225,6 +258,9 @@ export function lineSummary(
     validityMonths?: string;
     serviceCode?: string | null;
     serviceNationalCode?: string | null;
+    serviceNote?: string | null;
+    serviceNoteLetter?: string;
+    sessions?: string;
   },
   mode: 'farmaci' | 'specialistica',
   white = false,
@@ -234,6 +270,8 @@ export function lineSummary(
       `quantità ${l.quantity}`,
       l.serviceCode && `catalogo ${l.serviceCode}`,
       l.serviceNationalCode && `nomenclatore (DM) ${l.serviceNationalCode}`,
+      l.serviceNote && `nota ${[l.serviceNote, l.serviceNoteLetter].filter(Boolean).join(' ')}`,
+      l.sessions && `${l.sessions} sedute`,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -528,14 +566,24 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         lines: lines.map(
           ({
             key: _k,
+            catalog: _c,
             posologyText,
             notSubstitutableReason,
             notSubstitutableCode,
             repeatCount,
             validityMonths,
+            sessions,
+            serviceNoteLetter,
             ...l
           }) => ({
             ...l,
+            // Nota con la lettera e sedute del ciclo, solo per la specialistica (D276).
+            ...(mode === 'specialistica'
+              ? {
+                  sessions: sessions ? Number(sessions) : null,
+                  serviceNoteLetter: l.serviceNote ? serviceNoteLetter || null : null,
+                }
+              : {}),
             posologyText: posologyText || null,
             notSubstitutableReason: notSubstitutableReason || null,
             notSubstitutableCode: l.notSubstitutable ? notSubstitutableCode || null : null,
@@ -774,6 +822,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                       serviceCode: s.regionalCode,
                       serviceNationalCode: s.nationalCode,
                       serviceDescription: s.description,
+                      ...(s.note ? { serviceNote: s.note.note } : {}),
+                      catalog: {
+                        fee: s.fee,
+                        cycle: !!s.cycle,
+                        maxSessions: s.sessions ?? null,
+                        note: s.note ?? null,
+                      },
                       quantity: 1,
                     })
                   }
@@ -918,6 +973,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                       </span>
                     </button>
                     {l.aifaNote && <span className="etichetta">Nota {l.aifaNote}</span>}
+                    {mode === 'specialistica' && l.serviceNote && (
+                      <span className="etichetta">Nota {l.serviceNote}</span>
+                    )}
                   </div>
                   {mode === 'specialistica' && (l.serviceCode || l.serviceDescription) && (
                     <AlreadyPrescribed
@@ -942,6 +1000,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                           ? ` · nomenclatore (DM) ${l.serviceNationalCode}`
                           : ' · nomenclatore (DM) dal catalogo in uso'}
                       </p>
+                    )}
+                    {mode === 'specialistica' && l.catalog && (
+                      <CatalogDetails line={l} onChange={(patch) => update(l.key, patch)} />
                     )}
                     <div className="campi-riga">
                       <div className="campo campo-stretto">
@@ -1529,5 +1590,78 @@ function ManualServiceForm({
         </button>
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * Che cosa dice il catalogo della prestazione scelta (D276): la tariffa indicativa, a titolo
+ * informativo; per i cicli le sedute, facoltative e non oltre il massimo del catalogo; la nota del
+ * nomenclatore con il suo testo e, se la nota ha le lettere, la scelta della condizione.
+ */
+function CatalogDetails({
+  line,
+  onChange,
+}: {
+  line: Line;
+  onChange: (patch: Partial<Line>) => void;
+}) {
+  const c = line.catalog!;
+  const note = c.note;
+  const letters = note ? noteLetters(note.text) : [];
+  return (
+    <div className="catalogo-riga">
+      {c.fee && (
+        <p className="tenue">
+          Tariffa indicativa del catalogo: {money(c.fee)}, a titolo informativo
+        </p>
+      )}
+      {c.cycle && (
+        <div className="campo campo-stretto">
+          <label htmlFor={`sedute-${line.key}`}>
+            Sedute <span className="tenue">· {cycleText(c.maxSessions).toLowerCase()}</span>
+          </label>
+          <input
+            id={`sedute-${line.key}`}
+            type="number"
+            min={1}
+            {...(c.maxSessions ? { max: c.maxSessions } : {})}
+            value={line.sessions ?? ''}
+            onChange={(e) => onChange({ sessions: e.target.value })}
+          />
+        </div>
+      )}
+      {note && (
+        <div className="nota-nomenclatore">
+          <p>
+            <strong>
+              Nota {note.note}, {NOTE_KIND_TEXT[note.kind]}
+            </strong>
+            {note.kind === 'condizione'
+              ? ' · in ricetta va il numero della nota, con il quesito diagnostico'
+              : ' · in ricetta basta il quesito diagnostico'}
+          </p>
+          <p className="tenue">{note.text}</p>
+          {letters.length > 0 && (
+            <div className="campo campo-stretto">
+              <label htmlFor={`lettera-${line.key}`}>
+                {note.kind === 'condizione' ? 'Condizione' : 'Indicazione'}
+              </label>
+              <select
+                id={`lettera-${line.key}`}
+                value={line.serviceNoteLetter ?? ''}
+                onChange={(e) => onChange({ serviceNoteLetter: e.target.value })}
+              >
+                <option value="">Non indicata</option>
+                {letters.map((x) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

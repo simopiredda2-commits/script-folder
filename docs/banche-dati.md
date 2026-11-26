@@ -142,8 +142,9 @@ Che cosa controllare: un campione di codici e descrizioni contro il PDF, in part
 Che cosa resta fuori, e perché:
 
 - **le prestazioni di ogni esenzione** (terza parte dell'allegato 8): per R17 vale l'elenco regionale, che il SAR usa per bloccare (D.D. 1167/2022, con l'elenco sostituito dall'allegato C della D.D. 1452/2023; perché non si importa: D196). Nella parte nazionale, inoltre, la «visita di controllo» non ha un codice (lo sceglie il medico nel nomenclatore), alcune prestazioni valgono solo in certi casi («limitatamente a…») e alcune condizioni non hanno un elenco («le prestazioni appropriate»): trascritte così, R17 bloccherebbe ricette giuste;
-- **l'allegato 10** (tutela della maternità): elenca le prestazioni per periodo, senza i codici di esenzione da riportare in ricetta;
-- **l'allegato 4D** (note e condizioni di erogabilità): serve con l'allegato 4, il nomenclatore, che dice a quali prestazioni si applica ogni nota.
+- **l'allegato 10** (tutela della maternità): elenca le prestazioni per periodo, senza i codici di esenzione da riportare in ricetta.
+
+L'allegato 4D, che prima restava fuori, ora c'è, con l'allegato 4 che dice a quali prestazioni si applica ogni nota: «Note del nomenclatore», qui sotto (D276).
 
 **Allegato 7, malattie rare (D195).** Trascritto anche questo, da controllare: 370 codici (116 gruppi e 254 malattie) nella serie `lea-esenzioni-malattie-rare`, dal 30/10/2026. Il PDF si legge cella per cella: nome della malattia o del gruppo, esempi di malattie afferenti, sinonimi, malattie del gruppo con un codice proprio («… (codice RN1200)»), sezione e sottosezione. Dal testo impaginato, invece, nomi ed esempi si mescolavano (98 nomi su 370 erano sbagliati nella prima prova). Con i due allegati il catalogo copre le famiglie delle croniche e delle rare. Che cosa controllare: un campione di codici e nomi contro il PDF, i gruppi con molte righe (per esempio RCG071, RCG078, RNG262) e la riga di RNG262, dove le lettere spaziate «D I S G E N E S I A …» sono ricomposte.
 
@@ -155,6 +156,25 @@ Che cosa resta fuori, e perché:
 I fogli D2–D4 (prestazioni delle esenzioni) riguardano la parte che non si trascrive (sopra). Le prove fissano alcune modifiche dei fogli R e D1 (`packages/reference/test/lea.test.ts`).
 
 **Elenco esenzioni–prestazioni per R17 (D196).** Il SAR blocca le prestazioni non associate all'esenzione dal 28/06/2022 (D.D. 1167/2022). Il suo elenco è stato sostituito dall'allegato C della D.D. 1452/2023, in vigore dal 20/07/2023: 9871 righe, 48 esenzioni. È però precedente al nuovo nomenclatore, in vigore dal 30/12/2024: dei 1170 codici di prestazione distinti, solo 437 (37%) esistono nel catalogo regionale 2026, pari al 78% delle righe. Gli atti successivi letti (D.D. 868/2024, 990/2024, 444/2025, 590/2026, 710/2026) aggiornano il catalogo, non l'elenco. Per questo non si importa: usato per bloccare, fermerebbe ricette giuste. R17 resta «non verificabile» finché la Regione o il CSI Piemonte non danno l'elenco in uso nel SAR.
+
+### Note del nomenclatore (D276)
+
+Le note della specialistica vengono dall'allegato 4D del DPCM LEA, l'elenco delle note, e dall'allegato 4, il nomenclatore, che accanto a ogni codice stampa il numero della sua nota. Sono i PDF del Ministero del 29/9/2026, già aggiornati dai decreti di agosto 2026, in vigore dal 30/10/2026 (D216). Trascrizione `lea/allegato-4-note`, tipo `note_prestazioni`, serie `lea-note-nomenclatore`.
+
+Che cosa c'è:
+
+- una riga per codice del nomenclatore con una nota: 374 codici, ognuno con una nota sola, 112 note diverse delle 113 dell'allegato 4D;
+- il tipo della nota, dalla colonna «TIPO NOTA» dell'allegato 4D: `condizione` (condizione di erogabilità, 221 codici) o `appropriatezza` (indicazione di appropriatezza prescrittiva, 153 codici). Un altro valore ferma l'importazione;
+- il testo della nota come stampato, con le righe del PDF unite da uno spazio. Alcune note rimandano ad altri allegati, che non sono trascritti: «allegato 4 B» (nota 1), «allegato 4 A» (nota 29), «allegato 4 (FAR)» (nota 42), «allegato Genetica» e «Allegato 4 GEN» (note 62, 76, 92 e 93);
+- le colonne `parte_pagina_4` e `pagina_4d`, che dicono dove si trova la riga nei PDF: servono al controllo e non si importano.
+
+Come si è controllata la trascrizione: ogni numero di nota dell'allegato 4 c'è nell'allegato 4D, e nessun codice ha due note.
+
+Che cosa controllare: un campione di codici e numeri di nota contro le cinque parti dell'allegato 4; un campione di testi contro l'allegato 4D, in particolare le note lunghe; il tipo delle note.
+
+Nel programma, quando la trascrizione è controllata e importata (A8), ogni prestazione scelta dalla ricerca porta la sua nota. Sulla riga si vedono numero, tipo e testo, e il medico può indicare la lettera della condizione, se la nota ne ha. R24 controlla che una condizione di erogabilità abbia il numero della nota (`docs/regole.md`).
+
+**Ciclo e sedute nel catalogo regionale (D276).** Le trascrizioni del catalogo hanno due colonne in più, `ciclo` e `sedute`, dalle colonne «Prestazione Ciclo» e «Numero Sedute» della D.D. 590/2026. `ciclo` vale «sì» dove il PDF stampa «S» ed è vuota dove non stampa niente; `sedute` è il numero più alto di sedute del ciclo. Le voci a ciclo sono 52, tutte con le sedute; nessuna delle voci aggiunte dalla D.D. 710/2026 è a ciclo. Le controlla R10 (`docs/regole.md`).
 
 ### Presidi del DPCM LEA (D218, D236)
 

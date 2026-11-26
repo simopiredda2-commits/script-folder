@@ -320,6 +320,24 @@ La regola R23 viene da questi documenti, scaricati e letti il 25/11/2026. Nel re
 
 Non scaricato: l'allegato III-bis del DPR 309/1990 vigente. Normattiva chiude la connessione da qui («Connection reset by peer») e la pagina del Ministero della Salute risponde 403; chiesto a Simone il 25/11/2026.
 
+### SIAP, Sistema Informativo dell'Assistenza Primaria
+
+Scaricati e letti il 25 e 26/11/2026 per il confronto chiesto da Simone il 25/11/2026 (`docs/siap.md`). Nel repository non entra niente (D92).
+
+| Documento                                                                                                                                               | Indirizzo                                                                                                                                                                                      | Byte      | SHA-256                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------ |
+| CSI Piemonte, indagine di mercato AP26_003, avviso pubblico (servizio CCE MMG/PLS – SIAP)                                                               | `https://www.csipiemonte.it/sites/default/files/inline_download/indagini_di_mercato/2026/AP26_003/AP26_003_AvvisoPubblico_%20servizio_CCE_MMG_PLS%20-%20SIAP_def.pdf`                          | 261.240   | `daab83d79e6b417e118c1058718b5a01cfdd278ed6c51ad3ff407d68c8341aa2` |
+| CSI Piemonte, AP26_003, allegato A01: specifiche tecniche del servizio, con il DM 4/8/2025 come stampato nella GU n. 202 (pagine 6–11)                  | `https://www.csipiemonte.it/sites/default/files/inline_download/indagini_di_mercato/2026/AP26_003/AP26_003_A01_Specifiche%20tecniche%20servizio_e_%20Allegato_CCE_MMG_PLS%20-%20SIAP_def_.pdf` | 561.737   | `57dd5df68a730cbc68f81988b6d531729fccf96a28b91829dc46ed4459647647` |
+| Gazzetta Ufficiale, serie generale, n. 226 del 29/9/2025: comunicato 25A05298 sul DM 4/8/2025 (il disciplinare tecnico non fu stampato nella GU n. 202) | `https://www.gazzettaufficiale.it/eli/gu/2025/09/29/226/sg/pdf`                                                                                                                                | 2.070.422 | `cbe58941586e60880de20c572f26ce2b82a5eb208e9ce35c3267cd59919f7c17` |
+
+Non scaricati da qui:
+
+- **GU n. 202 dell'1/9/2025**, con il DM 4/8/2025 (codice 25A04813, pagina 5): `https://www.gazzettaufficiale.it/eli/gu/2025/09/01/202/sg/pdf`. Il collegamento con www.gazzettaufficiale.it si chiude a metà del trasferimento: dodici tentativi il 25 e 26/11/2026, «Connection reset by peer»; il proxy dice che il tunnel si è chiuso («ws_closed_mid_exchange»). Il sommario della stessa Gazzetta si è scaricato e dà il codice del decreto. Il testo si legge nelle specifiche del CSI.
+- **Ministero della Salute, «Specifiche funzionali» del SIAP, versione 1.3** (64 pagine, storia del documento fino all'11/02/2026): `https://www.salute.gov.it/new/sites/default/files/2026-04/Specifiche_funzionali_SIAP_v1.3_042026.pdf`. Il servizio di protezione del sito (Gcore) risponde 403. Il testo è stato letto con un servizio di lettura delle pagine (Firecrawl), che non dà il file: mancano byte e impronta.
+- **Ministero della Salute, disciplinare tecnico del SIAP** (allegato 1 del DM 4/8/2025): secondo il comunicato è sul portale del Ministero, «Servizi → Sistemi informativi sanitari del Ministero → Sistema informativo assistenza primaria SIAP». Stesso sito, stesso 403.
+
+Da chiedere a Simone: i due file del Ministero e, se la Gazzetta continua a chiudere la connessione, la GU n. 202.
+
 ## Fuori dal repository
 
 Le banche dati pubbliche non sono nel repository. Le scarica `sync/` nello studio e le importa il programma: AIFA, ISTAT, Regione Piemonte, DPCM LEA. Fonti e versioni sono in `sync/fonti.json` e in `docs/banche-dati.md`. Le condizioni d'uso di ciascuna fonte sono da verificare e scrivere qui prima del lancio.

@@ -1018,6 +1018,16 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
       .filter({ hasText: 'Visita di prova' })
       .getByRole('button', { name: 'Aggiungi' })
       .click();
+    // Sulla riga la tariffa indicativa del catalogo, a titolo informativo (D276).
+    const toggle = page
+      .locator('.righe-ricetta .riga-ricetta')
+      .filter({ hasText: 'Visita di prova' })
+      .locator('.riga-ricetta-apri');
+    if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click();
+    await page
+      .getByText(/Tariffa indicativa del catalogo: 20,66\s€, a titolo informativo/)
+      .waitFor();
+    await check(page, 'riga della specialistica con la tariffa');
     await page.getByLabel('Quesito diagnostico').fill('Quesito di prova');
     // Ricetta del medico in un passo (D255): «Firma e invia» salva, controlla e invia.
     await signAndSend(page);

@@ -139,6 +139,18 @@ Quando la ricetta SSN farmaceutica o specialistica non ha esito dal SAR, la Regi
 - **Principio attivo**: nella ricetta rossa una riga per principio attivo porta solo il gruppo di equivalenza (caso A1). Senza il gruppo nella lista di trasparenza in vigore va l'AIC, come per l'unico farmaco autorizzato (caso D).
 - **Tipologia S o H** (`indicazionePrescr`, IndicazionePrescr nella ricetta rossa): c'è solo se tutte le righe vengono da terapie con la stessa tipologia, come il campo 14 del promemoria (D217).
 
+## Note del nomenclatore, sedute e tariffa nella ricetta specialistica (D276)
+
+- **Nota del nomenclatore (R24)**: una prestazione con una nota dell'allegato 4D del DPCM LEA la porta sulla riga, con il numero preso dall'elenco in uso (`docs/banche-dati.md`, «Note del nomenclatore»). Sulla riga si leggono il tipo e il testo della nota, e il medico può scegliere la lettera della condizione, se la nota ne ha.
+  - Con una condizione di erogabilità il numero della nota è obbligatorio: R24 ferma l'invio senza.
+  - Con un'indicazione di appropriatezza prescrittiva il numero va con la riga, ma basta il quesito diagnostico.
+  - Va al SAR in `numeroNota`, con la lettera in `condErogabilita` o in `approprPrescrittiva`, secondo il tipo della nota.
+  - Nella ricetta rossa va in Prescrizione1: «#99-B-\*-\*#».
+  - Sul promemoria va nel campo 20: «99 B». Senza nota il campo stampa «---».
+- **Sedute dei cicli (R10)**: per le 52 voci a ciclo del catalogo il medico può scrivere le sedute, fino al massimo del catalogo; un ciclo per riga, con quantità 1. Le sedute vanno al SAR in `numsedute` e sul promemoria nel campo 18A, dopo il tipo di accesso: «PRIMO ACCESSO-N.SEDUTE:10». La ricetta rossa non ha un campo per le sedute.
+- **Al più otto prestazioni della stessa branca (R25)**: contando le quantità, come dice la legenda dell'allegato 4. Una voce che sta in più branche non si conta.
+- **Tariffa**: quella indicativa del catalogo, nella ricerca e sulla riga, a titolo informativo. Non va nel messaggio né sul promemoria.
+
 ## Da completare (servono le specifiche e le credenziali di collaudo)
 
 - Numeri del simulatore: gli NRE dei lotti simulati hanno la forma delle specifiche, con il raggruppamento «ZZ» (D269); NRBE e NRE dei simulatori senza lotti sono di fantasia e cominciano con `SIM`, non nella forma delle specifiche (che si controlla solo quando il medico scrive il numero a mano, D259). Formato del codice di autenticazione e del PIN-NRBE: da prendere dalle specifiche di collaudo.
