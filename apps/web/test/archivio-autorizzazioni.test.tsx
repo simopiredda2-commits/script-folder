@@ -323,18 +323,29 @@ describe('Strumenti › Registro di amministrazione (tappa 14)', () => {
   });
 });
 
-describe('Strumenti › AFT: nome, ASL e codice (tappa 14)', () => {
+describe('Strumenti › AFT: nome, ASL, codice e codici per il SIAP (tappa 14, D289)', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
   });
 
-  it('un membro li cambia; ASL vuota si toglie', async () => {
-    let aft: { id: string; nome: string; asl: string | null; codice: string | null } = {
+  it('un membro li cambia; ASL vuota si toglie; con un codice solo per il SIAP, l’avviso', async () => {
+    let aft: {
+      id: string;
+      nome: string;
+      asl: string | null;
+      codice: string | null;
+      codiceStruttura: string | null;
+      uccpNome: string | null;
+      uccpCodiceStruttura: string | null;
+    } = {
       id: 'f1',
       nome: 'AFT di prova',
       asl: 'ASL di prova',
       codice: null,
+      codiceStruttura: null,
+      uccpNome: null,
+      uccpCodiceStruttura: null,
     };
     const calls = stubFetch({
       '/api/aft': () => ({
@@ -348,8 +359,23 @@ describe('Strumenti › AFT: nome, ASL e codice (tappa 14)', () => {
         },
       }),
       '/api/aft/f1': (method, body) => {
-        const b = body as { nome: string; asl: string; codice: string };
-        aft = { ...aft, nome: b.nome, asl: b.asl || null, codice: b.codice || null };
+        const b = body as {
+          nome: string;
+          asl: string;
+          codice: string;
+          codiceStruttura: string;
+          uccpNome: string;
+          uccpCodiceStruttura: string;
+        };
+        aft = {
+          ...aft,
+          nome: b.nome,
+          asl: b.asl || null,
+          codice: b.codice || null,
+          codiceStruttura: b.codiceStruttura.toUpperCase() || null,
+          uccpNome: b.uccpNome || null,
+          uccpCodiceStruttura: b.uccpCodiceStruttura.toUpperCase() || null,
+        };
         return { status: method === 'PATCH' ? 200 : 405, body: { aft } };
       },
       '/api/aft/consultazioni': ok({ consultazioni: [] }),
@@ -357,9 +383,7 @@ describe('Strumenti › AFT: nome, ASL e codice (tappa 14)', () => {
     });
     const user = userEvent.setup();
     render(<AftSection />);
-    const toggle = await screen.findByRole('button', {
-      name: 'Modifica nome, ASL e codice dell’AFT',
-    });
+    const toggle = await screen.findByRole('button', { name: 'Modifica i dati dell’AFT' });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     await user.click(toggle);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
@@ -374,14 +398,32 @@ describe('Strumenti › AFT: nome, ASL e codice (tappa 14)', () => {
       screen.getByLabelText('Codice dell’AFT (facoltativo)', { selector: '#aft-modifica-codice' }),
       'AFT-01',
     );
+    expect(screen.queryByText(/Per il SIAP:/)).toBeNull();
+    await user.type(
+      screen.getByLabelText('Codice della struttura dell’AFT (facoltativo)'),
+      'af0007',
+    );
+    await user.type(
+      screen.getByLabelText('UCCP a cui afferisce l’AFT (facoltativo)'),
+      'UCCP di prova',
+    );
     await user.click(screen.getByRole('button', { name: 'Salva i dati dell’AFT' }));
     expect(await screen.findByText('Dati dell’AFT salvati.')).toBeTruthy();
     expect(calls.find((c) => c.method === 'PATCH')!.body).toEqual({
       nome: 'AFT Nord di prova',
       asl: '',
       codice: 'AFT-01',
+      codiceStruttura: 'af0007',
+      uccpNome: 'UCCP di prova',
+      uccpCodiceStruttura: '',
     });
     await waitFor(() => expect(screen.getByText(/AFT Nord di prova/)).toBeTruthy());
+    expect(await screen.findByText(/Per il SIAP: codice della struttura/)).toBeTruthy();
+    expect(screen.getByText('AF0007')).toBeTruthy();
+    // Con il codice dell'AFT e senza quello dell'UCCP: l'avviso, che non ferma niente.
+    expect(
+      screen.getByText(/i codici della struttura dell’AFT e dell’UCCP vanno indicati tutti e due/),
+    ).toBeTruthy();
   });
   it('una sezione alla volta, come in Strumenti: si cambia con il suo pulsante (D244)', async () => {
     stubFetch({

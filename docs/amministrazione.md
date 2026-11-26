@@ -88,6 +88,7 @@ Nome, tipo, regione (obbligatoria: senza, nessuna ricetta SSN parte), indirizzo 
 
 - **Intestazione dello studio:** vale nei certificati dai modelli quando il medico non ha la sua.
 - **Indirizzo completo:** è il luogo della visita in studio sulla copia INPS.
+- **Struttura per il SIAP** (D289): il codice della struttura (STS.11, 6 lettere o cifre, come lo dà la Regione o l'ASL; vuoto finché non c'è) e il tipo di struttura, uno dei primi cinque del Ministero, per difetto lo studio di medicina generale. Li cambia l'amministratore.
 - **Sicurezza:** 5 minuti di inattività, 50 password sbagliate o 5 codici sbagliati, 15 minuti di blocco (D29, D188); si cambiano qui, entro limiti di buon senso (le password da 20 a 100, i codici da 3 a 10, il blocco al più 60 minuti, perché non tenga fuori un medico per un giorno, D179). Le attese dopo le password sbagliate sono del servizio e si vedono nello stato del servizio.
 - **Tempo di attesa degli invii:** 8 secondi per difetto, quelli che la Regione indica nelle specifiche del SAR V06 (3.5.2; la V05 diceva 6–8, D94, D265). Si legge a ogni invio di ricette e certificati.
 - **Soglie degli avvisi sugli accessi anomali** (Garante, linee guida sul dossier sanitario, par. 7, lett. c): vuote, quindi avvisi spenti, finché qualcuno non dà i valori (da completare).

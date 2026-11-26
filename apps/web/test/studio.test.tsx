@@ -38,6 +38,14 @@ const studio = (over: Record<string, unknown> = {}) => ({
     { codice: 'group', nome: 'Medicina di gruppo' },
   ],
   indirizzoCompleto: 'Via di Prova 1, 10100 Comune di prova (TO)',
+  struttura: {
+    codice: null,
+    tipo: 'gp_office',
+    tipi: [
+      { codice: 'gp_office', nome: 'Studio medico MMG', codiceMinistero: 1 },
+      { codice: 'aft', nome: 'AFT', codiceMinistero: 3 },
+    ],
+  },
   intestazione: [],
   sicurezza: { minutiInattivita: 5, tentativiFalliti: 50, codiciSbagliati: 5, minutiBlocco: 15 },
   invii: { secondiAttesa: 8, avviso: null },
@@ -133,6 +141,9 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
       'Studio di prova{enter}{enter}  Via di Prova 1  ',
     );
     await user.selectOptions(screen.getByLabelText('Dalle ore'), '22');
+    // Struttura per il SIAP (D289): il codice com'è scritto; il servizio lo mette in maiuscolo.
+    await user.type(screen.getByLabelText('Codice della struttura (STS.11)'), 'prova1');
+    await user.selectOptions(screen.getByLabelText('Tipo di struttura'), 'aft');
     await user.click(screen.getByRole('button', { name: 'Salva i dati dello studio' }));
     await screen.findByText('Dati e impostazioni dello studio salvati.');
     expect(saved).toEqual([
@@ -149,6 +160,7 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
           email: null,
           pec: null,
         },
+        struttura: { codice: 'prova1', tipo: 'aft' },
         sicurezza: {
           minutiInattivita: 5,
           tentativiFalliti: 50,

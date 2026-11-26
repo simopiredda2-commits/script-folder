@@ -1,4 +1,11 @@
-import { can, PRINT_LIMITS, type Action } from '@mmg/domain';
+import {
+  can,
+  PRINT_LIMITS,
+  STRUCTURE_CODE_PATTERN,
+  STUDIO_STRUCTURE_TYPES,
+  type Action,
+  type StructureType,
+} from '@mmg/domain';
 import { and, arrayContains, asc, count, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
@@ -18,6 +25,7 @@ import {
 import { withActor, type Tx } from '../db/tx';
 import { HttpError } from '../http/errors';
 import { CONTROL_CHARACTERS_MESSAGE, hasControlCharacters } from '../security/plain-text';
+import { siapValues } from '../siap/values';
 import type { AdminDeps } from './deps';
 
 /**
@@ -218,6 +226,23 @@ const securityBody = z
   })
   .strict();
 
+/**
+ * Codice e tipo della struttura per il SIAP (D289): il gruppo si manda intero, come gli altri. Il
+ * codice è quello della codifica STS.11, come lo dà la Regione o l'ASL; vuoto finché non c'è.
+ */
+const structureBody = z
+  .object({
+    codice: code(
+      'Codice della struttura',
+      STRUCTURE_CODE_PATTERN,
+      'Codice della struttura: 6 lettere o cifre, come lo dà la Regione o l’ASL',
+    ),
+    tipo: z.enum(STUDIO_STRUCTURE_TYPES, {
+      error: 'Tipo di struttura: uno di quelli dell’elenco',
+    }),
+  })
+  .strict();
+
 const sendingBody = z
   .object({
     secondiAttesa: integer(
@@ -253,6 +278,7 @@ const updateBody = z
       .max(50, 'Intestazione: troppe righe')
       .optional(),
     sicurezza: securityBody.optional(),
+    struttura: structureBody.optional(),
     invii: sendingBody.optional(),
     avvisi: alertsBody.optional(),
   })
@@ -312,6 +338,8 @@ interface StudioValues {
   telefono: string | null;
   email: string | null;
   pec: string | null;
+  codiceStruttura: string | null;
+  tipoStruttura: StructureType;
   intestazione: string[];
   minutiInattivita: number | null;
   tentativiFalliti: number | null;
@@ -336,6 +364,8 @@ function valuesOf(s: StudioRow): StudioValues {
     telefono: s.phone,
     email: s.email,
     pec: s.pec,
+    codiceStruttura: s.structureCode,
+    tipoStruttura: s.structureType,
     intestazione: headerLinesOf(s.headerText),
     minutiInattivita: s.idleLockMinutes,
     tentativiFalliti: s.maxFailedLogins,
@@ -361,6 +391,8 @@ const COLUMNS = {
   telefono: 'phone',
   email: 'email',
   pec: 'pec',
+  codiceStruttura: 'structureCode',
+  tipoStruttura: 'structureType',
   intestazione: 'headerText',
   minutiInattivita: 'idleLockMinutes',
   tentativiFalliti: 'maxFailedLogins',
@@ -396,6 +428,18 @@ function diff<T extends object>(before: T, after: T) {
 }
 
 /** Che cosa manca nei dati dello studio, detto con il perché. */
+/**
+ * I tipi di struttura che lo studio può scegliere, con la descrizione e il codice del Ministero
+ * dalla trascrizione delle specifiche del SIAP (D284, D289): il legame fra chiave e codice è lì.
+ */
+function structureTypeOptions() {
+  const all = siapValues().tipoStruttura;
+  return STUDIO_STRUCTURE_TYPES.map((key) => {
+    const v = all.find((x) => x.chiave === key)!;
+    return { codice: key, nome: v.descrizione, codiceMinistero: v.codice };
+  });
+}
+
 function studioGaps(v: StudioValues): string[] {
   const out: string[] = [];
   if (!v.regione) out.push(`Regione: ${REGION_WHY}`);
@@ -558,6 +602,11 @@ export function createStudioAdminService(deps: AdminDeps) {
       })),
       /** Come va sulla copia del certificato INPS per la visita in studio. */
       indirizzoCompleto: formatStudioAddress(s),
+      struttura: {
+        codice: v.codiceStruttura,
+        tipo: v.tipoStruttura,
+        tipi: structureTypeOptions(),
+      },
       intestazione: v.intestazione,
       sicurezza: {
         minutiInattivita: v.minutiInattivita,
@@ -681,6 +730,9 @@ export function createStudioAdminService(deps: AdminDeps) {
           ? { intestazione: b.intestazione.map((l) => l.trim()).filter(Boolean) }
           : {}),
         ...(b.sicurezza ?? {}),
+        ...(b.struttura
+          ? { codiceStruttura: b.struttura.codice || null, tipoStruttura: b.struttura.tipo }
+          : {}),
         ...(b.invii ?? {}),
         ...(b.avvisi ?? {}),
       };

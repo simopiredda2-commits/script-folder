@@ -105,23 +105,19 @@ Campi delle specifiche del CSI (DataSet 2), con i valori del Ministero (tracciat
 
 Campi delle specifiche del CSI (DataSet 3) e del Ministero (tracciato 3). Il DataSet 3 del CSI ha anche data e progressivo del contatto, come il disciplinare (§6.4); il Ministero li ha tolti dal tracciato 3 nella versione 1.2 del 10/12/2025. Quale versione vale in Piemonte è nella domanda 12 per il CSI.
 
-| Campo                       | Valori (Ministero)                                                                                                                          | Nel programma                                       | Che cosa manca                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------ |
-| Regione, ASL, codice medico | come sopra                                                                                                                                  | Come sopra                                          | Niente                                                             |
-| Codice della struttura      | codice STS.11, 6 caratteri                                                                                                                  | No: lo studio ha nome, indirizzo e regione          | Il codice STS.11 dello studio, in Strumenti › Studio               |
-| Tipo di struttura           | 1 studio MMG, 2 studio PLS, 3 AFT, 4 UCCP, 5 Casa della Comunità, 6 guardia medica, 7 guardia turistica, 8 semiresidenziale, 9 residenziale | Studio singolo o di gruppo                          | Il tipo, per lo studio e per le altre sedi in cui lavora il medico |
-| AFT                         | codice STS.11 dell'AFT                                                                                                                      | AFT con il codice dato dall'ASL, facoltativo (D161) | Che il codice sia quello STS.11                                    |
-| UCCP                        | codice STS.11 dell'UCCP                                                                                                                     | No                                                  | L'UCCP a cui afferisce l'AFT                                       |
+| Campo                       | Valori (Ministero)                                                                                                                          | Nel programma                                                                                | Che cosa manca                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Regione, ASL, codice medico | come sopra                                                                                                                                  | Come sopra                                                                                   | Niente                                                 |
+| Codice della struttura      | codice STS.11, 6 caratteri                                                                                                                  | Sì, dal 26/11/2026: in Strumenti › Studio, «Struttura per il SIAP», 6 lettere o cifre (D289) | Il codice vero, che dà la Regione o l'ASL              |
+| Tipo di struttura           | 1 studio MMG, 2 studio PLS, 3 AFT, 4 UCCP, 5 Casa della Comunità, 6 guardia medica, 7 guardia turistica, 8 semiresidenziale, 9 residenziale | Sì per lo studio, dal 26/11/2026: uno dei primi cinque, per difetto lo studio MMG (D289)     | Le altre sedi in cui lavora il medico, con il contatto |
+| AFT                         | codice STS.11 dell'AFT                                                                                                                      | Il codice dato dall'ASL (D161) e, dal 26/11/2026, il codice della struttura dell'AFT (D289)  | Niente                                                 |
+| UCCP                        | codice STS.11 dell'UCCP                                                                                                                     | Sì, dal 26/11/2026: nome e codice della struttura dell'UCCP a cui afferisce l'AFT (D289)     | Niente                                                 |
 
 ## In breve
 
 - **C'è già** la maggior parte dei dati clinici: problemi con l'ICD-9-CM e la casella «cronica», BMI, tipo di contatto del diario, ricette, certificati, vaccinazioni, prestazioni aggiuntive, esenzioni, scelte, agenda, AFT, codici di regione, ASL e medico.
 - **Manca** soprattutto il **contatto** come registrazione a sé: data, progressivo, problema per cui è avvenuto, che cosa si è fatto. Oggi queste cose sono sparse nelle voci di quel giorno.
-- **Mancano** poi:
-  - il fumo codificato;
-  - il codice STS.11 dello studio e il tipo di struttura;
-  - l'UCCP;
-  - la tabella delle tipologie e dei dettagli di prestazione.
+- **Fatti dal 26/11/2026**: il fumo codificato e la tabella delle tipologie e dei dettagli di prestazione (D284); il codice e il tipo della struttura dello studio, il codice della struttura dell'AFT e l'UCCP (D289).
 - **Non servono dalla cartella** cittadinanza, stato civile e gli altri dati anagrafici: vengono dall'anagrafe regionale degli assistiti (disciplinare, §6.2).
 - **Dal CSI** servono il formato JSON, i servizi REST, i certificati del canale, l'ambiente di prova e il collaudo (domande 11 e 12 per il CSI).
 

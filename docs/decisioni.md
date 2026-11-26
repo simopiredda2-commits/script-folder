@@ -2527,3 +2527,26 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Risposta di Simone con il pulsante**: «Dopo il SIAP nazionale (Consigliata)».
   - **Ordine**: prima la parte nazionale del SIAP (codice della struttura, contatto, documenti) con la sua pull request. Poi lo scheletro (interfacce, scelta del pacchetto, la prova) e lo spostamento del Piemonte, un pezzo alla volta (dati, regole, integrazioni, testi), con le prove sempre verdi, in pull request loro. Poi il modulo del SIAP con il CSI, la rendicontazione dell'AIR (D287) e AURA, scritti già nel pacchetto del Piemonte.
   - **Fino allo spostamento**: il codice nuovo nazionale non nomina il Piemonte; quello regionale si scrive in moduli a parte, facili da spostare.
+
+**D289 · SIAP: codice e tipo della struttura dello studio, codice dell'AFT e UCCP (D284, passo 1c).** Il tracciato dell'organizzazione del SIAP vuole, per ogni contatto, il codice della struttura in cui il medico lavora, il tipo di struttura, l'AFT e l'UCCP (specifiche funzionali del Ministero, versione 1.3, § 3.10, e allegato 3). Le parole sono quelle del Ministero, quindi nazionali: stanno nel nucleo (D288).
+
+- **Studio**: in Strumenti › Studio, riquadro «Struttura per il SIAP», un gruppo a sé (`struttura`), che si manda intero come gli altri e lo cambia l'amministratore dello studio.
+  - Il **codice della struttura** ha 6 lettere o cifre, la forma del tracciato, controllata dal servizio e da un vincolo del database. Si scrive in maiuscolo e vuoto vuol dire «non ancora dato».
+  - Non si controlla il prefisso del transitorio («MM» e quattro cifre per uno studio di medicina generale): finita la fase transitoria arrivano i codici STS.11 veri, e un controllo sul prefisso li rifiuterebbe.
+  - Il **tipo di struttura** è per difetto lo studio di medicina generale. Lo studio può essere solo uno dei primi cinque tipi del Ministero: studio di medicina generale, studio di pediatria, sede unica di un'AFT, di un'UCCP, Casa della Comunità. Guardia medica, guardia turistica e strutture semiresidenziali e residenziali sono sedi in cui il medico lavora, non il suo studio: vengono con il contatto (passo 1d). Nel database ci sono tutti e nove, con le chiavi del dominio; codici e descrizioni vengono dalla trascrizione delle specifiche (D284).
+  - Il codice mancante **non** va fra i dati «da completare» in cima alla pagina: finché il flusso del SIAP non c'è sarebbe un avviso fisso, e la Regione può non averlo ancora dato. L'aiuto è nel riquadro.
+- **AFT**: il codice della struttura dell'AFT si aggiunge al codice dato dall'ASL, che resta: non è detto che siano lo stesso. In più l'UCCP a cui afferisce l'AFT, con nome e codice della struttura. Li cambia un medico titolare che fa parte dell'AFT, come gli altri dati dell'AFT; stessa forma e stesso vincolo del database.
+  - Con lo studio medico il tracciato vuole i codici dell'AFT e dell'UCCP tutti e due o nessuno (allegato 3). Con uno solo la pagina lo dice, ma non ferma niente: nel transitorio il Ministero solleva quei vincoli.
+- **Non fatto**: le altre sedi del medico, che vengono con il contatto; il controllo dei codici con un elenco ufficiale, che non c'è.
+- **Non provato**: i codici veri, che dà la Regione; come li manderà il CSI.
+
+**D290 · Strumenti con l'intelligenza artificiale che non decidono.** Domanda di Simone del 26/11/2026: «che ne dici di prevedere qualcosa tipo MediEvidence di Genomedics?». Letta la pagina pubblica di Medi Suite (`https://medisuite.it/`, 26/11/2026). MediEvidence è un assistente con l'intelligenza artificiale per il medico di medicina generale: risponde con linee guida, letteratura, schede dei farmaci e PubMed, con le fonti, anche sul singolo paziente. Il suo esempio dà le priorità di revisione delle terapie di un paziente, «decide il medico». Nella stessa suite ci sono il riassunto della cartella, la lettura dei referti in dati strutturati da validare e la proposta dei codici ICD-9 dal testo del diario.
+
+- **Il limite**: un suggerimento terapeutico o diagnostico sul singolo paziente urta la regola 3 («non diventare un dispositivo medico»). Per la lettura di qui, il software che dà informazioni usate per decisioni terapeutiche è almeno di classe IIa (regolamento UE 2017/745, allegato VIII, regola 11), e con l'AI Act diventa un sistema ad alto rischio. È da confermare con il consulente regolatorio.
+- **Risposta di Simone con il pulsante**: «Solo strumenti che non decidono (Consigliata)». La regola 3 resta.
+  - **Che cosa**:
+    - i valori dei referti letti e proposti come dati strutturati, da validare;
+    - i codici ICD-9 proposti dal testo che il medico ha scritto, con la sua conferma;
+    - una ricerca nelle linee guida e nelle schede tecniche che non usa i dati del paziente.
+  - **Come**: il medico conferma sempre; il servizio di intelligenza artificiale è un'interfaccia con un simulatore, come le altre integrazioni (regola 7); i dati restano nell'UE (regola 8). Il fornitore e la valutazione d'impatto sulla protezione dei dati si decidono prima di collegarne uno vero. Niente si copia da Medi Suite (regola 2).
+  - **Quando**: dopo il blocco di oggi, cioè SIAP, pacchetti regionali, AIR e AURA.

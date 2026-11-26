@@ -19,6 +19,10 @@ interface Overview {
     nome: string;
     asl: string | null;
     codice: string | null;
+    /** Per il SIAP (D289): codice della struttura dell'AFT e l'UCCP a cui afferisce. */
+    codiceStruttura: string | null;
+    uccpNome: string | null;
+    uccpCodiceStruttura: string | null;
     condivido: boolean;
     dal: string;
     membri: Member[];
@@ -224,6 +228,7 @@ function Membership({
         {a.asl ? ` · ${a.asl}` : ''}
         {a.codice ? ` · codice ${a.codice}` : ''}. Sei membro dal {date(a.dal)}.
       </p>
+      <SiapCodes a={a} />
       <EditAft a={a} onSaved={onChanged} />
       <table className="tabella">
         <caption>Medici dell’AFT nel programma</caption>
@@ -299,14 +304,50 @@ function Membership({
 }
 
 /**
- * Nome, ASL e codice dell'AFT (tappa 14): li cambia un medico titolare che ne fa parte. ASL e
- * codice vuoti si tolgono; ogni modifica va nel registro delle azioni di amministrazione.
+ * I codici dell'AFT per il SIAP (D289). Con lo studio medico il tracciato dell'organizzazione vuole
+ * i codici dell'AFT e dell'UCCP tutti e due o nessuno (specifiche funzionali del Ministero,
+ * allegato 3): con uno solo la pagina lo dice. Non ferma niente: nel transitorio il Ministero
+ * solleva quei vincoli.
+ */
+function SiapCodes({ a }: { a: NonNullable<Overview['aft']> }) {
+  if (!a.codiceStruttura && !a.uccpCodiceStruttura && !a.uccpNome) return null;
+  return (
+    <>
+      <p>
+        Per il SIAP: codice della struttura{' '}
+        {a.codiceStruttura ? <span className="codice">{a.codiceStruttura}</span> : 'non indicato'};
+        UCCP {a.uccpNome ?? 'senza nome'}
+        {a.uccpCodiceStruttura ? (
+          <>
+            , codice <span className="codice">{a.uccpCodiceStruttura}</span>
+          </>
+        ) : (
+          ', codice non indicato'
+        )}
+        .
+      </p>
+      {!a.codiceStruttura !== !a.uccpCodiceStruttura && (
+        <Notice kind="avviso">
+          Per il SIAP i codici della struttura dell’AFT e dell’UCCP vanno indicati tutti e due, o
+          nessuno dei due: con uno solo il tracciato dell’organizzazione non li prende.
+        </Notice>
+      )}
+    </>
+  );
+}
+
+/**
+ * Dati dell'AFT (tappa 14; per il SIAP D289): li cambia un medico titolare che ne fa parte. I campi
+ * facoltativi vuoti si tolgono; ogni modifica va nel registro delle azioni di amministrazione.
  */
 function EditAft({ a, onSaved }: { a: NonNullable<Overview['aft']>; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(a.nome);
   const [asl, setAsl] = useState(a.asl ?? '');
   const [code, setCode] = useState(a.codice ?? '');
+  const [structureCode, setStructureCode] = useState(a.codiceStruttura ?? '');
+  const [uccpName, setUccpName] = useState(a.uccpNome ?? '');
+  const [uccpCode, setUccpCode] = useState(a.uccpCodiceStruttura ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [saved, setSaved] = useState(false);
@@ -317,6 +358,9 @@ function EditAft({ a, onSaved }: { a: NonNullable<Overview['aft']>; onSaved: () 
       setName(a.nome);
       setAsl(a.asl ?? '');
       setCode(a.codice ?? '');
+      setStructureCode(a.codiceStruttura ?? '');
+      setUccpName(a.uccpNome ?? '');
+      setUccpCode(a.uccpCodiceStruttura ?? '');
       setError(null);
     }
     setSaved(false);
@@ -329,7 +373,14 @@ function EditAft({ a, onSaved }: { a: NonNullable<Overview['aft']>; onSaved: () 
     try {
       await api(`/api/aft/${a.id}`, {
         method: 'PATCH',
-        body: { nome: name, asl, codice: code },
+        body: {
+          nome: name,
+          asl,
+          codice: code,
+          codiceStruttura: structureCode,
+          uccpNome: uccpName,
+          uccpCodiceStruttura: uccpCode,
+        },
       });
       setSaved(true);
       setOpen(false);
@@ -350,7 +401,7 @@ function EditAft({ a, onSaved }: { a: NonNullable<Overview['aft']>; onSaved: () 
           aria-controls="aft-modifica"
           onClick={toggle}
         >
-          <Icon name="strumenti" /> <span>Modifica nome, ASL e codice dell’AFT</span>
+          <Icon name="strumenti" /> <span>Modifica i dati dell’AFT</span>
         </button>
       </p>
       {saved && <Notice kind="fatto">Dati dell’AFT salvati.</Notice>}
@@ -386,6 +437,51 @@ function EditAft({ a, onSaved }: { a: NonNullable<Overview['aft']>; onSaved: () 
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 maxLength={40}
+              />
+            </div>
+          </fieldset>
+          <fieldset disabled={busy}>
+            <legend>Per il SIAP</legend>
+            <p className="aiuto" id="aft-siap-aiuto">
+              I codici della struttura della codifica STS.11, 6 lettere o cifre, come li dà la
+              Regione o l’ASL. Nel periodo transitorio: «AF» e un numero progressivo per l’AFT, «UC»
+              e un numero progressivo per l’UCCP (specifiche funzionali del SIAP, allegato 3).
+            </p>
+            <div className="campo">
+              <label htmlFor="aft-modifica-struttura">
+                Codice della struttura dell’AFT (facoltativo)
+              </label>
+              <input
+                id="aft-modifica-struttura"
+                className="codice"
+                value={structureCode}
+                onChange={(e) => setStructureCode(e.target.value)}
+                maxLength={6}
+                pattern="[A-Za-z0-9]{6}"
+                aria-describedby="aft-siap-aiuto"
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor="aft-modifica-uccp">UCCP a cui afferisce l’AFT (facoltativo)</label>
+              <input
+                id="aft-modifica-uccp"
+                value={uccpName}
+                onChange={(e) => setUccpName(e.target.value)}
+                maxLength={120}
+              />
+            </div>
+            <div className="campo">
+              <label htmlFor="aft-modifica-uccp-struttura">
+                Codice della struttura dell’UCCP (facoltativo)
+              </label>
+              <input
+                id="aft-modifica-uccp-struttura"
+                className="codice"
+                value={uccpCode}
+                onChange={(e) => setUccpCode(e.target.value)}
+                maxLength={6}
+                pattern="[A-Za-z0-9]{6}"
+                aria-describedby="aft-siap-aiuto"
               />
             </div>
           </fieldset>
