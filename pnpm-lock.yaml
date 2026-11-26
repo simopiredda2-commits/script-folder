@@ -290,6 +290,9 @@ importers:
       '@mmg/domain':
         specifier: workspace:*
         version: link:../domain
+      '@mmg/integrations':
+        specifier: workspace:*
+        version: link:../integrations
 
   packages/rules:
     dependencies:

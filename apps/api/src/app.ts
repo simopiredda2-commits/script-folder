@@ -90,13 +90,13 @@ import {
   type AuraGateway,
   SimulatedAdditionalServicesPortal,
   type AdditionalServicesPortal,
-  SimulatedRegionalFseAccess,
   type RegionalFseAccess,
   RegionalFseClient,
   SimulatedRegionalFse,
   type SimulatedRegionalFseOptions,
 } from '@mmg/integrations';
 import { createRegionalQueue, type RegionalQueue } from './fse/regional-queue';
+import { fseAccessChoice } from './regions/integrations';
 import { loadMappings } from '@mmg/reference';
 import { ReferenceData } from './reference/lookup';
 import { ReferenceUpdates } from './reference/updates-service';
@@ -210,9 +210,9 @@ export interface AppDeps {
    */
   ppipPortal?: AdditionalServicesPortal;
   /**
-   * Apertura del Fascicolo regionale dalla cartella (D220), con il modulo di accesso del CSI. Per
-   * difetto il simulatore: l'adattatore vero si scrive con il CSI; con il simulatore, in
-   * produzione, l'apertura è spenta.
+   * Apertura del Fascicolo regionale dalla cartella (D220). Per difetto quella del pacchetto della
+   * regione dello studio, oggi il simulatore (D297); data qui, vale per ogni regione (le prove, o
+   * un adattatore vero dalla configurazione). Con il simulatore, in produzione, l'apertura è spenta.
    */
   fseAccess?: RegionalFseAccess;
 }
@@ -245,7 +245,7 @@ export function buildApp({
   identity = { gateway: new SimulatedDigitalIdentity({ now }), clientId: 'SIMULATORE_IDENTITA' },
   aura = {},
   ppipPortal = new SimulatedAdditionalServicesPortal(),
-  fseAccess = new SimulatedRegionalFseAccess(),
+  fseAccess,
 }: AppDeps): FastifyInstance {
   // Indirizzo della richiesta (`req.ip`, nel registro dei tentativi falliti): senza proxy fidati
   // è quello della connessione e X-Forwarded-For non conta; con APP_PROXY_FIDATI è quello del
@@ -553,11 +553,12 @@ export function buildApp({
       now,
     }),
   );
-  // Fascicolo regionale aperto dalla cartella (D220): modulo del CSI, oggi simulato.
+  // Fascicolo regionale aperto dalla cartella (D220), con il servizio della regione dello studio:
+  // oggi il simulatore del pacchetto (D297).
   registerFseAccessRoutes(app, {
     db,
     credentials,
-    access: fseAccess,
+    access: fseAccessChoice(fseAccess, now ? { now } : {}),
     environment: config.environment ?? 'prova',
   });
   // Profilo Sanitario Sintetico al Fascicolo regionale (D280): la coda con le politiche di invio.

@@ -1,14 +1,11 @@
-import {
-  FSE_DOCUMENT_TYPES,
-  isFseDocumentType,
-  SimulatedRegionalFseAccess,
-  type RegionalFseAccess,
-} from '@mmg/integrations';
+import { isDocumentTypeOf, type RegionalFseAccess } from '@mmg/integrations';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { createCredentialService } from '../credentials/service';
 import type { Database } from '../db/client';
 import { guardPatient } from '../patients/access';
+import type { RegionalChoice } from '../regions/integrations';
+import { studioRegion } from '../regions/region';
 import { HttpError } from './errors';
 
 const params = z.object({ id: z.uuid() });
@@ -19,33 +16,54 @@ const body = z
   })
   .strict();
 
-/** Errori di `getAuthentication` che riguardano le credenziali RUPAR del medico (V13, tabella 1). */
-const CREDENTIAL_ERRORS = new Set(['AUTH_ER_501', 'AUTH_ER_510', 'AUTH_ER_516']);
+/** Quando la regione dello studio non ha, nel programma, l'apertura del suo Fascicolo (D297). */
+export const NO_REGIONAL_FSE_ACCESS =
+  'La regione dello studio non ha ancora, nel programma, l’apertura del suo Fascicolo dalla cartella';
 
 export interface FseAccessDeps {
   db: Database;
   credentials: Pick<ReturnType<typeof createCredentialService>, 'authFor' | 'authRefused'>;
-  access: RegionalFseAccess;
+  /** L'apertura del Fascicolo della regione dello studio (D297). */
+  access: RegionalChoice<RegionalFseAccess>;
   environment: 'prova' | 'produzione';
 }
 
 /**
- * Aprire il Fascicolo regionale del paziente dalla cartella (D220), con il modulo di accesso del
- * CSI: il servizio chiede il token con le credenziali RUPAR del medico e restituisce l'indirizzo
- * da aprire, che vale una volta. Ogni richiesta resta nel registro degli accessi alla cartella.
+ * Aprire il Fascicolo regionale del paziente dalla cartella (D220), con il servizio di accesso
+ * della regione dello studio del medico (D297): il servizio chiede il token con le credenziali del
+ * medico e restituisce l'indirizzo da aprire, che vale una volta. Ogni richiesta resta nel registro
+ * degli accessi alla cartella.
  */
 export function registerFseAccessRoutes(app: FastifyInstance, deps: FseAccessDeps) {
-  const { db, credentials, access, environment } = deps;
+  const { db, credentials, environment } = deps;
   const scoped = { config: { patientScoped: true } };
   // Il simulatore non apre il Fascicolo vero: in produzione resta spento (regola 7).
-  const active = !(access.environment === 'simulator' && environment === 'produzione');
+  const activeFor = (access: RegionalFseAccess) =>
+    !(access.environment === 'simulator' && environment === 'produzione');
+  const accessOf = async (studioId: string) => deps.access.for(await studioRegion(db, studioId));
 
-  /** Per la pagina: i filtri delle specifiche e com'è il collegamento. */
-  app.get('/api/fascicolo-regionale', () => ({
-    tipiDocumento: Object.entries(FSE_DOCUMENT_TYPES).map(([codice, nome]) => ({ codice, nome })),
-    simulato: access.environment === 'simulator',
-    attivo: active,
-  }));
+  /**
+   * Per la pagina: i filtri e le parole della regione dello studio, e com'è il collegamento. Per
+   * una regione senza pacchetto, solo la nota: la pagina non mostra il modulo.
+   */
+  app.get('/api/fascicolo-regionale', async (req) => {
+    const access = await accessOf(req.actor!.studioId);
+    if (!access)
+      return { tipiDocumento: [], simulato: false, attivo: false, nota: NO_REGIONAL_FSE_ACCESS };
+    return {
+      tipiDocumento: Object.entries(access.documentTypes).map(([codice, nome]) => ({
+        codice,
+        nome,
+      })),
+      simulato: access.environment === 'simulator',
+      attivo: activeFor(access),
+      testi: {
+        introduzione: access.texts.intro,
+        simulato: access.texts.simulated,
+        nonAttivo: access.texts.notActive,
+      },
+    };
+  });
 
   app.post('/api/pazienti/:id/fascicolo-regionale', scoped, async (req) => {
     const actor = req.actor!;
@@ -59,14 +77,13 @@ export function registerFseAccessRoutes(app: FastifyInstance, deps: FseAccessDep
     );
     const { tipoDocumento } = body.parse(req.body ?? {});
     const documentType = tipoDocumento || null;
-    if (documentType !== null && !isFseDocumentType(documentType))
+    const access = await accessOf(actor.studioId);
+    if (!access) throw new HttpError(503, NO_REGIONAL_FSE_ACCESS);
+    if (documentType !== null && !isDocumentTypeOf(access, documentType))
       throw new HttpError(400, 'Tipo di documento non previsto dalle specifiche del Fascicolo');
-    if (!active)
-      throw new HttpError(
-        503,
-        'Il collegamento con il Fascicolo regionale non è ancora attivo: si attiva con il CSI Piemonte',
-      );
-    // Credenziali RUPAR del medico; se mancano, l'errore porta a «Credenziali dei servizi».
+    if (!activeFor(access)) throw new HttpError(503, access.texts.notActive);
+    // Credenziali del medico per i servizi della regione; se mancano, l'errore porta a
+    // «Credenziali dei servizi».
     const auth = await credentials.authFor(actor.userId, 'fascicolo_regionale');
     const result = await access.authenticate(
       { patientFiscalCode: pt.fiscalCode, clientIp: req.ip || null, documentType },
@@ -76,20 +93,20 @@ export function registerFseAccessRoutes(app: FastifyInstance, deps: FseAccessDep
       return { indirizzo: result.url, simulato: access.environment === 'simulator' };
     if (result.outcome === 'unreachable')
       throw new HttpError(503, `${result.message}: riprova più tardi`);
-    // Credenziali rifiutate o incomplete (V13, tabella 1: errate, PIN o credenziali mancanti): si
-    // annota, come per gli invii (D102), e si porta il medico alla pagina.
-    if (CREDENTIAL_ERRORS.has(result.code)) {
+    // Credenziali rifiutate o incomplete, come le dice il servizio della regione: si annota, come
+    // per gli invii (D102), e si porta il medico alla pagina.
+    if (result.outcome === 'credentials') {
       await credentials.authRefused(
         { userId: actor.userId, workstation: actor.workstation },
         'fascicolo_regionale',
         'credentials',
         `${result.code}: ${result.message}`,
       );
-      throw new HttpError(
-        422,
-        `${result.message} (${result.code}). Controlla utente, password e PIN RUPAR in «Credenziali dei servizi».`,
-        { codice: 'CREDENZIALI_RIFIUTATE', servizio: 'rupar', codiceFascicolo: result.code },
-      );
+      throw new HttpError(422, `${result.message} (${result.code}). ${access.texts.credentials}`, {
+        codice: 'CREDENZIALI_RIFIUTATE',
+        servizio: access.credentialService,
+        codiceFascicolo: result.code,
+      });
     }
     throw new HttpError(422, `${result.message} (${result.code})`, {
       codiceFascicolo: result.code,
@@ -98,30 +115,25 @@ export function registerFseAccessRoutes(app: FastifyInstance, deps: FseAccessDep
 
   /**
    * La pagina regionale simulata: al posto del Fascicolo vero, dice per chi e con quale filtro si
-   * sarebbe aperta. Il token vale una volta, come nella V13; l'IP non si confronta (2.2).
+   * sarebbe aperta, con le parole del simulatore della regione. Il token vale una volta; un token
+   * che nessun simulatore ha dato apre la pagina d'errore del primo. Senza simulatori la pagina non
+   * c'è.
    */
-  if (access instanceof SimulatedRegionalFseAccess) {
-    app.get('/api/simulatori/fascicolo', async (req, reply) => {
-      const { token } = z.object({ token: z.string().max(100) }).parse(req.query);
-      const page = access.open(token, req.ip || null);
-      const text =
-        page.outcome === 'opened'
-          ? `Fascicolo Sanitario Elettronico regionale (simulatore). Qui si aprirebbe il Fascicolo dell’assistito ${page.patientFiscalCode}${
-              page.documentType
-                ? `, con i documenti di tipo ${FSE_DOCUMENT_TYPES[page.documentType]}`
-                : ''
-            }.`
-          : `Fascicolo Sanitario Elettronico regionale (simulatore). ${page.message} (${page.code}).`;
-      return reply
-        .status(page.outcome === 'opened' ? 200 : 403)
-        .header('content-type', 'text/html; charset=utf-8')
-        .header('content-security-policy', "default-src 'none'; sandbox")
-        .header('cache-control', 'no-store')
-        .send(
-          `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Fascicolo regionale (simulatore)</title></head><body><p>${escapeHtml(text)}</p></body></html>`,
-        );
-    });
-  }
+  app.get('/api/simulatori/fascicolo', async (req, reply) => {
+    const simulators = deps.access.created().filter((a) => 'simulatedPage' in a);
+    if (simulators.length === 0) return reply.callNotFound();
+    const { token } = z.object({ token: z.string().max(100) }).parse(req.query);
+    const pages = simulators.map((a) => a.simulatedPage!(token, req.ip || null));
+    const page = pages.find((p) => p.status === 200) ?? pages[0]!;
+    return reply
+      .status(page.status)
+      .header('content-type', 'text/html; charset=utf-8')
+      .header('content-security-policy', "default-src 'none'; sandbox")
+      .header('cache-control', 'no-store')
+      .send(
+        `<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Fascicolo regionale (simulatore)</title></head><body><p>${escapeHtml(page.text)}</p></body></html>`,
+      );
+  });
 }
 
 function escapeHtml(text: string): string {

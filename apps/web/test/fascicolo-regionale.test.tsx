@@ -57,6 +57,7 @@ const PATIENT = {
   riepilogo: null,
 };
 
+/** Le parole arrivano dal pacchetto della regione dello studio (D297): qui una regione inventata. */
 const INFO = (over: Record<string, unknown> = {}) => ({
   tipiDocumento: [
     { codice: '57833-6', nome: 'PRESCRIZIONE FARMACEUTICA' },
@@ -64,6 +65,12 @@ const INFO = (over: Record<string, unknown> = {}) => ({
   ],
   simulato: true,
   attivo: true,
+  testi: {
+    introduzione:
+      'Il programma chiede l’accesso alla Regione di prova con le credenziali di prova.',
+    simulato: 'Collegamento simulato: si apre una pagina di prova della Regione di prova.',
+    nonAttivo: 'Il collegamento non è ancora attivo: si attiva con l’ente di prova',
+  },
   ...over,
 });
 
@@ -104,8 +111,9 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
     });
     const user = userEvent.setup();
     start();
-    // Con il simulatore la pagina lo dice: non è il Fascicolo vero.
+    // Con il simulatore la pagina lo dice: non è il Fascicolo vero. Le parole sono della regione.
     expect(await screen.findByText(/Collegamento simulato/)).toBeTruthy();
+    expect(screen.getByText(/chiede l’accesso alla Regione di prova/)).toBeTruthy();
     const select = screen.getByLabelText('Documenti da mostrare');
     expect(
       within(select)
@@ -163,10 +171,10 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
         status: 422,
         body: {
           errore:
-            'Errore di autenticazione (AUTH_ER_501). Controlla utente, password e PIN RUPAR in «Credenziali dei servizi».',
+            'Errore di autenticazione (AUTH_ER_501). Controlla le credenziali di prova in «Credenziali dei servizi».',
           dettagli: {
             codice: 'CREDENZIALI_RIFIUTATE',
-            servizio: 'rupar',
+            servizio: 'servizio-di-prova',
             codiceFascicolo: 'AUTH_ER_501',
           },
         },
@@ -193,10 +201,32 @@ describe('Fascicolo regionale dalla cartella (D220)', () => {
       '/api/fascicolo-regionale': ok(INFO({ attivo: false })),
     });
     start();
-    expect(await screen.findByText(/non è ancora attivo: si attiva con il CSI/)).toBeTruthy();
+    expect(
+      await screen.findByText(
+        'Il collegamento non è ancora attivo: si attiva con l’ente di prova.',
+      ),
+    ).toBeTruthy();
     expect(
       screen.getByRole<HTMLButtonElement>('button', { name: 'Apri il Fascicolo' }).disabled,
     ).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('la regione dello studio senza pacchetto: la nota, senza modulo né parole di un’altra regione', async () => {
+    const open = vi.spyOn(window, 'open');
+    const nota =
+      'La regione dello studio non ha ancora, nel programma, l’apertura del suo Fascicolo';
+    const calls = stubFetch({
+      '/api/io': ok(me('owner_doctor')),
+      '/api/pazienti/p1': ok(PATIENT),
+      '/api/fascicolo-regionale': ok({ tipiDocumento: [], simulato: false, attivo: false, nota }),
+    });
+    start();
+    expect(await screen.findByText(`${nota}.`)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Apri il Fascicolo' })).toBeNull();
+    expect(screen.queryByLabelText('Documenti da mostrare')).toBeNull();
+    expect(screen.queryByText(/Collegamento simulato|non è ancora attivo/)).toBeNull();
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
     expect(open).not.toHaveBeenCalled();
   });
 

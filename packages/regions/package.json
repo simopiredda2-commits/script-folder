@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./*": "./*/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p .",
     "inventario": "tsx scripts/inventario.ts"
   },
   "dependencies": {
-    "@mmg/domain": "workspace:*"
+    "@mmg/domain": "workspace:*",
+    "@mmg/integrations": "workspace:*"
   }
 }

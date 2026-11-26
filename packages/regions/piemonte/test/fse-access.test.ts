@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { FseAccessRequest } from '@mmg/integrations';
 import {
   FSE_ACCESS_APPLICATION,
   FSE_ACCESS_ERRORS,
@@ -6,9 +7,9 @@ import {
   FSE_ACCESS_ROLE,
   FSE_DOCUMENT_TYPES,
   MAX_TOKENS,
+  piemonte,
   SimulatedRegionalFseAccess,
-  type FseAccessRequest,
-} from '../src';
+} from '..';
 
 /** Credenziali RUPAR inventate: il simulatore controlla solo che ci siano. */
 const auth = { username: 'medico.inventato', password: 'parola-inventata', pin: '0000' };
@@ -77,7 +78,7 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
   it('utente, password e PIN obbligatori (V13, 3.3); tipo di documento sconosciuto: FSE_ER_504', async () => {
     const fse = new SimulatedRegionalFseAccess();
     expect(await fse.authenticate(request(), { username: 'x' })).toEqual({
-      outcome: 'failure',
+      outcome: 'credentials',
       code: 'AUTH_ER_516',
       message: 'Le credenziali devono essere valorizzate',
     });
@@ -85,7 +86,7 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
     expect(
       await fse.authenticate(request(), { username: 'medico.inventato', password: 'parola' }),
     ).toEqual({
-      outcome: 'failure',
+      outcome: 'credentials',
       code: 'AUTH_ER_510',
       message: 'Il parametro Pin del richiedente deve essere valorizzato',
     });
@@ -171,6 +172,35 @@ describe('accesso al Fascicolo regionale dalla cartella, simulato (D220, LCCE V1
     expect(FSE_DOCUMENT_TYPES['REG-ESE-11488-4']).toBe('CERTIFICATO DI CONDIZIONE O MALATTIA');
     // Il documento dei consensi della V03 non c'è più.
     expect(Object.hasOwn(FSE_DOCUMENT_TYPES, '59284-0')).toBe(false);
+  });
+
+  it('attua il contratto nazionale (D297): tipi di documento, parole, credenziali e pagina simulata', async () => {
+    const fse = piemonte.integrations!.fseAccess!({});
+    expect(fse).toBeInstanceOf(SimulatedRegionalFseAccess);
+    expect(fse.documentTypes).toBe(FSE_DOCUMENT_TYPES);
+    expect(fse.texts.intro).toMatch(/Regione Piemonte con le tue credenziali RUPAR/);
+    // Dalla V13 l'IP della postazione si traccia e non si confronta (2.2): niente «solo da qui».
+    expect(fse.texts.intro).not.toMatch(/solo da questo computer/);
+    expect(fse.texts.simulated).toMatch(
+      /^Collegamento simulato: .*si attiva con il CSI Piemonte\.$/,
+    );
+    expect(fse.texts.notActive).toMatch(/si attiva con il CSI Piemonte/);
+    expect(fse.texts.credentials).toMatch(/PIN RUPAR in «Credenziali dei servizi»/);
+    expect(fse.credentialService).toBe('rupar');
+    const r = await fse.authenticate(request({ documentType: '11502-2' }), auth);
+    if (r.outcome !== 'success') throw new Error(r.outcome);
+    const token = tokenOf(r.url);
+    expect(fse.simulatedPage!(token, null)).toEqual({
+      status: 200,
+      text: 'Fascicolo Sanitario Elettronico regionale (simulatore). Qui si aprirebbe il Fascicolo dell’assistito RSSMRA80A41X000Y, con i documenti di tipo REFERTO DI LABORATORIO.',
+    });
+    expect(fse.simulatedPage!(token, null)).toEqual({
+      status: 403,
+      text: 'Fascicolo Sanitario Elettronico regionale (simulatore). Token di autenticazione non valido (WEB_001).',
+    });
+    // AUTH_ER_501, errore di autenticazione: credenziali errate.
+    const wrong = new SimulatedRegionalFseAccess({ decide: () => 'AUTH_ER_501' });
+    expect((await wrong.authenticate(request(), auth)).outcome).toBe('credentials');
   });
 
   it('il simulatore non tiene i token senza limite: usati escono, i più vecchi oltre il limite pure (D232)', async () => {

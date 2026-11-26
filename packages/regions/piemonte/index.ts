@@ -1,4 +1,7 @@
 import type { RegionalPackage } from '../src/types';
+import { SimulatedRegionalFseAccess } from './integrations/fse-access';
+
+export * from './integrations/fse-access';
 
 /**
  * Il pacchetto della Regione Piemonte (D288, D292): il primo. Il manifesto dice che cosa dà la
@@ -60,6 +63,9 @@ export const piemonte: RegionalPackage = {
     },
   ],
   asl: [],
+  integrations: {
+    fseAccess: (options) => new SimulatedRegionalFseAccess(options),
+  },
   terms: [
     /piemont/i,
     /\bCSI\b/,

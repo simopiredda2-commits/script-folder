@@ -1,16 +1,16 @@
-import {
-  SimulatedRegionalFseAccess,
-  type FseAccessErrorCode,
-  type FseAccessRequest,
-  type FseAccessResult,
-  type RegionalFseAccess,
-} from '@mmg/integrations';
+import type { FseAccessRequest, FseAccessResult, RegionalFseAccess } from '@mmg/integrations';
+import { SimulatedRegionalFseAccess, type FseAccessErrorCode } from '@mmg/regions/piemonte';
 import { and, desc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildApp } from '../src/app';
-import { accessLog, patient, serviceCredential, serviceCredentialEvent } from '../src/db/schema';
-import { createScenario, login, type Scenario } from './helpers/scenario';
-import { createTestDatabase, type TestDatabase } from './helpers/test-db';
+import { buildApp } from '../../../src/app';
+import {
+  accessLog,
+  patient,
+  serviceCredential,
+  serviceCredentialEvent,
+} from '../../../src/db/schema';
+import { createScenario, login, type Scenario } from '../../helpers/scenario';
+import { createTestDatabase, type TestDatabase } from '../../helpers/test-db';
 
 type Decision = 'success' | 'unreachable' | FseAccessErrorCode;
 
@@ -278,6 +278,14 @@ describe('Fascicolo regionale fuori dal simulatore (D220)', () => {
     const calls: FseAccessRequest[] = [];
     const real: RegionalFseAccess = {
       environment: 'test',
+      documentTypes: {},
+      texts: {
+        intro: 'Introduzione (prova)',
+        simulated: 'Simulato (prova)',
+        notActive: 'Non attivo (prova)',
+        credentials: 'Controlla le credenziali (prova)',
+      },
+      credentialService: 'prova',
       authenticate: (request): Promise<FseAccessResult> => {
         calls.push(request);
         return Promise.resolve({ outcome: 'success', url: 'https://regione.invalid/fse?token=1' });

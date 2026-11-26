@@ -1,3 +1,5 @@
+import type { RegionalFseAccess } from '@mmg/integrations';
+
 /**
  * Pacchetti regionali (D288, D292): ciò che è legato a una regione sta nel pacchetto di quella
  * regione, scelto dalla regione dello studio e dall'ASL del medico. Qui il contratto di un
@@ -57,6 +59,16 @@ export interface AslVariant {
   parts: readonly RegionalPartEntry[];
 }
 
+/**
+ * Le integrazioni di un pacchetto con i servizi della regione, che non usano il database (D297):
+ * attuano i contratti nazionali di `@mmg/integrations`. Il servizio le sceglie dalla regione dello
+ * studio. Oggi ci sono i simulatori (regola 7); gli adattatori veri si aggiungono con l'ente.
+ */
+export interface RegionalIntegrations {
+  /** Apertura del Fascicolo della regione dalla cartella (D220): il simulatore. */
+  fseAccess?: (options: { now?: () => Date }) => RegionalFseAccess;
+}
+
 export interface RegionalPackage {
   /** La chiave: il nome delle cartelle del pacchetto (`regions/<chiave>/`). */
   key: string;
@@ -71,4 +83,6 @@ export interface RegionalPackage {
    * pacchetto non si scrivono (prova dei nomi regionali, D292). Si confrontano riga per riga.
    */
   terms: readonly RegExp[];
+  /** Le integrazioni con i servizi della regione (D297), se il pacchetto ne ha. */
+  integrations?: RegionalIntegrations;
 }

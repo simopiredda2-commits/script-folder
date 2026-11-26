@@ -1,0 +1,44 @@
+import type { RegionalFseAccess } from '@mmg/integrations';
+import { REGIONAL_PACKAGES, type RegionalPackage } from '@mmg/regions';
+
+/**
+ * Le integrazioni con i servizi della regione (D297), una per pacchetto: il servizio le sceglie
+ * dalla regione dello studio, a ogni richiesta. Si creano alla prima richiesta e restano. Con
+ * `override` (le prove, o un adattatore dato dalla configurazione) si usa quella per ogni regione.
+ */
+export interface RegionalChoice<T> {
+  /** L'integrazione per la regione (la chiave del pacchetto), o null se la regione non ce l'ha. */
+  for(region: string | null): T | null;
+  /** Le integrazioni già create, per esempio per servire le pagine dei simulatori. */
+  created(): T[];
+}
+
+export function regionalChoice<T>(
+  build: (pkg: RegionalPackage) => T | null,
+  override?: T,
+  packages: readonly RegionalPackage[] = REGIONAL_PACKAGES,
+): RegionalChoice<T> {
+  const made = new Map<string, T | null>();
+  return {
+    for(region) {
+      if (override !== undefined) return override;
+      if (region === null) return null;
+      if (!made.has(region)) {
+        const pkg = packages.find((p) => p.key === region);
+        made.set(region, pkg ? build(pkg) : null);
+      }
+      return made.get(region) ?? null;
+    },
+    created() {
+      if (override !== undefined) return [override];
+      return [...made.values()].filter((x): x is T => x !== null);
+    },
+  };
+}
+
+/** L'apertura del Fascicolo della regione dalla cartella (D220): il simulatore del pacchetto. */
+export const fseAccessChoice = (
+  override?: RegionalFseAccess,
+  options: { now?: () => Date } = {},
+  packages?: readonly RegionalPackage[],
+) => regionalChoice((pkg) => pkg.integrations?.fseAccess?.(options) ?? null, override, packages);

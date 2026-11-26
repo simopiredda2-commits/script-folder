@@ -8,10 +8,14 @@ import { useApi } from '../lib/useApi';
 import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
 interface FseAccessInfo {
-  /** Filtri dell'elenco dei documenti, come nelle specifiche del CSI (TIPO_DOCUMENTO). */
+  /** Filtri dell'elenco dei documenti, come nelle specifiche della regione dello studio. */
   tipiDocumento: { codice: string; nome: string }[];
   simulato: boolean;
   attivo: boolean;
+  /** Le parole della regione dello studio (D297): a chi si chiede l'accesso, con chi si attiva. */
+  testi?: { introduzione: string; simulato: string; nonAttivo: string };
+  /** Solo se la regione dello studio non ha, nel programma, l'apertura del suo Fascicolo. */
+  nota?: string;
 }
 
 /** I nomi delle specifiche sono in maiuscolo: nell'interfaccia si scrivono come una frase. */
@@ -44,10 +48,11 @@ function reserveTab(): Window | null {
 }
 
 /**
- * Aprire il Fascicolo regionale del paziente dalla cartella (D220), con il modulo di accesso del
- * CSI Piemonte: il servizio chiede l'accesso con le credenziali RUPAR del medico e restituisce un
- * indirizzo che vale una volta, solo da questa postazione. Si apre in una scheda nuova; se il
- * browser la blocca, resta un collegamento da aprire a mano.
+ * Aprire il Fascicolo regionale del paziente dalla cartella (D220), con il servizio di accesso
+ * della regione dello studio (D297): il servizio chiede l'accesso con le credenziali del medico per
+ * i servizi della regione e restituisce un indirizzo che vale una volta. Le parole che nominano la
+ * regione arrivano dal suo pacchetto. Si apre in una scheda nuova; se il browser la blocca, resta
+ * un collegamento da aprire a mano.
  */
 export function FseAccessPage() {
   const { id } = useParams<{ id: string }>();
@@ -109,27 +114,13 @@ export function FseAccessPage() {
       ) : (
         <section className="riquadro" aria-labelledby="titolo-fascicolo">
           <h2 id="titolo-fascicolo">Apri il Fascicolo Sanitario Elettronico</h2>
-          <p>
-            Il programma chiede l’accesso alla Regione Piemonte con le tue credenziali RUPAR e apre
-            il Fascicolo di questo paziente in una scheda nuova, senza riscrivere utente e password.
-            Il collegamento vale una volta sola e solo da questo computer; la Regione controlla che
-            il paziente abbia dato il consenso alla consultazione.
-          </p>
           {info.loading && !i && <Loading what="dati del collegamento" />}
           <ErrorMessage error={info.error} />
-          {i?.simulato && (
-            <Notice kind="avviso">
-              Collegamento simulato: si apre una pagina di prova del programma, non il Fascicolo
-              vero. Il collegamento vero si attiva con il CSI Piemonte.
-            </Notice>
-          )}
-          {i && !i.attivo && (
-            <Notice kind="errore">
-              Il collegamento con il Fascicolo regionale non è ancora attivo: si attiva con il CSI
-              Piemonte.
-            </Notice>
-          )}
-          {i && (
+          {i?.nota && <Notice kind="info">{i.nota}.</Notice>}
+          {i?.testi && <p>{i.testi.introduzione}</p>}
+          {i?.testi && i.simulato && <Notice kind="avviso">{i.testi.simulato}</Notice>}
+          {i?.testi && !i.attivo && <Notice kind="errore">{i.testi.nonAttivo}.</Notice>}
+          {i?.testi && (
             <form onSubmit={(e) => void open(e)}>
               <div className="campo">
                 <label htmlFor={selectId}>Documenti da mostrare</label>
