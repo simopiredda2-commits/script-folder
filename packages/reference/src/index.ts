@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { regionalDataDirs } from '@mmg/regions';
 import { join } from 'node:path';
 import { type MappingSet, parseMappings } from './mapping';
 
@@ -17,11 +18,17 @@ export * from './xlsx';
 export const DATA_DIR = join(import.meta.dirname, '..', 'data');
 
 /**
- * Trascrizioni che il programma porta con sé: il catalogo regionale delle prestazioni e gli atti che
- * lo modificano (D159), le diagnosi ICD-9-CM (D186). Entrano in uso quando una persona le ha
- * controllate.
+ * Trascrizioni nazionali che il programma porta con sé: le diagnosi ICD-9-CM (D186), gli allegati
+ * del DPCM LEA, le prestazioni aggiuntive dell'ACN. Entrano in uso quando una persona le ha
+ * controllate. Quelle delle regioni stanno nei pacchetti regionali (D292).
  */
-export const REGIONAL_TRANSCRIPTIONS = join(DATA_DIR, 'trascrizioni');
+export const TRANSCRIPTIONS_DIR = join(DATA_DIR, 'trascrizioni');
+
+/** Le cartelle delle trascrizioni: quella nazionale e quelle dei pacchetti regionali (D292). */
+export const TRANSCRIPTION_DIRS: readonly string[] = [
+  TRANSCRIPTIONS_DIR,
+  ...regionalDataDirs('trascrizioni'),
+];
 
 /** Sinonimi e sigle dei materiali per la ricerca delle prestazioni (D153). */
 export const SERVICE_SEARCH_DATA = join(DATA_DIR, 'ricerca-prestazioni.json');
@@ -33,21 +40,31 @@ export const SERVICE_SEARCH_DATA = join(DATA_DIR, 'ricerca-prestazioni.json');
 export const SIAP_VALUES_FILE = join(DATA_DIR, 'siap', 'valori-ministero-1.3.json');
 
 /**
- * Cartella dei dati del SIAP: i valori del Ministero e le corrispondenze fra le voci dei cataloghi
- * delle prestazioni aggiuntive e i dettagli della tipologia «PIPP» (D291), un file per serie.
+ * Cartella dei dati nazionali del SIAP: i valori del Ministero e la corrispondenza fra le voci
+ * dell'ACN e i dettagli della tipologia «PIPP» (D291).
  */
 export const SIAP_DIR = join(DATA_DIR, 'siap');
 
 /**
- * Tabelle RAO, Raggruppamenti di attesa omogenei (D285): il manuale di AGENAS e le determine della
- * Regione Piemonte per la cardiologia e la gastroenterologia, trascritti con il legame ai codici del
- * nomenclatore di oggi.
+ * Le cartelle delle corrispondenze delle prestazioni aggiuntive per il SIAP: quella nazionale e
+ * quelle dei pacchetti regionali, con gli accordi delle regioni (D291, D292).
  */
-export const RAO_FILES = [
-  'agenas-manuale-2020.json',
-  'piemonte-dd973-2019.json',
-  'piemonte-dd259-2019.json',
-].map((f) => join(DATA_DIR, 'rao', f));
+export const SIAP_DIRS: readonly string[] = [SIAP_DIR, ...regionalDataDirs('siap')];
+
+/**
+ * Tabelle RAO, Raggruppamenti di attesa omogenei (D285): il manuale di AGENAS e, dai pacchetti
+ * regionali, le tabelle delle regioni (D292), trascritti con il legame ai codici del nomenclatore di
+ * oggi. Prima il manuale nazionale, poi i file di ogni pacchetto in ordine di nome.
+ */
+export const RAO_FILES: readonly string[] = [
+  join(DATA_DIR, 'rao', 'agenas-manuale-2020.json'),
+  ...regionalDataDirs('rao').flatMap((d) =>
+    readdirSync(d)
+      .filter((f) => f.endsWith('.json'))
+      .sort()
+      .map((f) => join(d, f)),
+  ),
+];
 
 /** Legge un file di mappature (per difetto quello del repository). */
 export function loadMappings(path: string = join(DATA_DIR, 'mappature.json')): MappingSet {

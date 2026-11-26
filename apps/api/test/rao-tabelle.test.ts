@@ -145,7 +145,7 @@ describe('tabelle RAO (D285)', () => {
   it('ogni codice del legame è nel catalogo regionale, ogni prefisso trova almeno una voce', () => {
     const dir = join(
       import.meta.dirname,
-      '../../../packages/reference/data/trascrizioni/piemonte_catalogo',
+      '../../../packages/regions/piemonte/data/trascrizioni/piemonte_catalogo',
     );
     const read = (f: string) => {
       const [head, ...rows] = parseCsv(readFileSync(join(dir, f), 'utf8'), ';');

@@ -9,7 +9,7 @@ import {
   mappingForTranscription,
   parseChanges,
   readTable,
-  REGIONAL_TRANSCRIPTIONS,
+  TRANSCRIPTION_DIRS,
 } from '../src';
 
 /**
@@ -19,8 +19,10 @@ import {
  * rispetto al PDF è in docs/catalogo-regionale.md.
  */
 const mapping = mappingForTranscription(loadMappings(), 'prestazioni')!;
-const all = findTranscriptions(REGIONAL_TRANSCRIPTIONS);
-// Nella stessa cartella ci sono anche le diagnosi ICD-9-CM (D186): qui solo il catalogo regionale.
+// Le cartelle delle trascrizioni, nazionale e dei pacchetti regionali (D292), hanno anche le
+// diagnosi ICD-9-CM (D186) e gli allegati dei LEA: qui solo il catalogo regionale.
+const scans = TRANSCRIPTION_DIRS.map((d) => findTranscriptions(d));
+const all = { found: scans.flatMap((s) => s.found), invalid: scans.flatMap((s) => s.invalid) };
 const found = all.found.filter((f) => f.path.startsWith('piemonte_catalogo/'));
 const { invalid } = all;
 const sheet = (name: string) => {

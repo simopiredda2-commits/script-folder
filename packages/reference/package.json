@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
+    "@mmg/regions": "workspace:*",
     "fflate": "^0.8.3",
     "zod": "^4.6.7"
   }

@@ -80,7 +80,7 @@ export interface UpdateSetup {
   /** Cartella dei dati di sync (il suo --dest). */
   dataDir: string;
   /** Cartella delle trascrizioni dei PDF, se c'è. */
-  transcriptionsDir?: string;
+  transcriptionsDir?: string | readonly string[];
   mappings: MappingSet;
   sync: SyncRunner;
 }

@@ -18,7 +18,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { loadMappings, overrideMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
+import { loadMappings, overrideMappings, TRANSCRIPTION_DIRS } from '@mmg/reference';
 import { createDatabase, createPool } from '../db/client';
 import { runMigrations } from '../db/migrate';
 import { EXAMPLE_TRANSCRIPTIONS, runSyncOnExample, serveExampleSite } from './example-site';
@@ -62,7 +62,7 @@ let mappings = loadMappings();
 for (const f of values.mappature ?? []) mappings = overrideMappings(mappings, loadMappings(f));
 
 let syncDir = values.dati;
-let transcriptionsDir = values.trascrizioni;
+let transcriptionsDir: string | readonly string[] | undefined = values.trascrizioni;
 if (values.esempio) {
   const site = await serveExampleSite();
   try {
@@ -75,7 +75,7 @@ if (values.esempio) {
   // Il sito d'esempio ha le intestazioni vere AIFA: valgono le mappature del repository.
   transcriptionsDir ??= EXAMPLE_TRANSCRIPTIONS;
 }
-transcriptionsDir ??= REGIONAL_TRANSCRIPTIONS;
+transcriptionsDir ??= TRANSCRIPTION_DIRS;
 
 const pool = createPool(databaseUrl);
 try {

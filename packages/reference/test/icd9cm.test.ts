@@ -9,7 +9,7 @@ import {
   mappingForTranscription,
   parseChanges,
   readTable,
-  REGIONAL_TRANSCRIPTIONS,
+  TRANSCRIPTIONS_DIR,
   structureProblems,
 } from '../src';
 
@@ -20,7 +20,7 @@ import {
  * docs/icd9cm.md. Le righe attese sono quelle del documento.
  */
 const mapping = mappingForTranscription(loadMappings(), 'diagnosi')!;
-const icd = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.filter((f) =>
+const icd = findTranscriptions(TRANSCRIPTIONS_DIR).found.filter((f) =>
   f.path.startsWith('icd9cm/'),
 );
 const sheet = (name: string) => icd.find((f) => f.path === `icd9cm/${name}.json`)!;

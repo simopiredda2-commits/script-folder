@@ -1,7 +1,7 @@
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
+import { loadMappings, TRANSCRIPTIONS_DIR } from '@mmg/reference';
 import { desc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { accessLog } from '../src/db/schema';
@@ -59,7 +59,7 @@ describe('nomenclatore dei presidi dalle trascrizioni dei LEA (D218, D236)', () 
     const dir = join(work, name);
     mkdirSync(join(dir, 'lea'), { recursive: true });
     for (const base of ANNEXES) {
-      const from = (ext: string) => join(REGIONAL_TRANSCRIPTIONS, 'lea', `${base}.${ext}`);
+      const from = (ext: string) => join(TRANSCRIPTIONS_DIR, 'lea', `${base}.${ext}`);
       cpSync(from('csv'), join(dir, 'lea', `${base}.csv`));
       const sheet = JSON.parse(readFileSync(from('json'), 'utf-8')) as Record<string, unknown>;
       writeFileSync(

@@ -10,12 +10,20 @@
  *
  *   tsx apps/demo/scripts/prepara-database.ts DESTINAZIONE.tar.gz
  */
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { PGlite } from '@electric-sql/pglite';
-import { loadMappings, REGIONAL_TRANSCRIPTIONS } from '@mmg/reference';
+import { loadMappings, TRANSCRIPTION_DIRS } from '@mmg/reference';
 import { drizzle } from 'drizzle-orm/pglite';
 import type { Database } from '../../api/src/db/client';
 import { readMigrations } from '../../api/src/db/migrate';
@@ -45,6 +53,15 @@ const UNCHECKED_TRANSCRIPTIONS = {
     'dd710-2026-dal-2027-01-13',
   ],
 };
+/**
+ * La cartella delle trascrizioni del programma che ha la scheda: quella nazionale o quella di un
+ * pacchetto regionale (D292).
+ */
+function transcriptionRoot(dir: string, base: string) {
+  const root = TRANSCRIPTION_DIRS.find((d) => existsSync(join(d, dir, `${base}.json`)));
+  if (!root) throw new Error(`Manca la trascrizione ${dir}/${base}`);
+  return root;
+}
 /** «Controllato da» nella copia della dimostrazione: dice che nessuno l'ha controllata. */
 const DEMO_UNCHECKED = 'nessuno: copia della dimostrazione, ancora da controllare (A8)';
 
@@ -143,7 +160,8 @@ try {
   for (const [dir, bases] of Object.entries(UNCHECKED_TRANSCRIPTIONS)) {
     mkdirSync(join(unchecked, dir), { recursive: true });
     for (const base of bases) {
-      const from = (ext: string) => join(REGIONAL_TRANSCRIPTIONS, dir, `${base}.${ext}`);
+      const root = transcriptionRoot(dir, base);
+      const from = (ext: string) => join(root, dir, `${base}.${ext}`);
       cpSync(from('csv'), join(unchecked, dir, `${base}.csv`));
       const sheet = JSON.parse(readFileSync(from('json'), 'utf-8')) as Record<string, unknown>;
       writeFileSync(
