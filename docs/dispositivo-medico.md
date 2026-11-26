@@ -103,6 +103,14 @@ Le fonti pubbliche trovate sono del 2010–2013: articoli della rivista della SI
 - Appropriatezza farmacologica, rischio clinico e promemoria sul singolo paziente corrispondono agli esempi di moduli medici della linea guida: sarebbero almeno di classe IIa.
 - Gli indicatori di MilleGPG e di Health Search non si usano (regola 2): le definizioni vengono da atti pubblici (AIR, ASL, percorsi diagnostico-terapeutici regionali) o le scrive il medico.
 
+### La schermata di GPG
+
+Simone ha mandato la pagina iniziale di GPG, versione «7.0.0 CE» (26/11/2026). È letta solo nella conversazione e non entra nel repository: suggerisce funzioni, non impaginazione, testi o nomi (regola 2, D89).
+
+- **Funzioni che restano fuori dal dispositivo medico**: i conteggi per area (malattie croniche, vaccinazioni, screening) con il dettaglio e la fonte; il confronto con i colleghi dell'AFT con soli numeri aggregati; un indice di completezza dei dati della cartella; gli obiettivi dell'AFT e degli accordi aziendali; la data dell'ultimo calcolo.
+- **Funzioni dentro**: le carte del rischio (calcolatori), l'appropriatezza sul singolo paziente, il rischio clinico, le estrazioni di pazienti con l'intelligenza artificiale.
+- «CE» accanto alla versione può essere la marcatura di dispositivo medico, coerente con le carte del rischio; può anche voler dire altro. Non è verificato.
+
 ## Che cosa si fa
 
 - **Governo clinico che non decide**, con la rendicontazione dell'AIR (D287), perché l'AIR chiede già gli indicatori di AFT e l'estrazione dei dati (artt. 16–18 e 22):
@@ -110,6 +118,7 @@ Le fonti pubbliche trovate sono del 2010–2013: articoli della rivista della SI
   - nel pacchetto del Piemonte gli indicatori dell'AIR e dell'ASL, con i valori «da completare» finché Regione e ASL non li danno.
 - **Niente** promemoria nella cartella, punteggi o calcolatori clinici, giudizi di appropriatezza sul singolo paziente.
 - **Gli elenchi nominativi degli indicatori** aspettano il parere del consulente regolatorio.
+- **La pagina**: un cruscotto nuovo, con i colori e i caratteri del programma. Prima di costruirla, una bozza con dati inventati da guardare, quando si arriva all'AIR (risposta di Simone).
 
 ## Che cosa non è provato
 
