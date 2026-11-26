@@ -209,9 +209,11 @@ export class SimulatedRegionalFse implements RegionalFseTransport {
       );
     if (!username || !password) return this.fault(req.service);
     // Con la «implicit rejection» di OpenSSL un PIN cifrato con un'altra chiave non dà errore: si
-    // decifra in un valore a caso. Per questo il PIN si confronta con quello del medico.
+    // decifra in un valore a caso, a volte vuoto (con Node 22 circa una volta su 230, D286). Per
+    // questo il PIN si confronta con quello del medico, e «PIN mancante» vale solo per il campo
+    // vuoto o per un valore che non si decifra: un PIN decifrato vuoto è un PIN sbagliato.
     const pin = this.pin(field(root, 'pinCode'));
-    if (!pin)
+    if (pin === null)
       return this.answer(
         req.service,
         undefined,
@@ -242,7 +244,10 @@ export class SimulatedRegionalFse implements RegionalFseTransport {
     }
   }
 
-  /** Il PIN decifrato con la chiave privata del certificato; null se non si decifra. */
+  /**
+   * Il PIN decifrato con la chiave privata del certificato, anche vuoto; null se il campo è vuoto
+   * o se il valore non si decifra.
+   */
   private pin(encrypted: string | null): string | null {
     if (!encrypted) return null;
     try {
