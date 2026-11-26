@@ -134,8 +134,9 @@ export async function collectActs(
   onlyPatient?: string,
 ): Promise<CollectedAct[]> {
   if (archiveIds.length === 0) return [];
-  const inScope = (col: PgColumn) =>
-    onlyPatient ? eq(col, onlyPatient) : inArray(col, patientsOf(db, archiveIds));
+  // La sottoquery dei pazienti, fatta una volta qui: le condizioni non tengono il database.
+  const scope = patientsOf(db, archiveIds);
+  const inScope = (col: PgColumn) => (onlyPatient ? eq(col, onlyPatient) : inArray(col, scope));
   const acts: CollectedAct[] = [];
 
   const diary = await db
