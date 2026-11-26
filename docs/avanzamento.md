@@ -1884,7 +1884,8 @@ Richiesta di Simone: il programma deve poter servire tutte le regioni, con nient
   - importazione, tabelle RAO e corrispondenze lette dalle cartelle nazionali e da quelle dei pacchetti, senza nominare la regione; lo stesso percorso di trascrizione in due cartelle è rifiutato;
   - mappature delle trascrizioni senza il nome della regione; manifesto con le tabelle RAO «nel pacchetto»; inventario a 219 file e 2250 righe;
   - dimostrazione: database di partenza e disco virtuale con i dati dei pacchetti;
-  - la prova instabile del PIN cifrato con il certificato sbagliato, corretta con la misura.
+  - la prova instabile del PIN cifrato con il certificato sbagliato, corretta con la misura;
+  - la prova della dimostrazione con WebKit sulla ricetta rossa, caduta una volta sulla #46: ora aspetta la pagina ferma prima dei clic, e se il modulo non si apre l'errore dice che cosa mostra il riquadro.
 - **Come provarlo**: `packages/regions/test/dati.test.ts`; `apps/api/test/trascrizioni-cartelle.test.ts`; le prove di catalogo, RAO, prestazioni aggiuntive e SIAP, che leggono i dati dalle cartelle nuove; `pnpm --filter @mmg/demo build` e la prova nel browser.
 - **Non fatto**: le fonti regionali di `sync/` (catalogo, distribuzione per conto), un pezzo a sé; poi regole, integrazioni, servizi, pagine, dimostrazione e prove.
 
