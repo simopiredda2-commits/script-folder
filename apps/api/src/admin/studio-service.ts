@@ -6,6 +6,7 @@ import {
   type Action,
   type StructureType,
 } from '@mmg/domain';
+import { REGIONAL_PART_LABELS, selectRegionalPackage } from '@mmg/regions';
 import { and, arrayContains, asc, count, desc, eq, isNull, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { logAccess } from '../audit/access-log';
@@ -429,6 +430,26 @@ function diff<T extends object>(before: T, after: T) {
 
 /** Che cosa manca nei dati dello studio, detto con il perché. */
 /**
+ * Il pacchetto regionale della regione dello studio (D292): che cosa dà, dove sta oggi, e le parti
+ * che mancano, per le quali valgono solo le parti nazionali. Le varianti delle ASL valgono per il
+ * medico, non per lo studio.
+ */
+function regionalView(regionName: string | null) {
+  const s = selectRegionalPackage({ regionName });
+  return {
+    regione: s.region ? { codice: s.region.code, nome: s.region.name } : null,
+    pacchetto: s.package ? { chiave: s.package.key, nome: s.package.name } : null,
+    parti: s.parts.map((p) => ({
+      parte: p.part,
+      nome: REGIONAL_PART_LABELS[p.part],
+      cosa: p.what,
+      nelPacchetto: p.where === 'package',
+    })),
+    mancano: s.missing.map((p) => ({ parte: p, nome: REGIONAL_PART_LABELS[p] })),
+  };
+}
+
+/**
  * I tipi di struttura che lo studio può scegliere, con la descrizione e il codice del Ministero
  * dalla trascrizione delle specifiche del SIAP (D284, D289): il legame fra chiave e codice è lì.
  */
@@ -607,6 +628,7 @@ export function createStudioAdminService(deps: AdminDeps) {
         tipo: v.tipoStruttura,
         tipi: structureTypeOptions(),
       },
+      pacchettoRegionale: regionalView(v.regione),
       intestazione: v.intestazione,
       sicurezza: {
         minutiInattivita: v.minutiInattivita,

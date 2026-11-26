@@ -2573,3 +2573,26 @@ Tutto nello stesso branch, con una sola pull request alla fine.
 - **Dopo la conferma**: un atto nuovo dello stesso paziente, medico e giorno, o un atto contato e poi annullato, fa vedere il contatto «da aggiornare»; aggiornandolo entrano le prestazioni degli atti nuovi, sommate a quelle di prima (per il SIAP sarà una variazione). Un contatto scartato, con il motivo, non si ripropone; non si cancella (storico e divieto di cancellazione nel database) e si può confermare di nuovo. Lo scarto libera il progressivo, che la conferma dopo può riprendere: nessun contatto è ancora partito.
 - **Chi**: il medico per i suoi contatti (permesso nuovo `siap.contacts`, anche al sostituto per i contatti suoi); la segreteria no (regola 5). Si vedono i pazienti degli archivi su cui il medico lavora oggi; i contatti di un paziente passato poi a un altro archivio si confermano prima del passaggio. Il periodo di una lettura è al più di 31 giorni.
 - **Regola 3**: è un dato amministrativo per il flusso del Ministero; il programma non suggerisce diagnosi, propone solo dagli atti del medico.
+
+**D292 · Pacchetti regionali: lo scheletro (D288).** Dopo la parte nazionale del SIAP (#44), lo scheletro dei pacchetti regionali, prima di spostare il Piemonte un pezzo alla volta. La descrizione intera è in `docs/pacchetti-regionali.md`.
+
+- **Dove**: un pacchetto del workspace, `@mmg/regions` (`packages/regions/`).
+  - Il nucleo (`src/`) tiene le parti che un pacchetto può dare, il contratto di un pacchetto e la scelta, e non nomina nessuna regione.
+  - L'elenco dei pacchetti (`src/registry.ts`) è l'unico file del nucleo che le nomina, come `brand.ts` per il nome del prodotto.
+- **Le cartelle di un pacchetto**: `regions/<chiave>/` in ogni livello del programma (`packages/regions/`, `apps/api/src/`, `apps/web/src/`, `apps/demo/src/` e le prove).
+  - Un pacchetto attraversa i livelli: AURA usa il database e sta nel servizio, il SAR e il suo simulatore no, i testi stanno nelle pagine.
+  - Un solo pacchetto del workspace per tutte le regioni: un pacchetto del workspace per regione costerebbe una configurazione per ognuna senza dare niente di più.
+- **Le parti**: dodici, dalle integrazioni di D288 (ricetta, anagrafe, Fascicolo, invio del SIAP, prestazioni aggiuntive) e dai dati (rendicontazione dell'AIR, catalogo, RAO, distribuzione per conto, esenzioni, scadenze, valori delle regole). Il nome di ogni parte nelle pagine è nazionale.
+- **La scelta**:
+  - la regione viene dal nome scritto nei dati dello studio, riconosciuto con l'elenco delle aziende sanitarie del Ministero (D267), che ne dà il codice; il pacchetto è quello con lo stesso codice;
+  - la variante dell'ASL (accordi aziendali) è quella del codice ASL del medico;
+  - una regione senza pacchetto ha solo le parti nazionali, e Strumenti › Studio lo dice, con le parti che mancano.
+- **Il manifesto del Piemonte**: otto parti, tutte ancora nel nucleo, ognuna con che cosa è e con le decisioni; le parole che nominano la regione, i suoi enti, servizi e atti (CSI, SAR, SIRPED, AURA, RUPAR, LCCE, le determinazioni e le delibere, la voce dell'AIR), anche come appaiono nel codice (`auraLink`, `SimulatedSar`, `/aura`).
+- **La prova dei nomi regionali**: come quella del nome del prodotto, riga per riga e nei percorsi.
+  - Fuori dalle cartelle del pacchetto le sue parole stanno solo nei file dell'inventario, con lo stesso numero di righe.
+  - L'inventario, 235 file e 2298 righe oggi, si accorcia a ogni spostamento con `pnpm --filter @mmg/regions inventario`, che non lo fa crescere senza `--anche-in-piu`, da usare solo con una decisione scritta.
+  - Le eccezioni hanno il motivo nella prova: le migrazioni, che sono storia; l'elenco nazionale delle aziende sanitarie; l'elenco ICD-9-CM, dove il nome dell'anagrafe è anche un sintomo; l'elenco dei pacchetti e l'inventario stesso.
+  - Conta le righe e non i file perché anche un file già nell'inventario non deve prendere righe regionali nuove.
+- **Non fatto**:
+  - lo spostamento, con l'ordine proposto in `docs/pacchetti-regionali.md` (dati, regole, integrazioni senza database, servizi con il database, pagine, dimostrazione, prove), una pull request per pezzo;
+  - le alternative nazionali per una regione senza pacchetto (per esempio la ricetta SSN al Sistema TS senza il servizio regionale), da scrivere quando servono.

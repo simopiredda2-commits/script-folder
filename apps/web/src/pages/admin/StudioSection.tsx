@@ -29,6 +29,16 @@ interface StudioView {
     tipo: string;
     tipi: { codice: string; nome: string; codiceMinistero: number }[];
   };
+  /**
+   * Il pacchetto della regione dello studio (D292): che cosa dà e dove sta, e le parti che mancano,
+   * per le quali valgono solo le parti nazionali.
+   */
+  pacchettoRegionale?: {
+    regione: { codice: string; nome: string } | null;
+    pacchetto: { chiave: string; nome: string } | null;
+    parti: { parte: string; nome: string; cosa: string; nelPacchetto: boolean }[];
+    mancano: { parte: string; nome: string }[];
+  };
   intestazione: string[];
   sicurezza: {
     minutiInattivita: number | null;
@@ -445,6 +455,8 @@ function StudioForm({
         </div>
       </fieldset>
 
+      {data.pacchettoRegionale && <RegionalPackageBox p={data.pacchettoRegionale} />}
+
       <fieldset disabled={busy}>
         <legend>Intestazione dei documenti</legend>
         <div className="campo">
@@ -558,5 +570,52 @@ function StudioForm({
       )}
       <Problems error={error} />
     </form>
+  );
+}
+
+/**
+ * Il pacchetto regionale della regione dello studio (D292), in sola lettura: la regione viene dal
+ * campo «Regione» dei dati dello studio. Per le parti che mancano valgono le parti nazionali.
+ */
+function RegionalPackageBox({ p }: { p: NonNullable<StudioView['pacchettoRegionale']> }) {
+  return (
+    <section className="riquadro" aria-labelledby="titolo-pacchetto-regionale">
+      <h3 id="titolo-pacchetto-regionale">Pacchetto regionale</h3>
+      {!p.regione ? (
+        <p>
+          La regione dello studio non è scritta, o non è una regione dell’elenco del Ministero: il
+          programma usa solo le parti nazionali.
+        </p>
+      ) : !p.pacchetto ? (
+        <p>
+          Per la regione {p.regione.nome} non c’è ancora un pacchetto: il programma usa solo le
+          parti nazionali. Si scrive quando c’è l’elenco di che cosa serve dalla Regione.
+        </p>
+      ) : (
+        <>
+          <p>
+            Regione {p.regione.nome}: il programma usa il pacchetto «{p.pacchetto.nome}».
+          </p>
+          <ul className="elenco-semplice">
+            {p.parti.map((x) => (
+              <li key={x.parte}>
+                <strong>{x.nome}</strong>: {x.cosa}
+                {!x.nelPacchetto && <span className="tenue"> (nel programma, da spostare)</span>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {p.mancano.length > 0 && (
+        <>
+          <h4>Senza pacchetto regionale: valgono le parti nazionali</h4>
+          <ul className="elenco-semplice">
+            {p.mancano.map((x) => (
+              <li key={x.parte}>{x.nome}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }

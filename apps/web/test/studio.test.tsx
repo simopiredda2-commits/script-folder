@@ -94,6 +94,72 @@ describe('Strumenti › Dati dello studio, postazioni e stato del servizio (tapp
     vi.unstubAllGlobals();
   });
 
+  it('il pacchetto regionale della regione dello studio: che cosa dà, dove sta e che cosa manca (D292)', async () => {
+    const regional = {
+      regione: { codice: '999', nome: 'REGIONE DI PROVA' },
+      pacchetto: { chiave: 'prova', nome: 'Regione di prova' },
+      parti: [
+        {
+          parte: 'registry',
+          nome: 'Anagrafe regionale degli assistiti',
+          cosa: 'Anagrafe di prova, con un simulatore',
+          nelPacchetto: false,
+        },
+        {
+          parte: 'catalog',
+          nome: 'Catalogo regionale delle prestazioni specialistiche',
+          cosa: 'Catalogo di prova',
+          nelPacchetto: true,
+        },
+      ],
+      mancano: [{ parte: 'siap', nome: 'Invio dei flussi del SIAP alla Regione' }],
+    };
+    stubFetch({
+      '/api/studio': () => ({ status: 200, body: studio({ pacchettoRegionale: regional }) }),
+    });
+    render(<StudioSection />);
+    const box = await screen.findByRole('region', { name: 'Pacchetto regionale' });
+    expect(box.textContent).toMatch(
+      /Regione REGIONE DI PROVA: il programma usa il pacchetto «Regione di prova»/,
+    );
+    const items = within(box)
+      .getAllByRole('listitem')
+      .map((li) => li.textContent);
+    expect(items).toEqual([
+      'Anagrafe regionale degli assistiti: Anagrafe di prova, con un simulatore (nel programma, da spostare)',
+      'Catalogo regionale delle prestazioni specialistiche: Catalogo di prova',
+      'Invio dei flussi del SIAP alla Regione',
+    ]);
+    cleanup();
+    // Una regione senza pacchetto: lo dice, e le parti che mancano sono tutte.
+    stubFetch({
+      '/api/studio': () => ({
+        status: 200,
+        body: studio({ pacchettoRegionale: { ...regional, pacchetto: null, parti: [] } }),
+      }),
+    });
+    render(<StudioSection />);
+    const none = await screen.findByRole('region', { name: 'Pacchetto regionale' });
+    expect(none.textContent).toMatch(
+      /Per la regione REGIONE DI PROVA non c’è ancora un pacchetto: il programma usa solo le parti nazionali/,
+    );
+    cleanup();
+    stubFetch({
+      '/api/studio': () => ({
+        status: 200,
+        body: studio({
+          pacchettoRegionale: { ...regional, regione: null, pacchetto: null, parti: [] },
+        }),
+      }),
+    });
+    render(<StudioSection />);
+    expect(
+      (await screen.findByRole('region', { name: 'Pacchetto regionale' })).textContent,
+    ).toMatch(
+      /La regione dello studio non è scritta, o non è una regione dell’elenco del Ministero/,
+    );
+  });
+
   it('chi non è amministratore legge soltanto, e vede subito che manca la regione', async () => {
     stubFetch({ '/api/studio': () => ({ status: 200, body: studio() }) });
     render(<StudioSection />);
