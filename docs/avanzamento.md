@@ -53,7 +53,7 @@ Contatto per le applicazioni sanitarie della Regione gestite dal CSI (AURA, SAR,
 9. **SIAP, Sistema Informativo dell'Assistenza Primaria** (DM Salute 4/8/2025; D277, `docs/siap.md`). La cartella manda al CSI tre tracciati: assistito, contatto e organizzazione. Si usano le API REST in JSON, su un canale cifrato con certificati, e il CSI risponde con un ID di protocollo. L'invio è mensile nel 2026 e settimanale dal 2027. Non è costruito: è la domanda 3 della prossima fermata.
    - Dal programma mancano il contatto come registrazione a sé, il fumo codificato, il codice STS.11 dello studio con il tipo di struttura, l'UCCP e la tabella delle prestazioni.
    - Dal CSI servono il formato JSON, i servizi, i certificati, l'ambiente di prova e il collaudo, per un fornitore certificato SIRPED (domande 11 e 12 per il CSI).
-   - Da Simone servono i due file del Ministero che da qui non si scaricano: le specifiche funzionali 1.3 e il disciplinare tecnico (`docs/provenienze.md`, «SIAP»).
+   - Da Simone serve il disciplinare tecnico del Ministero, che da qui non si scarica; le specifiche funzionali 1.3 le ha mandate il 26/11/2026 (`docs/provenienze.md`, «SIAP»).
 
 _B. Controlli reali, allo studio e con la Dr.ssa Rocca_
 

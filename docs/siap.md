@@ -37,7 +37,7 @@ Link, byte e SHA-256 in `docs/provenienze.md`, «SIAP». I documenti restano fuo
 Che cosa non si è potuto scaricare da qui (`docs/provenienze.md`):
 
 - il PDF della GU n. 202: il collegamento con www.gazzettaufficiale.it si chiude a metà del trasferimento. Il testo del decreto si legge nelle pagine 6–11 delle specifiche del CSI, che lo riproducono;
-- dal portale del Ministero (www.salute.gov.it) sia le specifiche funzionali sia il disciplinare tecnico: il servizio di protezione del sito (Gcore) risponde 403. Le specifiche funzionali sono state lette attraverso un servizio di lettura delle pagine, che dà il testo e non il file: senza il file non ci sono né byte né impronta.
+- dal portale del Ministero (www.salute.gov.it) il disciplinare tecnico: il servizio di protezione del sito (Gcore) risponde 403. Le specifiche funzionali, bloccate allo stesso modo, le ha mandate Simone il 26/11/2026: sono le stesse lette prima come testo.
 
 Le specifiche del CSI elencano i campi senza i valori ammessi. I valori sono presi dalle specifiche del Ministero, finché il CSI non dice il formato del suo JSON (domanda 12 per il CSI, `docs/avanzamento.md`).
 
