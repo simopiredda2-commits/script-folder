@@ -887,7 +887,7 @@ describe(`dimostrazione nel browser (${ENGINE})`, { timeout: 120_000 }, () => {
   it('specialistica e seguito: visita dal catalogo inviata, poi l’esecuzione con il referto nel visore', async () => {
     // Il catalogo regionale vero, D.D. 590/2026 con le modifiche della 710, da controllare (D260).
     const hint = await fromPanel((panel) =>
-      panel.getByRole('region', { name: 'Specialistica' }).innerText(),
+      panel.getByRole('region', { name: 'Visite ed esami da prescrivere' }).innerText(),
     );
     expect(hint).toMatch(/D\.D\. 590\/2026 con le modifiche della D\.D\. 710\/2026/);
     expect(hint).toMatch(/prima\s+che una persona abbia controllato la trascrizione/);

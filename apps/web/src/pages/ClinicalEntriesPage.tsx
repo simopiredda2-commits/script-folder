@@ -19,7 +19,7 @@ import { PatientBanner, type Patient, type Summary } from './RecordPage';
 
 /**
  * I tipi di questa pagina; i parametri hanno la loro, con l'andamento nel tempo. Gli esami di
- * laboratorio hanno anche la pagina Esami, con il referto di più esami insieme.
+ * laboratorio hanno anche la pagina Risultati degli esami, con il referto di più esami insieme.
  */
 const TYPES: EntryType[] = [
   'problema',
@@ -706,7 +706,7 @@ function NewEntryForm({
             </div>
             <p className="aiuto">
               Per un referto con più esami c’è la pagina{' '}
-              <Link to={`/pazienti/${patientId}/esami`}>Esami di laboratorio</Link>.
+              <Link to={`/pazienti/${patientId}/esami`}>Risultati degli esami</Link>.
             </p>
           </>
         )}

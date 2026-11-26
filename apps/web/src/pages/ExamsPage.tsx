@@ -278,7 +278,7 @@ function NewReportForm({ patientId, onSaved }: { patientId: string; onSaved: () 
 }
 
 /**
- * Esami di laboratorio: gli ultimi tre referti affiancati, con l'intervallo stampato sul referto.
+ * Risultati degli esami (D282): gli ultimi tre referti affiancati, con l'intervallo stampato sul referto.
  * Nessun «sopra» o «sotto»: un confronto automatico è da validare con il consulente regolatorio
  * (regola 3, D71). Dalla tappa 15 il medico aggiunge qui i referti; un risultato sbagliato si
  * annulla dalle voci cliniche, come le altre voci.
@@ -303,21 +303,22 @@ export function ExamsPage() {
   return (
     <>
       <PageHeader
-        title="Esami di laboratorio"
+        title="Risultati degli esami"
         trail={
           <>
             <Link to={`/pazienti/${id}`}>
               {p.firstName} {p.lastName}
             </Link>{' '}
-            <span aria-hidden="true">/</span> <span>Esami di laboratorio</span>
+            <span aria-hidden="true">/</span> <span>Risultati degli esami</span>
           </>
         }
       />
       <PatientBanner patient={p} />
-      {/* Qui i risultati; la prescrizione degli esami sta in Specialistica (D279). */}
+      {/* Qui i risultati; la prescrizione degli esami sta in un'altra pagina (D279, D282). */}
       <p className="tenue">
         Qui si registrano e si leggono i risultati. Gli esami, anche quelli del sangue, si
-        prescrivono in <Link to={`/pazienti/${id}/specialistica`}>Specialistica</Link>: si cercano
+        prescrivono in{' '}
+        <Link to={`/pazienti/${id}/specialistica`}>Visite ed esami da prescrivere</Link>: si cercano
         per nome nel catalogo regionale, o si sceglie un pacchetto dello studio.
       </p>
       {exams.data?.puoScrivere && <NewReportForm patientId={id!} onSaved={exams.reload} />}

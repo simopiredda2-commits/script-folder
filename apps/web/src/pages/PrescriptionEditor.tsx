@@ -926,12 +926,12 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           <p role="status" className="tenue stato-ricerca">
             {q && search.data ? resultsText(q, search.data) : ''}
           </p>
-          {/* Un esame cercato fra i farmaci (D279): si prescrive in Specialistica. */}
+          {/* Un esame cercato fra i farmaci (D279): si prescrive fra visite ed esami (D282). */}
           {mode === 'farmaci' && q && search.data && (search.data.farmaci ?? []).length === 0 && (
             <p className="tenue">
-              Cerchi un esame o una visita? Si prescrivono in Specialistica:{' '}
+              Cerchi un esame o una visita? Si prescrivono in «Visite ed esami da prescrivere»:{' '}
               <Link to={`/pazienti/${id}/specialistica${query({ cerca: q })}`}>
-                cerca «{q}» in Specialistica
+                cerca «{q}» fra visite ed esami
               </Link>
               .
             </p>

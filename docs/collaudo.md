@@ -47,7 +47,7 @@ Per la Dr.ssa Rocca, con Simone. Si guarda se il lavoro di tutti i giorni si fa 
 ### G6 · Ricetta specialistica
 
 - **Chi**: Dr.ssa Rocca
-- **Dove**: cartella › «Specialistica»
+- **Dove**: cartella › «Visite ed esami da prescrivere» (prima «Specialistica», D282)
 - **Che cosa guardare**: la ricerca nel catalogo regionale (D.D. 590/2026 con le modifiche della D.D. 710/2026, trascrizione ancora da controllare: K3); tipo di accesso, classe di priorità, quesito diagnostico; la validità di 60 giorni per il primo accesso e 180 per gli altri (D260); l'esenzione per patologia (R17).
 
 ### G7 · Certificato di malattia INPS

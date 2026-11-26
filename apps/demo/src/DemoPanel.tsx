@@ -193,13 +193,13 @@ export function DemoPanel({ ready, seconds }: { ready: Ready; seconds: number })
         </p>
       </section>
       <section aria-labelledby="dimo-catalogo">
-        <h3 id="dimo-catalogo">Specialistica</h3>
+        <h3 id="dimo-catalogo">Visite ed esami da prescrivere</h3>
         <p>
-          Nella cartella, in <strong>Specialistica</strong>, si sceglie dal catalogo regionale del
-          Piemonte: la D.D. 590/2026 con le modifiche della D.D. 710/2026. Anche qui si vede prima
-          che una persona abbia controllato la trascrizione; nel programma entra dopo il controllo.
-          Lo stesso vale per le note del nomenclatore (allegati 4 e 4D del DPCM LEA) e per le sedute
-          dei cicli, per esempio cercando «rieducazione».
+          Nella cartella, in <strong>Visite ed esami da prescrivere</strong>, si sceglie dal
+          catalogo regionale del Piemonte: la D.D. 590/2026 con le modifiche della D.D. 710/2026.
+          Anche qui si vede prima che una persona abbia controllato la trascrizione; nel programma
+          entra dopo il controllo. Lo stesso vale per le note del nomenclatore (allegati 4 e 4D del
+          DPCM LEA) e per le sedute dei cicli, per esempio cercando «rieducazione».
         </p>
       </section>
       <section aria-labelledby="dimo-codice">

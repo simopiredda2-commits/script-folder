@@ -714,10 +714,14 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     // Le scorciatoie per prescrivere in testa, poi il riepilogo e le voci.
     expect(labels.slice(0, 4)).toEqual([
       'Nuova ricetta',
-      'Specialistica',
+      'Visite ed esami da prescrivere',
       'Certificati',
       'Riepilogo',
     ]);
+    // I nomi dicono che cosa si fa: i risultati da una parte, la prescrizione dall'altra (D282).
+    expect(labels).toContain('Risultati degli esami');
+    expect(labels).not.toContain('Esami');
+    expect(labels).not.toContain('Specialistica');
     // I farmaci prescritti stanno dentro «Nuova ricetta» (D246): nel menu non hanno una voce.
     expect(labels).not.toContain('Farmaci prescritti');
     expect(labels.length).toBeGreaterThanOrEqual(17);
@@ -1054,20 +1058,21 @@ describe('interfaccia nel browser', { timeout: 60_000 }, () => {
     await page.getByText('Aggiungi una prestazione dalla ricerca.').waitFor();
   });
 
-  it('un esame cercato fra i farmaci: il rimando a Specialistica con la stessa ricerca (D279)', async () => {
+  it('un esame cercato fra i farmaci: il rimando a visite ed esami con la stessa ricerca (D279)', async () => {
     await page.goto(`${base}/pazienti/${s.richPatient}/ricetta`);
     await page.getByLabel('Farmaco, principio attivo, codice AIC o ATC').fill('esame di prova');
     await page.getByText('Nessun risultato per «esame di prova».').waitFor();
-    await page.getByRole('link', { name: 'cerca «esame di prova» in Specialistica' }).click();
+    await page.getByRole('link', { name: 'cerca «esame di prova» fra visite ed esami' }).click();
     await page.waitForURL(/\/specialistica\?cerca=/);
     expect(await page.getByLabel('Prestazione, branca o codice').inputValue()).toBe(
       'esame di prova',
     );
     await page.locator('.risultato').filter({ hasText: 'Esame di prova' }).waitFor();
-    // Nella pagina Esami, dove si prescrivono.
+    // Nella pagina dei risultati, dove si prescrivono (D282).
     await page.goto(`${base}/pazienti/${s.richPatient}/esami`);
-    await page.getByText(/si prescrivono in Specialistica/).waitFor();
-    await check(page, 'esami con il rimando a Specialistica');
+    await page.getByRole('heading', { level: 1, name: 'Risultati degli esami' }).waitFor();
+    await page.getByText(/si prescrivono in Visite ed esami da prescrivere/).waitFor();
+    await check(page, 'risultati degli esami con il rimando alla prescrizione');
   });
 
   it('farmaci prescritti con i colori e la legenda, dentro «Nuova ricetta»; visite ed esami nei loro menu (D152, D246)', async () => {
