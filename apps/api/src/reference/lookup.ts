@@ -16,7 +16,12 @@ import {
   searchServices,
   type ServiceIndex,
 } from '@mmg/reference';
-import { shortageText, type DrugFacts } from '@mmg/rules';
+import {
+  shortageText,
+  type DrugFacts,
+  type ServiceCatalogEntry,
+  type ServiceNoteFacts,
+} from '@mmg/rules';
 import { and, desc, eq, ilike, inArray, isNotNull, lte, or, sql, type SQL } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import {
@@ -33,6 +38,7 @@ import {
   refExemptionService,
   refMunicipality,
   refService,
+  refServiceNote,
   referenceDataset,
   referenceUpdateRun,
 } from '../db/schema';
@@ -236,7 +242,16 @@ interface ServiceRow {
   branch: string | null;
   fee: string | null;
   notes: string | null;
+  cycle: boolean | null;
+  sessions: number | null;
 }
+
+/** Codici del nomenclatore confrontati senza punti né spazi, come in R10 (D154). */
+const compactNational = (code: string) => code.replace(/[\s.]/g, '').toUpperCase();
+
+/** Note del nomenclatore per versione dell'elenco (D276): come gli indici, non cambiano più. */
+const NOTE_INDEXES = new Map<string, Map<string, ServiceNoteFacts>>();
+const MAX_NOTE_INDEXES = 4;
 
 /**
  * Indici della ricerca delle prestazioni, per versione del catalogo. Una versione importata non
@@ -262,6 +277,13 @@ function likeText(q: string): string {
 }
 
 const lower = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+
+/**
+ * Il regime di fornitura AIFA dice «Ricetta Ministeriale a Ricalco»: stupefacente della sezione A
+ * della tabella dei medicinali (R23, D272).
+ */
+export const ministerialPad = (supplyRegime: string | null | undefined) =>
+  /ricetta ministeriale a ricalco/.test(lower(supplyRegime));
 
 /** Ordine degli equivalenti: prima il prezzo; a parità, nome e AIC, lo stesso a ogni ricerca. */
 /**
@@ -585,6 +607,9 @@ export class ReferenceData {
       // L'anagrafica in vigore dice «Sospesa»: la R22 informa (D210). «Autorizzata», nessuno stato
       // o nessuna riga non sono una sospensione, come nelle variazioni sui farmaci in terapia.
       if (d.some((x) => lower(x.adminState) === 'sospesa')) facts.suspended = true;
+      // Regime «prescrizione medica speciale con Ricetta Ministeriale a Ricalco»: stupefacente
+      // della sezione A della tabella dei medicinali (R23, D272).
+      if (d.some((x) => ministerialPad(x.supplyRegime))) facts.ministerialPad = true;
       // Unità per confezione dalla descrizione dell'anagrafica AIFA (D252): «- 28 COMPRESSE».
       // Solo compresse, capsule e bustine; il resto resta non noto.
       const units = packUnits(pick(d.map((x) => x.pack)));
@@ -1088,11 +1113,55 @@ export class ReferenceData {
     const ids = await this.ids('prestazioni', date);
     if (!q.trim() || !ids.length) return [];
     const index = await this.serviceIndex(ids);
+    const noteOf = await this.serviceNotes(date);
     return searchServices(index, q, limit).map((h) => ({
       ...h.item,
       /** Il materiale tra quadre, per esteso se la sigla è nota. */
       material: h.material,
+      /** La nota del nomenclatore, se l'elenco delle note è in uso (D276). */
+      note: (h.item.nationalCode && noteOf?.(h.item.nationalCode)) || null,
     }));
+  }
+
+  /**
+   * Le note del nomenclatore in vigore alla data (DPCM LEA, allegati 4 e 4D; D276): la nota del
+   * codice del nomenclatore, o null se il codice non ne ha; undefined se nessun elenco è in uso.
+   */
+  async serviceNotes(
+    date: string,
+  ): Promise<((nationalCode: string) => ServiceNoteFacts | null) | undefined> {
+    const ids = await this.ids('note_prestazioni', date);
+    if (!ids.length) return undefined;
+    const key = [...ids].sort().join(',');
+    let byCode = NOTE_INDEXES.get(key);
+    if (!byCode) {
+      const rows = await this.db
+        .select({
+          nationalCode: refServiceNote.nationalCode,
+          note: refServiceNote.note,
+          noteKind: refServiceNote.noteKind,
+          noteText: refServiceNote.noteText,
+        })
+        .from(refServiceNote)
+        .where(inArray(refServiceNote.datasetId, ids));
+      byCode = new Map(
+        rows.map((r) => [
+          compactNational(r.nationalCode),
+          {
+            note: r.note,
+            // L'importazione accetta solo questi due valori (packages/reference, D276).
+            kind: r.noteKind === 'appropriatezza' ? 'appropriatezza' : 'condizione',
+            text: r.noteText,
+          },
+        ]),
+      );
+      if (NOTE_INDEXES.size >= MAX_NOTE_INDEXES) {
+        NOTE_INDEXES.delete(NOTE_INDEXES.keys().next().value!);
+      }
+      NOTE_INDEXES.set(key, byCode);
+    }
+    const index = byCode;
+    return (code) => index.get(compactNational(code)) ?? null;
   }
 
   /**
@@ -1101,17 +1170,24 @@ export class ReferenceData {
    */
   async serviceLookup(
     date: string,
-  ): Promise<((code: string) => { nationalCode: string | null } | null) | undefined> {
+  ): Promise<((code: string) => ServiceCatalogEntry | null) | undefined> {
     const ids = await this.ids('prestazioni', date);
     if (!ids.length) return undefined;
     const index = await this.serviceIndex(ids);
-    const byCode = new Map(
-      index.entries.map((e) => [e.item.regionalCode.trim().toUpperCase(), e.item.nationalCode]),
-    );
-    return (code) => {
-      const key = code.trim().toUpperCase();
-      return byCode.has(key) ? { nationalCode: byCode.get(key) ?? null } : null;
-    };
+    // Lo stesso codice può stare in più branche, una riga per branca (D157): le branche si
+    // raccolgono (R25); ciclo e sedute valgono se una riga li dice (D276).
+    const byCode = new Map<string, ServiceCatalogEntry & { branches: string[] }>();
+    for (const { item } of index.entries) {
+      const key = item.regionalCode.trim().toUpperCase();
+      const entry = byCode.get(key) ?? { nationalCode: null, branches: [], cycle: false };
+      entry.nationalCode = item.nationalCode;
+      const branch = item.branch?.trim();
+      if (branch && !entry.branches.includes(branch)) entry.branches.push(branch);
+      if (item.cycle) entry.cycle = true;
+      if (item.sessions !== null) entry.sessions = Math.max(entry.sessions ?? 0, item.sessions);
+      byCode.set(key, entry);
+    }
+    return (code) => byCode.get(code.trim().toUpperCase()) ?? null;
   }
 
   private async serviceIndex(ids: string[]) {
@@ -1126,6 +1202,8 @@ export class ReferenceData {
         branch: refService.branch,
         fee: refService.fee,
         notes: refService.notes,
+        cycle: refService.cycle,
+        sessions: refService.sessions,
       })
       .from(refService)
       .where(inArray(refService.datasetId, ids));

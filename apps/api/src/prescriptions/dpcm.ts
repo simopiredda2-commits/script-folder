@@ -136,6 +136,15 @@ export const printRedSchema = z
   })
   .strict();
 
+/** «NON SOSTITUIBILE» sul modulo, con il codice della motivazione se c'è (D273). */
+export const notSubstitutableText = (l: {
+  notSubstitutable?: boolean;
+  notSubstitutableCode?: string | null;
+}) =>
+  l.notSubstitutable
+    ? ` - NON SOSTITUIBILE${l.notSubstitutableCode ? ` (motivazione ${l.notSubstitutableCode})` : ''}`
+    : '';
+
 /** Che cosa si stampa sul modulo: i dati della ricetta come erano alla stampa. */
 export interface RedFormData {
   poligrafico: string;
@@ -215,6 +224,25 @@ export function prescription2(catalogCode: string | null | undefined, access: st
   return parts.length ? parts.join('') : null;
 }
 
+/**
+ * Prescrizione1 della specialistica (specifiche DPCM, versione 11.0 dell'1/3/2016):
+ * «#<numeroNota>-<condizione di erogabilità>-<appropriatezza prescrittiva>-<patologia>#», con «*»
+ * per un dato che manca, e tutti e quattro i campi sempre scritti. La lettera va nel campo del tipo
+ * della nota; il codice di patologia non si compila (D276). Senza nota, niente.
+ */
+export function specialistPrescription1(l: {
+  serviceNote?: string | null;
+  serviceNoteKind?: string | null;
+  serviceNoteLetter?: string | null;
+}): string | null {
+  const note = l.serviceNote?.trim();
+  if (!note) return null;
+  const letter = l.serviceNoteLetter?.trim() || '*';
+  const condition = l.serviceNoteKind === 'condizione' ? letter : '*';
+  const appropriateness = l.serviceNoteKind === 'appropriatezza' ? letter : '*';
+  return `#${note}-${condition}-${appropriateness}-*#`;
+}
+
 export type DpcmService = ReturnType<typeof createDpcmService>;
 
 export function createDpcmService(deps: DpcmDeps) {
@@ -268,21 +296,30 @@ export function createDpcmService(deps: DpcmDeps) {
       priority: pharma ? null : (message.priority ?? null),
       nre: '',
       doctorFiscalCode: message.doctor.fiscalCode ?? '',
-      lines: message.lines.map((l) =>
-        pharma
+      // Casi delle linee guida del Sistema TS per il principio attivo (3.1.4): per principio
+      // attivo solo il gruppo di equivalenza (A1); con il nome anche l'AIC (A2); con la clausola
+      // di non sostituibilità il codice della motivazione in Prescrizione1 (B, C; D273). Senza
+      // il gruppo nella lista di trasparenza in vigore il caso A1 non si può scrivere: va l'AIC,
+      // come per l'unico farmaco autorizzato (D), perché la riga dica quale farmaco.
+      indication: pharma ? (message.prescriptionIndication ?? null) : null,
+      lines: message.lines.map((l) => {
+        const group = (l.drugAic && groups.get(l.drugAic)) || null;
+        return pharma
           ? {
-              productCode: l.drugAic ?? null,
-              description: (l.drugAic && groups.get(l.drugAic)) || null,
+              productCode: l.byActiveIngredient && group ? null : (l.drugAic ?? null),
+              description: group,
               aifaNote: l.aifaNote ?? null,
               quantity: l.quantity,
+              prescription1: l.notSubstitutable ? (l.notSubstitutableCode ?? null) : null,
             }
           : {
               productCode: l.serviceNationalCode ?? null,
               description: l.serviceDescription ?? null,
               quantity: l.quantity,
+              prescription1: specialistPrescription1(l),
               prescription2: prescription2(l.serviceCode, message.accessType ?? null),
-            },
-      ),
+            };
+      }),
     };
     const address = [pt!.residenceStreet, pt!.residenceNumber].filter(Boolean).join(' ');
     const town = [pt!.residencePostalCode, pt!.residenceTown].filter(Boolean).join(' ');
@@ -300,7 +337,7 @@ export function createDpcmService(deps: DpcmDeps) {
       asl,
       lines: message.lines.map((l) => ({
         text: pharma
-          ? `${l.drugName ?? l.activeIngredient ?? ''}${l.notSubstitutable ? ' - NON SOSTITUIBILE' : ''}`
+          ? `${l.drugName ?? l.activeIngredient ?? ''}${notSubstitutableText(l)}`
           : `${l.serviceNationalCode ?? l.serviceCode ?? ''} ${l.serviceDescription ?? ''}`.trim(),
         quantity: l.quantity,
       })),

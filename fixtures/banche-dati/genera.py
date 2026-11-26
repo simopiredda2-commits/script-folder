@@ -275,14 +275,14 @@ def genera_trascrizioni(impronte: dict[str, str]) -> None:
                  "A10BJ05, nota 100, «PT elettronico - Sistema TS», qui «sì». La nota (14) dell'elenco "
                  "riguarda le associazioni con gli SGLT2i.")})
     trascrizione("piemonte_catalogo/catalogo-precedente", [
-        "codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note",
-        "89.7;89.7;Visita di prova (catalogo precedente);Branca di prova;;",
+        "codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note;ciclo;sedute",
+        "89.7;89.7;Visita di prova (catalogo precedente);Branca di prova;;;;",
     ], {"tipo": "prestazioni", "serie": "catalogo-piemonte", "fonte": None, "chiave": None,
         "sha256_origine": None, "atto": "Catalogo di prova precedente", "in_vigore_dal": "2024-12-30"})
     trascrizione("piemonte_catalogo/catalogo_prova_allegato_c", [
-        "codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note",
-        "89.7;89.7;Visita di prova;Branca di prova;20,66;",
-        "PROVA.02;;Esame di prova;Laboratorio di prova;;Nota di prova",
+        "codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note;ciclo;sedute",
+        "89.7;89.7;Visita di prova;Branca di prova;20,66;;;",
+        "PROVA.02;;Esame di prova;Laboratorio di prova;;Nota di prova;;",
     ], {"tipo": "prestazioni", "serie": "catalogo-piemonte", "fonte": "piemonte_catalogo",
         "chiave": "catalogo_prova_allegato_c.pdf", "sha256_origine": impronte["catalogo_prova_allegato_c.pdf"],
         "atto": "Catalogo di prova delle prestazioni", "in_vigore_dal": "2026-10-30"})

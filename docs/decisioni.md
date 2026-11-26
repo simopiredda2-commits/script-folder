@@ -2059,7 +2059,7 @@ Non provato: la validità sul promemoria con un collaudo del Sistema TS; la dimo
 6. **PSS: allineato alla guida HL7 Italia v1.5 dove non contrasta con il Ministero.** «Sì, dove non contrasta (Consigliato)».
    - Si correggono le voci su cui i due schematron vanno d'accordo: quello del Ministero (v4.0, il controllo del Gateway) e quello della guida (ART-DECOR).
    - Ogni PSS deve passarli tutti e due.
-   - Dove si contraddicono resta il Ministero, finché il CSI non dice quale usa la Regione (domanda 7 per il CSI, `docs/avanzamento.md`).
+   - Dove si contraddicono resta il Ministero, finché il CSI non dice quale usa la Regione (domanda 10 delle domande nuove per il CSI, `docs/avanzamento.md`).
 7. **R14 resta com'è.** Risposta di Simone: «Atteniamoci alle disposizioni di TS o della Regione, se quello che abbiamo fatto è accettato allora ok». Verificato sulle fonti:
    - **Il Sistema TS accetta il tipo di accesso per ogni prestazione.** Tipo e classe di priorità «possono essere indicati dal medico, a sua discrezione oppure sulla base degli adempimenti normativi della propria Regione/PA di appartenenza, anche per le prestazioni che non fanno parte della lista» del PNGLA. Se sono indicati, valgono le stesse regole (Sistema TS, «Controlli secondo il PNGLA 2019-2021», 3/6/2019, p. 1–2). Le specifiche della prescrizione dicono lo stesso: il campo `tipoAccesso` è obbligatorio per le prestazioni del PNGLA ed «elemento facoltativo per tutte le altre» (versione del 08/07/2026, p. 28).
    - **Con il primo accesso indicato, la classe di priorità è obbligatoria (1301).** È quello che fa R14.
@@ -2174,3 +2174,163 @@ Tutto nello stesso branch, con una sola pull request alla fine.
   - l'archivio dei ricettari del medico (7.3 e 7.4).
 - **Non provato**: il SAR vero, la cifratura vera, la stampa su un modulo vero.
 - **Domanda per il CSI**: se l'invio DPCM resta senza risposta, la cartella lo rimanda; come risponde il SAR se il primo file era arrivato (stesso NRE e stesso modulo)? Oggi il rifiuto resta nella ricetta rossa, che Oggi conta fra quelle da seguire.
+
+**D271 · Unione della #39; le due parti nazionali della ricetta rossa adesso, le altre con il CSI.** Risposte di Simone con il pulsante (25/11/2026).
+
+- «Unisci (consigliato)»: pull request #39 unita in `main` (3794299), con le 14 verifiche su GitHub verdi. Il branch riparte da `main`.
+- «Le due nazionali ora (consigliato)». Prima del Fascicolo si fanno le due parti che vengono dalle norme nazionali e non dipendono dal CSI:
+  - i farmaci esclusi dalla ricetta dematerializzata (DM 2/11/2011, art. 3), che vanno sempre sulla ricetta rossa;
+  - il codice della motivazione di non sostituibilità.
+- Variazione e cancellazione di una ricetta DPCM già mandata, archivio dei ricettari del medico e presidi in DPCM si fanno con le risposte del CSI, insieme ad AURA.
+
+**D272 · Stupefacenti sulla ricetta del SSN: la regola R23.** Come si costruisce la prima parte nazionale di D271. Correzione di quello che avevo scritto in D270 e alla fermata: i farmaci esclusi dalla ricetta dematerializzata non vanno sulla ricetta rossa del SSN, ma sul ricettario ministeriale a ricalco del DM 10/3/2006.
+
+- **Fonti.**
+  - DM 2/11/2011, art. 3: esclude le prescrizioni dei farmaci del DM 10/3/2006 (ricettario a ricalco).
+  - Circolare MEF e Ministero della Salute, prot. 5351 del 14/05/2020. Con la ricetta dematerializzata vanno le sezioni B, C, D ed E della tabella dei medicinali e l'allegato III-bis per la terapia del dolore. La sezione A resta sul ricettario a ricalco, metadone compreso. Due elenchi di codici AIC: «TAB MED SEZ A», da bloccare, e «ALLEGATO III-BIS», solo con il codice TDL. Il controllo lo devono fare anche le cartelle cliniche.
+  - Specifiche del Sistema TS, prescrizione, 5/12/2024, «Nota STUP»: il codice è «TDL/TDL01 o altre decodifiche regionali». Nelle note della ricetta (motivazNote) vanno posologia e modalità di somministrazione; per la sezione A anche telefono e recapito del medico. Le note si stampano sul promemoria.
+  - Gli elenchi della circolare vengono dalla circolare FOFI n. 12255 del 18/05/2020, che li riporta: 19 codici della sezione A (metadone e metilfenidato) e 165 dell'allegato III-bis. Sono estratti dal testo del PDF; le provenienze sono in `docs/provenienze.md`.
+- **La regola** (R23, versione delle regole 2026-11-25.1), solo sulla ricetta farmaceutica del SSN, dematerializzata o rossa. Blocca:
+  - un farmaco dell'elenco della sezione A, anche con il TDL;
+  - un farmaco a base di metadone;
+  - una confezione a ricalco secondo l'anagrafica AIFA, senza il codice della terapia del dolore;
+  - un farmaco dell'allegato III-bis senza il codice della terapia del dolore;
+  - con il codice, la riga senza posologia o il medico senza telefono.
+- **Scelte mie.**
+  - L'anagrafica AIFA serve per le confezioni uscite dopo il 2020: 213 delle 251 confezioni «Ricetta Ministeriale a Ricalco» di oggi non sono negli elenchi del 2020. Con il TDL e una confezione a ricalco fuori dagli elenchi la regola informa e non blocca: vale solo se il farmaco è dell'allegato III-bis, e lo controlla il Sistema TS. Lo dice il messaggio.
+  - Il telefono è quello del medico che firma; se manca, quello dello studio. Il programma scrive da sé le note di ogni riga della ricetta con il codice TDL: «Posologia: …; tel. del medico …». Le manda al SAR (motivazNote) e le stampa sul promemoria.
+  - Il codice TDL non è un'esenzione del paziente: dalla stessa versione la R9 non lo controlla sulla ricetta farmaceutica.
+  - Elenchi e codici stanno nei dati delle regole, in un campo nuovo `lists`, versionato come i valori.
+  - Nella ricetta farmaceutica SSN la scelta dell'esenzione offre i codici della terapia del dolore della regola in vigore, accanto alle esenzioni del paziente.
+- **Non fatto**:
+  - le note dei farmaci dell'allegato III-bis fuori dalla sezione A (solo la posologia), perché senza l'elenco delle sostanze non si riconoscono;
+  - le note sulla ricetta rossa stampata, dove il medico le scrive a mano come sulla ricetta cartacea.
+- **Da completare**:
+  - l'allegato III-bis del DPR 309/1990 vigente: Normattiva e il sito del Ministero non si scaricano da qui, è chiesto a Simone;
+  - gli elenchi aggiornati dopo il 2020 e le decodifiche regionali del TDL: li tiene il Sistema TS, domanda per il CSI;
+  - le esclusioni regionali (piani terapeutici AIFA, distribuzione diretta e per conto, ossigeno), che la Regione manda al Sistema TS (specifiche del 15/11/2023): domanda per il CSI, perché la cartella non le ha.
+- **Non provato**: il Sistema TS e il SAR veri; la stampa delle note su un promemoria vero.
+
+**D273 · Codice della motivazione di non sostituibilità e tipologia S o H nel messaggio della ricetta.** La seconda parte nazionale di D271.
+
+- **Fonti.**
+  - Sistema TS, linee guida per la prescrizione del principio attivo (art. 15, comma 11-bis, DL 95/2012), versione 2.1 del 25/10/2013:
+    - i casi A1, A2, B, C e D e i campi da compilare (3.1.4);
+    - i codici 1, 2 e 3 della sintetica motivazione e il 4 della non applicabilità dell'art. 15, comma 11-bis, che il medico sceglie insieme alla clausola per proseguire una terapia in corso;
+    - il farmacista tratta il codice 4 come la non sostituibilità (paragrafo 4).
+  - Specifiche della prescrizione dell'8/7/2026:
+    - `nonSost` vale per il prodotto indicato con il codice AIC;
+    - `codMotivazione` «deve essere compilato se nonSost vale 1» (p. 27);
+    - `indicazionePrescr` (p. 25).
+  - Manuale dei codici di anomalia della ricetta in DPCM: l'avviso 5412 per un codice della motivazione non valido (p. 34).
+  - «Collegamento telematico in rete dei medici», versione 11.0:
+    - nella farmaceutica Prescrizione1 porta il codice;
+    - CodProdPrest può mancare per il solo principio attivo;
+    - DescrProdPrest porta il codice del gruppo di equivalenza.
+- **La regola R13**, dalla versione delle regole 2026-11-25.1. Con la clausola di non sostituibilità serve uno dei codici da 1 a 4, per un farmaco indicato con il codice AIC e non per principio attivo. Codici e descrizioni stanno nei dati della regola (`lists.substitutionReasons`), versionati come i valori. Le versioni di prima restano con la motivazione scritta, per le ricette che si ricontrollano alla loro data.
+- **Scheda della terapia e riga della ricetta.**
+  - Con «Non sostituibile» si sceglie il codice; il testo diventa una precisazione facoltativa.
+  - «Per principio attivo» e «Non sostituibile» si escludono, e «Non sostituibile» vuole l'AIC.
+  - La terapia che entra in ricetta porta con sé principio attivo, clausola e codice. Prima le due opzioni si perdevano: era un difetto, corretto.
+- **Messaggio al SAR.**
+  - `codMotivazione` sulla riga.
+  - Il caso A1 per principio attivo.
+  - `indicazionePrescr` S o H, solo se tutte le righe vengono da terapie con la stessa tipologia, come il campo 14 del promemoria (D217).
+- **Ricetta rossa.**
+  - Prescrizione1 con il codice.
+  - Per principio attivo solo il gruppo di equivalenza (A1).
+  - IndicazionePrescr S o H.
+- **Promemoria**: «NON SOSTITUIBILE - motivazione N - precisazione».
+- **Simulatore**: rifiuta la non sostituibilità senza codice (SIM-MOTIVAZIONE), come il SAC.
+- **Scelte mie.**
+  - Il codice 4 si sceglie sotto la clausola, come dicono le linee guida.
+  - Per principio attivo senza il gruppo di equivalenza nella lista di trasparenza in vigore, la ricetta rossa porta l'AIC, come per l'unico farmaco autorizzato (caso D). Senza nessuno dei due la riga non direbbe quale farmaco. Succede con un farmaco senza equivalenti o se la lista non è importata.
+- **Non fatto.**
+  - Sul modulo stampato della ricetta rossa le caselle S e H non si biffano: le fonti lette non danno le posizioni.
+  - Per principio attivo la riga stampata mostra il nome del farmaco, non il gruppo.
+  - La scheda della terapia accetta qualunque codice di due caratteri: il controllo sui codici della regola lo fa R13 alla ricetta.
+- **Non provato**: il Sistema TS e il SAR veri.
+
+**D274 · La ricerca della ricetta copre i risultati anche in Safari.** Segnalazione di Simone del 25/11/2026, con la schermata della ricetta specialistica nella dimostrazione: scorrendo i risultati, le righe si vedevano sopra il campo di ricerca.
+
+- **Causa.** Nella pagina della ricetta in una schermata (D242) il riquadro che scorre aveva uno spazio interno in alto. WebKit ferma il campo sotto quello spazio e lascia vedere, nella fascia sopra, le righe che scorrono; Chromium no.
+- **Correzione.**
+  - Il riquadro non ha più spazio interno in alto: lo dà il suo primo elemento.
+  - Il campo di ricerca ha lo sfondo del riquadro, un po' di spazio sopra e sotto e un bordo sottile in basso, che fa vedere dove le righe gli passano sotto.
+- **Prova.** In cima al riquadro, scorso fino in fondo, c'è il campo e non una riga dei risultati (`apps/api/test/e2e/interfaccia.test.ts`). Con WebKit diventa rossa con il foglio di stile di prima.
+- **Non provato**: Safari vero su Mac e iPad.
+
+**D275 · Risposte di Simone della sera del 25/11/2026.**
+
+- **Note di erogabilità, sedute e tariffa** (domanda 2 della prossima fermata). Risposta: «se manca qualcosa, provvedi e integra». Si fanno adesso, nella pull request delle parti nazionali, prima del Fascicolo (opzione A).
+- **Via dato in anticipo.** Simone: «ti autorizzo sin da ora a unire, visto che dopo non sarò operativo». La pull request di questo blocco si unisce con le prove su GitHub verdi. Lo stesso vale per quella del Fascicolo, che viene dopo nell'ordine concordato (D268), come gli ho scritto. Le domande della fermata restano in `docs/avanzamento.md` per quando torna.
+- Simone può spegnere il suo computer: il lavoro va avanti nella sessione in cloud, con commit e push dopo ogni passo.
+
+**D276 · Note del nomenclatore, sedute dei cicli e tariffa nella ricetta specialistica.** Dalla risposta di Simone del 25/11/2026 (D275): «se manca qualcosa, provvedi e integra». Il requisito («Prescrizione specialistica»: «Sedute per i cicli (es. riabilitazione), tariffa a titolo informativo, condizioni di erogabilità e note del catalogo quando presenti») non era fatto.
+
+- **Fonti.**
+  - DPCM 12/1/2017: allegato 4 (il nomenclatore, con il numero della nota accanto al codice) e allegato 4D (le note), nei PDF del Ministero del 29/9/2026, che hanno già le modifiche del DM 3/8/2026 e del DPCM 7/8/2026. La legenda dell'allegato 4 dice che per una condizione di erogabilità il medico riporta in ricetta il numero della nota e il quesito; per un'indicazione di appropriatezza prescrittiva il solo quesito. Dice anche: al più otto prestazioni della stessa branca sulla stessa ricetta, per la legge n. 8 del 1990, che non è letta.
+  - Sistema TS, prescrizione, 08/07/2026: numeroNota, condErogabilita, approprPrescrittiva e patologia, facoltativi (pp. 28–29); numsedute solo per i cicli del DPCM, fra il minimo e il massimo di sedute, con quantità 1 per ciclo; sulle altre prestazioni il SAC lo rifiuta (pp. 42–43).
+  - Specifiche di stampa del promemoria (05/12/2024): nel campo 18A «N.SEDUTE:» con le sedute; nel campo 20 numero della nota, spazio e lettera, e nella riga sotto il codice di patologia; senza nota «---».
+  - Specifiche DPCM (versione 11.0 dell'1/3/2016): Prescrizione1 della specialistica «#nota-condizione-appropriatezza-patologia#», con «*» per un campo vuoto.
+  - Catalogo regionale, D.D. 590/2026: colonne «Prestazione Ciclo» e «Numero Sedute». Le 52 voci a ciclo hanno tutte le sedute. Nelle 24 con un codice del nomenclatore il numero è il massimo del ciclo stampato nell'allegato 4. Le altre 28 hanno un codice regionale che nel nomenclatore non c'è (per esempio 93.11.6A).
+- **Scelte.**
+  - **Dati.** Le note sono una trascrizione nuova (`lea/allegato-4-note`, tipo `note_prestazioni`): una nota per codice del nomenclatore, con il tipo e il testo, 374 codici. Il catalogo ha le colonne ciclo e sedute. Le due cose sono da controllare prima dell'uso, come le altre trascrizioni (A8). Nella dimostrazione si vedono prima del controllo, come il catalogo (D260).
+  - **Sulla riga.** Il numero della nota lo mette il programma dall'elenco in uso, insieme al tipo della nota di quel momento. La lettera della condizione la sceglie il medico fra quelle che la nota scrive (A, B, C…); è facoltativa, perché le fonti chiedono il numero, non la lettera. Le sedute le scrive il medico, solo per i cicli, e sono facoltative.
+  - **Regole**, versione 2026-11-25.2:
+    - R24 blocca una prestazione con condizione di erogabilità senza il numero della nota. Blocca anche una nota che non è quella del codice e una nota su una prestazione che non ne ha. Con l'indicazione di appropriatezza la nota va con la riga, ma non è obbligatoria.
+    - R25 blocca più di otto prestazioni della stessa branca, contando le quantità. Non conta una voce che nel catalogo sta in più branche, come la 93.15 (Medicina fisica e riabilitazione, Ortopedia): potrebbe contare nell'una o nell'altra.
+    - R10 controlla anche le sedute: solo sui cicli, non oltre il massimo del catalogo, e un ciclo per riga, con quantità 1. Il minimo il catalogo non lo dà: lo controlla il SAR.
+  - **SAR e promemoria.** Nel messaggio vanno numero della nota, tipo, lettera e sedute. Sul promemoria, nel campo 18A, «N.SEDUTE:n» dopo il tipo di accesso; nel campo 20 il numero della nota e la lettera.
+  - **Ricetta rossa.** Prescrizione1 della specialistica con la nota e la lettera, e «*» per la patologia. Le sedute non hanno un campo nelle specifiche DPCM del 2016.
+  - **Tariffa.** È quella del catalogo («Tariffa indicativa di fascia A»): nella ricerca e sulla riga si chiama «indicativa» e si dà a titolo informativo. Non va nel messaggio né sul promemoria.
+- **Non fatto.**
+  - Il codice di patologia: le specifiche non dicono quale codifica usare. La riga sotto del campo 20 resta vuota.
+  - «AMBULATORIO EROGAZ:» nel campo 18A: viene dalla risposta del Sistema TS (tipoAmbulatorio), che il simulatore non dà.
+  - Gli allegati 4A (densitometria, nota 29), 4B (chirurgia refrattiva, nota 1) e «GEN» e «FAR» dell'allegato 4 (note 42, 62, 76, 92 e 93): non trascritti. Quelle note mostrano il rimando come lo stampa l'allegato 4D.
+  - Il modulo stampato della ricetta rossa non stampa la nota della specialistica.
+  - La scelta della lettera c'è per le 35 note che scrivono le lettere con la parentesi (32 maiuscole e 3 minuscole, su 112); con le altre la nota va senza lettera.
+- **Non provato**: il Sistema TS e il SAR veri; Safari vero.
+
+**D277 · SIAP: documenti, confronto con i dati del programma e una domanda per la fermata.** Richiesta di Simone del 25/11/2026: il flusso del Sistema Informativo dell'Assistenza Primaria (DM Salute 4/8/2025) manca, e prima della fermata non si costruisce niente.
+
+- **Documenti** (`docs/provenienze.md`, «SIAP»):
+  - scaricati dal sito del CSI l'avviso e le specifiche tecniche dell'indagine AP26_003, e dalla Gazzetta il comunicato della GU n. 226 del 29/9/2025;
+  - la GU n. 202 non si scarica: la connessione si chiude a metà. Il testo del decreto è nelle specifiche del CSI, e le pagine 5–9 della Gazzetta le ha mandate Simone il 26/11/2026, dalla notizia di regioni.it;
+  - il comunicato dice che il disciplinare tecnico, allegato 1 del decreto, non fu stampato in Gazzetta ed è sul portale del Ministero. Quel portale da qui risponde 403. Le specifiche funzionali del SIAP (versione 1.3), bloccate allo stesso modo e lette prima come testo, le ha mandate Simone il 26/11/2026, e lo stesso giorno il disciplinare tecnico;
+  - con le specifiche Simone ha mandato la comunicazione FNOMCeO n. 85: riguarda il SIOC (ospedali di comunità), un altro decreto dello stesso giorno, e non serve al SIAP.
+- **Confronto** (`docs/siap.md`): campo per campo, per i tre tracciati, che cosa c'è nel programma, dove, e che cosa manca. I valori ammessi vengono dalle specifiche del Ministero, perché quelle del CSI elencano solo i nomi dei campi.
+- **Disciplinare tecnico** (`docs/siap.md`, «Che cosa aggiunge il disciplinare tecnico»): per ogni campo dice da dove viene. Dalla cartella vengono fumo, BMI, patologie croniche e il contatto; l'anagrafica e le esenzioni vengono dall'anagrafe regionale degli assistiti, come nelle specifiche del CSI. Le differenze con le specifiche del Ministero (progressivo del contatto, data e progressivo nel tracciato 3, quantità erogata) sono nella domanda 12 per il CSI.
+- **Che cosa manca di più**:
+  - il contatto come registrazione a sé, con il problema per cui è avvenuto;
+  - il fumo codificato;
+  - il codice STS.11 dello studio con il tipo di struttura;
+  - l'UCCP;
+  - la tabella che lega le azioni del programma alle tipologie di prestazione.
+- **Domanda per la fermata** (domanda 3, `docs/avanzamento.md`): un modulo SIAP con un simulatore del CSI, come per il SAR, e in che ordine. Consigliato dopo il Fascicolo e prima di AURA, cominciando dalla parte che non dipende dal CSI.
+- **Domande per il CSI** 11 e 12: l'autocertificazione SIRPED di una società senza ancora medici; specifiche, ambiente di prova e collaudo del SIAP per un fornitore che arriva dopo l'AP26_003, e quale versione del DataSet 3 vale.
+- **Non provato**: niente da provare, perché non c'è codice.
+
+**D278 · «Rinnova» una ricetta già fatta.** Richiesta della Dr.ssa Rocca, riferita da Simone il 25/11/2026: «implementare una funzione per rinnovare una ricetta già fatta ed evitare di fare ogni volta una nuova ricetta».
+
+- **Che cosa c'era**:
+  - «Ripeti le terapie scelte» nel riepilogo, per le terapie croniche in corso;
+  - «Aggiungi» sui farmaci prescritti (D249).
+  - Mancava il modo di rifare una ricetta intera, con le visite e gli esami.
+- **Scelte.**
+  - **Dove.** Nella cronologia della cartella ogni ricetta ha «Rinnova». È solo del medico: la segreteria prepara le ripetizioni delle terapie croniche con «Ripeti» (D259).
+  - **Che cosa fa.** Le righe della ricetta vanno nella ricetta in corso del paziente, farmaceutica o specialistica, e il programma la apre: il medico la rivede e la firma. Non si manda niente da sé.
+  - **Le righe già in ricetta** non si ripetono.
+  - **Con la ricetta in corso vuota** vanno anche tipo ed esenzione e, per la specialistica, tipo di accesso, priorità e quesito, che il medico rivede.
+  - **Le prestazioni** prendono dal catalogo in uso tariffa, ciclo e nota del nomenclatore. La lettera della condizione resta solo se la nota è la stessa di allora; con una nota cambiata il medico la sceglie di nuovo (D276).
+  - **Le terapie**: la riga resta collegata solo a una terapia ancora in corso.
+  - **Quando non si rinnova.** Se la ricetta in corso non è finita (bozza, da firmare, in invio o in errore), il programma lo dice e non tocca niente. Se è finita (inviata, annullata o stampata su ricetta rossa) si ricomincia da capo, come con «Nuova ricetta da capo». Per le ricette ancora in corso rimanda alla pagina Ricette, per i presidi alla pagina Presidi, che ha già «Rinnova» (tappa 10).
+- **Prove**: `apps/web/test/rinnova.test.ts` e, nel browser, «Rinnova» della ricetta specialistica dalla cronologia (`apps/api/test/e2e/interfaccia.test.ts`).
+- **Non provato**: con la Dr.ssa Rocca, se la ricetta rinnovata è quella che si aspetta.
+
+**D279 · Dove si prescrivono gli esami.** Domanda di Simone del 25/11/2026: come si prescrivono gli esami del sangue. Si prescrivono in «Specialistica», dal catalogo regionale. Il menu «Esami» della cartella è per i risultati, e lì non si capiva.
+
+- **Pagina Esami.** In cima una riga dice che lì si registrano e si leggono i risultati, e che gli esami, anche quelli del sangue, si prescrivono in Specialistica, con il collegamento.
+- **Ricerca dei farmaci.** Se non trova niente, propone «cerca … in Specialistica», che apre la specialistica con la stessa ricerca.
+- **Dimostrazione.** Lo studio ha un pacchetto di prova, «Esami del sangue (pacchetto di prova)». Ha prelievo di sangue venoso, emocromo, glucosio, creatinina, colesterolo totale e HDL e trigliceridi, con i codici del catalogo della D.D. 590/2026. Si compone dal catalogo in uso, come i pacchetti dello studio; senza il catalogo non c'è. È una comodità da provare, non un'indicazione clinica.
+- **Il nome del menu** è una domanda per la fermata (domanda 4, `docs/avanzamento.md`).

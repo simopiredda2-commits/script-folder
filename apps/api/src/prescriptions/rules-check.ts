@@ -1,16 +1,26 @@
 import { samePackUnit, type PackUnit } from '@mmg/reference';
-import { checkPrescription, type DrugFacts, type LineContext, type RuleContext } from '@mmg/rules';
+import {
+  checkPrescription,
+  type DrugFacts,
+  type LineContext,
+  type RuleContext,
+  type ServiceCatalogEntry,
+  type ServiceNoteFacts,
+} from '@mmg/rules';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import type { ReferenceData } from '../reference/lookup';
 import {
+  archive,
   delegation,
+  doctorProfile,
   exemption,
   historicalPrescription,
   patient,
   patientChoice,
   prescription,
   prescriptionLine,
+  studio,
   therapeuticPlan,
   therapy,
 } from '../db/schema';
@@ -27,8 +37,10 @@ export interface RulesCheckDeps {
   exemptionExists?: (code: string) => boolean | undefined;
   /** Sostituisce l'elenco regionale esenzione → prestazioni (R17, prove). */
   exemptionServices?: (code: string) => ReadonlySet<string> | undefined;
-  /** Sostituisce il catalogo regionale delle prestazioni (R10, R18, prove). */
-  serviceCatalog?: (code: string) => { nationalCode: string | null } | null;
+  /** Sostituisce il catalogo regionale delle prestazioni (R10, R18, R25, prove). */
+  serviceCatalog?: (code: string) => ServiceCatalogEntry | null;
+  /** Sostituisce le note del nomenclatore (R24, prove). */
+  serviceNotes?: (nationalCode: string) => ServiceNoteFacts | null;
 }
 
 /** Data di oggi nello studio (Europe/Rome), AAAA-MM-GG. */
@@ -48,6 +60,8 @@ export async function buildRuleContext(
   deps: RulesCheckDeps,
   prescriptionId: string,
   input: SignInput,
+  /** Chi controlla: il suo telefono, o quello dello studio, va nelle note degli stupefacenti (R23). */
+  actorUserId?: string,
 ): Promise<RuleContext> {
   const { db } = deps;
   const [p] = await db.select().from(prescription).where(eq(prescription.id, prescriptionId));
@@ -89,10 +103,16 @@ export async function buildRuleContext(
       activeIngredient: l.activeIngredient,
       serviceCode: l.serviceCode,
       serviceNationalCode: l.serviceNationalCode,
+      serviceNote: l.serviceNote,
+      serviceNoteLetter: l.serviceNoteLetter,
+      sessions: l.sessions,
       quantity: l.quantity,
       aifaNote: l.aifaNote,
       notSubstitutable: l.notSubstitutable,
       notSubstitutableReason: l.notSubstitutableReason,
+      notSubstitutableCode: l.notSubstitutableCode,
+      byActiveIngredient: l.byActiveIngredient,
+      posologyText: l.posologyText,
       therapy: t
         ? {
             id: t.id,
@@ -108,10 +128,13 @@ export async function buildRuleContext(
 
   const date = studioDate((deps.now ?? (() => new Date()))());
   let drugFacts = deps.drugFacts;
-  let { exemptionExists, exemptionServices, serviceCatalog } = deps;
+  let { exemptionExists, exemptionServices, serviceCatalog, serviceNotes } = deps;
   if (deps.reference) {
     if (!serviceCatalog && p.kind === 'specialist_ssn') {
       serviceCatalog = await deps.reference.serviceLookup(date);
+    }
+    if (!serviceNotes && p.kind === 'specialist_ssn') {
+      serviceNotes = await deps.reference.serviceNotes(date);
     }
     if (!drugFacts) {
       const known = await deps.reference.drugs(
@@ -178,6 +201,7 @@ export async function buildRuleContext(
       .from(patientChoice)
       .where(and(eq(patientChoice.patientId, p.patientId), isNull(patientChoice.annulledAt))),
     ...(serviceCatalog ? { serviceCatalog } : {}),
+    ...(serviceNotes ? { serviceNotes } : {}),
     exemptions: await db
       .select({ code: exemption.code, validFrom: exemption.validFrom, validTo: exemption.validTo })
       .from(exemption)
@@ -228,17 +252,55 @@ export async function buildRuleContext(
     exemptionServices,
     confirmedAifaNotes: new Set(input.confirmedAifaNotes),
     reasons: input.reasons,
+    ...(actorUserId ? { doctorPhone: await contactPhone(db, actorUserId, p.patientId) } : {}),
   };
+}
+
+/**
+ * Le note della riga per la terapia del dolore (R23, «Nota STUP», D272): posologia e telefono del
+ * medico. Null se non c'è niente da scrivere.
+ */
+export function stupNote(posology: string | null, phone: string | null): string | null {
+  const parts = [
+    posology?.trim() ? `Posologia: ${posology.trim()}` : null,
+    phone?.trim() ? `tel. del medico ${phone.trim()}` : null,
+  ].filter((x): x is string => x !== null);
+  return parts.length ? parts.join('; ') : null;
+}
+
+/**
+ * Il telefono per le note della ricetta degli stupefacenti (R23, nota STUP): quello del medico,
+ * altrimenti quello dello studio dell'archivio del paziente.
+ */
+export async function contactPhone(
+  db: Database,
+  userId: string,
+  patientId: string,
+): Promise<string | null> {
+  const [doctor] = await db
+    .select({ phone: doctorProfile.phone })
+    .from(doctorProfile)
+    .where(eq(doctorProfile.userId, userId));
+  if (doctor?.phone?.trim()) return doctor.phone.trim();
+  const [place] = await db
+    .select({ phone: studio.phone })
+    .from(patient)
+    .innerJoin(archive, eq(archive.id, patient.archiveId))
+    .innerJoin(studio, eq(studio.id, archive.studioId))
+    .where(eq(patient.id, patientId));
+  return place?.phone?.trim() || null;
 }
 
 /** Controlli prima dell'invio con le regole di prescrizione in vigore alla data. */
 export function createRulesCheck(deps: RulesCheckDeps) {
   return async (
     prescriptionId: string,
-    _actor: unknown,
+    actor: { userId: string } | undefined,
     input: SignInput,
   ): Promise<CheckOutcome> => {
-    const result = checkPrescription(await buildRuleContext(deps, prescriptionId, input));
+    const result = checkPrescription(
+      await buildRuleContext(deps, prescriptionId, input, actor?.userId),
+    );
     return {
       rulesVersion: result.rulesVersion,
       issues: result.issues,

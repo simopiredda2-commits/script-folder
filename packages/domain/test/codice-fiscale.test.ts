@@ -51,6 +51,12 @@ describe('codice fiscale (DM 23/12/1976)', () => {
     expect(surnameCode('De Santis')).toBe('DSN'); // cognome composto: senza spazi
   });
 
+  it('virgola e punto nel cognome o nel nome, che AURA accetta dal 2020 (AVL-24): contano solo le lettere', () => {
+    // Esempi in cui un segno contato come consonante cambierebbe il risultato.
+    expect(surnameCode('Re, Oa')).toBe('REO');
+    expect(nameCode('U. Ida')).toBe('DUI');
+  });
+
   it('nome, art. 4: con quattro o più consonanti la prima, la terza e la quarta', () => {
     expect(nameCode('Gianfranco')).toBe('GFR');
     expect(nameCode('Lina')).toBe('LNI');

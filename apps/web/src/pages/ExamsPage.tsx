@@ -314,6 +314,12 @@ export function ExamsPage() {
         }
       />
       <PatientBanner patient={p} />
+      {/* Qui i risultati; la prescrizione degli esami sta in Specialistica (D279). */}
+      <p className="tenue">
+        Qui si registrano e si leggono i risultati. Gli esami, anche quelli del sangue, si
+        prescrivono in <Link to={`/pazienti/${id}/specialistica`}>Specialistica</Link>: si cercano
+        per nome nel catalogo regionale, o si sceglie un pacchetto dello studio.
+      </p>
       {exams.data?.puoScrivere && <NewReportForm patientId={id!} onSaved={exams.reload} />}
       <section className="riquadro" aria-labelledby="titolo-risultati">
         <h2 id="titolo-risultati">Risultati</h2>

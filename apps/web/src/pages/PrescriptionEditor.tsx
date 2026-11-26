@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import {
   DataVersions,
   ErrorMessage,
@@ -17,7 +17,13 @@ import {
   PackStepper,
   PrescribedDrugList,
 } from '../components/PrescribedDrugs';
-import { ServiceResultText, type ServiceResultData } from '../components/ServiceResult';
+import {
+  cycleText,
+  NOTE_KIND_TEXT,
+  ServiceResultText,
+  type ServiceNote,
+  type ServiceResultData,
+} from '../components/ServiceResult';
 import { RegistryNote, type DrugRegistry } from '../components/Registries';
 import {
   isSuspended,
@@ -30,7 +36,7 @@ import { ReminderPanel } from '../components/ReminderPanel';
 import { SendPanel } from '../components/SendPanel';
 import { api, ApiError, query } from '../lib/api';
 import { ACCESS_TYPE, date, money, PRIORITY, REMINDER_CHANNEL } from '../lib/format';
-import { readStored, usePersistentState, writeStored } from '../lib/storage';
+import { readStored, removeStored, usePersistentState, writeStored } from '../lib/storage';
 import { useMoreBelow } from '../lib/useMoreBelow';
 import {
   count,
@@ -43,7 +49,14 @@ import {
 } from '../lib/studio-lists';
 import { useApi } from '../lib/useApi';
 import { useSession } from '../lib/session';
-import { PatientBanner, posology, type Patient, type Summary, type TherapyRow } from './RecordPage';
+import {
+  PatientBanner,
+  posology,
+  type Patient,
+  type SubstitutionReason,
+  type Summary,
+  type TherapyRow,
+} from './RecordPage';
 
 export interface Drug {
   aic: string;
@@ -89,15 +102,44 @@ interface Line {
   /** Codice del nomenclatore, «codice DM» (D154). */
   serviceNationalCode?: string | null;
   serviceDescription?: string | null;
+  /** Numero della nota del nomenclatore (numeroNota, D276); assente: lo dà l'elenco in uso. */
+  serviceNote?: string | null;
+  /** Lettera della condizione o dell'indicazione della nota, scelta dal medico (D276). */
+  serviceNoteLetter?: string;
+  /** Sedute del ciclo (numsedute, D276), come le scrive il medico. */
+  sessions?: string;
+  /** Che cosa dice il catalogo della prestazione: si mostra, non parte con la ricetta (D276). */
+  catalog?: CatalogInfo;
   quantity: number;
   aifaNote?: string | null;
   posologyText?: string;
   byActiveIngredient?: boolean;
   notSubstitutable?: boolean;
   notSubstitutableReason?: string;
+  /** Codice della motivazione di non sostituibilità, da 1 a 4 (R13, D273). */
+  notSubstitutableCode?: string;
   /** Ricetta bianca ripetibile, solo se diverso dalla regola del farmaco (D93). */
   repeatCount?: string;
   validityMonths?: string;
+}
+
+/** Tariffa, ciclo e nota della prestazione nel catalogo e nell'elenco delle note in uso (D276). */
+interface CatalogInfo {
+  fee: string | null;
+  cycle: boolean;
+  maxSessions: number | null;
+  note: ServiceNote | null;
+}
+
+/**
+ * Le lettere delle condizioni o delle indicazioni di una nota, come la nota le scrive («A) …;
+ * B) …»): maiuscole, o minuscole se la nota non ne ha di maiuscole. Senza lettere, nessuna scelta.
+ */
+export function noteLetters(text: string): string[] {
+  const found = (re: RegExp) => [...text.matchAll(re)].map((m) => m[1]!.toUpperCase());
+  const upper = found(/(?:^|[\s.;:,])([A-Z])\)\s/g);
+  const letters = upper.length ? upper : found(/(?:^|[\s.;:,])([a-z])\)\s/g);
+  return [...new Set(letters)];
 }
 
 const SEARCH_DELAY_MS = 250;
@@ -211,10 +253,14 @@ export function lineSummary(
     posologyText?: string;
     byActiveIngredient?: boolean;
     notSubstitutable?: boolean;
+    notSubstitutableCode?: string;
     repeatCount?: string;
     validityMonths?: string;
     serviceCode?: string | null;
     serviceNationalCode?: string | null;
+    serviceNote?: string | null;
+    serviceNoteLetter?: string;
+    sessions?: string;
   },
   mode: 'farmaci' | 'specialistica',
   white = false,
@@ -224,6 +270,8 @@ export function lineSummary(
       `quantità ${l.quantity}`,
       l.serviceCode && `catalogo ${l.serviceCode}`,
       l.serviceNationalCode && `nomenclatore (DM) ${l.serviceNationalCode}`,
+      l.serviceNote && `nota ${[l.serviceNote, l.serviceNoteLetter].filter(Boolean).join(' ')}`,
+      l.sessions && `${l.sessions} sedute`,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -231,7 +279,10 @@ export function lineSummary(
     `${l.quantity} ${l.quantity === 1 ? 'confezione' : 'confezioni'}`,
     l.posologyText?.trim() || 'posologia non indicata',
     l.byActiveIngredient && 'per principio attivo',
-    l.notSubstitutable && 'non sostituibile',
+    l.notSubstitutable &&
+      (l.notSubstitutableCode
+        ? `non sostituibile, motivazione ${l.notSubstitutableCode}`
+        : 'non sostituibile'),
     white && l.repeatCount && `ripetibile ${l.repeatCount} volte`,
     white && l.validityMonths && `validità ${l.validityMonths} mesi`,
   ]
@@ -252,6 +303,16 @@ function therapyLine(t: TherapyRow): Omit<Line, 'key'> {
     aifaNote: t.aifaNote,
     quantity: t.packsPerPrescription ?? 1,
     posologyText: posology(t),
+    // «Come va in ricetta» della scheda: per principio attivo e non sostituibile, con la
+    // motivazione, entrano con la terapia, come nelle ripetizioni (D273).
+    ...(t.byActiveIngredient ? { byActiveIngredient: true } : {}),
+    ...(t.notSubstitutable
+      ? {
+          notSubstitutable: true,
+          notSubstitutableReason: t.notSubstitutableReason ?? '',
+          notSubstitutableCode: t.notSubstitutableCode ?? '',
+        }
+      : {}),
   };
 }
 
@@ -340,9 +401,166 @@ export function addToCurrentPrescription(patientId: string, line: Omit<Line, 'ke
   return true;
 }
 
+/** Ricette già fatte: dopo, nell'editor si ricomincia da capo (D278). */
+const FINISHED_STATUSES = new Set(['sent', 'cancelled', 'paper']);
+/** Che cosa l'editor ricorda della ricetta in corso, campo per campo (D68). */
+const DRAFT_FIELDS = [
+  'bozza',
+  'righe',
+  'tipo',
+  'esenzione',
+  'canale',
+  'accesso',
+  'priorita',
+  'quesito',
+  'oscurato',
+] as const;
+
+/** Una riga di una ricetta già fatta, come la dà l'elenco delle ricette del paziente (D278). */
+export interface PastLine {
+  therapyId: string | null;
+  drugAic: string | null;
+  drugName: string | null;
+  activeIngredient: string | null;
+  serviceCode: string | null;
+  serviceNationalCode: string | null;
+  serviceDescription: string | null;
+  serviceNote?: string | null;
+  serviceNoteLetter?: string | null;
+  sessions?: number | null;
+  quantity: number;
+  aifaNote: string | null;
+  byActiveIngredient: boolean;
+  notSubstitutable: boolean;
+  notSubstitutableReason: string | null;
+  notSubstitutableCode?: string | null;
+  posologyText: string | null;
+  repeatCount: number | null;
+  validityMonths: number | null;
+}
+
+/** Una ricetta già fatta, con le righe (D278). */
+export interface PastPrescription {
+  id: string;
+  kind: string;
+  status: string;
+  exemptionCode: string | null;
+  accessType: 'first' | 'subsequent' | null;
+  priority: string | null;
+  diagnosticQuestion: string | null;
+  righe: PastLine[];
+}
+
+/** Che cosa dice il catalogo in uso di una prestazione, dalla ricerca (D276, D278). */
+async function catalogInfoFor(code: string): Promise<CatalogInfo | null> {
+  const found = await api<{ prestazioni: Service[] }>(`/api/prestazioni${query({ q: code })}`);
+  const s = found.prestazioni.find(
+    (x) => x.regionalCode.trim().toUpperCase() === code.trim().toUpperCase(),
+  );
+  return s
+    ? { fee: s.fee, cycle: !!s.cycle, maxSessions: s.sessions ?? null, note: s.note ?? null }
+    : null;
+}
+
+/**
+ * «Rinnova» una ricetta già fatta (D278, richiesta della Dr.ssa Rocca): le sue righe vanno nella
+ * ricetta in corso del paziente, da rivedere e firmare. Non si manda niente.
+ * - Le righe già in ricetta non si ripetono.
+ * - Con la ricetta in corso vuota vanno anche tipo, esenzione e, per la specialistica, accesso,
+ *   priorità e quesito.
+ * - Per le prestazioni la nota del nomenclatore è quella dell'elenco in uso; la lettera resta
+ *   solo se la nota è la stessa.
+ * - Una terapia che non è più in corso non resta collegata.
+ * - Se la ricetta di prima è già fatta (inviata, annullata o stampata su ricetta rossa) si
+ *   ricomincia da capo, come con «Nuova ricetta da capo».
+ * Dà dove aprire la ricetta e quante righe ha aggiunto; null se la ricetta in corso è ancora da
+ * finire: in bozza, da firmare, in invio o in errore.
+ */
+export async function renewIntoCurrentPrescription(
+  patientId: string,
+  past: PastPrescription,
+  activeTherapyIds: ReadonlySet<string>,
+): Promise<{ mode: 'farmaci' | 'specialistica'; added: number } | null> {
+  const mode = past.kind === 'specialist_ssn' ? 'specialistica' : 'farmaci';
+  const key = (field: string) => draftKey(patientId, mode, field);
+  const previous = readStored<{ status?: string } | null>(key('bozza'), null);
+  if (previous) {
+    if (!FINISHED_STATUSES.has(previous.status ?? '')) return null;
+    for (const field of DRAFT_FIELDS) removeStored(key(field));
+  }
+  const current = readStored<Line[]>(key('righe'), []);
+  const sameService = (a: Pick<Line, 'serviceCode'>, b: Pick<Line, 'serviceCode'>) =>
+    !!a.serviceCode && a.serviceCode.trim().toUpperCase() === b.serviceCode?.trim().toUpperCase();
+  const added: Line[] = [];
+  for (const l of past.righe) {
+    let line: Omit<Line, 'key'>;
+    if (mode === 'specialistica') {
+      const catalog = l.serviceCode ? await catalogInfoFor(l.serviceCode) : null;
+      const note = catalog?.note ?? null;
+      line = {
+        serviceCode: l.serviceCode,
+        serviceNationalCode: l.serviceNationalCode,
+        serviceDescription: l.serviceDescription,
+        quantity: l.quantity,
+        ...(note ? { serviceNote: note.note } : {}),
+        ...(note && l.serviceNote === note.note && l.serviceNoteLetter
+          ? { serviceNoteLetter: l.serviceNoteLetter }
+          : {}),
+        ...(l.sessions ? { sessions: String(l.sessions) } : {}),
+        ...(catalog ? { catalog } : {}),
+      };
+      if ([...current, ...added].some((x) => sameService(x, line))) continue;
+    } else {
+      line = {
+        ...(l.therapyId && activeTherapyIds.has(l.therapyId) ? { therapyId: l.therapyId } : {}),
+        drugAic: l.drugAic,
+        drugName: l.drugName,
+        activeIngredient: l.activeIngredient,
+        quantity: l.quantity,
+        aifaNote: l.aifaNote,
+        ...(l.posologyText ? { posologyText: l.posologyText } : {}),
+        ...(l.byActiveIngredient ? { byActiveIngredient: true } : {}),
+        ...(l.notSubstitutable
+          ? {
+              notSubstitutable: true,
+              notSubstitutableCode: l.notSubstitutableCode ?? '',
+              notSubstitutableReason: l.notSubstitutableReason ?? '',
+            }
+          : {}),
+        ...(past.kind === 'white'
+          ? {
+              repeatCount: l.repeatCount === null ? '' : String(l.repeatCount),
+              validityMonths: l.validityMonths === null ? '' : String(l.validityMonths),
+            }
+          : {}),
+      };
+      if ([...current, ...added].some((x) => sameDrug(x, line))) continue;
+    }
+    added.push({ ...line, key: newKey() });
+  }
+  if (current.length === 0) {
+    writeStored(key('tipo'), past.kind);
+    if (past.exemptionCode) writeStored(key('esenzione'), past.exemptionCode);
+    if (mode === 'specialistica') {
+      if (past.accessType) writeStored(key('accesso'), past.accessType);
+      if (past.priority) writeStored(key('priorita'), past.priority);
+      if (past.diagnosticQuestion) writeStored(key('quesito'), past.diagnosticQuestion);
+    }
+  }
+  writeStored(key('righe'), [...current, ...added]);
+  return { mode, added: added.length };
+}
+
 export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica' }) {
   const { id } = useParams<{ id: string }>();
-  const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
+  const record = useApi<{
+    paziente: Patient;
+    riepilogo: Summary | null;
+    /** Codici della terapia del dolore (R23, D272): solo per la ricetta farmaceutica del SSN. */
+    codiciTerapiaDolore?: string[];
+    /** Codici della motivazione di non sostituibilità di R13 in vigore oggi (D273). */
+    motivazioniNonSostituibilita?: SubstitutionReason[];
+  }>(`/api/pazienti/${id}`);
   const therapies = useApi<{ terapie: TherapyRow[] }>(
     mode === 'farmaci' ? `/api/pazienti/${id}/terapie` : null,
   );
@@ -373,7 +591,11 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   const [priority, setPriority, resetPriority] = usePersistentState(k('priorita'), 'P');
   const [question, setQuestion, resetQuestion] = usePersistentState(k('quesito'), '');
   const [obscured, setObscured, resetObscured] = usePersistentState(k('oscurato'), false);
-  const [text, setText] = useState('');
+  // «Cercalo in Specialistica» dalla ricerca dei farmaci porta qui la stessa ricerca (D279).
+  const [params] = useSearchParams();
+  const [text, setText] = useState(
+    mode === 'specialistica' ? (params.get('cerca') ?? '').slice(0, 100) : '',
+  );
   const q = useDebounced(text);
   const search = useApi<{
     farmaci?: Drug[];
@@ -463,6 +685,8 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
   const p = record.data.paziente;
+  // Codici della motivazione di non sostituibilità di R13 in vigore oggi (D273); vuoto prima.
+  const reasons = record.data.motivazioniNonSostituibilita ?? [];
   const exemptions = record.data.riepilogo?.esenzioni ?? [];
   const versionKinds =
     mode === 'farmaci' ? ['farmaci', 'farmaci_classe', 'farmaci_dpc'] : ['prestazioni'];
@@ -496,15 +720,27 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
         lines: lines.map(
           ({
             key: _k,
+            catalog: _c,
             posologyText,
             notSubstitutableReason,
+            notSubstitutableCode,
             repeatCount,
             validityMonths,
+            sessions,
+            serviceNoteLetter,
             ...l
           }) => ({
             ...l,
+            // Nota con la lettera e sedute del ciclo, solo per la specialistica (D276).
+            ...(mode === 'specialistica'
+              ? {
+                  sessions: sessions ? Number(sessions) : null,
+                  serviceNoteLetter: l.serviceNote ? serviceNoteLetter || null : null,
+                }
+              : {}),
             posologyText: posologyText || null,
             notSubstitutableReason: notSubstitutableReason || null,
+            notSubstitutableCode: l.notSubstitutable ? notSubstitutableCode || null : null,
             ...(kind === 'white'
               ? {
                   repeatCount: repeatCount ? Number(repeatCount) : null,
@@ -690,6 +926,16 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
           <p role="status" className="tenue stato-ricerca">
             {q && search.data ? resultsText(q, search.data) : ''}
           </p>
+          {/* Un esame cercato fra i farmaci (D279): si prescrive in Specialistica. */}
+          {mode === 'farmaci' && q && search.data && (search.data.farmaci ?? []).length === 0 && (
+            <p className="tenue">
+              Cerchi un esame o una visita? Si prescrivono in Specialistica:{' '}
+              <Link to={`/pazienti/${id}/specialistica${query({ cerca: q })}`}>
+                cerca «{q}» in Specialistica
+              </Link>
+              .
+            </p>
+          )}
           <ul className="risultati">
             {search.data?.farmaci?.map((d) => {
               const line = {
@@ -740,6 +986,13 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                       serviceCode: s.regionalCode,
                       serviceNationalCode: s.nationalCode,
                       serviceDescription: s.description,
+                      ...(s.note ? { serviceNote: s.note.note } : {}),
+                      catalog: {
+                        fee: s.fee,
+                        cycle: !!s.cycle,
+                        maxSessions: s.sessions ?? null,
+                        note: s.note ?? null,
+                      },
                       quantity: 1,
                     })
                   }
@@ -884,6 +1137,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                       </span>
                     </button>
                     {l.aifaNote && <span className="etichetta">Nota {l.aifaNote}</span>}
+                    {mode === 'specialistica' && l.serviceNote && (
+                      <span className="etichetta">Nota {l.serviceNote}</span>
+                    )}
                   </div>
                   {mode === 'specialistica' && (l.serviceCode || l.serviceDescription) && (
                     <AlreadyPrescribed
@@ -908,6 +1164,9 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                           ? ` · nomenclatore (DM) ${l.serviceNationalCode}`
                           : ' · nomenclatore (DM) dal catalogo in uso'}
                       </p>
+                    )}
+                    {mode === 'specialistica' && l.catalog && (
+                      <CatalogDetails line={l} onChange={(patch) => update(l.key, patch)} />
                     )}
                     <div className="campi-riga">
                       <div className="campo campo-stretto">
@@ -944,6 +1203,10 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                             type="checkbox"
                             id={`pa-${l.key}`}
                             checked={!!l.byActiveIngredient}
+                            // Per principio attivo e non sostituibile non vanno insieme (R13, D273).
+                            disabled={
+                              reasons.length > 0 && !!l.notSubstitutable && !l.byActiveIngredient
+                            }
                             onChange={(e) =>
                               update(l.key, { byActiveIngredient: e.target.checked })
                             }
@@ -958,19 +1221,49 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                             type="checkbox"
                             id={`ns-${l.key}`}
                             checked={!!l.notSubstitutable}
+                            disabled={
+                              reasons.length > 0 &&
+                              !l.notSubstitutable &&
+                              (!!l.byActiveIngredient || !l.drugAic)
+                            }
                             onChange={(e) => update(l.key, { notSubstitutable: e.target.checked })}
                           />
                           <label htmlFor={`ns-${l.key}`}>
                             Non sostituibile{' '}
                             <span className="tenue">
-                              · vincola il farmacista; serve una motivazione (R13)
+                              {reasons.length > 0
+                                ? '· vincola il farmacista al farmaco con l’AIC; serve il codice della motivazione (R13)'
+                                : '· vincola il farmacista; serve una motivazione (R13)'}
                             </span>
                           </label>
                         </div>
+                        {l.notSubstitutable && reasons.length > 0 && (
+                          <div className="campo">
+                            <label htmlFor={`nsc-${l.key}`}>
+                              Motivazione (linee guida del Sistema TS)
+                            </label>
+                            <select
+                              id={`nsc-${l.key}`}
+                              value={l.notSubstitutableCode ?? ''}
+                              onChange={(e) =>
+                                update(l.key, { notSubstitutableCode: e.target.value })
+                              }
+                            >
+                              <option value="">Scegli la motivazione</option>
+                              {reasons.map((r) => (
+                                <option key={r.codice} value={r.codice}>
+                                  {r.codice} · {r.descrizione}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
                         {l.notSubstitutable && (
                           <div className="campo">
                             <label htmlFor={`nsm-${l.key}`}>
-                              Motivazione della non sostituibilità
+                              {reasons.length > 0
+                                ? 'Precisazione, facoltativa'
+                                : 'Motivazione della non sostituibilità'}
                             </label>
                             <input
                               id={`nsm-${l.key}`}
@@ -1097,6 +1390,16 @@ export function PrescriptionEditor({ mode }: { mode: 'farmaci' | 'specialistica'
                     {e.codice}
                   </option>
                 ))}
+                {/* Stupefacenti per la terapia del dolore: il codice va nel campo dell'esenzione
+                    (specifiche del Sistema TS, «Nota STUP»; D272). */}
+                {kind === 'pharma_ssn' &&
+                  (record.data.codiciTerapiaDolore ?? [])
+                    .filter((c) => !exemptions.some((e) => e.codice === c))
+                    .map((c) => (
+                      <option key={c} value={c}>
+                        {c} · terapia del dolore
+                      </option>
+                    ))}
               </select>
             </div>
             {/*
@@ -1451,5 +1754,78 @@ function ManualServiceForm({
         </button>
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * Che cosa dice il catalogo della prestazione scelta (D276): la tariffa indicativa, a titolo
+ * informativo; per i cicli le sedute, facoltative e non oltre il massimo del catalogo; la nota del
+ * nomenclatore con il suo testo e, se la nota ha le lettere, la scelta della condizione.
+ */
+function CatalogDetails({
+  line,
+  onChange,
+}: {
+  line: Line;
+  onChange: (patch: Partial<Line>) => void;
+}) {
+  const c = line.catalog!;
+  const note = c.note;
+  const letters = note ? noteLetters(note.text) : [];
+  return (
+    <div className="catalogo-riga">
+      {c.fee && (
+        <p className="tenue">
+          Tariffa indicativa del catalogo: {money(c.fee)}, a titolo informativo
+        </p>
+      )}
+      {c.cycle && (
+        <div className="campo campo-stretto">
+          <label htmlFor={`sedute-${line.key}`}>
+            Sedute <span className="tenue">· {cycleText(c.maxSessions).toLowerCase()}</span>
+          </label>
+          <input
+            id={`sedute-${line.key}`}
+            type="number"
+            min={1}
+            {...(c.maxSessions ? { max: c.maxSessions } : {})}
+            value={line.sessions ?? ''}
+            onChange={(e) => onChange({ sessions: e.target.value })}
+          />
+        </div>
+      )}
+      {note && (
+        <div className="nota-nomenclatore">
+          <p>
+            <strong>
+              Nota {note.note}, {NOTE_KIND_TEXT[note.kind]}
+            </strong>
+            {note.kind === 'condizione'
+              ? ' · in ricetta va il numero della nota, con il quesito diagnostico'
+              : ' · in ricetta basta il quesito diagnostico'}
+          </p>
+          <p className="tenue">{note.text}</p>
+          {letters.length > 0 && (
+            <div className="campo campo-stretto">
+              <label htmlFor={`lettera-${line.key}`}>
+                {note.kind === 'condizione' ? 'Condizione' : 'Indicazione'}
+              </label>
+              <select
+                id={`lettera-${line.key}`}
+                value={line.serviceNoteLetter ?? ''}
+                onChange={(e) => onChange({ serviceNoteLetter: e.target.value })}
+              >
+                <option value="">Non indicata</option>
+                {letters.map((x) => (
+                  <option key={x} value={x}>
+                    {x}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

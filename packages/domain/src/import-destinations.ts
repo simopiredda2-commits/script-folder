@@ -1024,6 +1024,12 @@ export const IMPORT_DESTINATIONS: readonly ImportDestination[] = [
         max: 500,
         synonyms: ['motivononsostituibile'],
       },
+      {
+        key: 'codiceMotivazioneNonSostituibile',
+        label: 'Codice della motivazione di non sostituibilità, da 1 a 4 (R13)',
+        kind: 'code',
+        synonyms: ['codicemotivazione', 'codmotivazione', 'codicemotivazionenonsostituibile'],
+      },
       sourceId,
     ],
   },

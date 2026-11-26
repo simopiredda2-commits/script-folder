@@ -1,3 +1,3 @@
-codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note
-89.7;89.7;Visita di prova;Branca di prova;20,66;
-PROVA.02;;Esame di prova;Laboratorio di prova;;Nota di prova
+codice_regionale;codice_nomenclatore;descrizione;branca;tariffa;note;ciclo;sedute
+89.7;89.7;Visita di prova;Branca di prova;20,66;;;
+PROVA.02;;Esame di prova;Laboratorio di prova;;Nota di prova;;

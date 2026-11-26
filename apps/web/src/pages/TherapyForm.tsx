@@ -35,7 +35,13 @@ import {
 } from '../lib/studio-lists';
 import { useApi } from '../lib/useApi';
 import { drugFacts, ingredientOf, useDebounced, type Drug } from './PrescriptionEditor';
-import { PatientBanner, type Patient, type Summary, type TherapyFull } from './RecordPage';
+import {
+  PatientBanner,
+  type Patient,
+  type SubstitutionReason,
+  type Summary,
+  type TherapyFull,
+} from './RecordPage';
 
 type Kind = 'chronic' | 'as_needed' | 'cycle';
 type Typology = 'none' | 'S' | 'H';
@@ -74,6 +80,8 @@ export interface TherapyDraft {
   byActiveIngredient: boolean;
   notSubstitutable: boolean;
   notSubstitutableReason: string;
+  /** Codice della motivazione di non sostituibilità, da 1 a 4 (R13, D273). */
+  notSubstitutableCode: string;
   multiPrescription: boolean;
   typology: Typology;
   /**
@@ -137,6 +145,7 @@ export function emptyDraft(today: string): TherapyDraft {
     byActiveIngredient: false,
     notSubstitutable: false,
     notSubstitutableReason: '',
+    notSubstitutableCode: '',
     multiPrescription: false,
     typology: 'none',
     concluded: false,
@@ -177,6 +186,7 @@ export function draftFromTherapy(t: TherapyFull): TherapyDraft {
     byActiveIngredient: t.byActiveIngredient,
     notSubstitutable: t.notSubstitutable,
     notSubstitutableReason: t.notSubstitutableReason ?? '',
+    notSubstitutableCode: t.notSubstitutableCode ?? '',
     multiPrescription: t.multiPrescription,
     typology: t.suggestedS ? 'S' : t.hospitalH ? 'H' : 'none',
     concluded: t.status === 'ended',
@@ -184,7 +194,12 @@ export function draftFromTherapy(t: TherapyFull): TherapyDraft {
 }
 
 /** Gli stessi controlli formali del servizio, detti prima di salvare e vicino al campo. */
-export function validateDraft(d: TherapyDraft, today = studioToday()): Record<string, string> {
+export function validateDraft(
+  d: TherapyDraft,
+  today = studioToday(),
+  /** I codici della motivazione della regola R13 in vigore (D273); vuoto per le versioni prima. */
+  reasonCodes: readonly string[] = [],
+): Record<string, string> {
   const e: Record<string, string> = {};
   if (!d.drugName.trim()) e.drugName = 'Scegli un farmaco dalla banca dati o scrivine il nome.';
   if (!/^\d{1,2}$/.test(d.packs.trim()) || Number(d.packs) < 1)
@@ -200,7 +215,13 @@ export function validateDraft(d: TherapyDraft, today = studioToday()): Record<st
     if (!d.endOn) e.endOn = 'Terapia conclusa: manca la data di fine.';
     else if (d.endOn > today) e.endOn = 'Terapia conclusa: la data di fine è nel futuro.';
   }
-  if (d.notSubstitutable && !d.notSubstitutableReason.trim())
+  if (d.notSubstitutable && reasonCodes.length > 0) {
+    if (!reasonCodes.includes(d.notSubstitutableCode))
+      e.notSubstitutableCode = 'Non sostituibile: scegli il codice della motivazione (R13).';
+    if (d.byActiveIngredient || !d.drugAic)
+      e.notSubstitutable =
+        'Non sostituibile vale per un farmaco scelto con il codice AIC, non per principio attivo (R13).';
+  } else if (d.notSubstitutable && !d.notSubstitutableReason.trim())
     e.notSubstitutableReason = 'Non sostituibile: serve una sintetica motivazione (R13).';
   if (d.typology === 'S' && !d.suggestedByName.trim())
     e.suggestedByName = 'Suggerita (S): servono i dati del medico suggeritore.';
@@ -242,6 +263,7 @@ export function draftBody(d: TherapyDraft) {
     byActiveIngredient: d.byActiveIngredient,
     notSubstitutable: d.notSubstitutable,
     notSubstitutableReason: d.notSubstitutable ? orNull(d.notSubstitutableReason) : null,
+    notSubstitutableCode: d.notSubstitutable ? orNull(d.notSubstitutableCode) : null,
     multiPrescription: d.multiPrescription,
     suggestedS: d.typology === 'S',
     hospitalH: d.typology === 'H',
@@ -536,7 +558,12 @@ export function TherapyForm() {
   const { id, therapyId } = useParams<{ id: string; therapyId?: string }>();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const record = useApi<{ paziente: Patient; riepilogo: Summary | null }>(`/api/pazienti/${id}`);
+  const record = useApi<{
+    paziente: Patient;
+    riepilogo: Summary | null;
+    /** Codici della motivazione di non sostituibilità di R13 in vigore oggi (D273). */
+    motivazioniNonSostituibilita?: SubstitutionReason[];
+  }>(`/api/pazienti/${id}`);
   // Le vie con il codice del dizionario ufficiale vengono dal dominio (tappa 11).
   const routes = useCatalog().data?.vieSomministrazione ?? ROUTES;
   const therapies = useApi<{ terapie: TherapyFull[] }>(
@@ -597,6 +624,7 @@ export function TherapyForm() {
 
   const p = record.data.paziente;
   const summary = record.data.riepilogo;
+  const reasons = record.data.motivazioniNonSostituibilita ?? [];
   const d = draft;
   const back = therapyId ? `/pazienti/${id}/terapie/${therapyId}` : `/pazienti/${id}`;
 
@@ -616,7 +644,11 @@ export function TherapyForm() {
 
   async function save() {
     setError(null);
-    const found = validateDraft(d);
+    const found = validateDraft(
+      d,
+      undefined,
+      reasons.map((r) => r.codice),
+    );
     setErrors(found);
     if (Object.keys(found).length > 0) {
       document.getElementById('problemi-scheda')?.focus();
@@ -1042,12 +1074,45 @@ export function TherapyForm() {
                 checked={d.notSubstitutable}
                 onChange={(v) => update({ notSubstitutable: v })}
                 name="Non sostituibile"
-                explanation="Vincola il farmacista a questo medicinale; serve una sintetica motivazione (R13)."
+                explanation={
+                  reasons.length > 0
+                    ? 'Vincola il farmacista a questo medicinale, indicato con il codice AIC; serve il codice della motivazione (R13).'
+                    : 'Vincola il farmacista a questo medicinale; serve una sintetica motivazione (R13).'
+                }
               />
+              {errors.notSubstitutable && (
+                <p className="errore-campo" id="nonSostituibile-errore">
+                  <Icon name="avviso" size={18} /> {errors.notSubstitutable}
+                </p>
+              )}
+              {d.notSubstitutable && reasons.length > 0 && (
+                <Field
+                  id="notSubstitutableCode"
+                  label="Motivazione (linee guida del Sistema TS)"
+                  error={errors.notSubstitutableCode}
+                >
+                  <select
+                    {...described('notSubstitutableCode', errors.notSubstitutableCode)}
+                    value={d.notSubstitutableCode}
+                    onChange={(e) => update({ notSubstitutableCode: e.target.value })}
+                  >
+                    <option value="">Scegli la motivazione</option>
+                    {reasons.map((r) => (
+                      <option key={r.codice} value={r.codice}>
+                        {r.codice} · {r.descrizione}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
               {d.notSubstitutable && (
                 <Field
                   id="notSubstitutableReason"
-                  label="Motivazione della non sostituibilità"
+                  label={
+                    reasons.length > 0
+                      ? 'Precisazione, facoltativa'
+                      : 'Motivazione della non sostituibilità'
+                  }
                   error={errors.notSubstitutableReason}
                 >
                   <textarea

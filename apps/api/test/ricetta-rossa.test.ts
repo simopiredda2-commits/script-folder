@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { SimulatedGateway, type SimulatorOptions } from '@mmg/integrations';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -5,6 +6,8 @@ import {
   dpcmPrescription,
   externalSubmission,
   prescription,
+  refDrugTransparency,
+  referenceDataset,
   serviceCredential,
 } from '../src/db/schema';
 import { DPCM_CHECK_MINUTES } from '../src/prescriptions/dpcm';
@@ -301,6 +304,98 @@ describe('ricetta rossa in DPCM (D270)', () => {
       '<DescrizioneDiagnosi>Controllo della funzione renale</DescrizioneDiagnosi>',
     );
     expect(xml).toContain('<ClassePriorita>P</ClassePriorita>');
+  });
+
+  it('la farmaceutica in DPCM: il codice della motivazione in Prescrizione1, il principio attivo col gruppo (D273)', async () => {
+    // Lista di trasparenza di prova: due confezioni nel gruppo ZZ2, una fuori.
+    const [dataset] = await t.db
+      .insert(referenceDataset)
+      .values({
+        kind: 'farmaci_trasparenza',
+        series: 'trasparenza-prova-ricetta-rossa',
+        title: 'Lista di trasparenza di prova',
+        mappingVersion: 'prova',
+        origin: 'sync',
+        sha256: randomBytes(32).toString('hex'),
+        bytes: 1,
+        validFrom: '2026-01-01',
+        validFromBasis: 'scaricamento',
+        rows: 2,
+        importedBy: 'prova',
+      })
+      .returning();
+    await t.db.insert(refDrugTransparency).values(
+      ['099998011', '099998023'].map((aic) => ({
+        datasetId: dataset!.id,
+        aic,
+        activeIngredient: 'Principio di prova',
+        referencePack: "28 UNITA' 5 MG - USO ORALE",
+        name: 'FARMACO EQUIVALENTE DI PROVA',
+        equivalenceGroup: 'ZZ2',
+      })),
+    );
+    const res = await req('titolare', 'POST', `/api/pazienti/${s.richPatient}/ricette`, {
+      kind: 'pharma_ssn',
+      lines: [
+        // Caso B: AIC, gruppo e codice della motivazione.
+        {
+          drugAic: '099998011',
+          drugName: 'FARMACO EQUIVALENTE DI PROVA 5 MG',
+          quantity: 1,
+          notSubstitutable: true,
+          notSubstitutableCode: '2',
+          notSubstitutableReason: 'Difficoltà di deglutizione',
+        },
+        // Caso A1: solo il gruppo, senza l'AIC.
+        {
+          drugAic: '099998023',
+          drugName: 'FARMACO EQUIVALENTE DI PROVA 5 MG',
+          activeIngredient: 'Principio di prova',
+          byActiveIngredient: true,
+          quantity: 1,
+        },
+      ],
+    });
+    expect(res.statusCode, res.body).toBe(201);
+    const id = res.json<{ id: string }>().id;
+    sends.push('timeout');
+    const signed = await req('titolare', 'POST', `/api/ricette/${id}/firma-e-invia`, {});
+    expect(signed.json(), signed.body).toMatchObject({ esito: 'timeout' });
+    const out = (await print(id)).json();
+    await runQueue();
+    const xml = sar.dpcmFiles.find((f) => f.xml.includes(`<Ricetta1>${out.nre}</Ricetta1>`))!.xml;
+    const lines = xml.match(/<Prescrizione>.*?<\/Prescrizione>/g)!;
+    expect(lines).toEqual([
+      '<Prescrizione><CodProdPrest>099998011</CodProdPrest><DescrProdPrest>ZZ2</DescrProdPrest><Quantita>1</Quantita><Prescrizione1>2</Prescrizione1></Prescrizione>',
+      '<Prescrizione><DescrProdPrest>ZZ2</DescrProdPrest><Quantita>1</Quantita></Prescrizione>',
+    ]);
+    // Le righe non hanno una terapia S o H: IndicazionePrescr non c'è.
+    expect(xml).not.toContain('<IndicazionePrescr>');
+  });
+
+  it('per principio attivo senza il gruppo nella lista di trasparenza va l’AIC (D273)', async () => {
+    const id = (
+      await req('titolare', 'POST', `/api/pazienti/${s.richPatient}/ricette`, {
+        kind: 'pharma_ssn',
+        lines: [
+          {
+            drugAic: '099997013',
+            drugName: 'FARMACO UNICO DI PROVA 5 MG',
+            activeIngredient: 'Principio unico di prova',
+            byActiveIngredient: true,
+            quantity: 1,
+          },
+        ],
+      })
+    ).json<{ id: string }>().id;
+    sends.push('timeout');
+    await req('titolare', 'POST', `/api/ricette/${id}/firma-e-invia`, {});
+    const out = (await print(id)).json();
+    await runQueue();
+    const xml = sar.dpcmFiles.find((f) => f.xml.includes(`<Ricetta1>${out.nre}</Ricetta1>`))!.xml;
+    expect(xml.match(/<Prescrizione>.*?<\/Prescrizione>/g)).toEqual([
+      '<Prescrizione><CodProdPrest>099997013</CodProdPrest><Quantita>1</Quantita></Prescrizione>',
+    ]);
   });
 
   it('il SAR non raggiungibile: la ricetta rossa resta da mandare e la coda riprova da sé', async () => {

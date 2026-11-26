@@ -1,5 +1,6 @@
 import { unseenLockCount } from '../auth/account-locks';
 import { ADVANCED_DRESSING_CODE, can, ROLE_LABELS } from '@mmg/domain';
+import { painTherapyCodes, substitutionReasons } from '@mmg/rules';
 import { and, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -238,6 +239,16 @@ export function registerPatientRoutes(
         ...summary,
         esenzioniInCorso: await currentExemptions(summary.esenzioni),
       },
+      // Codici della terapia del dolore della regola R23 in vigore oggi: la ricetta farmaceutica
+      // del SSN li offre accanto alle esenzioni del paziente (D272).
+      codiciTerapiaDolore: painTherapyCodes(studioDate(now())),
+      // Codici della motivazione di non sostituibilità della regola R13 in vigore oggi, con la
+      // descrizione delle linee guida del Sistema TS: la ricetta e la scheda della terapia li
+      // offrono quando il farmaco è non sostituibile (D273).
+      motivazioniNonSostituibilita: substitutionReasons(studioDate(now())).map((r) => ({
+        codice: r.code,
+        descrizione: r.label,
+      })),
     };
   });
 

@@ -23,7 +23,7 @@ import type {
   StatusResult,
 } from '@mmg/integrations';
 import { systemFor } from '@mmg/integrations';
-import { basePackLimit } from '@mmg/rules';
+import { basePackLimit, painTherapyCodes, type ServiceNoteFacts } from '@mmg/rules';
 import { createHash } from 'node:crypto';
 import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -52,11 +52,12 @@ import {
   type PromemoriaPatient,
 } from '../reminders/promemoria';
 import type { createCredentialService } from '../credentials/service';
-import { studioDate } from './rules-check';
+import { contactPhone, studioDate, stupNote } from './rules-check';
 import type { DpcmContent, DpcmService } from './dpcm';
 import { renderRedForm } from './red-form-pdf';
 import type { NreLots } from './nre-lots';
 import { cancelSchema, draftSchema, repeatSchema } from './schemas';
+import { prescriptionTypology } from './typology';
 
 export interface LineInput {
   therapyId?: string | null;
@@ -66,11 +67,19 @@ export interface LineInput {
   serviceCode?: string | null;
   serviceNationalCode?: string | null;
   serviceDescription?: string | null;
+  /** Numero della nota del nomenclatore: assente, lo dà l'elenco in uso; null, nessuna (D276). */
+  serviceNote?: string | null;
+  /** Lettera della condizione o dell'indicazione della nota (D276). */
+  serviceNoteLetter?: string | null;
+  /** Sedute del ciclo (numsedute, D276). */
+  sessions?: number | null;
   quantity: number;
   aifaNote?: string | null;
   byActiveIngredient?: boolean;
   notSubstitutable?: boolean;
   notSubstitutableReason?: string | null;
+  /** Codice della motivazione di non sostituibilità (codMotivazione, D273). */
+  notSubstitutableCode?: string | null;
   posologyText?: string | null;
   repeatCount?: number | null;
   validityMonths?: number | null;
@@ -204,6 +213,13 @@ export interface PrescriptionDeps {
   serviceCatalog?: (
     date: string,
   ) => Promise<((code: string) => { nationalCode: string | null } | null) | undefined>;
+  /**
+   * Note del nomenclatore in vigore alla data (D276): danno il numero della nota alle righe che
+   * non lo dicono. Per difetto nessuna nota.
+   */
+  serviceNotes?: (
+    date: string,
+  ) => Promise<((nationalCode: string) => ServiceNoteFacts | null) | undefined>;
   /** Come si fissano i dati del promemoria all'invio: le prove ci mettono un guasto (D232). */
   buildPromemoria?: typeof buildPromemoriaData;
   /**
@@ -242,6 +258,30 @@ function nationalCodeOf(
   const written = l.serviceNationalCode?.trim();
   if (written) return written;
   return l.serviceCode ? (catalog?.(l.serviceCode)?.nationalCode ?? null) : null;
+}
+
+/**
+ * Nota del nomenclatore di una riga di specialistica (D276): quella data con la riga, o, se la riga
+ * non la dice, quella del codice nell'elenco in uso, con il tipo che aveva quando si è fatta la riga.
+ * La lettera resta solo con la nota.
+ */
+function noteOf(
+  l: LineInput,
+  nationalCode: string | null,
+  notes: ((nationalCode: string) => ServiceNoteFacts | null) | undefined,
+): {
+  serviceNote: string | null;
+  serviceNoteKind: string | null;
+  serviceNoteLetter: string | null;
+} {
+  const known = nationalCode ? (notes?.(nationalCode) ?? null) : null;
+  const note = l.serviceNote === undefined ? (known?.note ?? null) : l.serviceNote?.trim() || null;
+  if (!note) return { serviceNote: null, serviceNoteKind: null, serviceNoteLetter: null };
+  return {
+    serviceNote: note,
+    serviceNoteKind: known && known.note === note ? known.kind : null,
+    serviceNoteLetter: l.serviceNoteLetter?.trim().toUpperCase() || null,
+  };
 }
 
 export function createPrescriptionService(deps: PrescriptionDeps) {
@@ -308,6 +348,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
     // Le righe di specialistica conservano anche il codice del nomenclatore (D154).
     const catalog =
       input.kind === 'specialist_ssn' ? await deps.serviceCatalog?.(studioDate(now())) : undefined;
+    const notes =
+      input.kind === 'specialist_ssn' ? await deps.serviceNotes?.(studioDate(now())) : undefined;
     return withActor(db, actor.userId, async (tx) => {
       // Il paziente resta fermo fino alla fine (D239): «Sposta» insieme a una ricetta nuova aspetta
       // e la trova aperta; oppure la ricetta trova lo spostamento già fatto e si ferma.
@@ -352,11 +394,16 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           serviceCode: l.serviceCode ?? null,
           serviceNationalCode: nationalCodeOf(l, catalog),
           serviceDescription: l.serviceDescription ?? null,
+          ...(input.kind === 'specialist_ssn'
+            ? { ...noteOf(l, nationalCodeOf(l, catalog), notes), sessions: l.sessions ?? null }
+            : {}),
           quantity: l.quantity,
           aifaNote: l.aifaNote ?? null,
           byActiveIngredient: l.byActiveIngredient ?? false,
           notSubstitutable: l.notSubstitutable ?? false,
           notSubstitutableReason: l.notSubstitutableReason ?? null,
+          // Il codice vale solo con la clausola: senza, non resta sulla riga (D273).
+          notSubstitutableCode: l.notSubstitutable ? l.notSubstitutableCode?.trim() || null : null,
           posologyText: l.posologyText ?? null,
           repeatCount: l.repeatCount ?? null,
           validityMonths: l.validityMonths ?? null,
@@ -476,6 +523,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         byActiveIngredient: t.byActiveIngredient,
         notSubstitutable: t.notSubstitutable,
         notSubstitutableReason: t.notSubstitutableReason,
+        notSubstitutableCode: t.notSubstitutableCode,
         posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
       });
     }
@@ -566,6 +614,7 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
               byActiveIngredient: t.byActiveIngredient,
               notSubstitutable: t.notSubstitutable,
               notSubstitutableReason: t.notSubstitutableReason,
+              notSubstitutableCode: t.notSubstitutableCode,
               posologyText: [t.dose, t.doseUnit, t.frequency].filter(Boolean).join(' ') || null,
             })),
           },
@@ -641,9 +690,31 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
       .from(prescriptionLine)
       .where(eq(prescriptionLine.prescriptionId, p.id))
       .orderBy(asc(prescriptionLine.position));
+    // Terapia del dolore (codice TDL nell'esenzione): posologia e telefono del medico nelle note
+    // di ogni riga, come vuole la «Nota STUP» per gli stupefacenti (D272).
+    const exemption = p.exemptionCode?.trim().toUpperCase() ?? '';
+    const pain =
+      p.kind === 'pharma_ssn' &&
+      painTherapyCodes(compiledAt).some((c) => c.toUpperCase() === exemption);
+    const phone = pain ? await contactPhone(db, doctorUserId, p.patientId) : null;
+    // indicazionePrescr: la S o la H delle schede delle terapie, come il campo 14 del promemoria.
+    const therapyIds = lines.map((l) => l.therapyId).filter((x): x is string => !!x);
+    const typologies =
+      p.kind === 'pharma_ssn' && therapyIds.length
+        ? await db
+            .select({
+              id: therapy.id,
+              suggestedS: therapy.suggestedS,
+              hospitalH: therapy.hospitalH,
+            })
+            .from(therapy)
+            .where(and(inArray(therapy.id, therapyIds), eq(therapy.patientId, p.patientId)))
+        : [];
     return {
       localId: p.id,
       kind: p.kind,
+      prescriptionIndication:
+        p.kind === 'pharma_ssn' ? prescriptionTypology(lines, typologies) : null,
       patientFiscalCode: pt!.fiscalCode,
       doctor: await doctorInfo(doctorUserId),
       exemptionCode: p.exemptionCode,
@@ -658,10 +729,18 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
         serviceCode: l.serviceCode,
         serviceNationalCode: nationalCodeOf(l, catalog),
         serviceDescription: l.serviceDescription,
+        // Nota del nomenclatore con la lettera, e sedute del ciclo (D276).
+        serviceNote: l.serviceNote,
+        serviceNoteKind: l.serviceNoteKind,
+        serviceNoteLetter: l.serviceNote ? l.serviceNoteLetter : null,
+        sessions: l.sessions,
         quantity: l.quantity,
         aifaNote: l.aifaNote,
+        byActiveIngredient: l.byActiveIngredient,
         notSubstitutable: l.notSubstitutable,
+        notSubstitutableCode: l.notSubstitutable ? l.notSubstitutableCode : null,
         notSubstitutableReason: l.notSubstitutableReason,
+        ...(pain ? { notes: stupNote(l.posologyText, phone) } : {}),
         repeatCount: l.repeatCount,
         validityMonths: l.validityMonths,
       })),
@@ -854,6 +933,9 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
             messages: accepted.messages ?? null,
           },
           message.lines,
+          undefined,
+          undefined,
+          message.prescriptionIndication,
         );
       } catch {
         promemoriaMissing = true;
@@ -1043,6 +1125,8 @@ export function createPrescriptionService(deps: PrescriptionDeps) {
           },
           message.lines,
           snapshot?.paziente ?? null,
+          undefined,
+          message.prescriptionIndication,
         );
       } catch {
         notFixed = true;

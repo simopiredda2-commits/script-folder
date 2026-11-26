@@ -89,6 +89,8 @@ export const therapyBody = z
     byActiveIngredient: z.boolean().optional(),
     notSubstitutable: z.boolean().optional(),
     notSubstitutableReason: text(500),
+    /** Codice della motivazione di non sostituibilità, da 1 a 4: lo controlla R13 in ricetta (D273). */
+    notSubstitutableCode: text(2),
     multiPrescription: z.boolean().optional(),
     suggestedS: z.boolean().optional(),
     hospitalH: z.boolean().optional(),
@@ -99,9 +101,11 @@ export const therapyBody = z
     concluded: z.boolean().optional(),
   })
   .strict()
-  .refine((t) => !t.notSubstitutable || !!t.notSubstitutableReason, {
-    message: 'Non sostituibile: serve una sintetica motivazione (R13)',
-    path: ['notSubstitutableReason'],
+  // Il codice della motivazione lo chiede la scheda; il solo testo resta valido per le terapie
+  // importate da altri programmi, e in ricetta R13 chiede il codice (D273).
+  .refine((t) => !t.notSubstitutable || !!t.notSubstitutableCode || !!t.notSubstitutableReason, {
+    message: 'Non sostituibile: serve il codice della motivazione (R13)',
+    path: ['notSubstitutableCode'],
   })
   .refine((t) => t.kind !== 'cycle' || !!t.endOn, {
     message: 'Ciclo con data di fine: manca la data di fine',

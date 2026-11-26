@@ -501,6 +501,7 @@ const THERAPY_RENAME: Record<string, string> = {
   importante: 'important',
   nonSostituibile: 'notSubstitutable',
   motivoNonSostituibile: 'notSubstitutableReason',
+  codiceMotivazioneNonSostituibile: 'notSubstitutableCode',
 };
 const THERAPY_KIND = { cronica: 'chronic', al_bisogno: 'as_needed', ciclo: 'cycle' } as const;
 const THERAPY_STATUS = { in_corso: 'active', conclusa: 'ended', sospesa: 'suspended' } as const;

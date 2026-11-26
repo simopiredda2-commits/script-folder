@@ -6,6 +6,7 @@ import {
   RULE_IDS,
   rulesetAt,
   specialistValidityDays,
+  substitutionReasons,
   type DrugFacts,
   type LineContext,
   type RuleContext,
@@ -84,7 +85,7 @@ const blocks = (c: RuleContext, id: string) =>
 describe('dati delle regole', () => {
   const [ruleset] = loadRulesets();
 
-  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3, R22 dalla 2026-11-20.1', () => {
+  it('ogni versione è valida e contiene R1–R17 una volta ciascuna; R18 dalla .3, R19 e R20 dalla 2026-11-19.2, R21 dalla 2026-11-19.3, R22 dalla 2026-11-20.1, R23 dalla 2026-11-25.1, R24 e R25 dalla 2026-11-25.2', () => {
     const all = loadRulesets();
     expect(all.map((r) => r.version)).toEqual([
       '2026-11-18.1',
@@ -95,8 +96,12 @@ describe('dati delle regole', () => {
       '2026-11-19.3',
       '2026-11-20.1',
       '2026-11-24.1',
+      '2026-11-25.1',
+      '2026-11-25.2',
     ]);
-    const upTo17 = RULE_IDS.filter((id) => !['R18', 'R19', 'R20', 'R21', 'R22'].includes(id));
+    const upTo17 = RULE_IDS.filter(
+      (id) => !['R18', 'R19', 'R20', 'R21', 'R22', 'R23', 'R24', 'R25'].includes(id),
+    );
     for (const rs of all.slice(0, 2)) {
       expect(rs.rules.map((r) => r.id).sort()).toEqual([...upTo17].sort());
     }
@@ -107,8 +112,62 @@ describe('dati delle regole', () => {
     expect(all[5]!.rules.map((r) => r.id).sort()).toEqual(
       [...upTo17, 'R18', 'R19', 'R20', 'R21'].sort(),
     );
-    for (const rs of all.slice(6)) {
+    const upTo22 = RULE_IDS.filter((id) => !['R23', 'R24', 'R25'].includes(id));
+    for (const rs of all.slice(6, 8)) {
+      expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...upTo22].sort());
+    }
+    expect(all[8]!.rules.map((r) => r.id).sort()).toEqual([...upTo22, 'R23'].sort());
+    for (const rs of all.slice(9)) {
       expect(rs.rules.map((r) => r.id).sort(), rs.version).toEqual([...RULE_IDS].sort());
+    }
+  });
+
+  it('dalla 2026-11-25.1 R23 sugli stupefacenti con gli elenchi del Ministero (D272) e R13 con i codici della motivazione (D273); il resto come la 2026-11-24.1', () => {
+    const all = loadRulesets();
+    const v8 = all.find((r) => r.version === '2026-11-24.1')!;
+    const v9 = all.find((r) => r.version === '2026-11-25.1')!;
+    expect(v9.effectiveFrom).toBe('2026-11-25');
+    expect(
+      rulesetAt(
+        '2026-11-25',
+        all.filter((r) => r.version !== '2026-11-25.2'),
+      ).version,
+    ).toBe('2026-11-25.1');
+    expect(v9.rules).toHaveLength(v8.rules.length + 1);
+    for (const r of v9.rules) {
+      if (r.id === 'R23') {
+        expect(r.behavior).toBe('block');
+        expect(r.status).toBe('active');
+        expect(r.lists!.painTherapyExemptions).toEqual(['TDL', 'TDL01']);
+        expect(r.lists!.padOnlyIngredients).toEqual(['METADONE']);
+        expect(r.lists!.sectionAAics).toHaveLength(19);
+        expect(r.lists!.annexIIIbisAics).toHaveLength(165);
+        // Codici AIC di 9 cifre, senza doppioni, mai in tutti e due gli elenchi.
+        const all9 = [...r.lists!.sectionAAics!, ...r.lists!.annexIIIbisAics!];
+        expect(all9.every((x) => /^\d{9}$/.test(x))).toBe(true);
+        expect(new Set(all9).size).toBe(all9.length);
+        expect(r.sources[0]!.title).toMatch(/Nota STUP/);
+        expect(r.sources[1]!.title).toMatch(/5351 del 14\/05\/2020/);
+        expect(r.sources.at(-1)!.title).toMatch(/D271/);
+      } else if (r.id === 'R13') {
+        const before = v8.rules.find((x) => x.id === 'R13')!;
+        expect({ ...r, text: before.text, sources: before.sources, lists: undefined }).toEqual({
+          ...before,
+          lists: undefined,
+        });
+        expect(r.lists!.substitutionReasons!.map((x) => x.split('=')[0])).toEqual([
+          '1',
+          '2',
+          '3',
+          '4',
+        ]);
+        expect(r.sources.map((x) => x.title).join(' ')).toMatch(
+          /principio attivo.*codMotivazione/s,
+        );
+        expect(r.sources.at(-1)!.title).toMatch(/D273/);
+      } else {
+        expect(r, r.id).toEqual(v8.rules.find((x) => x.id === r.id));
+      }
     }
   });
 
@@ -491,8 +550,8 @@ describe('R5, R6 · piano terapeutico', () => {
       sentLines: sent,
       prescription: { lines: [line({ quantity: 2 })] },
     });
-    // In vigore il 25/11/2026: la 2026-11-24.1, con R6 come nella 2026-11-19.1 (D181).
-    expect(run(c).rulesVersion).toBe('2026-11-24.1');
+    // In vigore il 25/11/2026: la 2026-11-25.2, con R6 come nella 2026-11-19.1 (D181).
+    expect(run(c).rulesVersion).toBe('2026-11-25.2');
     expect(blocks(c, 'R6')).toBe(true);
     expect(of(c, 'R6')[0]!.message).toBe(
       'Farmaco di prova 5 mg: il piano autorizza 4 confezioni, già prescritte 3, di cui 2 con un altro programma; residuo 1',
@@ -846,6 +905,64 @@ describe('R13 · principio attivo e non sostituibilità', () => {
       blocks(ctx({ prescription: { lines: [line({ activeIngredient: null })] } }), 'R13'),
     ).toBe(true);
   });
+
+  describe('dalla 2026-11-25.1: il codice della motivazione delle linee guida del Sistema TS', () => {
+    const at = (extra: Partial<LineContext>) =>
+      ctx({
+        date: '2026-11-25',
+        prescription: { lines: [line({ notSubstitutable: true, ...extra })] },
+      });
+    const messages = (c: RuleContext) => of(c, 'R13').map((i) => i.message);
+
+    it('i quattro codici, con la loro descrizione, solo dalla versione nuova', () => {
+      expect(substitutionReasons('2026-11-25').map((r) => r.code)).toEqual(['1', '2', '3', '4']);
+      expect(substitutionReasons('2026-11-25')[1]!.label).toBe(
+        'Obiettive difficoltà di assunzione',
+      );
+      expect(substitutionReasons('2026-11-24')).toEqual([]);
+    });
+    it('con il codice e l’AIC passa, anche senza il testo', () => {
+      for (const code of ['1', '2', '3', '4'])
+        expect(blocks(at({ notSubstitutableCode: code }), 'R13')).toBe(false);
+    });
+    it('senza codice blocca, anche con il testo', () => {
+      const c = at({ notSubstitutableReason: 'Intolleranza a un eccipiente' });
+      expect(blocks(c, 'R13')).toBe(true);
+      expect(messages(c).join(' ')).toMatch(/codice della motivazione \(1, 2, 3, 4\)/);
+    });
+    it('con un codice che non è nelle linee guida blocca', () => {
+      const c = at({ notSubstitutableCode: '7' });
+      expect(blocks(c, 'R13')).toBe(true);
+      expect(messages(c).join(' ')).toMatch(/«7» non è fra quelli/);
+    });
+    it('per principio attivo, o senza AIC, la non sostituibilità non vale: blocca', () => {
+      const pa = at({ notSubstitutableCode: '1', byActiveIngredient: true });
+      expect(messages(pa).join(' ')).toMatch(/non per una prescrizione per principio attivo/);
+      expect(blocks(at({ notSubstitutableCode: '1', drugAic: null }), 'R13')).toBe(true);
+    });
+    it('senza la clausola il codice non serve', () => {
+      expect(
+        blocks(
+          ctx({
+            date: '2026-11-25',
+            prescription: { lines: [line({ byActiveIngredient: true })] },
+          }),
+          'R13',
+        ),
+      ).toBe(false);
+    });
+    it('prima della versione nuova vale ancora la motivazione scritta', () => {
+      const old = (extra: Partial<LineContext>) =>
+        ctx({
+          date: '2026-11-24',
+          prescription: { lines: [line({ notSubstitutable: true, ...extra })] },
+        });
+      expect(blocks(old({ notSubstitutableReason: 'Intolleranza a un eccipiente' }), 'R13')).toBe(
+        false,
+      );
+      expect(blocks(old({ notSubstitutableCode: '1' }), 'R13')).toBe(true);
+    });
+  });
 });
 
 describe('R14 · ricetta specialistica', () => {
@@ -1178,5 +1295,280 @@ describe('R22 · confezione sospesa secondo l’anagrafica AIFA (D210)', () => {
         (i) => i.ruleId === 'R22',
       ),
     ).toBe(false);
+  });
+});
+
+describe('R23 · stupefacenti sulla ricetta farmaceutica del SSN (D272)', () => {
+  // Codici degli elenchi della circolare del 14/05/2020: RITALIN (sezione A, fuori dalla ricetta
+  // dematerializzata) e TEMGESIC (allegato III-bis, solo per la terapia del dolore).
+  const SECTION_A = '035040017';
+  const ANNEX = '025215043';
+  const day = '2026-11-25';
+  const narcotic = (over: Partial<LineContext> = {}, exemptionCode: string | null = 'TDL01') =>
+    ctx({
+      date: day,
+      doctorPhone: '011 0000000',
+      prescription: {
+        exemptionCode,
+        lines: [
+          line({ drugAic: ANNEX, drugName: 'TEMGESIC', posologyText: '1 cpr ogni 8 ore', ...over }),
+        ],
+      },
+    });
+
+  it('allegato III-bis con il codice TDL01, la posologia e il telefono: nessun blocco', () => {
+    expect(of(narcotic(), 'R23')).toEqual([]);
+    expect(of(narcotic({}, 'tdl'), 'R23')).toEqual([]);
+  });
+
+  it('allegato III-bis senza il codice della terapia del dolore: blocca e dice dove va', () => {
+    const [i, ...more] = of(narcotic({}, '048'), 'R23');
+    expect(more).toEqual([]);
+    expect(i).toMatchObject({ ruleId: 'R23', severity: 'block', lineId: 'l1' });
+    expect(i!.message).toBe(
+      "TEMGESIC: farmaco dell'allegato III-bis: con la ricetta del SSN solo per la terapia del dolore, con il codice TDL o TDL01 nell'esenzione; altrimenti si prescrive sul ricettario ministeriale a ricalco (DM 10/3/2006)",
+    );
+    expect(blocks(narcotic({}, null), 'R23')).toBe(true);
+  });
+
+  it('allegato III-bis con il TDL ma senza posologia o senza telefono: blocca e dice che cosa manca', () => {
+    expect(of(narcotic({ posologyText: '  ' }), 'R23').map((i) => i.message)).toEqual([
+      'TEMGESIC: per la terapia del dolore la ricetta riporta posologia e modalità di somministrazione (nota STUP): scrivile nella riga',
+    ]);
+    const noPhone = { ...narcotic(), doctorPhone: null };
+    expect(of(noPhone, 'R23').map((i) => i.message)).toEqual([
+      'TEMGESIC: per la terapia del dolore la ricetta riporta il telefono del medico (nota STUP): scrivilo nei dati del medico o dello studio',
+    ]);
+    // Senza il telefono nel contesto (non noto) la regola non lo chiede.
+    const unknown: RuleContext = { ...narcotic() };
+    delete unknown.doctorPhone;
+    expect(of(unknown, 'R23')).toEqual([]);
+  });
+
+  it("sezione A dell'elenco del Ministero: sempre sul ricettario a ricalco, anche con il TDL", () => {
+    const c = narcotic({ drugAic: SECTION_A, drugName: 'RITALIN' });
+    expect(of(c, 'R23').map((i) => [i.severity, i.message])).toEqual([
+      [
+        'block',
+        "RITALIN: nell'elenco degli stupefacenti della sezione A esclusi dalla ricetta dematerializzata: si prescrive sul ricettario ministeriale a ricalco (DM 10/3/2006), non con la ricetta del SSN",
+      ],
+    ]);
+  });
+
+  it('metadone: sul ricettario a ricalco anche con il TDL, dal principio attivo', () => {
+    const c = ctx({
+      date: day,
+      doctorPhone: '011 0000000',
+      facts: { ministerialPad: true },
+      prescription: {
+        exemptionCode: 'TDL01',
+        lines: [
+          line({
+            drugName: 'METADONE DI PROVA',
+            activeIngredient: 'Metadone cloridrato',
+            posologyText: '10 ml',
+          }),
+        ],
+      },
+    });
+    expect(of(c, 'R23').map((i) => i.message)).toEqual([
+      'METADONE DI PROVA: a base di metadone: si prescrive sul ricettario ministeriale a ricalco (DM 10/3/2006), non con la ricetta del SSN',
+    ]);
+  });
+
+  it("confezione a ricalco secondo l'anagrafica AIFA, fuori dagli elenchi: senza TDL blocca, con il TDL informa", () => {
+    const pad = (exemptionCode: string | null) =>
+      ctx({
+        date: day,
+        doctorPhone: '011 0000000',
+        facts: { ministerialPad: true },
+        prescription: { exemptionCode, lines: [line({ posologyText: '1 cpr la sera' })] },
+      });
+    const [b] = of(pad(null), 'R23');
+    expect(b!.severity).toBe('block');
+    expect(b!.message).toMatch(
+      /^Farmaco di prova 5 mg: stupefacente della sezione A \(ricetta ministeriale a ricalco secondo l'anagrafica AIFA\)/,
+    );
+    const issues = of(pad('TDL'), 'R23');
+    expect(issues.map((i) => i.severity)).toEqual(['info']);
+    expect(issues[0]!.message).toMatch(/non è negli elenchi del Ministero del 2020/);
+    expect(blocks(pad('TDL'), 'R23')).toBe(false);
+  });
+
+  it("il codice TDL01 non è un'esenzione del paziente: la R9 non lo controlla dalla 2026-11-25.1", () => {
+    const c = narcotic();
+    expect(of(c, 'R9')).toEqual([]);
+    expect(of({ ...c, exemptionExists: () => false }, 'R9')).toEqual([]);
+    // Con le versioni di prima la R9 lo trattava come un'esenzione qualunque.
+    expect(of({ ...c, date: '2026-11-24' }, 'R9')).toHaveLength(1);
+    // Sulla ricetta specialistica il TDL01 resta un codice di esenzione da controllare.
+    expect(
+      of({ ...c, prescription: { ...c.prescription, kind: 'specialist_ssn' } }, 'R9'),
+    ).toHaveLength(1);
+  });
+
+  it('solo la ricetta farmaceutica del SSN; gli altri farmaci e le versioni di prima non hanno la R23', () => {
+    const white = narcotic({}, null);
+    expect(of({ ...white, prescription: { ...white.prescription, kind: 'white' } }, 'R23')).toEqual(
+      [],
+    );
+    expect(of(narcotic({ drugAic: '012345678' }, null), 'R23')).toEqual([]);
+    const before = narcotic({}, null);
+    expect(run({ ...before, date: '2026-11-24' }).issues.some((i) => i.ruleId === 'R23')).toBe(
+      false,
+    );
+  });
+});
+
+describe('R10, R24 e R25 · sedute, nota del nomenclatore e branca (D276)', () => {
+  // Codici di prova, non del catalogo vero.
+  const catalog = new Map([
+    [
+      'CICLO.1',
+      { nationalCode: 'CICLO.1', branches: ['Branca di prova'], cycle: true, sessions: 10 },
+    ],
+    [
+      'CICLO.2',
+      {
+        nationalCode: 'CICLO.2',
+        branches: ['Branca di prova', 'Altra branca'],
+        cycle: true,
+        sessions: 4,
+      },
+    ],
+    ['PROVA.1', { nationalCode: 'PROVA.1', branches: ['Branca di prova'] }],
+    ['PROVA.C', { nationalCode: 'PROVA.C', branches: ['Branca di prova'] }],
+    ['PROVA.A', { nationalCode: 'PROVA.A', branches: ['Altra branca'] }],
+  ]);
+  const notes = new Map([
+    [
+      'PROVA.C',
+      {
+        note: '3',
+        kind: 'condizione' as const,
+        text: 'A) Condizione di prova; B) Altra condizione',
+      },
+    ],
+    ['PROVA.A', { note: '40', kind: 'appropriatezza' as const, text: 'Indicazione di prova' }],
+  ]);
+  const spec = (lines: Partial<LineContext>[], over: Partial<RuleContext> = {}) =>
+    ctx({
+      date: '2026-11-25',
+      prescription: {
+        kind: 'specialist_ssn',
+        accessType: 'subsequent',
+        diagnosticQuestion: 'Controllo',
+        lines: lines.map((l, i) =>
+          line({ id: `l${i + 1}`, drugAic: null, drugName: null, activeIngredient: null, ...l }),
+        ),
+      },
+      serviceCatalog: (code) => catalog.get(code) ?? null,
+      serviceNotes: (code) => notes.get(code) ?? null,
+      ...over,
+    });
+  const messages = (c: RuleContext, id: string) => of(c, id).map((i) => i.message);
+
+  it('la 2026-11-25.2 vale dal 25/11/2026: R10 con le sedute, R24 e R25; il resto come la 2026-11-25.1', () => {
+    const all = loadRulesets();
+    const v9 = all.find((r) => r.version === '2026-11-25.1')!;
+    const v10 = all.find((r) => r.version === '2026-11-25.2')!;
+    expect(rulesetAt('2026-11-25').version).toBe('2026-11-25.2');
+    expect(v10.rules).toHaveLength(v9.rules.length + 2);
+    for (const r of v10.rules) {
+      const before = v9.rules.find((x) => x.id === r.id);
+      if (r.id === 'R10') {
+        expect(r.values).toEqual({ ...before!.values, checkCycleSessions: 1 });
+        expect(r.sources.slice(0, -1)).toEqual(before!.sources);
+        expect(r.sources.at(-1)!.title).toMatch(/numsedute/);
+      } else if (r.id === 'R24') {
+        expect(r).toMatchObject({ behavior: 'block', status: 'active', values: {} });
+        expect(r.sources[0]!.title).toMatch(/numero della nota ed il quesito/);
+      } else if (r.id === 'R25') {
+        expect(r).toMatchObject({
+          behavior: 'block',
+          status: 'active',
+          values: { maxSameBranch: 8 },
+        });
+        expect(r.sources[0]!.title).toMatch(/otto prestazioni della medesima branca/);
+      } else {
+        expect(r, r.id).toEqual(before);
+      }
+    }
+  });
+
+  it('R10: sedute solo sulle prestazioni a ciclo e non oltre il massimo, un ciclo per riga', () => {
+    expect(of(spec([{ serviceCode: 'CICLO.1', sessions: 10 }]), 'R10')).toEqual([]);
+    // Le sedute sono facoltative.
+    expect(of(spec([{ serviceCode: 'CICLO.1' }]), 'R10')).toEqual([]);
+    expect(messages(spec([{ serviceCode: 'CICLO.1', sessions: 11 }]), 'R10')).toEqual([
+      'CICLO.1: 11 sedute, oltre le 10 del ciclo nel catalogo',
+    ]);
+    expect(messages(spec([{ serviceCode: 'CICLO.1', quantity: 2 }]), 'R10')).toEqual([
+      'CICLO.1: prestazione a ciclo: quantità 1, e una riga per ogni ciclo',
+    ]);
+    expect(messages(spec([{ serviceCode: 'PROVA.1', sessions: 3 }]), 'R10')).toEqual([
+      'PROVA.1: le sedute si indicano solo per le prestazioni a ciclo',
+    ]);
+    expect(blocks(spec([{ serviceCode: 'PROVA.1', sessions: 3 }]), 'R10')).toBe(true);
+    // Fuori dal catalogo in uso le sedute le controlla il SAR.
+    const manual = { serviceCode: 'NUOVO.1', serviceNationalCode: '99.99.9', sessions: 30 };
+    expect(of(spec([manual]), 'R10')).toEqual([]);
+    // La versione di prima non le guardava.
+    expect(
+      of(spec([{ serviceCode: 'PROVA.1', sessions: 3 }], { date: '2026-11-24' }), 'R10'),
+    ).toEqual([]);
+  });
+
+  it('R24: condizione di erogabilità senza il numero della nota: blocca, e dice come procedere', () => {
+    const c = spec([{ serviceCode: 'PROVA.C' }]);
+    expect(blocks(c, 'R24')).toBe(true);
+    expect(of(c, 'R24')).toEqual([
+      expect.objectContaining({
+        lineId: 'l1',
+        message:
+          'PROVA.C: prestazione con condizione di erogabilità (nota 3): in ricetta va il numero della nota',
+        remedy:
+          'Indica la nota 3 se ricorre la condizione; se non ricorre, la prestazione non è erogabile dal SSN',
+      }),
+    ]);
+    expect(
+      of(spec([{ serviceCode: 'PROVA.C', serviceNote: '3', serviceNoteLetter: 'B' }]), 'R24'),
+    ).toEqual([]);
+    // Senza l'elenco delle note in uso, R24 tace.
+    expect(of(spec([{ serviceCode: 'PROVA.C' }], { serviceNotes: undefined }), 'R24')).toEqual([]);
+  });
+
+  it('R24: con l’indicazione di appropriatezza la nota è facoltativa; una nota diversa o di troppo blocca', () => {
+    expect(of(spec([{ serviceCode: 'PROVA.A' }]), 'R24')).toEqual([]);
+    expect(of(spec([{ serviceCode: 'PROVA.A', serviceNote: '40' }]), 'R24')).toEqual([]);
+    expect(messages(spec([{ serviceCode: 'PROVA.A', serviceNote: '41' }]), 'R24')).toEqual([
+      'PROVA.A: la nota 41 non è quella della prestazione nel nomenclatore (nota 40)',
+    ]);
+    expect(messages(spec([{ serviceCode: 'PROVA.1', serviceNote: '3' }]), 'R24')).toEqual([
+      'PROVA.1: la prestazione PROVA.1 non ha note nel nomenclatore: la nota 3 non va in ricetta',
+    ]);
+  });
+
+  it('R25: al più otto prestazioni della stessa branca, contando le quantità', () => {
+    expect(of(spec([{ serviceCode: 'PROVA.1', quantity: 8 }]), 'R25')).toEqual([]);
+    const nine = spec([
+      { serviceCode: 'PROVA.1', quantity: 5 },
+      { serviceCode: 'PROVA.C', serviceNote: '3', quantity: 4 },
+    ]);
+    expect(blocks(nine, 'R25')).toBe(true);
+    expect(of(nine, 'R25')).toEqual([
+      expect.objectContaining({
+        message: '9 prestazioni della branca «Branca di prova» sulla stessa ricetta: al più 8',
+        remedy: 'Dividi le prestazioni su più ricette, al più 8 della stessa branca su ognuna',
+      }),
+    ]);
+    // Una voce in due branche può contare nell'altra: non si conta.
+    expect(
+      of(spec([{ serviceCode: 'PROVA.1', quantity: 8 }, { serviceCode: 'CICLO.2' }]), 'R25'),
+    ).toEqual([]);
+    // Prima della 2026-11-25.2 R25 non c'era.
+    expect(
+      of(spec([{ serviceCode: 'PROVA.1', quantity: 9 }], { date: '2026-11-24' }), 'R25'),
+    ).toEqual([]);
   });
 });

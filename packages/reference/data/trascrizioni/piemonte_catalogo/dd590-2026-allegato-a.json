@@ -9,5 +9,5 @@
   "trascritto_da": "Claude Code, estrazione automatica dal PDF",
   "trascritto_il": "2026-11-19",
   "controllato_da": null,
-  "nota": "Vale per le ricette prescritte dal 21/09/2026 (punto 3 della determina). PDF dell'atto in tre parti, mandate da Simone il 18/11/2026: impronte in docs/provenienze.md. Tolte le 2 voci non prescrivibili e 7 righe ripetute identiche; 26 descrizioni e 16 note tagliate nel PDF completate con il testo della D.D. 990/2024, stessa voce. Che cosa controllare: docs/catalogo-regionale.md."
+  "nota": "Vale per le ricette prescritte dal 21/09/2026 (punto 3 della determina). PDF dell'atto in tre parti, mandate da Simone il 18/11/2026: impronte in docs/provenienze.md. Tolte le 2 voci non prescrivibili e 7 righe ripetute identiche; 26 descrizioni e 16 note tagliate nel PDF completate con il testo della D.D. 990/2024, stessa voce. Colonne ciclo e sedute aggiunte il 25/11/2026 (D276) dalle colonne «Prestazione Ciclo» e «Numero Sedute» dell'allegato: «sì» dove il PDF stampa «S», vuoto dove non stampa niente; 52 voci a ciclo, tutte con il numero di sedute. Che cosa controllare: docs/catalogo-regionale.md."
 }

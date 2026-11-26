@@ -17,6 +17,7 @@ import { api, ApiError, query } from '../lib/api';
 import { date, THERAPY_KIND, TIMELINE_KIND } from '../lib/format';
 import { useSession } from '../lib/session';
 import { useApi } from '../lib/useApi';
+import { renewIntoCurrentPrescription, type PastPrescription } from './PrescriptionEditor';
 import { RegistrySection, type Registry } from './RegistrySection';
 
 export interface Patient {
@@ -45,6 +46,12 @@ export interface Summary {
   parametri: { data: string; parametro: string; valore: string; unita: string }[];
 }
 
+/** Un codice della motivazione di non sostituibilità della regola R13, come lo dà la cartella (D273). */
+export interface SubstitutionReason {
+  codice: string;
+  descrizione: string;
+}
+
 export interface TherapyRow {
   id: string;
   drugName: string;
@@ -65,6 +72,11 @@ export interface TherapyRow {
   aifaChanges?: AifaChange[];
   /** «Confezioni per ricetta» della scheda: le confezioni con cui la terapia entra in ricetta (D250). */
   packsPerPrescription?: number;
+  /** «Come va in ricetta»: entrano in ricetta con la terapia (D273). */
+  byActiveIngredient?: boolean;
+  notSubstitutable?: boolean;
+  notSubstitutableReason?: string | null;
+  notSubstitutableCode?: string | null;
 }
 
 /** La scheda intera, come la restituisce il servizio. */
@@ -88,6 +100,7 @@ export interface TherapyFull extends TherapyRow {
   byActiveIngredient: boolean;
   notSubstitutable: boolean;
   notSubstitutableReason: string | null;
+  notSubstitutableCode: string | null;
   multiPrescription: boolean;
   suggestedS: boolean;
   hospitalH: boolean;
@@ -168,6 +181,10 @@ export function RecordPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [repeatError, setRepeatError] = useState<ApiError | null>(null);
   const [repeatDone, setRepeatDone] = useState<string | null>(null);
+  // «Rinnova» una ricetta già fatta (D278): solo il medico; la segreteria ha «Ripeti».
+  const [renewing, setRenewing] = useState<string | null>(null);
+  const [renewNotice, setRenewNotice] = useState<string | null>(null);
+  const [renewError, setRenewError] = useState<ApiError | null>(null);
 
   if (record.loading && !record.data) return <Loading what="dati della cartella" />;
   if (!record.data) return <ErrorMessage error={record.error} />;
@@ -192,6 +209,41 @@ export function RecordPage() {
       );
     } catch (e) {
       setRepeatError(e instanceof ApiError ? e : null);
+    }
+  }
+
+  async function renew(prescriptionId: string) {
+    setRenewNotice(null);
+    setRenewError(null);
+    setRenewing(prescriptionId);
+    try {
+      const { ricette } = await api<{ ricette: PastPrescription[] }>(`/api/pazienti/${id}/ricette`);
+      const past = ricette.find((r) => r.id === prescriptionId);
+      if (!past) {
+        setRenewNotice('La ricetta non c’è più fra quelle del paziente.');
+      } else if (past.kind === 'devices') {
+        setRenewNotice(
+          'I presidi si rinnovano dalla pagina Presidi, con «Rinnova» su ogni presidio.',
+        );
+      } else if (past.status === 'draft' || past.status === 'to_sign') {
+        setRenewNotice('È una ricetta ancora in corso: si apre dalla pagina Ricette.');
+      } else {
+        const done = await renewIntoCurrentPrescription(
+          id!,
+          past,
+          new Set(active.map((t) => t.id)),
+        );
+        if (!done)
+          setRenewNotice(
+            'La ricetta in corso del paziente non è finita: firmala, o toglila con «Nuova ricetta da capo», poi rinnova.',
+          );
+        else
+          void navigate(`/pazienti/${id}/${done.mode === 'farmaci' ? 'ricetta' : 'specialistica'}`);
+      }
+    } catch (e) {
+      setRenewError(e instanceof ApiError ? e : null);
+    } finally {
+      setRenewing(null);
     }
   }
 
@@ -427,6 +479,8 @@ export function RecordPage() {
           ))}
         </div>
         <Forbidden error={timeline.error} what="Cronologia clinica" />
+        <ErrorMessage error={renewError} />
+        {renewNotice && <Notice kind="avviso">{renewNotice}</Notice>}
         {timeline.loading && !timeline.data && <Loading what="voci" />}
         {timeline.data && (
           <ol className="cronologia" aria-live="polite">
@@ -441,6 +495,20 @@ export function RecordPage() {
                   {v.annullata && <span> (annullata)</span>}
                   {v.autore && <span className="tenue"> · {v.autore}</span>}
                 </span>
+                {isDoctor && v.tipo === 'prescription' && (
+                  <button
+                    type="button"
+                    className="pulsante pulsante-piatto"
+                    disabled={renewing !== null}
+                    onClick={() => void renew(v.id)}
+                  >
+                    <Icon name="ripeti" /> <span>Rinnova</span>
+                    <span className="visivamente-nascosto">
+                      {' '}
+                      la ricetta del {date(v.data)}: {v.titolo}
+                    </span>
+                  </button>
+                )}
               </li>
             ))}
           </ol>

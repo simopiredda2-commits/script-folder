@@ -181,6 +181,7 @@ describe('scheda della terapia: aggiornare dalla banca dati (D208)', () => {
     byActiveIngredient: false,
     notSubstitutable: false,
     notSubstitutableReason: null,
+    notSubstitutableCode: null,
     multiPrescription: false,
     suggestedS: false,
     hospitalH: false,

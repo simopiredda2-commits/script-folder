@@ -489,6 +489,7 @@ export function buildApp({
       sendTimeoutMs,
       ...(buildPromemoria ? { buildPromemoria } : {}),
       serviceCatalog: (date) => reference.serviceLookup(date),
+      serviceNotes: (date) => reference.serviceNotes(date),
       ...(nreLots ? { nreLots } : {}),
       ...(dpcm ? { dpcm } : {}),
     }),

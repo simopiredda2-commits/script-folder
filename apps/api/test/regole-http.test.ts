@@ -1,11 +1,13 @@
 import { SimulatedGateway } from '@mmg/integrations';
 import { rulesetAt } from '@mmg/rules';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  externalSubmission,
   historicalPrescription,
   prescription,
   prescriptionCheck,
+  prescriptionDocument,
   prescriptionLine,
   therapy,
 } from '../src/db/schema';
@@ -111,6 +113,176 @@ describe('regole di prescrizione prima dell’invio', () => {
     expect(preview.json().problemi.some((p: { ruleId: string }) => p.ruleId === 'R14')).toBe(true);
     expect(sar.received.length).toBe(before);
     expect((await post(`/api/ricette/${id}/firma-e-invia`)).statusCode).toBe(422);
+  });
+
+  describe('R23 · stupefacenti sulla ricetta del SSN (D272)', () => {
+    // Codici AIC degli elenchi della circolare MEF e Salute del 14/05/2020: RITALIN (sezione A,
+    // fuori dalla ricetta dematerializzata) e TEMGESIC (allegato III-bis, terapia del dolore).
+    const ritalin = {
+      drugAic: '035040017',
+      drugName: 'RITALIN',
+      activeIngredient: 'METILFENIDATO',
+    };
+    const temgesic = {
+      drugAic: '025215043',
+      drugName: 'TEMGESIC',
+      activeIngredient: 'BUPRENORFINA CLORIDRATO',
+    };
+
+    it('sezione A dell’elenco del Ministero: «Firma e invia» si ferma e dice dove va', async () => {
+      const id = await draft({ ...pharma(ritalin), exemptionCode: 'TDL01' });
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(
+        /R23: RITALIN: nell'elenco degli stupefacenti della sezione A .*ricettario ministeriale a ricalco/,
+      );
+    });
+
+    it('allegato III-bis senza il codice della terapia del dolore: si ferma', async () => {
+      const id = await draft(pharma({ ...temgesic, posologyText: '1 compressa ogni 8 ore' }));
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(/R23: TEMGESIC: farmaco dell'allegato III-bis/);
+    });
+
+    it('terapia del dolore con TDL01: parte con posologia e telefono del medico nelle note, anche sul promemoria', async () => {
+      const id = await draft({
+        ...pharma({ ...temgesic, posologyText: '1 compressa ogni 8 ore' }),
+        exemptionCode: 'TDL01',
+      });
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode, res.body).toBe(200);
+      // L'invio, non la richiesta del lotto di NRE che la prima firma può fare (D269).
+      const [sent] = await t.db
+        .select()
+        .from(externalSubmission)
+        .where(
+          and(eq(externalSubmission.prescriptionId, id), eq(externalSubmission.operation, 'invio')),
+        );
+      const notes = 'Posologia: 1 compressa ogni 8 ore; tel. del medico 000 0000001';
+      expect((sent!.request as { lines: { notes?: string }[] }).lines[0]!.notes).toBe(notes);
+      const [doc] = await t.db
+        .select()
+        .from(prescriptionDocument)
+        .where(eq(prescriptionDocument.prescriptionId, id));
+      const data = JSON.parse(doc!.content) as { righe: { dettagli: string | null }[] };
+      expect(data.righe[0]!.dettagli).toBe(notes);
+    });
+
+    it('la cartella dà alla ricetta i codici della terapia del dolore della regola in vigore', async () => {
+      const res = await s.app.inject({
+        method: 'GET',
+        url: `/api/pazienti/${s.richPatient}`,
+        headers: { cookie },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      expect(res.json().codiciTerapiaDolore).toEqual(['TDL', 'TDL01']);
+    });
+
+    it('terapia del dolore senza posologia: si ferma e dice che cosa scrivere', async () => {
+      const id = await draft({ ...pharma(temgesic), exemptionCode: 'TDL01' });
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(
+        /R23: TEMGESIC: .*posologia e modalità di somministrazione/,
+      );
+    });
+  });
+
+  describe('R13 · codice della motivazione di non sostituibilità (D273)', () => {
+    const named = {
+      drugAic: '038092019',
+      drugName: 'AMLODIPINA DOC GENERICI 5 MG',
+      activeIngredient: 'AMLODIPINA BESILATO',
+    };
+    /** Il messaggio dell'invio, non la richiesta del lotto di NRE che la firma può fare (D269). */
+    const sentMessage = async (id: string) => {
+      const [sent] = await t.db
+        .select()
+        .from(externalSubmission)
+        .where(
+          and(eq(externalSubmission.prescriptionId, id), eq(externalSubmission.operation, 'invio')),
+        );
+      return sent!.request as {
+        prescriptionIndication?: string | null;
+        lines: Record<string, unknown>[];
+      };
+    };
+
+    it('non sostituibile con la sola motivazione scritta: «Firma e invia» si ferma e dice i codici', async () => {
+      const id = await draft(
+        pharma({ ...named, notSubstitutable: true, notSubstitutableReason: 'Testo libero' }),
+      );
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(
+        /R13: AMLODIPINA DOC GENERICI 5 MG: la clausola di non sostituibilità richiede il codice della motivazione \(1, 2, 3, 4\)/,
+      );
+    });
+
+    it('con il codice parte: il messaggio al SAR porta il codice e il nome con l’AIC', async () => {
+      const id = await draft(
+        pharma({ ...named, notSubstitutable: true, notSubstitutableCode: '3' }),
+      );
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await sentMessage(id)).lines[0]).toMatchObject({
+        drugAic: '038092019',
+        notSubstitutable: true,
+        notSubstitutableCode: '3',
+        byActiveIngredient: false,
+      });
+    });
+
+    it('per principio attivo la clausola non vale: si ferma', async () => {
+      const id = await draft(
+        pharma({
+          ...named,
+          byActiveIngredient: true,
+          notSubstitutable: true,
+          notSubstitutableCode: '1',
+        }),
+      );
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().errore).toMatch(/R13: .*non per una prescrizione per principio attivo/);
+    });
+
+    it('la cartella dà alla scheda e alla ricetta i codici della regola in vigore', async () => {
+      const res = await s.app.inject({
+        method: 'GET',
+        url: `/api/pazienti/${s.richPatient}`,
+        headers: { cookie },
+      });
+      expect(res.statusCode, res.body).toBe(200);
+      const reasons = res.json().motivazioniNonSostituibilita as { codice: string }[];
+      expect(reasons.map((r) => r.codice)).toEqual(['1', '2', '3', '4']);
+    });
+
+    it('la terapia suggerita dallo specialista dà la tipologia S al messaggio (indicazionePrescr)', async () => {
+      const created = await post(`/api/pazienti/${s.richPatient}/terapie`, {
+        ...named,
+        drugName: 'AMLODIPINA DOC GENERICI 5 MG COMPRESSE',
+        kind: 'chronic',
+        startOn: '2026-11-01',
+        packsPerPrescription: 1,
+        suggestedS: true,
+        suggestedByName: 'Dott. Specialista di prova',
+      });
+      expect(created.statusCode, created.body).toBe(201);
+      const therapyId = created.json<{ id: string }>().id;
+      const id = await draft({
+        kind: 'pharma_ssn',
+        lines: [{ ...named, therapyId, quantity: 1 }],
+      });
+      const res = await post(`/api/ricette/${id}/firma-e-invia`);
+      expect(res.statusCode, res.body).toBe(200);
+      expect((await sentMessage(id)).prescriptionIndication).toBe('S');
+      // Senza una terapia S o H la tipologia non c'è.
+      const plain = await draft(pharma(named));
+      expect((await post(`/api/ricette/${plain}/firma-e-invia`)).statusCode).toBe(200);
+      expect((await sentMessage(plain)).prescriptionIndication ?? null).toBeNull();
+    });
   });
 
   it('R9: un’esenzione non registrata per il paziente blocca', async () => {

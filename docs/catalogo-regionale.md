@@ -20,7 +20,7 @@
 | `dd710-2026-dal-2026-10-30.csv` | 30/10/2026    | 27 voci tolte (allegato A), 69 aggiunte (allegato C) | 5149           |
 | `dd710-2026-dal-2027-01-13.csv` | 13/01/2027    | 56 voci tolte (allegato B)                           | 5093           |
 
-Colonne: codice del catalogo, codice del nomenclatore (DM), descrizione del catalogo, branca, tariffa indicativa di fascia A, linee guida, inclusioni ed esclusioni. Le altre colonne dell'allegato per ora non entrano, perché le voci del catalogo nel programma non le hanno: prescrivibile ed erogabile (servono solo a togliere le voci non prescrivibili), ciclo e numero di sedute, LEA nazionale o regionale, branca e descrizione del nomenclatore, codici delle note. Ciclo, sedute e LEA potranno servire più avanti alle regole sulle sedute e alle esenzioni.
+Colonne: codice del catalogo, codice del nomenclatore (DM), descrizione del catalogo, branca, tariffa indicativa di fascia A, linee guida, inclusioni ed esclusioni, e dal 25/11/2026 ciclo e numero di sedute (D276: `ciclo` «sì» dove il PDF stampa «S», `sedute` il numero più alto di sedute del ciclo). Le altre colonne dell'allegato non entrano: prescrivibile ed erogabile (servono solo a togliere le voci non prescrivibili), LEA nazionale o regionale, branca e descrizione del nomenclatore, codici delle note. Le note del nomenclatore si prendono dagli allegati 4 e 4D del DPCM LEA (`docs/banche-dati.md`, «Note del nomenclatore»); LEA potrà servire più avanti alle esenzioni.
 
 ## Che cosa è diverso dal PDF
 
@@ -38,6 +38,7 @@ Colonne: codice del catalogo, codice del nomenclatore (DM), descrizione del cata
 4. Il numero delle righe «toglie»: 27 nell'allegato A, 56 nell'allegato B.
 5. Le 8 voci con un finale strano, nella tabella «Finali da guardare nel PDF»: sono uguali nella D.D. 990/2024, quindi il confronto non aiuta. Nel PDF si vede se il testo è proprio così o se la cella è tagliata in tutti e due gli atti.
 6. La tariffa di 92.2C.5 (Radioterapia - Trattamento lungo cat. C >20 sedute): nella trascrizione 11.261,50, come nel PDF della D.D. 710; nel testo della D.G.R. 40-3255 letto da qui 11.281,50. Quel testo ha altri errori di lettura, quindi la differenza può venire solo dalla lettura: si guarda la tariffa nell'allegato C della delibera.
+7. Le 52 voci a ciclo (`ciclo` «sì»), con il numero di sedute, contro le colonne «Prestazione Ciclo» e «Numero Sedute» del PDF della D.D. 590 (D276). Le 24 voci con un codice del nomenclatore hanno lo stesso numero del ciclo nell'allegato 4 del DPCM LEA; le altre 28 no, perché il loro codice nel nomenclatore non c'è.
 
 Controllato tutto, chi ha controllato scrive nome e cognome in `controllato_da` nelle tre schede (`.json`). Dal giro successivo il catalogo entra in uso, con il nome di chi l'ha controllato in ogni versione.
 

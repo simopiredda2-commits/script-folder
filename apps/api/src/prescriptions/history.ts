@@ -265,6 +265,7 @@ export async function prescriptionHistory(
         perPrincipioAttivo: line.byActiveIngredient,
         nonSostituibile: line.notSubstitutable,
         motivoNonSostituibile: line.notSubstitutableReason,
+        codiceMotivazione: line.notSubstitutableCode,
       },
       enti: exchanges
         .filter((x) => x.prescriptionId === p.id)

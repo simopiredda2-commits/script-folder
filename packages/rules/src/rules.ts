@@ -1,11 +1,12 @@
 import { checkFiscalCode } from '@mmg/domain';
 import type { LineContext, RuleContext, SentLineContext, ShortageFacts } from './context';
 import { addDays, addMonths, daysBetween, italian } from './dates';
-import { value, type Rule, type RuleId } from './ruleset';
+import { codedItems, value, type Rule, type RuleId } from './ruleset';
 
 /**
  * Le regole di prescrizione R1–R17 dei requisiti, R18 (D154), lo stato del paziente R19–R20 (D199),
- * i farmaci carenti R21 (D202) e la confezione sospesa R22 (D210), come controlli formali (regola 3:
+ * i farmaci carenti R21 (D202), la confezione sospesa R22 (D210), gli stupefacenti R23 (D272), la nota
+ * del nomenclatore R24 e le prestazioni della stessa branca R25 (D276), come controlli formali (regola 3:
  * nessun suggerimento diagnostico o terapeutico). Nessun numero è scritto qui: i valori vengono dal file dei dati
  * (packages/rules/data/), e una regola di lint lo controlla.
  */
@@ -357,9 +358,20 @@ const evaluators: Record<RuleId, Evaluator> = {
     });
   },
 
-  R9: (rule, ctx) => {
+  R9: (rule, ctx, all) => {
     const code = ctx.prescription.exemptionCode;
     if (!code || ctx.prescription.kind === 'white') return [];
+    // Il codice della terapia del dolore non è un'esenzione del paziente: lo controlla la R23
+    // (specifiche del Sistema TS, «Nota STUP»; D272).
+    const r23 = all.R23 as Rule | undefined;
+    if (
+      r23?.status === 'active' &&
+      isSsnPharma(ctx) &&
+      listOf(r23, 'painTherapyExemptions').some(
+        (c) => c.toUpperCase() === code.trim().toUpperCase(),
+      )
+    )
+      return [];
     if (ctx.exemptionExists?.(code) === false) {
       return [
         {
@@ -419,6 +431,35 @@ const evaluators: Record<RuleId, Evaluator> = {
         ) {
           block(
             `${lineLabel(line)}: il codice del nomenclatore ${written} non corrisponde a quello del catalogo in uso (${entry.nationalCode})`,
+            line.id,
+          );
+        }
+      }
+      // Dalla versione che lo dice (D276): le sedute solo sulle prestazioni a ciclo e non oltre il
+      // massimo del catalogo, un ciclo per riga (specifiche del Sistema TS, prescrizione,
+      // 08/07/2026, pp. 42–43). Senza la voce nel catalogo in uso le controlla il SAR.
+      if (isService && line.serviceCode && value(rule, 'checkCycleSessions') === 1) {
+        const entry = ctx.serviceCatalog?.(line.serviceCode) ?? null;
+        const sessions = line.sessions ?? null;
+        if (entry?.cycle) {
+          if (line.quantity !== 1) {
+            block(
+              `${lineLabel(line)}: prestazione a ciclo: quantità 1, e una riga per ogni ciclo`,
+              line.id,
+            );
+          }
+          const max = entry.sessions ?? null;
+          if (sessions !== null && (!Number.isInteger(sessions) || sessions < 1)) {
+            block(`${lineLabel(line)}: numero di sedute non valido`, line.id);
+          } else if (sessions !== null && max !== null && sessions > max) {
+            block(
+              `${lineLabel(line)}: ${sessions} sedute, oltre le ${max} del ciclo nel catalogo`,
+              line.id,
+            );
+          }
+        } else if (entry && sessions !== null) {
+          block(
+            `${lineLabel(line)}: le sedute si indicano solo per le prestazioni a ciclo`,
             line.id,
           );
         }
@@ -491,23 +532,36 @@ const evaluators: Record<RuleId, Evaluator> = {
 
   R13: (rule, ctx) => {
     if (ctx.prescription.kind !== 'pharma_ssn') return [];
+    // Dalla versione che ha i codici delle linee guida del Sistema TS, la motivazione è il codice
+    // (codMotivazione, Prescrizione1 nella ricetta rossa); il testo resta facoltativo (D273).
+    const reasons = codedItems(rule.lists?.substitutionReasons).map((r) => r.code);
     return ctx.prescription.lines.flatMap((line): Issue[] => {
       const issues: Issue[] = [];
-      if (line.notSubstitutable && !line.notSubstitutableReason?.trim()) {
-        issues.push({
-          ruleId: 'R13',
-          severity: severityOf(rule),
-          lineId: line.id,
-          message: `${lineLabel(line)}: la clausola di non sostituibilità richiede una sintetica motivazione`,
-        });
+      const issue = (message: string) =>
+        issues.push({ ruleId: 'R13', severity: severityOf(rule), lineId: line.id, message });
+      const code = line.notSubstitutableCode?.trim() ?? '';
+      if (line.notSubstitutable && reasons.length > 0) {
+        if (!code) {
+          issue(
+            `${lineLabel(line)}: la clausola di non sostituibilità richiede il codice della motivazione (${reasons.join(', ')}), dalle linee guida del Sistema TS`,
+          );
+        } else if (!reasons.includes(code)) {
+          issue(
+            `${lineLabel(line)}: il codice della motivazione «${code}» non è fra quelli delle linee guida del Sistema TS (${reasons.join(', ')})`,
+          );
+        }
+        if (line.byActiveIngredient || !line.drugAic?.trim()) {
+          issue(
+            `${lineLabel(line)}: la non sostituibilità vale per un farmaco indicato con il nome e il codice AIC, non per una prescrizione per principio attivo`,
+          );
+        }
+      } else if (line.notSubstitutable && !line.notSubstitutableReason?.trim()) {
+        issue(
+          `${lineLabel(line)}: la clausola di non sostituibilità richiede una sintetica motivazione`,
+        );
       }
       if (!line.activeIngredient?.trim()) {
-        issues.push({
-          ruleId: 'R13',
-          severity: severityOf(rule),
-          lineId: line.id,
-          message: `${lineLabel(line)}: in ricetta va indicato il principio attivo`,
-        });
+        issue(`${lineLabel(line)}: in ricetta va indicato il principio attivo`);
       }
       return issues;
     });
@@ -624,6 +678,69 @@ const evaluators: Record<RuleId, Evaluator> = {
       }));
   },
 
+  // Prestazione con una condizione di erogabilità (DPCM LEA, allegato 4D): in ricetta il numero
+  // della nota, come vuole la legenda dell'allegato 4 (D276). L'indicazione di appropriatezza chiede
+  // solo il quesito diagnostico, che controlla R14. Una nota che non è quella del codice ferma.
+  R24: (rule, ctx) => {
+    const p = ctx.prescription;
+    const notes = ctx.serviceNotes;
+    if (p.kind !== 'specialist_ssn' || !notes) return [];
+    const issues: Issue[] = [];
+    for (const l of p.lines) {
+      const national =
+        l.serviceNationalCode?.trim() ||
+        (l.serviceCode ? ctx.serviceCatalog?.(l.serviceCode)?.nationalCode : null) ||
+        null;
+      if (!national) continue;
+      const note = notes(national);
+      const written = l.serviceNote?.trim() || null;
+      const push = (message: string, remedy: string) =>
+        issues.push({ ruleId: 'R24', severity: severityOf(rule), lineId: l.id, message, remedy });
+      if (note?.kind === 'condizione' && !written) {
+        push(
+          `${lineLabel(l)}: prestazione con condizione di erogabilità (nota ${note.note}): in ricetta va il numero della nota`,
+          `Indica la nota ${note.note} se ricorre la condizione; se non ricorre, la prestazione non è erogabile dal SSN`,
+        );
+      } else if (written && note && written !== note.note) {
+        push(
+          `${lineLabel(l)}: la nota ${written} non è quella della prestazione nel nomenclatore (nota ${note.note})`,
+          `Indica la nota ${note.note}, quella del codice ${national}`,
+        );
+      } else if (written && !note) {
+        push(
+          `${lineLabel(l)}: la prestazione ${national} non ha note nel nomenclatore: la nota ${written} non va in ricetta`,
+          'Togli la nota dalla riga',
+        );
+      }
+    }
+    return issues;
+  },
+
+  // Al più otto prestazioni della stessa branca sulla stessa ricetta (legge 8/1990, come la richiama
+  // la legenda dell'allegato 4 del DPCM LEA; D276): si contano le quantità. Una voce che nel catalogo
+  // sta in più branche può contare nell'una o nell'altra, e non si conta.
+  R25: (rule, ctx) => {
+    const max = value(rule, 'maxSameBranch');
+    const p = ctx.prescription;
+    const catalog = ctx.serviceCatalog;
+    if (max === null || p.kind !== 'specialist_ssn' || !catalog) return [];
+    const byBranch = new Map<string, number>();
+    for (const l of p.lines) {
+      const branches = l.serviceCode ? (catalog(l.serviceCode)?.branches ?? []) : [];
+      if (branches.length !== 1) continue;
+      const branch = branches[0]!;
+      byBranch.set(branch, (byBranch.get(branch) ?? 0) + l.quantity);
+    }
+    return [...byBranch]
+      .filter(([, n]) => n > max)
+      .map(([branch, n]) => ({
+        ruleId: 'R25' as const,
+        severity: severityOf(rule),
+        message: `${n} prestazioni della branca «${branch}» sulla stessa ricetta: al più ${max}`,
+        remedy: `Dividi le prestazioni su più ricette, al più ${max} della stessa branca su ognuna`,
+      }));
+  },
+
   // Paziente deceduto nella cartella: la ricetta non si fa (D199).
   R19: (rule, ctx) => {
     if (ctx.patient.status !== 'deceased') return [];
@@ -711,7 +828,82 @@ const evaluators: Record<RuleId, Evaluator> = {
           ]
         : [],
     ),
+
+  // Stupefacenti sulla ricetta farmaceutica del SSN (D272). Fonti: specifiche del Sistema TS,
+  // prescrizione, 5/12/2024, «Nota STUP»; circolare MEF e Ministero della Salute del 14/05/2020,
+  // con i suoi elenchi di codici AIC. Sul ricettario ministeriale a ricalco (DM 10/3/2006), non
+  // con la ricetta del SSN: l'elenco «TAB MED SEZ A», il metadone e ogni confezione a ricalco
+  // nell'anagrafica AIFA che non sia prescritta per la terapia del dolore. L'elenco «ALLEGATO
+  // III-BIS» va con la ricetta del SSN solo con il codice TDL nell'esenzione, con la posologia e
+  // con il telefono del medico nelle note.
+  R23: (rule, ctx) => {
+    if (!isSsnPharma(ctx)) return [];
+    const sectionA = new Set(listOf(rule, 'sectionAAics'));
+    const annex = new Set(listOf(rule, 'annexIIIbisAics'));
+    const tdl = listOf(rule, 'painTherapyExemptions');
+    const padOnly = listOf(rule, 'padOnlyIngredients');
+    const exemption = (ctx.prescription.exemptionCode ?? '').trim().toUpperCase();
+    const painTherapy = tdl.some((c) => c.toUpperCase() === exemption);
+    const codes = tdl.join(' o ');
+    const pad =
+      'si prescrive sul ricettario ministeriale a ricalco (DM 10/3/2006), non con la ricetta del SSN';
+    return ctx.prescription.lines.flatMap((line): Issue[] => {
+      const aic = line.drugAic ?? '';
+      const inAnnex = annex.has(aic);
+      const padRegime = ctx.drugFacts(line.drugAic)?.ministerialPad === true;
+      if (!inAnnex && !sectionA.has(aic) && !padRegime) return [];
+      const issue = (message: string, severity = severityOf(rule)): Issue => ({
+        ruleId: 'R23',
+        severity,
+        lineId: line.id,
+        message: `${lineLabel(line)}: ${message}`,
+      });
+      const ingredient = (line.activeIngredient ?? '').toUpperCase();
+      const padIngredient = padOnly.find((x) => ingredient.includes(x.toUpperCase()));
+      if (padIngredient) return [issue(`a base di ${padIngredient.toLowerCase()}: ${pad}`)];
+      if (sectionA.has(aic) && !inAnnex)
+        return [
+          issue(
+            `nell'elenco degli stupefacenti della sezione A esclusi dalla ricetta dematerializzata: ${pad}`,
+          ),
+        ];
+      const out: Issue[] = [];
+      if (!painTherapy)
+        return [
+          issue(
+            inAnnex
+              ? `farmaco dell'allegato III-bis: con la ricetta del SSN solo per la terapia del dolore, con il codice ${codes} nell'esenzione; altrimenti ${pad.replace(', non con la ricetta del SSN', '')}`
+              : `stupefacente della sezione A (ricetta ministeriale a ricalco secondo l'anagrafica AIFA): ${pad}; con la ricetta del SSN vanno solo i farmaci dell'allegato III-bis per la terapia del dolore, con il codice ${codes} nell'esenzione`,
+          ),
+        ];
+      if (!inAnnex)
+        // Confezione a ricalco che gli elenchi del 2020 non hanno: con il codice TDL la ricetta vale
+        // solo se il farmaco è dell'allegato III-bis. Lo controlla il Sistema TS (circolare, punto 2).
+        out.push(
+          issue(
+            "confezione a ricalco che non è negli elenchi del Ministero del 2020: con il codice della terapia del dolore la ricetta del SSN vale solo se il farmaco è dell'allegato III-bis; lo controlla il Sistema TS",
+            'info',
+          ),
+        );
+      if (!line.posologyText?.trim())
+        out.push(
+          issue(
+            'per la terapia del dolore la ricetta riporta posologia e modalità di somministrazione (nota STUP): scrivile nella riga',
+          ),
+        );
+      if (ctx.doctorPhone !== undefined && !ctx.doctorPhone?.trim())
+        out.push(
+          issue(
+            'per la terapia del dolore la ricetta riporta il telefono del medico (nota STUP): scrivilo nei dati del medico o dello studio',
+          ),
+        );
+      return out;
+    });
+  },
 };
+
+/** Un elenco della regola, dai dati (D272): vuoto se la versione non lo ha. */
+const listOf = (rule: Rule, key: string): string[] => rule.lists?.[key] ?? [];
 
 /**
  * La carenza in parole, alla data: «carente dal …» se è cominciata, «carenza prevista dal …» se

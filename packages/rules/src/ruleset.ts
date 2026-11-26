@@ -5,7 +5,9 @@ import { z } from 'zod';
 /**
  * Identificativi delle regole: R1–R17 dei requisiti; R18 chiesta da Simone (D154); R19 e R20 sullo
  * stato del paziente, per scelta di Simone (D199); R21 sui farmaci carenti, dall'elenco AIFA (D202);
- * R22 sulla confezione sospesa, dall'anagrafica AIFA delle confezioni, per scelta di Simone (D210).
+ * R22 sulla confezione sospesa, dall'anagrafica AIFA delle confezioni, per scelta di Simone (D210);
+ * R23 sugli stupefacenti (D272); R24 sulla nota del nomenclatore e R25 sulle prestazioni della stessa
+ * branca, dal DPCM LEA (D276).
  */
 export const RULE_IDS = [
   'R1',
@@ -30,6 +32,9 @@ export const RULE_IDS = [
   'R20',
   'R21',
   'R22',
+  'R23',
+  'R24',
+  'R25',
 ] as const;
 export type RuleId = (typeof RULE_IDS)[number];
 
@@ -50,6 +55,8 @@ const ruleSchema = z
     sources: z.array(sourceSchema).min(1),
     /** Valori della regola: numeri presi dai requisiti, mai scritti nel codice. */
     values: z.record(z.string(), z.number().nullable()),
+    /** Elenchi della regola, presi dalle fonti: codici AIC, codici di esenzione, sostanze (D272). */
+    lists: z.record(z.string(), z.array(z.string().trim().min(1))).optional(),
     /** Che cosa manca perché la regola sia completa. */
     toComplete: z.array(z.string()),
   })
@@ -134,4 +141,43 @@ export function specialistValidityDays(
 export function basePackLimit(date: string, rulesets: Ruleset[] = loadRulesets()): number | null {
   const r2 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R2');
   return r2 && r2.status === 'active' ? value(r2, 'maxPacks') : null;
+}
+
+/**
+ * Codici di esenzione della terapia del dolore secondo R23 alla data (D272): con questi la
+ * ricetta degli stupefacenti dell'allegato III-bis porta posologia e telefono del medico nelle
+ * note. Vuoto se la versione in vigore non ha la regola.
+ */
+export function painTherapyCodes(date: string, rulesets: Ruleset[] = loadRulesets()): string[] {
+  const r23 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R23');
+  return r23 && r23.status === 'active' ? (r23.lists?.painTherapyExemptions ?? []) : [];
+}
+
+/** Una voce di un elenco codificato nei dati di una regola: «codice=descrizione». */
+export interface CodedItem {
+  code: string;
+  label: string;
+}
+
+/** Legge le voci «codice=descrizione» di un elenco dei dati; senza «=» il codice fa da descrizione. */
+export function codedItems(items: readonly string[] | undefined): CodedItem[] {
+  return (items ?? []).map((item) => {
+    const at = item.indexOf('=');
+    return at === -1
+      ? { code: item.trim(), label: item.trim() }
+      : { code: item.slice(0, at).trim(), label: item.slice(at + 1).trim() };
+  });
+}
+
+/**
+ * I codici della motivazione di non sostituibilità della regola R13 in vigore alla data, con la
+ * loro descrizione (linee guida del Sistema TS per la prescrizione del principio attivo, D273).
+ * Vuoto se la versione in vigore non li ha: allora la motivazione è solo il testo.
+ */
+export function substitutionReasons(
+  date: string,
+  rulesets: Ruleset[] = loadRulesets(),
+): CodedItem[] {
+  const r13 = rulesetAt(date, rulesets).rules.find((r) => r.id === 'R13');
+  return r13 && r13.status === 'active' ? codedItems(r13.lists?.substitutionReasons) : [];
 }

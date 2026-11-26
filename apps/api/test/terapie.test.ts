@@ -62,7 +62,25 @@ describe('scheda della terapia: nuova, modifica, sospensione, ripresa', () => {
   it('i controlli formali della scheda: motivazione della non sostituibilità, fine del ciclo, indicazione', async () => {
     const r1 = await req('POST', url(), doctor, { ...base, notSubstitutable: true });
     expect(r1.statusCode).toBe(400);
-    expect(JSON.stringify(r1.json())).toMatch(/serve una sintetica motivazione \(R13\)/);
+    expect(JSON.stringify(r1.json())).toMatch(/serve il codice della motivazione \(R13\)/);
+    // Il codice basta; il solo testo resta valido per le terapie importate (D273).
+    const coded = await req('POST', url(), doctor, {
+      ...base,
+      notSubstitutable: true,
+      notSubstitutableCode: '2',
+    });
+    expect(coded.statusCode).toBe(201);
+    const [row] = await t.db
+      .select({ code: therapy.notSubstitutableCode })
+      .from(therapy)
+      .where(eq(therapy.id, coded.json<{ id: string }>().id));
+    expect(row!.code).toBe('2');
+    const written = await req('POST', url(), doctor, {
+      ...base,
+      notSubstitutable: true,
+      notSubstitutableReason: 'Intolleranza a un eccipiente',
+    });
+    expect(written.statusCode).toBe(201);
     expect((await req('POST', url(), doctor, { ...base, kind: 'cycle' })).statusCode).toBe(400);
     expect(
       (await req('POST', url(), doctor, { ...base, startOn: '2026-11-10', endOn: '2026-11-01' }))

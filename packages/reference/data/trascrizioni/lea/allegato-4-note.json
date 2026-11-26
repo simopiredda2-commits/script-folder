@@ -1,0 +1,13 @@
+{
+  "tipo": "note_prestazioni",
+  "serie": "lea-note-nomenclatore",
+  "fonte": null,
+  "chiave": null,
+  "sha256_origine": null,
+  "atto": "DPCM 12 gennaio 2017 (livelli essenziali di assistenza), allegato 4 (nomenclatore dell'assistenza specialistica ambulatoriale, colonna «NOTA») e allegato 4D (elenco delle note e delle condizioni di erogabilità e indicazioni di appropriatezza prescrittiva), aggiornati dal DM 3 agosto 2026 e dal DPCM 7 agosto 2026 (versioni della pagina del Ministero della salute del 29/9/2026)",
+  "in_vigore_dal": "2026-10-30",
+  "trascritto_da": "Claude Code, dalle celle dei PDF: codice e numero della nota dalle cinque parti dell'allegato 4, tipo e testo della nota dall'allegato 4D",
+  "trascritto_il": "2026-11-25",
+  "controllato_da": null,
+  "nota": "PDF mandati da Simone, SHA-256 in docs/provenienze.md. Una riga per codice del nomenclatore che nell'allegato 4 ha un numero nella colonna della nota: 374 codici, ognuno con una nota sola, 112 note diverse delle 113 dell'allegato 4D. Tipo: «condizione» (condizione di erogabilità, 221 codici) o «appropriatezza» (indicazione di appropriatezza prescrittiva, 153 codici), dalla colonna «TIPO NOTA» dell'allegato 4D. Testo: il «CONTENUTO NOTA» come stampato, con le righe unite da uno spazio, compreso il rimando «allegato 4 B» della nota 1. Le colonne parte_pagina_4 (parte e pagina dell'allegato 4) e pagina_4d servono al controllo e non si importano. Ogni numero di nota dell'allegato 4 c'è nell'allegato 4D. In vigore dal 30/10/2026, il trentesimo giorno dopo la GU n. 227 del 30/9/2026 (D216). Che cosa controllare: docs/banche-dati.md, «Note del nomenclatore»."
+}

@@ -451,3 +451,70 @@ describe('famiglie dei codici di esenzione (D190)', () => {
     ).toEqual(['croniche', 'croniche', 'croniche', 'rare', 'rare', 'E', 'M', 'T', 'DEMO']);
   });
 });
+
+describe('allegati 4 e 4D del DPCM LEA: note del nomenclatore (D276)', () => {
+  const noteSheet = findTranscriptions(REGIONAL_TRANSCRIPTIONS).found.find(
+    (f) => f.path === 'lea/allegato-4-note.json',
+  )!;
+  const noteTable = readTable(readFileSync(noteSheet.csvPath), 'allegato-4-note.csv');
+  const notes = extractRecords(
+    mappingForTranscription(loadMappings(), 'note_prestazioni')!,
+    noteTable,
+  );
+  const byNational = new Map(notes.records.map((r) => [String(r.nationalCode), r]));
+
+  it('una scheda intera, da controllare, dal 30/10/2026, in una serie sua', () => {
+    expect(noteSheet.sheet).toMatchObject({
+      tipo: 'note_prestazioni',
+      serie: 'lea-note-nomenclatore',
+      in_vigore_dal: '2026-10-30',
+      controllato_da: null,
+    });
+    expect(noteSheet.sheet.solo_modifiche ?? false).toBe(false);
+  });
+
+  it('374 codici, una nota ciascuno: 221 condizioni di erogabilità e 153 indicazioni di appropriatezza', () => {
+    expect(notes.missingColumns).toEqual([]);
+    expect(notes.problems).toEqual([]);
+    expect(notes.records).toHaveLength(374);
+    expect(byNational.size).toBe(374);
+    const kinds = notes.records.map((r) => r.noteKind);
+    expect(kinds.filter((k) => k === 'condizione')).toHaveLength(221);
+    expect(kinds.filter((k) => k === 'appropriatezza')).toHaveLength(153);
+    expect(new Set(notes.records.map((r) => r.note)).size).toBe(112);
+  });
+
+  it('il testo come stampato nell’allegato 4D, con le righe unite', () => {
+    expect(byNational.get('22.71.1')).toMatchObject({
+      note: '2',
+      noteKind: 'condizione',
+      noteText: 'Generalità della popolazione',
+    });
+    expect(byNational.get('23.01')).toMatchObject({
+      note: '3',
+      noteText:
+        'A) 0-14 anni. B) Condizioni di vulnerabilità sanitaria; C) Condizioni di vulnerabilità sociale',
+    });
+    // Il rimando della nota 1 è il testo della nota.
+    expect(byNational.get('11.99.2')).toMatchObject({ note: '1', noteText: 'allegato 4 B' });
+    expect(notes.records.every((r) => !/\n|\s{2}/.test(String(r.noteText)))).toBe(true);
+  });
+
+  it('un tipo che non è «condizione» o «appropriatezza» è un problema, non una nota', () => {
+    const header = noteTable[0]!;
+    const bad = extractRecords(mappingForTranscription(loadMappings(), 'note_prestazioni')!, [
+      header,
+      header.map((h) =>
+        h === 'tipo_nota'
+          ? 'condizione di erogabilità'
+          : h === 'codice_nomenclatore'
+            ? '22.71.1'
+            : h === 'numero_nota'
+              ? '2'
+              : 'testo',
+      ),
+    ]);
+    expect(bad.records).toEqual([]);
+    expect(bad.problems.map((p) => p.field)).toEqual(['noteKind']);
+  });
+});

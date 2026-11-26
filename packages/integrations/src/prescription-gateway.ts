@@ -22,10 +22,36 @@ export interface PrescriptionLineMessage {
   /** Codice del nomenclatore, «codice DM» (codProdPrest; D154). */
   serviceNationalCode?: string | null;
   serviceDescription?: string | null;
+  /** numeroNota: il numero della nota del nomenclatore (DPCM LEA, allegato 4D; D276). */
+  serviceNote?: string | null;
+  /** Tipo della nota: dice se la lettera va in condErogabilita o in approprPrescrittiva. */
+  serviceNoteKind?: string | null;
+  /** La lettera della condizione di erogabilità o dell'indicazione di appropriatezza. */
+  serviceNoteLetter?: string | null;
+  /** numsedute: le sedute del ciclo, solo per le prestazioni a ciclo (D276). */
+  sessions?: number | null;
   quantity: number;
   aifaNote?: string | null;
+  /**
+   * «Per principio attivo» (caso A1 delle linee guida del Sistema TS): in ricetta il gruppo di
+   * equivalenza, senza l'AIC in codProdPrest. L'AIC resta qui solo per trovare il gruppo (D273).
+   */
+  byActiveIngredient?: boolean;
+  /** nonSost: il farmaco indicato con l'AIC non si sostituisce. */
   notSubstitutable?: boolean;
+  /**
+   * codMotivazione: il codice della motivazione di non sostituibilità, da 1 a 4 (linee guida del
+   * Sistema TS per la prescrizione del principio attivo, 3.1.3); va compilato se nonSost vale 1.
+   */
+  notSubstitutableCode?: string | null;
+  /** Precisazione scritta dal medico, facoltativa accanto al codice: va con le note (motivazNote). */
   notSubstitutableReason?: string | null;
+  /**
+   * Note della riga (motivazNote): per la terapia del dolore con gli stupefacenti posologia e
+   * telefono del medico, come vuole la «Nota STUP» delle specifiche del Sistema TS (D272). Vanno
+   * anche sul promemoria.
+   */
+  notes?: string | null;
   /**
    * Ricetta bianca ripetibile: quante volte e per quanti mesi, solo se diverso dalla regola del
    * farmaco (Disciplinare tecnico della ricetta bianca, 1/12/2022: numRipetibilita, validitaFarm).
@@ -38,6 +64,11 @@ export interface PrescriptionMessage {
   /** Identificativo della ricetta nel nostro database, per collegare la risposta. */
   localId: string;
   kind: 'pharma_ssn' | 'specialist_ssn' | 'white' | 'devices';
+  /**
+   * indicazionePrescr (IndicazionePrescr nella ricetta rossa): S suggerita, H ricovero, dalle
+   * schede delle terapie, solo se tutte le righe hanno la stessa; è il campo 14 del promemoria.
+   */
+  prescriptionIndication?: 'S' | 'H' | null;
   patientFiscalCode: string;
   /** Il medico che firma: le ricette sono sempre a nome suo (anche se sostituto). */
   doctor: {

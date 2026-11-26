@@ -33,11 +33,12 @@ const dest = process.argv[2];
 if (!dest) throw new Error('Indica il file da scrivere (.tar.gz)');
 
 /**
- * Le trascrizioni che la dimostrazione mostra prima del controllo, per cartella: i presidi del DPCM
- * LEA e il catalogo regionale (la versione intera della D.D. 590 e le due date della D.D. 710).
+ * Le trascrizioni che la dimostrazione mostra prima del controllo, per cartella: i presidi e le note
+ * del nomenclatore del DPCM LEA (D276) e il catalogo regionale (la versione intera della D.D. 590 e
+ * le due date della D.D. 710).
  */
 const UNCHECKED_TRANSCRIPTIONS = {
-  lea: ['allegato-2-ausili-monouso', 'allegato-3-presidi'],
+  lea: ['allegato-2-ausili-monouso', 'allegato-3-presidi', 'allegato-4-note'],
   piemonte_catalogo: [
     'dd590-2026-allegato-a',
     'dd710-2026-dal-2026-10-30',
@@ -158,7 +159,7 @@ try {
       transcriptionsDir: unchecked,
       mappings: loadMappings(),
       importedBy:
-        'dimostrazione nel browser (presidi del DPCM LEA e catalogo regionale, da controllare)',
+        'dimostrazione nel browser (presidi e note del nomenclatore del DPCM LEA e catalogo regionale, da controllare)',
     })),
   );
   const refused = report.filter((r) => r.outcome !== 'importato' && r.outcome !== 'gia_importato');

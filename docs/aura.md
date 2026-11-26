@@ -5,11 +5,22 @@ Collegamento del programma con AURA, l'anagrafe regionale degli assistiti del Pi
 ## Fonti
 
 - **Requisiti** (`docs/requisiti.md`): «Scelte e revoche, esenzioni: sincronizzate con l'anagrafe regionale (AURA)». Nella tabella dei collegamenti, AURA è un web service SOAP/XML, previsto nella prima versione. I servizi in tempo reale «si interrogano al momento».
-- **Manuale pubblico dei servizi di cooperazione**, AURA--ORG-01-V08 ([servizi.regione.piemonte.it/media/786](https://servizi.regione.piemonte.it/media/786/download)). Descrive tre servizi:
+- **Manuale pubblico dei servizi di cooperazione**, AURA--ORG-01-V08 ([servizi.regione.piemonte.it/media/786](https://servizi.regione.piemonte.it/media/786/download)). Descrive i servizi delle aziende sanitarie, che il simulatore di oggi imita:
   - ricerca «massiva» dei profili (FIND) per codice fiscale e altri dati, che dà gli identificativi AURA;
   - ricerca puntuale del profilo sanitario completo (GET) per identificativo AURA;
   - notifiche delle variazioni a un servizio dell'ente, per gli eventi sottoscritti presso il CSI. Nel servizio vero arrivano su un web service esposto sulla rete RUPAR, firmate con il certificato di AURA.
-- **Da avere dal CSI**: le specifiche di dettaglio (documenti AURA--SER-01, con WSDL e XSD), l'ambiente di prova, l'accesso alla RUPAR e gli eventi da sottoscrivere. Simone le ha chieste con la PEC del 19/11/2026, mandata al CSI e in copia alla Regione.
+
+  Per le cartelle di MMG e PLS il manuale rimanda a un «apposito documento» (§1, p. 2).
+
+- **Documenti dei servizi per i medici**, scaricati il 25/11/2026 dalla scheda AURA del portale degli operatori. Link e impronte sono in `docs/provenienze.md`. Sono quelli da usare quando il programma passa ai servizi per i medici (D266, D268), anche se una scheda non li elencasse (Simone, 25/11/2026):
+  - i cinque WSDL: RicercaAssistito, ListaAssistiti, ListaAssistitiEsenti, RicercaEsenzioniPato e RicercaEsenzioniRed;
+  - AURA--SER-01 V19 (servizi di ricerca) e V17 (notifica delle variazioni);
+  - AURA--LST-01 V05 (elenco degli eventi) e VU (elenco dei messaggi di errore);
+  - la nota AVL-17 (novembre 2013), che annuncia i servizi per i medici. Sono solo di interrogazione, con le credenziali individuali di ogni medico, da Internet. Le liste per medico vengono da una copia della base dati aggiornata ogni sera.
+- **Note di versione dopo la AVL-17**, dalla 18 alla 24 (2014–2020), nello zip della scheda: nessuna cambia i servizi per i medici. Per il programma contano due cose:
+  - la AVL-22 (gennaio 2017) ricorda che i client senza i certificati SHA-256 non si collegano più ai servizi in https: per il programma non cambia niente;
+  - con la AVL-24 (ottobre 2020) cognomi e nomi possono avere la virgola e il punto. Il programma li accetta; il codice fiscale conta solo le lettere, con la sua prova.
+- **Da avere dal CSI**: il documento che descrive i servizi per i medici, perché oggi i nomi dei campi vengono solo dai WSDL (confronto delle specifiche regionali, §3.1). Poi indirizzi e modo di autenticarsi, ambiente di prova, notifiche per una cartella in cloud. Le ultime tre domande sono nella mail del 25/11/2026, il documento è fra le domande nuove (`docs/avanzamento.md`). La PEC del 19/11/2026 chiedeva già specifiche, ambiente di prova, RUPAR ed eventi.
 
 ## Che cosa fa il programma
 

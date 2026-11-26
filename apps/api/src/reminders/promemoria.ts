@@ -13,6 +13,7 @@ import {
   therapy,
 } from '../db/schema';
 import { HttpError } from '../http/errors';
+import { prescriptionTypology } from '../prescriptions/typology';
 import { ReferenceData } from '../reference/lookup';
 
 /**
@@ -313,6 +314,11 @@ export async function buildPromemoriaData(
   patientAt?: PromemoriaPatient | null,
   /** Il medico del promemoria se la ricetta non è ancora firmata: l'anteprima (D253). */
   doctorId?: string,
+  /**
+   * La tipologia S o H partita con la ricetta (indicazionePrescr, D273); assente per le ricette
+   * partite prima, e allora si legge dalle terapie.
+   */
+  sentIndication?: 'S' | 'H' | null,
 ): Promise<PromemoriaDataV2> {
   const [row] = await db
     .select({ p: prescription, pt: patient, st: studio })
@@ -349,17 +355,14 @@ export async function buildPromemoriaData(
   const therapyIds = lines.map((l) => l.therapyId).filter((x): x is string => !!x);
   const therapies = therapyIds.length
     ? await db
-        .select({ id: therapy.id, s: therapy.suggestedS, h: therapy.hospitalH })
+        .select({ id: therapy.id, suggestedS: therapy.suggestedS, hospitalH: therapy.hospitalH })
         .from(therapy)
         .where(and(inArray(therapy.id, therapyIds), eq(therapy.patientId, pt.id)))
     : [];
-  // Campo 14, uno per ricetta: la tipologia c'è se tutte le prescrizioni la hanno uguale.
-  const typologies = lines.map((l) => {
-    const t = therapies.find((x) => x.id === l.therapyId);
-    return t?.s ? 'S' : t?.h ? 'H' : null;
-  });
+  // Campo 14, uno per ricetta: la tipologia c'è se tutte le prescrizioni la hanno uguale. Se la
+  // ricetta è partita con indicazionePrescr, vale quella partita (D273).
   const tipologia =
-    typologies.length && typologies.every((x) => x && x === typologies[0]) ? typologies[0]! : null;
+    sentIndication !== undefined ? sentIndication : prescriptionTypology(lines, therapies);
 
   const specialist = p.kind === 'specialist_ssn';
   const groups = specialist
@@ -376,14 +379,20 @@ export async function buildPromemoriaData(
       const nationalCode = sent?.[i]?.serviceNationalCode ?? l.serviceNationalCode;
       const codes = [nationalCode, l.serviceCode && `(${l.serviceCode})`].filter(Boolean).join(' ');
       const description = l.serviceDescription ?? '';
+      // 18A: tipologia di accesso e, per i cicli, «N.SEDUTE:» con le sedute partite con la ricetta
+      // (D276); ambulatorio, televisita e note del medico non sono nella ricetta.
+      const sessions = sent?.[i]?.sessions ?? l.sessions;
+      // 20: numero della nota, spazio, lettera della condizione o dell'indicazione (D276); il
+      // codice di patologia, nella riga sotto, non si compila. Senza nota «---».
+      const note = (sent?.[i]?.serviceNote ?? l.serviceNote)?.trim();
+      const letter = note ? (sent?.[i]?.serviceNoteLetter ?? l.serviceNoteLetter)?.trim() : null;
       return {
         // 17A: codice nomenclatore (codice catalogo) – descrizione del catalogo.
         prescrizione: [codes && description ? `${codes} – ${description}` : codes || description],
-        // 18A: tipologia di accesso; ambulatorio, televisita, note e sedute non sono nella ricetta.
-        dettagli: accessText,
+        dettagli:
+          [accessText, sessions ? `N.SEDUTE:${sessions}` : null].filter(Boolean).join('-') || null,
         quantita: l.quantity,
-        // 20: le note del DM 9/12/2015 non sono nella ricetta.
-        nota: NO_NOTE,
+        nota: note ? [note, letter].filter(Boolean).join(' ') : NO_NOTE,
       };
     }
     const group = l.drugAic ? (groups.get(l.drugAic) ?? null) : null;
@@ -393,11 +402,23 @@ export async function buildPromemoriaData(
     const prescrizione = l.byActiveIngredient
       ? [group ?? l.activeIngredient ?? l.drugName ?? l.drugAic ?? '']
       : [group, product ?? ''].filter((x): x is string => x !== null);
+    // Le note partite con la ricetta (motivazNote): per la terapia del dolore posologia e
+    // telefono del medico, che vanno stampati sul promemoria («Nota STUP», D272).
+    const notes = sent?.[i]?.notes?.trim() || null;
+    // «NON SOSTITUIBILE» e la motivazione «scritta o codificata» (specifiche di stampa, campo 18):
+    // il codice delle linee guida e, se c'è, la precisazione del medico (D273).
+    const notSubstitutable = l.notSubstitutable
+      ? [
+          NOT_SUBSTITUTABLE_TEXT,
+          l.notSubstitutableCode?.trim() ? `motivazione ${l.notSubstitutableCode.trim()}` : null,
+          l.notSubstitutableReason?.trim(),
+        ]
+          .filter(Boolean)
+          .join(' - ')
+      : null;
     return {
       prescrizione,
-      dettagli: l.notSubstitutable
-        ? [NOT_SUBSTITUTABLE_TEXT, l.notSubstitutableReason?.trim()].filter(Boolean).join(' - ')
-        : null,
+      dettagli: [notSubstitutable, notes].filter(Boolean).join(' · ') || null,
       quantita: l.quantity,
       nota: l.aifaNote?.trim() || NO_NOTE,
     };

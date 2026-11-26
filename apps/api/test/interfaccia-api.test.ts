@@ -11,6 +11,7 @@ import {
 import { withActor } from '../src/db/tx';
 import { startOfStudioDay } from '../src/http/today-routes';
 import { studioDate } from '../src/prescriptions/rules-check';
+import { middayOf } from './helpers/dates';
 import { createScenario, login, type Scenario } from './helpers/scenario';
 import { createTestDatabase, type TestDatabase } from './helpers/test-db';
 
@@ -25,11 +26,14 @@ describe('rotte per l’interfaccia: storico, cronologia, esami, oggi', () => {
   let secretary: string;
   let therapyId: string;
   let reservedId: string;
-  const today = studioDate(new Date());
+  // L'orologio del servizio sta a mezzogiorno di oggi, e «oggi» è lo stesso per la prova e per il
+  // servizio anche se il giro passa dalla mezzanotte (D203).
+  const clockAt = middayOf(new Date());
+  const today = studioDate(clockAt);
 
   beforeAll(async () => {
     t = await createTestDatabase();
-    s = await createScenario(t.db);
+    s = await createScenario(t.db, {}, { clockAt });
     doctor = await login(s, 'titolare');
     secretary = await login(s, 'segreteria');
     const rows = await t.db.select().from(therapy).where(eq(therapy.patientId, s.richPatient));
